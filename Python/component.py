@@ -5,6 +5,7 @@ from typing import Dict, List
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 Signal = QtCore.pyqtSignal
+Slot = QtCore.pyqtSlot
 
 # Ensure an application instance is running
 app = pg.mkQApp()
@@ -27,6 +28,7 @@ class Component(QtCore.QObject):
 
     self._boundPlt = pg.PlotDataItem([np.NaN, np.NaN], pen=pg.mkPen('b', width=5))
     self._boundPlt.curve.setClickable(True)
+    self._boundPlt.sigClicked.connect(self._rethrowCurveClicked)
 
 
     self._txtPlt = pg.LabelItem('N/A')
@@ -47,6 +49,10 @@ class Component(QtCore.QObject):
     for fn in pltUpdateFns:
       fn()
 
+  @Slot(object)
+  def _rethrowCurveClicked(self, curve: pg.PlotDataItem):
+    self.sigCompClicked.emit(self)
+
   def updateBoundPlt(self):
     self._boundPlt.setData(self.vertices)
 
@@ -57,7 +63,9 @@ class Component(QtCore.QObject):
     self._txtPlt.setPos(newPos[0] - 0.25*newSz[0]/2, newPos[1] - newSz[1]/2)
 
 
-class ComponentMgr():
+class ComponentMgr(QtCore.QObject):
+  sigCompClicked = Signal(object)
+
   _compList: List[Component] = []
   _nextCompId = 0
 
@@ -65,6 +73,7 @@ class ComponentMgr():
   _compImgView: pg.ViewBox
 
   def __init__(self, mainImgView: pg.ViewBox):
+    super().__init__()
     self._mainImgView = mainImgView
 
   def addComps(self, comps: List[Component]):
@@ -72,17 +81,17 @@ class ComponentMgr():
       comp.uid = self._nextCompId
       self._mainImgView.addItem(comp._boundPlt)
       self._mainImgView.addItem(comp._txtPlt)
-      comp._boundPlt.sigClicked.connect(lambda a: print('caught'))
 
-      # Listen for component signals
-      comp.sigCompClicked.connect(self.updateCompPlot)
+      # Listen for component signals and rethrow them
+      comp.sigCompClicked.connect(self._rethrowCompClick)
 
       self._compList.append(comp)
 
       self._nextCompId += 1
 
-  def updateCompPlot(self, newComp: Component):
-    pass
+  @Slot(object)
+  def _rethrowCompClick(self, comp:Component):
+    self.sigCompClicked.emit(comp)
 
 if __name__== '__main__':
   from PIL import Image

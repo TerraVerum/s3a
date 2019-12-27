@@ -16,6 +16,7 @@ import numpy as np
 from PIL import Image
 
 from skimage.morphology import dilation
+from skimage.segmentation import quickshift
 import cv2 as cv
 
 import os
@@ -64,6 +65,7 @@ class MainWindow(TemplateBaseClass):
     # COMPONENT MANAGER
     # ---------------
     self.compMgr = ComponentMgr(mainView)
+    self.compMgr.sigCompClicked.connect(self.updateCurComp)
 
     # ---------------
     # SIGNALS
@@ -94,6 +96,9 @@ class MainWindow(TemplateBaseClass):
       newComp.vertices = contour[:,0,:]
       components.append(newComp)
     self.compMgr.addComps(components)
+
+  def updateCurComp(self, newComp: Component):
+    newBBox = newComp._boundPlt.boundingRect()
 
 ## Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
