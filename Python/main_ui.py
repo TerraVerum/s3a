@@ -9,7 +9,7 @@ tools/rebuildUi.py script).
 """
 
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from pyqtgraph.Qt import QtCore, QtWidgets
 QInputDialog = QtWidgets.QInputDialog
 QSettings = QtCore.QSettings
 import numpy as np
