@@ -28,7 +28,7 @@ class Component(QtCore.QObject):
     self.notes = ''
     self.valid = False
 
-    self._boundPlt = ABBoundsItem([np.NaN, np.NaN], pen=pg.mkPen('b', width=5))
+    self._boundPlt = ABBoundsItem([np.NaN, np.NaN], pen=pg.mkPen('b', width=2))
 
     self._txtPlt = ABTextItem('N/A', color='y')
     self._txtPlt.sigClicked.connect(self._rethrowItemClicked)

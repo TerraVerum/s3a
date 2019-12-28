@@ -4,8 +4,11 @@ Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
 
 from contextlib import contextmanager
+from functools import wraps
 
 from typing import Union
+
+import numpy as np
 
 class TformHelper:
   def __init__(self, tformObj: Union[QtGui.QTransform,type(None)] = None):
@@ -23,13 +26,15 @@ def flipHorizontal(gItem: QtWidgets.QGraphicsItem):
   newTf = origTf.scale(1,-1)
   gItem.setTransform(newTf)
 
-@contextmanager
-def waitCursor():
-  try:
-    pg.QAPP.setOverrideCursor(QCursor(QtCore.Qt.WaitCursor))
-    yield
-  finally:
-    pg.QAPP.restoreOverrideCursor()
+def applyWaitCursor(func):
+  @wraps(func)
+  def wrapWithWaitCursor(*args, **kwargs):
+    try:
+      pg.QAPP.setOverrideCursor(QCursor(QtCore.Qt.WaitCursor))
+      return func(*args, **kwargs)
+    finally:
+      pg.QAPP.restoreOverrideCursor()
+  return wrapWithWaitCursor
 
 class ABTextItem(pg.TextItem):
   sigClicked = Signal()
@@ -45,12 +50,13 @@ class ABTextItem(pg.TextItem):
     self.setCursor(self.hoverCursor)
 
   def hoverLeaveEvent(self, ev):
-    self.setCursor(self.origCursor)
+    #self.setCursor(self.origCursor)
+    self.unsetCursor()
 
   def mousePressEvent(self, ev):
     self.sigClicked.emit()
 
-class ABBoundsItem(pg.PlotDataItem):
+class ABBoundsItem(pg.PolyLineROI):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self.curve.setClickable(True)
+  
