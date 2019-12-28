@@ -1,11 +1,13 @@
 from constants import ComponentTypes as ct
 import numpy as np
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
+
+from graphicshelpers import flipHorizontal
 
 # Ensure an application instance is running
 app = pg.mkQApp()
@@ -31,8 +33,9 @@ class Component(QtCore.QObject):
     self._boundPlt.sigClicked.connect(self._rethrowCurveClicked)
 
 
-    self._txtPlt = pg.LabelItem('N/A')
-
+    self._txtPlt = pg.TextItem('N/A', anchor=(0.5,0.5), color='y')
+    #flipHorizontal(self._txtPlt)
+    
     '''
     IMPORTANT!! Update this list as more properties / plots are added.
     '''
@@ -58,9 +61,9 @@ class Component(QtCore.QObject):
 
   def updateTxtPlt(self):
     self._txtPlt.setText(str(self.uid))
-    newSz = self._txtPlt.width(), self._txtPlt.height()
+    #newSz = self._txtPlt.width(), self._txtPlt.height()
     newPos = np.mean(self.vertices, axis=0)
-    self._txtPlt.setPos(newPos[0] - 0.25*newSz[0]/2, newPos[1] - newSz[1]/2)
+    self._txtPlt.setPos(newPos[0], newPos[1])
 
 
 class ComponentMgr(QtCore.QObject):
@@ -69,18 +72,18 @@ class ComponentMgr(QtCore.QObject):
   _compList: List[Component] = []
   _nextCompId = 0
 
-  _mainImgView: pg.ViewBox
+  _mainImgArea: pg.ViewBox
   _compImgView: pg.ViewBox
 
-  def __init__(self, mainImgView: pg.ViewBox):
+  def __init__(self, mainImgArea: pg.GraphicsWidget):
     super().__init__()
-    self._mainImgView = mainImgView
+    self._mainImgArea = mainImgArea
 
   def addComps(self, comps: List[Component]):
     for comp in comps:
       comp.uid = self._nextCompId
-      self._mainImgView.addItem(comp._boundPlt)
-      self._mainImgView.addItem(comp._txtPlt)
+      self._mainImgArea.addItem(comp._boundPlt)
+      self._mainImgArea.addItem(comp._txtPlt)
 
       # Listen for component signals and rethrow them
       comp.sigCompClicked.connect(self._rethrowCompClick)
@@ -88,6 +91,20 @@ class ComponentMgr(QtCore.QObject):
       self._compList.append(comp)
 
       self._nextCompId += 1
+      
+  def rmComps(self, idList: Union[List[int], str] = 'all'):
+    newCompList = []
+    if idList == 'all':
+      idList = [obj.uid for obj in self._compList]
+    # Take each requested component off the main image and remove from list
+    for ii, comp in enumerate(self._compList):
+      if comp.uid in idList:
+        [self._mainImgArea.removeItem(plt) for plt in (comp._boundPlt, comp._txtPlt)]
+      else:
+        newCompList.append(comp)
+    self._compList = newCompList
+      
+    
 
   @Slot(object)
   def _rethrowCompClick(self, comp:Component):
