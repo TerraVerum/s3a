@@ -7,7 +7,7 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
-from graphicshelpers import flipHorizontal
+from graphicshelpers import ABBoundsItem, ABTextItem
 
 # Ensure an application instance is running
 app = pg.mkQApp()
@@ -28,14 +28,11 @@ class Component(QtCore.QObject):
     self.notes = ''
     self.valid = False
 
-    self._boundPlt = pg.PlotDataItem([np.NaN, np.NaN], pen=pg.mkPen('b', width=5))
-    self._boundPlt.curve.setClickable(True)
-    self._boundPlt.sigClicked.connect(self._rethrowCurveClicked)
+    self._boundPlt = ABBoundsItem([np.NaN, np.NaN], pen=pg.mkPen('b', width=5))
 
+    self._txtPlt = ABTextItem('N/A', color='y')
+    self._txtPlt.sigClicked.connect(self._rethrowItemClicked)
 
-    self._txtPlt = pg.TextItem('N/A', anchor=(0.5,0.5), color='y')
-    #flipHorizontal(self._txtPlt)
-    
     '''
     IMPORTANT!! Update this list as more properties / plots are added.
     '''
@@ -52,8 +49,8 @@ class Component(QtCore.QObject):
     for fn in pltUpdateFns:
       fn()
 
-  @Slot(object)
-  def _rethrowCurveClicked(self, curve: pg.PlotDataItem):
+  @Slot()
+  def _rethrowItemClicked(self):
     self.sigCompClicked.emit(self)
 
   def updateBoundPlt(self):
@@ -91,7 +88,7 @@ class ComponentMgr(QtCore.QObject):
       self._compList.append(comp)
 
       self._nextCompId += 1
-      
+
   def rmComps(self, idList: Union[List[int], str] = 'all'):
     newCompList = []
     if idList == 'all':
@@ -103,8 +100,8 @@ class ComponentMgr(QtCore.QObject):
       else:
         newCompList.append(comp)
     self._compList = newCompList
-      
-    
+
+
 
   @Slot(object)
   def _rethrowCompClick(self, comp:Component):
@@ -112,18 +109,17 @@ class ComponentMgr(QtCore.QObject):
 
 if __name__== '__main__':
   from PIL import Image
-  mw = pg.GraphicsView()
-  mainView = pg.ViewBox(lockAspect=True)
+  mw = pg.PlotWindow()
   item = pg.ImageItem(np.array(Image.open('../fast.tif')))
-  mainView.addItem(item)
-  mw.setCentralItem(mainView)
+  mw.addItem(item)
+  mw.setAspectLocked(True)
   mw.show()
 
   c = Component()
   c.vertices = np.random.randint(0,100,size=(10,2))
   c.uid = 5
   c.boardText = 'test'
-  mgr = ComponentMgr(mainView)
+  mgr = ComponentMgr(mw)
   mgr.addComps([c])
 
   app.exec()

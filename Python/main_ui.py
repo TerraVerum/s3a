@@ -9,17 +9,20 @@ tools/rebuildUi.py script).
 """
 
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtWidgets
+from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 QInputDialog = QtWidgets.QInputDialog
 QSettings = QtCore.QSettings
+QIntValidator = QtGui.QIntValidator
+QDoubleValidator = QtGui.QDoubleValidator
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
 import numpy as np
 from PIL import Image
-from skimage.morphology import dilation
-from skimage.segmentation import quickshift
 import cv2 as cv
+
+from processing import getComps, segmentComp
+from graphicshelpers import waitCursor
 
 import os
 from component import Component, ComponentMgr
@@ -33,7 +36,7 @@ class MainWindow(TemplateBaseClass):
   def __init__(self):
     # Configure pg to correctly read image dimensions
     pg.setConfigOption('imageAxisOrder', 'row-major')
-    
+
     TemplateBaseClass.__init__(self)
     #self.setWindowTitle('pyqtgraph example: Qt Designer')
 
@@ -50,7 +53,6 @@ class MainWindow(TemplateBaseClass):
     item.setZValue(-100)
     self.ui.mainImg.addItem(item)
     self.ui.mainImg.setAspectLocked(True)
-
     self.mainImgItem = item
 
     # ---------------
@@ -59,9 +61,16 @@ class MainWindow(TemplateBaseClass):
     item = pg.ImageItem(np.array(0.).reshape((1,1)))
     self.ui.compImg.addItem(item)
     self.ui.compImg.setAspectLocked(True)
-
-    self.compImg = {};
     self.compImgItem = item
+
+    # ---------------
+    # INPUT VALIDATORS
+    # ---------------
+    intVdtr = QIntValidator()
+    floatVdtr = QDoubleValidator()
+    self.ui.marginEdit.setValidator(intVdtr)
+    self.ui.segThreshEdit.setValidator(floatVdtr)
+    self.ui.seedThreshEdit.setValidator(floatVdtr)
 
     # ---------------
     # COMPONENT MANAGER
@@ -85,35 +94,42 @@ class MainWindow(TemplateBaseClass):
     if len(fname) > 0:
       newIm = np.array(Image.open(fname))
       self.resetMainImg(newIm)
-    
+
   @Slot()
   def estBoundsBtnClicked(self):
-    sampleComps = np.zeros(self.mainImgItem.image.shape[0:2], dtype='bool')
-    sampleComps[[100, 200], [75, 75]] = True
-    sampleComps = dilation(sampleComps, np.ones((25, 75)))
-    contours, _ = cv.findContours(sampleComps.astype('uint8'), cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
-    components = []
-    for contour in contours:
-      newComp = Component()
-      newComp.vertices = contour[:,0,:]
-      components.append(newComp)
-    self.compMgr.addComps(components)
-    
+    with waitCursor():
+      sampleComps = getComps(self.mainImgItem.image)
+      contours, _ = cv.findContours(sampleComps.astype('uint8'), cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
+      components = []
+      for contour in contours:
+        newComp = Component()
+        newComp.vertices = contour[:,0,:]
+        components.append(newComp)
+      self.compMgr.addComps(components)
+
   @Slot()
   def clearBoudnsBtnClicked(self):
     self.compMgr.rmComps()
 
   def updateCurComp(self, newComp: Component):
-    mainImg = self.mainImgItem.image
-    
-    bbox = np.vstack((newComp.vertices.min(0),
-          newComp.vertices.max(0)))
-    newCompImg = mainImg[bbox[0,1]:bbox[1,1], bbox[0,0]:bbox[1,0],:]
-    self.compImgItem.setImage(newCompImg)
-    
-    
+    with waitCursor():
+      mainImg = self.mainImgItem.image
+      margin = int(self.ui.marginEdit.text())
+
+      bbox = np.vstack((newComp.vertices.min(0),
+            newComp.vertices.max(0)))
+      # Account for margins
+      for ii in range(2):
+        bbox[0,ii] = np.maximum(0, bbox[0,ii]-margin)
+        bbox[1,ii] = np.minimum(mainImg.shape[1-ii], bbox[1,ii]+margin)
+
+      newCompImg = mainImg[bbox[0,1]:bbox[1,1], bbox[0,0]:bbox[1,0],:]
+      segImg = segmentComp(newCompImg, float(self.ui.segThreshEdit.text()))
+      self.compImgItem.setImage(segImg)
+
+
   def resetMainImg(self, newIm: np.array):
-    self.mainImg['item'].setImage(newIm)  
+    self.mainImg['item'].setImage(newIm)
 
 ## Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
