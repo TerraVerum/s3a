@@ -1,15 +1,7 @@
 # -*- coding: utf-8 -*-
-"""
-Simple example of loading UI template created with Qt Designer.
 
-This example uses uic.loadUiType to parse and load the ui at runtime. It is also
-possible to pre-compile the .ui file using pyuic (see VideoSpeedTest and
-ScatterPlotSpeedTest examples; these .ui files have been compiled with the
-tools/rebuildUi.py script).
-"""
-#import PySide2
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
+from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
 QInputDialog = QtWidgets.QInputDialog
 QSettings = QtCore.QSettings
 QIntValidator = QtGui.QIntValidator
@@ -33,25 +25,18 @@ from glob import glob
 from functools import partial
 from component import Component, ComponentMgr
 
-## Define main window class from template
-path = os.path.dirname(os.path.abspath(__file__))
-uiFile = os.path.join(path, 'imgAnnotator.ui')
-WindowTemplate, TemplateBaseClass = pg.Qt.loadUiType(uiFile)
+# Configure pg to correctly read image dimensions
+pg.setConfigOptions(imageAxisOrder='row-major')
 
-class MainWindow(TemplateBaseClass):
+class MainWindow(QtWidgets.QMainWindow):
   # Alerts GUI that a layout (either new or overwriting old) was saved
   sigLayoutSaved = Signal()
 
   def __init__(self):
-    # Configure pg to correctly read image dimensions
-    pg.setConfigOptions(imageAxisOrder='row-major')
-
-    TemplateBaseClass.__init__(self)
-    #self.setWindowTitle('pyqtgraph example: Qt Designer')
-
-    # Create the main window
-    self.ui = WindowTemplate()
-    self.ui.setupUi(self)
+    super().__init__()
+    uiPath = os.path.dirname(os.path.abspath(__file__))
+    uiFile = os.path.join(uiPath, 'imgAnnotator.ui')
+    uic.loadUi(uiFile, self)
 
     # Flesh out pg components
     # ---------------
@@ -61,8 +46,8 @@ class MainWindow(TemplateBaseClass):
     item = pg.ImageItem(imgArray)
     # Ensure image will remain in background of window
     item.setZValue(-100)
-    self.ui.mainImg.addItem(item)
-    self.ui.mainImg.setAspectLocked(True)
+    self.mainImg.addItem(item)
+    self.mainImg.setAspectLocked(True)
     self.mainImgItem = item
 
     # ---------------
@@ -70,14 +55,14 @@ class MainWindow(TemplateBaseClass):
     # ---------------
     intVdtr = QIntValidator()
     floatVdtr = QDoubleValidator()
-    self.ui.marginEdit.setValidator(intVdtr)
-    self.ui.segThreshEdit.setValidator(floatVdtr)
-    self.ui.seedThreshEdit.setValidator(floatVdtr)
+    self.marginEdit.setValidator(intVdtr)
+    self.segThreshEdit.setValidator(floatVdtr)
+    self.seedThreshEdit.setValidator(floatVdtr)
 
     # ---------------
     # COMPONENT MANAGER
     # ---------------
-    self.compMgr = ComponentMgr(self.ui.mainImg)
+    self.compMgr = ComponentMgr(self.mainImg)
     self.compMgr.sigCompClicked.connect(self.updateCurComp)
 
     # ---------------
@@ -92,16 +77,16 @@ class MainWindow(TemplateBaseClass):
     # UI ELEMENT SIGNALS
     # ---------------
     # Buttons
-    self.ui.newImgBtn.clicked.connect(self.newImgBtnClicked)
-    self.ui.estBoundsBtn.clicked.connect(self.estBoundsBtnClicked)
-    self.ui.clearBoundsBtn.clicked.connect(self.clearBoudnsBtnClicked)
+    self.newImgBtn.clicked.connect(self.newImgBtnClicked)
+    self.estBoundsBtn.clicked.connect(self.estBoundsBtnClicked)
+    self.clearBoundsBtn.clicked.connect(self.clearBoudnsBtnClicked)
 
     # Menu options
-    self.ui.saveLayout.triggered.connect(self.saveLayoutActionTriggered)
+    self.saveLayout.triggered.connect(self.saveLayoutActionTriggered)
     self.sigLayoutSaved.connect(self.populateLoadLayoutOptions)
 
   def populateLoadLayoutOptions(self):
-    layoutMenu = self.ui.loadLayout
+    layoutMenu = self.loadLayout
     # Remove existing menus so only the current file system setup is in place
     for action in layoutMenu.children():
       layoutMenu.removeAction(action)
@@ -167,10 +152,10 @@ class MainWindow(TemplateBaseClass):
   @applyWaitCursor
   def updateCurComp(self, newComp: Component):
     mainImg = self.mainImgItem.image
-    margin = int(self.ui.marginEdit.text())
-    segThresh = float(self.ui.segThreshEdit.text())
+    margin = int(self.marginEdit.text())
+    segThresh = float(self.segThreshEdit.text())
 
-    self.ui.compImg.update(mainImg, newComp, margin, segThresh)
+    self.compImg.update(mainImg, newComp, margin, segThresh)
 
   def resetMainImg(self, newIm: np.array):
     self.mainImgItem.setImage(newIm)
