@@ -7,7 +7,7 @@ possible to pre-compile the .ui file using pyuic (see VideoSpeedTest and
 ScatterPlotSpeedTest examples; these .ui files have been compiled with the
 tools/rebuildUi.py script).
 """
-import PySide2
+#import PySide2
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 QInputDialog = QtWidgets.QInputDialog
@@ -25,7 +25,7 @@ import numpy as np
 from PIL import Image
 import cv2 as cv
 
-from processing import getComps, segmentComp
+from processing import getComps
 from graphicshelpers import applyWaitCursor
 
 import os
@@ -41,10 +41,10 @@ WindowTemplate, TemplateBaseClass = pg.Qt.loadUiType(uiFile)
 class MainWindow(TemplateBaseClass):
   # Alerts GUI that a layout (either new or overwriting old) was saved
   sigLayoutSaved = Signal()
-  
+
   def __init__(self):
     # Configure pg to correctly read image dimensions
-    pg.setConfigOption(imageAxisOrder='row-major')
+    pg.setConfigOptions(imageAxisOrder='row-major')
 
     TemplateBaseClass.__init__(self)
     #self.setWindowTitle('pyqtgraph example: Qt Designer')
@@ -57,20 +57,13 @@ class MainWindow(TemplateBaseClass):
     # ---------------
     # MAIN IMAGE
     # ---------------
-    item = pg.ImageItem(np.array(Image.open('../fast.tif')), axisOrder='row-major')
+    imgArray = np.array(Image.open('../fast.tif'))
+    item = pg.ImageItem(imgArray)
     # Ensure image will remain in background of window
     item.setZValue(-100)
     self.ui.mainImg.addItem(item)
     self.ui.mainImg.setAspectLocked(True)
     self.mainImgItem = item
-
-    # ---------------
-    # COMPONENT IMAGE
-    # ---------------
-    item = pg.ImageItem(np.array(0.).reshape((1,1)))
-    self.ui.compImg.addItem(item)
-    self.ui.compImg.setAspectLocked(True)
-    self.compImgItem = item
 
     # ---------------
     # INPUT VALIDATORS
@@ -86,7 +79,7 @@ class MainWindow(TemplateBaseClass):
     # ---------------
     self.compMgr = ComponentMgr(self.ui.mainImg)
     self.compMgr.sigCompClicked.connect(self.updateCurComp)
-    
+
     # ---------------
     # LOAD LAYOUT OPTIONS
     # ---------------
@@ -102,11 +95,11 @@ class MainWindow(TemplateBaseClass):
     self.ui.newImgBtn.clicked.connect(self.newImgBtnClicked)
     self.ui.estBoundsBtn.clicked.connect(self.estBoundsBtnClicked)
     self.ui.clearBoundsBtn.clicked.connect(self.clearBoudnsBtnClicked)
-    
+
     # Menu options
     self.ui.saveLayout.triggered.connect(self.saveLayoutActionTriggered)
     self.sigLayoutSaved.connect(self.populateLoadLayoutOptions)
-    
+
   def populateLoadLayoutOptions(self):
     layoutMenu = self.ui.loadLayout
     # Remove existing menus so only the current file system setup is in place
@@ -120,7 +113,7 @@ class MainWindow(TemplateBaseClass):
       name = name[0:name.rfind('.')]
       curAction = layoutMenu.addAction(name)
       curAction.triggered.connect(partial(self.loadLayoutActionTriggered, name))
-    
+
 
   @Slot()
   def newImgBtnClicked(self):
@@ -148,13 +141,13 @@ class MainWindow(TemplateBaseClass):
   @applyWaitCursor
   def clearBoudnsBtnClicked(self):
     self.compMgr.rmComps()
-    
+
   @Slot()
   def loadLayoutActionTriggered(self, layoutName):
     with open(f'./Layouts/{layoutName}.dockstate', 'rb') as savedSettings:
       dockStates = pkl.load(savedSettings)
     self.restoreState(dockStates)
-  
+
   @Slot()
   def saveLayoutActionTriggered(self):
     dockStates = self.saveState()
@@ -169,22 +162,15 @@ class MainWindow(TemplateBaseClass):
       with open(f'./Layouts/{saveName}.dockstate', 'wb') as saveFile:
         pkl.dump(dockStates, saveFile)
     self.sigLayoutSaved.emit()
-      
+
+  @Slot(object)
   @applyWaitCursor
   def updateCurComp(self, newComp: Component):
     mainImg = self.mainImgItem.image
     margin = int(self.ui.marginEdit.text())
+    segThresh = float(self.ui.segThreshEdit.text())
 
-    bbox = np.vstack((newComp.vertices.min(0),
-          newComp.vertices.max(0)))
-    # Account for margins
-    for ii in range(2):
-      bbox[0,ii] = np.maximum(0, bbox[0,ii]-margin)
-      bbox[1,ii] = np.minimum(mainImg.shape[1-ii], bbox[1,ii]+margin)
-
-    newCompImg = mainImg[bbox[0,1]:bbox[1,1], bbox[0,0]:bbox[1,0],:]
-    segImg = segmentComp(newCompImg, float(self.ui.segThreshEdit.text()))
-    self.compImgItem.setImage(segImg)
+    self.ui.compImg.update(mainImg, newComp, margin, segThresh)
 
   def resetMainImg(self, newIm: np.array):
     self.mainImgItem.setImage(newIm)

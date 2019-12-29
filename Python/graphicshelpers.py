@@ -6,6 +6,8 @@ QCursor = QtGui.QCursor
 from contextlib import contextmanager
 from functools import wraps
 
+from processing import segmentComp
+
 from typing import Union
 
 import numpy as np
@@ -56,7 +58,48 @@ class ABTextItem(pg.TextItem):
   def mousePressEvent(self, ev):
     self.sigClicked.emit()
 
-class ABBoundsItem(pg.PolyLineROI):
+class ImageROISuite(pg.PlotWidget):
+  # Import here to resolve cyclic dependence
+  from component import Component
+
+  compImgItem: pg.ImageItem
+  regionImgItem: pg.PlotDataItem
+
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-  
+    self.setAspectLocked(True)
+
+    self.compImgItem = pg.ImageItem()
+    self.addItem(self.compImgItem)
+
+    self.region = pg.PolyLineROI([], closed=True)
+    self.addItem(self.region)
+
+  def setImage(self, image=None, autoLevels=None):
+    return self.compImgItem.setImage(image, autoLevels)
+
+  def update(self, mainImg: np.array, newComp:Component,
+             margin: int, segThresh: float):
+    offset = self._updateImg_getOffset(mainImg, newComp, margin, segThresh)
+    self._updateRegion(newComp, offset)
+
+  def _updateImg_getOffset(self, mainImg, newComp, margin, segThresh) -> np.array:
+    bbox = np.vstack((newComp.vertices.min(0),
+          newComp.vertices.max(0)))
+    # Account for margins
+    for ii in range(2):
+      bbox[0,ii] = np.maximum(0, bbox[0,ii]-margin)
+      bbox[1,ii] = np.minimum(mainImg.shape[1-ii], bbox[1,ii]+margin)
+
+    newCompImg = mainImg[bbox[0,1]:bbox[1,1], bbox[0,0]:bbox[1,0],:]
+    segImg = segmentComp(newCompImg, segThresh)
+    self.setImage(segImg)
+    # Return offset so polygons can be swapped between this
+    # component image and the main image
+    return bbox[0,:]
+
+  def _updateRegion(self, newComp: Component, offset: np.array):
+    # Subtract offset from vertices so they are in reference to
+    # (0,0) on the component image
+    newVerts = newComp.vertices - offset
+    self.region.setPoints([vert for vert in newVerts], closed=True)
