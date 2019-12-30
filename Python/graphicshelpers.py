@@ -11,6 +11,7 @@ from processing import segmentComp
 from typing import Union
 
 import numpy as np
+import cv2 as cv
 
 class TformHelper:
   def __init__(self, tformObj: Union[QtGui.QTransform,type(None)] = None):
@@ -58,7 +59,7 @@ class ABTextItem(pg.TextItem):
   def mousePressEvent(self, ev):
     self.sigClicked.emit()
 
-class ImageROISuite(pg.PlotWidget):
+class FocusedComp(pg.PlotWidget):
   # Import here to resolve cyclic dependence
   from component import Component
 
@@ -69,7 +70,7 @@ class ImageROISuite(pg.PlotWidget):
     self.compImgItem = pg.ImageItem()
     self.addItem(self.compImgItem)
 
-    self.region = pg.PlotDataItem([], pen=pg.mkPen('b', width=2))
+    self.region = pg.ImageItem()
     self.addItem(self.region)
 
   def setImage(self, image=None, autoLevels=None):
@@ -77,10 +78,9 @@ class ImageROISuite(pg.PlotWidget):
 
   def update(self, mainImg: np.array, newComp:Component,
              margin: int, segThresh: float):
-    offset = self._updateImg_getOffset(mainImg, newComp, margin, segThresh)
-    self._updateRegion(newComp, offset)
-
-  def _updateImg_getOffset(self, mainImg, newComp, margin, segThresh) -> np.array:
+    # --------
+    # Update background image
+    # --------
     bbox = np.vstack((newComp.vertices.min(0),
           newComp.vertices.max(0)))
     # Account for margins
@@ -91,12 +91,14 @@ class ImageROISuite(pg.PlotWidget):
     newCompImg = mainImg[bbox[0,1]:bbox[1,1], bbox[0,0]:bbox[1,0],:]
     segImg = segmentComp(newCompImg, segThresh)
     self.setImage(segImg)
-    # Return offset so polygons can be swapped between this
-    # component image and the main image
-    return bbox[0,:]
 
-  def _updateRegion(self, newComp: Component, offset: np.array):
-    # Subtract offset from vertices so they are in reference to
-    # (0,0) on the component image
-    newVerts = newComp.vertices - offset
-    self.region.setData(newVerts)
+    # --------
+    # Update image making up the region
+    # --------
+    offset = bbox[0,:]
+    vertices = newComp.vertices - offset
+    region = np.zeros(segImg.shape, dtype='uint8')
+    cv.fillPoly(region, [vertices], (0,255,0))
+    alpha = region[:,:,1].copy()//4
+    alpha[vertices[:,1], vertices[:,0]] = 255
+    self.region.setImage(np.concatenate((region, alpha[:,:,None]), axis=2))

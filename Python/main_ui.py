@@ -9,15 +9,12 @@ QDoubleValidator = QtGui.QDoubleValidator
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
-from inspect import getmembers
-
 import pickle as pkl
 
 import numpy as np
 from PIL import Image
-import cv2 as cv
 
-from processing import getComps
+from processing import getCompBounds
 from graphicshelpers import applyWaitCursor
 
 import os
@@ -72,7 +69,6 @@ class MainWindow(QtWidgets.QMainWindow):
     # Start with docks in default position
     self.loadLayoutActionTriggered('Default')
 
-
     # ---------------
     # UI ELEMENT SIGNALS
     # ---------------
@@ -113,12 +109,11 @@ class MainWindow(QtWidgets.QMainWindow):
   @Slot()
   @applyWaitCursor
   def estBoundsBtnClicked(self):
-    sampleComps = getComps(self.mainImgItem.image)
-    contours, _ = cv.findContours(sampleComps.astype('uint8'), cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
+    compVertices = getCompBounds(self.mainImgItem.image)
     components = []
-    for contour in contours:
+    for verts in compVertices:
       newComp = Component()
-      newComp.vertices = contour[:,0,:]
+      newComp.vertices = verts
       components.append(newComp)
     self.compMgr.addComps(components)
 
