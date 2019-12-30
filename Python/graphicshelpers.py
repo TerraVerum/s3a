@@ -59,6 +59,32 @@ class ABTextItem(pg.TextItem):
   def mousePressEvent(self, ev):
     self.sigClicked.emit()
 
+class ClickableImageItem(pg.ImageItem):
+  sigClicked = Signal(object)
+
+  def mouseClickEvent(self, ev):
+    if ev.button() == QtCore.Qt.LeftButton:
+      self.sigClicked.emit(ev)
+      return
+
+class SaveablePolyROI(pg.PolyLineROI):
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    # Force new menu options
+    self.getMenu()
+
+  def getMenu(self, *args, **kwargs):
+    '''
+    Adds context menu option to add current ROI area to existing region
+    '''
+    if self.menu is None:
+      menu = super().getMenu()
+      addAct = QtGui.QAction("Add to Region", menu)
+      menu.addAction(addAct)
+      self.addAct = addAct
+      self.menu = menu
+    return self.menu
+
 class FocusedComp(pg.PlotWidget):
   # Import here to resolve cyclic dependence
   from component import Component
@@ -67,13 +93,44 @@ class FocusedComp(pg.PlotWidget):
     super().__init__(*args, **kwargs)
     self.setAspectLocked(True)
 
-    self.compImgItem = pg.ImageItem()
+    self.compImgItem = ClickableImageItem()
     self.addItem(self.compImgItem)
 
     self.region = pg.ImageItem()
     self.addItem(self.region)
 
+    self.interactor = SaveablePolyROI([], pen=(6,9), closed=False, removable=True)
+    self.addItem(self.interactor)
+
+    # Remove points when user asks to delete polygon
+    self.interactor.sigRemoveRequested.connect(self.interactor.clearPoints)
+    # Expand current mask by region on request
+    self.interactor.addAct.triggered.connect(self._addRoiToRegion)
+
+    self.compImgItem.sigClicked.connect(self.compImageClicked)
+
+  def compImageClicked(self, ev: QtWidgets.QGraphicsSceneMouseEvent):
+    # Capture clicks for ROI if component is present
+    if self.compImgItem.image is None:
+      return
+    newVert = ev.pos()
+    # Account for moved ROI
+    newVert.setX(newVert.x() - self.interactor.x())
+    newVert.setY(newVert.y() - self.interactor.y())
+    # If enough points exist and new point is 'close' to origin,
+    # consider the ROI complete
+    handles = self.interactor.handles
+    lastPos = handles[-1]['pos'] if len(handles) > 2 else None
+    if lastPos is not None and abs(lastPos.x() - newVert.x()) < 5 \
+                           and abs(lastPos.y() - newVert.y()) < 5:
+      self.interactor.addAct.triggered.emit()
+    else:
+      # Add point as normal
+      prevVerts = [handle['pos'] for handle in handles]
+      self.interactor.setPoints(prevVerts + [newVert])
+
   def setImage(self, image=None, autoLevels=None):
+    self.interactor.clearPoints()
     return self.compImgItem.setImage(image, autoLevels)
 
   def update(self, mainImg: np.array, newComp:Component,
@@ -102,3 +159,8 @@ class FocusedComp(pg.PlotWidget):
     alpha = region[:,:,1].copy()//4
     alpha[vertices[:,1], vertices[:,0]] = 255
     self.region.setImage(np.concatenate((region, alpha[:,:,None]), axis=2))
+
+  def _addRoiToRegion(self):
+    roiArea = self.interactor.getArrayRegion(self.region.image, self.compImgItem)
+    breakp = 1
+    breakp2 = 2
