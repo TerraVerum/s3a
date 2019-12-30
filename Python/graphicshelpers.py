@@ -62,9 +62,6 @@ class ImageROISuite(pg.PlotWidget):
   # Import here to resolve cyclic dependence
   from component import Component
 
-  compImgItem: pg.ImageItem
-  regionImgItem: pg.PlotDataItem
-
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self.setAspectLocked(True)
@@ -72,7 +69,7 @@ class ImageROISuite(pg.PlotWidget):
     self.compImgItem = pg.ImageItem()
     self.addItem(self.compImgItem)
 
-    self.region = pg.PolyLineROI([], closed=True)
+    self.region = pg.PlotDataItem([], pen=pg.mkPen('b', width=2))
     self.addItem(self.region)
 
   def setImage(self, image=None, autoLevels=None):
@@ -102,4 +99,4 @@ class ImageROISuite(pg.PlotWidget):
     # Subtract offset from vertices so they are in reference to
     # (0,0) on the component image
     newVerts = newComp.vertices - offset
-    self.region.setPoints([vert for vert in newVerts], closed=True)
+    self.region.setData(newVerts)
