@@ -14,7 +14,7 @@ import pickle as pkl
 import numpy as np
 from PIL import Image
 
-from processing import getCompBounds
+from processing import getBwComps, getVertsFromBwComps
 from graphicshelpers import applyWaitCursor
 
 import os
@@ -109,7 +109,7 @@ class MainWindow(QtWidgets.QMainWindow):
   @Slot()
   @applyWaitCursor
   def estBoundsBtnClicked(self):
-    compVertices = getCompBounds(self.mainImgItem.image)
+    compVertices = getVertsFromBwComps(getBwComps(self.mainImgItem.image))
     components = []
     for verts in compVertices:
       newComp = Component()

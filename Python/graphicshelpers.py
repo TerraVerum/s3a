@@ -6,7 +6,7 @@ QCursor = QtGui.QCursor
 from contextlib import contextmanager
 from functools import wraps
 
-from processing import segmentComp
+from processing import segmentComp, getVertsFromBwComps
 
 from typing import Union
 
@@ -84,6 +84,21 @@ class SaveablePolyROI(pg.PolyLineROI):
       self.addAct = addAct
       self.menu = menu
     return self.menu
+  
+  def getImgMask(self, imgItem: pg.ImageItem):
+    imgMask = np.zeros(imgItem.image.shape[0:2], dtype='bool')
+    roiSlices,_ = self.getArraySlice(imgMask, imgItem)
+    # TODO: Clip regions that extend beyond image dimensions
+    roiSz = [curslice.stop - curslice.start for curslice in roiSlices]
+    # renderShapeMask takes width, height args. roiSlices has row/col sizes,
+    # so switch this order when passing to renderShapeMask
+    roiSz = roiSz[::-1]
+    roiMask = self.renderShapeMask(*roiSz).astype('uint8')
+    # Also, the return value for renderShapeMask is given in col-major form.
+    # Transpose this, since all other data is in row-major.
+    roiMask = roiMask.T
+    imgMask[roiSlices[0], roiSlices[1]] = roiMask
+    return imgMask
 
 class FocusedComp(pg.PlotWidget):
   # Import here to resolve cyclic dependence
@@ -97,6 +112,10 @@ class FocusedComp(pg.PlotWidget):
     self.addItem(self.compImgItem)
 
     self.region = pg.ImageItem()
+    # Default LUT is green with alpha at interior
+    self.setRegionLUT(np.array([[0,0,0,0],
+                                [0,255,0,70],
+                                [0,255,0,255]]))
     self.addItem(self.region)
 
     self.interactor = SaveablePolyROI([], pen=(6,9), closed=False, removable=True)
@@ -108,6 +127,11 @@ class FocusedComp(pg.PlotWidget):
     self.interactor.addAct.triggered.connect(self._addRoiToRegion)
 
     self.compImgItem.sigClicked.connect(self.compImageClicked)
+    
+  def setRegionLUT(self, lutArr:np.array):
+    # Define LUT that properly colors vertices and interior of region
+    cmap = pg.ColorMap([0,1,2], lutArr)
+    self.region.setLookupTable(cmap.getLookupTable(0,2,nPts=3,alpha=True))
 
   def compImageClicked(self, ev: QtWidgets.QGraphicsSceneMouseEvent):
     # Capture clicks for ROI if component is present
@@ -138,6 +162,14 @@ class FocusedComp(pg.PlotWidget):
     # --------
     # Update background image
     # --------
+    offset = self._updateCompImg(mainImg, newComp, margin, segThresh)
+
+    # --------
+    # Update image making up the region
+    # --------
+    self._updateRegion(newComp.vertices, offset)
+    
+  def _updateCompImg(self, mainImg, newComp, margin, segThresh):
     bbox = np.vstack((newComp.vertices.min(0),
           newComp.vertices.max(0)))
     # Account for margins
@@ -148,19 +180,22 @@ class FocusedComp(pg.PlotWidget):
     newCompImg = mainImg[bbox[0,1]:bbox[1,1], bbox[0,0]:bbox[1,0],:]
     segImg = segmentComp(newCompImg, segThresh)
     self.setImage(segImg)
-
-    # --------
-    # Update image making up the region
-    # --------
-    offset = bbox[0,:]
-    vertices = newComp.vertices - offset
-    region = np.zeros(segImg.shape, dtype='uint8')
-    cv.fillPoly(region, [vertices], (0,255,0))
-    alpha = region[:,:,1].copy()//4
-    alpha[vertices[:,1], vertices[:,0]] = 255
-    self.region.setImage(np.concatenate((region, alpha[:,:,None]), axis=2))
+    return bbox[0,:]
+  
+  def _updateRegion(self, newVerts, offset):
+    newImgShape = self.compImgItem.image.shape
+    vertices = newVerts - offset
+    regionData = np.zeros(newImgShape[0:2], dtype='uint8')
+    cv.fillPoly(regionData, [vertices], 1)
+    # Make vertices full brightness
+    regionData[vertices[:,1], vertices[:,0]] = 2
+    self.region.setImage(regionData)
 
   def _addRoiToRegion(self):
-    roiArea = self.interactor.getArrayRegion(self.region.image, self.compImgItem)
-    breakp = 1
-    breakp2 = 2
+    imgMask = self.interactor.getImgMask(self.compImgItem)
+    newRegion = np.bitwise_or(imgMask, self.region.image)
+    newVerts = getVertsFromBwComps(newRegion)
+    # TODO: Handle case of poly not intersecting existing region
+    newVerts = newVerts[0]
+    # Update region expects xy vertices
+    self._updateRegion(newVerts, [0,0])
