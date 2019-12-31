@@ -6,7 +6,8 @@ QCursor = QtGui.QCursor
 from contextlib import contextmanager
 from functools import wraps
 
-from processing import segmentComp, getVertsFromBwComps
+from processing import segmentComp, getVertsFromBwComps, growSeedpoint
+from skimage.morphology import closing
 
 from typing import Union
 
@@ -84,7 +85,7 @@ class SaveablePolyROI(pg.PolyLineROI):
       self.addAct = addAct
       self.menu = menu
     return self.menu
-  
+
   def getImgMask(self, imgItem: pg.ImageItem):
     imgMask = np.zeros(imgItem.image.shape[0:2], dtype='bool')
     roiSlices,_ = self.getArraySlice(imgMask, imgItem)
@@ -127,7 +128,7 @@ class FocusedComp(pg.PlotWidget):
     self.interactor.addAct.triggered.connect(self._addRoiToRegion)
 
     self.compImgItem.sigClicked.connect(self.compImageClicked)
-    
+
   def setRegionLUT(self, lutArr:np.array):
     # Define LUT that properly colors vertices and interior of region
     cmap = pg.ColorMap([0,1,2], lutArr)
@@ -168,7 +169,7 @@ class FocusedComp(pg.PlotWidget):
     # Update image making up the region
     # --------
     self._updateRegion(newComp.vertices, offset)
-    
+
   def _updateCompImg(self, mainImg, newComp, margin, segThresh):
     bbox = np.vstack((newComp.vertices.min(0),
           newComp.vertices.max(0)))
@@ -181,7 +182,7 @@ class FocusedComp(pg.PlotWidget):
     segImg = segmentComp(newCompImg, segThresh)
     self.setImage(segImg)
     return bbox[0,:]
-  
+
   def _updateRegion(self, newVerts, offset):
     newImgShape = self.compImgItem.image.shape
     vertices = newVerts - offset
@@ -197,5 +198,7 @@ class FocusedComp(pg.PlotWidget):
     newVerts = getVertsFromBwComps(newRegion)
     # TODO: Handle case of poly not intersecting existing region
     newVerts = newVerts[0]
-    # Update region expects xy vertices
     self._updateRegion(newVerts, [0,0])
+    # Now that the ROI was added to the region, remove it
+    self.interactor.clearPoints()
+

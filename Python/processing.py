@@ -1,7 +1,7 @@
 import numpy as np
 import cv2 as cv
 
-from skimage.morphology import closing
+from skimage.morphology import closing, dilation
 from skimage.morphology import disk
 from skimage.segmentation import quickshift
 
@@ -30,3 +30,56 @@ def segmentComp(compImg: np.array, maxDist: np.float) -> np.array:
     curmask = segImg == label
     outImg[curmask,:] = compImg[curmask,:].reshape(-1,3).mean(0)
   return outImg
+
+def growSeedpoint(img: np.array, seeds: np.array, thresh: float) -> np.array:
+  '''
+  Starting from *seed*, fills each connected pixel if the difference between
+  neighboring pixels and the current component is less than *thresh*.
+  Places one 'on' pixel in each seed location, rerunning the algorithm for each
+  new seed. **Note**: only one label is  generated for each call to this
+  function. I.e. if multiple seeds are specified, they are assumed to belong
+  to the same label.
+
+  Parameters
+  ----------
+  img :    MxNxChan
+    Input image
+
+  seeds :  Mx2 np array
+    Contains locations in output mask that are 'on'
+    at the start of the algorithm. Pixels connected to these are
+    iteratively added to the components if their intensities are
+    close enough to each seed component.
+
+  thresh : float
+    Threshold between component and neighbors. If neighbor pixels
+    are below this value, they are added to the seed component.
+  '''
+  bwOut = np.zeros(img.shape[0:2], dtype=bool)
+  nChans = img.shape[2] if len(img.shape) > 2 else 1
+  # Computationally cheaper to compare square of thresh instead of using
+  # euclidean distance
+  thresh = thresh**2
+  for seed in seeds:
+    bwOut[seed[0], seed[1]] = True
+    changed = True
+    while changed:
+      neighbors = dilation(bwOut, np.ones((3,3)))
+      neighbors[bwOut] = False
+      compMean = img[bwOut,:].reshape(-1,nChans).mean(0)
+      # Add neighbor pixels close to this mean value
+      valsAtNeighbors = img[neighbors,:].reshape(-1,nChans)
+      diffFromMean = ((valsAtNeighbors-compMean)**2).sum(1)
+      # Invalidate idxs not passing the threshold
+      nbrIdxs = np.nonzero(neighbors)
+      invalidIdxs = []
+      for idxList in nbrIdxs:
+        idxList = idxList[diffFromMean >= thresh]
+        invalidIdxs.append(idxList)
+      neighbors[invalidIdxs[0], invalidIdxs[1]] = False
+      newBwOut = bwOut | neighbors
+      changed = np.any(newBwOut != bwOut)
+      bwOut = newBwOut
+  return bwOut
+
+
