@@ -15,7 +15,7 @@ import numpy as np
 from PIL import Image
 
 from processing import getBwComps, getVertsFromBwComps
-from graphicshelpers import applyWaitCursor
+from graphicshelpers import applyWaitCursor, dialogSaveToFile
 
 import os
 from glob import glob
@@ -158,16 +158,7 @@ class MainWindow(QtWidgets.QMainWindow):
   @Slot()
   def saveLayoutActionTriggered(self):
     dockStates = self.saveState()
-    saveName, ok = QtWidgets.QInputDialog() \
-    .getText(self, 'Layout Name', 'Layout Name:', QtWidgets.QLineEdit.Normal)
-    if ok:
-      # Prevent overwriting default layout
-      if saveName.lower() == 'default':
-        QtGui.QMessageBox().information(self, 'Error During Save',
-                    'Cannot overwrite default layout.', QtGui.QMessageBox.Ok)
-        return
-      with open(f'./Layouts/{saveName}.dockstate', 'wb') as saveFile:
-        pkl.dump(dockStates, saveFile)
+    dialogSaveToFile(self, dockStates, 'Layout Name', './Layouts/', 'dockstate')
     self.sigLayoutSaved.emit()
 
   @Slot(object)
