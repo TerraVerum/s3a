@@ -3,32 +3,16 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
 
-from contextlib import contextmanager
 from functools import wraps
 
 from processing import segmentComp, getVertsFromBwComps, growSeedpoint
 from skimage.morphology import closing
 
-from typing import Union
-
 import numpy as np
 import cv2 as cv
 
-class TformHelper:
-  def __init__(self, tformObj: Union[QtGui.QTransform,type(None)] = None):
-    self.matValList = []
-    for ii in range(1,4):
-      for jj in range(1,4):
-        initialVal = getattr(tformObj, f'm{ii}{jj}', lambda: None)()
-        setattr(self, f'm{ii}{jj}', initialVal)
-  def getTransform(self) -> QtGui.QTransform:
-    matEls = [getattr(self, f'm{ii}{jj}') for ii in range(1,4) for jj in range(1,4)]
-    return QtGui.QTransform(*matEls)
-
-def flipHorizontal(gItem: QtWidgets.QGraphicsItem):
-  origTf = gItem.transform()
-  newTf = origTf.scale(1,-1)
-  gItem.setTransform(newTf)
+# Must import everything to avoid cyclic dependency
+from component import Component
 
 def applyWaitCursor(func):
   @wraps(func)
@@ -102,12 +86,16 @@ class SaveablePolyROI(pg.PolyLineROI):
     return imgMask
 
 class FocusedComp(pg.PlotWidget):
-  # Import here to resolve cyclic dependence
-  from component import Component
-
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self.setAspectLocked(True)
+
+    self.comp = Component()
+
+    self.bbox = np.zeros((2,2), dtype='int32')
+
+    # Items directly updated from the gui
+    self.seedThresh = 0.
 
     self.compImgItem = ClickableImageItem()
     self.addItem(self.compImgItem)
@@ -135,10 +123,25 @@ class FocusedComp(pg.PlotWidget):
     self.region.setLookupTable(cmap.getLookupTable(0,2,nPts=3,alpha=True))
 
   def compImageClicked(self, ev: QtWidgets.QGraphicsSceneMouseEvent):
-    # Capture clicks for ROI if component is present
+    # Capture clicks only if component is present
     if self.compImgItem.image is None:
       return
-    newVert = ev.pos()
+    # TODO: Expand to include ROI, superpixel, etc.
+    # y -> row, x -> col
+    newVert = np.round(np.array([[ev.pos().y(), ev.pos().x()]], dtype='int32'))
+    newArea = growSeedpoint(self.compImgItem.image, newVert, self.seedThresh).astype('uint8')
+    newArea |= self.region.image
+    newArea = closing(newArea, np.ones((5,5)))
+    # TODO: handle case of multiple regions existing after click. For now, just use
+    # the largest
+    vertsPerComp = getVertsFromBwComps(newArea)
+    vertsToUse = np.array([])
+    for verts in vertsPerComp:
+      if verts.shape[0] > vertsToUse.shape[0]:
+        vertsToUse = verts
+    self.updateRegion(vertsToUse, [0,0])
+
+  def addRoiVertex(self, newVert: QtCore.QPointF):
     # Account for moved ROI
     newVert.setX(newVert.x() - self.interactor.x())
     newVert.setY(newVert.y() - self.interactor.y())
@@ -158,38 +161,43 @@ class FocusedComp(pg.PlotWidget):
     self.interactor.clearPoints()
     return self.compImgItem.setImage(image, autoLevels)
 
-  def update(self, mainImg: np.array, newComp:Component,
+  def updateAll(self, mainImg: np.array, newComp:Component,
              margin: int, segThresh: float):
-    # --------
-    # Update background image
-    # --------
-    offset = self._updateCompImg(mainImg, newComp, margin, segThresh)
 
-    # --------
-    # Update image making up the region
-    # --------
-    self._updateRegion(newComp.vertices, offset)
+    self.comp = newComp
+    self.updateBbox(mainImg.shape, newComp, margin)
+    self.updateCompImg(mainImg, segThresh)
+    self.updateRegion(newComp.vertices)
 
-  def _updateCompImg(self, mainImg, newComp, margin, segThresh):
+  def updateBbox(self, mainImgShape, newComp, margin):
     bbox = np.vstack((newComp.vertices.min(0),
           newComp.vertices.max(0)))
     # Account for margins
     for ii in range(2):
       bbox[0,ii] = np.maximum(0, bbox[0,ii]-margin)
-      bbox[1,ii] = np.minimum(mainImg.shape[1-ii], bbox[1,ii]+margin)
+      bbox[1,ii] = np.minimum(mainImgShape[1-ii], bbox[1,ii]+margin)
+    self.bbox = bbox
 
-    newCompImg = mainImg[bbox[0,1]:bbox[1,1], bbox[0,0]:bbox[1,0],:]
+  def updateCompImg(self, mainImg, segThresh, bbox=None):
+    if bbox is None:
+      bbox = self.bbox
+    newCompImg = mainImg[self.bbox[0,1]:self.bbox[1,1],
+                         self.bbox[0,0]:self.bbox[1,0],
+                         :]
     segImg = segmentComp(newCompImg, segThresh)
     self.setImage(segImg)
-    return bbox[0,:]
 
-  def _updateRegion(self, newVerts, offset):
+  def updateRegion(self, newVerts, offset=None):
+    if offset is None:
+      offset = self.bbox[0,:]
     newImgShape = self.compImgItem.image.shape
-    vertices = newVerts - offset
     regionData = np.zeros(newImgShape[0:2], dtype='uint8')
-    cv.fillPoly(regionData, [vertices], 1)
-    # Make vertices full brightness
-    regionData[vertices[:,1], vertices[:,0]] = 2
+    # No need to look for polygons if vertices are empty
+    if newVerts.shape[0] > 0:
+      vertices = newVerts - offset
+      cv.fillPoly(regionData, [vertices], 1)
+      # Make vertices full brightness
+      regionData[vertices[:,1], vertices[:,0]] = 2
     self.region.setImage(regionData)
 
   def _addRoiToRegion(self):

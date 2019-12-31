@@ -75,7 +75,15 @@ class MainWindow(QtWidgets.QMainWindow):
     # Buttons
     self.newImgBtn.clicked.connect(self.newImgBtnClicked)
     self.estBoundsBtn.clicked.connect(self.estBoundsBtnClicked)
-    self.clearBoundsBtn.clicked.connect(self.clearBoudnsBtnClicked)
+    self.clearBoundsBtn.clicked.connect(self.clearBoundsBtnClicked)
+    self.clearRegionBtn.clicked.connect(self.clearRegionBtnClicked)
+    self.resetRegionBtn.clicked.connect(self.resetRegionBtnClicked)
+
+    # Edit fields
+    self.seedThreshEdit.editingFinished.connect(self.seedThreshChanged)
+    # Note: This signal must be false-triggered on startup to propagate
+    # the field's initial value
+    self.seedThreshEdit.editingFinished.emit()
 
     # Menu options
     self.saveLayout.triggered.connect(self.saveLayoutActionTriggered)
@@ -95,6 +103,25 @@ class MainWindow(QtWidgets.QMainWindow):
       curAction = layoutMenu.addAction(name)
       curAction.triggered.connect(partial(self.loadLayoutActionTriggered, name))
 
+  @Slot()
+  def clearRegionBtnClicked(self):
+    # Reset drawn comp vertices to nothing
+    # Only perform action if image currently exists
+    if self.compImg.compImgItem.image is None:
+      return
+    self.compImg.updateRegion(np.zeros((0,2)))
+
+  @Slot()
+  def resetRegionBtnClicked(self):
+    # Reset drawn comp vertices to nothing
+    # Only perform action if image currently exists
+    if self.compImg.compImgItem.image is None:
+      return
+    self.compImg.updateRegion(self.compImg.comp.vertices)
+
+  @Slot()
+  def seedThreshChanged(self):
+    self.compImg.seedThresh = np.float(self.seedThreshEdit.text())
 
   @Slot()
   def newImgBtnClicked(self):
@@ -119,7 +146,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
   @Slot()
   @applyWaitCursor
-  def clearBoudnsBtnClicked(self):
+  def clearBoundsBtnClicked(self):
     self.compMgr.rmComps()
 
   @Slot()
@@ -150,7 +177,7 @@ class MainWindow(QtWidgets.QMainWindow):
     margin = int(self.marginEdit.text())
     segThresh = float(self.segThreshEdit.text())
 
-    self.compImg.update(mainImg, newComp, margin, segThresh)
+    self.compImg.updateAll(mainImg, newComp, margin, segThresh)
 
   def resetMainImg(self, newIm: np.array):
     self.mainImgItem.setImage(newIm)

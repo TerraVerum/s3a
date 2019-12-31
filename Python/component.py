@@ -7,7 +7,7 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
-from graphicshelpers import ABTextItem
+import graphicshelpers
 
 # Ensure an application instance is running
 app = pg.mkQApp()
@@ -29,7 +29,7 @@ class Component(QtCore.QObject):
     self.valid = False
 
     self._boundPlt = pg.PlotDataItem([np.NaN, np.NaN], pen=pg.mkPen('b', width=2))
-    self._txtPlt = ABTextItem('N/A', color='y')
+    self._txtPlt = graphicshelpers.ABTextItem('N/A', color='y')
     self._txtPlt.sigClicked.connect(self._rethrowItemClicked)
 
     '''
