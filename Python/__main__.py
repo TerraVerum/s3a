@@ -1,6 +1,6 @@
 import pyqtgraph as pg
 
-from main_ui import MainWindow
+from MainWindow import MainWindow
 
 ## Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
