@@ -132,8 +132,9 @@ class ComponentMgr(QtCore.QObject):
     newCompList = newCompList[validIdxs]
     self._mainImgArea.clear()
     self._mainImgArea.addItem(self._mainImgItem)
-    if idList.size > 0:
-      self._nextCompId = np.max(idList) + 1
+    newIdList = np.array([comp.instanceId for comp in newCompList])
+    if newIdList.size > 0:
+      self._nextCompId = np.max(newIdList) + 1
     else:
       self._nextCompId = 0
     self.addComps(list(newCompList))
