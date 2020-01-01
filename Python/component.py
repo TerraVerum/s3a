@@ -3,7 +3,7 @@ import numpy as np
 from typing import Dict, List, Union
 
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from pyqtgraph.Qt import QtCore
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 

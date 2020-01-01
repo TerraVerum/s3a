@@ -11,11 +11,6 @@ from os import path
 from glob import glob
 from functools import partial
 
-import numpy as np
-import cv2 as cv
-
-from constants import SchemeValues as SV
-
 def applyWaitCursor(func):
   @wraps(func)
   def wrapWithWaitCursor(*args, **kwargs):
@@ -34,9 +29,9 @@ def dialogSaveToFile(parent, saveObj, winTitle, saveDir, saveExt, allowOverwrite
     returnVal = saveName
     # Prevent overwriting default layout
     if not allowOverwriteDefault and saveName.lower() == 'default':
-      QtGui.QMessageBox().information(parent, f'Error During Save',
+      QtWidgets.QMessageBox().information(parent, f'Error During Save',
                   'Cannot overwrite default setting.\n\'Default\' is automatically'
-                  ' generated, so it should not be modified.', QtGui.QMessageBox.Ok)
+                  ' generated, so it should not be modified.', QtWidgets.QMessageBox.Ok)
       return None
     else:
       with open(f'{saveDir}{saveName}.{saveExt}', 'wb') as saveFile:
@@ -54,7 +49,7 @@ def attemptLoadSettings(fpath, openMode='rb'):
     pklObj = pkl.load(curFile)
     curFile.close()
   except IOError as err:
-    QtGui.QErrorMessage().showMessage(f'Settings could not be loaded.\n'
+    QtWidgets.QErrorMessage().showMessage(f'Settings could not be loaded.\n'
                                       f'Error: {err}')
   finally:
     return pklObj
