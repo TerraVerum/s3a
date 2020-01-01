@@ -35,7 +35,8 @@ class VertexRegion(pg.ImageItem):
   def embedMaskInImg(self, toEmbedShape: Tuple[int, int]):
     outImg = np.zeros(toEmbedShape, dtype=bool)
     selfShape = self.image.shape
-    embedSlices = [slice(self.offset[ii], selfShape[ii]+self.offset[ii]) for ii in range(2)]
+    # Offset is x-y, shape is row-col. So, swap order of offset relative to current axis
+    embedSlices = [slice(self.offset[1-ii], selfShape[ii]+self.offset[1-ii]) for ii in range(2)]
     outImg[embedSlices[0], embedSlices[1]] = self.image
     return outImg
 
