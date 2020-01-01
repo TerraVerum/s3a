@@ -2,8 +2,12 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui
 
 import numpy as np
+import cv2 as cv
+
+from typing import Tuple
 
 from SchemeEditor import SchemeEditor
+from constants import SchemeValues as SV
 
 class VertexRegion(pg.ImageItem):
   scheme = None
@@ -13,18 +17,27 @@ class VertexRegion(pg.ImageItem):
 
     self.offset = [0,0]
 
-  def updateRegion(self, newVerts):
+  def updateVertices(self, newVerts):
+    if newVerts.shape[0] == 0:
+      # No need to look for polygons if vertices are empty
+      self.setImage(np.zeros((1,1), dtype='uint8'))
+      return
     self.offset = newVerts.min(0)
     newVerts -= self.offset
     newImgShape = (newVerts.max(0)+1)[::-1]
     regionData = np.zeros(newImgShape, dtype='uint8')
-    # No need to look for polygons if vertices are empty
-    if newVerts.shape[0] > 0:
-      cv.fillPoly(regionData, [newVerts], 1)
-      # Make vertices full brightness
-      regionData[newVerts[:,1], newVerts[:,0]] = 2
+    cv.fillPoly(regionData, [newVerts], 1)
+    # Make vertices full brightness
+    regionData[newVerts[:,1], newVerts[:,0]] = 2
     self.setImage(regionData, levels=[0,2], lut=self.getLUTFromScheme())
     self.setPos(*self.offset)
+
+  def embedMaskInImg(self, toEmbedShape: Tuple[int, int]):
+    outImg = np.zeros(toEmbedShape, dtype=bool)
+    selfShape = self.image.shape
+    embedSlices = [slice(self.offset[ii], selfShape[ii]+self.offset[ii]) for ii in range(2)]
+    outImg[embedSlices[0], embedSlices[1]] = self.image
+    return outImg
 
   @staticmethod
   def getLUTFromScheme():

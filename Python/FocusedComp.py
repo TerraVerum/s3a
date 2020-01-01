@@ -7,15 +7,12 @@ from processing import segmentComp, getVertsFromBwComps, growSeedpoint
 from skimage.morphology import closing
 
 import numpy as np
-import cv2 as cv
 
 from ABGraphics.clickables import ClickableImageItem
 from ABGraphics.regions import VertexRegion, SaveablePolyROI
 from component import *
 from SchemeEditor import SchemeEditor
 from constants import SchemeValues as SV
-
-from typing import List
 
 class FocusedComp(pg.PlotWidget):
   scheme = SchemeEditor()
@@ -55,7 +52,7 @@ class FocusedComp(pg.PlotWidget):
     # y -> row, x -> col
     newVert = np.round(np.array([[ev.pos().y(), ev.pos().x()]], dtype='int32'))
     newArea = growSeedpoint(self.compImgItem.image, newVert, self.seedThresh).astype('uint8')
-    newArea |= self.region.image
+    newArea |= self.region.embedMaskInImg(newArea.shape)
     newArea = closing(newArea, np.ones((5,5)))
     # TODO: handle case of multiple regions existing after click. For now, just use
     # the largest
@@ -115,15 +112,8 @@ class FocusedComp(pg.PlotWidget):
   def updateRegion(self, newVerts, offset=None):
     if offset is None:
       offset = self.bbox[0,:]
-    newImgShape = self.compImgItem.image.shape
-    regionData = np.zeros(newImgShape[0:2], dtype='uint8')
-    # No need to look for polygons if vertices are empty
-    if newVerts.shape[0] > 0:
-      vertices = newVerts - offset
-      cv.fillPoly(regionData, [vertices], 1)
-      # Make vertices full brightness
-      regionData[vertices[:,1], vertices[:,0]] = 2
-    self.region.setImage(regionData, levels=[0,2], lut=self.getLUTFromScheme())
+    compCenteredVertices = newVerts - offset
+    self.region.updateVertices(compCenteredVertices)
 
   def _addRoiToRegion(self):
     imgMask = self.interactor.getImgMask(self.compImgItem)
