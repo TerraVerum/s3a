@@ -11,8 +11,14 @@ import cv2 as cv
 
 from graphicshelpers import ClickableImageItem, SaveablePolyROI
 from component import *
+from SchemeEditor import SchemeEditor
+from constants import SchemeValues as SV
+
+from typing import List
 
 class FocusedComp(pg.PlotWidget):
+  scheme = SchemeEditor()
+
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self.setAspectLocked(True)
@@ -28,10 +34,6 @@ class FocusedComp(pg.PlotWidget):
     self.addItem(self.compImgItem)
 
     self.region = pg.ImageItem()
-    # Default LUT is green with alpha at interior
-    self.setRegionLUT(np.array([[0,0,0,0],
-                                [0,255,0,70],
-                                [0,255,0,255]]))
     self.addItem(self.region)
 
     self.interactor = SaveablePolyROI([], pen=(6,9), closed=False, removable=True)
@@ -43,11 +45,6 @@ class FocusedComp(pg.PlotWidget):
     self.interactor.addAct.triggered.connect(self._addRoiToRegion)
 
     self.compImgItem.sigClicked.connect(self.compImageClicked)
-
-  def setRegionLUT(self, lutArr:np.array):
-    # Define LUT that properly colors vertices and interior of region
-    cmap = pg.ColorMap([0,1,2], lutArr)
-    self.region.setLookupTable(cmap.getLookupTable(0,2,nPts=3,alpha=True))
 
   def compImageClicked(self, ev: QtWidgets.QGraphicsSceneMouseEvent):
     # Capture clicks only if component is present
@@ -125,7 +122,7 @@ class FocusedComp(pg.PlotWidget):
       cv.fillPoly(regionData, [vertices], 1)
       # Make vertices full brightness
       regionData[vertices[:,1], vertices[:,0]] = 2
-    self.region.setImage(regionData)
+    self.region.setImage(regionData, levels=[0,2], lut=self.getLUTFromScheme())
 
   def _addRoiToRegion(self):
     imgMask = self.interactor.getImgMask(self.compImgItem)
@@ -133,6 +130,23 @@ class FocusedComp(pg.PlotWidget):
     newVerts = getVertsFromBwComps(newRegion)
     # TODO: Handle case of poly not intersecting existing region
     newVerts = newVerts[0]
-    self._updateRegion(newVerts, [0,0])
+    self.updateRegion(newVerts, [0,0])
     # Now that the ROI was added to the region, remove it
     self.interactor.clearPoints()
+
+  @staticmethod
+  def setScheme(scheme: SchemeEditor):
+    FocusedComp.scheme = scheme
+
+  @staticmethod
+  def getLUTFromScheme():
+    fillClr, vertClr = FocusedComp.scheme.getFocImgProps((SV.foc_fillColor, SV.foc_vertColor))
+    lut = [(0,0,0,0)]
+    for clr in fillClr, vertClr:
+      lut.append(clr.getRgb())
+    return np.array(lut, dtype='uint8')
+
+  #def setRegionLUT(self, lutArr:np.array):
+    ## Define LUT that properly colors vertices and interior of region
+    #cmap = pg.ColorMap([0,1,2], lutArr)
+    #self.region.setLookupTable(cmap.getLookupTable(0,2,nPts=3,alpha=True))

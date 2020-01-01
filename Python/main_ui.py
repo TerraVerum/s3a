@@ -3,9 +3,6 @@
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
 QInputDialog = QtWidgets.QInputDialog
-QSettings = QtCore.QSettings
-QIntValidator = QtGui.QIntValidator
-QDoubleValidator = QtGui.QDoubleValidator
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
@@ -15,11 +12,10 @@ import numpy as np
 from PIL import Image
 
 from processing import getBwComps, getVertsFromBwComps
-from graphicshelpers import applyWaitCursor, dialogSaveToFile
+from graphicshelpers import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, attemptLoadSettings
+from SchemeEditor import SchemeEditor
 
 import os
-from glob import glob
-from functools import partial
 from component import Component, ComponentMgr
 
 # Configure pg to correctly read image dimensions
@@ -50,17 +46,11 @@ class MainWindow(QtWidgets.QMainWindow):
     # ---------------
     # INPUT VALIDATORS
     # ---------------
-    intVdtr = QIntValidator()
-    floatVdtr = QDoubleValidator()
+    intVdtr = QtGui.QIntValidator()
+    floatVdtr = QtGui.QDoubleValidator()
     self.marginEdit.setValidator(intVdtr)
     self.segThreshEdit.setValidator(floatVdtr)
     self.seedThreshEdit.setValidator(floatVdtr)
-
-    # ---------------
-    # COMPONENT MANAGER
-    # ---------------
-    self.compMgr = ComponentMgr(self.mainImg)
-    self.compMgr.sigCompClicked.connect(self.updateCurComp)
 
     # ---------------
     # LOAD LAYOUT OPTIONS
@@ -68,6 +58,24 @@ class MainWindow(QtWidgets.QMainWindow):
     self.populateLoadLayoutOptions()
     # Start with docks in default position
     self.loadLayoutActionTriggered('Default')
+
+    # ---------------
+    # LOAD SCHEME OPTIONS
+    # ---------------
+    self.scheme = SchemeEditor()
+    self.populateSchemeOptions()
+
+    # ---------------
+    # COMPONENT MANAGER
+    # ---------------
+    Component.setScheme(self.scheme)
+    self.compMgr = ComponentMgr(self.mainImg)
+    self.compMgr.sigCompClicked.connect(self.updateCurComp)
+
+    # ---------------
+    # FOCUSED COMPONENT IMAGE
+    # ---------------
+    self.compImg.setScheme(self.scheme)
 
     # ---------------
     # UI ELEMENT SIGNALS
@@ -89,19 +97,47 @@ class MainWindow(QtWidgets.QMainWindow):
     self.saveLayout.triggered.connect(self.saveLayoutActionTriggered)
     self.sigLayoutSaved.connect(self.populateLoadLayoutOptions)
 
+    self.newScheme.triggered.connect(self.scheme.show)
+
+    # Scheme editor
+    self.scheme.sigSchemeSaved.connect(self.populateSchemeOptions)
+    # When a new scheme is created, switch to that scheme
+    self.scheme.sigSchemeSaved.connect(self.loadSchemeActionTriggered)
+
   def populateLoadLayoutOptions(self):
-    layoutMenu = self.loadLayout
-    # Remove existing menus so only the current file system setup is in place
-    for action in layoutMenu.children():
-      layoutMenu.removeAction(action)
-    layouts = glob('./Layouts/*.dockstate')
-    for layout in layouts:
-      # glob returns entire filepath, so keep only filename as layout name
-      name = os.path.basename(layout)
-      # Also strip file extension
-      name = name[0:name.rfind('.')]
-      curAction = layoutMenu.addAction(name)
-      curAction.triggered.connect(partial(self.loadLayoutActionTriggered, name))
+    addDirItemsToMenu(self.loadLayout, './Layouts/*.dockstate', self.loadLayoutActionTriggered)
+
+  @Slot(str)
+  def loadLayoutActionTriggered(self, layoutName):
+    dockStates = attemptLoadSettings(f'./Layouts/{layoutName}.dockstate')
+    if dockStates is not None:
+      self.restoreState(dockStates)
+
+  def populateSchemeOptions(self, newSchemeName=None):
+    # We don't want all menu children to be removed, since this would also remove the 'add scheme' and
+    # separator options. So, do this step manually. Remove all actions after the separator
+    encounteredSep = False
+    for ii, action in enumerate(self.appearanceMenu.children()):
+      if encounteredSep:
+        self.appearanceMenu.removeAction(action)
+      elif action.isSeparator():
+        encounteredSep = True
+    addDirItemsToMenu(self.appearanceMenu, './Schemes/*.scheme',
+                      self.loadSchemeActionTriggered, removeExistingChildren=False)
+
+  @Slot(str)
+  def loadSchemeActionTriggered(self, schemeName):
+    schemeDict = attemptLoadSettings(f'./Schemes/{schemeName}.scheme')
+    if schemeDict is None:
+      return
+    # ---------
+    # COMPONENTS DRAWN ON MAIN IMAGE
+    # ---------
+    self.scheme.loadScheme(schemeDict)
+    self.compImg.setScheme(self.scheme)
+    QtWidgets.QMessageBox().information(self, 'Scheme Updated',
+                'Scheme updated. Changes will take effect in future operations.',
+                QtGui.QMessageBox.Ok)
 
   @Slot()
   def clearRegionBtnClicked(self):
@@ -148,12 +184,6 @@ class MainWindow(QtWidgets.QMainWindow):
   @applyWaitCursor
   def clearBoundsBtnClicked(self):
     self.compMgr.rmComps()
-
-  @Slot()
-  def loadLayoutActionTriggered(self, layoutName):
-    with open(f'./Layouts/{layoutName}.dockstate', 'rb') as savedSettings:
-      dockStates = pkl.load(savedSettings)
-    self.restoreState(dockStates)
 
   @Slot()
   def saveLayoutActionTriggered(self):

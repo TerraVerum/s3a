@@ -1,4 +1,4 @@
-from constants import ComponentTypes as ct
+from constants import ComponentTypes
 import numpy as np
 from typing import Dict, List, Union
 
@@ -8,6 +8,8 @@ Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
 import graphicshelpers
+from SchemeEditor import SchemeEditor
+from constants import SchemeValues as SV
 
 # Ensure an application instance is running
 app = pg.mkQApp()
@@ -17,19 +19,28 @@ class Component(QtCore.QObject):
 
   sigCompClicked = Signal(object)
 
+  scheme = SchemeEditor()
+
   def __init__(self):
     super().__init__()
+    self.instanceId = -1
     self.vertices = np.array([np.NaN, np.NaN])
-    self.uid = -1
-    self.devType = ct.N_A
+    self.deviceType = ComponentTypes.N_A
     self.boardText = ''
-    self.devText = ''
+    self.deviceText = ''
     self.logo = ''
     self.notes = ''
-    self.valid = False
+    self.validated = False
 
-    self._boundPlt = pg.PlotDataItem([np.NaN, np.NaN], pen=pg.mkPen('b', width=2))
-    self._txtPlt = graphicshelpers.ABTextItem('N/A', color='y')
+    # Shorthand for convenience
+    penClr, penWidth, txtSize = Component.scheme.getCompProps(
+      (SV.boundaryColor, SV.boundaryWidth, SV.idFontSize))
+
+    self._boundPlt = pg.PlotDataItem([np.NaN, np.NaN], pen=pg.mkPen(color=penClr, width=penWidth))
+    self._txtPlt = graphicshelpers.ClickableTextItem('N/A')
+    curFont = self._txtPlt.textItem.font()
+    curFont.setPointSize(txtSize)
+    self._txtPlt.setFont(curFont)
     self._txtPlt.sigClicked.connect(self._rethrowItemClicked)
 
     '''
@@ -37,8 +48,9 @@ class Component(QtCore.QObject):
     '''
     # Handles update behavior for traits that alter plot information
     self._reqdUpdates = {
-      'vertices': [self.updateBoundPlt, self.updateTxtPlt],
-      'uid'     : [self.updateTxtPlt]
+      'vertices'   : [self._updateBoundPlt, self._updateTxtPlt],
+      'instanceId' : [self._updateTxtPlt],
+      'validated'  : [self._updateTxtPlt]
       }
 
   def __setattr__(self, prop, val):
@@ -48,19 +60,31 @@ class Component(QtCore.QObject):
     for fn in pltUpdateFns:
       fn()
 
+  @staticmethod
+  def setScheme(scheme: SchemeEditor):
+    '''
+    Responsible for customizing display aspects of each component. Only one scheme
+    should exist per application, so this is a static method
+    '''
+    Component.scheme = scheme
+
   @Slot()
   def _rethrowItemClicked(self):
     self.sigCompClicked.emit(self)
 
-  def updateBoundPlt(self):
+  def _updateBoundPlt(self):
     self._boundPlt.setData(self.vertices)
 
-  def updateTxtPlt(self):
-    self._txtPlt.setText(str(self.uid))
+  def _updateTxtPlt(self):
+    schemeClrProp = SV.nonValidIdColor
+    if self.validated:
+      schemeClrProp = SV.validIdColor
+    txtClr = Component.scheme.getCompProps(schemeClrProp)
+    self._txtPlt.setText(str(self.instanceId))
+    self._txtPlt.setColor(txtClr)
     #newSz = self._txtPlt.width(), self._txtPlt.height()
     newPos = np.mean(self.vertices, axis=0)
     self._txtPlt.setPos(newPos[0], newPos[1])
-
 
 class ComponentMgr(QtCore.QObject):
   sigCompClicked = Signal(object)
@@ -77,7 +101,7 @@ class ComponentMgr(QtCore.QObject):
 
   def addComps(self, comps: List[Component]):
     for comp in comps:
-      comp.uid = self._nextCompId
+      comp.instanceId = self._nextCompId
       self._mainImgArea.addItem(comp._boundPlt)
       self._mainImgArea.addItem(comp._txtPlt)
 
@@ -90,16 +114,19 @@ class ComponentMgr(QtCore.QObject):
 
   def rmComps(self, idList: Union[List[int], str] = 'all'):
     newCompList = []
+    # Next ID will change depending on which components are deleted
+    nextId = 0
     if idList == 'all':
-      idList = [obj.uid for obj in self._compList]
+      idList = [obj.instanceId for obj in self._compList]
     # Take each requested component off the main image and remove from list
     for ii, comp in enumerate(self._compList):
-      if comp.uid in idList:
+      if comp.instanceId in idList:
         [self._mainImgArea.removeItem(plt) for plt in (comp._boundPlt, comp._txtPlt)]
       else:
         newCompList.append(comp)
+        if comp.instanceId >= nextId:
+          nextId = comp.instanceId + 1
     self._compList = newCompList
-
 
 
   @Slot(object)
@@ -116,7 +143,7 @@ if __name__== '__main__':
 
   c = Component()
   c.vertices = np.random.randint(0,100,size=(10,2))
-  c.uid = 5
+  c.instanceId = 5
   c.boardText = 'test'
   mgr = ComponentMgr(mw)
   mgr.addComps([c])
