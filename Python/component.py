@@ -10,6 +10,7 @@ Slot = QtCore.pyqtSlot
 from SchemeEditor import SchemeEditor
 from constants import SchemeValues as SV
 from ABGraphics.clickables import ClickableTextItem
+from ABGraphics.regions import VertexRegion
 
 # Ensure an application instance is running
 app = pg.mkQApp()
@@ -36,7 +37,9 @@ class Component(QtCore.QObject):
     penClr, penWidth, txtSize = Component.scheme.getCompProps(
       (SV.boundaryColor, SV.boundaryWidth, SV.idFontSize))
 
-    self._boundPlt = pg.PlotDataItem([np.NaN, np.NaN], pen=pg.mkPen(color=penClr, width=penWidth))
+    # Using VertexRegion is significantly faster than PlotDataItem
+    #self._boundPlt = pg.PlotDataItem([np.NaN, np.NaN], pen=pg.mkPen(color=penClr, width=penWidth))
+    self._boundPlt = VertexRegion()
     self._txtPlt = ClickableTextItem('N/A')
     curFont = self._txtPlt.textItem.font()
     curFont.setPointSize(txtSize)
@@ -73,7 +76,8 @@ class Component(QtCore.QObject):
     self.sigCompClicked.emit(self)
 
   def _updateBoundPlt(self):
-    self._boundPlt.setData(self.vertices)
+    #self._boundPlt.setData(self.vertices)
+    self._boundPlt.updateVertices(self.vertices.copy())
 
   def _updateTxtPlt(self):
     schemeClrProp = SV.nonValidIdColor
