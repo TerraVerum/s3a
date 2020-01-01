@@ -9,7 +9,8 @@ from skimage.morphology import closing
 import numpy as np
 import cv2 as cv
 
-from graphicshelpers import ClickableImageItem, SaveablePolyROI
+from ABGraphics.clickables import ClickableImageItem
+from ABGraphics.regions import VertexRegion, SaveablePolyROI
 from component import *
 from SchemeEditor import SchemeEditor
 from constants import SchemeValues as SV
@@ -33,7 +34,7 @@ class FocusedComp(pg.PlotWidget):
     self.compImgItem = ClickableImageItem()
     self.addItem(self.compImgItem)
 
-    self.region = pg.ImageItem()
+    self.region = VertexRegion()
     self.addItem(self.region)
 
     self.interactor = SaveablePolyROI([], pen=(6,9), closed=False, removable=True)
@@ -145,8 +146,3 @@ class FocusedComp(pg.PlotWidget):
     for clr in fillClr, vertClr:
       lut.append(clr.getRgb())
     return np.array(lut, dtype='uint8')
-
-  #def setRegionLUT(self, lutArr:np.array):
-    ## Define LUT that properly colors vertices and interior of region
-    #cmap = pg.ColorMap([0,1,2], lutArr)
-    #self.region.setLookupTable(cmap.getLookupTable(0,2,nPts=3,alpha=True))

@@ -7,9 +7,9 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
-import graphicshelpers
 from SchemeEditor import SchemeEditor
 from constants import SchemeValues as SV
+from ABGraphics.clickables import ClickableTextItem
 
 # Ensure an application instance is running
 app = pg.mkQApp()
@@ -37,7 +37,7 @@ class Component(QtCore.QObject):
       (SV.boundaryColor, SV.boundaryWidth, SV.idFontSize))
 
     self._boundPlt = pg.PlotDataItem([np.NaN, np.NaN], pen=pg.mkPen(color=penClr, width=penWidth))
-    self._txtPlt = graphicshelpers.ClickableTextItem('N/A')
+    self._txtPlt = ClickableTextItem('N/A')
     curFont = self._txtPlt.textItem.font()
     curFont.setPointSize(txtSize)
     self._txtPlt.setFont(curFont)
@@ -95,9 +95,10 @@ class ComponentMgr(QtCore.QObject):
   _mainImgArea: pg.ViewBox
   _compImgView: pg.ViewBox
 
-  def __init__(self, mainImgArea: pg.GraphicsWidget):
+  def __init__(self, mainImgArea: pg.GraphicsWidget, mainImgItem: pg.ImageItem):
     super().__init__()
     self._mainImgArea = mainImgArea
+    self._mainImgItem = mainImgItem
 
   def addComps(self, comps: List[Component]):
     for comp in comps:
@@ -112,21 +113,30 @@ class ComponentMgr(QtCore.QObject):
 
       self._nextCompId += 1
 
-  def rmComps(self, idList: Union[List[int], str] = 'all'):
-    newCompList = []
+  def rmComps(self, idList: Union[np.array, str] = 'all'):
+    # Use numpy array so size is preallocated
+    newCompList = np.empty(len(self._compList), dtype=object)
+    validIdxs = np.zeros(newCompList.size, dtype=bool)
     # Next ID will change depending on which components are deleted
-    nextId = 0
+
+    '''
+    Removing items one by one is significantly more intensive than adding them.
+    So, it is more effective to clear the whole list and re-add components to keep
+    '''
     if idList == 'all':
       idList = [obj.instanceId for obj in self._compList]
-    # Take each requested component off the main image and remove from list
+    idList = np.array(idList)
     for ii, comp in enumerate(self._compList):
-      if comp.instanceId in idList:
-        [self._mainImgArea.removeItem(plt) for plt in (comp._boundPlt, comp._txtPlt)]
-      else:
-        newCompList.append(comp)
-        if comp.instanceId >= nextId:
-          nextId = comp.instanceId + 1
-    self._compList = newCompList
+      if not np.any(comp.instanceId == idList):
+        validIdxs[ii] = True
+    newCompList = newCompList[validIdxs]
+    self._mainImgArea.clear()
+    self._mainImgArea.addItem(self._mainImgItem)
+    if idList.size > 0:
+      self._nextCompId = np.max(idList) + 1
+    else:
+      self._nextCompId = 0
+    self.addComps(list(newCompList))
 
 
   @Slot(object)
@@ -145,7 +155,7 @@ if __name__== '__main__':
   c.vertices = np.random.randint(0,100,size=(10,2))
   c.instanceId = 5
   c.boardText = 'test'
-  mgr = ComponentMgr(mw)
+  mgr = ComponentMgr(mw, item)
   mgr.addComps([c])
 
   app.exec()

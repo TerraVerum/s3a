@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from pyqtgraph.Qt import QtCore, QtWidgets
 from pyqtgraph.parametertree import Parameter, ParameterTree
 Signal = QtCore.pyqtSignal
 
-from graphicshelpers import dialogSaveToFile
 from constants import DEFAULT_SCHEME_DICT, SchemeValues as SV
+from ABGraphics.utils import dialogSaveToFile
 
 import pickle as pkl
 
@@ -73,8 +73,9 @@ class SchemeEditor(QtWidgets.QWidget):
     else:
       with open(saveName, 'wb') as saveFile:
         pkl.dump(newScheme, saveFile)
-    self.sigSchemeSaved.emit(saveName)
-    self.close()
+    if saveName is not None:
+      self.sigSchemeSaved.emit(saveName)
+      self.close()
 
   def loadScheme(self, schemeDict):
     self.params.restoreState(schemeDict, addChildren=False)

@@ -2,21 +2,20 @@
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
-QInputDialog = QtWidgets.QInputDialog
-Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
-
-import pickle as pkl
+Signal = QtCore.pyqtSignal
 
 import numpy as np
 from PIL import Image
 
 from processing import getBwComps, getVertsFromBwComps
-from graphicshelpers import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, attemptLoadSettings
+from ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, attemptLoadSettings
 from SchemeEditor import SchemeEditor
 
 import os
 from component import Component, ComponentMgr
+
+from SchemeEditor import SchemeEditor
 
 # Configure pg to correctly read image dimensions
 pg.setConfigOptions(imageAxisOrder='row-major')
@@ -69,7 +68,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # COMPONENT MANAGER
     # ---------------
     Component.setScheme(self.scheme)
-    self.compMgr = ComponentMgr(self.mainImg)
+    self.compMgr = ComponentMgr(self.mainImg, self.mainImgItem)
     self.compMgr.sigCompClicked.connect(self.updateCurComp)
 
     # ---------------
@@ -172,6 +171,7 @@ class MainWindow(QtWidgets.QMainWindow):
   @Slot()
   @applyWaitCursor
   def estBoundsBtnClicked(self):
+    self.compMgr.rmComps()
     compVertices = getVertsFromBwComps(getBwComps(self.mainImgItem.image))
     components = []
     for verts in compVertices:
