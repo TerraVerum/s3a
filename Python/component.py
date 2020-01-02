@@ -32,8 +32,7 @@ class Component(QtCore.QObject):
     self.validated = False
 
     # Shorthand for convenience
-    penClr, penWidth, txtSize = Component.scheme.getCompProps(
-      (SV.boundaryColor, SV.boundaryWidth, SV.idFontSize))
+    txtSize = ComponentMgr.scheme.getCompProps(SV.idFontSize)
 
     # Using VertexRegion is significantly faster than PlotDataItem
     #self._boundPlt = pg.PlotDataItem([np.NaN, np.NaN], pen=pg.mkPen(color=penClr, width=penWidth))
