@@ -1,6 +1,7 @@
 import numpy as np
 from typing import Dict, List, Union
 from functools import partial
+import warnings
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
@@ -65,9 +66,12 @@ class Component(QtCore.QObject):
     self.sigCompClicked.emit()
 
   def _updateTxtPlt(self):
+    # It is OK for NaN mean values, since this will hide the text
+    with warnings.catch_warnings():
+      warnings.simplefilter("ignore", category=RuntimeWarning)
+      newPos = np.mean(self.vertices, axis=0)
+      self._txtPlt.setPos(newPos[0], newPos[1])
     self._txtPlt.updateText(str(self.instanceId), self.validated)
-    newPos = np.mean(self.vertices, axis=0)
-    self._txtPlt.setPos(newPos[0], newPos[1])
 
 class ComponentMgr(QtCore.QObject):
   sigCompClicked = Signal(object)
@@ -108,6 +112,10 @@ class ComponentMgr(QtCore.QObject):
     existingCompIds = [obj.instanceId for obj in self._compList]
     if idsToRemove == 'all':
       idsToRemove = existingCompIds
+    elif not hasattr(idsToRemove, '__iter__'):
+      # single number passed in
+      idsToRemove = [idsToRemove]
+      pass
     idsToRemove = np.array(idsToRemove)
     existingCompIds = np.array(existingCompIds)
 

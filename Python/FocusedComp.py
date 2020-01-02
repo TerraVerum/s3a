@@ -19,6 +19,7 @@ class FocusedComp(pg.PlotWidget):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
+
     self.setAspectLocked(True)
 
     self.comp = Component()
@@ -85,11 +86,15 @@ class FocusedComp(pg.PlotWidget):
 
   def updateAll(self, mainImg: np.array, newComp:Component,
              margin: int, segThresh: float):
-
+    deletePrevComponent = False
+    # If the previous component had no vertices, signal its removal
+    if len(self.comp.vertices) == 0:
+      deletePrevComponent = True
     self.comp = newComp
     self.updateBbox(mainImg.shape, newComp, margin)
     self.updateCompImg(mainImg, segThresh)
     self.updateRegion(newComp.vertices)
+    return deletePrevComponent
 
   def updateBbox(self, mainImgShape, newComp: Component, margin):
     # Ignore NAN entries during computation
@@ -124,10 +129,8 @@ class FocusedComp(pg.PlotWidget):
     self.region.updateVertices(centeredVerts)
 
   def saveNewVerts(self):
-    # Add in offset from main image to VertexRegion vertices,
-    # denote separate regions within the component by separating
-    # with nan entries
-    self.comp.vertices = self.region.verts + self.bbox[:,0]
+    # Add in offset from main image to VertexRegion vertices
+    self.comp.vertices = self.region.verts + self.bbox[0,:]
 
   def _addRoiToRegion(self):
     imgMask = self.interactor.getImgMask(self.compImgItem)

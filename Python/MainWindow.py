@@ -203,7 +203,12 @@ class MainWindow(QtWidgets.QMainWindow):
     mainImg = self.mainImgItem.image
     margin = int(self.marginEdit.text())
     segThresh = float(self.segThreshEdit.text())
-    self.compImg.updateAll(mainImg, newComp, margin, segThresh)
+    prevComp = self.compImg.comp
+    rmPrevComp = self.compImg.updateAll(mainImg, newComp, margin, segThresh)
+    # If all old vertices were deleted AND we switched images, signal deletion
+    # for the previous focused component
+    if rmPrevComp:
+      self.compMgr.rmComps(prevComp.instanceId)
 
     htmlTxt: str = self.curCompIdLbl.text()
     # Find location of id in text string and replace with current ID
