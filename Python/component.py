@@ -21,6 +21,8 @@ class Component(QtCore.QObject):
 
   sigCompClicked = Signal(object)
 
+  sigVertsChanged = Signal()
+
   scheme = SchemeEditor()
 
   def __init__(self):
@@ -34,17 +36,7 @@ class Component(QtCore.QObject):
     self.notes = ''
     self.validated = False
 
-    # Shorthand for convenience
-    penClr, penWidth, txtSize = Component.scheme.getCompProps(
-      (SV.boundaryColor, SV.boundaryWidth, SV.idFontSize))
-
-    # Using VertexRegion is significantly faster than PlotDataItem
-    #self._boundPlt = pg.PlotDataItem([np.NaN, np.NaN], pen=pg.mkPen(color=penClr, width=penWidth))
-    self._boundPlt = VertexRegion()
     self._txtPlt = ClickableTextItem('N/A')
-    curFont = self._txtPlt.textItem.font()
-    curFont.setPointSize(txtSize)
-    self._txtPlt.setFont(curFont)
     self._txtPlt.sigClicked.connect(self._rethrowItemClicked)
 
     '''
@@ -52,7 +44,7 @@ class Component(QtCore.QObject):
     '''
     # Handles update behavior for traits that alter plot information
     self._reqdUpdates = {
-      'vertices'   : [self._updateBoundPlt, self._updateTxtPlt],
+      'vertices'   : [self.sigVertsChanged.emit, self._updateTxtPlt],
       'instanceId' : [self._updateTxtPlt],
       'validated'  : [self._updateTxtPlt]
       }
@@ -66,27 +58,15 @@ class Component(QtCore.QObject):
 
   @staticmethod
   def setScheme(scheme: SchemeEditor):
-    '''
-    Responsible for customizing display aspects of each component. Only one scheme
-    should exist per application, so this is a static method
-    '''
-    Component.scheme = scheme
+    # Pass scheme to ClickableTextItem
+    ClickableTextItem.setScheme(scheme)
 
   @Slot()
   def _rethrowItemClicked(self):
     self.sigCompClicked.emit(self)
 
-  def _updateBoundPlt(self):
-    #self._boundPlt.setData(self.vertices)
-    self._boundPlt.updateVertices(self.vertices.copy())
-
   def _updateTxtPlt(self):
-    schemeClrProp = SV.nonValidIdColor
-    if self.validated:
-      schemeClrProp = SV.validIdColor
-    txtClr = Component.scheme.getCompProps(schemeClrProp)
-    self._txtPlt.setText(str(self.instanceId))
-    self._txtPlt.setColor(txtClr)
+    self._txtPlt.updateText(str(self.instanceId), self.validated)
     newPos = np.mean(self.vertices, axis=0)
     self._txtPlt.setPos(newPos[0], newPos[1])
 
@@ -95,8 +75,6 @@ class ComponentMgr(QtCore.QObject):
 
   _compList: List[Component] = []
   _nextCompId = 0
-
-  _compImgView: pg.ViewBox
 
   def __init__(self, mainImgArea: pg.GraphicsWidget, mainImgItem: pg.ImageItem):
     super().__init__()
@@ -158,6 +136,11 @@ class ComponentMgr(QtCore.QObject):
   @Slot()
   def _updateCompBoundsPlt(self):
     self._compBounds.resetRegionList()
+
+  @staticmethod
+  def setScheme(scheme: SchemeEditor):
+    # Pass this scheme to the MultiRegionPlot
+    MultiRegionPlot.setScheme(scheme)
 
 if __name__== '__main__':
   from PIL import Image

@@ -59,22 +59,20 @@ class MainWindow(QtWidgets.QMainWindow):
     self.loadLayoutActionTriggered('Default')
 
     # ---------------
-    # LOAD SCHEME OPTIONS
-    # ---------------
-    self.scheme = SchemeEditor()
-    self.populateSchemeOptions()
-
-    # ---------------
     # COMPONENT MANAGER
     # ---------------
-    Component.setScheme(self.scheme)
     self.compMgr = ComponentMgr(self.mainImg, self.mainImgItem)
     self.compMgr.sigCompClicked.connect(self.updateCurComp)
 
     # ---------------
-    # FOCUSED COMPONENT IMAGE
+    # LOAD SCHEME OPTIONS
     # ---------------
+    self.scheme = SchemeEditor()
+    self.populateSchemeOptions()
+    # Attach scheme to all UI children
     self.compImg.setScheme(self.scheme)
+    Component.setScheme(self.scheme)
+    ComponentMgr.setScheme(self.scheme)
 
     # ---------------
     # UI ELEMENT SIGNALS
@@ -129,11 +127,8 @@ class MainWindow(QtWidgets.QMainWindow):
     schemeDict = attemptLoadSettings(f'./Schemes/{schemeName}.scheme')
     if schemeDict is None:
       return
-    # ---------
-    # COMPONENTS DRAWN ON MAIN IMAGE
-    # ---------
     self.scheme.loadScheme(schemeDict)
-    self.compImg.setScheme(self.scheme)
+
     QtWidgets.QMessageBox().information(self, 'Scheme Updated',
                 'Scheme updated. Changes will take effect in future operations.',
                 QtGui.QMessageBox.Ok)

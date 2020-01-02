@@ -2,6 +2,9 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
 Signal = QtCore.pyqtSignal
 
+from SchemeEditor import SchemeEditor
+from constants import SchemeValues as SV
+
 
 class ClickableImageItem(pg.ImageItem):
   sigClicked = Signal(object)
@@ -13,6 +16,8 @@ class ClickableImageItem(pg.ImageItem):
 
 class ClickableTextItem(pg.TextItem):
   sigClicked = Signal()
+
+  scheme: SchemeEditor()
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -30,3 +35,25 @@ class ClickableTextItem(pg.TextItem):
 
   def mousePressEvent(self, ev):
     self.sigClicked.emit()
+
+  def updateText(self, newText: str, validated: bool):
+    '''
+    Overload setting text to utilize scheme editor
+    '''
+    schemeClrProp = SV.nonValidIdColor
+    if validated:
+      schemeClrProp = SV.validIdColor
+    txtSize, txtClr = ClickableTextItem.scheme.getCompProps(
+        (SV.idFontSize, schemeClrProp))
+
+    curFont = self.textItem.font()
+    curFont.setPointSize(txtSize)
+    self.setFont(curFont)
+
+    self.setColor(txtClr)
+
+    self.setText(newText)
+
+  @staticmethod
+  def setScheme(scheme):
+    ClickableTextItem.scheme = scheme

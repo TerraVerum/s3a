@@ -13,6 +13,7 @@ class SchemeValues(Enum):
   nonValidIdColor:Enum = 'Non-Validated ID Color'
   boundaryColor:Enum = 'Component Boundary Color'
   boundaryWidth:Enum = 'Component Boundary Width'
+  boundaryVertex:Enum = 'Component Boundary Vertex Shape'
   idFontSize:Enum = 'ID Font Size'
 
   FOC_IMG_PARAMS:Enum = 'Focused Image Parameters'

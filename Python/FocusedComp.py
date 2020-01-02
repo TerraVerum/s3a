@@ -127,12 +127,5 @@ class FocusedComp(pg.PlotWidget):
 
   @staticmethod
   def setScheme(scheme: SchemeEditor):
-    FocusedComp.scheme = scheme
-
-  @staticmethod
-  def getLUTFromScheme():
-    fillClr, vertClr = FocusedComp.scheme.getFocImgProps((SV.foc_fillColor, SV.foc_vertColor))
-    lut = [(0,0,0,0)]
-    for clr in fillClr, vertClr:
-      lut.append(clr.getRgb())
-    return np.array(lut, dtype='uint8')
+    # Pass scheme to VertexRegion
+    VertexRegion.setScheme(scheme)
