@@ -3,9 +3,9 @@ from pathlib import Path
 import os
 
 # Preference directories
-_filepath = os.path.dirname(Path(__file__).absolute())
-SCHEMES_DIR = os.path.join(_filepath, 'Schemes', '')
-LAYOUTS_DIR = os.path.join(_filepath, 'Layouts', '')
+BASE_DIR = os.path.dirname(Path(__file__).absolute())
+SCHEMES_DIR = os.path.join(BASE_DIR, 'Schemes', '')
+LAYOUTS_DIR = os.path.join(BASE_DIR, 'Layouts', '')
 
 class ComponentTypes(Enum):
   CAP:Enum = 'Capacitor'

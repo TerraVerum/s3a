@@ -17,7 +17,7 @@ from os.path import join
 # Ensure app instance is running
 app = pg.mkQApp()
 
-class SchemeEditor(QtWidgets.QWidget):
+class SchemeEditor(QtWidgets.QDialog):
   '''
   Only one instance of this class is intended for use for a given application.
   So, don't import and instantiate this class. Rather, import the SCHEME variable
@@ -25,9 +25,14 @@ class SchemeEditor(QtWidgets.QWidget):
   '''
   sigSchemeSaved = Signal(str)
 
-  def __init__(self):
-    super().__init__()
-    self.resize(500, 300)
+  def __init__(self, parent=None):
+    # Place in list so an empty value gets unpacked into super constructor
+    parentArg = []
+    if parent is not None:
+      parentArg.append(parent)
+    super().__init__(*parentArg)
+    self.resize(500, 400)
+    self.setModal(True)
     # -----------
     # Construct parameter tree
     # -----------

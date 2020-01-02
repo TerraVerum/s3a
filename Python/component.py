@@ -19,8 +19,7 @@ app = pg.mkQApp()
 class Component(QtCore.QObject):
   _reqdUpdates: Dict[str, list] = {}
 
-  sigCompClicked = Signal(object)
-
+  sigCompClicked = Signal()
   sigVertsChanged = Signal()
 
   scheme = SchemeEditor()
@@ -63,7 +62,7 @@ class Component(QtCore.QObject):
 
   @Slot()
   def _rethrowItemClicked(self):
-    self.sigCompClicked.emit(self)
+    self.sigCompClicked.emit()
 
   def _updateTxtPlt(self):
     self._txtPlt.updateText(str(self.instanceId), self.validated)
@@ -96,6 +95,7 @@ class ComponentMgr(QtCore.QObject):
 
       # Listen for component signals and rethrow them
       comp.sigCompClicked.connect(self._rethrowCompClick)
+      comp.sigVertsChanged.connect(self._reflectVertsChanged)
 
     self._nextCompId += newIds[-1] + 1
     self._compList.extend(comps)
@@ -129,13 +129,19 @@ class ComponentMgr(QtCore.QObject):
     if not np.all(tfRmIdx):
       self._nextCompId = np.max(existingCompIds[keepCompIdxs]) + 1
 
-  @Slot(object)
-  def _rethrowCompClick(self, comp:Component):
+  @Slot()
+  def _rethrowCompClick(self):
+    comp: Component = self.sender()
     self.sigCompClicked.emit(comp)
 
   @Slot()
   def _updateCompBoundsPlt(self):
     self._compBounds.resetRegionList()
+
+  @Slot()
+  def _reflectVertsChanged(self):
+    comp: Component = self.sender()
+    self._compBounds.setRegions(comp.instanceId, comp.vertices)
 
   @staticmethod
   def setScheme(scheme: SchemeEditor):

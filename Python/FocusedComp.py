@@ -3,7 +3,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
 
-from processing import segmentComp, getVertsFromBwComps, growSeedpoint
+from processing import segmentComp, getVertsFromBwComps, growSeedpoint, nanConcatList, splitListAtNans
 from skimage.morphology import closing
 
 import numpy as np
@@ -91,9 +91,10 @@ class FocusedComp(pg.PlotWidget):
     self.updateCompImg(mainImg, segThresh)
     self.updateRegion(newComp.vertices)
 
-  def updateBbox(self, mainImgShape, newComp, margin):
-    bbox = np.vstack((newComp.vertices.min(0),
-          newComp.vertices.max(0)))
+  def updateBbox(self, mainImgShape, newComp: Component, margin):
+    # Ignore NAN entries during computation
+    bbox = np.vstack([np.nanmin(newComp.vertices, 0),
+          np.nanmax(newComp.vertices, 0)])
     # Account for margins
     for ii in range(2):
       bbox[0,ii] = np.maximum(0, bbox[0,ii]-margin)
@@ -110,10 +111,23 @@ class FocusedComp(pg.PlotWidget):
     self.setImage(segImg)
 
   def updateRegion(self, newVerts, offset=None):
+    # Component vertices are nan-separated regions
     if offset is None:
       offset = self.bbox[0,:]
-    compCenteredVertices = newVerts - offset
-    self.region.updateVertices(compCenteredVertices)
+    if newVerts is None:
+      newVerts = np.ones((0,2), dtype=int)
+    # 0-center new vertices relative to FocusedComp image
+    # Make a copy of each list first so we aren't modifying the
+    # original data
+    centeredVerts = newVerts.copy()
+    centeredVerts -= offset
+    self.region.updateVertices(centeredVerts)
+
+  def saveNewVerts(self):
+    # Add in offset from main image to VertexRegion vertices,
+    # denote separate regions within the component by separating
+    # with nan entries
+    self.comp.vertices = self.region.verts + self.bbox[:,0]
 
   def _addRoiToRegion(self):
     imgMask = self.interactor.getImgMask(self.compImgItem)

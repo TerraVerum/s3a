@@ -82,4 +82,35 @@ def growSeedpoint(img: np.array, seeds: np.array, thresh: float) -> np.array:
       bwOut = newBwOut
   return bwOut
 
+def nanConcatList(vertList):
+  '''
+  Utility for concatenating all vertices within a list while adding
+  NaN entries between each separate list
+  '''
+  if isinstance(vertList, np.ndarray):
+    vertList = [vertList]
+  nanSep = np.ones((1,2), dtype=int)*np.nan
+  allVerts = []
+  for curVerts in vertList:
+    allVerts.append(curVerts)
+    allVerts.append(nanSep)
+  return np.vstack(allVerts)
+
+def splitListAtNans(concatVerts:np.ndarray):
+  '''
+  Utility for taking a single list of nan-separated region vertices
+  and breaking it into several regions with no nans.
+  '''
+  # concatVerts must end with nan if it came from nanConcatList
+  if not np.isnan(concatVerts[-1,0]):
+    concatVerts = nanConcatList(concatVerts)
+  allVerts = []
+  nanEntries = np.nonzero(np.isnan(concatVerts[:,0]))[0]
+  curIdx = 0
+  for nanEntry in nanEntries:
+    curVerts = concatVerts[curIdx:nanEntry,:].astype('int')
+    allVerts.append(curVerts)
+  return allVerts
+
+
 

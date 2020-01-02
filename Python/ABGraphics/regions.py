@@ -8,6 +8,7 @@ from typing import Tuple
 
 from SchemeEditor import SchemeEditor
 from constants import SchemeValues as SV
+from processing import splitListAtNans
 
 class VertexRegion(pg.ImageItem):
   scheme = SchemeEditor()
@@ -15,34 +16,34 @@ class VertexRegion(pg.ImageItem):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
-    self.offset = np.array([0,0], dtype=np.int)
+    self._offset = np.array([0,0], dtype=int)
+    self.verts = [np.zeros((0,2), dtype=int)]
 
-  def updateVertices(self, newVerts):
-    # If only one vertex list is passed, wrap it
-    if isinstance(newVerts, np.ndarray):
-      newVerts = [newVerts]
+  def updateVertices(self, newVerts: np.ndarray):
+    self.verts = newVerts.copy()
+
     if len(newVerts) == 0:
       self.setImage(np.zeros((1,1), dtype='bool'))
       return
-    allVerts: np.ndarray = np.vstack(newVerts)
-    self.offset = allVerts.min(0)
-    for vertList in newVerts:
-      vertList -= self.offset
-    allVerts -= self.offset
+    self._offset = np.nanmin(newVerts, 0)
+    newVerts -= self._offset
 
-    newImgShape = (allVerts.max(0)+1)[::-1]
+    # cv.fillPoly requires list-of-lists format
+    fillPolyArg = splitListAtNans(newVerts)
+    newImgShape = (np.nanmax(newVerts, 0)+1)[::-1]
     regionData = np.zeros(newImgShape, dtype='uint8')
-    cv.fillPoly(regionData, newVerts, 1)
+    cv.fillPoly(regionData, fillPolyArg, 1)
     # Make vertices full brightness
-    regionData[allVerts[:,1], allVerts[:,0]] = 2
+    nonNanVerts = newVerts[np.invert(np.isnan(newVerts[:,0])),:]
+    regionData[nonNanVerts[:,1], nonNanVerts[:,0]] = 2
     self.setImage(regionData, levels=[0,2], lut=self.getLUTFromScheme())
-    self.setPos(*self.offset)
+    self.setPos(*self._offset)
 
   def embedMaskInImg(self, toEmbedShape: Tuple[int, int]):
     outImg = np.zeros(toEmbedShape, dtype=bool)
     selfShape = self.image.shape
     # Offset is x-y, shape is row-col. So, swap order of offset relative to current axis
-    embedSlices = [slice(self.offset[1-ii], selfShape[ii]+self.offset[1-ii]) for ii in range(2)]
+    embedSlices = [slice(self._offset[1-ii], selfShape[ii]+self._offset[1-ii]) for ii in range(2)]
     outImg[embedSlices[0], embedSlices[1]] = self.image
     return outImg
 
@@ -114,7 +115,7 @@ class MultiRegionPlot(pg.PlotDataItem):
     If region vertices are empty, remove the region
     '''
     # Wrap single region instances in list to allow batch processing
-    if isinstance(regionIds, int):
+    if not hasattr(regionIds, '__iter__'):
       regionIds = [regionIds]
       vertices = [vertices]
     for curId, curVerts in zip(regionIds, vertices):

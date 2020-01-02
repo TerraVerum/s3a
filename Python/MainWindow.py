@@ -17,6 +17,7 @@ from constants import SCHEMES_DIR, LAYOUTS_DIR
 from os.path import join
 import os
 
+import re
 # Configure pg to correctly read image dimensions
 pg.setConfigOptions(imageAxisOrder='row-major')
 
@@ -24,7 +25,7 @@ class MainWindow(QtWidgets.QMainWindow):
   # Alerts GUI that a layout (either new or overwriting old) was saved
   sigLayoutSaved = Signal()
 
-  def __init__(self):
+  def __init__(self, startImgFpath=None):
     super().__init__()
     uiPath = os.path.dirname(os.path.abspath(__file__))
     uiFile = os.path.join(uiPath, 'imgAnnotator.ui')
@@ -34,8 +35,9 @@ class MainWindow(QtWidgets.QMainWindow):
     # ---------------
     # MAIN IMAGE
     # ---------------
-    imgArray = np.array(Image.open('../fast.tif'))
-    #imgArray = None
+    imgArray = None
+    if startImgFpath is not None:
+      imgArray = np.array(Image.open(startImgFpath))
     item = pg.ImageItem(imgArray)
     # Ensure image will remain in background of window
     item.setZValue(-100)
@@ -68,7 +70,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # ---------------
     # LOAD SCHEME OPTIONS
     # ---------------
-    self.scheme = SchemeEditor()
+    self.scheme = SchemeEditor(self)
     self.populateSchemeOptions()
     # Attach scheme to all UI children
     self.compImg.setScheme(self.scheme)
@@ -84,6 +86,7 @@ class MainWindow(QtWidgets.QMainWindow):
     self.clearBoundsBtn.clicked.connect(self.clearBoundsBtnClicked)
     self.clearRegionBtn.clicked.connect(self.clearRegionBtnClicked)
     self.resetRegionBtn.clicked.connect(self.resetRegionBtnClicked)
+    self.acceptRegionBtn.clicked.connect(self.acceptRegionBtnClicked)
 
     # Edit fields
     self.seedThreshEdit.editingFinished.connect(self.seedThreshChanged)
@@ -143,7 +146,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # Only perform action if image currently exists
     if self.compImg.compImgItem.image is None:
       return
-    self.compImg.updateRegion([])
+    self.compImg.updateRegion(None)
 
   @Slot()
   def resetRegionBtnClicked(self):
@@ -152,6 +155,10 @@ class MainWindow(QtWidgets.QMainWindow):
     if self.compImg.compImgItem.image is None:
       return
     self.compImg.updateRegion(self.compImg.comp.vertices)
+
+  @Slot()
+  def acceptRegionBtnClicked(self):
+    self.compImg.saveNewVerts()
 
   @Slot()
   def seedThreshChanged(self):
@@ -196,8 +203,12 @@ class MainWindow(QtWidgets.QMainWindow):
     mainImg = self.mainImgItem.image
     margin = int(self.marginEdit.text())
     segThresh = float(self.segThreshEdit.text())
-
     self.compImg.updateAll(mainImg, newComp, margin, segThresh)
+
+    htmlTxt: str = self.curCompIdLbl.text()
+    # Find location of id in text string and replace with current ID
+    htmlTxt = re.sub(r'ID: -?\d+', f'ID: {newComp.instanceId}', htmlTxt)
+    self.curCompIdLbl.setText(htmlTxt)
 
   def resetMainImg(self, newIm: np.array):
     self.mainImgItem.setImage(newIm)
