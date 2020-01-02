@@ -94,3 +94,54 @@ class SaveablePolyROI(pg.PolyLineROI):
     roiMask = roiMask.T
     imgMask[roiSlices[0], roiSlices[1]] = roiMask
     return imgMask
+
+class MultiRegionPlot(pg.PlotDataItem):
+  scheme: SchemeEditor()
+
+  def __init__(self, *args, **kargs):
+    super().__init__(*args, **kargs, connect='finite')
+    self.regions = []
+    self.ids = []
+    self._nanSep = np.empty((1,2))
+    self._nanSep.fill(np.nan)
+
+  def resetRegionList(self, newIds=[], newRegions = []):
+    self.regions = newRegions
+    self.ids = newIds
+    self.updatePlot()
+
+  def setRegions(self, regionIds, vertices):
+    '''
+    If the region already exists, update it. Otherwise, append to the list.
+    If region vertices are empty, remove the region
+    '''
+    # Wrap single region instances in list to allow batch processing
+    if isinstance(regionIds, int):
+      regionIds = [regionIds]
+      vertices = [vertices]
+    for curId, curVerts in zip(regionIds, vertices):
+      try:
+        regionIdx = self.ids.index(curId)
+        if len(curVerts) == 0:
+          del self.regions[regionIdx]
+          del self.ids[regionIdx]
+        else:
+          # Add nan values to indicate separate regions once all verts
+          # are concatenated for plotting
+          curVerts = np.vstack((curVerts, self._nanSep))
+          self.regions[regionIdx] = curVerts
+      except ValueError:
+        if len(curVerts) > 0:
+          self.ids.append(curId)
+          curVerts = np.vstack((curVerts, self._nanSep))
+          self.regions.append(curVerts)
+    self.updatePlot()
+
+  def updatePlot(self):
+    concatData = [], []
+    if len(self.regions) > 0:
+      # We have regions to plot
+      concatData = np.vstack(self.regions)
+      concatData = (concatData[:,0], concatData[:,1])
+
+    self.setData(*concatData)
