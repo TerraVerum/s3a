@@ -144,7 +144,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # Only perform action if image currently exists
     if self.compImg.compImgItem.image is None:
       return
-    self.compImg.updateRegion(np.zeros((0,2)))
+    self.compImg.updateRegion([])
 
   @Slot()
   def resetRegionBtnClicked(self):

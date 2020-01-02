@@ -20,8 +20,6 @@ class Component(QtCore.QObject):
 
   sigCompClicked = Signal(object)
 
-  scheme = SchemeEditor()
-
   def __init__(self):
     super().__init__()
     self.instanceId = -1
@@ -86,7 +84,6 @@ class Component(QtCore.QObject):
     txtClr = Component.scheme.getCompProps(schemeClrProp)
     self._txtPlt.setText(str(self.instanceId))
     self._txtPlt.setColor(txtClr)
-    #newSz = self._txtPlt.width(), self._txtPlt.height()
     newPos = np.mean(self.vertices, axis=0)
     self._txtPlt.setPos(newPos[0], newPos[1])
 
@@ -96,57 +93,94 @@ class ComponentMgr(QtCore.QObject):
   _compList: List[Component] = []
   _nextCompId = 0
 
-  _mainImgArea: pg.ViewBox
   _compImgView: pg.ViewBox
+
+  scheme = SchemeEditor()
 
   def __init__(self, mainImgArea: pg.GraphicsWidget, mainImgItem: pg.ImageItem):
     super().__init__()
     self._mainImgArea = mainImgArea
     self._mainImgItem = mainImgItem
+    self._compBoundsImgItem = VertexRegion()
+    #self._compBoundsImgItem = pg.PlotDataItem(connect='finite')
+    # Update comp image on main image change
+    mainImgItem.sigImageChanged.connect(self._updateCompBoundsImg)
+    self._mainImgArea.addItem(self._compBoundsImgItem)
 
   def addComps(self, comps: List[Component]):
+    # On first pass, collect all encountered vertices so they can be recolored
+    # appropriately
+    allVerts = [np.empty((0,2), dtype=int)]
+    nanSep = np.empty((1,2))
+    nanSep.fill(np.nan)
+    for comp in self._compList: # type: Component
+      allVerts.append(comp.vertices)
+      #allVerts.append(nanSep)
+
     for comp in comps:
+      allVerts.append(comp.vertices)
+      #allVerts.append(nanSep)
       comp.instanceId = self._nextCompId
-      self._mainImgArea.addItem(comp._boundPlt)
+      #self._mainImgArea.addItem(comp._boundPlt)
       self._mainImgArea.addItem(comp._txtPlt)
 
       # Listen for component signals and rethrow them
       comp.sigCompClicked.connect(self._rethrowCompClick)
 
-      self._compList.append(comp)
-
       self._nextCompId += 1
+    self._compList.extend(comps)
+    self._compBoundsImgItem.updateVertices(allVerts[1:])
+    #npData = np.vstack(allVerts)
+    #self._compBoundsImgItem.setData(npData[:,0], npData[:,1])
 
-  def rmComps(self, idList: Union[np.array, str] = 'all'):
+  def rmComps(self, idsToRemove: Union[np.array, str] = 'all'):
     # Use numpy array so size is preallocated
-    newCompList = np.empty(len(self._compList), dtype=object)
-    validIdxs = np.zeros(newCompList.size, dtype=bool)
-    # Next ID will change depending on which components are deleted
+    curComps = np.array(self._compList)
+    idxIsValid = np.zeros(curComps.size, dtype=bool)
+    # Generate ID list
+    compListIds = [obj.instanceId for obj in self._compList]
+    if idsToRemove == 'all':
+      idsToRemove = compListIds
+    idsToRemove = np.array(idsToRemove)
+    compListIds = np.array(compListIds)
 
-    '''
-    Removing items one by one is significantly more intensive than adding them.
-    So, it is more effective to clear the whole list and re-add components to keep
-    '''
-    if idList == 'all':
-      idList = [obj.instanceId for obj in self._compList]
-    idList = np.array(idList)
+    remainingVerts = []
+    nanSep = np.empty((1,2))
+    nanSep.fill(np.nan)
     for ii, comp in enumerate(self._compList):
-      if not np.any(comp.instanceId == idList):
-        validIdxs[ii] = True
-    newCompList = newCompList[validIdxs]
-    self._mainImgArea.clear()
-    self._mainImgArea.addItem(self._mainImgItem)
-    newIdList = np.array([comp.instanceId for comp in newCompList])
+      if np.any(comp.instanceId == idsToRemove):
+        self._mainImgArea.removeItem(comp._txtPlt)
+      else:
+        remainingVerts.append(comp.vertices)
+        #remainingVerts.append(nanSep)
+        idxIsValid[ii] = True
+
+    # Update bounds image
+    self._compBoundsImgItem.updateVertices(remainingVerts)
+    #if len(remainingVerts) > 0:
+      #npData = np.vstack(remainingVerts)
+    #else:
+      #npData = np.empty((0,2))
+    #self._compBoundsImgItem.setData(npData[:,0], npData[:,1])
+
+    # Reset manager's component list
+    self._compList = list(curComps[idxIsValid])
+
+    # Determine next ID for new components
+    newIdList = compListIds[idxIsValid]
     if newIdList.size > 0:
       self._nextCompId = np.max(newIdList) + 1
     else:
       self._nextCompId = 0
-    self.addComps(list(newCompList))
-
 
   @Slot(object)
   def _rethrowCompClick(self, comp:Component):
     self.sigCompClicked.emit(comp)
+
+  @Slot()
+  def _updateCompBoundsImg(self):
+    self._compBoundsImgItem.updateVertices([])
+    #self._compBoundsImgItem.setData([], [])
 
 if __name__== '__main__':
   from PIL import Image

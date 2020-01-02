@@ -15,20 +15,26 @@ class VertexRegion(pg.ImageItem):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
-    self.offset = [0,0]
+    self.offset = np.array([0,0], dtype=np.int)
 
   def updateVertices(self, newVerts):
-    if newVerts.shape[0] == 0:
-      # No need to look for polygons if vertices are empty
-      self.setImage(np.zeros((1,1), dtype='uint8'))
+    # If only one vertex list is passed, wrap it
+    if isinstance(newVerts, np.ndarray):
+      newVerts = [newVerts]
+    if len(newVerts) == 0:
+      self.setImage(np.zeros((1,1), dtype='bool'))
       return
-    self.offset = newVerts.min(0)
-    newVerts -= self.offset
-    newImgShape = (newVerts.max(0)+1)[::-1]
+    allVerts: np.ndarray = np.vstack(newVerts)
+    self.offset = allVerts.min(0)
+    for vertList in newVerts:
+      vertList -= self.offset
+    allVerts -= self.offset
+
+    newImgShape = (allVerts.max(0)+1)[::-1]
     regionData = np.zeros(newImgShape, dtype='uint8')
-    cv.fillPoly(regionData, [newVerts], 1)
+    cv.fillPoly(regionData, newVerts, 1)
     # Make vertices full brightness
-    regionData[newVerts[:,1], newVerts[:,0]] = 2
+    regionData[allVerts[:,1], allVerts[:,0]] = 2
     self.setImage(regionData, levels=[0,2], lut=self.getLUTFromScheme())
     self.setPos(*self.offset)
 
