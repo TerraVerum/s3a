@@ -1,4 +1,11 @@
 from enum import Enum
+from pathlib import Path
+import os
+
+# Preference directories
+_filepath = os.path.dirname(Path(__file__).absolute())
+SCHEMES_DIR = os.path.join(_filepath, 'Schemes', '')
+LAYOUTS_DIR = os.path.join(_filepath, 'Layouts', '')
 
 class ComponentTypes(Enum):
   CAP:Enum = 'Capacitor'

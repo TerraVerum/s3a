@@ -5,12 +5,14 @@ from pyqtgraph.Qt import QtCore, QtWidgets
 from pyqtgraph.parametertree import Parameter, ParameterTree
 Signal = QtCore.pyqtSignal
 
-from constants import DEFAULT_SCHEME_DICT, SchemeValues as SV
+from constants import (
+  DEFAULT_SCHEME_DICT, SCHEMES_DIR, SchemeValues as SV)
 from ABGraphics.utils import dialogSaveToFile
 
 import pickle as pkl
 
 from typing import List, Union
+from os.path import join
 
 # Ensure app instance is running
 app = pg.mkQApp()
@@ -35,7 +37,7 @@ class SchemeEditor(QtWidgets.QWidget):
     self.tree.setParameters(self.params, showTop=False)
 
     # Init default layout as export of DEFAULT_SCHEME_DICT
-    with open('./Schemes/Default.scheme', 'wb') as ofile:
+    with open(join(SCHEMES_DIR, 'Default.scheme'), 'wb') as ofile:
       pkl.dump(self.params.saveState(), ofile)
 
     # Allow the user to change column widths
@@ -69,7 +71,7 @@ class SchemeEditor(QtWidgets.QWidget):
   def saveBtnClicked(self, saveName=False):
     newScheme = self.params.saveState()
     if saveName is False or saveName is None:
-      saveName = dialogSaveToFile(self, newScheme, 'Scheme Name', './Schemes/', 'scheme', allowOverwriteDefault=False)
+      saveName = dialogSaveToFile(self, newScheme, 'Scheme Name', SCHEMES_DIR, 'scheme', allowOverwriteDefault=False)
     else:
       with open(saveName, 'wb') as saveFile:
         pkl.dump(newScheme, saveFile)

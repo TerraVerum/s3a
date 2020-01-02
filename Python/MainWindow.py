@@ -11,11 +11,11 @@ from PIL import Image
 from processing import getBwComps, getVertsFromBwComps
 from ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, attemptLoadSettings
 from SchemeEditor import SchemeEditor
-
-import os
 from component import Component, ComponentMgr
+from constants import SCHEMES_DIR, LAYOUTS_DIR
 
-from SchemeEditor import SchemeEditor
+from os.path import join
+import os
 
 # Configure pg to correctly read image dimensions
 pg.setConfigOptions(imageAxisOrder='row-major')
@@ -35,6 +35,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # MAIN IMAGE
     # ---------------
     imgArray = np.array(Image.open('../fast.tif'))
+    #imgArray = None
     item = pg.ImageItem(imgArray)
     # Ensure image will remain in background of window
     item.setZValue(-100)
@@ -102,11 +103,13 @@ class MainWindow(QtWidgets.QMainWindow):
     self.scheme.sigSchemeSaved.connect(self.loadSchemeActionTriggered)
 
   def populateLoadLayoutOptions(self):
-    addDirItemsToMenu(self.loadLayout, './Layouts/*.dockstate', self.loadLayoutActionTriggered)
+    layoutGlob = join(LAYOUTS_DIR, '*.dockstate')
+    addDirItemsToMenu(self.loadLayout, layoutGlob, self.loadLayoutActionTriggered)
 
   @Slot(str)
   def loadLayoutActionTriggered(self, layoutName):
-    dockStates = attemptLoadSettings(f'./Layouts/{layoutName}.dockstate')
+    layoutFilename = join(LAYOUTS_DIR, f'{layoutName}.dockstate')
+    dockStates = attemptLoadSettings(layoutFilename)
     if dockStates is not None:
       self.restoreState(dockStates)
 
@@ -119,12 +122,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.appearanceMenu.removeAction(action)
       elif action.isSeparator():
         encounteredSep = True
-    addDirItemsToMenu(self.appearanceMenu, './Schemes/*.scheme',
+    addDirItemsToMenu(self.appearanceMenu, join(SCHEMES_DIR, '*.scheme'),
                       self.loadSchemeActionTriggered, removeExistingChildren=False)
 
   @Slot(str)
   def loadSchemeActionTriggered(self, schemeName):
-    schemeDict = attemptLoadSettings(f'./Schemes/{schemeName}.scheme')
+    schemeFilename = join(SCHEMES_DIR, f'{schemeName}.scheme')
+    schemeDict = attemptLoadSettings(schemeFilename)
     if schemeDict is None:
       return
     self.scheme.loadScheme(schemeDict)
@@ -183,7 +187,7 @@ class MainWindow(QtWidgets.QMainWindow):
   @Slot()
   def saveLayoutActionTriggered(self):
     dockStates = self.saveState()
-    dialogSaveToFile(self, dockStates, 'Layout Name', './Layouts/', 'dockstate')
+    dialogSaveToFile(self, dockStates, 'Layout Name', LAYOUTS_DIR, 'dockstate')
     self.sigLayoutSaved.emit()
 
   @Slot(object)
