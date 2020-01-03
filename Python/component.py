@@ -9,10 +9,10 @@ Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
 from constants import ComponentTypes
-from SchemeEditor import SchemeEditor
+from ABGraphics.SchemeEditor import SchemeEditor
 from constants import SchemeValues as SV
 from ABGraphics.clickables import ClickableTextItem
-from ABGraphics.regions import VertexRegion, MultiRegionPlot
+from ABGraphics.regions import MultiRegionPlot
 
 # Ensure an application instance is running
 app = pg.mkQApp()
