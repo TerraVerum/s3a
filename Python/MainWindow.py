@@ -14,10 +14,11 @@ from SchemeEditor import SchemeEditor
 from component import Component, ComponentMgr
 from constants import SCHEMES_DIR, LAYOUTS_DIR
 
-from os.path import join
 import os
-
+from os.path import join
 import re
+import inspect
+
 # Configure pg to correctly read image dimensions
 pg.setConfigOptions(imageAxisOrder='row-major')
 
@@ -88,6 +89,16 @@ class MainWindow(QtWidgets.QMainWindow):
     self.resetRegionBtn.clicked.connect(self.resetRegionBtnClicked)
     self.acceptRegionBtn.clicked.connect(self.acceptRegionBtnClicked)
 
+    # Radio buttons
+    self.regionRadioBtnGroup.buttonClicked.connect(self.regionTypeChanged)
+
+    # Dropdowns
+    self.addRmCombo.currentIndexChanged.connect(self.addRmComboChanged)
+
+    # Checkboxes
+    self.allowEditsChk.stateChanged.connect(self.allowEditsChkChanged)
+
+
     # Edit fields
     self.seedThreshEdit.editingFinished.connect(self.seedThreshChanged)
     # Note: This signal must be false-triggered on startup to propagate
@@ -105,6 +116,22 @@ class MainWindow(QtWidgets.QMainWindow):
     # When a new scheme is created, switch to that scheme
     self.scheme.sigSchemeSaved.connect(self.loadSchemeActionTriggered)
 
+  # -----------------------------
+  # MainWindow CLASS FUNCTIONS
+  # -----------------------------
+
+  def resetMainImg(self, newIm: np.array):
+    self.mainImgItem.setImage(newIm)
+    self.compMgr.rmComps('all')
+
+
+  # -----------------------------
+  # SIGNAL CALLBACK FUNCTIONS
+  # -----------------------------
+  # ---------------
+  # MENU CALLBACKS
+  # ---------------
+
   def populateLoadLayoutOptions(self):
     layoutGlob = join(LAYOUTS_DIR, '*.dockstate')
     addDirItemsToMenu(self.loadLayout, layoutGlob, self.loadLayoutActionTriggered)
@@ -115,6 +142,12 @@ class MainWindow(QtWidgets.QMainWindow):
     dockStates = attemptLoadSettings(layoutFilename)
     if dockStates is not None:
       self.restoreState(dockStates)
+
+  @Slot()
+  def saveLayoutActionTriggered(self):
+    dockStates = self.saveState()
+    dialogSaveToFile(self, dockStates, 'Layout Name', LAYOUTS_DIR, 'dockstate')
+    self.sigLayoutSaved.emit()
 
   def populateSchemeOptions(self, newSchemeName=None):
     # We don't want all menu children to be removed, since this would also remove the 'add scheme' and
@@ -140,6 +173,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 'Scheme updated. Changes will take effect in future operations.',
                 QtGui.QMessageBox.Ok)
 
+  # ---------------
+  # BUTTON CALLBACKS
+  # ---------------
+  # Push buttons
   @Slot()
   def clearRegionBtnClicked(self):
     # Reset drawn comp vertices to nothing
@@ -159,10 +196,6 @@ class MainWindow(QtWidgets.QMainWindow):
   @Slot()
   def acceptRegionBtnClicked(self):
     self.compImg.saveNewVerts()
-
-  @Slot()
-  def seedThreshChanged(self):
-    self.compImg.seedThresh = np.float(self.seedThreshEdit.text())
 
   @Slot()
   def newImgBtnClicked(self):
@@ -191,12 +224,40 @@ class MainWindow(QtWidgets.QMainWindow):
   def clearBoundsBtnClicked(self):
     self.compMgr.rmComps()
 
+  # ---------------
+  # CHECK BOX CALLBACKS
+  # ---------------
   @Slot()
-  def saveLayoutActionTriggered(self):
-    dockStates = self.saveState()
-    dialogSaveToFile(self, dockStates, 'Layout Name', LAYOUTS_DIR, 'dockstate')
-    self.sigLayoutSaved.emit()
+  def allowEditsChkChanged(self):
+    self.compImg.allowEdits = self.allowEditsChk.isChecked()
 
+  # ---------------
+  # RADIO BUTTON CALLBACKS
+  # ---------------
+  @Slot()
+  def regionTypeChanged(self):
+    regionType = self.regionRadioBtnGroup.checkedButton().text()
+    self.compImg.regionType = regionType.lower()
+
+  # ---------------
+  # COMBO BOX CALLBACKS
+  # ---------------
+  @Slot(int)
+  def addRmComboChanged(self):
+    curTxt = self.addRmCombo.currentText()
+    self.compImg.inAddMode = curTxt == 'Add'
+
+  # ---------------
+  # TEXT EDIT CALLBACKS
+  # ---------------
+  @Slot()
+  def seedThreshChanged(self):
+    self.compImg.seedThresh = np.float(self.seedThreshEdit.text())
+
+
+  # ---------------
+  # CUSTOM UI ELEMENT CALLBACKS
+  # ---------------
   @Slot(object)
   @applyWaitCursor
   def updateCurComp(self, newComp: Component):
@@ -214,11 +275,6 @@ class MainWindow(QtWidgets.QMainWindow):
     # Find location of id in text string and replace with current ID
     htmlTxt = re.sub(r'ID: -?\d+', f'ID: {newComp.instanceId}', htmlTxt)
     self.curCompIdLbl.setText(htmlTxt)
-
-  def resetMainImg(self, newIm: np.array):
-    self.mainImgItem.setImage(newIm)
-    self.compMgr.rmComps('all')
-
 
 ## Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':

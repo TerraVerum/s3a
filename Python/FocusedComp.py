@@ -4,7 +4,7 @@ Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
 
 from processing import segmentComp, getVertsFromBwComps, growSeedpoint, nanConcatList, splitListAtNans
-from skimage.morphology import closing
+from skimage.morphology import closing, opening
 
 import numpy as np
 
@@ -19,6 +19,14 @@ class FocusedComp(pg.PlotWidget):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
+
+    # Whether drawing is allowed on the figure
+    self.allowEdits = True
+    # Whether drawn items should be added or removed from current component
+    self.inAddMode = True
+    # Type of region to add once the user clicks. See radio buttons on the
+    # image annotator UI
+    self.drawType = 'seedpoint'
 
     self.setAspectLocked(True)
 
@@ -46,19 +54,25 @@ class FocusedComp(pg.PlotWidget):
     self.compImgItem.sigClicked.connect(self.compImageClicked)
 
   def compImageClicked(self, ev: QtWidgets.QGraphicsSceneMouseEvent):
-    # Capture clicks only if component is present
-    if self.compImgItem.image is None:
+    # Capture clicks only if component is present and user allows it
+    if self.compImgItem.image is None or not self.allowEdits:
       return
     # TODO: Expand to include ROI, superpixel, etc.
     # y -> row, x -> col
-    newVert = np.round(np.array([[ev.pos().y(), ev.pos().x()]], dtype='int32'))
-    newArea = growSeedpoint(self.compImgItem.image, newVert, self.seedThresh).astype('uint8')
-    newArea |= self.region.embedMaskInImg(newArea.shape)
+    newVert = np.round(np.array([[ev.pos().y(), ev.pos().x()]], dtype='int'))
+    newArea = growSeedpoint(self.compImgItem.image, newVert, self.seedThresh)
+    curRegionMask = self.region.embedMaskInImg(newArea.shape)
+    if self.inAddMode:
+      newArea |= curRegionMask
+      newArea = closing(newArea, np.ones((5,5)))
+    else:
+      newArea = ~newArea & curRegionMask
+      newArea = opening(newArea, np.ones((5,5)))
     newArea = closing(newArea, np.ones((5,5)))
     # TODO: handle case of multiple regions existing after click. For now, just use
     # the largest
     vertsPerComp = getVertsFromBwComps(newArea)
-    vertsToUse = np.array([])
+    vertsToUse = np.empty((0,2), dtype='int')
     for verts in vertsPerComp:
       if verts.shape[0] > vertsToUse.shape[0]:
         vertsToUse = verts
