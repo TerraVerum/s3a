@@ -40,11 +40,11 @@ class ClickableTextItem(pg.TextItem):
     '''
     Overload setting text to utilize scheme editor
     '''
-    schemeClrProp = SV.nonValidIdColor
+    schemeClrProp = SV.NONVALID_ID_COLOR
     if validated:
-      schemeClrProp = SV.validIdColor
+      schemeClrProp = SV.VALID_ID_COLOR
     txtSize, txtClr = ClickableTextItem.scheme.getCompProps(
-        (SV.idFontSize, schemeClrProp))
+        (SV.ID_FONT_SIZE, schemeClrProp))
 
     curFont = self.textItem.font()
     curFont.setPointSize(txtSize)

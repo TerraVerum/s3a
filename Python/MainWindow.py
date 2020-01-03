@@ -65,8 +65,9 @@ class MainWindow(QtWidgets.QMainWindow):
     # ---------------
     # COMPONENT MANAGER
     # ---------------
-    self.compMgr = ComponentMgr(self.mainImg, self.mainImgItem)
+    self.compMgr = ComponentMgr(self.mainImg, self.compTbl)
     self.compMgr.sigCompClicked.connect(self.updateCurComp)
+    self.mainImgItem.sigImageChanged.connect(self.compMgr.resetCompBounds)
 
     # ---------------
     # LOAD SCHEME OPTIONS

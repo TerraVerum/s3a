@@ -4,7 +4,7 @@ from functools import partial
 import warnings
 
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore
+from pyqtgraph.Qt import QtCore, QtWidgets
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
@@ -18,6 +18,12 @@ from ABGraphics.regions import VertexRegion, MultiRegionPlot
 app = pg.mkQApp()
 
 class Component(QtCore.QObject):
+  # TODO:
+  # Since no fields will be added to this class, and potentially
+  # thousands of components may be registered per image, utilize
+  # 'slots' for memory efficiency
+  #__slots__ = ['_reqdUpdates', 'sigCompClicked', 'sigVertsChanged',
+               #'scheme', 'instanceId', 'vertices', 'deviceType',...]
   _reqdUpdates: Dict[str, list] = {}
 
   sigCompClicked = Signal()
@@ -79,16 +85,15 @@ class ComponentMgr(QtCore.QObject):
   _compList: List[Component] = []
   _nextCompId = 0
 
-  def __init__(self, mainImgArea: pg.GraphicsWidget, mainImgItem: pg.ImageItem):
+  def __init__(self, mainImgArea: pg.GraphicsWidget, compTbl: QtWidgets.QTableWidget):
     super().__init__()
     self._mainImgArea = mainImgArea
-    self._mainImgItem = mainImgItem
     self._compBounds = MultiRegionPlot()
+    self._compTbl = compTbl
     # Update comp image on main image change
-    mainImgItem.sigImageChanged.connect(self._updateCompBoundsPlt)
     self._mainImgArea.addItem(self._compBounds)
 
-  def addComps(self, comps: List[Component]):
+  def addComps(self, comps: List[Component], addtype='new'):
     # Preallocate list size since we know its size in advance
     newVerts = [None]*len(comps)
     newIds = np.arange(self._nextCompId, self._nextCompId + len(comps), dtype=int)
@@ -104,6 +109,7 @@ class ComponentMgr(QtCore.QObject):
     self._nextCompId += newIds[-1] + 1
     self._compList.extend(comps)
     self._compBounds.setRegions(newIds, newVerts)
+    self._updateCompTbl(comps)
 
   def rmComps(self, idsToRemove: Union[np.array, str] = 'all'):
     # Use numpy array so size is preallocated
@@ -137,19 +143,22 @@ class ComponentMgr(QtCore.QObject):
     if not np.all(tfRmIdx):
       self._nextCompId = np.max(existingCompIds[keepCompIdxs]) + 1
 
+  def _updateCompTbl(self, compList):
+    pass
+
   @Slot()
   def _rethrowCompClick(self):
     comp: Component = self.sender()
     self.sigCompClicked.emit(comp)
 
   @Slot()
-  def _updateCompBoundsPlt(self):
-    self._compBounds.resetRegionList()
-
-  @Slot()
   def _reflectVertsChanged(self):
     comp: Component = self.sender()
     self._compBounds.setRegions(comp.instanceId, comp.vertices)
+
+  @Slot()
+  def resetCompBounds(self):
+    self._compBounds.resetRegionList()
 
   @staticmethod
   def setScheme(scheme: SchemeEditor):

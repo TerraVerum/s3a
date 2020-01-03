@@ -49,7 +49,7 @@ class VertexRegion(pg.ImageItem):
 
   @staticmethod
   def getLUTFromScheme():
-    fillClr, vertClr = VertexRegion.scheme.getFocImgProps((SV.foc_fillColor, SV.foc_vertColor))
+    fillClr, vertClr = VertexRegion.scheme.getFocImgProps((SV.REG_FILL_COLOR, SV.REG_VERT_COLOR))
     lut = [(0,0,0,0)]
     for clr in fillClr, vertClr:
       lut.append(clr.getRgb())
@@ -73,9 +73,9 @@ class SaveablePolyROI(pg.PolyLineROI):
     '''
     if self.menu is None:
       menu = super().getMenu()
-      addAct = QtGui.QAction("Add to Region", menu)
-      menu.addAction(addAct)
-      self.addAct = addAct
+      finishPolyAct = QtGui.QAction("Finish Polygon", menu)
+      menu.addAction(finishPolyAct)
+      self.finishPolyAct = finishPolyAct
       self.menu = menu
     return self.menu
 
@@ -150,7 +150,7 @@ class MultiRegionPlot(pg.PlotDataItem):
     # Update scheme
     # -----------
     boundClr, boundWidth = MultiRegionPlot.scheme.getCompProps(
-                             (SV.boundaryColor, SV.boundaryWidth))
+                             (SV.BOUNDARY_COLOR, SV.BOUNDARY_WIDTH))
     pltPen = pg.mkPen(boundClr, width=boundWidth)
     self.setData(*concatData, pen=pltPen)
 

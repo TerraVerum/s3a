@@ -49,7 +49,7 @@ class FocusedComp(pg.PlotWidget):
     # Remove points when user asks to delete polygon
     self.interactor.sigRemoveRequested.connect(self.interactor.clearPoints)
     # Expand current mask by region on request
-    self.interactor.addAct.triggered.connect(self._addRoiToRegion)
+    self.interactor.finishPolyAct.triggered.connect(self._addRoiToRegion)
 
     self.compImgItem.sigClicked.connect(self.compImageClicked)
 
@@ -88,7 +88,7 @@ class FocusedComp(pg.PlotWidget):
     lastPos = handles[-1]['pos'] if len(handles) > 2 else None
     if lastPos is not None and abs(lastPos.x() - newVert.x()) < 5 \
                            and abs(lastPos.y() - newVert.y()) < 5:
-      self.interactor.addAct.triggered.emit()
+      self.interactor.finishPolyAct.triggered.emit()
     else:
       # Add point as normal
       prevVerts = [handle['pos'] for handle in handles]
