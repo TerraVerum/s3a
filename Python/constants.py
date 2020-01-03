@@ -16,13 +16,13 @@ class ComponentTypes(Enum):
 
 class ComponentTableFields(Enum):
   INST_ID:Enum = 'Instance ID'
-  VERTICES:Enum = 'Vertices'
+  VALIDATED:Enum = 'Validated'
   DEVICE_TYPE:Enum = 'Device Type'
-  BOARD_TEXT:Enum = 'Text On Board'
-  DEVICE_TEXT:Enum = 'Text on Device'
   LOGO:Enum = 'Logo'
   NOTES:Enum = 'Notes'
-  VALIDATED:Enum = 'Validated'
+  BOARD_TEXT:Enum = 'Board Text'
+  DEVICE_TEXT:Enum = 'Device Text'
+  VERTICES:Enum = 'Vertices'
 
 
 class SchemeValues(Enum):

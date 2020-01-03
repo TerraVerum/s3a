@@ -1,3 +1,6 @@
+# Required to avoid cyclic dependency from CompTable annotation
+from __future__ import annotations
+
 import numpy as np
 from typing import Dict, List, Union
 from functools import partial
@@ -13,6 +16,7 @@ from ABGraphics.SchemeEditor import SchemeEditor
 from constants import SchemeValues as SV
 from ABGraphics.clickables import ClickableTextItem
 from ABGraphics.regions import MultiRegionPlot
+from ABGraphics import CompTable
 
 # Ensure an application instance is running
 app = pg.mkQApp()
@@ -85,7 +89,7 @@ class ComponentMgr(QtCore.QObject):
   _compList: List[Component] = []
   _nextCompId = 0
 
-  def __init__(self, mainImgArea: pg.GraphicsWidget, compTbl: QtWidgets.QTableWidget):
+  def __init__(self, mainImgArea: pg.GraphicsWidget, compTbl: CompTable.CompTable):
     super().__init__()
     self._mainImgArea = mainImgArea
     self._compBounds = MultiRegionPlot()
@@ -109,7 +113,7 @@ class ComponentMgr(QtCore.QObject):
     self._nextCompId += newIds[-1] + 1
     self._compList.extend(comps)
     self._compBounds.setRegions(newIds, newVerts)
-    self._updateCompTbl(comps)
+    self._compTbl.addComps(comps)
 
   def rmComps(self, idsToRemove: Union[np.array, str] = 'all'):
     # Use numpy array so size is preallocated
@@ -142,9 +146,6 @@ class ComponentMgr(QtCore.QObject):
     self._nextCompId = 0
     if not np.all(tfRmIdx):
       self._nextCompId = np.max(existingCompIds[keepCompIdxs]) + 1
-
-  def _updateCompTbl(self, compList):
-    pass
 
   @Slot()
   def _rethrowCompClick(self):
