@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
+from abc import abstractmethod
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets
 from pyqtgraph.parametertree import Parameter, ParameterTree
-Signal = QtCore.pyqtSignal
 
 from constants import (
-  DEFAULT_SCHEME_DICT, SCHEMES_DIR, SchemeValues as SV)
+  DEFAULT_SCHEME_DICT, SCHEMES_DIR, SchemeValues as SV,
+  TABLE_EDIT_DICT, ComponentTableFields as CTF)
 from ABGraphics.utils import dialogSaveToFile
 
 import pickle as pkl
@@ -14,17 +15,12 @@ import pickle as pkl
 from typing import List, Union
 from os.path import join
 
+Signal = QtCore.pyqtSignal
 # Ensure app instance is running
 app = pg.mkQApp()
 
-class SchemeEditor(QtWidgets.QDialog):
-  '''
-  Only one instance of this class is intended for use for a given application.
-  So, don't import and instantiate this class. Rather, import the SCHEME variable
-  defined below this class definition.
-  '''
-  sigSchemeSaved = Signal(str)
 
+class ConstParamWidget(QtWidgets.QDialog):
   def __init__(self, parent=None):
     # Place in list so an empty value gets unpacked into super constructor
     parentArg = []
@@ -37,13 +33,8 @@ class SchemeEditor(QtWidgets.QDialog):
     # Construct parameter tree
     # -----------
     self.params = Parameter(name='Parameters', type='group')
-    self.params.addChildren(DEFAULT_SCHEME_DICT)
     self.tree = ParameterTree()
     self.tree.setParameters(self.params, showTop=False)
-
-    # Init default layout as export of DEFAULT_SCHEME_DICT
-    with open(join(SCHEMES_DIR, 'Default.scheme'), 'wb') as ofile:
-      pkl.dump(self.params.saveState(), ofile)
 
     # Allow the user to change column widths
     for colIdx in range(2):
@@ -52,14 +43,14 @@ class SchemeEditor(QtWidgets.QDialog):
     # -----------
     # Additional widget buttons
     # -----------
-    self.saveBtn = QtWidgets.QPushButton('Save and Switch')
+    self.acceptBtn = QtWidgets.QPushButton('Accept')
     self.cancelBtn = QtWidgets.QPushButton('Cancel')
 
     # -----------
     # Widget layout
     # -----------
     btnLayout = QtWidgets.QHBoxLayout()
-    btnLayout.addWidget(self.saveBtn)
+    btnLayout.addWidget(self.acceptBtn)
     btnLayout.addWidget(self.cancelBtn)
 
     centralLayout = QtWidgets.QVBoxLayout()
@@ -69,11 +60,45 @@ class SchemeEditor(QtWidgets.QDialog):
     # -----------
     # UI Element Signals
     # -----------
-    self.saveBtn.clicked.connect(self.saveBtnClicked)
+    self.acceptBtn.clicked.connect(self.acceptBtnClicked)
     self.cancelBtn.clicked.connect(self.close)
 
+  @abstractmethod
+  def acceptBtnClicked(self):
+    return
 
-  def saveBtnClicked(self, saveName=False):
+
+class TableRowEditor(ConstParamWidget):
+  sigEditFinished = Signal(list)
+  def __init__(self):
+    super().__init__()
+    self.params.addChildren(TABLE_EDIT_DICT)
+
+  def acceptBtnClicked(self) -> List:
+    """
+    :return: List where each index corresponds to the tree's parameter.
+    This is suitable for extending with an ID and vertex list, after which
+    it can be placed into the component table.
+    """
+    outList = []
+    for param in self.params.children():
+      outList.append(param.value())
+    self.sigEditFinished.emit(outList)
+    return outList
+
+
+class SchemeEditor(ConstParamWidget):
+  sigSchemeSaved = Signal(str)
+
+  def __init__(self, parent=None):
+    super().__init__()
+    self.params.addChildren(DEFAULT_SCHEME_DICT)
+
+    # Init default layout as export of DEFAULT_SCHEME_DICT
+    with open(join(SCHEMES_DIR, 'Default.scheme'), 'wb') as ofile:
+      pkl.dump(self.params.saveState(), ofile)
+
+  def acceptBtnClicked(self, saveName=False):
     newScheme = self.params.saveState()
     if saveName is False or saveName is None:
       saveName = dialogSaveToFile(self, newScheme, 'Scheme Name', SCHEMES_DIR, 'scheme', allowOverwriteDefault=False)
@@ -105,10 +130,14 @@ class SchemeEditor(QtWidgets.QDialog):
   def getFocImgProps(self, whichProps: List[SV]):
     return self._getProps(SV.FOC_IMG_PARAMS, whichProps)
 
-if __name__== '__main__':
+
+if __name__ == '__main__':
   win = QtWidgets.QWidget()
   layout = QtWidgets.QGridLayout()
   win.setLayout(layout)
-  layout.addWidget(SchemeEditor())
+  # layout.addWidget(SchemeEditor())
+  te = TableRowEditor()
+  te.sigEditFinished.connect(lambda lst: print(lst))
+  layout.addWidget(te)
   win.show()
   app.exec()

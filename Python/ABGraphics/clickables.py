@@ -2,7 +2,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
 Signal = QtCore.pyqtSignal
 
-from ABGraphics.SchemeEditor import SchemeEditor
+from ABGraphics.parameditors import SchemeEditor
 from constants import SchemeValues as SV
 
 

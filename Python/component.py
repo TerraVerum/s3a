@@ -12,7 +12,7 @@ Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
 from constants import ComponentTypes
-from ABGraphics.SchemeEditor import SchemeEditor
+from ABGraphics.parameditors import SchemeEditor
 from constants import SchemeValues as SV
 from ABGraphics.clickables import ClickableTextItem
 from ABGraphics.regions import MultiRegionPlot
@@ -113,7 +113,7 @@ class ComponentMgr(QtCore.QObject):
     self._nextCompId += newIds[-1] + 1
     self._compList.extend(comps)
     self._compBounds.setRegions(newIds, newVerts)
-    self._compTbl.addComps(comps)
+    self._compTbl.resetComps(self._compList)
 
   def rmComps(self, idsToRemove: Union[np.array, str] = 'all'):
     # Use numpy array so size is preallocated
@@ -141,6 +141,7 @@ class ComponentMgr(QtCore.QObject):
 
     # Update bound plot
     self._compBounds.setRegions(idsToRemove, [[] for id in idsToRemove])
+    self._compTbl.resetComps(self._compList)
 
     # Determine next ID for new components
     self._nextCompId = 0

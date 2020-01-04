@@ -10,7 +10,7 @@ from PIL import Image
 
 from processing import getBwComps, getVertsFromBwComps
 from ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, attemptLoadSettings
-from ABGraphics.SchemeEditor import SchemeEditor
+from ABGraphics.parameditors import SchemeEditor
 from component import Component, ComponentMgr
 from constants import SCHEMES_DIR, LAYOUTS_DIR
 

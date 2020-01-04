@@ -11,7 +11,7 @@ import numpy as np
 from ABGraphics.clickables import ClickableImageItem
 from ABGraphics.regions import VertexRegion, SaveablePolyROI
 from component import *
-from ABGraphics.SchemeEditor import SchemeEditor
+from ABGraphics.parameditors import SchemeEditor
 from constants import SchemeValues as SV
 
 class FocusedComp(pg.PlotWidget):

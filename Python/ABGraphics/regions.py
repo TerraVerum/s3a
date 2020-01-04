@@ -6,7 +6,7 @@ import cv2 as cv
 
 from typing import Tuple
 
-from ABGraphics.SchemeEditor import SchemeEditor
+from ABGraphics.parameditors import SchemeEditor
 from constants import SchemeValues as SV
 from processing import splitListAtNans
 
