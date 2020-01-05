@@ -42,19 +42,6 @@ class ComponentTableFields(Enum):
   DEVICE_TEXT: Enum = 'Device Text'
   VERTICES: Enum = 'Vertices'
 
-# Define shorthand terms for convenience
-_ = ComponentTableFields
-TABLE_EDIT_DICT = [
-  {'name': _.VALIDATED.value, 'type': 'bool', 'value': False},
-  {'name': _.DEVICE_TYPE.value, 'type': 'list', 'value': ComponentTypes.N_A.value,
-   'limits': [compType for compType in ComponentTypes]
-   },
-  {'name': _.LOGO.value, 'type': 'text', 'value': ''},
-  {'name': _.NOTES.value, 'type': 'text', 'value': ''},
-  {'name': _.BOARD_TEXT.value, 'type': 'text', 'value': ''},
-  {'name': _.DEVICE_TEXT.value, 'type': 'text', 'value': ''}
-]
-
 
 class SchemeValues(Enum):
   COMP_PARAMS: Enum = 'Component Parameters'
@@ -68,19 +55,3 @@ class SchemeValues(Enum):
   REG_VERT_COLOR: Enum = 'Vertex Color'
   REG_FILL_COLOR: Enum = 'Fill Color'
 
-
-# Define shorthand terms for convenience
-_ = SchemeValues
-DEFAULT_SCHEME_DICT = [
-  {'name': _.COMP_PARAMS.value, 'type': 'group', 'children': [
-    {'name': _.VALID_ID_COLOR.value, 'type': 'color', 'value': '0f0'},
-    {'name': _.NONVALID_ID_COLOR.value, 'type': 'color', 'value': 'f00'},
-    {'name': _.BOUNDARY_COLOR.value, 'type': 'color', 'value': 'ff0'},
-    {'name': _.BOUNDARY_WIDTH.value, 'type': 'int', 'value': 2},
-    {'name': _.ID_FONT_SIZE.value, 'type': 'int', 'value': 10}
-  ]},
-  {'name': _.FOC_IMG_PARAMS.value, 'type': 'group', 'children': [
-    {'name': _.REG_VERT_COLOR.value, 'type': 'color', 'value': '0f0'},
-    {'name': _.REG_FILL_COLOR.value, 'type': 'color', 'value': '00ff0046'}
-  ]},
-]

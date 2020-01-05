@@ -10,7 +10,7 @@ from PIL import Image
 
 from processing import getBwComps, getVertsFromBwComps
 from ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, attemptLoadSettings
-from ABGraphics.parameditors import SchemeEditor
+from ABGraphics.parameditors import SchemeEditor, TableFilterEditor
 from component import Component, ComponentMgr, CompDisplayFilter
 from constants import SCHEMES_DIR, LAYOUTS_DIR
 
@@ -71,7 +71,8 @@ class MainWindow(QtWidgets.QMainWindow):
     # COMPONENT DISPLAY FILTER
     # ---------------
     # TODO: Add filter widget for displaying only part of component data
-    self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl, [])
+    self.filterEditor = TableFilterEditor()
+    self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl, self.filterEditor)
 
     self.mainImgItem.sigImageChanged.connect(self.compDisplay.resetCompBounds)
     self.compDisplay.sigCompClicked.connect(self.updateCurComp)
@@ -94,6 +95,7 @@ class MainWindow(QtWidgets.QMainWindow):
     self.newImgBtn.clicked.connect(self.newImgBtnClicked)
     self.estBoundsBtn.clicked.connect(self.estBoundsBtnClicked)
     self.clearBoundsBtn.clicked.connect(self.clearBoundsBtnClicked)
+    self.filterBtn.clicked.connect(self.filterBtnClicked)
     self.clearRegionBtn.clicked.connect(self.clearRegionBtnClicked)
     self.resetRegionBtn.clicked.connect(self.resetRegionBtnClicked)
     self.acceptRegionBtn.clicked.connect(self.acceptRegionBtnClicked)
@@ -232,6 +234,11 @@ class MainWindow(QtWidgets.QMainWindow):
   @applyWaitCursor
   def clearBoundsBtnClicked(self):
     self.compMgr.rmComps()
+
+  @Slot()
+  @applyWaitCursor
+  def filterBtnClicked(self):
+    self.filterEditor.show()
 
   # ---------------
   # CHECK BOX CALLBACKS

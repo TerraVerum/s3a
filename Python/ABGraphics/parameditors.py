@@ -3,14 +3,16 @@ from abc import abstractmethod
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets
-from pyqtgraph.parametertree import Parameter, ParameterTree
+from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes as pTypes,
+                                     registerParameterType)
 
 from constants import (
-  DEFAULT_SCHEME_DICT, SCHEMES_DIR, SchemeValues as SV,
-  TABLE_EDIT_DICT, ComponentTableFields as CTF)
+  SCHEMES_DIR, SchemeValues as SV,
+  ComponentTableFields as CTF, ComponentTypes)
 from ABGraphics.utils import dialogSaveToFile
 
 import pickle as pkl
+import sys
 
 from typing import List, Union
 from os.path import join
@@ -18,7 +20,6 @@ from os.path import join
 Signal = QtCore.pyqtSignal
 # Ensure app instance is running
 app = pg.mkQApp()
-
 
 class ConstParamWidget(QtWidgets.QDialog):
   def __init__(self, parent=None):
@@ -68,11 +69,23 @@ class ConstParamWidget(QtWidgets.QDialog):
     return
 
 
+
 class TableRowEditor(ConstParamWidget):
+  # Emits list where each element corresponds to an edit field
   sigEditFinished = Signal(list)
   def __init__(self):
     super().__init__()
-    self.params.addChildren(TABLE_EDIT_DICT)
+    _TABLE_EDIT_DICT = [
+      {'name': CTF.VALIDATED.value, 'type': 'bool', 'value': False},
+      {'name': CTF.DEVICE_TYPE.value, 'type': 'list', 'value': ComponentTypes.N_A.value,
+       'limits': [compType for compType in ComponentTypes]
+       },
+      {'name': CTF.LOGO.value, 'type': 'text', 'value': ''},
+      {'name': CTF.NOTES.value, 'type': 'text', 'value': ''},
+      {'name': CTF.BOARD_TEXT.value, 'type': 'text', 'value': ''},
+      {'name': CTF.DEVICE_TEXT.value, 'type': 'text', 'value': ''}
+    ]
+    self.params.addChildren(_TABLE_EDIT_DICT)
 
   def acceptBtnClicked(self) -> List:
     """
@@ -86,13 +99,53 @@ class TableRowEditor(ConstParamWidget):
     self.sigEditFinished.emit(outList)
     return outList
 
+def _genList(nameIter, paramType, defaultVal):
+  """Helper for generating children elements"""
+  return [{'name': name, 'type': paramType, 'value': defaultVal} for name in nameIter]
+
+class TableFilterEditor(ConstParamWidget):
+  # Emits key-value pair of input filter options
+  sigEditFinished = Signal(dict)
+
+  def __init__(self):
+    super().__init__()
+    minMaxParam = _genList(['min', 'max'], 'int', 0)
+    # Make max 'infinity'
+    minMaxParam[1]['value'] = sys.maxsize
+    validatedParms = _genList(['Validated', 'Not Validated'], 'bool', True)
+    devTypeParam = _genList((name.value for name in ComponentTypes), 'bool', True)
+
+    _FILTER_DICT = [
+        {'name': CTF.INST_ID.value, 'type': 'group', 'children': minMaxParam},
+        {'name': CTF.VALIDATED.value, 'type': 'group', 'children': validatedParms},
+        {'name': CTF.DEVICE_TYPE.value, 'type': 'group', 'children': devTypeParam},
+        {'name': f'{CTF.LOGO.value} regex', 'type': 'str', 'value': '.*'},
+        {'name': f'{CTF.NOTES.value} regex', 'type': 'str', 'value': '.*'},
+        {'name': f'{CTF.BOARD_TEXT.value} regex', 'type': 'str', 'value': '.*'},
+        {'name': f'{CTF.DEVICE_TEXT.value} regex', 'type': 'str', 'value': '.*'}
+      ]
+    self.params.addChildren(_FILTER_DICT)
+
 
 class SchemeEditor(ConstParamWidget):
   sigSchemeSaved = Signal(str)
 
   def __init__(self, parent=None):
     super().__init__()
-    self.params.addChildren(DEFAULT_SCHEME_DICT)
+    _DEFAULT_SCHEME_DICT = [
+      {'name': SV.COMP_PARAMS.value, 'type': 'group', 'children': [
+        {'name': SV.VALID_ID_COLOR.value, 'type': 'color', 'value': '0f0'},
+        {'name': SV.NONVALID_ID_COLOR.value, 'type': 'color', 'value': 'f00'},
+        {'name': SV.BOUNDARY_COLOR.value, 'type': 'color', 'value': 'ff0'},
+        {'name': SV.BOUNDARY_WIDTH.value, 'type': 'int', 'value': 2},
+        {'name': SV.ID_FONT_SIZE.value, 'type': 'int', 'value': 10}
+      ]},
+      {'name': SV.FOC_IMG_PARAMS.value, 'type': 'group', 'children': [
+        {'name': SV.REG_VERT_COLOR.value, 'type': 'color', 'value': '0f0'},
+        {'name': SV.REG_FILL_COLOR.value, 'type': 'color', 'value': '00ff0046'}
+      ]},
+    ]
+    self.params.addChildren(_DEFAULT_SCHEME_DICT)
 
     # Init default layout as export of DEFAULT_SCHEME_DICT
     with open(join(SCHEMES_DIR, 'Default.scheme'), 'wb') as ofile:
@@ -129,15 +182,3 @@ class SchemeEditor(ConstParamWidget):
 
   def getFocImgProps(self, whichProps: List[SV]):
     return self._getProps(SV.FOC_IMG_PARAMS, whichProps)
-
-
-if __name__ == '__main__':
-  win = QtWidgets.QWidget()
-  layout = QtWidgets.QGridLayout()
-  win.setLayout(layout)
-  # layout.addWidget(SchemeEditor())
-  te = TableRowEditor()
-  te.sigEditFinished.connect(lambda lst: print(lst))
-  layout.addWidget(te)
-  win.show()
-  app.exec()
