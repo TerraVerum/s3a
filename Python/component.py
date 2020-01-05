@@ -2,14 +2,14 @@
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
+from pandas import DataFrame as df
 from typing import Dict, List, Union
 from functools import partial
 import warnings
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets
-Signal = QtCore.pyqtSignal
-Slot = QtCore.pyqtSlot
 
 from constants import ComponentTypes
 from ABGraphics.parameditors import SchemeEditor
@@ -18,6 +18,8 @@ from ABGraphics.clickables import ClickableTextItem
 from ABGraphics.regions import MultiRegionPlot
 from ABGraphics import CompTable
 
+Signal = QtCore.pyqtSignal
+Slot = QtCore.pyqtSlot
 # Ensure an application instance is running
 app = pg.mkQApp()
 
@@ -86,7 +88,6 @@ class Component(QtCore.QObject):
 class ComponentMgr(QtCore.QObject):
   sigCompClicked = Signal(object)
 
-  _compList: List[Component] = []
   _nextCompId = 0
 
   def __init__(self, mainImgArea: pg.GraphicsWidget, compTbl: CompTable.CompTable):
@@ -96,48 +97,49 @@ class ComponentMgr(QtCore.QObject):
     self._compTbl = compTbl
     # Update comp image on main image change
     self._mainImgArea.addItem(self._compBounds)
+    name_typeTups = [(key, type(val)) for key, val in Component().__dict__.items()]
+    self._compList = df(columns=[tup[0] for tup in name_typeTups])
+    # Ensure ID is numeric
+    self._compList['instanceId'] = self._compList['instanceId'].astype(int)
 
   def addComps(self, comps: List[Component], addtype='new'):
     # Preallocate list size since we know its size in advance
     newVerts = [None]*len(comps)
     newIds = np.arange(self._nextCompId, self._nextCompId + len(comps), dtype=int)
+    newDf_list = []
     for ii, comp in enumerate(comps):
       newVerts[ii] = comp.vertices
       comp.instanceId = newIds[ii]
+      newDf_list.append([getattr(comp, field) for field in comp.__dict__])
       self._mainImgArea.addItem(comp._txtPlt)
-
       # Listen for component signals and rethrow them
       comp.sigCompClicked.connect(self._rethrowCompClick)
       comp.sigVertsChanged.connect(self._reflectVertsChanged)
 
     self._nextCompId += newIds[-1] + 1
-    self._compList.extend(comps)
+    newDf = df(newDf_list, columns=self._compList.columns)
+    self._compList = pd.concat((self._compList, newDf))
     self._compBounds.setRegions(newIds, newVerts)
     self._compTbl.resetComps(self._compList)
 
   def rmComps(self, idsToRemove: Union[np.array, str] = 'all'):
-    # Use numpy array so size is preallocated
-    curComps = np.array(self._compList)
     # Generate ID list
-    existingCompIds = [obj.instanceId for obj in self._compList]
+    existingCompIds = self._compList.instanceId
     if idsToRemove == 'all':
       idsToRemove = existingCompIds
     elif not hasattr(idsToRemove, '__iter__'):
       # single number passed in
       idsToRemove = [idsToRemove]
       pass
-    idsToRemove = np.array(idsToRemove)
-    existingCompIds = np.array(existingCompIds)
 
     tfRmIdx = np.isin(existingCompIds, idsToRemove)
-    rmCompIdxs = np.nonzero(tfRmIdx)[0]
-    keepCompIdxs = np.nonzero(np.invert(tfRmIdx))[0]
-    for idx in rmCompIdxs:
-      curComp: Component = self._compList[idx]
-      self._mainImgArea.removeItem(curComp._txtPlt)
+
+    plotsToRemove = self._compList.loc[tfRmIdx, '_txtPlt']
+    for plt in plotsToRemove:
+      self._mainImgArea.removeItem(plt)
 
     # Reset manager's component list
-    self._compList = list(curComps[keepCompIdxs])
+    self._compList = self._compList.loc[np.invert(tfRmIdx),:]
 
     # Update bound plot
     self._compBounds.setRegions(idsToRemove, [[] for id in idsToRemove])
@@ -146,7 +148,7 @@ class ComponentMgr(QtCore.QObject):
     # Determine next ID for new components
     self._nextCompId = 0
     if not np.all(tfRmIdx):
-      self._nextCompId = np.max(existingCompIds[keepCompIdxs]) + 1
+      self._nextCompId = np.max(existingCompIds[np.invert(tfRmIdx)]) + 1
 
   @Slot()
   def _rethrowCompClick(self):
@@ -167,7 +169,7 @@ class ComponentMgr(QtCore.QObject):
     # Pass this scheme to the MultiRegionPlot
     MultiRegionPlot.setScheme(scheme)
 
-if __name__== '__main__':
+if __name__ == '__main__':
   from PIL import Image
   mw = pg.PlotWindow()
   item = pg.ImageItem(np.array(Image.open('../fast.tif')))

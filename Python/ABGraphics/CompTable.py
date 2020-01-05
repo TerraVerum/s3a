@@ -1,6 +1,8 @@
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 
+import numpy as np
+
 from constants import ComponentTableFields as CTF
 import component
 
@@ -31,9 +33,8 @@ class CompTable(pg.TableWidget):
     self._xpondingCompFields = xpondingCompFields
 
   def addComps(self, compList):
-    for comp in compList:
-      curRow = [getattr(comp, field) for field in self._xpondingCompFields]
-      self.addRow(curRow)
+    compArr = np.array(compList.loc[:,self._xpondingCompFields])
+    self.appendData(compArr)
 
   def resetComps(self, compList):
     self.setRowCount(0)
