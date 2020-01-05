@@ -21,6 +21,11 @@ Signal = QtCore.pyqtSignal
 # Ensure app instance is running
 app = pg.mkQApp()
 
+def _genList(nameIter, paramType, defaultVal, defaultParam='value'):
+  """Helper for generating children elements"""
+  return [{'name': name, 'type': paramType, defaultParam: defaultVal} for name in nameIter]
+
+
 class ConstParamWidget(QtWidgets.QDialog):
   def __init__(self, parent=None):
     # Place in list so an empty value gets unpacked into super constructor
@@ -64,6 +69,21 @@ class ConstParamWidget(QtWidgets.QDialog):
     self.acceptBtn.clicked.connect(self.acceptBtnClicked)
     self.cancelBtn.clicked.connect(self.close)
 
+  def __getitem__(self, key):
+    paramList = self._paramsToList()
+    return paramList[key]
+
+  def _paramsToList(self) -> list:
+    """
+    :return: List where each index corresponds to the tree's parameter.
+    This is suitable for extending with an ID and vertex list, after which
+    it can be placed into the component table.
+    """
+    outList = []
+    for param in self.params.children():
+      outList.append(param.value())
+    return outList
+
   @abstractmethod
   def acceptBtnClicked(self):
     return
@@ -93,15 +113,10 @@ class TableRowEditor(ConstParamWidget):
     This is suitable for extending with an ID and vertex list, after which
     it can be placed into the component table.
     """
-    outList = []
-    for param in self.params.children():
-      outList.append(param.value())
+    outList = self[:]
     self.sigEditFinished.emit(outList)
     return outList
 
-def _genList(nameIter, paramType, defaultVal):
-  """Helper for generating children elements"""
-  return [{'name': name, 'type': paramType, 'value': defaultVal} for name in nameIter]
 
 class TableFilterEditor(ConstParamWidget):
   # Emits key-value pair of input filter options
@@ -114,6 +129,7 @@ class TableFilterEditor(ConstParamWidget):
     minMaxParam[1]['value'] = sys.maxsize
     validatedParms = _genList(['Validated', 'Not Validated'], 'bool', True)
     devTypeParam = _genList((name.value for name in ComponentTypes), 'bool', True)
+    xyVerts = _genList(['X Bounds', 'Y Bounds'], 'group', minMaxParam, 'children')
 
     _FILTER_DICT = [
         {'name': CTF.INST_ID.value, 'type': 'group', 'children': minMaxParam},
@@ -122,10 +138,22 @@ class TableFilterEditor(ConstParamWidget):
         {'name': f'{CTF.LOGO.value} regex', 'type': 'str', 'value': '.*'},
         {'name': f'{CTF.NOTES.value} regex', 'type': 'str', 'value': '.*'},
         {'name': f'{CTF.BOARD_TEXT.value} regex', 'type': 'str', 'value': '.*'},
-        {'name': f'{CTF.DEVICE_TEXT.value} regex', 'type': 'str', 'value': '.*'}
+        {'name': f'{CTF.DEVICE_TEXT.value} regex', 'type': 'str', 'value': '.*'},
+        {'name': f'{CTF.VERTICES.value}', 'type': 'group', 'children': xyVerts}
       ]
     self.params.addChildren(_FILTER_DICT)
 
+  def acceptBtnClicked(self) -> List:
+    """
+    :return: List where each index corresponds to the tree's parameter.
+    This is suitable for extending with an ID and vertex list, after which
+    it can be placed into the component table.
+    """
+    outDict = {}
+    for param in self.params.children():
+      outDict[param.name()] = param.value()
+    self.sigEditFinished.emit(outDict)
+    return outDict
 
 class SchemeEditor(ConstParamWidget):
   sigSchemeSaved = Signal(str)
