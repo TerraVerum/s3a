@@ -11,7 +11,7 @@ from PIL import Image
 from processing import getBwComps, getVertsFromBwComps
 from ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, attemptLoadSettings
 from ABGraphics.parameditors import SchemeEditor
-from component import Component, ComponentMgr
+from component import Component, ComponentMgr, CompDisplayFilter
 from constants import SCHEMES_DIR, LAYOUTS_DIR
 
 import os
@@ -65,9 +65,17 @@ class MainWindow(QtWidgets.QMainWindow):
     # ---------------
     # COMPONENT MANAGER
     # ---------------
-    self.compMgr = ComponentMgr(self.mainImg, self.compTbl)
-    self.compMgr.sigCompClicked.connect(self.updateCurComp)
-    self.mainImgItem.sigImageChanged.connect(self.compMgr.resetCompBounds)
+    self.compMgr = ComponentMgr()
+
+    # ---------------
+    # COMPONENT DISPLAY FILTER
+    # ---------------
+    # TODO: Add filter widget for displaying only part of component data
+    self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl, [])
+
+    self.mainImgItem.sigImageChanged.connect(self.compDisplay.resetCompBounds)
+    self.compDisplay.sigCompClicked.connect(self.updateCurComp)
+
 
     # ---------------
     # LOAD SCHEME OPTIONS
@@ -77,7 +85,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # Attach scheme to all UI children
     self.compImg.setScheme(self.scheme)
     Component.setScheme(self.scheme)
-    ComponentMgr.setScheme(self.scheme)
+    CompDisplayFilter.setScheme(self.scheme)
 
     # ---------------
     # UI ELEMENT SIGNALS

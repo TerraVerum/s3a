@@ -105,35 +105,37 @@ class MultiRegionPlot(pg.PlotDataItem):
     self._nanSep.fill(np.nan)
 
   def resetRegionList(self, newIds=[], newRegions = []):
-    self.regions = newRegions
-    self.ids = newIds
+    self.regions = []
+    self.ids = []
     self.updatePlot()
+    self[newIds] = newRegions
 
   def setRegions(self, regionIds, vertices):
     '''
     If the region already exists, update it. Otherwise, append to the list.
     If region vertices are empty, remove the region
     '''
-    # Wrap single region instances in list to allow batch processing
-    if not hasattr(regionIds, '__iter__'):
-      regionIds = [regionIds]
-      vertices = [vertices]
-    for curId, curVerts in zip(regionIds, vertices):
-      try:
-        regionIdx = self.ids.index(curId)
-        if len(curVerts) == 0:
-          del self.regions[regionIdx]
-          del self.ids[regionIdx]
-        else:
-          # Add nan values to indicate separate regions once all verts
-          # are concatenated for plotting
-          curVerts = np.vstack((curVerts, self._nanSep))
-          self.regions[regionIdx] = curVerts
-      except ValueError:
-        if len(curVerts) > 0:
-          self.ids.append(curId)
-          curVerts = np.vstack((curVerts, self._nanSep))
-          self.regions.append(curVerts)
+    self[regionIds] = vertices
+    ## Wrap single region instances in list to allow batch processing
+    #if not hasattr(regionIds, '__iter__'):
+      #regionIds = [regionIds]
+      #vertices = [vertices]
+    #for curId, curVerts in zip(regionIds, vertices):
+      #try:
+        #regionIdx = self.ids.index(curId)
+        #if len(curVerts) == 0:
+          #del self.regions[regionIdx]
+          #del self.ids[regionIdx]
+        #else:
+          ## Add nan values to indicate separate regions once all verts
+          ## are concatenated for plotting
+          #curVerts = np.vstack((curVerts, self._nanSep))
+          #self.regions[regionIdx] = curVerts
+      #except ValueError:
+        #if len(curVerts) > 0:
+          #self.ids.append(curId)
+          #curVerts = np.vstack((curVerts, self._nanSep))
+          #self.regions.append(curVerts)
     self.updatePlot()
 
   def updatePlot(self):
@@ -153,6 +155,62 @@ class MultiRegionPlot(pg.PlotDataItem):
                              (SV.BOUNDARY_COLOR, SV.BOUNDARY_WIDTH))
     pltPen = pg.mkPen(boundClr, width=boundWidth)
     self.setData(*concatData, pen=pltPen)
+
+  def __getitem__(self, regionIds):
+    """
+    Allows retrieval of vertex list for a given id list
+    """
+    # Wrap single region instances in list to allow batch processing
+    returnSingle = False
+    if not hasattr(regionIds, '__iter__'):
+      returnSingle = True
+      regionIds = np.array([regionIds])
+    outList = np.empty(regionIds.size, dtype=object)
+
+    for ii, curId in enumerate(regionIds):
+      try:
+        regionIdx = self.ids.index(curId)
+        # Found the region
+        outList[ii] = self.regions[regionIdx]
+      except ValueError:
+        # Requested ID was not in the displayed regions. Indicate with '[]'
+        outList[ii] = []
+    # Unwrap single value at end
+    if returnSingle:
+      outList = outList[0]
+    return outList
+
+  def __setitem__(self, regionIds, newVerts):
+    if not hasattr(regionIds, '__iter__'):
+      regionIds = [regionIds]
+      newVerts = [newVerts]
+    elif len(newVerts) == 1:
+      # Same value for all specified region ids
+      newVerts = [newVerts for _ in regionIds]
+    regionIds = np.array(regionIds)
+    newVerts = np.array(newVerts)
+
+    emptyVertIdxs = np.array([len(verts) == 0 for verts in newVerts], dtype=bool)
+    # If new verts are empty, delete the region
+    keepIds = regionIds[~emptyVertIdxs]
+    vertsAtKeepIds = newVerts[~emptyVertIdxs]
+    rmIds = regionIds[emptyVertIdxs]
+    for curId, curVerts in zip(keepIds, vertsAtKeepIds):
+      # Ensure the vert list ends with nans
+      if not np.isnan(curVerts[-1,0]):
+        curVerts = np.vstack((curVerts, self._nanSep))
+      # Append if not already present in list
+      try:
+        idIdx = self.ids.index(curId)
+        self.regions[idIdx] = curVerts
+      except ValueError:
+        self.ids.append(curId)
+        self.regions.append(curVerts)
+    for curId in rmIds:
+      idIdx = self.ids.index(curId)
+      del self.ids[idIdx]
+      del self.regions[idIdx]
+    self.updatePlot()
 
   @staticmethod
   def setScheme(scheme):
