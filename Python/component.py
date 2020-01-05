@@ -163,12 +163,6 @@ class ComponentMgr(QtCore.QObject):
     component ids
     """
     return self._compList.index.intersection(idList)
-    #existingIds = np.array(self._compList.loc[:, 'instanceId'])
-    #existenceMat = existingIds[:,None] == idList[None,:]
-    #unsortedIdxs = np.nonzero(existenceMat)
-    ## Sort by appearance column number so the ids are in the same order of their request
-    #sortedIdxList = np.sort(unsortedIdxs[1])
-    #return sortedIdxList
 
   def _rethrowClick(self):
     comp = self.sender()
