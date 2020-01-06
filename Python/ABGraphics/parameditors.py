@@ -120,7 +120,7 @@ class TableRowEditor(ConstParamWidget):
 
 class TableFilterEditor(ConstParamWidget):
   # Emits key-value pair of input filter options
-  sigEditFinished = Signal(dict)
+  sigFilterChanged = Signal(dict)
 
   def __init__(self):
     super().__init__()
@@ -135,11 +135,11 @@ class TableFilterEditor(ConstParamWidget):
         {'name': CTF.INST_ID.value, 'type': 'group', 'children': minMaxParam},
         {'name': CTF.VALIDATED.value, 'type': 'group', 'children': validatedParms},
         {'name': CTF.DEVICE_TYPE.value, 'type': 'group', 'children': devTypeParam},
-        {'name': f'{CTF.LOGO.value} regex', 'type': 'str', 'value': '.*'},
-        {'name': f'{CTF.NOTES.value} regex', 'type': 'str', 'value': '.*'},
-        {'name': f'{CTF.BOARD_TEXT.value} regex', 'type': 'str', 'value': '.*'},
-        {'name': f'{CTF.DEVICE_TEXT.value} regex', 'type': 'str', 'value': '.*'},
-        {'name': f'{CTF.VERTICES.value}', 'type': 'group', 'children': xyVerts}
+        {'name': CTF.LOGO.value, 'type': 'str', 'value': '.*'},
+        {'name': CTF.NOTES.value, 'type': 'str', 'value': '.*'},
+        {'name': CTF.BOARD_TEXT.value, 'type': 'str', 'value': '.*'},
+        {'name': CTF.DEVICE_TEXT.value, 'type': 'str', 'value': '.*'},
+        {'name': CTF.VERTICES.value, 'type': 'group', 'children': xyVerts}
       ]
     self.params.addChildren(_FILTER_DICT)
 
@@ -149,10 +149,9 @@ class TableFilterEditor(ConstParamWidget):
     This is suitable for extending with an ID and vertex list, after which
     it can be placed into the component table.
     """
-    outDict = {}
-    for param in self.params.children():
-      outDict[param.name()] = param.value()
-    self.sigEditFinished.emit(outDict)
+    # TODO: Add method to save this filter to a menu like schemes and layouts
+    outDict = self.params.getValues()
+    self.sigFilterChanged.emit(outDict)
     return outDict
 
 class SchemeEditor(ConstParamWidget):

@@ -12,8 +12,8 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets
 
 from constants import ComponentTypes
-from ABGraphics.parameditors import SchemeEditor
-from constants import SchemeValues as SV
+from ABGraphics.parameditors import SchemeEditor, TableFilterEditor
+from constants import SchemeValues as SV, ComponentTableFields as CTF
 from ABGraphics.clickables import ClickableTextItem
 from ABGraphics.regions import MultiRegionPlot
 from ABGraphics import CompTable
@@ -83,7 +83,7 @@ class Component(QtCore.QObject):
 
 class ComponentMgr(QtCore.QObject):
   # Emits 3-element dict: Deleted comp ids, changed comp ids, added comp ids
-  _defaultEmitDict = {'deleted': np.array([]), 'changed': np.array([]), 'added': np.array([])}
+  defaultEmitDict = {'deleted': np.array([]), 'changed': np.array([]), 'added': np.array([])}
   sigCompsChanged = Signal(dict)
   sigCompClicked = Signal(object)
   sigCompVertsChanged = Signal(object)
@@ -98,7 +98,7 @@ class ComponentMgr(QtCore.QObject):
     self._compList['instanceId'] = self._compList['instanceId'].astype(int)
 
   def addComps(self, comps: List[Component], addtype='new'):
-    toEmit = self._defaultEmitDict.copy()
+    toEmit = self.defaultEmitDict.copy()
     # Preallocate list size since we know its size in advance
     newVerts = [None]*len(comps)
     newIds = np.arange(self._nextCompId, self._nextCompId + len(comps), dtype=int)
@@ -117,7 +117,7 @@ class ComponentMgr(QtCore.QObject):
     self.sigCompsChanged.emit(toEmit)
 
   def rmComps(self, idsToRemove: Union[np.array, str] = 'all'):
-    toEmit = self._defaultEmitDict.copy()
+    toEmit = self.defaultEmitDict.copy()
     # Generate ID list
     existingCompIds = self._compList.instanceId
     if idsToRemove == 'all':
@@ -176,10 +176,10 @@ class CompDisplayFilter(QtCore.QObject):
   sigCompClicked = Signal(object)
 
   def __init__(self, compMgr: ComponentMgr, mainImg: pg.PlotWindow,
-               compTbl: CompTable, filterWidget):
+               compTbl: CompTable, filterEditor: TableFilterEditor):
     super().__init__()
     self._mainImgArea = mainImg
-    self._filter = filterWidget
+    self._filter = filterEditor.params.getValues()
     self._compTbl = compTbl
     self._compMgr = compMgr
 
@@ -187,6 +187,9 @@ class CompDisplayFilter(QtCore.QObject):
     self._compMgr.sigCompClicked.connect(self._rethrowCompClicked)
     self._compMgr.sigCompVertsChanged.connect(self._reflectVertsChanged)
     self._compMgr.sigCompsChanged.connect(self.redrawComps)
+
+    # Retrieve filter changes
+    filterEditor.sigFilterChanged.connect(self._updateFilter)
 
     self._compBounds = MultiRegionPlot()
     self._displayedIds = np.array([], dtype=int)
@@ -208,8 +211,11 @@ class CompDisplayFilter(QtCore.QObject):
     # For new components: Add hidden id plot. This will be shown later if filter allows
     pltsToAdd = self._compMgr[idLists['added'],'_txtPlt']
     for plt in pltsToAdd: # Type: ClickableTextItem
-      plt.hide()
       self._mainImgArea.addItem(plt)
+
+    # Hide all other ids, since they will be reshown as needed after display filtering
+    for plt in self._compMgr[:, '_txtPlt']:
+      plt.hide()
 
     # Component deleted: Delete hidden id plot
     idsToRm = idLists['deleted']
@@ -222,7 +228,7 @@ class CompDisplayFilter(QtCore.QObject):
     # functions that hook into signals sent from filter widget
     # TODO: Implement this logic. Will be placed in self._displayedIds
     # Only plot shown vertices
-    self._displayedIds = self._compMgr[:,'instanceId']
+    self._populateDisplayedIds()
 
     pltsToShow = self._compMgr[self._displayedIds, '_txtPlt']
     for plt in pltsToShow:
@@ -231,6 +237,85 @@ class CompDisplayFilter(QtCore.QObject):
 
     # Reset list of plot handles
     self._oldPlotsDf = self._compMgr[:,['instanceId', '_txtPlt']]
+
+  def _updateFilter(self, newFilterDict):
+    self._filter = newFilterDict
+    self.redrawComps(self._compMgr.defaultEmitDict)
+
+  def _populateDisplayedIds(self):
+    curComps = self._compMgr[:,:]
+
+    # idx 0 = value, 1 = children
+    # ------
+    # ID FILTERING
+    # ------
+    curParam = self._filter[CTF.INST_ID.value][1]
+    curmin, curmax = [curParam[name][0] for name in ['min', 'max']]
+
+    idList = np.array(curComps.loc[:, 'instanceId'], dtype=int)
+    curComps = curComps.loc[(idList >= curmin) & (idList <= curmax),:]
+
+    # ------
+    # VALIDATED FILTERING
+    # ------
+    curParam = self._filter[CTF.VALIDATED.value][1]
+    allowValid, allowInvalid = [curParam[name][0] for name in ['Validated', 'Not Validated']]
+
+    validList = np.array(curComps.loc[:, 'validated'], dtype=bool)
+    if not allowValid:
+      curComps = curComps.loc[~validList, :]
+    if not allowInvalid:
+      curComps = curComps.loc[validList, :]
+
+    # ------
+    # DEVICE TYPE FILTERING
+    # ------
+    compTypes = np.array(curComps.loc[:, 'deviceType'])
+    curParam = self._filter[CTF.DEVICE_TYPE.value][1]
+    allowedTypes = []
+    for curType in ComponentTypes:
+      isAllowed = curParam[curType.value][0]
+      if isAllowed:
+        allowedTypes.append(curType)
+    curComps = curComps.loc[np.isin(compTypes, allowedTypes),:]
+
+    # ------
+    # LOGO, NOTES, BOARD, DEVICE TEXT FILTERING
+    # ------
+    nextParamNames = [param.value for param in [CTF.LOGO, CTF.NOTES, CTF.BOARD_TEXT, CTF.DEVICE_TEXT]]
+    nextParamCompNames = ['logo', 'notes', 'boardText', 'deviceText']
+    for param, compParamName in zip(nextParamNames, nextParamCompNames):
+      compParamVals = curComps.loc[:, compParamName]
+      allowedRegex = self._filter[param][0]
+      isCompAllowed = compParamVals.str.contains(allowedRegex, regex=True, case=False)
+      curComps = curComps.loc[isCompAllowed,:]
+
+    # ------
+    # VERTEX FILTERING
+    # ------
+    compVerts = curComps.loc[:, 'vertices']
+    vertsAllowed = np.ones(len(compVerts), dtype=bool)
+
+    vertParam = self._filter[CTF.VERTICES.value][1]
+    xParam = vertParam['X Bounds'][1]
+    yParam = vertParam['Y Bounds'][1]
+    xmin, xmax, ymin, ymax = [param[val][0] for param in (xParam, yParam) for val in ['min', 'max']]
+
+    for ii, verts in enumerate(compVerts):
+      xVerts = verts[:,0]
+      yVerts = verts[:,1]
+      isAllowed = np.all((xVerts >= xmin) & (xVerts <= xmax)) & \
+                  np.all((yVerts >= ymin) & (yVerts <= ymax))
+      vertsAllowed[ii] = isAllowed
+    curComps = curComps.loc[vertsAllowed,:]
+
+    # Give self the id list of surviving comps
+    self._displayedIds = np.array(curComps.loc[:, 'instanceId'])
+
+
+
+
+
 
 
   @Slot(object)
