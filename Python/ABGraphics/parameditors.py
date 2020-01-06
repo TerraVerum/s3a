@@ -69,10 +69,6 @@ class ConstParamWidget(QtWidgets.QDialog):
     self.acceptBtn.clicked.connect(self.acceptBtnClicked)
     self.cancelBtn.clicked.connect(self.close)
 
-  def __getitem__(self, key):
-    paramList = self._paramsToList()
-    return paramList[key]
-
   def _paramsToList(self) -> list:
     """
     :return: List where each index corresponds to the tree's parameter.

@@ -110,34 +110,6 @@ class MultiRegionPlot(pg.PlotDataItem):
     self.updatePlot()
     self[newIds] = newRegions
 
-  def setRegions(self, regionIds, vertices):
-    '''
-    If the region already exists, update it. Otherwise, append to the list.
-    If region vertices are empty, remove the region
-    '''
-    self[regionIds] = vertices
-    ## Wrap single region instances in list to allow batch processing
-    #if not hasattr(regionIds, '__iter__'):
-      #regionIds = [regionIds]
-      #vertices = [vertices]
-    #for curId, curVerts in zip(regionIds, vertices):
-      #try:
-        #regionIdx = self.ids.index(curId)
-        #if len(curVerts) == 0:
-          #del self.regions[regionIdx]
-          #del self.ids[regionIdx]
-        #else:
-          ## Add nan values to indicate separate regions once all verts
-          ## are concatenated for plotting
-          #curVerts = np.vstack((curVerts, self._nanSep))
-          #self.regions[regionIdx] = curVerts
-      #except ValueError:
-        #if len(curVerts) > 0:
-          #self.ids.append(curId)
-          #curVerts = np.vstack((curVerts, self._nanSep))
-          #self.regions.append(curVerts)
-    self.updatePlot()
-
   def updatePlot(self):
     # -----------
     # Update data
@@ -181,6 +153,10 @@ class MultiRegionPlot(pg.PlotDataItem):
     return outList
 
   def __setitem__(self, regionIds, newVerts):
+    '''
+    If the region already exists, update it. Otherwise, append to the list.
+    If region vertices are empty, remove the region
+    '''
     if not hasattr(regionIds, '__iter__'):
       regionIds = [regionIds]
       newVerts = [newVerts]

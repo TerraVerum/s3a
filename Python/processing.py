@@ -112,5 +112,18 @@ def splitListAtNans(concatVerts:np.ndarray):
     allVerts.append(curVerts)
   return allVerts
 
+def sliceToArray(keySlice: slice, arrToSlice: np.ndarray):
+  """
+  Converts array slice into concrete array values
+  """
+  start, stop, step = keySlice.start, keySlice.stop, keySlice.step
+  if start == None:
+    start = 0
+  if stop == None:
+    stop = len(arrToSlice)
+  outArr = np.arange(start, stop, step)
+  # Remove elements that don't correspond to list indices
+  outArr = outArr[np.isin(outArr, arrToSlice)]
+  return outArr
 
 

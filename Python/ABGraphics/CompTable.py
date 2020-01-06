@@ -5,6 +5,9 @@ import numpy as np
 
 from constants import ComponentTableFields as CTF
 import component
+from processing import sliceToArray
+
+from typing import Union
 
 class CompTable(pg.TableWidget):
   colTitles = [field.value for field in CTF]
@@ -32,16 +35,34 @@ class CompTable(pg.TableWidget):
         pass
     self._xpondingCompFields = xpondingCompFields
 
-  def addComps(self, compList):
-    compArr = np.array(compList.loc[:,self._xpondingCompFields])
+  def addComps(self, compDf):
+    compArr = np.array(compDf.loc[:,self._xpondingCompFields])
     self.appendData(compArr)
 
-  def resetComps(self, compList):
-    self.setRowCount(0)
-    self.addComps(compList)
+  def updateComps(self, compDf):
+    compArr = np.array(compDf.loc[:,self._xpondingCompFields])
+    idsToUpdate = compArr[:,self._xpondingCompFields.index('instanceId')]
+    rowsToUpdate = self.idsToRowIdxs(idsToUpdate)
+    for ii, rowIdx in enumerate(rowsToUpdate):
+      self.setRow(rowIdx, compArr[ii,:])
 
-  def _comp2TableRow(self, comp):
-    return [getattr(comp, field) for field in self._xpondingCompFields]
+  def resetComps(self, compDf):
+    self.setRowCount(0)
+    self.addComps(compDf)
+
+  def idsToRowIdxs(self, idList: Union[np.ndarray, int]):
+    if not hasattr(idList, '__iter__'):
+      idList = np.array([idList])
+    idColIdx = self._xpondingCompFields.index('instanceId')
+    existingIds = np.array([self.item(ii, idColIdx).value
+                            for ii in range(self.rowCount())])
+    xrefMat = idList[None,:] == existingIds[:,None]
+    # Xrefmat has len(existingIds) x len(idList) entries
+    # argsort by columns gives existingIds that match each
+    # initial entry in idList
+    xpondingIdxs = np.nonzero(xrefMat)
+    listOrder = np.argsort(xpondingIdxs[1])
+    return xpondingIdxs[0][listOrder]
 
 if __name__ == '__main__':
   from sys import path

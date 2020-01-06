@@ -11,12 +11,12 @@ import warnings
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets
 
-from constants import ComponentTypes
 from ABGraphics.parameditors import SchemeEditor, TableFilterEditor
-from constants import SchemeValues as SV, ComponentTableFields as CTF
-from ABGraphics.clickables import ClickableTextItem
 from ABGraphics.regions import MultiRegionPlot
+from ABGraphics.clickables import ClickableTextItem
 from ABGraphics import CompTable
+from constants import ComponentTypes, SchemeValues as SV, ComponentTableFields as CTF
+from processing import sliceToArray
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
@@ -108,7 +108,7 @@ class ComponentMgr(QtCore.QObject):
       comp.instanceId = newIds[ii]
       newDf_list.append([getattr(comp, field) for field in comp.__dict__])
       comp.sigIdClicked.connect(self._rethrowClick)
-      comp.sigVertsChanged.connect(self._rethrowVerts)
+      comp.sigVertsChanged.connect(self._handleVertsChanged)
 
     self._nextCompId += newIds[-1] + 1
     newDf = df(newDf_list, columns=self._compList.columns)
@@ -146,13 +146,10 @@ class ComponentMgr(QtCore.QObject):
     # If key is a slice, convert to array
     idList = keyWithIds[0]
     if isinstance(idList, slice):
-      start, stop, step = idList.start, idList.stop, idList.step
-      if start == None:
-        start = 0
-      if stop == None:
-        stop = len(self._compList)
-      idList = np.arange(start, stop, step)
-
+      idList = sliceToArray(idList, self._compList.loc[:,'instanceId'])
+    elif not hasattr(idList, '__iter__'):
+      # Single number passed
+      idList = np.array([idList])
     xpondingIdxs = self.idToRowIdx(idList)
 
     return self._compList.loc[xpondingIdxs, keyWithIds[1]]
@@ -168,8 +165,11 @@ class ComponentMgr(QtCore.QObject):
     comp = self.sender()
     self.sigCompClicked.emit(comp)
 
-  def _rethrowVerts(self):
+  def _handleVertsChanged(self):
     comp = self.sender()
+    # Update component vertex entry
+    compIdx = self.idToRowIdx([comp.instanceId])
+    self._compList.at[compIdx,'vertices'] = [comp.vertices]
     self.sigCompVertsChanged.emit(comp)
 
 class CompDisplayFilter(QtCore.QObject):
@@ -209,20 +209,36 @@ class CompDisplayFilter(QtCore.QObject):
     # operation
 
     # For new components: Add hidden id plot. This will be shown later if filter allows
-    pltsToAdd = self._compMgr[idLists['added'],'_txtPlt']
+    addedIds = idLists['added']
+    pltsToAdd = self._compMgr[addedIds,'_txtPlt']
     for plt in pltsToAdd: # Type: ClickableTextItem
       self._mainImgArea.addItem(plt)
+    # Also add rows to component table
+    self._compTbl.addComps(self._compMgr[addedIds,:])
 
-    # Hide all other ids, since they will be reshown as needed after display filtering
-    for plt in self._compMgr[:, '_txtPlt']:
+    # Hide all other ids and table rows, since they will be reshown as needed after display filtering
+    for rowIdx, plt in enumerate(self._compMgr[:, '_txtPlt']):
       plt.hide()
+      self._compTbl.hideRow(rowIdx)
 
     # Component deleted: Delete hidden id plot
-    idsToRm = idLists['deleted']
+    idsToRm = np.array(idLists['deleted'])
     deletedIdxs = np.isin(self._oldPlotsDf.loc[:, 'instanceId'], idsToRm)
     pltsToRm = self._oldPlotsDf.loc[deletedIdxs,'_txtPlt']
     for plt in pltsToRm:
       self._mainImgArea.removeItem(plt)
+
+    # Delete table entry
+    tblIdxsToRm = self._compTbl.idsToRowIdxs(idsToRm)
+    tblIdxsToRm = np.sort(tblIdxsToRm)[::-1]
+    # Make sure to iterate in reverse order! E.g. if index 1 is deleted before index
+    # 3, all table entries will shift down by 1 and index 3 is no longer accurate
+    for idx in tblIdxsToRm:
+      self._compTbl.removeRow(idx)
+
+    # Component changed: only component table needs updating
+    idsToChange = idLists['changed']
+    self._compTbl.updateComps(self._compMgr[idsToChange,:])
 
     # Update filter list: hide/unhide ids and verts as needed. This should occur in other
     # functions that hook into signals sent from filter widget
@@ -231,8 +247,12 @@ class CompDisplayFilter(QtCore.QObject):
     self._populateDisplayedIds()
 
     pltsToShow = self._compMgr[self._displayedIds, '_txtPlt']
+    tblIdxsToShow = self._compTbl.idsToRowIdxs(self._displayedIds)
     for plt in pltsToShow:
       plt.show()
+    for rowIdx in tblIdxsToShow:
+      self._compTbl.showRow(rowIdx)
+
     self._compBounds.resetRegionList(self._displayedIds, self._compMgr[self._displayedIds, 'vertices'])
 
     # Reset list of plot handles
@@ -312,12 +332,6 @@ class CompDisplayFilter(QtCore.QObject):
     # Give self the id list of surviving comps
     self._displayedIds = np.array(curComps.loc[:, 'instanceId'])
 
-
-
-
-
-
-
   @Slot(object)
   def _rethrowCompClicked(self, comp: Component):
     self.sigCompClicked.emit(comp)
@@ -328,7 +342,9 @@ class CompDisplayFilter(QtCore.QObject):
 
   @Slot(object)
   def _reflectVertsChanged(self, comp: Component):
-    self._compBounds.setRegions(comp.instanceId, comp.vertices)
+    self._compBounds[comp.instanceId] = comp.vertices
+    # Don't forget to update table entry
+    self._compTbl.updateComps(self._compMgr[comp.instanceId,:])
 
   @staticmethod
   def setScheme(scheme: SchemeEditor):
