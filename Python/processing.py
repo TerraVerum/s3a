@@ -4,8 +4,60 @@ import cv2 as cv
 from skimage.morphology import closing, dilation
 from skimage.morphology import disk
 from skimage.segmentation import quickshift
+from skimage.measure import regionprops, label
+from skimage.filters import gaussian
 
-def getBwComps(img: np.array) -> np.array:
+from graphicseval import overlayImgs, makeImgPieces
+
+def getBwComps(img: np.ndarray) -> np.ndarray:
+  img = (gaussian(img, 1)*255).astype('uint8')
+  margin = 5
+  bwHullImg = regionConvHulls(img)
+  bwHullImg = dilation(bwHullImg, np.ones((margin,margin)))
+  segImg = quickshift(img, ratio=0.9, max_dist=25)
+  colorBroadcast = np.zeros((1,1,3),dtype='uint8')
+  colorBroadcast[0,0,2] = 255
+
+  win = overlayImgs(colorLabelsWithMean(segImg, img), img, bwHullImg.astype('uint8')[:,:,None]*colorBroadcast)
+  win.show()
+  seedpoints = getVertsFromBwComps(bwHullImg, simplifyVerts=False)
+  for compVerts in seedpoints:
+    # Vertices are x-y, convert to row-col
+    edgeLabels = np.unique(segImg[compVerts[:,1], compVerts[:,0]])
+    comparisonMat = segImg[:,:,None] == edgeLabels[None,None,:]
+    isEdgePix = np.any(comparisonMat, axis=2)
+    pgImg = makeImgPieces(isEdgePix.astype('uint8')*255)
+    bwHullImg[isEdgePix] = False
+  return bwHullImg
+
+def regionConvHulls(img: np.ndarray):
+  compMask = bwBgMask(img)
+  outImg = np.zeros(img.shape[0:2], dtype=bool)
+  labeledImg = label(compMask)
+  regions = regionprops(labeledImg)
+  for region in regions:
+    bbox = region.bbox
+    convHull = region.convex_image
+    #convHullLoc = [slice(bbox[ii],bbox[ii]+bbox[ii+1]) for ii in range(2)]
+    outImg[bbox[0]:bbox[2],bbox[1]:bbox[3]] = convHull
+
+    #bbox = np.array(region.bbox)
+    #for ii in range(2):
+      #bbox[ii] = np.maximum(0, bbox[ii]-margin)
+      #bbox[ii+1] = np.minimum(imgShape[ii], bbox[ii+1]+margin)
+    #outImg[bbox[0]:bbox[2], bbox[1]:bbox[3]] = True
+  return outImg
+
+def colorLabelsWithMean(labelImg, refImg) -> np.ndarray:
+  outImg = np.empty(refImg.shape)
+  labels = np.unique(labelImg)
+  for label in labels:
+    curmask = labelImg == label
+    outImg[curmask,:] = refImg[curmask,:].reshape(-1,3).mean(0)
+  return outImg
+
+
+def bwBgMask(img: np.array) -> np.array:
   if img.dtype != 'uint8':
     img = img.astype('uint8')
   chans = cv.split(img)
@@ -14,22 +66,20 @@ def getBwComps(img: np.array) -> np.array:
   mask = np.invert(closing(mask, disk(5)))
   return mask
 
-def getVertsFromBwComps(bwmask: np.array) -> np.array:
-  contours, _ = cv.findContours(bwmask.astype('uint8'), cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+def getVertsFromBwComps(bwmask: np.array, simplifyVerts=True) -> np.array:
+  approxMethod = cv.CHAIN_APPROX_SIMPLE
+  if not simplifyVerts:
+    approxMethod = cv.CHAIN_APPROX_NONE
+  contours, _ = cv.findContours(bwmask.astype('uint8'), cv.RETR_TREE, approxMethod)
   compVertices = []
   for contour in contours:
     compVertices.append(contour[:,0,:])
   return compVertices
 
-def segmentComp(compImg: np.array, maxDist: np.float) -> np.array:
-  segImg = quickshift(compImg, kernel_size=10, max_dist=maxDist)
+def segmentComp(compImg: np.array, maxDist: np.float, kernSz=10) -> np.array:
+  segImg = quickshift(compImg, kernel_size=kernSz, max_dist=maxDist)
   # Color segmented image with mean values
-  labels = np.unique(segImg)
-  outImg = np.empty(compImg.shape)
-  for label in labels:
-    curmask = segImg == label
-    outImg[curmask,:] = compImg[curmask,:].reshape(-1,3).mean(0)
-  return outImg
+  return colorLabelsWithMean(segImg, compImg)
 
 def growSeedpoint(img: np.array, seeds: np.array, thresh: float) -> np.array:
   '''
@@ -127,3 +177,10 @@ def sliceToArray(keySlice: slice, arrToSlice: np.ndarray):
   return outArr
 
 
+if __name__ == '__main__':
+  from PIL import Image
+  import pyqtgraph as pg
+  im = np.array(Image.open('../med.tif'))
+  im = getBwComps(im)
+  pg.image(im)
+  pg.show()
