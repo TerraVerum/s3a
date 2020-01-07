@@ -116,8 +116,15 @@ class MultiRegionPlot(pg.PlotDataItem):
     # -----------
     concatData = [], []
     if len(self.regions) > 0:
+      # Before stacking regions, add first point of region to end of region vertices.
+      # This will make the whole region connected in the output plot
+      # Insert nan to make separate components unconnected
+      plotRegions = []
+      for region in self.regions:
+        region = np.vstack((region, region[0,:], self._nanSep))
+        plotRegions.append(region)
       # We have regions to plot
-      concatData = np.vstack(self.regions)
+      concatData = np.vstack(plotRegions)
       concatData = (concatData[:,0], concatData[:,1])
 
     # -----------
@@ -172,9 +179,6 @@ class MultiRegionPlot(pg.PlotDataItem):
     vertsAtKeepIds = newVerts[~emptyVertIdxs]
     rmIds = regionIds[emptyVertIdxs]
     for curId, curVerts in zip(keepIds, vertsAtKeepIds):
-      # Ensure the vert list ends with nans
-      if not np.isnan(curVerts[-1,0]):
-        curVerts = np.vstack((curVerts, self._nanSep))
       # Append if not already present in list
       try:
         idIdx = self.ids.index(curId)
