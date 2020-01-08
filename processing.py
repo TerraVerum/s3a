@@ -10,6 +10,9 @@ from skimage.filters import gaussian
 from graphicseval import overlayImgs, makeImgPieces
 
 def getBwComps(img: np.ndarray) -> np.ndarray:
+  return bwBgMask(img)
+
+def getBwComps_segmentation(img: np.ndarray) -> np.ndarray:
   img = (gaussian(img, 1)*255).astype('uint8')
   margin = 5
   bwHullImg = regionConvHulls(img)
