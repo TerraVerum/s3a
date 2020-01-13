@@ -17,7 +17,7 @@ class ClickableImageItem(pg.ImageItem):
 class ClickableTextItem(pg.TextItem):
   sigClicked = Signal()
 
-  scheme: SchemeEditor()
+  scheme = SchemeEditor()
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)

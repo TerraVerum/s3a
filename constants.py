@@ -20,7 +20,7 @@ class ComponentTypes(Enum):
     Redefine print representation for prettier display in table
     :return: printable string representation of enum object
     """
-    return f'Type: {self.value}'
+    return f'{self.value}'
 
   def __lt__(self, other):
     """

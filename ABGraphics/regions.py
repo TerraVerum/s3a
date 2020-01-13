@@ -167,7 +167,7 @@ class MultiRegionPlot(pg.PlotDataItem):
     if not hasattr(regionIds, '__iter__'):
       regionIds = [regionIds]
       newVerts = [newVerts]
-    elif len(newVerts) == 1:
+    elif len(newVerts) != len(regionIds):
       # Same value for all specified region ids
       newVerts = [newVerts for _ in regionIds]
     regionIds = np.array(regionIds)
