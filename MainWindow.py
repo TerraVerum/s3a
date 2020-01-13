@@ -10,10 +10,11 @@ from PIL import Image
 
 from processing import getBwComps, getVertsFromBwComps
 from ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, attemptLoadSettings
-from ABGraphics.parameditors import SchemeEditor, TableFilterEditor
+from ABGraphics.parameditors import SchemeEditor, TableFilterEditor, RegionControlsEditor
 from ABGraphics.table import CompTableModel
 from component import Component, ComponentMgr, CompDisplayFilter
 from constants import SCHEMES_DIR, LAYOUTS_DIR
+from constants import RegionControlsEditorValues as RCEV
 
 import os
 from os.path import join
@@ -52,9 +53,9 @@ class MainWindow(QtWidgets.QMainWindow):
     # ---------------
     intVdtr = QtGui.QIntValidator()
     floatVdtr = QtGui.QDoubleValidator()
-    self.marginEdit.setValidator(intVdtr)
-    self.segThreshEdit.setValidator(floatVdtr)
-    self.seedThreshEdit.setValidator(floatVdtr)
+    #self.marginEdit.setValidator(intVdtr)
+    #self.segThreshEdit.setValidator(floatVdtr)
+    #self.seedThreshEdit.setValidator(floatVdtr)
 
     # ---------------
     # LOAD LAYOUT OPTIONS
@@ -93,6 +94,11 @@ class MainWindow(QtWidgets.QMainWindow):
     CompDisplayFilter.setScheme(self.scheme)
 
     # ---------------
+    # LOAD REGION EDIT CONTROLS
+    # ---------------
+    self.regCtrlEditor = RegionControlsEditor()
+
+    # ---------------
     # UI ELEMENT SIGNALS
     # ---------------
     # Buttons
@@ -115,16 +121,18 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
     # Edit fields
-    self.seedThreshEdit.editingFinished.connect(self.seedThreshChanged)
+    self.regCtrlEditor[RCEV.SEED_THRESH].sigValueChanged.connect(self.seedThreshChanged)
     # Note: This signal must be false-triggered on startup to propagate
     # the field's initial value
-    self.seedThreshEdit.editingFinished.emit()
+    self.regCtrlEditor[RCEV.SEED_THRESH].sigValueChanged.emit(None, None)
 
     # Menu options
     self.saveLayout.triggered.connect(self.saveLayoutActionTriggered)
     self.sigLayoutSaved.connect(self.populateLoadLayoutOptions)
 
     self.newScheme.triggered.connect(self.scheme.show)
+
+    self.compEditCtrls.triggered.connect(self.regCtrlEditor.show)
 
     # Scheme editor
     self.scheme.sigSchemeSaved.connect(self.populateSchemeOptions)
@@ -272,7 +280,7 @@ class MainWindow(QtWidgets.QMainWindow):
   # ---------------
   @Slot()
   def seedThreshChanged(self):
-    self.compImg.seedThresh = np.float(self.seedThreshEdit.text())
+    self.compImg.seedThresh = self.regCtrlEditor[RCEV.SEED_THRESH].value()
 
 
   # ---------------
@@ -282,8 +290,8 @@ class MainWindow(QtWidgets.QMainWindow):
   @applyWaitCursor
   def updateCurComp(self, newComp: Component):
     mainImg = self.mainImgItem.image
-    margin = int(self.marginEdit.text())
-    segThresh = float(self.segThreshEdit.text())
+    margin = self.regCtrlEditor[RCEV.MARGIN].value()
+    segThresh = self.regCtrlEditor[RCEV.SEG_THRESH].value()
     prevComp = self.compImg.comp
     rmPrevComp = self.compImg.updateAll(mainImg, newComp, margin, segThresh)
     # If all old vertices were deleted AND we switched images, signal deletion
@@ -291,10 +299,7 @@ class MainWindow(QtWidgets.QMainWindow):
     if rmPrevComp:
       self.compMgr.rmComps(prevComp.instanceId)
 
-    htmlTxt: str = self.curCompIdLbl.text()
-    # Find location of id in text string and replace with current ID
-    htmlTxt = re.sub(r'ID: -?\d+', f'ID: {newComp.instanceId}', htmlTxt)
-    self.curCompIdLbl.setText(htmlTxt)
+    self.curCompIdLbl.setText(f'Component ID: {newComp.instanceId}')
 
 ## Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
