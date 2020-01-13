@@ -14,7 +14,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets
 from ABGraphics.parameditors import SchemeEditor, TableFilterEditor
 from ABGraphics.regions import MultiRegionPlot
 from ABGraphics.clickables import ClickableTextItem
-from ABGraphics import CompTable
+from ABGraphics import table
 from constants import ComponentTypes, SchemeValues as SV, ComponentTableFields as CTF
 from processing import sliceToArray
 
@@ -22,6 +22,8 @@ Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 # Ensure an application instance is running
 app = pg.mkQApp()
+
+__all__ = ['Component', 'ComponentMgr', 'CompDisplayFilter']
 
 class Component(QtCore.QObject):
   # TODO:
@@ -85,6 +87,8 @@ class ComponentMgr(QtCore.QObject):
   # Emits 3-element dict: Deleted comp ids, changed comp ids, added comp ids
   defaultEmitDict = {'deleted': np.array([]), 'changed': np.array([]), 'added': np.array([])}
   sigCompsChanged = Signal(dict)
+  # Used to alert models about data changes
+  sigCompsAboutToChange = Signal()
   sigCompClicked = Signal(object)
   sigCompVertsChanged = Signal(object)
 
@@ -112,6 +116,8 @@ class ComponentMgr(QtCore.QObject):
 
     self._nextCompId += newIds[-1] + 1
     newDf = df(newDf_list, columns=self._compList.columns)
+
+    self.sigCompsAboutToChange.emit()
     self._compList = pd.concat((self._compList, newDf))
     toEmit['added'] = newIds
     self.sigCompsChanged.emit(toEmit)
@@ -130,6 +136,7 @@ class ComponentMgr(QtCore.QObject):
     tfRmIdx = np.isin(existingCompIds, idsToRemove)
 
     # Reset manager's component list
+    self.sigCompsAboutToChange.emit()
     self._compList = self._compList.loc[np.invert(tfRmIdx),:]
 
     # Determine next ID for new components
@@ -172,11 +179,12 @@ class ComponentMgr(QtCore.QObject):
     self._compList.at[compIdx,'vertices'] = [comp.vertices]
     self.sigCompVertsChanged.emit(comp)
 
+
 class CompDisplayFilter(QtCore.QObject):
   sigCompClicked = Signal(object)
 
   def __init__(self, compMgr: ComponentMgr, mainImg: pg.PlotWindow,
-               compTbl: CompTable, filterEditor: TableFilterEditor):
+               compTbl: table.CompTableView, filterEditor: TableFilterEditor):
     super().__init__()
     self._mainImgArea = mainImg
     self._filter = filterEditor.params.getValues()
@@ -213,8 +221,6 @@ class CompDisplayFilter(QtCore.QObject):
     pltsToAdd = self._compMgr[addedIds,'_txtPlt']
     for plt in pltsToAdd: # Type: ClickableTextItem
       self._mainImgArea.addItem(plt)
-    # Also add rows to component table
-    self._compTbl.addComps(self._compMgr[addedIds,:])
 
     # Hide all other ids and table rows, since they will be reshown as needed after display filtering
     for rowIdx, plt in enumerate(self._compMgr[:, '_txtPlt']):
@@ -228,17 +234,7 @@ class CompDisplayFilter(QtCore.QObject):
     for plt in pltsToRm:
       self._mainImgArea.removeItem(plt)
 
-    # Delete table entry
-    tblIdxsToRm = self._compTbl.idsToRowIdxs(idsToRm)
-    tblIdxsToRm = np.sort(tblIdxsToRm)[::-1]
-    # Make sure to iterate in reverse order! E.g. if index 1 is deleted before index
-    # 3, all table entries will shift down by 1 and index 3 is no longer accurate
-    for idx in tblIdxsToRm:
-      self._compTbl.removeRow(idx)
-
-    # Component changed: only component table needs updating
-    idsToChange = idLists['changed']
-    self._compTbl.updateComps(self._compMgr[idsToChange,:])
+    # Component changed: Nothing required here
 
     # Update filter list: hide/unhide ids and verts as needed. This should occur in other
     # functions that hook into signals sent from filter widget
@@ -247,7 +243,7 @@ class CompDisplayFilter(QtCore.QObject):
     self._populateDisplayedIds()
 
     pltsToShow = self._compMgr[self._displayedIds, '_txtPlt']
-    tblIdxsToShow = self._compTbl.idsToRowIdxs(self._displayedIds)
+    tblIdxsToShow = self._compMgr.idToRowIdx(self._displayedIds)
     for plt in pltsToShow:
       plt.show()
     for rowIdx in tblIdxsToShow:
@@ -344,7 +340,7 @@ class CompDisplayFilter(QtCore.QObject):
   def _reflectVertsChanged(self, comp: Component):
     self._compBounds[comp.instanceId] = comp.vertices
     # Don't forget to update table entry
-    self._compTbl.updateComps(self._compMgr[comp.instanceId,:])
+    self._compTbl.model().layoutChanged.emit()
 
   @staticmethod
   def setScheme(scheme: SchemeEditor):

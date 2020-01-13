@@ -11,6 +11,7 @@ from PIL import Image
 from processing import getBwComps, getVertsFromBwComps
 from ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, attemptLoadSettings
 from ABGraphics.parameditors import SchemeEditor, TableFilterEditor
+from ABGraphics.table import CompTableModel
 from component import Component, ComponentMgr, CompDisplayFilter
 from constants import SCHEMES_DIR, LAYOUTS_DIR
 
@@ -66,6 +67,9 @@ class MainWindow(QtWidgets.QMainWindow):
     # COMPONENT MANAGER
     # ---------------
     self.compMgr = ComponentMgr()
+
+    self.tableModel = CompTableModel(self.compMgr)
+    self.compTbl.setModel(self.tableModel)
 
     # ---------------
     # COMPONENT DISPLAY FILTER
