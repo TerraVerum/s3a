@@ -55,3 +55,8 @@ class SchemeValues(Enum):
   REG_VERT_COLOR: Enum = 'Vertex Color'
   REG_FILL_COLOR: Enum = 'Fill Color'
 
+class RegionControlsEditorValues(Enum):
+  MARGIN: Enum = 'Margin'
+  SEG_THRESH: Enum = 'Segmentation Threshold'
+  SEED_THRESH: Enum = 'Seedpoint Mean Threshold'
+  NEW_COMP_SZ: Enum = 'New Component Size'

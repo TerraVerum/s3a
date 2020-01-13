@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from abc import abstractmethod
+from enum import Enum
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets
@@ -8,7 +9,8 @@ from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes as
 
 from constants import (
   SCHEMES_DIR, SchemeValues as SV,
-  ComponentTableFields as CTF, ComponentTypes)
+  ComponentTableFields as CTF, ComponentTypes,
+  RegionControlsEditorValues as RCEV)
 from ABGraphics.utils import dialogSaveToFile
 
 import pickle as pkl
@@ -80,28 +82,30 @@ class ConstParamWidget(QtWidgets.QDialog):
       outList.append(param.value())
     return outList
 
+  # Helper method for accessing simple parameter values
+  def __getitem__(self, key: Enum):
+    return self.params.child(key.value)
+
   @abstractmethod
   def acceptBtnClicked(self):
     return
 
 
+class RegionControlsEditor(ConstParamWidget):
+  # Emits key-value pair of input filter options
+  sigControlsChanged = Signal(dict)
 
-class TableRowEditor(ConstParamWidget):
-  # Emits list where each element corresponds to an edit field
-  sigEditFinished = Signal(list)
   def __init__(self):
     super().__init__()
-    _TABLE_EDIT_DICT = [
-      {'name': CTF.VALIDATED.value, 'type': 'bool', 'value': False},
-      {'name': CTF.DEVICE_TYPE.value, 'type': 'list', 'value': ComponentTypes.N_A.value,
-       'limits': [compType for compType in ComponentTypes]
-       },
-      {'name': CTF.LOGO.value, 'type': 'text', 'value': ''},
-      {'name': CTF.NOTES.value, 'type': 'text', 'value': ''},
-      {'name': CTF.BOARD_TEXT.value, 'type': 'text', 'value': ''},
-      {'name': CTF.DEVICE_TEXT.value, 'type': 'text', 'value': ''}
-    ]
-    self.params.addChildren(_TABLE_EDIT_DICT)
+    # Make max 'infinity'
+
+    _CONTROLS_DICT = [
+        {'name': RCEV.MARGIN.value, 'type': 'int', 'value': 5},
+        {'name': RCEV.SEG_THRESH.value, 'type': 'float', 'value': 6.},
+        {'name': RCEV.SEED_THRESH.value, 'type': 'float', 'value': 15.},
+        {'name': RCEV.NEW_COMP_SZ.value, 'type': 'int', 'value': 10},
+      ]
+    self.params.addChildren(_CONTROLS_DICT)
 
   def acceptBtnClicked(self) -> List:
     """
@@ -109,10 +113,10 @@ class TableRowEditor(ConstParamWidget):
     This is suitable for extending with an ID and vertex list, after which
     it can be placed into the component table.
     """
-    outList = self[:]
-    self.sigEditFinished.emit(outList)
-    return outList
-
+    # TODO: Add method to save this filter to a menu like schemes and layouts
+    outDict = self.params.getValues()
+    self.sigControlsChanged.emit(outDict)
+    return outDict
 
 class TableFilterEditor(ConstParamWidget):
   # Emits key-value pair of input filter options
