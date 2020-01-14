@@ -39,7 +39,7 @@ class Component(QtCore.QObject):
 
   scheme = SchemeEditor()
 
-  def __init__(self):
+  def __init__(self, **initValsForVars):
     super().__init__()
     self.instanceId = -1
     self.vertices = np.array([np.NaN, np.NaN])
@@ -49,6 +49,8 @@ class Component(QtCore.QObject):
     self.logo = ''
     self.notes = ''
     self.validated = False
+    self.__dict__.update(initValsForVars)
+
 
     self._txtPlt = ClickableTextItem('N/A')
     self._txtPlt.sigClicked.connect(self.sigIdClicked.emit)
@@ -114,7 +116,7 @@ class ComponentMgr(QtCore.QObject):
       comp.sigIdClicked.connect(self._rethrowClick)
       comp.sigVertsChanged.connect(self._handleVertsChanged)
 
-    self._nextCompId += newIds[-1] + 1
+    self._nextCompId = newIds[-1] + 1
     newDf = df(newDf_list, columns=self._compList.columns)
 
     self.sigCompsAboutToChange.emit()
