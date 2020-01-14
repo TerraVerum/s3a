@@ -179,6 +179,28 @@ def sliceToArray(keySlice: slice, arrToSlice: np.ndarray):
   outArr = outArr[np.isin(outArr, arrToSlice)]
   return outArr
 
+def getClippedBbox(arrShape: tuple, bbox: np.ndarray, margin: int):
+  """
+  Given a bounding box and margin, create a clipped bounding box that does not extend
+  past any dimension size from arrShape
+
+  Parameters
+  ----------
+  arrShape :    2-element tuple
+     Refrence array dimensions
+
+  bbox     :    2x2 array
+     [minX minY; maxX maxY] bounding box coordinates
+
+  margin   :    int
+     Offset from bounding box coords. This will not fully be added to the bounding box
+     if the new margin causes coordinates to fall off either end of the reference array shape.
+  """
+  for ii in range(2):
+    bbox[0,ii] = np.maximum(0, bbox[0,ii]-margin)
+    bbox[1,ii] = np.minimum(arrShape[1-ii], bbox[1,ii]+margin)
+  return bbox
+
 
 if __name__ == '__main__':
   from PIL import Image

@@ -1,6 +1,8 @@
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore
+from pyqtgraph.Qt import QtCore, QtGui
 Signal = QtCore.pyqtSignal
+
+import numpy as np
 
 from ABGraphics.parameditors import SchemeEditor
 from constants import SchemeValues as SV
@@ -9,10 +11,14 @@ from constants import SchemeValues as SV
 class ClickableImageItem(pg.ImageItem):
   sigClicked = Signal(object)
 
+  clickable = True
+
   def mouseClickEvent(self, ev):
-    if ev.button() == QtCore.Qt.LeftButton:
-      self.sigClicked.emit(ev)
-      return
+    # Capture clicks only if component is present and user allows it
+    if ev.button() == QtCore.Qt.LeftButton \
+       and self.clickable and self.image is not None:
+      xyCoord = np.round(np.array([[ev.pos().x(), ev.pos().y()]], dtype='int'))
+      self.sigClicked.emit(xyCoord)
 
 class ClickableTextItem(pg.TextItem):
   sigClicked = Signal()
@@ -33,8 +39,9 @@ class ClickableTextItem(pg.TextItem):
     #self.setCursor(self.origCursor)
     self.unsetCursor()
 
-  def mousePressEvent(self, ev):
+  def mousePressEvent(self, ev: QtGui.QMouseEvent):
     self.sigClicked.emit()
+    ev.accept()
 
   def updateText(self, newText: str, validated: bool):
     '''

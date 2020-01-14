@@ -3,7 +3,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
 
-from processing import segmentComp, getVertsFromBwComps, growSeedpoint, nanConcatList, splitListAtNans
+from processing import segmentComp, getVertsFromBwComps, growSeedpoint, getClippedBbox
 from skimage.morphology import closing, opening
 
 import numpy as np
@@ -12,7 +12,6 @@ from ABGraphics.clickables import ClickableImageItem
 from ABGraphics.regions import VertexRegion, SaveablePolyROI
 from component import *
 from ABGraphics.parameditors import SchemeEditor
-from constants import SchemeValues as SV
 
 class FocusedComp(pg.PlotWidget):
   scheme = SchemeEditor()
@@ -20,8 +19,6 @@ class FocusedComp(pg.PlotWidget):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
-    # Whether drawing is allowed on the figure
-    self.allowEdits = True
     # Whether drawn items should be added or removed from current component
     self.inAddMode = True
     # Type of region to add once the user clicks. See radio buttons on the
@@ -53,13 +50,14 @@ class FocusedComp(pg.PlotWidget):
 
     self.compImgItem.sigClicked.connect(self.compImageClicked)
 
-  def compImageClicked(self, ev: QtWidgets.QGraphicsSceneMouseEvent):
+  def setClickable(self, isClickable):
+    self.compImgItem.clickable = isClickable
+
+  def compImageClicked(self, newVert: np.ndarray):
     # Capture clicks only if component is present and user allows it
-    if self.compImgItem.image is None or not self.allowEdits:
-      return
     # TODO: Expand to include ROI, superpixel, etc.
-    # y -> row, x -> col
-    newVert = np.round(np.array([[ev.pos().y(), ev.pos().x()]], dtype='int'))
+    # Change vertex from x-y to row-col
+    newVert = np.fliplr(newVert)
     newArea = growSeedpoint(self.compImgItem.image, newVert, self.seedThresh)
     curRegionMask = self.region.embedMaskInImg(newArea.shape)
     if self.inAddMode:
@@ -115,10 +113,7 @@ class FocusedComp(pg.PlotWidget):
     bbox = np.vstack([np.nanmin(newComp.vertices, 0),
           np.nanmax(newComp.vertices, 0)])
     # Account for margins
-    for ii in range(2):
-      bbox[0,ii] = np.maximum(0, bbox[0,ii]-margin)
-      bbox[1,ii] = np.minimum(mainImgShape[1-ii], bbox[1,ii]+margin)
-    self.bbox = bbox
+    self.bbox = getClippedBbox(mainImgShape, bbox, margin)
 
   def updateCompImg(self, mainImg, segThresh, bbox=None):
     if bbox is None:

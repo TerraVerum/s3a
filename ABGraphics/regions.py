@@ -107,7 +107,6 @@ class MultiRegionPlot(pg.PlotDataItem):
   def resetRegionList(self, newIds=[], newRegions = []):
     self.regions = []
     self.ids = []
-    self.updatePlot()
     self[newIds] = newRegions
 
   def updatePlot(self):

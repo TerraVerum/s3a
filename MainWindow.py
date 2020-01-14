@@ -8,18 +8,17 @@ Signal = QtCore.pyqtSignal
 import numpy as np
 from PIL import Image
 
-from processing import getBwComps, getVertsFromBwComps
+from processing import getBwComps, getVertsFromBwComps, getClippedBbox
 from ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, attemptLoadSettings
 from ABGraphics.parameditors import SchemeEditor, TableFilterEditor, RegionControlsEditor
 from ABGraphics.table import CompTableModel
 from component import Component, ComponentMgr, CompDisplayFilter
 from constants import SCHEMES_DIR, LAYOUTS_DIR
 from constants import RegionControlsEditorValues as RCEV
+from ABGraphics.clickables import ClickableImageItem
 
 import os
 from os.path import join
-import re
-import inspect
 
 # Configure pg to correctly read image dimensions
 pg.setConfigOptions(imageAxisOrder='row-major')
@@ -41,21 +40,13 @@ class MainWindow(QtWidgets.QMainWindow):
     imgArray = None
     if startImgFpath is not None:
       imgArray = np.array(Image.open(startImgFpath))
-    item = pg.ImageItem(imgArray)
+    item = ClickableImageItem(imgArray)
     # Ensure image will remain in background of window
     item.setZValue(-100)
     self.mainImg.addItem(item)
     self.mainImg.setAspectLocked(True)
     self.mainImgItem = item
-
-    # ---------------
-    # INPUT VALIDATORS
-    # ---------------
-    intVdtr = QtGui.QIntValidator()
-    floatVdtr = QtGui.QDoubleValidator()
-    #self.marginEdit.setValidator(intVdtr)
-    #self.segThreshEdit.setValidator(floatVdtr)
-    #self.seedThreshEdit.setValidator(floatVdtr)
+    item.sigClicked.connect(self.mainImgItemClicked)
 
     # ---------------
     # LOAD LAYOUT OPTIONS
@@ -257,7 +248,7 @@ class MainWindow(QtWidgets.QMainWindow):
   # ---------------
   @Slot()
   def allowEditsChkChanged(self):
-    self.compImg.allowEdits = self.allowEditsChk.isChecked()
+    self.compImg.setClickable(self.allowEditsChk.isChecked())
 
   # ---------------
   # RADIO BUTTON CALLBACKS
@@ -286,6 +277,28 @@ class MainWindow(QtWidgets.QMainWindow):
   # ---------------
   # CUSTOM UI ELEMENT CALLBACKS
   # ---------------
+  @Slot(object)
+  def mainImgItemClicked(self, xyCoord):
+    """
+    Forms a box with a center at the clicked location, and passes the box
+    edges as vertices for a new component.
+    """
+    sideLen = self.regCtrlEditor[RCEV.NEW_COMP_SZ].value()
+    vertBox = np.vstack((xyCoord, xyCoord))
+    vertBox = getClippedBbox(self.mainImgItem.image.shape, vertBox, sideLen)
+    # Create square from bounding box
+    compVerts = []
+    compVerts.append([vertBox[0,0], vertBox[0,1]])
+    compVerts.append([vertBox[1,0], vertBox[0,1]])
+    compVerts.append([vertBox[1,0], vertBox[1,1]])
+    compVerts.append([vertBox[0,0], vertBox[1,1]])
+    compVerts = np.vstack(compVerts)
+
+    newComp = Component()
+    newComp.vertices = compVerts
+    self.compMgr.addComps([newComp])
+
+
   @Slot(object)
   @applyWaitCursor
   def updateCurComp(self, newComp: Component):
