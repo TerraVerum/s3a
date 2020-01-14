@@ -135,9 +135,9 @@ class MainWindow(QtWidgets.QMainWindow):
     self.compEditCtrls.triggered.connect(self.regCtrlEditor.show)
 
     # Scheme editor
-    self.scheme.sigSchemeSaved.connect(self.populateSchemeOptions)
+    self.scheme.sigParamStateCreated.connect(self.populateSchemeOptions)
     # When a new scheme is created, switch to that scheme
-    self.scheme.sigSchemeSaved.connect(self.loadSchemeActionTriggered)
+    self.scheme.sigParamStateCreated.connect(self.loadSchemeActionTriggered)
 
   # -----------------------------
   # MainWindow CLASS FUNCTIONS

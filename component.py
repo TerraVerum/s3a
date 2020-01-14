@@ -197,7 +197,7 @@ class CompDisplayFilter(QtCore.QObject):
     self._compMgr.sigCompsChanged.connect(self.redrawComps)
 
     # Retrieve filter changes
-    filterEditor.sigFilterChanged.connect(self._updateFilter)
+    filterEditor.sigParamStateUpdated.connect(self._updateFilter)
 
     self._compBounds = MultiRegionPlot()
     self._displayedIds = np.array([], dtype=int)

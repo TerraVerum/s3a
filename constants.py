@@ -6,6 +6,8 @@ import os
 BASE_DIR = os.path.dirname(Path(__file__).absolute())
 SCHEMES_DIR = os.path.join(BASE_DIR, 'Schemes', '')
 LAYOUTS_DIR = os.path.join(BASE_DIR, 'Layouts', '')
+FILTERS_DIR = os.path.join(BASE_DIR, 'Filters', '')
+REGION_CTRL_DIR = os.path.join(BASE_DIR, 'RegionControls', '')
 
 
 class ComponentTypes(Enum):
