@@ -30,24 +30,6 @@ class CompTableModel(QtCore.QAbstractTableModel):
 
   def __init__(self, compMgr: component.ComponentMgr):
     super().__init__()
-    self.compMgr = compMgr
-
-    compMgr.sigCompsAboutToChange.connect(self.layoutAboutToBeChanged.emit)
-    compMgr.sigCompsChanged.connect(self.layoutChanged.emit)
-
-    # Create list of component fields that correspond to table columns
-    # These are camel-cased
-    xpondingCompFields = []
-    compFields = list(component.Component().__dict__.keys())
-    lowercaseCompFields = [field.lower() for field in compFields]
-    compareColNames = [name.lower().replace(' ', '') for name in self.colTitles]
-    for name in compareColNames:
-      try:
-        compFieldIdx = lowercaseCompFields.index(name)
-        xpondingCompFields.append(compFields[compFieldIdx])
-      except ValueError:
-        pass
-    self._xpondingCompFields = xpondingCompFields
 
   # Helper for delegates
   def indexToRowCol(self, index: QtCore.QModelIndex):
