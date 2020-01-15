@@ -1,13 +1,16 @@
 from dataclasses import dataclass, fields, field
 from typing import Any
 from enum import Enum
-from abc import ABC
+
+from pyqtgraph.Qt import QtCore
 
 from pathlib import Path
 import os
 
 from pandas import DataFrame as df
 import numpy as np
+
+Signal = QtCore.pyqtSignal
 
 # Preference directories
 BASE_DIR = os.path.dirname(Path(__file__).absolute())
@@ -42,14 +45,25 @@ class ComponentTypes(Enum):
 
 
 @dataclass()
-class ABParam:
+class ABParam(QtCore.QObject):
+  sigChanged = Signal()
+
   name: str
   value: Any
 
   def __str__(self):
     return f'{self.name}: {self.value}'
 
-class ABParamGroup():
+_vertDefault = lambda: ABParam('Vertices', np.ones((1,2))*np.nan)
+class ABParamGroup(QtCore.QObject):
+  """
+  Hosts all child parameters and ensures each group contains an instance ID and vertices to plot
+  on the main image, as well as an indicator of whether the component was verified by the user
+  """
+  INST_ID:ABParam    = ABParam('Instance ID', -1)
+  VERTICES:ABParam   = field(default_factory=_vertDefault)
+  VALIDATED:ABParam  = ABParam('Validated', False)
+
   @classmethod
   def paramNames(cls):
     """
@@ -74,17 +88,13 @@ class ABParamGroup():
     return df([df_list], columns=df_colNames)
 
 
-_vertDefault = lambda: ABParam('Vertices', np.ones((1,2))*np.nan)
 @dataclass
-class NewComponentTableFields(ABParamGroup):
-  INST_ID:ABParam    = ABParam('Instance ID', -1)
-  VALIDATED:ABParam  = ABParam('Validated', False)
+class CustomCompParams(ABParamGroup):
   DEV_TYPE:ABParam   = ABParam('Device Type', ComponentTypes.N_A)
   DEV_TEXT:ABParam   = ABParam('Device Text', '')
   BOARD_TEXT:ABParam = ABParam('Board Text', '')
   LOGO:ABParam       = ABParam('Logo', '')
   NOTES:ABParam      = ABParam('Notes', '')
-  VERTICES:ABParam   = field(default_factory=_vertDefault)
 
 class ComponentTableFields(Enum):
   INST_ID: Enum = 'Instance ID'

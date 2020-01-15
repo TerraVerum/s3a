@@ -16,8 +16,9 @@ from ABGraphics.regions import MultiRegionPlot
 from ABGraphics.clickables import ClickableTextItem
 from ABGraphics import table
 from constants import (ComponentTypes, SchemeValues as SV,
-                       ABParamGroup, ABParam, NewComponentTableFields as CTF)
+                       ABParamGroup, ABParam, CustomCompParams as CCP)
 from processing import sliceToArray
+from ABGraphics.dataTable import CompTableModel
 
 from dataclasses import dataclass, field
 
@@ -26,9 +27,7 @@ Slot = QtCore.pyqtSlot
 # Ensure an application instance is running
 app = pg.mkQApp()
 
-Component = DataComponent
-
-class DataComponent(QtCore.QObject, CTF):
+class DataComponent(QtCore.QObject, CCP):
   # TODO:
   # Since no fields will be added to this class, and potentially
   # thousands of components may be registered per image, utilize
@@ -77,7 +76,7 @@ class DataComponent(QtCore.QObject, CTF):
       self._txtPlt.setPos(newPos[0], newPos[1])
     self._txtPlt.updateText(str(self.instanceId), self.validated)
 
-class DataComponentMgr(QtCore.QObject):
+class DataComponentMgr(CompTableModel):
   # Emits 3-element dict: Deleted comp ids, changed comp ids, added comp ids
   defaultEmitDict = {'deleted': np.array([]), 'changed': np.array([]), 'added': np.array([])}
   sigCompsChanged = Signal(dict)
@@ -344,12 +343,12 @@ class CompDisplayFilter(QtCore.QObject):
 if __name__ == '__main__':
   from PIL import Image
   mw = pg.PlotWindow()
-  item = pg.ImageItem(np.array(Image.open('../fast.tif')))
+  item = pg.ImageItem(np.array(Image.open('./fast.tif')))
   mw.addItem(item)
   mw.setAspectLocked(True)
   mw.show()
 
-  c = Component()
+  c = DataComponent()
   c.vertices = np.random.randint(0,100,size=(10,2))
   c.instanceId = 5
   c.boardText = 'test'
