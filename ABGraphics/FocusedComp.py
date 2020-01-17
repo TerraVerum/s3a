@@ -105,7 +105,7 @@ class FocusedComp(pg.PlotWidget):
     # If the previous component had no vertices, signal its removal
     if len(self.comp[TC.VERTICES.name].squeeze()) == 0:
       deletePrevComponent = True
-    self.comp = newComp.reset_index()
+    self.comp = newComp.reset_index(0, drop=True)
     self.updateBbox(mainImg.shape, newVerts, margin)
     self.updateCompImg(mainImg, segThresh)
     self.updateRegion(newVerts)
@@ -142,7 +142,7 @@ class FocusedComp(pg.PlotWidget):
 
   def saveNewVerts(self):
     # Add in offset from main image to VertexRegion vertices
-    self.comp[TC.VERTICES.name] = [self.region.verts + self.bbox[0,:]]
+    self.comp.loc[0,TC.VERTICES.name] = [self.region.verts + self.bbox[0,:]]
 
   def _addRoiToRegion(self):
     imgMask = self.interactor.getImgMask(self.compImgItem)
