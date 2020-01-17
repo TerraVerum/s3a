@@ -2,15 +2,12 @@ from dataclasses import dataclass, fields, field
 from typing import Any
 from enum import Enum
 
-from pyqtgraph.Qt import QtCore
-
 from pathlib import Path
 import os
+from sys import maxsize
 
 from pandas import DataFrame as df
 import numpy as np
-
-Signal = QtCore.pyqtSignal
 
 # Preference directories
 BASE_DIR = os.path.dirname(Path(__file__).absolute())
@@ -44,25 +41,18 @@ class ComponentTypes(Enum):
     return str(self) < str(other)
 
 
-@dataclass()
-class ABParam(QtCore.QObject):
-  sigChanged = Signal()
-
+@dataclass
+class ABParam:
   name: str
   value: Any
 
   def __str__(self):
     return f'{self.name}: {self.value}'
 
-_vertDefault = lambda: ABParam('Vertices', np.ones((1,2))*np.nan)
-class ABParamGroup(QtCore.QObject):
+class ABParamGroup:
   """
-  Hosts all child parameters and ensures each group contains an instance ID and vertices to plot
-  on the main image, as well as an indicator of whether the component was verified by the user
+  Hosts all child parameters and offers convenience function for iterating over them
   """
-  INST_ID:ABParam    = ABParam('Instance ID', -1)
-  VERTICES:ABParam   = field(default_factory=_vertDefault)
-  VALIDATED:ABParam  = ABParam('Validated', False)
 
   @classmethod
   def paramNames(cls):
@@ -72,29 +62,27 @@ class ABParamGroup(QtCore.QObject):
     """
     paramNames = []
     for field in fields(cls):
-      paramNames.append(field.default.name)
+      paramNames.append(field.name)
     return paramNames
 
   def __iter__(self):
     for field in fields(self):
       yield getattr(self, field.name)
 
-  def to_dataframe(self):
-    df_list = []
-    df_colNames = []
-    for param in self:
-      df_colNames.append(param.name)
-      df_list.append(param.value)
-    return df([df_list], columns=df_colNames)
-
-
+newParam = lambda name, val: field(default_factory=lambda: ABParam(name, val))
 @dataclass
-class CustomCompParams(ABParamGroup):
-  DEV_TYPE:ABParam   = ABParam('Device Type', ComponentTypes.N_A)
-  DEV_TEXT:ABParam   = ABParam('Device Text', '')
-  BOARD_TEXT:ABParam = ABParam('Board Text', '')
-  LOGO:ABParam       = ABParam('Logo', '')
-  NOTES:ABParam      = ABParam('Notes', '')
+class CompParams(ABParamGroup):
+  # These 3 params MUST exist in the component
+  INST_ID:ABParam    = newParam('Instance ID', -1)
+  VERTICES:ABParam   = newParam('Vertices', np.ones((1,2))*np.nan)
+  VALIDATED:ABParam  = newParam('Validated', False)
+
+  DEV_TYPE:ABParam   = newParam('Device Type', ComponentTypes.N_A)
+  DEV_TEXT:ABParam   = newParam('Device Text', '')
+  BOARD_TEXT:ABParam = newParam('Board Text', '')
+  LOGO:ABParam       = newParam('Logo', '')
+  NOTES:ABParam      = newParam('Notes', '')
+TEMPLATE_COMP = CompParams()
 
 class ComponentTableFields(Enum):
   INST_ID: Enum = 'Instance ID'
@@ -105,7 +93,6 @@ class ComponentTableFields(Enum):
   BOARD_TEXT: Enum = 'Board Text'
   DEVICE_TEXT: Enum = 'Device Text'
   VERTICES: Enum = 'Vertices'
-
 
 class SchemeValues(Enum):
   COMP_PARAMS: Enum = 'Component Parameters'
@@ -126,7 +113,8 @@ class RegionControlsEditorValues(Enum):
   NEW_COMP_SZ: Enum = 'New Component Size'
 
 if __name__ == '__main__':
-  x1 = NewComponentTableFields()
-  x2 = NewComponentTableFields()
-  x2.VERTICES.value[0,1] = 3
-  print(x1.VERTICES)
+  x1 = CompParams()
+  x1.paramNames()
+  x2 = CompParams()
+  x1.INST_ID.value = 3
+  print(x2.INST_ID.value)
