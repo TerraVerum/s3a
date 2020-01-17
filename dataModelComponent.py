@@ -16,72 +16,21 @@ from ABGraphics.regions import MultiRegionPlot
 from ABGraphics.clickables import ClickableTextItem
 from ABGraphics import table
 from constants import (ComponentTypes, SchemeValues as SV,
-                       ABParamGroup, ABParam, CustomCompParams as CCP)
+                       CompParams)
 from processing import sliceToArray
 from ABGraphics.dataTable import CompTableModel
 
-from dataclasses import dataclass, field
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 # Ensure an application instance is running
 app = pg.mkQApp()
 
-class DataComponent(QtCore.QObject, CCP):
-  # TODO:
-  # Since no fields will be added to this class, and potentially
-  # thousands of components may be registered per image, utilize
-  # 'slots' for memory efficiency
-  #__slots__ = ['_reqdUpdates', 'sigCompClicked', 'sigVertsChanged',
-               #'scheme', 'instanceId', 'vertices', 'deviceType',...]
-  _reqdUpdates: Dict[str, list] = {}
-
-  sigIdClicked = Signal()
-  sigVertsChanged = Signal()
-
-  scheme = SchemeEditor()
-
-  def __init__(self, **initValsForVars):
-    super().__init__()
-    self._txtPlt = ClickableTextItem('N/A')
-    self._txtPlt.sigClicked.connect(self.sigIdClicked.emit)
-
-    '''
-    IMPORTANT!! Update this list as more properties / plots are added.
-    '''
-    # Handles update behavior for traits that alter plot information
-    self._reqdUpdates = {
-      'vertices'   : [self.sigVertsChanged.emit, self._updateTxtPlt],
-      'instanceId' : [self._updateTxtPlt],
-      'validated'  : [self._updateTxtPlt]
-      }
-
-  def __setattr__(self, prop, val):
-    super().__setattr__(prop, val)
-    # Apply plot updates depending on which variable was changed
-    pltUpdateFns = self._reqdUpdates.get(prop, [])
-    for fn in pltUpdateFns:
-      fn()
-
-  @staticmethod
-  def setScheme(scheme: SchemeEditor):
-    # Pass scheme to ClickableTextItem
-    ClickableTextItem.setScheme(scheme)
-
-  def _updateTxtPlt(self):
-    # It is OK for NaN mean values, since this will hide the text
-    with warnings.catch_warnings():
-      warnings.simplefilter("ignore", category=RuntimeWarning)
-      newPos = np.mean(self.vertices, axis=0)
-      self._txtPlt.setPos(newPos[0], newPos[1])
-    self._txtPlt.updateText(str(self.instanceId), self.validated)
-
 class DataComponentMgr(CompTableModel):
   # Emits 3-element dict: Deleted comp ids, changed comp ids, added comp ids
   defaultEmitDict = {'deleted': np.array([]), 'changed': np.array([]), 'added': np.array([])}
   sigCompsChanged = Signal(dict)
   # Used to alert models about data changes
-  sigCompsAboutToChange = Signal()
   sigCompClicked = Signal(object)
   sigCompVertsChanged = Signal(object)
 
@@ -173,6 +122,28 @@ class DataComponentMgr(CompTableModel):
     self.sigCompVertsChanged.emit(comp)
 
 
+  def newCompDf(self, numRows: int=1, **initVals) -> df:
+    """
+    Creates a dataframe for the requested number of components.
+    This is the recommended method for component instantiation prior to table insertion.
+
+    Parameters
+    ----------
+    numRows : int
+      Number of rows in the template dataframe
+
+    initVals : dict
+      Optional initialization values to be placed in the output dataframe.
+      If initVals is specfied, each key must correspond to a valid identifier
+      from CompParams. Moreover, each value must have the same length as numRows.
+    """
+    df_list = []
+    for _ in range(numRows):
+      # Make sure to construct a separate component instance for
+      # each row no objects have the same reference
+      compTemplate = CompParams()
+      df_list.append([field.value for field in CompParams()])
+    return df(df_list, columns=self.colTitles)
 class CompDisplayFilter(QtCore.QObject):
   sigCompClicked = Signal(object)
 

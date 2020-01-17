@@ -10,7 +10,7 @@ def profileFunc(func, numTimes, *funcArgs, **funcKwargs):
     func(*funcArgs, **funcKwargs)
 
 if __name__ == '__main__':
-  startImgFpath = path.join(BASE_DIR, './fast.tif')
+  startImgFpath = path.join(BASE_DIR, './Images/fast.tif')
   app = pg.mkQApp()
   win = MainWindow(startImgFpath)
   #p = run('profileFunc(win.estBoundsBtnClicked, 1)')
