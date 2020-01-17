@@ -99,7 +99,6 @@ class DataComponentMgr(CompTableModel):
     # Now, merge existing IDs and add new ones
     existingIds = self.compDf[idCol].values
     newIds = newCompsDf[idCol].values
-    existingChangedIdxs = np.isin(existingIds, newIds, assume_unique=True)
     newChangedIdxs = np.isin(newIds, existingIds, assume_unique=True)
 
     # Signal to table that rows should change
@@ -107,7 +106,7 @@ class DataComponentMgr(CompTableModel):
     #insertEnd = insertStart + np.count_nonzero(newChangedIdxs)
     #self.beginInsertRows(QtCore.QModelIndex(), insertStart, insertEnd)
     self.layoutAboutToBeChanged.emit()
-    self.compDf.iloc[existingChangedIdxs] = newCompsDf.iloc[newChangedIdxs]
+    self.compDf = self.compDf.update(newCompsDf)
     toEmit['changed'] = newIds[newChangedIdxs]
 
     # Finally, add new comps
