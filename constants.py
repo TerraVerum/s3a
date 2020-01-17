@@ -54,16 +54,11 @@ class ABParamGroup:
   Hosts all child parameters and offers convenience function for iterating over them
   """
 
-  @classmethod
-  def paramNames(cls):
+  def paramNames(self):
     """
-    Outputs the column names of each parameter in the group. Helpful since it
-    doesn't require a class instantiation.
+    Outputs the column names of each parameter in the group.
     """
-    paramNames = []
-    for field in fields(cls):
-      paramNames.append(field.name)
-    return paramNames
+    return [field.name for field in self]
 
   def __iter__(self):
     for field in fields(self):
@@ -114,7 +109,4 @@ class RegionControlsEditorValues(Enum):
 
 if __name__ == '__main__':
   x1 = CompParams()
-  x1.paramNames()
-  x2 = CompParams()
-  x1.INST_ID.value = 3
   print(x2.INST_ID.value)

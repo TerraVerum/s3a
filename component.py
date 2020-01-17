@@ -83,7 +83,7 @@ class Component(QtCore.QObject):
       warnings.simplefilter("ignore", category=RuntimeWarning)
       newPos = np.mean(self.vertices, axis=0)
       self._txtPlt.setPos(newPos[0], newPos[1])
-    self._txtPlt.updateText(str(self.instanceId), self.validated)
+    self._txtPlt.setText(str(self.instanceId), self.validated)
 
 class ComponentMgr(QtCore.QObject):
   # Emits 3-element dict: Deleted comp ids, changed comp ids, added comp ids

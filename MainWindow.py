@@ -6,14 +6,17 @@ Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal
 
 import numpy as np
+from pandas import DataFrame as df
 from PIL import Image
 
 from processing import getBwComps, getVertsFromBwComps, getClippedBbox
 from ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, attemptLoadSettings
 from ABGraphics.parameditors import SchemeEditor, TableFilterEditor, RegionControlsEditor
-from ABGraphics.table import CompTableModel
-from component import Component, ComponentMgr, CompDisplayFilter
-from constants import SCHEMES_DIR, LAYOUTS_DIR
+from dataTable import CompTableModel, makeCompDf
+#from component import Component, ComponentMgr, CompDisplayFilter
+from dataTable import DataComponentMgr as ComponentMgr
+from dataModelComponent import CompDisplayFilter
+from constants import SCHEMES_DIR, LAYOUTS_DIR, TEMPLATE_COMP as TC
 from constants import RegionControlsEditorValues as RCEV
 from ABGraphics.clickables import ClickableImageItem
 
@@ -60,8 +63,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # ---------------
     self.compMgr = ComponentMgr()
 
-    self.tableModel = CompTableModel(self.compMgr)
-    self.compTbl.setModel(self.tableModel)
+    self.compTbl.setModel(self.compMgr)
 
     # ---------------
     # COMPONENT DISPLAY FILTER
@@ -81,7 +83,7 @@ class MainWindow(QtWidgets.QMainWindow):
     self.populateSchemeOptions()
     # Attach scheme to all UI children
     self.compImg.setScheme(self.scheme)
-    Component.setScheme(self.scheme)
+    #Component.setScheme(self.scheme)
     CompDisplayFilter.setScheme(self.scheme)
 
     # ---------------
@@ -205,11 +207,12 @@ class MainWindow(QtWidgets.QMainWindow):
     # Only perform action if image currently exists
     if self.compImg.compImgItem.image is None:
       return
-    self.compImg.updateRegion(self.compImg.comp.vertices)
+    self.compImg.updateRegion(self.compImg.comp[TC.VERTICES.name].squeeze())
 
   @Slot()
   def acceptRegionBtnClicked(self):
     self.compImg.saveNewVerts()
+    self.compMgr.addComps(self.compImg.comp, addtype='merge')
 
   @Slot()
   def newImgBtnClicked(self):
@@ -226,11 +229,8 @@ class MainWindow(QtWidgets.QMainWindow):
   def estBoundsBtnClicked(self):
     self.compMgr.rmComps()
     compVertices = getVertsFromBwComps(getBwComps(self.mainImgItem.image))
-    components = []
-    for verts in compVertices:
-      newComp = Component()
-      newComp.vertices = verts
-      components.append(newComp)
+    components = makeCompDf(len(compVertices))
+    components[TC.VERTICES.name] = compVertices
     self.compMgr.addComps(components)
 
   @Slot()
@@ -294,14 +294,14 @@ class MainWindow(QtWidgets.QMainWindow):
     compVerts.append([vertBox[0,0], vertBox[1,1]])
     compVerts = np.vstack(compVerts)
 
-    newComp = Component()
-    newComp.vertices = compVerts
-    self.compMgr.addComps([newComp])
+    newComp = makeCompDf()
+    newComp[TC.VERTICES.name] = [compVerts]
+    self.compMgr.addComps(newComp)
 
 
   @Slot(object)
   @applyWaitCursor
-  def updateCurComp(self, newComp: Component):
+  def updateCurComp(self, newComp: df):
     mainImg = self.mainImgItem.image
     margin = self.regCtrlEditor[RCEV.MARGIN].value()
     segThresh = self.regCtrlEditor[RCEV.SEG_THRESH].value()
@@ -312,7 +312,7 @@ class MainWindow(QtWidgets.QMainWindow):
     if rmPrevComp:
       self.compMgr.rmComps(prevComp.instanceId)
 
-    self.curCompIdLbl.setText(f'Component ID: {newComp.instanceId}')
+    self.curCompIdLbl.setText(f'Component ID: {newComp[TC.INST_ID.name].squeeze()}')
 
 ## Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
