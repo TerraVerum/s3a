@@ -1,29 +1,35 @@
 from __future__ import annotations
 from pyqtgraph.Qt import QtWidgets, QtCore
+
+from enum import Enum
+
 Slot = QtCore.pyqtSlot
 
 
-from constants import ComponentTableFields as CTF, ComponentTypes
+from constants import TEMPLATE_COMP, ComponentTypes, ComponentTableFields as CTF
 import component
 
-from typing import Union
-
 class CompTableView(QtWidgets.QTableView):
-  def __init__(self, parent):
-    super().__init__(parent)
+  def __init__(self, *args):
+    super().__init__(*args)
 
-    #TODO: Set delegates dynamically based on given parameter types
-
+    # Default to text box delegate
     self.setItemDelegate(TextDelegate(self))
 
-    colTitles = [field.value for field in CTF]
-    validColIdx = colTitles.index('Validated')
-    validOpts = ['True', 'False']
-    self.setItemDelegateForColumn(validColIdx, ComboBoxDelegate(self, comboValues=validOpts))
+    validOpts = [True, False]
+    boolDelegate = ComboBoxDelegate(self, comboValues=validOpts)
 
-    devTypeColIdx = colTitles.index('Device Type')
-    devTypeOpts = [devType for devType in ComponentTypes]
-    self.setItemDelegateForColumn(devTypeColIdx, ComboBoxDelegate(self, comboValues=devTypeOpts))
+    colTitles = []
+    for ii, field in enumerate(TEMPLATE_COMP):
+      colTitles.append(field.name)
+      curval = field.value
+      if isinstance(curval, bool):
+        self.setItemDelegateForColumn(ii, boolDelegate)
+      elif isinstance(curval, Enum):
+        self.setItemDelegateForColumn(ii, ComboBoxDelegate(self, comboValues=list(type(curval))))
+      else:
+        # Default to text box
+        pass
 
 class CompTableModel(QtCore.QAbstractTableModel):
   colTitles = [field.value for field in CTF]

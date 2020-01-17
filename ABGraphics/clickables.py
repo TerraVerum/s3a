@@ -3,6 +3,7 @@ from pyqtgraph.Qt import QtCore, QtGui
 Signal = QtCore.pyqtSignal
 
 import numpy as np
+import warnings
 
 from ABGraphics.parameditors import SchemeEditor
 from constants import SchemeValues as SV
@@ -43,7 +44,7 @@ class ClickableTextItem(pg.TextItem):
     self.sigClicked.emit()
     ev.accept()
 
-  def updateText(self, newText: str, validated: bool):
+  def setText(self, newText: str, validated: bool = False):
     '''
     Overload setting text to utilize scheme editor
     '''
@@ -59,7 +60,15 @@ class ClickableTextItem(pg.TextItem):
 
     self.setColor(txtClr)
 
-    self.setText(newText)
+    super().setText(newText)
+
+  def update(self, newText, newVerts, newValid):
+    # It is OK for NaN mean values, since this will hide the text
+    with warnings.catch_warnings():
+      warnings.simplefilter("ignore", category=RuntimeWarning)
+      newPos = np.mean(newVerts, axis=0)
+      self.setPos(newPos[0], newPos[1])
+    self.setText(newText, newValid)
 
   @staticmethod
   def setScheme(scheme):

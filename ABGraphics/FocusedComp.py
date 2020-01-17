@@ -7,11 +7,13 @@ from processing import segmentComp, getVertsFromBwComps, growSeedpoint, getClipp
 from skimage.morphology import closing, opening
 
 import numpy as np
+from pandas import DataFrame as df
 
 from ABGraphics.clickables import ClickableImageItem
 from ABGraphics.regions import VertexRegion, SaveablePolyROI
-from component import *
 from ABGraphics.parameditors import SchemeEditor
+from dataTable import makeCompDf
+from constants import TEMPLATE_COMP as TC
 
 class FocusedComp(pg.PlotWidget):
   scheme = SchemeEditor()
@@ -27,7 +29,7 @@ class FocusedComp(pg.PlotWidget):
 
     self.setAspectLocked(True)
 
-    self.comp = Component()
+    self.comp = makeCompDf()
 
     self.bbox = np.zeros((2,2), dtype='int32')
 
@@ -96,22 +98,23 @@ class FocusedComp(pg.PlotWidget):
     self.interactor.clearPoints()
     return self.compImgItem.setImage(image, autoLevels)
 
-  def updateAll(self, mainImg: np.array, newComp:Component,
+  def updateAll(self, mainImg: np.array, newComp:df,
              margin: int, segThresh: float):
+    newVerts = newComp[TC.VERTICES.name].squeeze()
     deletePrevComponent = False
     # If the previous component had no vertices, signal its removal
-    if len(self.comp.vertices) == 0:
+    if len(self.comp[TC.VERTICES.name].squeeze()) == 0:
       deletePrevComponent = True
-    self.comp = newComp
-    self.updateBbox(mainImg.shape, newComp, margin)
+    self.comp = newComp.reset_index()
+    self.updateBbox(mainImg.shape, newVerts, margin)
     self.updateCompImg(mainImg, segThresh)
-    self.updateRegion(newComp.vertices)
+    self.updateRegion(newVerts)
     return deletePrevComponent
 
-  def updateBbox(self, mainImgShape, newComp: Component, margin):
+  def updateBbox(self, mainImgShape, newVerts: np.ndarray, margin: int):
     # Ignore NAN entries during computation
-    bbox = np.vstack([np.nanmin(newComp.vertices, 0),
-          np.nanmax(newComp.vertices, 0)])
+    bbox = np.vstack([np.nanmin(newVerts, 0),
+          np.nanmax(newVerts, 0)])
     # Account for margins
     self.bbox = getClippedBbox(mainImgShape, bbox, margin)
 
@@ -139,7 +142,7 @@ class FocusedComp(pg.PlotWidget):
 
   def saveNewVerts(self):
     # Add in offset from main image to VertexRegion vertices
-    self.comp.vertices = self.region.verts + self.bbox[0,:]
+    self.comp[TC.VERTICES.name] = [self.region.verts + self.bbox[0,:]]
 
   def _addRoiToRegion(self):
     imgMask = self.interactor.getImgMask(self.compImgItem)
