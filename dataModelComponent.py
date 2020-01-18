@@ -96,7 +96,7 @@ class CompDisplayFilter(QtCore.QObject):
     self._populateDisplayedIds()
 
     pltsToShow = self._oldPlotsDf.loc[self._displayedIds, 'idPlot']
-    tblIdxsToShow = np.in1d(id_indexDf.index, self._displayedIds)
+    tblIdxsToShow = np.nonzero(np.in1d(id_indexDf.index, self._displayedIds))[0]
     for plt in pltsToShow:
       plt.show()
     for rowIdx in tblIdxsToShow:
@@ -214,10 +214,15 @@ if __name__ == '__main__':
   mw.setModel(mgr)
   mw.show()
 
-  c = makeCompDf()
-  c[TC.VERTICES.name] = [np.random.randint(0,100,size=(10,2))]
-  c[TC.INST_ID.name] = 5
-  c[TC.BOARD_TEXT.name] = 'test'
+  c = makeCompDf(5)
+  for ii in range(len(c)):
+    c.loc[ii,TC.VERTICES.name] = [np.random.randint(0,100,size=(10,2))]
+    c.loc[ii,TC.INST_ID.name] = 5
+    c.loc[ii,TC.BOARD_TEXT.name] = 'test'
   mgr.addComps(c)
+
+  newComp = makeCompDf(1)
+  newComp[TC.INST_ID.name] = 100
+  mgr.addComps(newComp)
 
   app.exec()

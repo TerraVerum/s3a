@@ -137,6 +137,11 @@ class MainWindow(QtWidgets.QMainWindow):
   # -----------------------------
 
   def resetMainImg(self, newIm: np.array):
+    try:
+      newIm = newIm[:,:,0:3]
+    except IndexError:
+      # Assume 2d shape
+      pass
     self.mainImgItem.setImage(newIm)
     self.compMgr.rmComps('all')
 
@@ -310,7 +315,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # If all old vertices were deleted AND we switched images, signal deletion
     # for the previous focused component
     if rmPrevComp:
-      self.compMgr.rmComps(prevComp.instanceId)
+      self.compMgr.rmComps(prevComp[TC.INST_ID.name])
 
     self.curCompIdLbl.setText(f'Component ID: {newComp[TC.INST_ID.name].squeeze()}')
 

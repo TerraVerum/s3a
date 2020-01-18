@@ -100,17 +100,21 @@ class DataComponentMgr(CompTableModel):
     existingIds = self.compDf[idCol].values
     newIds = newCompsDf[idCol].values
     newChangedIdxs = np.isin(newIds, existingIds, assume_unique=True)
+    existingChangedIdxs = np.isin(existingIds, newIds, assume_unique=True)
 
     # Signal to table that rows should change
-    #insertStart = self.compDf.index[-1]
+    #self.layoutAboutToBeChanged.emit()
+    #insertStart = self.compDf.index[-1] if len(self.compDf.index > 0) else 0
     #insertEnd = insertStart + np.count_nonzero(newChangedIdxs)
     #self.beginInsertRows(QtCore.QModelIndex(), insertStart, insertEnd)
-    self.layoutAboutToBeChanged.emit()
-    self.compDf = self.compDf.update(newCompsDf)
+    #self.insertRows(insertStart, insertEnd, QtCore.QModelIndex())
+    # Index by ID for updating existing entries
+    newCompsDf = newCompsDf.set_index(TC.INST_ID.name, drop=False)
+    self.compDf.iloc[existingChangedIdxs,:] = newCompsDf.iloc[newChangedIdxs,:]
     toEmit['changed'] = newIds[newChangedIdxs]
 
     # Finally, add new comps
-    compsToAdd = newCompsDf.loc[~newChangedIdxs, :]
+    compsToAdd = newCompsDf.iloc[~newChangedIdxs, :]
     self.compDf = pd.concat((self.compDf, compsToAdd))
     toEmit['added'] = newIds[~newChangedIdxs]
     #self.endInsertRows()
@@ -125,7 +129,7 @@ class DataComponentMgr(CompTableModel):
     idCol = TC.INST_ID.name
     # Generate ID list
     existingCompIds = self.compDf[idCol]
-    if idsToRemove == 'all':
+    if idsToRemove is 'all':
       idsToRemove = existingCompIds
     elif not hasattr(idsToRemove, '__iter__'):
       # single number passed in
