@@ -186,9 +186,13 @@ class MultiRegionPlot(pg.PlotDataItem):
         self.ids.append(curId)
         self.regions.append(curVerts)
     for curId in rmIds:
-      idIdx = self.ids.index(curId)
-      del self.ids[idIdx]
-      del self.regions[idIdx]
+      try:
+        idIdx = self.ids.index(curId)
+        del self.ids[idIdx]
+        del self.regions[idIdx]
+      except ValueError:
+        # The Id was initialized to empty before it was actually plotted
+        pass
     self.updatePlot()
 
   @staticmethod
