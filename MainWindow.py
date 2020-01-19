@@ -12,10 +12,10 @@ from PIL import Image
 from processing import getBwComps, getVertsFromBwComps, getClippedBbox
 from ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, attemptLoadSettings
 from ABGraphics.parameditors import SchemeEditor, TableFilterEditor, RegionControlsEditor
-from dataTable import CompTableModel, makeCompDf
+from tablemodel import CompTableModel, makeCompDf
 #from component import Component, ComponentMgr, CompDisplayFilter
-from dataTable import DataComponentMgr as ComponentMgr
-from dataModelComponent import CompDisplayFilter
+from tablemodel import ComponentMgr as ComponentMgr
+from CompDisplayFilter import CompDisplayFilter
 from constants import SCHEMES_DIR, LAYOUTS_DIR, TEMPLATE_COMP as TC
 from constants import RegionControlsEditorValues as RCEV
 

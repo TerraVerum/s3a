@@ -1,5 +1,9 @@
+from typing import Union
+
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
+from PIL import Image
+from pyqtgraph.Qt import QtCore, QtGui
+
 Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
 
@@ -12,8 +16,45 @@ from pandas import DataFrame as df
 from ABGraphics.clickables import ClickableImageItem
 from ABGraphics.regions import VertexRegion, SaveablePolyROI
 from ABGraphics.parameditors import SchemeEditor
-from dataTable import makeCompDf
+from tablemodel import makeCompDf
 from constants import TEMPLATE_COMP as TC
+
+class MainImageArea(pg.PlotWidget):
+  def __init__(self, parent=None, background='default', imgSrc=None, **kargs):
+    super().__init__(parent, background, **kargs)
+
+    self.allowNewComps = True
+
+    self.setAspectLocked(True)
+    # -----
+    # Image Item
+    # -----
+    self.imgItem = ClickableImageItem()
+    # Ensure image is behind plots
+    self.imgItem.setZValue(-100)
+    self.setImage(imgSrc)
+    self.addItem(self.imgItem)
+
+  @property
+  def image(self):
+    return self.imgItem.image
+
+  def setImage(self, imgSrc: Union[str, np.ndarray]=None):
+    """
+    Allows the user to change the main image either from a filepath or array data
+    """
+    if isinstance(imgSrc, str):
+      imgSrc = np.array(Image.open(imgSrc))
+
+    self.imgItem.setImage(imgSrc)
+
+  def mouseClickEvent(self, ev):
+    # Capture clicks only if component is present and user allows it
+    if not ev.isAccepted() \
+       and ev.button() == QtCore.Qt.LeftButton \
+       and self.clickable and self.image is not None:
+      xyCoord = np.round(np.array([[ev.pos().x(), ev.pos().y()]], dtype='int'))
+      self.sigClicked.emit(xyCoord)
 
 class FocusedComp(pg.PlotWidget):
   scheme = SchemeEditor()

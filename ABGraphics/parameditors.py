@@ -1,24 +1,20 @@
 # -*- coding: utf-8 -*-
-from abc import abstractmethod
+import pickle as pkl
+import sys
 from enum import Enum
+from os.path import join
+from typing import List, Union, Sequence, Any
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets
-from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes as pTypes,
-                                     registerParameterType)
+from pyqtgraph.parametertree import (Parameter, ParameterTree)
 
+from ABGraphics.utils import dialogSaveToFile
 from constants import (
   SCHEMES_DIR, SchemeValues as SV,
   ComponentTableFields as CTF, ComponentTypes,
   REGION_CTRL_DIR, RegionControlsEditorValues as RCEV,
   FILTERS_DIR)
-from ABGraphics.utils import dialogSaveToFile
-
-import pickle as pkl
-import sys
-
-from typing import List, Union
-from os.path import join
 
 Signal = QtCore.pyqtSignal
 # Ensure app instance is running
@@ -33,8 +29,10 @@ class ConstParamWidget(QtWidgets.QDialog):
   sigParamStateCreated = Signal(str)
   sigParamStateUpdated = Signal(dict)
 
-  def __init__(self, parent=None, paramDict={}, saveDir='.', saveExt='param', saveDlgName='Save As'):
+  def __init__(self, parent=None, paramDict=None, saveDir='.', saveExt='param', saveDlgName='Save As'):
     # Place in list so an empty value gets unpacked into super constructor
+    if paramDict is None:
+      paramDict = []
     parentArg = []
     if parent is not None:
       parentArg.append(parent)
@@ -172,6 +170,7 @@ class TableFilterEditor(ConstParamWidget):
 
 class SchemeEditor(ConstParamWidget):
   def __init__(self, parent=None):
+    super().__init__(parent)
     _DEFAULT_SCHEME_DICT = [
       {'name': SV.COMP_PARAMS.value, 'type': 'group', 'children': [
         {'name': SV.VALID_ID_COLOR.value, 'type': 'color', 'value': '0f0'},
@@ -194,7 +193,7 @@ class SchemeEditor(ConstParamWidget):
   def loadScheme(self, schemeDict):
     self.params.restoreState(schemeDict, addChildren=False)
 
-  def _getProps(self, compOrFocIm: SV, whichProps: Union[SV, List[SV]]):
+  def _getProps(self, compOrFocIm: SV, whichProps):
     returnList = True
     if isinstance(whichProps, SV):
       whichProps = [whichProps]
@@ -206,8 +205,8 @@ class SchemeEditor(ConstParamWidget):
       outProps = outProps[0]
     return outProps
 
-  def getCompProps(self, whichProps: List[SV]):
+  def getCompProps(self, whichProps):
     return self._getProps(SV.COMP_PARAMS, whichProps)
 
-  def getFocImgProps(self, whichProps: List[SV]):
+  def getFocImgProps(self, whichProps):
     return self._getProps(SV.FOC_IMG_PARAMS, whichProps)
