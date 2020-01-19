@@ -2,11 +2,60 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 Signal = QtCore.pyqtSignal
 
+from typing import Union
+
 import numpy as np
+from PIL import Image
 import warnings
 
 from ABGraphics.parameditors import SchemeEditor
 from constants import SchemeValues as SV
+
+
+class MainImageArea(pg.PlotWidget):
+  def __init__(self, parent=None, background='default', imgSrc=None, **kargs):
+    super().__init__(parent, background, **kargs)
+
+    self.allowNewComps = True
+
+    self.setAspectLocked(True)
+    # -----
+    # Image Item
+    # -----
+    self.imgItem = ClickableImageItem()
+    # Ensure image is behind plots
+    self.imgItem.setZValue(-100)
+    self.setImage(imgSrc)
+    self.addItem(self.imgItem)
+
+  @property
+  def image(self):
+    return self.imgItem.image
+
+  def setImage(self, imgSrc: Union[str, np.ndarray]=None):
+    """
+    Allows the user to change the main image either from a filepath or array data
+    """
+    if isinstance(imgSrc, str):
+      imgSrc = np.array(Image.open(imgSrc))
+
+    self.imgItem.setImage(imgSrc)
+
+
+  def mouseClickEvent(self, ev):
+    """
+    If the user clicks an empty area of the image, this creates a new component at that location.
+    Else, allow the event to propagate to the ID plot.
+    """
+    pot = 1
+
+  def mouseClickEvent(self, ev):
+    # Capture clicks only if component is present and user allows it
+    if not ev.isAccepted() \
+       and ev.button() == QtCore.Qt.LeftButton \
+       and self.clickable and self.image is not None:
+      xyCoord = np.round(np.array([[ev.pos().x(), ev.pos().y()]], dtype='int'))
+      self.sigClicked.emit(xyCoord)
 
 
 class ClickableImageItem(pg.ImageItem):
@@ -20,6 +69,7 @@ class ClickableImageItem(pg.ImageItem):
        and self.clickable and self.image is not None:
       xyCoord = np.round(np.array([[ev.pos().x(), ev.pos().y()]], dtype='int'))
       self.sigClicked.emit(xyCoord)
+
 
 class ClickableTextItem(pg.TextItem):
   sigClicked = Signal()

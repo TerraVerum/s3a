@@ -54,7 +54,7 @@ class CompDisplayFilter(QtCore.QObject):
     # Plots: DRAWN, UNDRAWN
     # Note that hiding the ID is chosen instead of deleting, since that is a costly graphics
     # operation
-    id_indexDf = self._compMgr.compDf.set_index(TC.INST_ID.name)
+    id_indexDf = self._compMgr.compDf
 
     # For new components: Add hidden id plot. This will be shown later if filter allows
     addedIds = idLists['added']
@@ -110,8 +110,7 @@ class CompDisplayFilter(QtCore.QObject):
     self.redrawComps(self._compMgr.defaultEmitDict)
 
   def _populateDisplayedIds(self):
-    curComps = self._compMgr.compDf[:]
-    idCol = TC.INST_ID.name
+    curComps = self._compMgr.compDf
 
     # idx 0 = value, 1 = children
     # ------
@@ -120,7 +119,7 @@ class CompDisplayFilter(QtCore.QObject):
     curParam = self._filter[TC.INST_ID.name][1]
     curmin, curmax = [curParam[name][0] for name in ['min', 'max']]
 
-    idList = np.array(curComps[idCol], dtype=int)
+    idList = curComps.index
     curComps = curComps.loc[(idList >= curmin) & (idList <= curmax),:]
 
     # ------
@@ -177,7 +176,7 @@ class CompDisplayFilter(QtCore.QObject):
     curComps = curComps.loc[vertsAllowed,:]
 
     # Give self the id list of surviving comps
-    self._displayedIds = np.array(curComps[idCol])
+    self._displayedIds = curComps.index
 
   @Slot()
   def resetCompBounds(self):
@@ -194,8 +193,7 @@ class CompDisplayFilter(QtCore.QObject):
   def _rethrowCompClick(self):
     idPlot: ClickableTextItem = self.sender()
     clickedId = int(idPlot.textItem.toPlainText())
-    clickedRow = self._compMgr.compDf[TC.INST_ID.name] == clickedId
-    self.sigCompClicked.emit(self._compMgr.compDf.loc[clickedRow,:])
+    self.sigCompClicked.emit(self._compMgr.compDf.loc[clickedId,:])
 
   @staticmethod
   def setScheme(scheme: SchemeEditor):
