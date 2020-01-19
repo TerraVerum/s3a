@@ -9,11 +9,12 @@ from typing import Union
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets
 
+from ABGraphics import tableview
 from ABGraphics.parameditors import SchemeEditor, TableFilterEditor
 from ABGraphics.regions import MultiRegionPlot
 from ABGraphics.clickables import ClickableTextItem
 from constants import (ComponentTypes, CompParams, TEMPLATE_COMP as TC)
-from dataTable import *
+from tablemodel import *
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
@@ -23,8 +24,8 @@ app = pg.mkQApp()
 class CompDisplayFilter(QtCore.QObject):
   sigCompClicked = Signal(object)
 
-  def __init__(self, compMgr: DataComponentMgr, mainImg: pg.PlotWindow,
-               compTbl: table.CompTableView, filterEditor: TableFilterEditor):
+  def __init__(self, compMgr: ComponentMgr, mainImg: pg.PlotWindow,
+               compTbl: tableview.CompTableView, filterEditor: TableFilterEditor):
     super().__init__()
     self._mainImgArea = mainImg
     self._filter = filterEditor.params.getValues()
@@ -203,12 +204,12 @@ class CompDisplayFilter(QtCore.QObject):
 
 if __name__ == '__main__':
   from PIL import Image
-  from ABGraphics.table import CompTableView
+  from ABGraphics.tableview import CompTableView
   mw = CompTableView()
   item = pg.ImageItem(np.array(Image.open('./Images/fast.tif')))
   #mw.addItem(item)
   #mw.setAspectLocked(True)
-  mgr = DataComponentMgr()
+  mgr = ComponentMgr()
   mw.setModel(mgr)
   mw.show()
 

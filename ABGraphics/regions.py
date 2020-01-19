@@ -65,12 +65,13 @@ class SaveablePolyROI(pg.PolyLineROI):
     # a dependency
     super().__init__(*args, **kwargs)
     # Force new menu options
+    self.finishPolyAct = QtGui.QAction()
     self.getMenu()
 
   def getMenu(self, *args, **kwargs):
-    '''
+    """
     Adds context menu option to add current ROI area to existing region
-    '''
+    """
     if self.menu is None:
       menu = super().getMenu()
       finishPolyAct = QtGui.QAction("Finish Polygon", menu)
@@ -104,7 +105,11 @@ class MultiRegionPlot(pg.PlotDataItem):
     self._nanSep = np.empty((1,2))
     self._nanSep.fill(np.nan)
 
-  def resetRegionList(self, newIds=[], newRegions = []):
+  def resetRegionList(self, newIds=None, newRegions=None):
+    if newRegions is None:
+      newRegions = []
+    if newIds is None:
+      newIds = []
     self.regions = []
     self.ids = []
     self[newIds] = newRegions
@@ -159,10 +164,10 @@ class MultiRegionPlot(pg.PlotDataItem):
     return outList
 
   def __setitem__(self, regionIds, newVerts):
-    '''
+    """
     If the region already exists, update it. Otherwise, append to the list.
     If region vertices are empty, remove the region
-    '''
+    """
     if not hasattr(regionIds, '__iter__'):
       regionIds = [regionIds]
       newVerts = [newVerts]

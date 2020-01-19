@@ -1,7 +1,5 @@
 from __future__ import annotations
 from pyqtgraph.Qt import QtCore
-Slot = QtCore.pyqtSlot
-Signal = QtCore.pyqtSignal
 
 from pandas import DataFrame as df
 import pandas as pd
@@ -10,6 +8,9 @@ import numpy as np
 from constants import TEMPLATE_COMP as TC, CompParams
 
 from typing import Union
+
+Slot = QtCore.pyqtSlot
+Signal = QtCore.pyqtSignal
 
 def makeCompDf(numRows=1) -> df:
   """
@@ -62,7 +63,7 @@ class CompTableModel(QtCore.QAbstractTableModel):
   def setData(self, index, value, role=QtCore.Qt.EditRole):
     self.compDf.iloc[index.row(), index.column()] = value
     toEmit = self.defaultEmitDict.copy()
-    toEmit['changed'] = [self.compDf.index[index.row()]]
+    toEmit['changed'] = np.array([self.compDf.index[index.row()]])
     self.sigCompsChanged.emit(toEmit)
     return True
 
@@ -75,7 +76,7 @@ class CompTableModel(QtCore.QAbstractTableModel):
       return QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled
 
 
-class DataComponentMgr(CompTableModel):
+class ComponentMgr(CompTableModel):
   _nextCompId = 0
 
   def __init__(self):
@@ -93,13 +94,11 @@ class DataComponentMgr(CompTableModel):
     existingIds = self.compDf.index
     newIds = newCompsDf.index
     newChangedIdxs = np.isin(newIds, existingIds, assume_unique=True)
-    #existingChangedIdxs = np.isin(existingIds, newIds, assume_unique=True)
 
     # Signal to table that rows should change
     self.layoutAboutToBeChanged.emit()
     # Ensure indices overlap with the components these are replacing
-    #newCompsDf = newCompsDf.set_index(self.compDf.index[existingChangedIdxs])
-    #self.compDf.iloc[existingChangedIdxs,:] = newCompsDf.iloc[newChangedIdxs,:]
+    self.compDf.update(newCompsDf)
     self.compDf.update(newCompsDf)
     toEmit['changed'] = newIds[newChangedIdxs]
 
@@ -134,7 +133,7 @@ class DataComponentMgr(CompTableModel):
     # Determine next ID for new components
     self._nextCompId = 0
     if np.any(tfKeepIdx):
-      self._nextCompId = np.max(existingCompIds[tfKeepIdx]) + 1
+      self._nextCompId = np.max(existingCompIds[tfKeepIdx].to_numpy()) + 1
 
     # Reflect these changes to the component list
     toEmit['deleted'] = idsToRemove

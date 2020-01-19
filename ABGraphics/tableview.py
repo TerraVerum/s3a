@@ -3,11 +3,10 @@ from pyqtgraph.Qt import QtWidgets, QtCore
 
 from enum import Enum
 
+from constants import TEMPLATE_COMP
+from tablemodel import CompTableModel
+
 Slot = QtCore.pyqtSlot
-
-
-from constants import TEMPLATE_COMP, ComponentTypes, ComponentTableFields as CTF
-import component
 
 class CompTableView(QtWidgets.QTableView):
   def __init__(self, *args):
@@ -31,71 +30,6 @@ class CompTableView(QtWidgets.QTableView):
         # Default to text box
         pass
 
-class CompTableModel(QtCore.QAbstractTableModel):
-  colTitles = [field.value for field in CTF]
-
-  def __init__(self, compMgr: component.ComponentMgr):
-    super().__init__()
-    self.compMgr = compMgr
-
-    compMgr.sigCompsAboutToChange.connect(self.layoutAboutToBeChanged.emit)
-    compMgr.sigCompsChanged.connect(self.layoutChanged.emit)
-
-    # Create list of component fields that correspond to table columns
-    # These are camel-cased
-    xpondingCompFields = []
-    compFields = list(component.Component().__dict__.keys())
-    lowercaseCompFields = [field.lower() for field in compFields]
-    compareColNames = [name.lower().replace(' ', '') for name in self.colTitles]
-    for name in compareColNames:
-      try:
-        compFieldIdx = lowercaseCompFields.index(name)
-        xpondingCompFields.append(compFields[compFieldIdx])
-      except ValueError:
-        pass
-    self._xpondingCompFields = xpondingCompFields
-
-  # Helper for delegates
-  def indexToRowCol(self, index: QtCore.QModelIndex):
-    row = index.row()
-    col = self._xpondingCompFields[index.column()]
-    return row, col
-
-  # ------
-  # Functions required to implement table model
-  # ------
-  def columnCount(self, *args, **kwargs):
-    return len(self.colTitles)
-
-  def rowCount(self, *args, **kwargs):
-    return len(self.compMgr._compList)
-
-  def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
-    if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
-      return self.colTitles[section]
-
-  def data(self, index, role=QtCore.Qt.DisplayRole):
-    dataIdx = self.indexToRowCol(index)
-    outData = self.compMgr._compList.loc[dataIdx]
-    if role == QtCore.Qt.DisplayRole:
-      return str(outData)
-    elif role == QtCore.Qt.EditRole:
-      return outData
-    else:
-      return None
-
-  def setData(self, index, value, role=QtCore.Qt.EditRole):
-    dataIdx = self.indexToRowCol(index)
-    self.compMgr._compList.loc[dataIdx] = value
-    return True
-
-  def flags(self, index):
-    noEditColIdxs = [self.colTitles.index(col) for col in ['Instance ID', 'Vertices']]
-    if index.column() not in noEditColIdxs:
-      return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable
-    else:
-      return QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled
-
 class TextDelegate(QtWidgets.QItemDelegate):
   def createEditor(self, parent, option, index):
     editor = QtWidgets.QPlainTextEdit(parent)
@@ -118,8 +52,10 @@ class TextDelegate(QtWidgets.QItemDelegate):
 
 
 class ComboBoxDelegate(QtWidgets.QStyledItemDelegate):
-  def __init__(self, parent=None, comboValues=[], comboNames=None):
+  def __init__(self, parent=None, comboValues=None, comboNames=None):
     super().__init__(parent)
+    if comboValues is None:
+      comboValues = []
     self.comboValues: list = comboValues
     if comboNames is None:
       self.comboNames = [str(val) for val in comboValues]
