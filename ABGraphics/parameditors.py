@@ -40,7 +40,7 @@ class ConstParamWidget(QtWidgets.QDialog):
       parentArg.append(parent)
     super().__init__(*parentArg)
     self.resize(500, 400)
-    self.setModal(True)
+    #self.setModal(True)
 
     # -----------
     # Construct parameter tree
@@ -139,7 +139,8 @@ class ConstParamWidget(QtWidgets.QDialog):
 
 
 class RegionControlsEditor(ConstParamWidget):
-  def __init__(self):
+  def __init__(self, parent=None):
+    super().__init__(parent)
     _CONTROLS_DICT = [
         {'name': RCEV.MARGIN.value, 'type': 'int', 'value': 5},
         {'name': RCEV.SEG_THRESH.value, 'type': 'float', 'value': 6.},
@@ -149,7 +150,8 @@ class RegionControlsEditor(ConstParamWidget):
     super().__init__(paramDict=_CONTROLS_DICT, saveDir=REGION_CTRL_DIR)
 
 class TableFilterEditor(ConstParamWidget):
-  def __init__(self):
+  def __init__(self, parent=None):
+    super().__init__(parent)
     minMaxParam = _genList(['min', 'max'], 'int', 0)
     # Make max 'infinity'
     minMaxParam[1]['value'] = sys.maxsize

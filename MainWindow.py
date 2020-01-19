@@ -18,7 +18,6 @@ from dataTable import DataComponentMgr as ComponentMgr
 from dataModelComponent import CompDisplayFilter
 from constants import SCHEMES_DIR, LAYOUTS_DIR, TEMPLATE_COMP as TC
 from constants import RegionControlsEditorValues as RCEV
-from ABGraphics.clickables import ClickableImageItem
 
 import os
 from os.path import join
@@ -40,16 +39,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # ---------------
     # MAIN IMAGE
     # ---------------
-    imgArray = None
-    if startImgFpath is not None:
-      imgArray = np.array(Image.open(startImgFpath))
-    item = ClickableImageItem(imgArray)
-    # Ensure image will remain in background of window
-    item.setZValue(-100)
-    self.mainImg.addItem(item)
-    self.mainImg.setAspectLocked(True)
-    self.mainImgItem = item
-    item.sigClicked.connect(self.mainImgItemClicked)
+    self.mainImg.setImage(startImgFpath)
 
     # ---------------
     # LOAD LAYOUT OPTIONS
@@ -72,7 +62,7 @@ class MainWindow(QtWidgets.QMainWindow):
     self.filterEditor = TableFilterEditor()
     self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl, self.filterEditor)
 
-    self.mainImgItem.sigImageChanged.connect(self.compDisplay.resetCompBounds)
+    self.mainImg.imgItem.sigImageChanged.connect(self.clearBoundsBtnClicked)
     self.compDisplay.sigCompClicked.connect(self.updateCurComp)
 
 
@@ -123,7 +113,7 @@ class MainWindow(QtWidgets.QMainWindow):
     self.saveLayout.triggered.connect(self.saveLayoutActionTriggered)
     self.sigLayoutSaved.connect(self.populateLoadLayoutOptions)
 
-    self.newScheme.triggered.connect(self.scheme.show)
+    self.editScheme.triggered.connect(self.scheme.show)
 
     self.compEditCtrls.triggered.connect(self.regCtrlEditor.show)
 
@@ -135,20 +125,12 @@ class MainWindow(QtWidgets.QMainWindow):
   # -----------------------------
   # MainWindow CLASS FUNCTIONS
   # -----------------------------
+  def closeEvent(self, ev):
+    # Clean up all child windows, which could potentially be left open
+    self.filterEditor.close()
+    self.scheme.close()
+    self.regCtrlEditor.close()
 
-  def resetMainImg(self, newIm: np.array):
-    try:
-      newIm = newIm[:,:,0:3]
-    except IndexError:
-      # Assume 2d shape
-      pass
-    self.mainImgItem.setImage(newIm)
-    self.compMgr.rmComps('all')
-
-
-  # -----------------------------
-  # SIGNAL CALLBACK FUNCTIONS
-  # -----------------------------
   # ---------------
   # MENU CALLBACKS
   # ---------------
@@ -212,12 +194,12 @@ class MainWindow(QtWidgets.QMainWindow):
     # Only perform action if image currently exists
     if self.compImg.compImgItem.image is None:
       return
-    self.compImg.updateRegion(self.compImg.comp[TC.VERTICES.name].squeeze())
+    self.compImg.updateRegion(self.compImg.compSer[TC.VERTICES.name].squeeze())
 
   @Slot()
   def acceptRegionBtnClicked(self):
     self.compImg.saveNewVerts()
-    self.compMgr.addComps(self.compImg.comp, addtype='merge')
+    self.compMgr.addComps(self.compImg.compSer.to_frame().T, addtype='merge')
 
   @Slot()
   def newImgBtnClicked(self):
@@ -226,14 +208,13 @@ class MainWindow(QtWidgets.QMainWindow):
     fname, _ = fileDlg.getOpenFileName(self, 'Select Main Image', '', fileFilter)
 
     if len(fname) > 0:
-      newIm = np.array(Image.open(fname))
-      self.resetMainImg(newIm)
+      self.mainImg.setImage(fname)
 
   @Slot()
   @applyWaitCursor
   def estBoundsBtnClicked(self):
     self.compMgr.rmComps()
-    compVertices = getVertsFromBwComps(getBwComps(self.mainImgItem.image))
+    compVertices = getVertsFromBwComps(getBwComps(self.mainImg.image))
     components = makeCompDf(len(compVertices))
     components[TC.VERTICES.name] = compVertices
     self.compMgr.addComps(components)
@@ -290,7 +271,7 @@ class MainWindow(QtWidgets.QMainWindow):
     """
     sideLen = self.regCtrlEditor[RCEV.NEW_COMP_SZ].value()
     vertBox = np.vstack((xyCoord, xyCoord))
-    vertBox = getClippedBbox(self.mainImgItem.image.shape, vertBox, sideLen)
+    vertBox = getClippedBbox(self.mainImg.image.shape, vertBox, sideLen)
     # Create square from bounding box
     compVerts = []
     compVerts.append([vertBox[0,0], vertBox[0,1]])
@@ -307,17 +288,17 @@ class MainWindow(QtWidgets.QMainWindow):
   @Slot(object)
   @applyWaitCursor
   def updateCurComp(self, newComp: df):
-    mainImg = self.mainImgItem.image
+    mainImg = self.mainImg.image
     margin = self.regCtrlEditor[RCEV.MARGIN].value()
     segThresh = self.regCtrlEditor[RCEV.SEG_THRESH].value()
-    prevComp = self.compImg.comp
+    prevComp = self.compImg.compSer
     rmPrevComp = self.compImg.updateAll(mainImg, newComp, margin, segThresh)
     # If all old vertices were deleted AND we switched images, signal deletion
     # for the previous focused component
     if rmPrevComp:
       self.compMgr.rmComps(prevComp[TC.INST_ID.name])
 
-    self.curCompIdLbl.setText(f'Component ID: {newComp[TC.INST_ID.name].squeeze()}')
+    self.curCompIdLbl.setText(f'Component ID: {newComp[TC.INST_ID.name]}')
 
 ## Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
