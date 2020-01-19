@@ -1,12 +1,9 @@
-from dataclasses import dataclass, fields, field
-from typing import Any
-from enum import Enum
-
-from pathlib import Path
 import os
-from sys import maxsize
+from dataclasses import dataclass, fields, field
+from enum import Enum
+from pathlib import Path
+from typing import Any
 
-from pandas import DataFrame as df
 import numpy as np
 
 # Preference directories
@@ -58,11 +55,13 @@ class ABParamGroup:
     """
     Outputs the column names of each parameter in the group.
     """
-    return [field.name for field in self]
+    return [curField.name for curField in self]
 
   def __iter__(self):
-    for field in fields(self):
-      yield getattr(self, field.name)
+    # 'self' is an instance of the class, so the warning is a false positive
+    # noinspection PyDataclass
+    for curField in fields(self):
+      yield getattr(self, curField.name)
 
 newParam = lambda name, val: field(default_factory=lambda: ABParam(name, val))
 @dataclass
@@ -106,7 +105,3 @@ class RegionControlsEditorValues(Enum):
   SEG_THRESH: Enum = 'Segmentation Threshold'
   SEED_THRESH: Enum = 'Seedpoint Mean Threshold'
   NEW_COMP_SZ: Enum = 'New Component Size'
-
-if __name__ == '__main__':
-  x1 = CompParams()
-  print(x2.INST_ID.value)

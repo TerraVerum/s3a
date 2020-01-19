@@ -22,6 +22,7 @@ class ClickableImageItem(pg.ImageItem):
       self.sigClicked.emit(xyCoord)
 
 
+# noinspection PyUnusedLocal
 class ClickableTextItem(pg.TextItem):
   sigClicked = Signal()
 
@@ -38,7 +39,6 @@ class ClickableTextItem(pg.TextItem):
     self.setCursor(self.hoverCursor)
 
   def hoverLeaveEvent(self, ev):
-    #self.setCursor(self.origCursor)
     self.unsetCursor()
 
   def mousePressEvent(self, ev: QtGui.QMouseEvent):
@@ -46,9 +46,9 @@ class ClickableTextItem(pg.TextItem):
     ev.accept()
 
   def setText(self, newText: str, validated: bool = False):
-    '''
+    """
     Overload setting text to utilize scheme editor
-    '''
+    """
     schemeClrProp = SV.NONVALID_ID_COLOR
     if validated:
       schemeClrProp = SV.VALID_ID_COLOR
