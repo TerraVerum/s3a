@@ -1,13 +1,13 @@
-import numpy as np
 import cv2 as cv
-
+import numpy as np
+from skimage.filters import gaussian
+from skimage.measure import regionprops, label
 from skimage.morphology import closing, dilation
 from skimage.morphology import disk
 from skimage.segmentation import quickshift
-from skimage.measure import regionprops, label
-from skimage.filters import gaussian
 
-from graphicseval import overlayImgs, makeImgPieces
+from graphicseval import overlayImgs
+
 
 def getBwComps(img: np.ndarray) -> np.ndarray:
   return bwBgMask(img)

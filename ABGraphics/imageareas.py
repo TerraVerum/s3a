@@ -164,8 +164,8 @@ class FocusedComp(pg.PlotWidget):
   def updateCompImg(self, mainImg, segThresh, bbox=None):
     if bbox is None:
       bbox = self.bbox
-    newCompImg = mainImg[self.bbox[0,1]:self.bbox[1,1],
-                         self.bbox[0,0]:self.bbox[1,0],
+    newCompImg = mainImg[bbox[0,1]:bbox[1,1],
+                         bbox[0,0]:bbox[1,0],
                          :]
     segImg = segmentComp(newCompImg, segThresh)
     self.setImage(segImg)
