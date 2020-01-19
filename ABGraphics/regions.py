@@ -60,10 +60,12 @@ class VertexRegion(pg.ImageItem):
     VertexRegion.scheme = scheme
 
 class SaveablePolyROI(pg.PolyLineROI):
-  def __init__(self, *args, **kwargs):
+  def __init__(self, initialPoints=None, *args, **kwargs):
+    if initialPoints is None:
+      initialPoints = []
     # Since this won't execute until after module import, it doesn't cause
     # a dependency
-    super().__init__(*args, **kwargs)
+    super().__init__(initialPoints, *args, **kwargs)
     # Force new menu options
     self.finishPolyAct = QtGui.QAction()
     self.getMenu()

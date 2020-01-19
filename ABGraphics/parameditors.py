@@ -3,7 +3,6 @@ import pickle as pkl
 import sys
 from enum import Enum
 from os.path import join
-from typing import List, Union, Sequence, Any
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets

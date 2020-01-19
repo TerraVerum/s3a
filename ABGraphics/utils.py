@@ -39,10 +39,10 @@ def dialogSaveToFile(parent, saveObj, winTitle, saveDir, saveExt, allowOverwrite
   return returnVal
 
 def attemptLoadSettings(fpath, openMode='rb'):
-  '''
+  """
   I/O helper function that, when given a file path, either returns the pickle object
   associated with that file or displays an error message and returns nothing.
-  '''
+  """
   pklObj = None
   try:
     curFile = open(fpath, openMode)
@@ -55,7 +55,7 @@ def attemptLoadSettings(fpath, openMode='rb'):
     return pklObj
 
 def addDirItemsToMenu(parentMenu, dirRegex, triggerFunc, removeExistingChildren=True):
-  '''Helper function for populating menu from directory contents'''
+  """Helper function for populating menu from directory contents"""
   # Remove existing menus so only the current file system setup is in place
   if removeExistingChildren:
     for action in parentMenu.children():

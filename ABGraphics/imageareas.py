@@ -4,9 +4,6 @@ import pyqtgraph as pg
 from PIL import Image
 from pyqtgraph.Qt import QtCore, QtGui
 
-Signal = QtCore.pyqtSignal
-QCursor = QtGui.QCursor
-
 from processing import segmentComp, getVertsFromBwComps, growSeedpoint, getClippedBbox
 from skimage.morphology import closing, opening
 
@@ -18,6 +15,9 @@ from ABGraphics.regions import VertexRegion, SaveablePolyROI
 from ABGraphics.parameditors import SchemeEditor
 from tablemodel import makeCompDf
 from constants import TEMPLATE_COMP as TC
+
+Signal = QtCore.pyqtSignal
+QCursor = QtGui.QCursor
 
 class MainImageArea(pg.PlotWidget):
   def __init__(self, parent=None, background='default', imgSrc=None, **kargs):

@@ -1,7 +1,6 @@
 import pyqtgraph as pg
 
 def overlayImgs(img1, *addtnlImgs):
-  app = pg.mkQApp()
   win = pg.GraphicsWindow()
   vb = win.addViewBox()
   baseImg = pg.ImageItem(img1)
@@ -14,7 +13,6 @@ def overlayImgs(img1, *addtnlImgs):
     extraImgItem.setZValue(ii+1)
     extraImgItem.setOpacity(1/(numAddtnlImgs+1))
   return win
-  #app.exec()
 
 def makeImgPieces(img):
   win = pg.PlotWindow()

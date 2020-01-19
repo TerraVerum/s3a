@@ -29,7 +29,6 @@ def getBwComps_segmentation(img: np.ndarray) -> np.ndarray:
     edgeLabels = np.unique(segImg[compVerts[:,1], compVerts[:,0]])
     comparisonMat = segImg[:,:,None] == edgeLabels[None,None,:]
     isEdgePix = np.any(comparisonMat, axis=2)
-    pgImg = makeImgPieces(isEdgePix.astype('uint8')*255)
     bwHullImg[isEdgePix] = False
   return bwHullImg
 
@@ -41,21 +40,14 @@ def regionConvHulls(img: np.ndarray):
   for region in regions:
     bbox = region.bbox
     convHull = region.convex_image
-    #convHullLoc = [slice(bbox[ii],bbox[ii]+bbox[ii+1]) for ii in range(2)]
     outImg[bbox[0]:bbox[2],bbox[1]:bbox[3]] = convHull
-
-    #bbox = np.array(region.bbox)
-    #for ii in range(2):
-      #bbox[ii] = np.maximum(0, bbox[ii]-margin)
-      #bbox[ii+1] = np.minimum(imgShape[ii], bbox[ii+1]+margin)
-    #outImg[bbox[0]:bbox[2], bbox[1]:bbox[3]] = True
   return outImg
 
 def colorLabelsWithMean(labelImg, refImg) -> np.ndarray:
   outImg = np.empty(refImg.shape)
   labels = np.unique(labelImg)
-  for label in labels:
-    curmask = labelImg == label
+  for curLabel in labels:
+    curmask = labelImg == curLabel
     outImg[curmask,:] = refImg[curmask,:].reshape(-1,3).mean(0)
   return outImg
 
@@ -85,7 +77,7 @@ def segmentComp(compImg: np.array, maxDist: np.float, kernSz=10) -> np.array:
   return colorLabelsWithMean(segImg, compImg)
 
 def growSeedpoint(img: np.array, seeds: np.array, thresh: float) -> np.array:
-  '''
+  """
   Starting from *seed*, fills each connected pixel if the difference between
   neighboring pixels and the current component is less than *thresh*.
   Places one 'on' pixel in each seed location, rerunning the algorithm for each
@@ -107,7 +99,7 @@ def growSeedpoint(img: np.array, seeds: np.array, thresh: float) -> np.array:
   thresh : float
     Threshold between component and neighbors. If neighbor pixels
     are below this value, they are added to the seed component.
-  '''
+  """
   bwOut = np.zeros(img.shape[0:2], dtype=bool)
   nChans = img.shape[2] if len(img.shape) > 2 else 1
   # Computationally cheaper to compare square of thresh instead of using
@@ -136,10 +128,10 @@ def growSeedpoint(img: np.array, seeds: np.array, thresh: float) -> np.array:
   return bwOut
 
 def nanConcatList(vertList):
-  '''
+  """
   Utility for concatenating all vertices within a list while adding
   NaN entries between each separate list
-  '''
+  """
   if isinstance(vertList, np.ndarray):
     vertList = [vertList]
   nanSep = np.ones((1,2), dtype=int)*np.nan
@@ -150,10 +142,10 @@ def nanConcatList(vertList):
   return np.vstack(allVerts)
 
 def splitListAtNans(concatVerts:np.ndarray):
-  '''
+  """
   Utility for taking a single list of nan-separated region vertices
   and breaking it into several regions with no nans.
-  '''
+  """
   # concatVerts must end with nan if it came from nanConcatList
   if not np.isnan(concatVerts[-1,0]):
     concatVerts = nanConcatList(concatVerts)
@@ -170,9 +162,9 @@ def sliceToArray(keySlice: slice, arrToSlice: np.ndarray):
   Converts array slice into concrete array values
   """
   start, stop, step = keySlice.start, keySlice.stop, keySlice.step
-  if start == None:
+  if start is None:
     start = 0
-  if stop == None:
+  if stop is None:
     stop = len(arrToSlice)
   outArr = np.arange(start, stop, step)
   # Remove elements that don't correspond to list indices

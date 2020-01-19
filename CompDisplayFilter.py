@@ -1,19 +1,13 @@
 # Required to avoid cyclic dependency from CompTable annotation
 from __future__ import annotations
 
-import numpy as np
-import pandas as pd
-from pandas import DataFrame as df
-from typing import Union
-
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtWidgets
 
 from ABGraphics import tableview
+from ABGraphics.clickables import ClickableTextItem
 from ABGraphics.parameditors import SchemeEditor, TableFilterEditor
 from ABGraphics.regions import MultiRegionPlot
-from ABGraphics.clickables import ClickableTextItem
-from constants import (ComponentTypes, CompParams, TEMPLATE_COMP as TC)
+from constants import (ComponentTypes)
 from tablemodel import *
 
 Signal = QtCore.pyqtSignal
@@ -62,9 +56,10 @@ class CompDisplayFilter(QtCore.QObject):
     verts = id_indexDf.loc[addedIds, TC.VERTICES.name].values
     valids = id_indexDf.loc[addedIds, TC.VALIDATED.name].values
     newIdPlots = [None]*len(addedIds)
-    for ii, (curId, curVerts, curValid) in enumerate(zip(addedIds, verts, valids)):
+    for pltIdx, (curId, curVerts, curValid) in enumerate(zip(addedIds, verts, valids)):
       newPlt = self._createIdPlot(curId, curVerts, curValid)
-      newIdPlots[ii] = newPlt
+      # noinspection PyTypeChecker
+      newIdPlots[pltIdx] = newPlt
     newIdPlots_Df = df(newIdPlots, index=addedIds, columns=self._oldPlotsDf.columns)
     self._oldPlotsDf = pd.concat((self._oldPlotsDf, newIdPlots_Df), sort=False)
 
@@ -168,12 +163,12 @@ class CompDisplayFilter(QtCore.QObject):
     yParam = vertParam['Y Bounds'][1]
     xmin, xmax, ymin, ymax = [param[val][0] for param in (xParam, yParam) for val in ['min', 'max']]
 
-    for ii, verts in enumerate(compVerts):
+    for vertIdx, verts in enumerate(compVerts):
       xVerts = verts[:,0]
       yVerts = verts[:,1]
       isAllowed = np.all((xVerts >= xmin) & (xVerts <= xmax)) & \
                   np.all((yVerts >= ymin) & (yVerts <= ymax))
-      vertsAllowed[ii] = isAllowed
+      vertsAllowed[vertIdx] = isAllowed
     curComps = curComps.loc[vertsAllowed,:]
 
     # Give self the id list of surviving comps
@@ -192,6 +187,7 @@ class CompDisplayFilter(QtCore.QObject):
 
   @Slot()
   def _rethrowCompClick(self):
+    # noinspection PyTypeChecker
     idPlot: ClickableTextItem = self.sender()
     clickedId = int(idPlot.textItem.toPlainText())
     self.sigCompClicked.emit(self._compMgr.compDf.loc[clickedId,:])

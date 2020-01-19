@@ -1,26 +1,24 @@
 # -*- coding: utf-8 -*-
 
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
-Slot = QtCore.pyqtSlot
-Signal = QtCore.pyqtSignal
-
-import numpy as np
-from pandas import DataFrame as df
-from PIL import Image
-
-from processing import getBwComps, getVertsFromBwComps, getClippedBbox
-from ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, attemptLoadSettings
-from ABGraphics.parameditors import SchemeEditor, TableFilterEditor, RegionControlsEditor
-from tablemodel import CompTableModel, makeCompDf
-#from component import Component, ComponentMgr, CompDisplayFilter
-from tablemodel import ComponentMgr as ComponentMgr
-from CompDisplayFilter import CompDisplayFilter
-from constants import SCHEMES_DIR, LAYOUTS_DIR, TEMPLATE_COMP as TC
-from constants import RegionControlsEditorValues as RCEV
-
 import os
 from os.path import join
+
+import numpy as np
+import pyqtgraph as pg
+from pandas import DataFrame as df
+from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
+
+from ABGraphics.parameditors import SchemeEditor, TableFilterEditor, RegionControlsEditor
+from ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, attemptLoadSettings
+from CompDisplayFilter import CompDisplayFilter
+from constants import RegionControlsEditorValues as RCEV
+from constants import SCHEMES_DIR, LAYOUTS_DIR, TEMPLATE_COMP as TC
+from processing import getBwComps, getVertsFromBwComps, getClippedBbox
+from tablemodel import ComponentMgr as ComponentMgr
+from tablemodel import makeCompDf
+
+Slot = QtCore.pyqtSlot
+Signal = QtCore.pyqtSignal
 
 # Configure pg to correctly read image dimensions
 pg.setConfigOptions(imageAxisOrder='row-major')
@@ -152,6 +150,8 @@ class MainWindow(QtWidgets.QMainWindow):
     dialogSaveToFile(self, dockStates, 'Layout Name', LAYOUTS_DIR, 'dockstate')
     self.sigLayoutSaved.emit()
 
+  # noinspection PyUnusedLocal
+  @Slot(str)
   def populateSchemeOptions(self, newSchemeName=None):
     # We don't want all menu children to be removed, since this would also remove the 'add scheme' and
     # separator options. So, do this step manually. Remove all actions after the separator
@@ -173,8 +173,8 @@ class MainWindow(QtWidgets.QMainWindow):
     self.scheme.loadScheme(schemeDict)
 
     QtWidgets.QMessageBox().information(self, 'Scheme Updated',
-                'Scheme updated. Changes will take effect in future operations.',
-                QtGui.QMessageBox.Ok)
+                                        'Scheme updated. Changes will take effect in future operations.',
+                                        QtGui.QMessageBox.Ok)
 
   # ---------------
   # BUTTON CALLBACKS
@@ -273,11 +273,12 @@ class MainWindow(QtWidgets.QMainWindow):
     vertBox = np.vstack((xyCoord, xyCoord))
     vertBox = getClippedBbox(self.mainImg.image.shape, vertBox, sideLen)
     # Create square from bounding box
-    compVerts = []
-    compVerts.append([vertBox[0,0], vertBox[0,1]])
-    compVerts.append([vertBox[1,0], vertBox[0,1]])
-    compVerts.append([vertBox[1,0], vertBox[1,1]])
-    compVerts.append([vertBox[0,0], vertBox[1,1]])
+    compVerts = [
+      [vertBox[0, 0], vertBox[0, 1]],
+      [vertBox[1, 0], vertBox[0, 1]],
+      [vertBox[1, 0], vertBox[1, 1]],
+      [vertBox[0, 0], vertBox[1, 1]]
+    ]
     compVerts = np.vstack(compVerts)
 
     newComp = makeCompDf()
