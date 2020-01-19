@@ -1,24 +1,23 @@
+from sys import path
+
 import pyqtgraph as pg
 
-from sys import path
 path.append('..')
-from ABGraphics.regions import VertexRegion
-from ABGraphics.table import CompTableView, CompTableModel
-from component import *
+from ABGraphics.tableview import CompTableView
+from tablemodel import ComponentMgr, makeCompDf
+from constants import TEMPLATE_COMP as TC
 
 import numpy as np
 
 if __name__ == '__main__':
   app = pg.mkQApp()
-  comps = []
+  comps = makeCompDf(5)
+  comps = comps.set_index(np.arange(5, dtype=int))
   mgr = ComponentMgr()
-  for ii in range(5):
-    newcomp = Component()
-    newcomp.vertices = np.random.randint(10,size=(5,2))
-    comps.append(newcomp)
-  mgr.addComps(comps)
-  model = CompTableModel(mgr)
-  t = CompTableView(model.colTitles)
-  t.setModel(model)
+  for ii in range(len(comps)):
+    comps.loc[ii, TC.VERTICES.name] = [np.random.randint(10,size=(5,2))]
+  mgr.addComps(comps, addtype='new')
+  t = CompTableView()
+  t.setModel(mgr)
   t.show()
   app.exec()

@@ -1,4 +1,5 @@
 import pyqtgraph as pg
+import numpy as np
 
 from ABGraphics.regions import VertexRegion
 
