@@ -38,6 +38,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # MAIN IMAGE
     # ---------------
     self.mainImg.setImage(startImgFpath)
+    self.mainImg.imgItem.sigClicked.connect(self.mainImgItemClicked)
 
     # ---------------
     # LOAD LAYOUT OPTIONS
@@ -253,7 +254,7 @@ class MainWindow(QtWidgets.QMainWindow):
   # ---------------
   @Slot()
   def allowEditsChkChanged(self):
-    self.compImg.setClickable(self.allowEditsChk.isChecked())
+    self.compImg.clickable = self.allowEditsChk.isChecked()
 
   # ---------------
   # RADIO BUTTON CALLBACKS
