@@ -165,7 +165,9 @@ class MainWindow(QtWidgets.QMainWindow):
     fileFilter = "CSV Files (*.csv)"
     fname, _ = fileDlg.getOpenFileName(self, 'Select Load File', '', fileFilter)
     if len(fname) > 0:
-      self.compMgr.csvImport(fname, loadType)
+      # Operation may take a long time, but we don't want to start the wait cursor until
+      # after dialog selection
+      applyWaitCursor(self.compMgr.csvImport)(fname, loadType)
 
   # noinspection PyUnusedLocal
   @Slot(str)
