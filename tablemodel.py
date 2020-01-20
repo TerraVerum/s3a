@@ -67,14 +67,13 @@ class CompTableModel(QtCore.QAbstractTableModel):
     self.sigCompsChanged.emit(toEmit)
     return True
 
-  def flags(self, index):
+  def flags(self, index: QtCore.QModelIndex):
     noEditColIdxs = [self.colTitles.index(col)for col in
                      [TC.INST_ID.name, TC.VERTICES.name]]
     if index.column() not in noEditColIdxs:
       return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable
     else:
       return QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled
-
 
 class ComponentMgr(CompTableModel):
   _nextCompId = 0
@@ -138,6 +137,46 @@ class ComponentMgr(CompTableModel):
     # Reflect these changes to the component list
     toEmit['deleted'] = idsToRemove
     self.sigCompsChanged.emit(toEmit)
+
+  def exportToFile(self, outFile: str, **pdExportArgs) -> bool:
+    """
+    Serializes the table data and returns the success or failure of the operation.
+
+    :param outFile: Name of the output file location
+    :param pdExportArgs: Dictionary of values passed to underlying pandas export function.
+           These will overwrite the default options for :func:`exportToFile
+           <ComponentMgr.exportToFile>`
+    :return: Success or failure of the operation.
+    """
+    defaultExportParams = {
+      'na_rep': 'NaN',
+      'float_format': '{:0.10n}',
+      'index': False
+    }
+    defaultExportParams.update(pdExportArgs)
+    try:
+      # TODO: Currently the additional options are causing errors. Find out why and fix
+      #  them, since this may be useful if it can be modified
+      self.compDf.to_csv(outFile, index=False)
+      return True
+    except FileNotFoundError:
+      return False
+
+  def importFromFile(self, inFile: str) -> bool:
+    """
+    Deserializes data from a csv file to create a Component :class:`DataFrame`.
+    The input .csv should be the same format as one exported by
+    :func:`exportToFile <ComponentMgr.exportToFile>`.
+
+    :param inFile: Name of file to import
+    :return: Success or failure of the operation
+    """
+    stringDf = pd.read_csv(inFile)
+    # TODO: Find out how to convert this into an object df somehow
+    compDf = makeCompDf(len(stringDf))
+    # compDf = stringDfToCompDf(stringDf)
+    self.addComps(compDf)
+    return True
 
 if __name__ == '__main__':
   pass
