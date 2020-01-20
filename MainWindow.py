@@ -108,14 +108,17 @@ class MainWindow(QtWidgets.QMainWindow):
     self.regCtrlEditor[RCEV.SEED_THRESH].sigValueChanged.emit(None, None)
 
     # Menu options
+    # FILE
     self.saveLayout.triggered.connect(self.saveLayoutActionTriggered)
     self.sigLayoutSaved.connect(self.populateLoadLayoutOptions)
+    self.saveComps.triggered.connect(self.saveCompsActionTriggered)
+    self.loadComps_merge.triggered.connect(lambda: self.loadCompsActionTriggered('merge'))
+    self.loadComps_add.triggered.connect(lambda: self.loadCompsActionTriggered('add'))
 
-    self.editScheme.triggered.connect(self.scheme.show)
-
+    # SETTINGS
     self.compEditCtrls.triggered.connect(self.regCtrlEditor.show)
 
-    # Scheme editor
+    self.editScheme.triggered.connect(self.scheme.show)
     self.scheme.sigParamStateCreated.connect(self.populateSchemeOptions)
     # When a new scheme is created, switch to that scheme
     self.scheme.sigParamStateCreated.connect(self.loadSchemeActionTriggered)
@@ -132,7 +135,6 @@ class MainWindow(QtWidgets.QMainWindow):
   # ---------------
   # MENU CALLBACKS
   # ---------------
-
   def populateLoadLayoutOptions(self):
     layoutGlob = join(LAYOUTS_DIR, '*.dockstate')
     addDirItemsToMenu(self.loadLayout, layoutGlob, self.loadLayoutActionTriggered)
@@ -149,6 +151,21 @@ class MainWindow(QtWidgets.QMainWindow):
     dockStates = self.saveState()
     dialogSaveToFile(self, dockStates, 'Layout Name', LAYOUTS_DIR, 'dockstate')
     self.sigLayoutSaved.emit()
+
+  @Slot()
+  def saveCompsActionTriggered(self):
+    fileDlg = QtWidgets.QFileDialog()
+    fileFilter = "CSV Files (*.csv)"
+    fname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilter)
+    if len(fname) > 0:
+      self.compMgr.csvExport(fname)
+
+  def loadCompsActionTriggered(self, loadType='add'):
+    fileDlg = QtWidgets.QFileDialog()
+    fileFilter = "CSV Files (*.csv)"
+    fname, _ = fileDlg.getOpenFileName(self, 'Select Load File', '', fileFilter)
+    if len(fname) > 0:
+      self.compMgr.csvImport(fname, loadType)
 
   # noinspection PyUnusedLocal
   @Slot(str)
@@ -305,5 +322,11 @@ class MainWindow(QtWidgets.QMainWindow):
 if __name__ == '__main__':
   app = pg.mkQApp()
   win = MainWindow()
+  c = makeCompDf(100)
+  c = c.set_index(np.arange(len(c),dtype=int))
+  for ii in range(len(c)):
+    c.loc[ii,TC.VERTICES.name] = [np.random.randint(100,size=(30,2),dtype=int)]
+    c.loc[ii, TC.NOTES.name] = 'test notes'
+  # win.compMgr.addComps(c)
   win.show()
   app.exec()

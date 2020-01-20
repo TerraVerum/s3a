@@ -5,9 +5,13 @@ from pandas import DataFrame as df
 import pandas as pd
 import numpy as np
 
-from constants import TEMPLATE_COMP as TC, CompParams
+from ast import literal_eval
+import re
+import sys
 
-from typing import Union
+from constants import TEMPLATE_COMP as TC, CompParams, ComponentTypes
+
+from typing import Union, Any
 
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal
@@ -90,6 +94,10 @@ class ComponentMgr(CompTableModel):
       newCompsDf[idCol] = newIds
       newCompsDf = newCompsDf.set_index(newIds)
     # Now, merge existing IDs and add new ones
+    # TODO: Add some metric for merging other than a total override. Currently, even if the existing
+    #  component has a value in e.g. vertices while the new component does not, the new, empty value
+    #  will override the older. This might often be desirable, but it would still be good to let the
+    #  user have the final say on what happens
     existingIds = self.compDf.index
     newIds = newCompsDf.index
     newChangedIdxs = np.isin(newIds, existingIds, assume_unique=True)
@@ -138,7 +146,7 @@ class ComponentMgr(CompTableModel):
     toEmit['deleted'] = idsToRemove
     self.sigCompsChanged.emit(toEmit)
 
-  def exportToFile(self, outFile: str, **pdExportArgs) -> bool:
+  def csvExport(self, outFile: str, **pdExportArgs) -> bool:
     """
     Serializes the table data and returns the success or failure of the operation.
 
@@ -154,29 +162,70 @@ class ComponentMgr(CompTableModel):
       'index': False
     }
     defaultExportParams.update(pdExportArgs)
+    # Make sure no rows are truncated
+    pd.set_option('display.max_rows', sys.maxsize)
+    oldNpOpts=  np.get_printoptions()
+    np.set_printoptions(threshold=sys.maxsize)
+    success = False
     try:
       # TODO: Currently the additional options are causing errors. Find out why and fix
       #  them, since this may be useful if it can be modified
+      # TODO: Add some comment to the top of the CSV or some extra text file output with additional metrics
+      #  about the export, like time, who did it, what image it was from, etc.
       self.compDf.to_csv(outFile, index=False)
-      return True
-    except FileNotFoundError:
-      return False
+      success = True
+    except IOError:
+      # success is already false
+      pass
+    finally:
+      pd.reset_option('display.max_rows')
+      # False positive checker warning for some reason
+      # noinspection PyTypeChecker
+      np.set_printoptions(oldNpOpts)
+      return success
 
-  def importFromFile(self, inFile: str) -> bool:
+  def csvImport(self, inFile: str, loadType='add') -> bool:
     """
     Deserializes data from a csv file to create a Component :class:`DataFrame`.
     The input .csv should be the same format as one exported by
-    :func:`exportToFile <ComponentMgr.exportToFile>`.
+    :func:`csvImport <ComponentMgr.csvImport>`.
 
     :param inFile: Name of file to import
-    :return: Success or failure of the operation
+    :param loadType: Whether new components should be added to the exisitng component list as new
+           or if they should be merged by ID with existing entries. Currently, all fields of the
+           existing component will be overwritten by the new values, even if they had text/values.
+    :return: Success or failure of the operation -- Returns false if the specified file wasn't found
     """
-    stringDf = pd.read_csv(inFile)
-    # TODO: Find out how to convert this into an object df somehow
-    compDf = makeCompDf(len(stringDf))
-    # compDf = stringDfToCompDf(stringDf)
-    self.addComps(compDf)
+    try:
+      csvDf = pd.read_csv(inFile, keep_default_na=False)
+    except FileNotFoundError:
+      return False
+    # Objects in the original frame are represented as strings, so try to convert these
+    # as needed
+    stringCols = csvDf.columns[csvDf.dtypes == object]
+    valToParamMap = {param.name: param.value for param in TC}
+    for col in stringCols:
+      paramVal = valToParamMap[col]
+      # No need to perform this expensive computation if the values are already strings
+      if not isinstance(paramVal, str):
+        csvDf[col] = _strSerToParamSer(csvDf[col], valToParamMap[col])
+    csvDf = csvDf.set_index(TC.INST_ID.name, drop=False)
+    # TODO: Apply this function to individual rows instead of the whole dataframe. This will allow malformed
+    #  rows to gracefully fall off the dataframe with some sort of warning message
+    self.addComps(csvDf, loadType)
     return True
+
+def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> Any:
+  paramType = type(paramVal)
+  funcMap = {
+    np.ndarray    : lambda strVal: np.array(literal_eval(re.sub(r'(\d|\])\s+', '\\1,', strVal.replace('\n', '')))),
+    bool          : lambda strVal: strVal.lower() == 'true',
+    ComponentTypes: lambda strVal: ComponentTypes.fromString(strVal)
+
+  }
+  defaultFunc = lambda strVal: paramType(strVal)
+  funcToUse = funcMap.get(paramType, defaultFunc)
+  return strSeries.apply(funcToUse)
 
 if __name__ == '__main__':
   pass
