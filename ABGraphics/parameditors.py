@@ -28,7 +28,8 @@ class ConstParamWidget(QtWidgets.QDialog):
   sigParamStateCreated = Signal(str)
   sigParamStateUpdated = Signal(dict)
 
-  def __init__(self, parent=None, paramDict=None, saveDir='.', saveExt='param', saveDlgName='Save As'):
+  def __init__(self, parent=None, paramDict=None, saveDir='.',
+               saveExt='param', saveDlgName='Save As', createDefaultOutput=True):
     # Place in list so an empty value gets unpacked into super constructor
     if paramDict is None:
       paramDict = []
@@ -53,10 +54,17 @@ class ConstParamWidget(QtWidgets.QDialog):
     # -----------
     # Internal parameters for saving settings
     # -----------
-    self._saveDir = saveDir
-    self._saveExt = saveExt
+    self.SAVE_DIR = saveDir
+    self.FILE_TYPE = saveExt
     self._saveDlgName = saveDlgName
     self._stateBeforeEdit = self.params.saveState()
+
+    # -----------
+    # Save default state if desired
+    # -----------
+    if createDefaultOutput:
+      with open(join(saveDir, f'Default.{saveExt}'), 'wb') as ofile:
+        pkl.dump(self.params.saveState(), ofile)
 
     # -----------
     # Additional widget buttons
@@ -84,17 +92,6 @@ class ConstParamWidget(QtWidgets.QDialog):
     self.closeBtn.clicked.connect(self.close)
     self.applyBtn.clicked.connect(self.applyBtnClicked)
 
-  def _paramsToList(self) -> list:
-    """
-    :return: List where each index corresponds to the tree's parameter.
-    This is suitable for extending with an ID and vertex list, after which
-    it can be placed into the component table.
-    """
-    outList = []
-    for param in self.params.children():
-      outList.append(param.value())
-    return outList
-
   # Helper method for accessing simple parameter values
   def __getitem__(self, key: Enum):
     return self.params.child(key.value)
@@ -121,7 +118,7 @@ class ConstParamWidget(QtWidgets.QDialog):
     paramState = self.params.saveState()
     if saveName is False or saveName is None:
       saveName = dialogSaveToFile(self, paramState, self._saveDlgName,
-                                  self._saveDir, self._saveExt, allowOverwriteDefault=False)
+                                  self.SAVE_DIR, self.FILE_TYPE, allowOverwriteDefault=False)
     else:
       with open(saveName, 'wb') as saveFile:
         pkl.dump(paramState, saveFile)
@@ -134,6 +131,9 @@ class ConstParamWidget(QtWidgets.QDialog):
     # If no name specified
     return None
 
+  def loadState(self, newStateDict):
+    self.params.restoreState(newStateDict, addChildren=False)
+
 
 class RegionControlsEditor(ConstParamWidget):
   def __init__(self, parent=None):
@@ -144,7 +144,7 @@ class RegionControlsEditor(ConstParamWidget):
         {'name': RCEV.SEED_THRESH.value, 'type': 'float', 'value': 15.},
         {'name': RCEV.NEW_COMP_SZ.value, 'type': 'int', 'value': 10},
       ]
-    super().__init__(paramDict=_CONTROLS_DICT, saveDir=REGION_CTRL_DIR)
+    super().__init__(paramDict=_CONTROLS_DICT, saveDir=REGION_CTRL_DIR, saveExt='regctrl')
 
 class TableFilterEditor(ConstParamWidget):
   def __init__(self, parent=None):
@@ -184,13 +184,6 @@ class SchemeEditor(ConstParamWidget):
       ]},
     ]
     super().__init__(paramDict=_DEFAULT_SCHEME_DICT, saveDir=SCHEMES_DIR, saveExt='scheme')
-
-    # Init default layout as export of DEFAULT_SCHEME_DICT
-    with open(join(SCHEMES_DIR, 'Default.scheme'), 'wb') as ofile:
-      pkl.dump(self.params.saveState(), ofile)
-
-  def loadScheme(self, schemeDict):
-    self.params.restoreState(schemeDict, addChildren=False)
 
   def _getProps(self, compOrFocIm: SV, whichProps):
     returnList = True

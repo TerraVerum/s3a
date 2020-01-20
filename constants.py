@@ -10,10 +10,13 @@ import numpy as np
 
 # Preference directories
 BASE_DIR = os.path.dirname(Path(__file__).absolute())
-SCHEMES_DIR = os.path.join(BASE_DIR, 'Schemes', '')
-LAYOUTS_DIR = os.path.join(BASE_DIR, 'Layouts', '')
-FILTERS_DIR = os.path.join(BASE_DIR, 'Filters', '')
-REGION_CTRL_DIR = os.path.join(BASE_DIR, 'RegionControls', '')
+SCHEMES_DIR     = os.path.join(BASE_DIR, 'MenuOpts', 'Schemes', '')
+LAYOUTS_DIR     = os.path.join(BASE_DIR, 'MenuOpts', 'Layouts', '')
+FILTERS_DIR     = os.path.join(BASE_DIR, 'MenuOpts', 'Filters', '')
+REGION_CTRL_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'RegionControls', '')
+# Ensure these directories exist
+for curDir in [SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR, REGION_CTRL_DIR]:
+  Path(curDir).mkdir(parents=True, exist_ok=True)
 
 
 class ComponentTypes(Enum):
