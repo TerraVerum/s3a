@@ -4,6 +4,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from warnings import warn
+
 import numpy as np
 
 # Preference directories
@@ -20,6 +22,19 @@ class ComponentTypes(Enum):
   IND: Enum = 'Inductor'
   IC: Enum = 'IC'
   N_A: Enum = 'Unassigned'
+
+  @classmethod
+  def fromString(cls, value):
+    """
+    Allows user to create a ComponentTypes object from its string value
+    """
+    value = value.lower()
+    for param in cls:
+      if param.value.lower() == value:
+        return param
+    # If we reach here the value didn't match any ComponentTypes values. Throw an error
+    warn('String representation of ComponentTypes was not recognized. Defaulting to Unassigned')
+    return cls.N_A
 
   def __str__(self):
     """
@@ -105,3 +120,7 @@ class RegionControlsEditorValues(Enum):
   SEG_THRESH: Enum = 'Segmentation Threshold'
   SEED_THRESH: Enum = 'Seedpoint Mean Threshold'
   NEW_COMP_SZ: Enum = 'New Component Size'
+
+if __name__ == '__main__':
+  c = ComponentTypes.fromString('capacitor')
+  print(c)
