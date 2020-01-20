@@ -73,6 +73,8 @@ class CompDisplayFilter(QtCore.QObject):
     pltsToRm = self._oldPlotsDf['idPlot'].loc[idsToRm].dropna()
     for plt in pltsToRm.values:
       self._mainImgArea.removeItem(plt)
+    # Remove these plots from our handle list
+    self._oldPlotsDf = self._oldPlotsDf.drop(index=idsToRm)
 
     # Component changed: update text plot
     # No need to update regions, since the whole list is reset at the end of
