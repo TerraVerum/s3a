@@ -39,6 +39,14 @@ class MainImageArea(pg.PlotWidget):
   def image(self):
     return self.imgItem.image
 
+  @property
+  def clickable(self):
+    return self.compImgItem.clickable
+
+  @clickable.setter
+  def clickable(self, newVal):
+    self.compImgItem.clickable = bool(newVal)
+
   def setImage(self, imgSrc: Union[str, np.ndarray]=None):
     """
     Allows the user to change the main image either from a filepath or array data
@@ -47,14 +55,6 @@ class MainImageArea(pg.PlotWidget):
       imgSrc = np.array(Image.open(imgSrc))
 
     self.imgItem.setImage(imgSrc)
-
-  def mouseClickEvent(self, ev):
-    # Capture clicks only if component is present and user allows it
-    if not ev.isAccepted() \
-       and ev.button() == QtCore.Qt.LeftButton \
-       and self.clickable and self.image is not None:
-      xyCoord = np.round(np.array([[ev.pos().x(), ev.pos().y()]], dtype='int'))
-      self.sigClicked.emit(xyCoord)
 
 class FocusedComp(pg.PlotWidget):
   scheme = SchemeEditor()
@@ -93,8 +93,13 @@ class FocusedComp(pg.PlotWidget):
 
     self.compImgItem.sigClicked.connect(self.compImageClicked)
 
-  def setClickable(self, isClickable):
-    self.compImgItem.clickable = isClickable
+  @property
+  def clickable(self):
+    return self.compImgItem.clickable
+
+  @clickable.setter
+  def clickable(self, newVal):
+    self.compImgItem.clickable = bool(newVal)
 
   def compImageClicked(self, newVert: np.ndarray):
     # Capture clicks only if component is present and user allows it

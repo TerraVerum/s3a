@@ -14,9 +14,9 @@ class ClickableImageItem(pg.ImageItem):
 
   clickable = True
 
-  def mouseClickEvent(self, ev):
+  def mouseClickEvent(self, ev: QtGui.QMouseEvent):
     # Capture clicks only if component is present and user allows it
-    if ev.button() == QtCore.Qt.LeftButton \
+    if not ev.isAccepted() and ev.button() == QtCore.Qt.LeftButton \
        and self.clickable and self.image is not None:
       xyCoord = np.round(np.array([[ev.pos().x(), ev.pos().y()]], dtype='int'))
       self.sigClicked.emit(xyCoord)
