@@ -8,11 +8,14 @@ import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
 
-from ABGraphics.parameditors import SchemeEditor, TableFilterEditor, RegionControlsEditor
+from typing import Callable
+from functools import partial
+
+from ABGraphics.parameditors import ConstParamWidget, SchemeEditor, TableFilterEditor, RegionControlsEditor
 from ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, attemptLoadSettings
 from CompDisplayFilter import CompDisplayFilter
 from constants import RegionControlsEditorValues as RCEV
-from constants import SCHEMES_DIR, LAYOUTS_DIR, TEMPLATE_COMP as TC
+from constants import SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR, REGION_CTRL_DIR, TEMPLATE_COMP as TC
 from processing import getBwComps, getVertsFromBwComps, getClippedBbox
 from tablemodel import ComponentMgr as ComponentMgr
 from tablemodel import makeCompDf
@@ -69,10 +72,8 @@ class MainWindow(QtWidgets.QMainWindow):
     # LOAD SCHEME OPTIONS
     # ---------------
     self.scheme = SchemeEditor(self)
-    self.populateSchemeOptions()
     # Attach scheme to all UI children
     self.compImg.setScheme(self.scheme)
-    #Component.setScheme(self.scheme)
     CompDisplayFilter.setScheme(self.scheme)
 
     # ---------------
@@ -87,7 +88,6 @@ class MainWindow(QtWidgets.QMainWindow):
     self.newImgBtn.clicked.connect(self.newImgBtnClicked)
     self.estBoundsBtn.clicked.connect(self.estBoundsBtnClicked)
     self.clearBoundsBtn.clicked.connect(self.clearBoundsBtnClicked)
-    self.filterBtn.clicked.connect(self.filterBtnClicked)
     self.clearRegionBtn.clicked.connect(self.clearRegionBtnClicked)
     self.resetRegionBtn.clicked.connect(self.resetRegionBtnClicked)
     self.acceptRegionBtn.clicked.connect(self.acceptRegionBtnClicked)
@@ -112,17 +112,22 @@ class MainWindow(QtWidgets.QMainWindow):
     # FILE
     self.saveLayout.triggered.connect(self.saveLayoutActionTriggered)
     self.sigLayoutSaved.connect(self.populateLoadLayoutOptions)
+
     self.saveComps.triggered.connect(self.saveCompsActionTriggered)
     self.loadComps_merge.triggered.connect(lambda: self.loadCompsActionTriggered('merge'))
     self.loadComps_add.triggered.connect(lambda: self.loadCompsActionTriggered('add'))
 
     # SETTINGS
-    self.compEditCtrls.triggered.connect(self.regCtrlEditor.show)
-
-    self.editScheme.triggered.connect(self.scheme.show)
-    self.scheme.sigParamStateCreated.connect(self.populateSchemeOptions)
-    # When a new scheme is created, switch to that scheme
-    self.scheme.sigParamStateCreated.connect(self.loadSchemeActionTriggered)
+    menuObjs = [self.regCtrlEditor  , self.filterEditor, self.scheme]
+    menus    = [self.regionCtrlsMenu, self.filterMenu  , self.schemeMenu]
+    editBtns = [self.editRegionCtrls, self.editFilter  , self.editScheme]
+    for curObj, curMenu, curEditBtn in zip(menuObjs, menus, editBtns):
+      curEditBtn.triggered.connect(curObj.show)
+      loadFunc = partial(self.genericLoadActionTriggered, curObj)
+      populateFunc = partial(self.genericPopulateMenuOptions, curObj, curMenu, loadFunc)
+      curObj.sigParamStateCreated.connect(populateFunc)
+      # Initialize default menus
+      populateFunc()
 
   # -----------------------------
   # MainWindow CLASS FUNCTIONS
@@ -138,7 +143,7 @@ class MainWindow(QtWidgets.QMainWindow):
   # ---------------
   def populateLoadLayoutOptions(self):
     layoutGlob = join(LAYOUTS_DIR, '*.dockstate')
-    addDirItemsToMenu(self.loadLayout, layoutGlob, self.loadLayoutActionTriggered)
+    addDirItemsToMenu(self.layoutMenu, layoutGlob, self.loadLayoutActionTriggered)
 
   @Slot(str)
   def loadLayoutActionTriggered(self, layoutName):
@@ -170,31 +175,17 @@ class MainWindow(QtWidgets.QMainWindow):
       # after dialog selection
       applyWaitCursor(self.compMgr.csvImport)(fname, loadType)
 
-  # noinspection PyUnusedLocal
-  @Slot(str)
-  def populateSchemeOptions(self, newSchemeName=None):
-    # We don't want all menu children to be removed, since this would also remove the 'add scheme' and
-    # separator options. So, do this step manually. Remove all actions after the separator
-    encounteredSep = False
-    for ii, action in enumerate(self.appearanceMenu.children()):
-      if encounteredSep:
-        self.appearanceMenu.removeAction(action)
-      elif action.isSeparator():
-        encounteredSep = True
-    addDirItemsToMenu(self.appearanceMenu, join(SCHEMES_DIR, '*.scheme'),
-                      self.loadSchemeActionTriggered, removeExistingChildren=False)
+  def genericPopulateMenuOptions(self, objForMenu: ConstParamWidget, winMenu: QtWidgets.QMenu, triggerFn: Callable):
+    addDirItemsToMenu(winMenu,
+                      join(objForMenu.SAVE_DIR, f'*.{objForMenu.FILE_TYPE}'),
+                      triggerFn)
 
-  @Slot(str)
-  def loadSchemeActionTriggered(self, schemeName):
-    schemeFilename = join(SCHEMES_DIR, f'{schemeName}.scheme')
-    schemeDict = attemptLoadSettings(schemeFilename)
-    if schemeDict is None:
+  def genericLoadActionTriggered(self, objForMenu: ConstParamWidget, nameToLoad: str):
+    dictFilename = join(objForMenu.SAVE_DIR, f'{nameToLoad}.{objForMenu.FILE_TYPE}')
+    loadDict = attemptLoadSettings(dictFilename)
+    if loadDict is None:
       return
-    self.scheme.loadScheme(schemeDict)
-
-    QtWidgets.QMessageBox().information(self, 'Scheme Updated',
-                                        'Scheme updated. Changes will take effect in future operations.',
-                                        QtGui.QMessageBox.Ok)
+    objForMenu.loadState(loadDict)
 
   # ---------------
   # BUTTON CALLBACKS
@@ -243,11 +234,6 @@ class MainWindow(QtWidgets.QMainWindow):
   @applyWaitCursor
   def clearBoundsBtnClicked(self):
     self.compMgr.rmComps()
-
-  @Slot()
-  @applyWaitCursor
-  def filterBtnClicked(self):
-    self.filterEditor.show()
 
   # ---------------
   # CHECK BOX CALLBACKS

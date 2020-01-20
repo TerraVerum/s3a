@@ -56,10 +56,15 @@ def attemptLoadSettings(fpath, openMode='rb'):
 
 def addDirItemsToMenu(parentMenu, dirRegex, triggerFunc, removeExistingChildren=True):
   """Helper function for populating menu from directory contents"""
-  # Remove existing menus so only the current file system setup is in place
+  # We don't want all menu children to be removed, since this would also remove the 'edit' and
+  # separator options. So, do this step manually. Remove all actions after the separator
   if removeExistingChildren:
-    for action in parentMenu.children():
-      parentMenu.removeAction(action)
+    encounteredSep = False
+    for ii, action in enumerate(parentMenu.children()):
+      if encounteredSep:
+        parentMenu.removeAction(action)
+      elif action.isSeparator():
+        encounteredSep = True
   itemNames = glob(dirRegex)
   for name in itemNames:
     # glob returns entire filepath, so keep only filename as layout name
@@ -68,4 +73,3 @@ def addDirItemsToMenu(parentMenu, dirRegex, triggerFunc, removeExistingChildren=
     name = name[0:name.rfind('.')]
     curAction = parentMenu.addAction(name)
     curAction.triggered.connect(partial(triggerFunc, name))
-  pass
