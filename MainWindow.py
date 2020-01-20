@@ -13,7 +13,7 @@ from functools import partial
 
 from ABGraphics.parameditors import ConstParamWidget, SchemeEditor, TableFilterEditor, RegionControlsEditor
 from ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, attemptLoadSettings
-from CompDisplayFilter import CompDisplayFilter
+from CompDisplayFilter import CompDisplayFilter, CompSortFilter
 from constants import RegionControlsEditorValues as RCEV
 from constants import SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR, REGION_CTRL_DIR, TEMPLATE_COMP as TC
 from processing import getBwComps, getVertsFromBwComps, getClippedBbox
@@ -35,6 +35,7 @@ class MainWindow(QtWidgets.QMainWindow):
     uiPath = os.path.dirname(os.path.abspath(__file__))
     uiFile = os.path.join(uiPath, 'imgAnnotator.ui')
     uic.loadUi(uiFile, self)
+    self.showMaximized()
 
     # Flesh out pg components
     # ---------------
@@ -55,7 +56,10 @@ class MainWindow(QtWidgets.QMainWindow):
     # ---------------
     self.compMgr = ComponentMgr()
 
-    self.compTbl.setModel(self.compMgr)
+    # Allow filtering/sorting
+    self.sortFilterProxy = CompSortFilter(self.compMgr, self)
+
+    self.compTbl.setModel(self.sortFilterProxy)
 
     # ---------------
     # COMPONENT DISPLAY FILTER

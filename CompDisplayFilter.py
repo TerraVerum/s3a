@@ -2,18 +2,47 @@
 from __future__ import annotations
 
 import pyqtgraph as pg
+from pyqtgraph.Qt import QtCore
 
 from ABGraphics import tableview
 from ABGraphics.clickables import ClickableTextItem
 from ABGraphics.parameditors import SchemeEditor, TableFilterEditor
 from ABGraphics.regions import MultiRegionPlot
-from constants import (ComponentTypes)
+from constants import TEMPLATE_COMP as TC
 from tablemodel import *
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 # Ensure an application instance is running
 app = pg.mkQApp()
+
+class CompSortFilter(QtCore.QSortFilterProxyModel):
+  colTitles = TC.paramNames()
+  def __init__(self, compMgr: ComponentMgr, parent=None):
+    super().__init__(parent)
+    self.setSourceModel(compMgr)
+    # TODO: Move code for filtering into the proxy too. It will be more efficient and
+    #  easier to generalize than the current solution in CompDisplayFilter.
+
+
+  def sort(self, column: int, order: QtCore.Qt.SortOrder) -> None:
+    # Do nothing if the user is trying to sort by vertices, since the intention of
+    # sorting numpy arrays is somewhat ambiguous
+    if column == self.colTitles.index(TC.VERTICES.name):
+      return
+    else:
+      super().sort(column, order)
+
+  def lessThan(self, left: QtCore.QModelIndex, right: QtCore.QModelIndex) -> bool:
+    # First, attempt to compare the object data
+    leftObj = left.data(QtCore.Qt.EditRole)
+    rightObj = right.data(QtCore.Qt.EditRole)
+    try:
+      return np.all(leftObj < rightObj)
+    except ValueError:
+      # If that doesn't work, default to stringified comparison
+      return str(leftObj) < str(rightObj)
+
 
 class CompDisplayFilter(QtCore.QObject):
   sigCompClicked = Signal(object)

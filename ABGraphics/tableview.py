@@ -11,6 +11,7 @@ Slot = QtCore.pyqtSlot
 class CompTableView(QtWidgets.QTableView):
   def __init__(self, *args):
     super().__init__(*args)
+    self.setSortingEnabled(True)
 
     # Default to text box delegate
     self.setItemDelegate(TextDelegate(self))
