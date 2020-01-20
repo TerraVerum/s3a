@@ -218,6 +218,7 @@ class ComponentMgr(CompTableModel):
 def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> Any:
   paramType = type(paramVal)
   funcMap = {
+    # Format string to look like a list, use ast to convert that string INTO a list, make a numpy array from the list
     np.ndarray    : lambda strVal: np.array(literal_eval(re.sub(r'(\d|\])\s+', '\\1,', strVal.replace('\n', '')))),
     bool          : lambda strVal: strVal.lower() == 'true',
     ComponentTypes: lambda strVal: ComponentTypes.fromString(strVal)
