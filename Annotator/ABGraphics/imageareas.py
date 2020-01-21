@@ -1,20 +1,17 @@
 from typing import Union
 
+import numpy as np
 import pyqtgraph as pg
 from PIL import Image
-from pyqtgraph.Qt import QtCore, QtGui
-
-from ..processing import segmentComp, getVertsFromBwComps, growSeedpoint, getClippedBbox
-from skimage.morphology import closing, opening
-
-import numpy as np
 from pandas import DataFrame as df
+from pyqtgraph.Qt import QtCore, QtGui
+from skimage.morphology import closing, opening
 
 from .clickables import ClickableImageItem
 from .regions import VertexRegion, SaveablePolyROI
-from .parameditors import SchemeEditor
-from ..tablemodel import makeCompDf
 from ..constants import TEMPLATE_COMP as TC
+from ..processing import segmentComp, getVertsFromBwComps, growSeedpoint, getClippedBbox
+from ..tablemodel import makeCompDf
 
 Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
@@ -57,8 +54,6 @@ class MainImageArea(pg.PlotWidget):
     self.imgItem.setImage(imgSrc)
 
 class FocusedComp(pg.PlotWidget):
-  scheme = SchemeEditor()
-
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
@@ -201,8 +196,3 @@ class FocusedComp(pg.PlotWidget):
     self.updateRegion(newVerts, [0,0])
     # Now that the ROI was added to the region, remove it
     self.interactor.clearPoints()
-
-  @staticmethod
-  def setScheme(scheme: SchemeEditor):
-    # Pass scheme to VertexRegion
-    VertexRegion.setScheme(scheme)

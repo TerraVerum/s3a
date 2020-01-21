@@ -1,11 +1,13 @@
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
+from typing import Union
+
 Signal = QtCore.pyqtSignal
 
 import numpy as np
 import warnings
 
-from .parameditors import SchemeEditor
+from .parameditors import SchemeEditor, SCHEME_HOLDER
 from ..constants import SchemeValues as SV
 
 
@@ -26,10 +28,9 @@ class ClickableImageItem(pg.ImageItem):
 class ClickableTextItem(pg.TextItem):
   sigClicked = Signal()
 
-  scheme = SchemeEditor()
-
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
+
     self.origCursor = self.cursor()
     self.hoverCursor = QtCore.Qt.PointingHandCursor
     self.setAnchor((0.5,0.5))
@@ -52,7 +53,7 @@ class ClickableTextItem(pg.TextItem):
     schemeClrProp = SV.NONVALID_ID_COLOR
     if validated:
       schemeClrProp = SV.VALID_ID_COLOR
-    txtSize, txtClr = ClickableTextItem.scheme.getCompProps(
+    txtSize, txtClr = SCHEME_HOLDER.scheme.getCompProps(
         (SV.ID_FONT_SIZE, schemeClrProp))
 
     curFont = self.textItem.font()
@@ -70,7 +71,3 @@ class ClickableTextItem(pg.TextItem):
       newPos = np.mean(newVerts, axis=0)
       self.setPos(newPos[0], newPos[1])
     self.setText(newText, newValid)
-
-  @staticmethod
-  def setScheme(scheme):
-    ClickableTextItem.scheme = scheme
