@@ -5,8 +5,8 @@ Signal = QtCore.pyqtSignal
 import numpy as np
 import warnings
 
-from ABGraphics.parameditors import SchemeEditor
-from constants import SchemeValues as SV
+from .parameditors import SchemeEditor
+from ..constants import SchemeValues as SV
 
 
 class ClickableImageItem(pg.ImageItem):

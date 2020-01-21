@@ -3,9 +3,9 @@ from sys import path
 import pyqtgraph as pg
 
 path.append('..')
-from ABGraphics.tableview import CompTableView
-from tablemodel import ComponentMgr, makeCompDf
-from constants import TEMPLATE_COMP as TC
+from .ABGraphics.tableview import CompTableView
+from .tablemodel import ComponentMgr, makeCompDf
+from .constants import TEMPLATE_COMP as TC
 
 import numpy as np
 

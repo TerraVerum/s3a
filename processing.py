@@ -6,7 +6,7 @@ from skimage.morphology import closing, dilation
 from skimage.morphology import disk
 from skimage.segmentation import quickshift
 
-from graphicseval import overlayImgs
+from .graphicseval import overlayImgs
 
 
 def getBwComps(img: np.ndarray) -> np.ndarray:

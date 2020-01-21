@@ -8,16 +8,14 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets
 from pyqtgraph.parametertree import (Parameter, ParameterTree)
 
-from ABGraphics.utils import dialogSaveToFile
-from constants import (
+from .utils import dialogSaveToFile
+from ..constants import (
   SCHEMES_DIR, SchemeValues as SV,
   ComponentTableFields as CTF, ComponentTypes,
   REGION_CTRL_DIR, RegionControlsEditorValues as RCEV,
   FILTERS_DIR)
 
 Signal = QtCore.pyqtSignal
-# Ensure app instance is running
-app = pg.mkQApp()
 
 def _genList(nameIter, paramType, defaultVal, defaultParam='value'):
   """Helper for generating children elements"""

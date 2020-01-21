@@ -11,14 +11,17 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
 from typing import Callable
 from functools import partial
 
-from ABGraphics.parameditors import ConstParamWidget, SchemeEditor, TableFilterEditor, RegionControlsEditor
-from ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, attemptLoadSettings
-from CompDisplayFilter import CompDisplayFilter, CompSortFilter
-from constants import RegionControlsEditorValues as RCEV
-from constants import SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR, REGION_CTRL_DIR, TEMPLATE_COMP as TC
-from processing import getBwComps, getVertsFromBwComps, getClippedBbox
-from tablemodel import ComponentMgr as ComponentMgr
-from tablemodel import makeCompDf
+from .ABGraphics.parameditors import ConstParamWidget, SchemeEditor, TableFilterEditor,\
+  RegionControlsEditor
+from .ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
+  attemptLoadSettings
+from .CompDisplayFilter import CompDisplayFilter, CompSortFilter
+from .constants import RegionControlsEditorValues as RCEV
+from .constants import SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR, REGION_CTRL_DIR, \
+  TEMPLATE_COMP as TC
+from .processing import getBwComps, getVertsFromBwComps, getClippedBbox
+from .tablemodel import ComponentMgr as ComponentMgr
+from .tablemodel import makeCompDf
 
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal

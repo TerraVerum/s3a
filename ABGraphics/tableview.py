@@ -3,8 +3,8 @@ from pyqtgraph.Qt import QtWidgets, QtCore
 
 from enum import Enum
 
-from constants import TEMPLATE_COMP
-from tablemodel import CompTableModel
+from ..constants import TEMPLATE_COMP
+from ..tablemodel import CompTableModel
 
 Slot = QtCore.pyqtSlot
 

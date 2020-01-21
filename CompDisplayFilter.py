@@ -1,25 +1,25 @@
 # Required to avoid cyclic dependency from CompTable annotation
 from __future__ import annotations
 
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore
 import numpy as np
 import pandas as pd
+import pyqtgraph as pg
 from pandas import DataFrame as df
+from pyqtgraph.Qt import QtCore
 
-from ABGraphics import tableview
-from ABGraphics.clickables import ClickableTextItem
-from ABGraphics.parameditors import SchemeEditor, TableFilterEditor
-from ABGraphics.regions import MultiRegionPlot
-from constants import TEMPLATE_COMP as TC, ComponentTypes
-import tablemodel
+from .ABGraphics import tableview
+from .ABGraphics.clickables import ClickableTextItem
+from .ABGraphics.parameditors import SchemeEditor, TableFilterEditor
+from .ABGraphics.regions import MultiRegionPlot
+from .constants import TEMPLATE_COMP as TC
+from .tablemodel import ComponentMgr, ComponentTypes
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
 class CompSortFilter(QtCore.QSortFilterProxyModel):
   colTitles = TC.paramNames()
-  def __init__(self, compMgr: tablemodel.ComponentMgr, parent=None):
+  def __init__(self, compMgr: ComponentMgr, parent=None):
     super().__init__(parent)
     self.setSourceModel(compMgr)
     # TODO: Move code for filtering into the proxy too. It will be more efficient and
@@ -48,7 +48,7 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
 class CompDisplayFilter(QtCore.QObject):
   sigCompClicked = Signal(object)
 
-  def __init__(self, compMgr: tablemodel.ComponentMgr, mainImg: pg.PlotWindow,
+  def __init__(self, compMgr: ComponentMgr, mainImg: pg.PlotWindow,
                compTbl: tableview.CompTableView, filterEditor: TableFilterEditor):
     super().__init__()
     self._mainImgArea = mainImg
