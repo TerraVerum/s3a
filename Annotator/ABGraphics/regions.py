@@ -6,13 +6,11 @@ import cv2 as cv
 
 from typing import Tuple
 
-from .parameditors import SchemeEditor
+from .parameditors import SchemeEditor, SCHEME_HOLDER
 from ..constants import SchemeValues as SV
 from ..processing import splitListAtNans
 
 class VertexRegion(pg.ImageItem):
-  scheme = SchemeEditor()
-
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
@@ -49,15 +47,11 @@ class VertexRegion(pg.ImageItem):
 
   @staticmethod
   def getLUTFromScheme():
-    fillClr, vertClr = VertexRegion.scheme.getFocImgProps((SV.REG_FILL_COLOR, SV.REG_VERT_COLOR))
+    fillClr, vertClr = SCHEME_HOLDER.scheme.getFocImgProps((SV.REG_FILL_COLOR, SV.REG_VERT_COLOR))
     lut = [(0,0,0,0)]
     for clr in fillClr, vertClr:
       lut.append(clr.getRgb())
     return np.array(lut, dtype='uint8')
-
-  @staticmethod
-  def setScheme(scheme: SchemeEditor):
-    VertexRegion.scheme = scheme
 
 class SaveablePolyROI(pg.PolyLineROI):
   def __init__(self, initialPoints=None, *args, **kwargs):
@@ -98,8 +92,6 @@ class SaveablePolyROI(pg.PolyLineROI):
     return imgMask
 
 class MultiRegionPlot(pg.PlotDataItem):
-  scheme = SchemeEditor()
-
   def __init__(self, *args, **kargs):
     super().__init__(*args, **kargs, connect='finite')
     self.regions = []
@@ -136,7 +128,7 @@ class MultiRegionPlot(pg.PlotDataItem):
     # -----------
     # Update scheme
     # -----------
-    boundClr, boundWidth = MultiRegionPlot.scheme.getCompProps(
+    boundClr, boundWidth = SCHEME_HOLDER.scheme.getCompProps(
                              (SV.BOUNDARY_COLOR, SV.BOUNDARY_WIDTH))
     pltPen = pg.mkPen(boundClr, width=boundWidth)
     self.setData(*concatData, pen=pltPen)
@@ -201,7 +193,3 @@ class MultiRegionPlot(pg.PlotDataItem):
         # The Id was initialized to empty before it was actually plotted
         pass
     self.updatePlot()
-
-  @staticmethod
-  def setScheme(scheme):
-    MultiRegionPlot.scheme = scheme

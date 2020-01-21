@@ -1,24 +1,22 @@
 # -*- coding: utf-8 -*-
 
 import os
+from functools import partial
 from os.path import join
+from typing import Callable
 
 import numpy as np
 import pyqtgraph as pg
 from pandas import DataFrame as df
-from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
+from pyqtgraph.Qt import QtCore, QtWidgets, uic
 
-from typing import Callable
-from functools import partial
-
-from .ABGraphics.parameditors import ConstParamWidget, SchemeEditor, TableFilterEditor,\
-  RegionControlsEditor
+from .ABGraphics.parameditors import ConstParamWidget, TableFilterEditor, \
+  RegionControlsEditor, SCHEME_HOLDER
 from .ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
   attemptLoadSettings
 from .CompDisplayFilter import CompDisplayFilter, CompSortFilter
+from .constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
 from .constants import RegionControlsEditorValues as RCEV
-from .constants import SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR, REGION_CTRL_DIR, \
-  TEMPLATE_COMP as TC
 from .processing import getBwComps, getVertsFromBwComps, getClippedBbox
 from .tablemodel import ComponentMgr as ComponentMgr
 from .tablemodel import makeCompDf
@@ -29,7 +27,7 @@ Signal = QtCore.pyqtSignal
 # Configure pg to correctly read image dimensions
 pg.setConfigOptions(imageAxisOrder='row-major')
 
-class MainWindow(QtWidgets.QMainWindow):
+class Annotator(QtWidgets.QMainWindow):
   # Alerts GUI that a layout (either new or overwriting old) was saved
   sigLayoutSaved = Signal()
 
@@ -37,7 +35,8 @@ class MainWindow(QtWidgets.QMainWindow):
     super().__init__()
     uiPath = os.path.dirname(os.path.abspath(__file__))
     uiFile = os.path.join(uiPath, 'imgAnnotator.ui')
-    uic.loadUi(uiFile, self, 'ImgAnnotator')
+    baseModule = str(self.__module__).split('.')[0]
+    uic.loadUi(uiFile, self, baseModule)
     self.showMaximized()
 
     # Flesh out pg components
@@ -74,19 +73,15 @@ class MainWindow(QtWidgets.QMainWindow):
     self.mainImg.imgItem.sigImageChanged.connect(self.clearBoundsBtnClicked)
     self.compDisplay.sigCompClicked.connect(self.updateCurComp)
 
-
-    # ---------------
-    # LOAD SCHEME OPTIONS
-    # ---------------
-    self.scheme = SchemeEditor(self)
-    # Attach scheme to all UI children
-    self.compImg.setScheme(self.scheme)
-    CompDisplayFilter.setScheme(self.scheme)
-
     # ---------------
     # LOAD REGION EDIT CONTROLS
     # ---------------
     self.regCtrlEditor = RegionControlsEditor()
+
+    # ---------------
+    # SCHEME INIT
+    # ---------------
+    self.scheme = SCHEME_HOLDER.scheme
 
     # ---------------
     # UI ELEMENT SIGNALS
@@ -316,6 +311,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 ## Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
-  win = MainWindow()
+  app = pg.mkQApp()
+  win = Annotator()
   win.show()
   app.exec()

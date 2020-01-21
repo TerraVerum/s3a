@@ -9,7 +9,7 @@ from pyqtgraph.Qt import QtCore
 
 from .ABGraphics import tableview
 from .ABGraphics.clickables import ClickableTextItem
-from .ABGraphics.parameditors import SchemeEditor, TableFilterEditor
+from .ABGraphics.parameditors import TableFilterEditor
 from .ABGraphics.regions import MultiRegionPlot
 from .constants import TEMPLATE_COMP as TC
 from .tablemodel import ComponentMgr, ComponentTypes
@@ -223,9 +223,3 @@ class CompDisplayFilter(QtCore.QObject):
     idPlot: ClickableTextItem = self.sender()
     clickedId = int(idPlot.textItem.toPlainText())
     self.sigCompClicked.emit(self._compMgr.compDf.loc[clickedId,:])
-
-  @staticmethod
-  def setScheme(scheme: SchemeEditor):
-    # Pass this scheme to drawing elements
-    MultiRegionPlot.setScheme(scheme)
-    ClickableTextItem.setScheme(scheme)

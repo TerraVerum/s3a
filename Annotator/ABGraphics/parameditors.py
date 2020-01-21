@@ -145,7 +145,6 @@ class RegionControlsEditor(ConstParamWidget):
 
 class TableFilterEditor(ConstParamWidget):
   def __init__(self, parent=None):
-    super().__init__(parent)
     minMaxParam = _genList(['min', 'max'], 'int', 0)
     # Make max 'infinity'
     minMaxParam[1]['value'] = sys.maxsize
@@ -162,7 +161,7 @@ class TableFilterEditor(ConstParamWidget):
         {'name': CTF.DEVICE_TEXT.value, 'type': 'str', 'value': '.*'},
         {'name': CTF.VERTICES.value, 'type': 'group', 'children': xyVerts}
       ]
-    super().__init__(paramDict=_FILTER_DICT, saveDir=FILTERS_DIR, saveExt='filter')
+    super().__init__(parent, paramDict=_FILTER_DICT, saveDir=FILTERS_DIR, saveExt='filter')
 
 class SchemeEditor(ConstParamWidget):
   def __init__(self, parent=None):
@@ -199,3 +198,18 @@ class SchemeEditor(ConstParamWidget):
 
   def getFocImgProps(self, whichProps):
     return self._getProps(SV.FOC_IMG_PARAMS, whichProps)
+
+class _SchemeSingleton:
+  _scheme = SchemeEditor()
+
+  # Using properties intead of raw member ensures the same scheme is used across all class instances
+  @property
+  def scheme(self):
+    return _SchemeSingleton._scheme
+
+  @scheme.setter
+  def scheme(self, newScheme: SchemeEditor):
+    _SchemeSingleton._scheme = newScheme
+
+# Encapsulate scheme within class so that changes to the scheme propagate to all GUI elements
+SCHEME_HOLDER = _SchemeSingleton()
