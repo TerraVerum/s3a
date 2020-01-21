@@ -95,16 +95,6 @@ class CompParams(ABParamGroup):
   NOTES:ABParam      = newParam('Notes', '')
 TEMPLATE_COMP = CompParams()
 
-class ComponentTableFields(Enum):
-  INST_ID: Enum = 'Instance ID'
-  VALIDATED: Enum = 'Validated'
-  DEVICE_TYPE: Enum = 'Device Type'
-  LOGO: Enum = 'Logo'
-  NOTES: Enum = 'Notes'
-  BOARD_TEXT: Enum = 'Board Text'
-  DEVICE_TEXT: Enum = 'Device Text'
-  VERTICES: Enum = 'Vertices'
-
 class SchemeValues(Enum):
   COMP_PARAMS: Enum = 'Component Parameters'
   VALID_ID_COLOR: Enum = 'Validated ID Color'

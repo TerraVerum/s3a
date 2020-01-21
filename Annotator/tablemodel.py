@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import sys
 from ast import literal_eval
+from enum import Enum
 from typing import Union, Any
 
 import numpy as np
@@ -26,6 +27,10 @@ def makeCompDf(numRows=1) -> df:
     # each row no objects have the same reference
     df_list.append([field.value for field in CompParams()])
   return df(df_list, columns=TC.paramNames()).set_index(TC.INST_ID.name, drop=False)
+
+class AddTypes(Enum):
+  NEW: Enum = 'new'
+  MERGE: Enum = 'merge'
 
 class CompTableModel(QtCore.QAbstractTableModel):
   colTitles = TC.paramNames()
@@ -84,10 +89,10 @@ class ComponentMgr(CompTableModel):
   def __init__(self):
     super().__init__()
 
-  def addComps(self, newCompsDf: df, addtype='new'):
+  def addComps(self, newCompsDf: df, addtype: AddTypes = AddTypes.NEW):
     toEmit = self.defaultEmitDict.copy()
     idCol = TC.INST_ID.name
-    if addtype == 'new':
+    if addtype == AddTypes.NEW:
       # Treat all comps as new -> set their IDs to guaranteed new values
       newIds = np.arange(self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int)
       newCompsDf[idCol] = newIds
@@ -183,7 +188,7 @@ class ComponentMgr(CompTableModel):
       np.set_printoptions(oldNpOpts)
       return success
 
-  def csvImport(self, inFile: str, loadType='add') -> bool:
+  def csvImport(self, inFile: str, loadType = AddTypes.NEW) -> bool:
     """
     Deserializes data from a csv file to create a Component :class:`DataFrame`.
     The input .csv should be the same format as one exported by
