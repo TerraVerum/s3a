@@ -4,17 +4,17 @@ import pyqtgraph as pg
 from PIL import Image
 from pyqtgraph.Qt import QtCore, QtGui
 
-from processing import segmentComp, getVertsFromBwComps, growSeedpoint, getClippedBbox
+from ..processing import segmentComp, getVertsFromBwComps, growSeedpoint, getClippedBbox
 from skimage.morphology import closing, opening
 
 import numpy as np
 from pandas import DataFrame as df
 
-from .ABGraphics.clickables import ClickableImageItem
-from .ABGraphics.regions import VertexRegion, SaveablePolyROI
-from .ABGraphics.parameditors import SchemeEditor
-from .tablemodel import makeCompDf
-from .constants import TEMPLATE_COMP as TC
+from .clickables import ClickableImageItem
+from .regions import VertexRegion, SaveablePolyROI
+from .parameditors import SchemeEditor
+from ..tablemodel import makeCompDf
+from ..constants import TEMPLATE_COMP as TC
 
 Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
