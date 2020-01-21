@@ -9,16 +9,10 @@ from . import Annotator, appInst
 from os import path
 import sys
 
-def profileFunc(func, numTimes, *funcArgs, **funcKwargs):
-  for _ in range(numTimes):
-    func(*funcArgs, **funcKwargs)
-args = sys.argv
-runProfile = len(args) > 1
 startImgFpath = path.join(BASE_DIR, '../Images/fast.tif')
+if len(sys.argv) > 1:
+  startImgFpath = path.join(BASE_DIR, sys.argv[1])
 win = Annotator(startImgFpath)
-if runProfile:
-  p = run('profileFunc(win.estBoundsBtnClicked, 1)')
-else:
-  win.show()
-  ret = appInst.exec()
-
+# p = run('profileFunc(win.estBoundsBtnClicked, 1)')
+win.showMaximized()
+appInst.exec()

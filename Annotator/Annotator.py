@@ -37,7 +37,8 @@ class Annotator(QtWidgets.QMainWindow):
     uiFile = os.path.join(uiPath, 'imgAnnotator.ui')
     baseModule = str(self.__module__).split('.')[0]
     uic.loadUi(uiFile, self, baseModule)
-    self.showMaximized()
+    # Start off as a hidden window, force user to show()
+    self.hide()
 
     # Flesh out pg components
     # ---------------
