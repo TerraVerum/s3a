@@ -3,7 +3,6 @@ from dataclasses import dataclass, fields, field
 from enum import Enum
 from pathlib import Path
 from typing import Any
-
 from warnings import warn
 
 import numpy as np

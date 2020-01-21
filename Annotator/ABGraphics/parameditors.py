@@ -4,7 +4,6 @@ import sys
 from enum import Enum
 from os.path import join
 
-import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets
 from pyqtgraph.parametertree import (Parameter, ParameterTree)
 

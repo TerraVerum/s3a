@@ -1,13 +1,10 @@
 #!/usr/bin/env python
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtGui
-from cProfile import run
 
-from .constants import BASE_DIR
-from . import Annotator, appInst
-
-from os import path
 import sys
+from os import path
+
+from . import Annotator, appInst
+from .constants import BASE_DIR
 
 startImgFpath = path.join(BASE_DIR, '../Images/fast.tif')
 if len(sys.argv) > 1:

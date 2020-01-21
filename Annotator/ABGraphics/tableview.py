@@ -1,7 +1,8 @@
 from __future__ import annotations
-from pyqtgraph.Qt import QtWidgets, QtCore
 
 from enum import Enum
+
+from pyqtgraph.Qt import QtWidgets, QtCore
 
 from ..constants import TEMPLATE_COMP
 from ..tablemodel import CompTableModel

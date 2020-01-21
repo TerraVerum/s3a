@@ -1,13 +1,12 @@
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
-from typing import Union
 
 Signal = QtCore.pyqtSignal
 
 import numpy as np
 import warnings
 
-from .parameditors import SchemeEditor, SCHEME_HOLDER
+from .parameditors import SCHEME_HOLDER
 from ..constants import SchemeValues as SV
 
 
