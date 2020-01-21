@@ -10,11 +10,11 @@ from skimage.morphology import closing, opening
 import numpy as np
 from pandas import DataFrame as df
 
-from ABGraphics.clickables import ClickableImageItem
-from ABGraphics.regions import VertexRegion, SaveablePolyROI
-from ABGraphics.parameditors import SchemeEditor
-from tablemodel import makeCompDf
-from constants import TEMPLATE_COMP as TC
+from .ABGraphics.clickables import ClickableImageItem
+from .ABGraphics.regions import VertexRegion, SaveablePolyROI
+from .ABGraphics.parameditors import SchemeEditor
+from .tablemodel import makeCompDf
+from .constants import TEMPLATE_COMP as TC
 
 Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor

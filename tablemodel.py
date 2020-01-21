@@ -9,7 +9,7 @@ from ast import literal_eval
 import re
 import sys
 
-from constants import TEMPLATE_COMP as TC, CompParams, ComponentTypes
+from .constants import TEMPLATE_COMP as TC, CompParams, ComponentTypes
 
 from typing import Union, Any
 

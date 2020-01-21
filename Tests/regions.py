@@ -1,7 +1,7 @@
 import pyqtgraph as pg
 import numpy as np
 
-from ABGraphics.regions import VertexRegion
+from .ABGraphics.regions import VertexRegion
 
 if __name__ == '__main__':
   app = pg.mkQApp()
