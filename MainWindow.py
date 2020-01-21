@@ -37,7 +37,7 @@ class MainWindow(QtWidgets.QMainWindow):
     super().__init__()
     uiPath = os.path.dirname(os.path.abspath(__file__))
     uiFile = os.path.join(uiPath, 'imgAnnotator.ui')
-    uic.loadUi(uiFile, self)
+    uic.loadUi(uiFile, self, 'ImgAnnotator')
     self.showMaximized()
 
     # Flesh out pg components

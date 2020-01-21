@@ -12,7 +12,7 @@ import sys
 def profileFunc(func, numTimes, *funcArgs, **funcKwargs):
   for _ in range(numTimes):
     func(*funcArgs, **funcKwargs)
-
+app = pg.mkQApp()
 args = sys.argv
 runProfile = len(args) > 1
 startImgFpath = path.join(BASE_DIR, './Images/fast.tif')
@@ -20,6 +20,6 @@ win = MainWindow(startImgFpath)
 if runProfile:
   p = run('profileFunc(win.estBoundsBtnClicked, 1)')
 else:
-  showWin = win.show()
+  win.show()
   ret = app.exec()
 
