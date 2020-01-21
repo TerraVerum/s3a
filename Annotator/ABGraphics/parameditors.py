@@ -10,7 +10,7 @@ from pyqtgraph.parametertree import (Parameter, ParameterTree)
 from .utils import dialogSaveToFile
 from ..constants import (
   SCHEMES_DIR, SchemeValues as SV,
-  ComponentTableFields as CTF, ComponentTypes,
+  CompParams, TEMPLATE_COMP as TC, ComponentTypes,
   REGION_CTRL_DIR, RegionControlsEditorValues as RCEV,
   FILTERS_DIR)
 
@@ -90,7 +90,7 @@ class ConstParamWidget(QtWidgets.QDialog):
     self.applyBtn.clicked.connect(self.applyBtnClicked)
 
   # Helper method for accessing simple parameter values
-  def __getitem__(self, key: Enum):
+  def __getitem__(self, key: CompParams):
     return self.params.child(key.value)
 
   def close(self):
@@ -151,14 +151,14 @@ class TableFilterEditor(ConstParamWidget):
     devTypeParam = _genList((name.value for name in ComponentTypes), 'bool', True)
     xyVerts = _genList(['X Bounds', 'Y Bounds'], 'group', minMaxParam, 'children')
     _FILTER_DICT = [
-        {'name': CTF.INST_ID.value, 'type': 'group', 'children': minMaxParam},
-        {'name': CTF.VALIDATED.value, 'type': 'group', 'children': validatedParms},
-        {'name': CTF.DEVICE_TYPE.value, 'type': 'group', 'children': devTypeParam},
-        {'name': CTF.LOGO.value, 'type': 'str', 'value': '.*'},
-        {'name': CTF.NOTES.value, 'type': 'str', 'value': '.*'},
-        {'name': CTF.BOARD_TEXT.value, 'type': 'str', 'value': '.*'},
-        {'name': CTF.DEVICE_TEXT.value, 'type': 'str', 'value': '.*'},
-        {'name': CTF.VERTICES.value, 'type': 'group', 'children': xyVerts}
+        {'name': TC.INST_ID.name, 'type': 'group', 'children': minMaxParam},
+        {'name': TC.VALIDATED.name, 'type': 'group', 'children': validatedParms},
+        {'name': TC.DEV_TYPE.name, 'type': 'group', 'children': devTypeParam},
+        {'name': TC.LOGO.name, 'type': 'str', 'value': '.*'},
+        {'name': TC.NOTES.name, 'type': 'str', 'value': '.*'},
+        {'name': TC.BOARD_TEXT.name, 'type': 'str', 'value': '.*'},
+        {'name': TC.DEV_TEXT.name, 'type': 'str', 'value': '.*'},
+        {'name': TC.VERTICES.name, 'type': 'group', 'children': xyVerts}
       ]
     super().__init__(parent, paramDict=_FILTER_DICT, saveDir=FILTERS_DIR, saveExt='filter')
 

@@ -18,7 +18,7 @@ from .CompDisplayFilter import CompDisplayFilter, CompSortFilter
 from .constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
 from .constants import RegionControlsEditorValues as RCEV
 from .processing import getBwComps, getVertsFromBwComps, getClippedBbox
-from .tablemodel import ComponentMgr as ComponentMgr
+from .tablemodel import ComponentMgr as ComponentMgr, AddTypes
 from .tablemodel import makeCompDf
 
 Slot = QtCore.pyqtSlot
@@ -117,8 +117,10 @@ class Annotator(QtWidgets.QMainWindow):
     self.sigLayoutSaved.connect(self.populateLoadLayoutOptions)
 
     self.saveComps.triggered.connect(self.saveCompsActionTriggered)
-    self.loadComps_merge.triggered.connect(lambda: self.loadCompsActionTriggered('merge'))
-    self.loadComps_add.triggered.connect(lambda: self.loadCompsActionTriggered('add'))
+    self.loadComps_merge.triggered.connect(lambda: self.loadCompsActionTriggered(
+      AddTypes.MERGE))
+    self.loadComps_add.triggered.connect(lambda: self.loadCompsActionTriggered(
+      AddTypes.MERGE))
 
     # SETTINGS
     menuObjs = [self.regCtrlEditor  , self.filterEditor, self.scheme]
@@ -169,7 +171,7 @@ class Annotator(QtWidgets.QMainWindow):
     if len(fname) > 0:
       self.compMgr.csvExport(fname)
 
-  def loadCompsActionTriggered(self, loadType='add'):
+  def loadCompsActionTriggered(self, loadType=AddTypes.NEW):
     fileDlg = QtWidgets.QFileDialog()
     fileFilter = "CSV Files (*.csv)"
     fname, _ = fileDlg.getOpenFileName(self, 'Select Load File', '', fileFilter)
@@ -213,7 +215,7 @@ class Annotator(QtWidgets.QMainWindow):
   @Slot()
   def acceptRegionBtnClicked(self):
     self.compImg.saveNewVerts()
-    self.compMgr.addComps(self.compImg.compSer.to_frame().T, addtype='merge')
+    self.compMgr.addComps(self.compImg.compSer.to_frame().T, addtype=AddTypes.MERGE)
 
   @Slot()
   def newImgBtnClicked(self):
