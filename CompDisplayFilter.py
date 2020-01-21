@@ -3,29 +3,30 @@ from __future__ import annotations
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
+import numpy as np
+import pandas as pd
+from pandas import DataFrame as df
 
 from ABGraphics import tableview
 from ABGraphics.clickables import ClickableTextItem
 from ABGraphics.parameditors import SchemeEditor, TableFilterEditor
 from ABGraphics.regions import MultiRegionPlot
-from constants import TEMPLATE_COMP as TC
-from tablemodel import *
+from constants import TEMPLATE_COMP as TC, ComponentTypes
+import tablemodel
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
-# Ensure an application instance is running
-app = pg.mkQApp()
 
 class CompSortFilter(QtCore.QSortFilterProxyModel):
   colTitles = TC.paramNames()
-  def __init__(self, compMgr: ComponentMgr, parent=None):
+  def __init__(self, compMgr: tablemodel.ComponentMgr, parent=None):
     super().__init__(parent)
     self.setSourceModel(compMgr)
     # TODO: Move code for filtering into the proxy too. It will be more efficient and
     #  easier to generalize than the current solution in CompDisplayFilter.
 
 
-  def sort(self, column: int, order: QtCore.Qt.SortOrder) -> None:
+  def sort(self, column: int, order: QtCore.Qt.SortOrder=...) -> None:
     # Do nothing if the user is trying to sort by vertices, since the intention of
     # sorting numpy arrays is somewhat ambiguous
     if column == self.colTitles.index(TC.VERTICES.name):
@@ -47,7 +48,7 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
 class CompDisplayFilter(QtCore.QObject):
   sigCompClicked = Signal(object)
 
-  def __init__(self, compMgr: ComponentMgr, mainImg: pg.PlotWindow,
+  def __init__(self, compMgr: tablemodel.ComponentMgr, mainImg: pg.PlotWindow,
                compTbl: tableview.CompTableView, filterEditor: TableFilterEditor):
     super().__init__()
     self._mainImgArea = mainImg
@@ -228,27 +229,3 @@ class CompDisplayFilter(QtCore.QObject):
     # Pass this scheme to drawing elements
     MultiRegionPlot.setScheme(scheme)
     ClickableTextItem.setScheme(scheme)
-
-if __name__ == '__main__':
-  from PIL import Image
-  from ABGraphics.tableview import CompTableView
-  mw = CompTableView()
-  item = pg.ImageItem(np.array(Image.open('./Images/fast.tif')))
-  #mw.addItem(item)
-  #mw.setAspectLocked(True)
-  mgr = ComponentMgr()
-  mw.setModel(mgr)
-  mw.show()
-
-  c = makeCompDf(5)
-  for ii in range(len(c)):
-    c.loc[ii,TC.VERTICES.name] = [np.random.randint(0,100,size=(10,2))]
-    c.loc[ii,TC.INST_ID.name] = 5
-    c.loc[ii,TC.BOARD_TEXT.name] = 'test'
-  mgr.addComps(c)
-
-  newComp = makeCompDf(1)
-  newComp[TC.INST_ID.name] = 100
-  mgr.addComps(newComp)
-
-  app.exec()

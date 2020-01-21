@@ -137,14 +137,13 @@ class ConstParamWidget(QtWidgets.QDialog):
 
 class RegionControlsEditor(ConstParamWidget):
   def __init__(self, parent=None):
-    super().__init__(parent)
     _CONTROLS_DICT = [
         {'name': RCEV.MARGIN.value, 'type': 'int', 'value': 5},
         {'name': RCEV.SEG_THRESH.value, 'type': 'float', 'value': 6.},
         {'name': RCEV.SEED_THRESH.value, 'type': 'float', 'value': 15.},
         {'name': RCEV.NEW_COMP_SZ.value, 'type': 'int', 'value': 10},
       ]
-    super().__init__(paramDict=_CONTROLS_DICT, saveDir=REGION_CTRL_DIR, saveExt='regctrl')
+    super().__init__(parent, paramDict=_CONTROLS_DICT, saveDir=REGION_CTRL_DIR, saveExt='regctrl')
 
 class TableFilterEditor(ConstParamWidget):
   def __init__(self, parent=None):
