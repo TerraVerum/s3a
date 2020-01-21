@@ -165,7 +165,6 @@ class TableFilterEditor(ConstParamWidget):
 
 class SchemeEditor(ConstParamWidget):
   def __init__(self, parent=None):
-    super().__init__(parent)
     _DEFAULT_SCHEME_DICT = [
       {'name': SV.COMP_PARAMS.value, 'type': 'group', 'children': [
         {'name': SV.VALID_ID_COLOR.value, 'type': 'color', 'value': '0f0'},
@@ -179,7 +178,8 @@ class SchemeEditor(ConstParamWidget):
         {'name': SV.REG_FILL_COLOR.value, 'type': 'color', 'value': '00ff0046'}
       ]},
     ]
-    super().__init__(paramDict=_DEFAULT_SCHEME_DICT, saveDir=SCHEMES_DIR, saveExt='scheme')
+    super().__init__(parent, paramDict=_DEFAULT_SCHEME_DICT, saveDir=SCHEMES_DIR,
+                     saveExt='scheme')
 
   def _getProps(self, compOrFocIm: SV, whichProps):
     returnList = True
