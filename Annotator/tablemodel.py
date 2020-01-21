@@ -1,17 +1,16 @@
 from __future__ import annotations
-from pyqtgraph.Qt import QtCore
 
-from pandas import DataFrame as df
-import pandas as pd
-import numpy as np
-
-from ast import literal_eval
 import re
 import sys
+from ast import literal_eval
+from typing import Union, Any
+
+import numpy as np
+import pandas as pd
+from pandas import DataFrame as df
+from pyqtgraph.Qt import QtCore
 
 from .constants import TEMPLATE_COMP as TC, CompParams, ComponentTypes
-
-from typing import Union, Any
 
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal

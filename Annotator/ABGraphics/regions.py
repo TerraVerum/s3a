@@ -1,14 +1,14 @@
+from typing import Tuple
+
+import cv2 as cv
+import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui
 
-import numpy as np
-import cv2 as cv
-
-from typing import Tuple
-
-from .parameditors import SchemeEditor, SCHEME_HOLDER
+from .parameditors import SCHEME_HOLDER
 from ..constants import SchemeValues as SV
 from ..processing import splitListAtNans
+
 
 class VertexRegion(pg.ImageItem):
   def __init__(self, *args, **kwargs):

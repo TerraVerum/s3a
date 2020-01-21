@@ -1,14 +1,14 @@
-import numpy as np
-from numpy.random import randint
-from pandas import DataFrame as df
-import pyqtgraph as pg
 import string
 from time import time
+
+import numpy as np
+import pyqtgraph as pg
+from numpy.random import randint
+from pandas import DataFrame as df
 from tqdm import tqdm
 
-from Annotator.tablemodel import makeCompDf
-from Annotator.constants import  TEMPLATE_COMP as TC
-from Annotator import Annotator, makeCompDf, appInst
+from Annotator import Annotator, makeCompDf
+from Annotator.constants import TEMPLATE_COMP as TC
 
 np.random.seed(42)
 outTimes = {}
@@ -21,7 +21,7 @@ for inImg in tqdm(fnames, 'Files'):
   outTimes[inImg] = {}
   win = Annotator(inImg)
   winImgShape = win.mainImg.image.shape
-  for numComps in tqdm([round(10**x) for x in [2,3]], 'Num Comps'):
+  for numComps in tqdm([round(10**x) for x in [2,2.5,3,3.5]], 'Num Comps'):
     comps = makeCompDf(numComps)
     xVerts = randint(winImgShape[1], size=(randint(maxCompSz),1, numComps))
     yVerts = randint(winImgShape[0], size=xVerts.shape)
