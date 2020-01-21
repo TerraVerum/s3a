@@ -313,13 +313,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
 ## Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
-  app = pg.mkQApp()
   win = MainWindow()
-  c = makeCompDf(100)
-  c = c.set_index(np.arange(len(c),dtype=int))
-  for ii in range(len(c)):
-    c.loc[ii,TC.VERTICES.name] = [np.random.randint(100,size=(30,2),dtype=int)]
-    c.loc[ii, TC.NOTES.name] = 'test notes'
-  # win.compMgr.addComps(c)
   win.show()
   app.exec()
