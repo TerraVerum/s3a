@@ -38,7 +38,6 @@ class Annotator(QtWidgets.QMainWindow):
     baseModule = str(self.__module__).split('.')[0]
     uic.loadUi(uiFile, self, baseModule)
     # Start off as a hidden window, force user to show()
-    self.hide()
 
     # Flesh out pg components
     # ---------------
@@ -68,7 +67,7 @@ class Annotator(QtWidgets.QMainWindow):
     # COMPONENT DISPLAY FILTER
     # ---------------
     # TODO: Add filter widget for displaying only part of component data
-    self.filterEditor = TableFilterEditor()
+    self.filterEditor = TableFilterEditor(self)
     self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl, self.filterEditor)
 
     self.mainImg.imgItem.sigImageChanged.connect(self.clearBoundaries)
@@ -77,7 +76,7 @@ class Annotator(QtWidgets.QMainWindow):
     # ---------------
     # LOAD REGION EDIT CONTROLS
     # ---------------
-    self.regCtrlEditor = RegionControlsEditor()
+    self.regCtrlEditor = RegionControlsEditor(self)
 
     # ---------------
     # SCHEME INIT
