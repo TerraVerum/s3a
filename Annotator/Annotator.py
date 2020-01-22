@@ -13,7 +13,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
 from .ABGraphics.parameditors import ConstParamWidget, TableFilterEditor, \
   RegionControlsEditor, SCHEME_HOLDER
 from .ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
-  attemptLoadSettings
+  attemptLoadSettings, popupFilePicker
 from .CompDisplayFilter import CompDisplayFilter, CompSortFilter
 from .constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
 from .constants import TEMPLATE_REG_CTRLS as REG_CTRLS
@@ -88,7 +88,7 @@ class Annotator(QtWidgets.QMainWindow):
     # UI ELEMENT SIGNALS
     # ---------------
     # Buttons
-    self.newImgBtn.clicked.connect(self.newImgBtnClicked)
+    self.openImgAct.triggered.connect(self.openImgActionTriggered)
     self.clearRegionBtn.clicked.connect(self.clearRegionBtnClicked)
     self.resetRegionBtn.clicked.connect(self.resetRegionBtnClicked)
     self.acceptRegionBtn.clicked.connect(self.acceptRegionBtnClicked)
@@ -122,7 +122,7 @@ class Annotator(QtWidgets.QMainWindow):
     self.saveComps.triggered.connect(self.saveCompsActionTriggered)
     self.loadComps_merge.triggered.connect(lambda: self.loadCompsActionTriggered(
       AddTypes.MERGE))
-    self.loadComps_add.triggered.connect(lambda: self.loadCompsActionTriggered(
+    self.loadComps_new.triggered.connect(lambda: self.loadCompsActionTriggered(
       AddTypes.NEW))
 
     # SETTINGS
@@ -149,6 +149,18 @@ class Annotator(QtWidgets.QMainWindow):
   # ---------------
   # MENU CALLBACKS
   # ---------------
+
+  @Slot()
+  @applyWaitCursor
+  def openImgActionTriggered(self):
+    fileFilter = "Image Files (*.png; *.tif; *.jpg; *.jpeg; *.bmp)"
+    fname = popupFilePicker(self, 'Select Main Image', fileFilter)
+
+    if fname is not None:
+      self.mainImg.setImage(fname)
+      if self.regCtrlEditor[REG_CTRLS.EST_BOUNDS_ON_START].value():
+        self.estimateBoundaries()
+
   def populateLoadLayoutOptions(self):
     layoutGlob = join(LAYOUTS_DIR, '*.dockstate')
     addDirItemsToMenu(self.layoutMenu, layoutGlob, self.loadLayoutActionTriggered)
@@ -175,10 +187,9 @@ class Annotator(QtWidgets.QMainWindow):
       self.compMgr.csvExport(fname)
 
   def loadCompsActionTriggered(self, loadType=AddTypes.NEW):
-    fileDlg = QtWidgets.QFileDialog()
     fileFilter = "CSV Files (*.csv)"
-    fname, _ = fileDlg.getOpenFileName(self, 'Select Load File', '', fileFilter)
-    if len(fname) > 0:
+    fname = popupFilePicker(self, 'Select Load File', fileFilter)
+    if fname is not None:
       # Operation may take a long time, but we don't want to start the wait cursor until
       # after dialog selection
       err = applyWaitCursor(self.compMgr.csvImport)(fname, loadType,
@@ -225,19 +236,6 @@ class Annotator(QtWidgets.QMainWindow):
   def acceptRegionBtnClicked(self):
     self.compImg.saveNewVerts()
     self.compMgr.addComps(self.compImg.compSer.to_frame().T, addtype=AddTypes.MERGE)
-
-  @Slot()
-  @applyWaitCursor
-  def newImgBtnClicked(self):
-    fileDlg = QtWidgets.QFileDialog()
-    fileFilter = "Image Files (*.png; *.tif; *.jpg; *.jpeg; *.bmp)"
-    fname, _ = fileDlg.getOpenFileName(self, 'Select Main Image', '', fileFilter)
-
-    if len(fname) > 0:
-      self.mainImg.setImage(fname)
-      if self.regCtrlEditor[REG_CTRLS.EST_BOUNDS_ON_START].value():
-        self.estimateBoundaries()
-
 
   @applyWaitCursor
   def estimateBoundaries(self):

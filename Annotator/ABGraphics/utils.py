@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
 from functools import wraps
@@ -22,6 +24,15 @@ def applyWaitCursor(func):
     finally:
       appInst.restoreOverrideCursor()
   return wrapWithWaitCursor
+
+def popupFilePicker(parent, winTitle: str, fileFilter: str) -> Optional[str]:
+  retVal = None
+  fileDlg = QtWidgets.QFileDialog()
+  fname, _ = fileDlg.getOpenFileName(parent, winTitle, '', fileFilter)
+
+  if len(fname) > 0:
+    retVal = fname
+  return retVal
 
 def dialogSaveToFile(parent, saveObj, winTitle, saveDir, saveExt, allowOverwriteDefault=False):
   saveName, ok = QtWidgets.QInputDialog() \
