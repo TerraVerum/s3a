@@ -98,9 +98,7 @@ class ComponentMgr(CompTableModel):
     toEmit = self.defaultEmitDict.copy()
     idCol = TC.INST_ID.name
 
-    # Remove components if they have no vertices, since there is no easy way to modify
-    # them.
-    # TODO: Should something else be done instead?
+    # Properly format components with empty vertices
     dropIdxs = newCompsDf[TC.VERTICES.name].map(lambda el: len(el) == 0).to_numpy().nonzero()[0]
     newCompsDf.drop(index=dropIdxs, inplace=True)
     if addtype == AddTypes.NEW:
@@ -132,6 +130,10 @@ class ComponentMgr(CompTableModel):
 
     self._nextCompId = np.max(self.compDf[idCol]) + 1
     self.sigCompsChanged.emit(toEmit)
+
+
+  def updateComps(self, updateDf: df):
+    pass
 
   def rmComps(self, idsToRemove: Union[np.array, str] = 'all'):
     toEmit = self.defaultEmitDict.copy()

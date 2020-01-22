@@ -235,7 +235,8 @@ class Annotator(QtWidgets.QMainWindow):
   @Slot()
   def acceptRegionBtnClicked(self):
     self.compImg.saveNewVerts()
-    self.compMgr.addComps(self.compImg.compSer.to_frame().T, addtype=AddTypes.MERGE)
+    modifiedComp = self.compImg.compSer
+    self.compMgr.addComps(modifiedComp.to_frame().T, addtype=AddTypes.MERGE)
 
   @applyWaitCursor
   def estimateBoundaries(self):
