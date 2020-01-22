@@ -8,7 +8,7 @@ from typing import Callable
 import numpy as np
 import pyqtgraph as pg
 from pandas import DataFrame as df
-from pyqtgraph.Qt import QtCore, QtWidgets, uic
+from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
 
 from .ABGraphics.parameditors import ConstParamWidget, TableFilterEditor, \
   RegionControlsEditor, SCHEME_HOLDER
@@ -16,7 +16,7 @@ from .ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMe
   attemptLoadSettings
 from .CompDisplayFilter import CompDisplayFilter, CompSortFilter
 from .constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
-from .constants import RegionControlsEditorValues as RCEV
+from .constants import TEMPLATE_REG_CTRLS as REG_CTRLS
 from .processing import getBwComps, getVertsFromBwComps, getClippedBbox
 from .tablemodel import ComponentMgr as ComponentMgr, AddTypes
 from .tablemodel import makeCompDf
@@ -44,8 +44,8 @@ class Annotator(QtWidgets.QMainWindow):
     # ---------------
     # MAIN IMAGE
     # ---------------
-    self.mainImg.setImage(startImgFpath)
     self.mainImg.imgItem.sigClicked.connect(self.mainImgItemClicked)
+    self.mainImg.setImage(startImgFpath)
 
     # ---------------
     # LOAD LAYOUT OPTIONS
@@ -71,7 +71,7 @@ class Annotator(QtWidgets.QMainWindow):
     self.filterEditor = TableFilterEditor()
     self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl, self.filterEditor)
 
-    self.mainImg.imgItem.sigImageChanged.connect(self.clearBoundsBtnClicked)
+    self.mainImg.imgItem.sigImageChanged.connect(self.clearBoundaries)
     self.compDisplay.sigCompClicked.connect(self.updateCurComp)
 
     # ---------------
@@ -89,8 +89,6 @@ class Annotator(QtWidgets.QMainWindow):
     # ---------------
     # Buttons
     self.newImgBtn.clicked.connect(self.newImgBtnClicked)
-    self.estBoundsBtn.clicked.connect(self.estBoundsBtnClicked)
-    self.clearBoundsBtn.clicked.connect(self.clearBoundsBtnClicked)
     self.clearRegionBtn.clicked.connect(self.clearRegionBtnClicked)
     self.resetRegionBtn.clicked.connect(self.resetRegionBtnClicked)
     self.acceptRegionBtn.clicked.connect(self.acceptRegionBtnClicked)
@@ -106,10 +104,15 @@ class Annotator(QtWidgets.QMainWindow):
 
 
     # Edit fields
-    self.regCtrlEditor[RCEV.SEED_THRESH].sigValueChanged.connect(self.seedThreshChanged)
+    sig = self.regCtrlEditor[REG_CTRLS.SEED_THRESH].sigValueChanged
+    sig.connect(self.seedThreshChanged)
     # Note: This signal must be false-triggered on startup to propagate
     # the field's initial value
-    self.regCtrlEditor[RCEV.SEED_THRESH].sigValueChanged.emit(None, None)
+    sig.emit(None, None)
+    # Same with estimating boundaries
+    if startImgFpath is not None \
+       and self.regCtrlEditor[REG_CTRLS.EST_BOUNDS_ON_START].value():
+      self.estimateBoundaries()
 
     # Menu options
     # FILE
@@ -120,7 +123,7 @@ class Annotator(QtWidgets.QMainWindow):
     self.loadComps_merge.triggered.connect(lambda: self.loadCompsActionTriggered(
       AddTypes.MERGE))
     self.loadComps_add.triggered.connect(lambda: self.loadCompsActionTriggered(
-      AddTypes.MERGE))
+      AddTypes.NEW))
 
     # SETTINGS
     menuObjs = [self.regCtrlEditor  , self.filterEditor, self.scheme]
@@ -178,7 +181,12 @@ class Annotator(QtWidgets.QMainWindow):
     if len(fname) > 0:
       # Operation may take a long time, but we don't want to start the wait cursor until
       # after dialog selection
-      applyWaitCursor(self.compMgr.csvImport)(fname, loadType)
+      err = applyWaitCursor(self.compMgr.csvImport)(fname, loadType,
+                                                    self.mainImg.image.shape)
+      if err is not None:
+        # Something went wrong. Inform the user.
+        errMsg = f'Failed to import components. {type(err)}:\n{err}'
+        QtWidgets.QMessageBox().information(self, 'Error During Import', errMsg)
 
   def genericPopulateMenuOptions(self, objForMenu: ConstParamWidget, winMenu: QtWidgets.QMenu, triggerFn: Callable):
     addDirItemsToMenu(winMenu,
@@ -191,6 +199,7 @@ class Annotator(QtWidgets.QMainWindow):
     if loadDict is None:
       return
     objForMenu.loadState(loadDict)
+    objForMenu.applyBtnClicked()
 
   # ---------------
   # BUTTON CALLBACKS
@@ -218,6 +227,7 @@ class Annotator(QtWidgets.QMainWindow):
     self.compMgr.addComps(self.compImg.compSer.to_frame().T, addtype=AddTypes.MERGE)
 
   @Slot()
+  @applyWaitCursor
   def newImgBtnClicked(self):
     fileDlg = QtWidgets.QFileDialog()
     fileFilter = "Image Files (*.png; *.tif; *.jpg; *.jpeg; *.bmp)"
@@ -225,11 +235,12 @@ class Annotator(QtWidgets.QMainWindow):
 
     if len(fname) > 0:
       self.mainImg.setImage(fname)
+      if self.regCtrlEditor[REG_CTRLS.EST_BOUNDS_ON_START].value():
+        self.estimateBoundaries()
 
-  @Slot()
+
   @applyWaitCursor
-  def estBoundsBtnClicked(self):
-    self.compMgr.rmComps()
+  def estimateBoundaries(self):
     compVertices = getVertsFromBwComps(getBwComps(self.mainImg.image))
     components = makeCompDf(len(compVertices))
     components[TC.VERTICES.name] = compVertices
@@ -237,7 +248,7 @@ class Annotator(QtWidgets.QMainWindow):
 
   @Slot()
   @applyWaitCursor
-  def clearBoundsBtnClicked(self):
+  def clearBoundaries(self):
     self.compMgr.rmComps()
 
   # ---------------
@@ -268,7 +279,7 @@ class Annotator(QtWidgets.QMainWindow):
   # ---------------
   @Slot()
   def seedThreshChanged(self):
-    self.compImg.seedThresh = self.regCtrlEditor[RCEV.SEED_THRESH].value()
+    self.compImg.seedThresh = self.regCtrlEditor[REG_CTRLS.SEED_THRESH].value()
 
 
   # ---------------
@@ -280,7 +291,7 @@ class Annotator(QtWidgets.QMainWindow):
     Forms a box with a center at the clicked location, and passes the box
     edges as vertices for a new component.
     """
-    sideLen = self.regCtrlEditor[RCEV.NEW_COMP_SZ].value()
+    sideLen = self.regCtrlEditor[REG_CTRLS.NEW_COMP_SZ].value()
     vertBox = np.vstack((xyCoord, xyCoord))
     vertBox = getClippedBbox(self.mainImg.image.shape, vertBox, sideLen)
     # Create square from bounding box
@@ -301,8 +312,8 @@ class Annotator(QtWidgets.QMainWindow):
   @applyWaitCursor
   def updateCurComp(self, newComp: df):
     mainImg = self.mainImg.image
-    margin = self.regCtrlEditor[RCEV.MARGIN].value()
-    segThresh = self.regCtrlEditor[RCEV.SEG_THRESH].value()
+    margin = self.regCtrlEditor[REG_CTRLS.MARGIN].value()
+    segThresh = self.regCtrlEditor[REG_CTRLS.SEG_THRESH].value()
     prevComp = self.compImg.compSer
     rmPrevComp = self.compImg.updateAll(mainImg, newComp, margin, segThresh)
     # If all old vertices were deleted AND we switched images, signal deletion

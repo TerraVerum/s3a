@@ -1,7 +1,4 @@
-import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-Signal = QtCore.pyqtSignal
-QCursor = QtGui.QCursor
 
 from functools import wraps
 
@@ -11,14 +8,19 @@ from os import path
 from glob import glob
 from functools import partial
 
+from .. import appInst
+
+Signal = QtCore.pyqtSignal
+QCursor = QtGui.QCursor
+
 def applyWaitCursor(func):
   @wraps(func)
   def wrapWithWaitCursor(*args, **kwargs):
     try:
-      pg.QAPP.setOverrideCursor(QCursor(QtCore.Qt.WaitCursor))
+      appInst.setOverrideCursor(QCursor(QtCore.Qt.WaitCursor))
       return func(*args, **kwargs)
     finally:
-      pg.QAPP.restoreOverrideCursor()
+      appInst.restoreOverrideCursor()
   return wrapWithWaitCursor
 
 def dialogSaveToFile(parent, saveObj, winTitle, saveDir, saveExt, allowOverwriteDefault=False):

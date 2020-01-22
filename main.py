@@ -1,0 +1,1 @@
+from Annotator import __main__

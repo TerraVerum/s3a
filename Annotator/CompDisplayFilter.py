@@ -119,7 +119,6 @@ class CompDisplayFilter(QtCore.QObject):
 
     # Update filter list: hide/unhide ids and verts as needed. This should occur in other
     # functions that hook into signals sent from filter widget
-    # TODO: Implement this logic. Will be placed in self._displayedIds
     # Only plot shown vertices
     self._populateDisplayedIds()
 

@@ -56,7 +56,6 @@ class MainImageArea(pg.PlotWidget):
 class FocusedComp(pg.PlotWidget):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-
     # Whether drawn items should be added or removed from current component
     self.inAddMode = True
     # Type of region to add once the user clicks. See radio buttons on the
@@ -73,6 +72,7 @@ class FocusedComp(pg.PlotWidget):
     self.seedThresh = 0.
 
     self.compImgItem = ClickableImageItem()
+    self.compImgItem.requireCtrlKey = False
     self.addItem(self.compImgItem)
 
     self.region = VertexRegion()

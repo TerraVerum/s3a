@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import pickle as pkl
 import sys
-from enum import Enum
 from os.path import join
 
 from pyqtgraph.Qt import QtCore, QtWidgets
@@ -9,10 +8,11 @@ from pyqtgraph.parametertree import (Parameter, ParameterTree)
 
 from .utils import dialogSaveToFile
 from ..constants import (
-  SCHEMES_DIR, SchemeValues as SV,
-  CompParams, TEMPLATE_COMP as TC, ComponentTypes,
-  REGION_CTRL_DIR, RegionControlsEditorValues as RCEV,
-  FILTERS_DIR)
+  SCHEMES_DIR, REGION_CTRL_DIR, FILTERS_DIR,
+  TEMPLATE_SCHEME_VALUES as SV,
+  TEMPLATE_COMP as TC, ComponentTypes,
+  TEMPLATE_REG_CTRLS as REG_CTRLS,
+  ABParam)
 
 Signal = QtCore.pyqtSignal
 
@@ -35,7 +35,8 @@ class ConstParamWidget(QtWidgets.QDialog):
       parentArg.append(parent)
     super().__init__(*parentArg)
     self.resize(500, 400)
-    #self.setModal(True)
+
+    self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
 
     # -----------
     # Construct parameter tree
@@ -90,8 +91,8 @@ class ConstParamWidget(QtWidgets.QDialog):
     self.applyBtn.clicked.connect(self.applyBtnClicked)
 
   # Helper method for accessing simple parameter values
-  def __getitem__(self, key: CompParams):
-    return self.params.child(key.value)
+  def __getitem__(self, key: ABParam):
+    return self.params.child(key.name)
 
   def close(self):
     """
@@ -135,10 +136,11 @@ class ConstParamWidget(QtWidgets.QDialog):
 class RegionControlsEditor(ConstParamWidget):
   def __init__(self, parent=None):
     _CONTROLS_DICT = [
-        {'name': RCEV.MARGIN.value, 'type': 'int', 'value': 5},
-        {'name': RCEV.SEG_THRESH.value, 'type': 'float', 'value': 6.},
-        {'name': RCEV.SEED_THRESH.value, 'type': 'float', 'value': 15.},
-        {'name': RCEV.NEW_COMP_SZ.value, 'type': 'int', 'value': 10},
+        {'name': REG_CTRLS.MARGIN.name, 'type': 'int', 'value': 5},
+        {'name': REG_CTRLS.SEG_THRESH.name, 'type': 'float', 'value': 6.},
+        {'name': REG_CTRLS.SEED_THRESH.name, 'type': 'float', 'value': 15.},
+        {'name': REG_CTRLS.NEW_COMP_SZ.name, 'type': 'int', 'value': 10},
+        {'name': REG_CTRLS.EST_BOUNDS_ON_START.name, 'type': 'bool', 'value': True}
       ]
     super().__init__(parent, paramDict=_CONTROLS_DICT, saveDir=REGION_CTRL_DIR, saveExt='regctrl')
 
@@ -165,16 +167,16 @@ class TableFilterEditor(ConstParamWidget):
 class SchemeEditor(ConstParamWidget):
   def __init__(self, parent=None):
     _DEFAULT_SCHEME_DICT = [
-      {'name': SV.COMP_PARAMS.value, 'type': 'group', 'children': [
-        {'name': SV.VALID_ID_COLOR.value, 'type': 'color', 'value': '0f0'},
-        {'name': SV.NONVALID_ID_COLOR.value, 'type': 'color', 'value': 'f00'},
-        {'name': SV.BOUNDARY_COLOR.value, 'type': 'color', 'value': 'ff0'},
-        {'name': SV.BOUNDARY_WIDTH.value, 'type': 'int', 'value': 2},
-        {'name': SV.ID_FONT_SIZE.value, 'type': 'int', 'value': 10}
+      {'name': SV.COMP_PARAMS.name, 'type': 'group', 'children': [
+        {'name': SV.VALID_ID_COLOR.name, 'type': 'color', 'value': '0f0'},
+        {'name': SV.NONVALID_ID_COLOR.name, 'type': 'color', 'value': 'f00'},
+        {'name': SV.BOUNDARY_COLOR.name, 'type': 'color', 'value': 'ff0'},
+        {'name': SV.BOUNDARY_WIDTH.name, 'type': 'int', 'value': 2},
+        {'name': SV.ID_FONT_SIZE.name, 'type': 'int', 'value': 10}
       ]},
-      {'name': SV.FOC_IMG_PARAMS.value, 'type': 'group', 'children': [
-        {'name': SV.REG_VERT_COLOR.value, 'type': 'color', 'value': '0f0'},
-        {'name': SV.REG_FILL_COLOR.value, 'type': 'color', 'value': '00ff0046'}
+      {'name': SV.FOC_IMG_PARAMS.name, 'type': 'group', 'children': [
+        {'name': SV.REG_VERT_COLOR.name, 'type': 'color', 'value': '0f0'},
+        {'name': SV.REG_FILL_COLOR.name, 'type': 'color', 'value': '00ff0046'}
       ]},
     ]
     super().__init__(parent, paramDict=_DEFAULT_SCHEME_DICT, saveDir=SCHEMES_DIR,
@@ -182,12 +184,12 @@ class SchemeEditor(ConstParamWidget):
 
   def _getProps(self, compOrFocIm: SV, whichProps):
     returnList = True
-    if isinstance(whichProps, SV):
+    if isinstance(whichProps, ABParam):
       whichProps = [whichProps]
       returnList = False
     outProps = []
     for prop in whichProps:
-      outProps.append(self.params.child(compOrFocIm.value, prop.value).value())
+      outProps.append(self.params.child(compOrFocIm.name, prop.name).value())
     if not returnList:
       outProps = outProps[0]
     return outProps

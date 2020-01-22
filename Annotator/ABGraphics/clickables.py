@@ -1,5 +1,5 @@
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 Signal = QtCore.pyqtSignal
 
@@ -7,18 +7,23 @@ import numpy as np
 import warnings
 
 from .parameditors import SCHEME_HOLDER
-from ..constants import SchemeValues as SV
+from ..constants import TEMPLATE_SCHEME_VALUES as SV
+from .. import appInst
 
 
 class ClickableImageItem(pg.ImageItem):
   sigClicked = Signal(object)
 
   clickable = True
+  requireCtrlKey = True
 
   def mouseClickEvent(self, ev: QtGui.QMouseEvent):
     # Capture clicks only if component is present and user allows it
+    # And user pressed control
+    keyMods = appInst.keyboardModifiers()
     if not ev.isAccepted() and ev.button() == QtCore.Qt.LeftButton \
-       and self.clickable and self.image is not None:
+       and self.clickable and self.image is not None \
+       and (keyMods == QtCore.Qt.ControlModifier or not self.requireCtrlKey):
       xyCoord = np.round(np.array([[ev.pos().x(), ev.pos().y()]], dtype='int'))
       self.sigClicked.emit(xyCoord)
 
@@ -64,9 +69,11 @@ class ClickableTextItem(pg.TextItem):
     super().setText(newText)
 
   def update(self, newText, newVerts, newValid):
-    # It is OK for NaN mean values, since this will hide the text
-    with warnings.catch_warnings():
-      warnings.simplefilter("ignore", category=RuntimeWarning)
+    # Case when verts is empty or all NaN. Assume it is not possible for one vertex to
+    # be NaN while the other is a real number
+    if np.any(np.isfinite(newVerts)):
       newPos = np.mean(newVerts, axis=0)
-      self.setPos(newPos[0], newPos[1])
+    else:
+      newPos = np.ones(2)*np.nan
+    self.setPos(newPos[0], newPos[1])
     self.setText(newText, newValid)
