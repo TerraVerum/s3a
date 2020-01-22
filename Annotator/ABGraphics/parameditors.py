@@ -30,10 +30,7 @@ class ConstParamWidget(QtWidgets.QDialog):
     # Place in list so an empty value gets unpacked into super constructor
     if paramDict is None:
       paramDict = []
-    parentArg = []
-    if parent is not None:
-      parentArg.append(parent)
-    super().__init__(*parentArg)
+    super().__init__(parent)
     self.resize(500, 400)
 
     self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
