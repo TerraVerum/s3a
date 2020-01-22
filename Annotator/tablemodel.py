@@ -4,12 +4,13 @@ import re
 import sys
 from ast import literal_eval
 from enum import Enum
-from typing import Union, Any
+from typing import Union, Any, Optional
 
 import numpy as np
 import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
+from tqdm import tqdm
 
 from .constants import TEMPLATE_COMP as TC, CompParams, ComponentTypes
 
@@ -31,6 +32,10 @@ def makeCompDf(numRows=1) -> df:
 class AddTypes(Enum):
   NEW: Enum = 'new'
   MERGE: Enum = 'merge'
+
+class CsvIOError(Exception):
+  def __init__(self, message):
+    super().__init__(message)
 
 class CompTableModel(QtCore.QAbstractTableModel):
   colTitles = TC.paramNames()
@@ -92,10 +97,16 @@ class ComponentMgr(CompTableModel):
   def addComps(self, newCompsDf: df, addtype: AddTypes = AddTypes.NEW):
     toEmit = self.defaultEmitDict.copy()
     idCol = TC.INST_ID.name
+
+    # Remove components if they have no vertices, since there is no easy way to modify
+    # them.
+    # TODO: Should something else be done instead?
+    dropIdxs = newCompsDf[TC.VERTICES.name].map(lambda el: len(el) == 0).to_numpy().nonzero()[0]
+    newCompsDf.drop(index=dropIdxs, inplace=True)
     if addtype == AddTypes.NEW:
       # Treat all comps as new -> set their IDs to guaranteed new values
       newIds = np.arange(self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int)
-      newCompsDf[idCol] = newIds
+      newCompsDf.loc[:,idCol] = newIds
       newCompsDf = newCompsDf.set_index(newIds)
     # Now, merge existing IDs and add new ones
     # TODO: Add some metric for merging other than a total override. Currently, even if the existing
@@ -110,12 +121,11 @@ class ComponentMgr(CompTableModel):
     self.layoutAboutToBeChanged.emit()
     # Ensure indices overlap with the components these are replacing
     self.compDf.update(newCompsDf)
-    self.compDf.update(newCompsDf)
     toEmit['changed'] = newIds[newChangedIdxs]
 
     # Finally, add new comps
     compsToAdd = newCompsDf.iloc[~newChangedIdxs, :]
-    self.compDf = pd.concat((self.compDf, compsToAdd))
+    self.compDf = pd.concat((self.compDf, compsToAdd), sort=False)
     toEmit['added'] = newIds[~newChangedIdxs]
     self.layoutChanged.emit()
 
@@ -188,36 +198,52 @@ class ComponentMgr(CompTableModel):
       np.set_printoptions(oldNpOpts)
       return success
 
-  def csvImport(self, inFile: str, loadType = AddTypes.NEW) -> bool:
+  def csvImport(self, inFile: str, loadType=AddTypes.NEW,
+                imShape: Optional[tuple]=None) -> Optional[Exception]:
     """
     Deserializes data from a csv file to create a Component :class:`DataFrame`.
     The input .csv should be the same format as one exported by
     :func:`csvImport <ComponentMgr.csvImport>`.
 
+    :param imShape: If included, this ensures all imported components lie within imSize
+           boundaries. If any components do not, an error is thrown since this is
+           indicative of components that actually came from a different reference image.
     :param inFile: Name of file to import
     :param loadType: Whether new components should be added to the exisitng component list as new
            or if they should be merged by ID with existing entries. Currently, all fields of the
            existing component will be overwritten by the new values, even if they had text/values.
-    :return: Success or failure of the operation -- Returns false if the specified file wasn't found
+    :return: Exception that occurs if the operation did not succeed. Otherwise,
+           this value will be `None`.
     """
     try:
       csvDf = pd.read_csv(inFile, keep_default_na=False)
-    except FileNotFoundError:
-      return False
-    # Objects in the original frame are represented as strings, so try to convert these
-    # as needed
-    stringCols = csvDf.columns[csvDf.dtypes == object]
-    valToParamMap = {param.name: param.value for param in TC}
-    for col in stringCols:
-      paramVal = valToParamMap[col]
-      # No need to perform this expensive computation if the values are already strings
-      if not isinstance(paramVal, str):
-        csvDf[col] = _strSerToParamSer(csvDf[col], valToParamMap[col])
-    csvDf = csvDf.set_index(TC.INST_ID.name, drop=False)
+      # Objects in the original frame are represented as strings, so try to convert these
+      # as needed
+      stringCols = csvDf.columns[csvDf.dtypes == object]
+      valToParamMap = {param.name: param.value for param in TC}
+      for col in stringCols:
+        paramVal = valToParamMap[col]
+        # No need to perform this expensive computation if the values are already strings
+        if not isinstance(paramVal, str):
+          csvDf[col] = _strSerToParamSer(csvDf[col], valToParamMap[col])
+      csvDf = csvDf.set_index(TC.INST_ID.name, drop=False)
+
+      # Image shape from row-col -> x-y
+      imShape = np.array(imShape[1::-1])[None,:]
+      # Remove components whose vertices go over any image edges
+      vertMaxs = [verts.max(0) for verts in csvDf[TC.VERTICES.name] if len(verts) > 0]
+      vertMaxs = np.vstack(vertMaxs)
+      offendingIds = np.nonzero(np.any(vertMaxs >= imShape, axis=1))[0]
+      if len(offendingIds) > 0:
+        raise CsvIOError(f'Vertices on some components extend beyond image dimensions. '
+                         f'Perhaps this export came from a different image?\n'
+                         f'Offending IDs: {offendingIds}')
+    except Exception as ex:
+      return ex
     # TODO: Apply this function to individual rows instead of the whole dataframe. This will allow malformed
     #  rows to gracefully fall off the dataframe with some sort of warning message
     self.addComps(csvDf, loadType)
-    return True
+    return None
 
 def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> Any:
   paramType = type(paramVal)
@@ -226,7 +252,6 @@ def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> Any:
     np.ndarray    : lambda strVal: np.array(literal_eval(re.sub(r'(\d|\])\s+', '\\1,', strVal.replace('\n', '')))),
     bool          : lambda strVal: strVal.lower() == 'true',
     ComponentTypes: lambda strVal: ComponentTypes.fromString(strVal)
-
   }
   defaultFunc = lambda strVal: paramType(strVal)
   funcToUse = funcMap.get(paramType, defaultFunc)

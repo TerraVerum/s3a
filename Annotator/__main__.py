@@ -2,6 +2,7 @@
 
 import sys
 from os import path
+from pyqtgraph.Qt import QtWidgets
 
 from . import Annotator, appInst
 from .constants import BASE_DIR
@@ -12,4 +13,7 @@ if len(sys.argv) > 1:
 win = Annotator(startImgFpath)
 # p = run('profileFunc(win.estBoundsBtnClicked, 1)')
 win.showMaximized()
-appInst.exec()
+try:
+  sys.exit(appInst.exec())
+except Exception as ex:
+  QtWidgets.QMessageBox().information(win, 'Error', f'An error occurred:\n{str(ex)}')

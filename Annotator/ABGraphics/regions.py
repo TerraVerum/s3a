@@ -6,7 +6,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui
 
 from .parameditors import SCHEME_HOLDER
-from ..constants import SchemeValues as SV
+from ..constants import TEMPLATE_SCHEME_VALUES as SV
 from ..processing import splitListAtNans
 
 

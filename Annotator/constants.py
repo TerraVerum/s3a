@@ -80,38 +80,43 @@ class ABParamGroup:
     for curField in fields(self):
       yield getattr(self, curField.name)
 
-newParam = lambda name, val: field(default_factory=lambda: ABParam(name, val))
+newParam = lambda name, val=None: field(default_factory=lambda:ABParam(name, val))
 @dataclass
 class CompParams(ABParamGroup):
   # These 3 params MUST exist in the component
-  INST_ID:ABParam    = newParam('Instance ID', -1)
-  VERTICES:ABParam   = newParam('Vertices', np.ones((1,2))*np.nan)
-  VALIDATED:ABParam  = newParam('Validated', False)
+  INST_ID   :ABParam  = newParam('Instance ID', -1)
+  VERTICES  :ABParam  = newParam('Vertices', np.ones((1,2))*np.nan)
+  VALIDATED :ABParam  = newParam('Validated', False)
 
-  DEV_TYPE:ABParam   = newParam('Device Type', ComponentTypes.N_A)
-  DEV_TEXT:ABParam   = newParam('Device Text', '')
-  BOARD_TEXT:ABParam = newParam('Board Text', '')
-  LOGO:ABParam       = newParam('Logo', '')
-  NOTES:ABParam      = newParam('Notes', '')
+  DEV_TEXT   :ABParam = newParam('Device Text', '')
+  DEV_TYPE   :ABParam = newParam('Device Type', ComponentTypes.N_A)
+  BOARD_TEXT :ABParam = newParam('Board Text', '')
+  LOGO       :ABParam = newParam('Logo', '')
+  NOTES      :ABParam = newParam('Notes', '')
 TEMPLATE_COMP = CompParams()
 
-class SchemeValues(Enum):
-  COMP_PARAMS: Enum = 'Component Parameters'
-  VALID_ID_COLOR: Enum = 'Validated ID Color'
-  NONVALID_ID_COLOR: Enum = 'Non-Validated ID Color'
-  BOUNDARY_COLOR: Enum = 'Component Boundary Color'
-  BOUNDARY_WIDTH: Enum = 'Component Boundary Width'
-  ID_FONT_SIZE: Enum = 'ID Font Size'
+@dataclass
+class SchemeValues(ABParamGroup):
+  COMP_PARAMS       :ABParam = newParam('Component Parameters')
+  VALID_ID_COLOR    :ABParam = newParam('Validated ID Color')
+  NONVALID_ID_COLOR :ABParam = newParam('Non-Validated ID Color')
+  BOUNDARY_COLOR    :ABParam = newParam('Component Boundary Color')
+  BOUNDARY_WIDTH    :ABParam = newParam('Component Boundary Width')
+  ID_FONT_SIZE      :ABParam = newParam('ID Font Size')
 
-  FOC_IMG_PARAMS: Enum = 'Focused Image Parameters'
-  REG_VERT_COLOR: Enum = 'Vertex Color'
-  REG_FILL_COLOR: Enum = 'Fill Color'
+  FOC_IMG_PARAMS    :ABParam = newParam('Focused Image Parameters')
+  REG_VERT_COLOR    :ABParam = newParam('Vertex Color')
+  REG_FILL_COLOR    :ABParam = newParam('Fill Color')
+TEMPLATE_SCHEME_VALUES = SchemeValues()
 
-class RegionControlsEditorValues(Enum):
-  MARGIN: Enum = 'Margin'
-  SEG_THRESH: Enum = 'Segmentation Threshold'
-  SEED_THRESH: Enum = 'Seedpoint Mean Threshold'
-  NEW_COMP_SZ: Enum = 'New Component Size'
+@dataclass
+class RegionControlsEditorValues(ABParamGroup):
+  MARGIN              :ABParam = newParam('Margin')
+  SEG_THRESH          :ABParam = newParam('Segmentation Threshold')
+  SEED_THRESH         :ABParam = newParam('Seedpoint Mean Threshold')
+  NEW_COMP_SZ         :ABParam = newParam('New Component Size')
+  EST_BOUNDS_ON_START :ABParam = newParam('Estimate Boundaries on Image Load')
+TEMPLATE_REG_CTRLS = RegionControlsEditorValues()
 
 if __name__ == '__main__':
   c = ComponentTypes.fromString('capacitor')
