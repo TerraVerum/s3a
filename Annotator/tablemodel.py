@@ -96,22 +96,25 @@ class ComponentMgr(CompTableModel):
 
   def addComps(self, newCompsDf: df, addtype: AddTypes = AddTypes.NEW):
     toEmit = self.defaultEmitDict.copy()
-    idCol = TC.INST_ID.name
+    existingIds = self.compDf.index
 
-    # Properly format components with empty vertices
-    dropIdxs = newCompsDf[TC.VERTICES.name].map(lambda el: len(el) == 0).to_numpy().nonzero()[0]
-    newCompsDf.drop(index=dropIdxs, inplace=True)
+    # Delete entries with no vertices, since they make work within the app difficult.
+    # TODO: Is this the appropriate response?
+    dropIds = newCompsDf.index[newCompsDf[TC.VERTICES.name].map(lambda el: len(el) == 0)]
+    newCompsDf.drop(index=dropIds, inplace=True)
+    # Inform graphics elements of deletion if this ID is already in our dataframe
+    toEmit.update(self.rmComps(dropIds, emitChange=False))
+
     if addtype == AddTypes.NEW:
       # Treat all comps as new -> set their IDs to guaranteed new values
       newIds = np.arange(self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int)
-      newCompsDf.loc[:,idCol] = newIds
+      newCompsDf.loc[:,TC.INST_ID.name] = newIds
       newCompsDf = newCompsDf.set_index(newIds)
     # Now, merge existing IDs and add new ones
     # TODO: Add some metric for merging other than a total override. Currently, even if the existing
     #  component has a value in e.g. vertices while the new component does not, the new, empty value
     #  will override the older. This might often be desirable, but it would still be good to let the
     #  user have the final say on what happens
-    existingIds = self.compDf.index
     newIds = newCompsDf.index
     newChangedIdxs = np.isin(newIds, existingIds, assume_unique=True)
 
@@ -128,14 +131,10 @@ class ComponentMgr(CompTableModel):
     self.layoutChanged.emit()
 
 
-    self._nextCompId = np.max(self.compDf[idCol]) + 1
+    self._nextCompId = np.max(self.compDf.index) + 1
     self.sigCompsChanged.emit(toEmit)
 
-
-  def updateComps(self, updateDf: df):
-    pass
-
-  def rmComps(self, idsToRemove: Union[np.array, str] = 'all'):
+  def rmComps(self, idsToRemove: Union[np.array, str] = 'all', emitChange=True) -> Optional[dict]:
     toEmit = self.defaultEmitDict.copy()
     # Generate ID list
     existingCompIds = self.compDf.index
@@ -160,7 +159,9 @@ class ComponentMgr(CompTableModel):
 
     # Reflect these changes to the component list
     toEmit['deleted'] = idsToRemove
-    self.sigCompsChanged.emit(toEmit)
+    if emitChange:
+      self.sigCompsChanged.emit(toEmit)
+    return toEmit
 
   def csvExport(self, outFile: str, **pdExportArgs) -> bool:
     """
