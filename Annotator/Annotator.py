@@ -229,7 +229,7 @@ class Annotator(QtWidgets.QMainWindow):
     # Only perform action if image currently exists
     if self.compImg.compImgItem.image is None:
       return
-    self.compImg.updateRegion(self.compImg.compSer[TC.VERTICES.name].squeeze())
+    self.compImg.updateRegion(self.compImg.compSer[TC.VERTICES].squeeze())
 
   @Slot()
   def acceptRegionBtnClicked(self):
@@ -241,7 +241,7 @@ class Annotator(QtWidgets.QMainWindow):
   def estimateBoundaries(self):
     compVertices = getVertsFromBwComps(getBwComps(self.mainImg.image))
     components = makeCompDf(len(compVertices))
-    components[TC.VERTICES.name] = compVertices
+    components[TC.VERTICES] = compVertices
     self.compMgr.addComps(components)
 
   @Slot()
@@ -302,7 +302,7 @@ class Annotator(QtWidgets.QMainWindow):
     compVerts = np.vstack(compVerts)
 
     newComp = makeCompDf()
-    newComp[TC.VERTICES.name] = [compVerts]
+    newComp[TC.VERTICES] = [compVerts]
     self.compMgr.addComps(newComp)
 
 
@@ -317,9 +317,9 @@ class Annotator(QtWidgets.QMainWindow):
     # If all old vertices were deleted AND we switched images, signal deletion
     # for the previous focused component
     if rmPrevComp:
-      self.compMgr.rmComps(prevComp[TC.INST_ID.name])
+      self.compMgr.rmComps(prevComp[TC.INST_ID])
 
-    self.curCompIdLbl.setText(f'Component ID: {newComp[TC.INST_ID.name]}')
+    self.curCompIdLbl.setText(f'Component ID: {newComp[TC.INST_ID]}')
 
 ## Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':

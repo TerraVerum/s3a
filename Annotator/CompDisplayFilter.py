@@ -68,7 +68,7 @@ class CompDisplayFilter(QtCore.QObject):
     # No need to keep vertices, since deleted vertices are handled by the
     # MultiRegionPlot and table rows will still have the associated ID
     self._oldPlotsDf = df(columns=['idPlot'])
-    self._oldPlotsDf.index.set_names([TC.INST_ID.name], inplace=True)
+    self._oldPlotsDf.index.set_names([TC.INST_ID], inplace=True)
 
     mainImg.addItem(self._compBounds)
 
@@ -83,8 +83,8 @@ class CompDisplayFilter(QtCore.QObject):
 
     # For new components: Add hidden id plot. This will be shown later if filter allows
     addedIds = idLists['added']
-    verts = id_indexDf.loc[addedIds, TC.VERTICES.name].values
-    valids = id_indexDf.loc[addedIds, TC.VALIDATED.name].values
+    verts = id_indexDf.loc[addedIds, TC.VERTICES].values
+    valids = id_indexDf.loc[addedIds, TC.VALIDATED].values
     newIdPlots = [None]*len(addedIds)
     for pltIdx, (curId, curVerts, curValid) in enumerate(zip(addedIds, verts, valids)):
       newPlt = self._createIdPlot(curId, curVerts, curValid)
@@ -110,8 +110,8 @@ class CompDisplayFilter(QtCore.QObject):
     # No need to update regions, since the whole list is reset at the end of
     # this function
     idsToChange = idLists['changed']
-    changedVerts = id_indexDf.loc[idsToChange, TC.VERTICES.name]
-    changedValid = id_indexDf.loc[idsToChange, TC.VALIDATED.name]
+    changedVerts = id_indexDf.loc[idsToChange, TC.VERTICES]
+    changedValid = id_indexDf.loc[idsToChange, TC.VALIDATED]
     plotsToChange = self._oldPlotsDf['idPlot'].loc[idsToChange]
     for curId, curVerts, curValid, idPlot in \
         zip(idsToChange, changedVerts, changedValid, plotsToChange):
@@ -129,7 +129,7 @@ class CompDisplayFilter(QtCore.QObject):
     for rowIdx in tblIdxsToShow:
       self._compTbl.showRow(rowIdx)
 
-    displayVerts = id_indexDf.loc[self._displayedIds, TC.VERTICES.name]
+    displayVerts = id_indexDf.loc[self._displayedIds, TC.VERTICES]
     self._compBounds.resetRegionList(self._displayedIds, displayVerts)
 
   def _updateFilter(self, newFilterDict):
@@ -155,7 +155,7 @@ class CompDisplayFilter(QtCore.QObject):
     curParam = self._filter[TC.VALIDATED.name][1]
     allowValid, allowInvalid = [curParam[name][0] for name in ['Validated', 'Not Validated']]
 
-    validList = np.array(curComps.loc[:, TC.VALIDATED.name], dtype=bool)
+    validList = np.array(curComps.loc[:, TC.VALIDATED], dtype=bool)
     if not allowValid:
       curComps = curComps.loc[~validList, :]
     if not allowInvalid:
@@ -164,7 +164,7 @@ class CompDisplayFilter(QtCore.QObject):
     # ------
     # DEVICE TYPE FILTERING
     # ------
-    compTypes = np.array(curComps.loc[:, TC.DEV_TYPE.name])
+    compTypes = np.array(curComps.loc[:, TC.DEV_TYPE])
     curParam = self._filter[TC.DEV_TYPE.name][1]
     allowedTypes = []
     for curType in ComponentTypes:
@@ -176,17 +176,17 @@ class CompDisplayFilter(QtCore.QObject):
     # ------
     # LOGO, NOTES, BOARD, DEVICE TEXT FILTERING
     # ------
-    nextParamNames = [param.name for param in [TC.LOGO, TC.NOTES, TC.BOARD_TEXT, TC.DEV_TEXT]]
+    nextParamNames = [TC.LOGO, TC.NOTES, TC.BOARD_TEXT, TC.DEV_TEXT]
     for param in nextParamNames:
       compParamVals = curComps.loc[:, param]
-      allowedRegex = self._filter[param][0]
+      allowedRegex = self._filter[param.name][0]
       isCompAllowed = compParamVals.str.contains(allowedRegex, regex=True, case=False)
       curComps = curComps.loc[isCompAllowed,:]
 
     # ------
     # VERTEX FILTERING
     # ------
-    compVerts = curComps.loc[:, TC.VERTICES.name]
+    compVerts = curComps.loc[:, TC.VERTICES]
     vertsAllowed = np.ones(len(compVerts), dtype=bool)
 
     vertParam = self._filter[TC.VERTICES.name][1]
