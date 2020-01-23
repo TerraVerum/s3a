@@ -11,8 +11,8 @@ from ..constants import (
   SCHEMES_DIR, REGION_CTRL_DIR, FILTERS_DIR,
   TEMPLATE_SCHEME_VALUES as SV,
   TEMPLATE_COMP as TC, ComponentTypes,
-  TEMPLATE_REG_CTRLS as REG_CTRLS,
-  ABParam)
+  TEMPLATE_REG_CTRLS as REG_CTRLS)
+from Annotator.params import ABParam
 
 Signal = QtCore.pyqtSignal
 
@@ -32,8 +32,6 @@ class ConstParamWidget(QtWidgets.QDialog):
       paramDict = []
     super().__init__(parent)
     self.resize(500, 400)
-
-    self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint)
 
     # -----------
     # Construct parameter tree
@@ -90,6 +88,10 @@ class ConstParamWidget(QtWidgets.QDialog):
   # Helper method for accessing simple parameter values
   def __getitem__(self, key: ABParam):
     return self.params.child(key.name)
+
+  def show(self):
+    super().show()
+    self.setWindowState(QtCore.Qt.WindowActive)
 
   def close(self):
     """

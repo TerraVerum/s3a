@@ -1,13 +1,14 @@
 import os
-from dataclasses import dataclass, fields, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any
 from warnings import warn
 
 import numpy as np
 
 # Preference directories
+from Annotator.params import ABParam, ABParamGroup, newParam
+
 BASE_DIR = os.path.dirname(Path(__file__).absolute())
 SCHEMES_DIR     = os.path.join(BASE_DIR, 'MenuOpts', 'Schemes', '')
 LAYOUTS_DIR     = os.path.join(BASE_DIR, 'MenuOpts', 'Layouts', '')
@@ -56,74 +57,40 @@ class ComponentTypes(Enum):
 
 
 @dataclass
-class ABParam:
-  name: str
-  value: Any
-
-  def __str__(self):
-    return f'{self.name}'
-
-  def __hash__(self):
-    # Since every param within a group will have a unique name, just the name is
-    # sufficient to form a proper hash
-    return hash(self.name,)
-
-class ABParamGroup:
-  """
-  Hosts all child parameters and offers convenience function for iterating over them
-  """
-
-  def paramNames(self):
-    """
-    Outputs the column names of each parameter in the group.
-    """
-    return [curField.name for curField in self]
-
-  def __iter__(self):
-    # 'self' is an instance of the class, so the warning is a false positive
-    # noinspection PyDataclass
-    for curField in fields(self):
-      yield getattr(self, curField.name)
-
-  def __len__(self):
-    return len(fields(self))
-
-newParam = lambda name, val=None: field(default_factory=lambda:ABParam(name, val))
-@dataclass
 class CompParams(ABParamGroup):
   # These 3 params MUST exist in the component
-  INST_ID   :ABParam  = newParam('Instance ID', -1)
-  VERTICES  :ABParam  = newParam('Vertices', np.ones((1,2))*np.nan)
-  VALIDATED :ABParam  = newParam('Validated', False)
+  INST_ID   : ABParam = newParam('Instance ID', -1)
+  VERTICES  : ABParam = newParam('Vertices', np.ones((1, 2)) * np.nan)
+  VALIDATED : ABParam = newParam('Validated', False)
 
-  DEV_TEXT   :ABParam = newParam('Device Text', '')
-  DEV_TYPE   :ABParam = newParam('Device Type', ComponentTypes.N_A)
-  BOARD_TEXT :ABParam = newParam('Board Text', '')
-  LOGO       :ABParam = newParam('Logo', '')
-  NOTES      :ABParam = newParam('Notes', '')
+  DEV_TEXT   : ABParam = newParam('Device Text', '')
+  DEV_TYPE   : ABParam = newParam('Device Type', ComponentTypes.N_A)
+  BOARD_TEXT : ABParam = newParam('Board Text', '')
+  LOGO       : ABParam = newParam('Logo', '')
+  NOTES      : ABParam = newParam('Notes', '')
 TEMPLATE_COMP = CompParams()
 
 @dataclass
 class SchemeValues(ABParamGroup):
-  COMP_PARAMS       :ABParam = newParam('Component Parameters')
-  VALID_ID_COLOR    :ABParam = newParam('Validated ID Color')
-  NONVALID_ID_COLOR :ABParam = newParam('Non-Validated ID Color')
-  BOUNDARY_COLOR    :ABParam = newParam('Component Boundary Color')
-  BOUNDARY_WIDTH    :ABParam = newParam('Component Boundary Width')
-  ID_FONT_SIZE      :ABParam = newParam('ID Font Size')
+  COMP_PARAMS       : ABParam = newParam('Component Parameters')
+  VALID_ID_COLOR    : ABParam = newParam('Validated ID Color')
+  NONVALID_ID_COLOR : ABParam = newParam('Non-Validated ID Color')
+  BOUNDARY_COLOR    : ABParam = newParam('Component Boundary Color')
+  BOUNDARY_WIDTH    : ABParam = newParam('Component Boundary Width')
+  ID_FONT_SIZE      : ABParam = newParam('ID Font Size')
 
-  FOC_IMG_PARAMS    :ABParam = newParam('Focused Image Parameters')
-  REG_VERT_COLOR    :ABParam = newParam('Vertex Color')
-  REG_FILL_COLOR    :ABParam = newParam('Fill Color')
+  FOC_IMG_PARAMS    : ABParam = newParam('Focused Image Parameters')
+  REG_VERT_COLOR    : ABParam = newParam('Vertex Color')
+  REG_FILL_COLOR    : ABParam = newParam('Fill Color')
 TEMPLATE_SCHEME_VALUES = SchemeValues()
 
 @dataclass
 class RegionControlsEditorValues(ABParamGroup):
-  MARGIN              :ABParam = newParam('Margin')
-  SEG_THRESH          :ABParam = newParam('Segmentation Threshold')
-  SEED_THRESH         :ABParam = newParam('Seedpoint Mean Threshold')
-  NEW_COMP_SZ         :ABParam = newParam('New Component Size')
-  EST_BOUNDS_ON_START :ABParam = newParam('Estimate Boundaries on Image Load')
+  MARGIN              : ABParam = newParam('Margin')
+  SEG_THRESH          : ABParam = newParam('Segmentation Threshold')
+  SEED_THRESH         : ABParam = newParam('Seedpoint Mean Threshold')
+  NEW_COMP_SZ         : ABParam = newParam('New Component Size')
+  EST_BOUNDS_ON_START : ABParam = newParam('Estimate Boundaries on Image Load')
 TEMPLATE_REG_CTRLS = RegionControlsEditorValues()
 
 if __name__ == '__main__':

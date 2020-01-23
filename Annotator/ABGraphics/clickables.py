@@ -27,6 +27,21 @@ class ClickableImageItem(pg.ImageItem):
       xyCoord = np.round(np.array([[ev.pos().x(), ev.pos().y()]], dtype='int'))
       self.sigClicked.emit(xyCoord)
 
+class ClickableScatterItem(pg.ScatterPlotItem):
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    # TODO: Find out where the mouse is and make sure it's above a point before changing
+    # the mouse cursor
+    #self.setAcceptHoverEvents(True)
+
+    self.hoverCursor = QtCore.Qt.PointingHandCursor
+
+
+  def hoverEnterEvent(self, ev):
+    self.setCursor(self.hoverCursor)
+
+  def hoverLeaveEvent(self, ev):
+    self.unsetCursor()
 
 # noinspection PyUnusedLocal
 class ClickableTextItem(pg.TextItem):
