@@ -145,6 +145,10 @@ class ComponentMgr(CompTableModel):
       idsToRemove = [idsToRemove]
       pass
 
+    # Do nothing for IDs not actually in the existing list
+    idsActuallyRemoved = np.isin(idsToRemove, existingCompIds, assume_unique=True)
+    idsToRemove = idsToRemove[idsActuallyRemoved]
+
     tfKeepIdx = np.isin(existingCompIds, idsToRemove, assume_unique=True, invert=True)
 
     # Reset manager's component list
