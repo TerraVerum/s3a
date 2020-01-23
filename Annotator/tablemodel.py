@@ -27,7 +27,7 @@ def makeCompDf(numRows=1) -> df:
     # Make sure to construct a separate component instance for
     # each row no objects have the same reference
     df_list.append([field.value for field in CompParams()])
-  return df(df_list, columns=TC.paramNames()).set_index(TC.INST_ID.name, drop=False)
+  return df(df_list, columns=TC).set_index(TC.INST_ID, drop=False)
 
 class AddTypes(Enum):
   NEW: Enum = 'new'
@@ -81,8 +81,8 @@ class CompTableModel(QtCore.QAbstractTableModel):
     return True
 
   def flags(self, index: QtCore.QModelIndex):
-    noEditColIdxs = [self.colTitles.index(col)for col in
-                     [TC.INST_ID.name, TC.VERTICES.name]]
+    noEditColIdxs = [self.colTitles.index(col.name)for col in
+                     [TC.INST_ID, TC.VERTICES]]
     if index.column() not in noEditColIdxs:
       return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable
     else:
@@ -100,7 +100,7 @@ class ComponentMgr(CompTableModel):
 
     # Delete entries with no vertices, since they make work within the app difficult.
     # TODO: Is this the appropriate response?
-    dropIds = newCompsDf.index[newCompsDf[TC.VERTICES.name].map(lambda el: len(el) == 0)]
+    dropIds = newCompsDf.index[newCompsDf[TC.VERTICES].map(lambda el: len(el) == 0)]
     newCompsDf.drop(index=dropIds, inplace=True)
     # Inform graphics elements of deletion if this ID is already in our dataframe
     toEmit.update(self.rmComps(dropIds, emitChange=False))
@@ -108,7 +108,7 @@ class ComponentMgr(CompTableModel):
     if addtype == AddTypes.NEW:
       # Treat all comps as new -> set their IDs to guaranteed new values
       newIds = np.arange(self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int)
-      newCompsDf.loc[:,TC.INST_ID.name] = newIds
+      newCompsDf.loc[:,TC.INST_ID] = newIds
       newCompsDf = newCompsDf.set_index(newIds)
     # Now, merge existing IDs and add new ones
     # TODO: Add some metric for merging other than a total override. Currently, even if the existing
@@ -234,12 +234,13 @@ class ComponentMgr(CompTableModel):
         # No need to perform this expensive computation if the values are already strings
         if not isinstance(paramVal, str):
           csvDf[col] = _strSerToParamSer(csvDf[col], valToParamMap[col])
-      csvDf = csvDf.set_index(TC.INST_ID.name, drop=False)
+      csvDf.columns = TC
+      csvDf = csvDf.set_index(TC.INST_ID, drop=False)
 
       # Image shape from row-col -> x-y
       imShape = np.array(imShape[1::-1])[None,:]
       # Remove components whose vertices go over any image edges
-      vertMaxs = [verts.max(0) for verts in csvDf[TC.VERTICES.name] if len(verts) > 0]
+      vertMaxs = [verts.max(0) for verts in csvDf[TC.VERTICES] if len(verts) > 0]
       vertMaxs = np.vstack(vertMaxs)
       offendingIds = np.nonzero(np.any(vertMaxs >= imShape, axis=1))[0]
       if len(offendingIds) > 0:

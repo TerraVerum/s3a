@@ -141,10 +141,10 @@ class FocusedComp(pg.PlotWidget):
 
   def updateAll(self, mainImg: np.array, newComp:df,
              margin: int, segThresh: float):
-    newVerts = newComp[TC.VERTICES.name].squeeze()
+    newVerts = newComp[TC.VERTICES].squeeze()
     deletePrevComponent = False
     # If the previous component had no vertices, signal its removal
-    if len(self.compSer[TC.VERTICES.name].squeeze()) == 0:
+    if len(self.compSer[TC.VERTICES].squeeze()) == 0:
       deletePrevComponent = True
     # Since values INSIDE the dataframe are reset instead of modified, there is no
     # need to go through the trouble of deep copying
@@ -185,7 +185,7 @@ class FocusedComp(pg.PlotWidget):
 
   def saveNewVerts(self):
     # Add in offset from main image to VertexRegion vertices
-    self.compSer.loc[TC.VERTICES.name] = self.region.verts + self.bbox[0,:]
+    self.compSer.loc[TC.VERTICES] = self.region.verts + self.bbox[0,:]
 
   def _addRoiToRegion(self):
     imgMask = self.interactor.getImgMask(self.compImgItem)

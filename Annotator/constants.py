@@ -61,7 +61,12 @@ class ABParam:
   value: Any
 
   def __str__(self):
-    return f'{self.name}: {self.value}'
+    return f'{self.name}'
+
+  def __hash__(self):
+    # Since every param within a group will have a unique name, just the name is
+    # sufficient to form a proper hash
+    return hash(self.name,)
 
 class ABParamGroup:
   """
@@ -79,6 +84,9 @@ class ABParamGroup:
     # noinspection PyDataclass
     for curField in fields(self):
       yield getattr(self, curField.name)
+
+  def __len__(self):
+    return len(fields(self))
 
 newParam = lambda name, val=None: field(default_factory=lambda:ABParam(name, val))
 @dataclass

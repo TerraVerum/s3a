@@ -33,10 +33,10 @@ for inImg in tqdm(fnames, 'Files'):
     notes = [''.join(lettersArr[randint(52, size=randint(30))]) for ii in range(numComps)]
     devTxt = [''.join(lettersArr[randint(52, size=randint(30))]) for ii in range(numComps)]
     boardTxt = [''.join(lettersArr[randint(52, size=randint(30))]) for ii in range(numComps)]
-    comps[TC.VERTICES.name] = allVerts_list
-    comps[TC.NOTES.name] = notes
-    comps[TC.DEV_TEXT.name] = devTxt
-    comps[TC.BOARD_TEXT.name] = boardTxt
+    comps[TC.VERTICES] = allVerts_list
+    comps[TC.NOTES] = notes
+    comps[TC.DEV_TEXT] = devTxt
+    comps[TC.BOARD_TEXT] = boardTxt
     timeToAdd = time()
     win.compMgr.addComps(comps)
     timeToAdd = time() - timeToAdd

@@ -15,7 +15,7 @@ if __name__ == '__main__':
   comps = comps.set_index(np.arange(5, dtype=int))
   mgr = ComponentMgr()
   for ii in range(len(comps)):
-    comps.loc[ii, TC.VERTICES.name] = [np.random.randint(10,size=(5,2))]
+    comps.loc[ii, TC.VERTICES] = [np.random.randint(10,size=(5,2))]
   mgr.addComps(comps, addtype='new')
   t = CompTableView()
   t.setModel(mgr)
