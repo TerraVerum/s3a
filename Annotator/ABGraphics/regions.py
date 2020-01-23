@@ -1,14 +1,22 @@
-from typing import Tuple
+from typing import Tuple, Sequence, Optional, Any
 
 import cv2 as cv
 import numpy as np
+import pandas as pd
+from dataclasses import dataclass
+from pandas import DataFrame as df
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtGui
+from pyqtgraph.Qt import QtGui, QtCore
 
+from Annotator.constants import TEMPLATE_COMP as TC
+from Annotator.params import ABParamGroup, ABParam, newParam
 from .parameditors import SCHEME_HOLDER
+from .clickables import ClickableScatterItem
 from ..constants import TEMPLATE_SCHEME_VALUES as SV
 from ..processing import splitListAtNans
 
+Signal = QtCore.pyqtSignal
+Slot = QtCore.pyqtSlot
 
 class VertexRegion(pg.ImageItem):
   def __init__(self, *args, **kwargs):
@@ -91,105 +99,125 @@ class SaveablePolyROI(pg.PolyLineROI):
     imgMask[roiSlices[0], roiSlices[1]] = roiMask
     return imgMask
 
-class MultiRegionPlot(pg.PlotDataItem):
-  def __init__(self, *args, **kargs):
-    super().__init__(*args, **kargs, connect='finite')
-    self.regions = []
-    self.ids = []
-    self._nanSep = np.empty((1,2))
-    self._nanSep.fill(np.nan)
+def _makeMultiRegionDf(numRows=1) -> df:
+  df_list = []
+  cols = [TC.VALIDATED, TC.VERTICES]
+  for _ in range(numRows):
+    # Make sure to construct a separate component instance for
+    # each row no objects have the same reference
+    df_list.append([field.value for field in cols])
+  # Ensure 'valid' is boolean
+  outDf = df(df_list, columns=cols)
+  outDf[TC.VALIDATED] = outDf[TC.VALIDATED].astype('bool')
+  return outDf
 
-  def resetRegionList(self, newIds=None, newRegions=None):
-    if newRegions is None:
-      newRegions = []
+def _makeTxtSymbol(txt: str, fontSize: int):
+  outSymbol = QtGui.QPainterPath()
+  txtLabel = QtGui.QFont("Sans Serif", fontSize)
+  txtLabel.setStyleStrategy(QtGui.QFont.PreferBitmap | QtGui.QFont.PreferQuality)
+  outSymbol.addText(0, 0, txtLabel, txt)
+  br = outSymbol.boundingRect()
+  scale = min(1. / br.width(), 1. / br.height())
+  tr = QtGui.QTransform()
+  tr.scale(scale, scale)
+  tr.translate(-br.x() - br.width()/2., -br.y() - br.height()/2.)
+  outSymbol = tr.map(outSymbol)
+  return outSymbol
+
+class MultiRegionPlot(QtCore.QObject):
+  sigIdClicked = Signal(int)
+  # Helper class for IDE assistance during dataframe access
+  def __init__(self, parent=None):
+    super().__init__(parent)
+    self.boundPlt = pg.PlotDataItem(connect='finite')
+    self.validIdPlt = ClickableScatterItem(pen=None)
+    self.nonValidIdPlt = ClickableScatterItem(pen=None)
+    for plt in self.validIdPlt, self.nonValidIdPlt:
+      plt.sigClicked.connect(self.scatPltClicked)
+    self._nanSep = np.empty((1,2)) * np.nan
+    self.data = _makeMultiRegionDf(0)
+
+  @Slot(object, object)
+  def scatPltClicked(self, plot, points):
+    # Only send click signal for one point in the list
+    self.sigIdClicked.emit(points[-1].data())
+
+  def resetRegionList(self, newIds: Optional[Sequence]=None, vertValidDf: Optional[df]=None):
     if newIds is None:
       newIds = []
-    self.regions = []
-    self.ids = []
-    self[newIds] = newRegions
+    if vertValidDf is None:
+      vertValidDf = _makeMultiRegionDf(0)
+    self.data = _makeMultiRegionDf(0)
+    self[newIds,:] = vertValidDf
 
   def updatePlot(self):
     # -----------
-    # Update data
-    # -----------
-    concatData = [], []
-    if len(self.regions) > 0:
-      # Before stacking regions, add first point of region to end of region vertices.
-      # This will make the whole region connected in the output plot
-      # Insert nan to make separate components unconnected
-      plotRegions = []
-      for region in self.regions:
-        region = np.vstack((region, region[0,:], self._nanSep))
-        plotRegions.append(region)
-      # We have regions to plot
-      concatData = np.vstack(plotRegions)
-      concatData = (concatData[:,0], concatData[:,1])
-
-    # -----------
     # Update scheme
     # -----------
-    boundClr, boundWidth = SCHEME_HOLDER.scheme.getCompProps(
-                             (SV.BOUNDARY_COLOR, SV.BOUNDARY_WIDTH))
-    pltPen = pg.mkPen(boundClr, width=boundWidth)
-    self.setData(*concatData, pen=pltPen)
+    validFill, nonValidFill = SCHEME_HOLDER.scheme.getCompProps(
+      [SV.VALID_ID_COLOR, SV.NONVALID_ID_COLOR]
+    )
+    boundClr, boundWidth, idSz = SCHEME_HOLDER.scheme.getCompProps(
+      (SV.BOUNDARY_COLOR, SV.BOUNDARY_WIDTH, SV.ID_FONT_SIZE))
 
-  def __getitem__(self, regionIds):
-    """
-    Allows retrieval of vertex list for a given id list
-    """
-    # Wrap single region instances in list to allow batch processing
-    returnSingle = False
-    if not hasattr(regionIds, '__iter__'):
-      returnSingle = True
-      regionIds = np.array([regionIds])
-    outList = np.empty(regionIds.size, dtype=object)
+    # -----------
+    # Update data
+    # -----------
+    validRegionIdxs = self.data.loc[:, TC.VALIDATED].to_numpy()
+    plotRegions = [np.ones((0,2))]
+    for regionIdxs, plt, pltFill in zip([validRegionIdxs, np.invert(validRegionIdxs)],
+                                        [self.validIdPlt, self.nonValidIdPlt],
+                                        [validFill, nonValidFill]):
+      curRegionList = self.data.loc[regionIdxs,TC.VERTICES]
+      curIdList = self.data.index[regionIdxs]
+      idLocs = [np.ones((0,2))]
+      for region in curRegionList:
+        idLoc = np.nanmean(region, 0).reshape(1,2)
+        idLocs.append(idLoc)
+        # Before stacking regions, add first point of region to end of region vertices.
+        # This will make the whole region connected in the output plot
+        # Insert nan to make separate components unconnected
+        region = np.vstack((region, region[0,:], self._nanSep))
+        plotRegions.append(region)
+      idLocs = np.vstack(idLocs)
+      # Now that the list for valid or invalid plot centers is complete, place them in
+      # the current plot
+      scatSymbols = [_makeTxtSymbol(str(curId), idSz) for curId in curIdList]
+      plt.setData(x=idLocs[:,0], y=idLocs[:,1], size=idSz, brush=pltFill, data=curIdList, symbol=scatSymbols)
 
-    for ii, curId in enumerate(regionIds):
-      try:
-        regionIdx = self.ids.index(curId)
-        # Found the region
-        outList[ii] = self.regions[regionIdx]
-      except ValueError:
-        # Requested ID was not in the displayed regions. Indicate with '[]'
-        outList[ii] = []
-    # Unwrap single value at end
-    if returnSingle:
-      outList = outList[0]
-    return outList
+    # Finally finished createing region boundaries to plot
+    plotRegions = np.vstack(plotRegions)
+    boundPen = pg.mkPen(color=boundClr, width=boundWidth)
+    self.boundPlt.setData(plotRegions[:,0], plotRegions[:,1], pen=boundPen)
 
-  def __setitem__(self, regionIds, newVerts):
+  def __getitem__(self, keys: Tuple[Any,...]):
     """
-    If the region already exists, update it. Otherwise, append to the list.
-    If region vertices are empty, remove the region
+    Allows retrieval of vertex/valid list for a given set of IDs
     """
-    if not hasattr(regionIds, '__iter__'):
-      regionIds = [regionIds]
-      newVerts = [newVerts]
-    elif len(newVerts) != len(regionIds):
-      # Same value for all specified region ids
-      newVerts = [newVerts for _ in regionIds]
-    regionIds = np.array(regionIds)
-    newVerts = np.array(newVerts)
+    return self.data.loc[keys[0], keys[1:]]
 
-    emptyVertIdxs = np.array([len(verts) == 0 for verts in newVerts], dtype=bool)
-    # If new verts are empty, delete the region
-    keepIds = regionIds[~emptyVertIdxs]
-    vertsAtKeepIds = newVerts[~emptyVertIdxs]
-    rmIds = regionIds[emptyVertIdxs]
-    for curId, curVerts in zip(keepIds, vertsAtKeepIds):
-      # Append if not already present in list
-      try:
-        idIdx = self.ids.index(curId)
-        self.regions[idIdx] = curVerts
-      except ValueError:
-        self.ids.append(curId)
-        self.regions.append(curVerts)
-    for curId in rmIds:
-      try:
-        idIdx = self.ids.index(curId)
-        del self.ids[idIdx]
-        del self.regions[idIdx]
-      except ValueError:
-        # The Id was initialized to empty before it was actually plotted
-        pass
+  def __setitem__(self, keys: Tuple, vals: Sequence):
+    if len(keys) == 2:
+      regionIds = keys[0]
+      setVals = keys[1]
+    else:
+      regionIds = keys[0]
+      setVals = keys[1:]
+    # First update old entries
+    newEntryIdxs = np.isin(regionIds, self.data.index, invert=True)
+    keysDf = _makeMultiRegionDf(len(regionIds))
+    keysDf = keysDf.set_index(regionIds)
+    # Since we are only resetting one parameter (either valid or regions),
+    # Make sure to keep the old parameter value for the unset index
+    keysDf.update(self.data)
+    keysDf.loc[regionIds, setVals] = vals
+    self.data.update(keysDf)
+
+    # Now we can add entries that weren't in our original dataframe
+    self.data = pd.concat((self.data, keysDf.loc[newEntryIdxs,:]))
+    # Make sure 'valid' is still bool after the operation
+    self.data[TC.VALIDATED] = self.data[TC.VALIDATED].astype('bool')
     self.updatePlot()
+
+  def drop(self, ids):
+    self.data.drop(index=ids, inplace=True)

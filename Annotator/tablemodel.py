@@ -23,11 +23,20 @@ def makeCompDf(numRows=1) -> df:
   This is the recommended method for component instantiation prior to table insertion.
   """
   df_list = []
+  dropRow = False
+  if numRows <= 0:
+    # Create one row and drop it, which ensures data types are correct in the empty
+    # dataframe
+    numRows = 1
+    dropRow = True
   for _ in range(numRows):
     # Make sure to construct a separate component instance for
     # each row no objects have the same reference
     df_list.append([field.value for field in CompParams()])
-  return df(df_list, columns=TC).set_index(TC.INST_ID, drop=False)
+  outDf = df(df_list, columns=TC).set_index(TC.INST_ID, drop=False)
+  if dropRow:
+    outDf = outDf.drop(index=TC.INST_ID.value)
+  return outDf
 
 class AddTypes(Enum):
   NEW: Enum = 'new'
@@ -48,8 +57,7 @@ class CompTableModel(QtCore.QAbstractTableModel):
     super().__init__()
     # Create component dataframe and remove created row. This is to
     # ensure datatypes are correct
-    self.compDf = makeCompDf()
-    self.compDf = self.compDf.drop(index=TC.INST_ID.value)
+    self.compDf = makeCompDf(0)
 
   # ------
   # Functions required to implement table model
