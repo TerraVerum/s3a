@@ -47,13 +47,6 @@ class Annotator(QtWidgets.QMainWindow):
     self.mainImg.setImage(startImgFpath)
 
     # ---------------
-    # LOAD LAYOUT OPTIONS
-    # ---------------
-    self.populateLoadLayoutOptions()
-    # Start with docks in default position
-    self.loadLayoutActionTriggered('Default')
-
-    # ---------------
     # COMPONENT MANAGER
     # ---------------
     self.compMgr = ComponentMgr()
@@ -67,7 +60,7 @@ class Annotator(QtWidgets.QMainWindow):
     # COMPONENT DISPLAY FILTER
     # ---------------
     # TODO: Add filter widget for displaying only part of component data
-    self.filterEditor = TableFilterEditor(self)
+    self.filterEditor = TableFilterEditor()
     self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl, self.filterEditor)
 
     self.mainImg.imgItem.sigImageChanged.connect(self.clearBoundaries)
@@ -76,7 +69,7 @@ class Annotator(QtWidgets.QMainWindow):
     # ---------------
     # LOAD REGION EDIT CONTROLS
     # ---------------
-    self.regCtrlEditor = RegionControlsEditor(self)
+    self.regCtrlEditor = RegionControlsEditor()
 
     # ---------------
     # SCHEME INIT
@@ -135,6 +128,13 @@ class Annotator(QtWidgets.QMainWindow):
       curObj.sigParamStateCreated.connect(populateFunc)
       # Initialize default menus
       populateFunc()
+
+    # ---------------
+    # LOAD LAYOUT OPTIONS
+    # ---------------
+    self.populateLoadLayoutOptions()
+    # Start with docks in default position
+    self.loadLayoutActionTriggered('Default')
 
   # -----------------------------
   # MainWindow CLASS FUNCTIONS
