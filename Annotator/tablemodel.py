@@ -144,6 +144,7 @@ class ComponentMgr(CompTableModel):
       # single number passed in
       idsToRemove = [idsToRemove]
       pass
+    idsToRemove = np.array(idsToRemove)
 
     # Do nothing for IDs not actually in the existing list
     idsActuallyRemoved = np.isin(idsToRemove, existingCompIds, assume_unique=True)
