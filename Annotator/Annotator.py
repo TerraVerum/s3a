@@ -238,6 +238,7 @@ class Annotator(QtWidgets.QMainWindow):
     modifiedComp = self.compImg.compSer
     self.compMgr.addComps(modifiedComp.to_frame().T, addtype=AddTypes.MERGE)
 
+  @disableAppDuringFunc
   def estimateBoundaries(self):
     compVertices = getVertsFromBwComps(getBwComps(self.mainImg.image))
     components = makeCompDf(len(compVertices))
