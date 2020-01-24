@@ -5,6 +5,7 @@ from enum import Enum
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
 import numpy as np
+import pandas as pd
 
 from ..constants import TEMPLATE_COMP
 from ..tablemodel import CompTableModel, ComponentMgr, AddTypes
@@ -71,11 +72,10 @@ class CompTableView(QtWidgets.QTableView):
                  dlg.Yes | dlg.Cancel)
     if confirm == dlg.Yes:
       # Proceed with operation
-      rowIdxs = [idx.row() for idx in self.selectedIndexes()]
+      idList = [idx.sibling(idx.row(), 0).data(QtCore.Qt.EditRole) for idx in self.selectedIndexes()]
       # Since each selection represents a row, remove duplicate row indices
-      rowIdxs = np.unique(rowIdxs)
-      xpondingIds = self.mgr.compDf.index[rowIdxs]
-      self.mgr.rmComps(xpondingIds)
+      idList = pd.unique(idList)
+      self.mgr.rmComps(idList)
       self.clearSelection()
 
   def overwriteTriggered(self):
@@ -87,18 +87,19 @@ class CompTableView(QtWidgets.QTableView):
     if confirm != dlg.Yes:
       return
     selectedIdxs = self.selectedIndexes()
-    rowIdxs = []
+    idList = []
     colIdxs = []
     for idx in selectedIdxs:
-      rowIdxs.append(idx.row())
+      idAtIdx = idx.sibling(idx.row(), 0).data(QtCore.Qt.EditRole)
+      idList.append(idAtIdx)
       colIdxs.append(idx.column())
-    rowIdxs = np.unique(rowIdxs)
-    colIdxs = np.unique(colIdxs)
-    if len(rowIdxs) <= 1:
+    idList = pd.unique(idList)
+    colIdxs = pd.unique(colIdxs)
+    if len(idList) <= 1:
       return
-    toOverwrite = self.mgr.compDf.iloc[rowIdxs].copy()
+    toOverwrite = self.mgr.compDf.loc[idList].copy()
     # Some bug is preventing the single assignment value from broadcasting
-    setVals = [toOverwrite.iloc[0,colIdxs] for _ in range(len(rowIdxs)-1)]
+    setVals = [toOverwrite.iloc[0,colIdxs] for _ in range(len(idList)-1)]
     toOverwrite.iloc[1:, colIdxs] = setVals
     self.mgr.addComps(toOverwrite, addtype=AddTypes.MERGE)
     self.clearSelection()
