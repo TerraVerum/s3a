@@ -64,11 +64,6 @@ class CompDisplayFilter(QtCore.QObject):
 
     self._regionPlots = MultiRegionPlot()
     self._displayedIds = np.array([], dtype=int)
-    # Keep copy of old id plots to delete when they are removed from compMgr
-    # No need to keep vertices, since deleted vertices are handled by the
-    # MultiRegionPlot and table rows will still have the associated ID
-    self._oldPlotsDf = df(columns=['idPlot'])
-    self._oldPlotsDf.index.set_names([TC.INST_ID], inplace=True)
 
     for plt in self._regionPlots.validIdPlt, self._regionPlots.nonValidIdPlt, \
                self._regionPlots.boundPlt:
@@ -84,35 +79,32 @@ class CompDisplayFilter(QtCore.QObject):
     # operation
     compDf = self._compMgr.compDf
 
-    # For new components: Nothing to do, since display IDs will determine new plots
-    #addedIds = idLists['added']
+    # Update and add changed/new components
+    # TODO: Find out why this isn't working. For now, just reset the whole comp list
+    #  each time components are changed, since the overhead isn't too terrible.
+    regCols = (TC.VERTICES, TC.VALIDATED)
+    # changedIds = np.concatenate((idLists['added'], idLists['changed']))
+    # self._regionPlots[changedIds, regCols] = compDf.loc[changedIds, regCols]
 
-    # Hide all other ids and table rows, since they will be reshown as needed after display filtering
-    for rowIdx, plt in enumerate(self._oldPlotsDf['idPlot']):
-      plt.hide()
+    # Hide all ids and table rows, since they will be reshown as needed after display filtering
+    for rowIdx in range(len(compDf)):
       self._compTbl.hideRow(rowIdx)
 
-
-    # Component deleted: Nothing to do since display IDs will overwrite plots anyway
+    # Component deleted: Nothing to do, since only displayed IDs will remain in the
+    # region manager anyway
     #idsToRm = idLists['deleted']
 
-    # Component changed: update text plot
-    # No need to update regions, since the whole list is reset at the end of
-    # this function
-    #idsToChange = idLists['changed']
-
-    # Update filter list: hide/unhide ids and verts as needed. This should occur in other
-    # functions that hook into signals sent from filter widget
-    # Only plot shown vertices
+    # Update filter list: hide/unhide ids and verts as needed.
     self._populateDisplayedIds()
+    # Remove all IDs that aren't displayed
+    # FIXME: This isn't working correctly at the moment
+    # self._regionPlots.drop(np.setdiff1d(self._regionPlots.data.index, self._displayedIds))
+    displayVertsValids = compDf.loc[self._displayedIds, regCols]
+    self._regionPlots.resetRegionList(self._displayedIds, displayVertsValids)
 
-    #pltsToShow = self._oldPlotsDf.loc[self._displayedIds, 'idPlot']
     tblIdxsToShow = np.nonzero(np.in1d(compDf.index, self._displayedIds))[0]
     for rowIdx in tblIdxsToShow:
       self._compTbl.showRow(rowIdx)
-
-    vertValidDf = compDf.loc[self._displayedIds, (TC.VERTICES, TC.VALIDATED)]
-    self._regionPlots.resetRegionList(self._displayedIds, vertValidDf)
 
   def _updateFilter(self, newFilterDict):
     self._filter = newFilterDict

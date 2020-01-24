@@ -139,7 +139,7 @@ class ComponentMgr(CompTableModel):
     self.layoutChanged.emit()
 
 
-    self._nextCompId = np.max(self.compDf.index) + 1
+    self._nextCompId = np.max(self.compDf.index.to_numpy()) + 1
     self.sigCompsChanged.emit(toEmit)
 
   def rmComps(self, idsToRemove: Union[np.array, str] = 'all', emitChange=True) -> Optional[dict]:
