@@ -5,6 +5,7 @@ import sys
 from ast import literal_eval
 from enum import Enum
 from typing import Union, Any, Optional
+from functools import wraps
 
 import numpy as np
 import pandas as pd
@@ -38,6 +39,21 @@ def makeCompDf(numRows=1) -> df:
     outDf = outDf.drop(index=TC.INST_ID.value)
   return outDf
 
+def _coerceTypes(func) -> df:
+  """
+  Pandas currently has a bug where datatypes are not preserved after update operations.
+  Current workaround is to coerce all types to their original values after each operation
+  """
+  @wraps(func)
+  def doCoercion(self, *args, **kwargs):
+    try:
+      return func(self, *args, **kwargs)
+    finally:
+      origTypes = makeCompDf(0).dtypes
+      for col, origType in zip(self.compDf, origTypes):
+        self.compDf[col] = self.compDf[col].astype(origType)
+  return doCoercion
+
 class AddTypes(Enum):
   NEW: Enum = 'new'
   MERGE: Enum = 'merge'
@@ -52,6 +68,9 @@ class CompTableModel(QtCore.QAbstractTableModel):
   # Emits 3-element dict: Deleted comp ids, changed comp ids, added comp ids
   defaultEmitDict = {'deleted': np.array([]), 'changed': np.array([]), 'added': np.array([])}
   sigCompsChanged = Signal(dict)
+
+  # Used for efficient deletion, where deleting non-contiguous rows takes 1 operation
+  # Instead of N operations
 
   def __init__(self):
     super().__init__()
@@ -72,7 +91,7 @@ class CompTableModel(QtCore.QAbstractTableModel):
     if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
       return self.colTitles[section]
 
-  def data(self, index, role=QtCore.Qt.DisplayRole):
+  def data(self, index: QtCore.QModelIndex, role: int) -> Any:
     outData = self.compDf.iloc[index.row(), index.column()]
     if role == QtCore.Qt.DisplayRole:
       return str(outData)
@@ -81,20 +100,20 @@ class CompTableModel(QtCore.QAbstractTableModel):
     else:
       return None
 
-  def setData(self, index, value, role=QtCore.Qt.EditRole):
+  def setData(self, index, value, role=QtCore.Qt.EditRole) -> bool:
     self.compDf.iloc[index.row(), index.column()] = value
     toEmit = self.defaultEmitDict.copy()
     toEmit['changed'] = np.array([self.compDf.index[index.row()]])
     self.sigCompsChanged.emit(toEmit)
     return True
 
-  def flags(self, index: QtCore.QModelIndex):
+  def flags(self, index: QtCore.QModelIndex) -> QtCore.Qt.ItemFlags:
     noEditColIdxs = [self.colTitles.index(col.name)for col in
                      [TC.INST_ID, TC.VERTICES]]
     if index.column() not in noEditColIdxs:
       return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable
     else:
-      return QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled
+      return QtCore.Qt.ItemIsEnabled
 
 class ComponentMgr(CompTableModel):
   _nextCompId = 0
@@ -102,6 +121,7 @@ class ComponentMgr(CompTableModel):
   def __init__(self):
     super().__init__()
 
+  @_coerceTypes
   def addComps(self, newCompsDf: df, addtype: AddTypes = AddTypes.NEW):
     toEmit = self.defaultEmitDict.copy()
     existingIds = self.compDf.index
@@ -142,7 +162,8 @@ class ComponentMgr(CompTableModel):
     self._nextCompId = np.max(self.compDf.index.to_numpy()) + 1
     self.sigCompsChanged.emit(toEmit)
 
-  def rmComps(self, idsToRemove: Union[np.array, str] = 'all', emitChange=True) -> Optional[dict]:
+  @_coerceTypes
+  def rmComps(self, idsToRemove: Union[np.array, str] = 'all', emitChange=True) -> dict:
     toEmit = self.defaultEmitDict.copy()
     # Generate ID list
     existingCompIds = self.compDf.index

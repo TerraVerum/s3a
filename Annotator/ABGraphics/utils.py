@@ -36,7 +36,7 @@ def disableAppDuringFunc(func):
       return func(*args, **kwargs)
     finally:
       mainWin.setEnabled(True)
-    return disableApp
+  return disableApp
 
 def popupFilePicker(parent, winTitle: str, fileFilter: str) -> Optional[str]:
   retVal = None
