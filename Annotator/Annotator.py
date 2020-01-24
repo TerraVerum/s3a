@@ -13,7 +13,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
 from .ABGraphics.parameditors import ConstParamWidget, TableFilterEditor, \
   RegionControlsEditor, SCHEME_HOLDER
 from .ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
-  attemptLoadSettings, popupFilePicker
+  attemptLoadSettings, popupFilePicker, disableAppDuringFunc
 from .CompDisplayFilter import CompDisplayFilter, CompSortFilter
 from .constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
 from .constants import TEMPLATE_REG_CTRLS as REG_CTRLS
@@ -37,7 +37,7 @@ class Annotator(QtWidgets.QMainWindow):
     uiFile = os.path.join(uiPath, 'imgAnnotator.ui')
     baseModule = str(self.__module__).split('.')[0]
     uic.loadUi(uiFile, self, baseModule)
-    # Start off as a hidden window, force user to show()
+    self.setStatusBar(QtWidgets.QStatusBar())
 
     # Flesh out pg components
     # ---------------
@@ -156,6 +156,7 @@ class Annotator(QtWidgets.QMainWindow):
     fname = popupFilePicker(self, 'Select Main Image', fileFilter)
 
     if fname is not None:
+      self.compMgr.rmComps()
       self.mainImg.setImage(fname)
       if self.regCtrlEditor[REG_CTRLS.EST_BOUNDS_ON_START].value():
         self.estimateBoundaries()
@@ -237,7 +238,6 @@ class Annotator(QtWidgets.QMainWindow):
     modifiedComp = self.compImg.compSer
     self.compMgr.addComps(modifiedComp.to_frame().T, addtype=AddTypes.MERGE)
 
-  @applyWaitCursor
   def estimateBoundaries(self):
     compVertices = getVertsFromBwComps(getBwComps(self.mainImg.image))
     components = makeCompDf(len(compVertices))

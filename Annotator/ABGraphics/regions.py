@@ -182,7 +182,10 @@ class MultiRegionPlot(QtCore.QObject):
       idLocs = np.vstack(idLocs)
       # Now that the list for valid or invalid plot centers is complete, place them in
       # the current plot
-      scatSymbols = [_makeTxtSymbol(str(curId), idSz) for curId in curIdList]
+      # TODO: If the 'development' branch of pyqtgraph is set up, the clickable portion of each
+      # plot will be the ID of the component. Otherwise it must be a non-descript item.
+      #scatSymbols = [_makeTxtSymbol(str(curId), idSz) for curId in curIdList]
+      scatSymbols = [None for curId in curIdList]
       plt.setData(x=idLocs[:,0], y=idLocs[:,1], size=idSz, brush=pltFill, data=curIdList, symbol=scatSymbols)
 
     # Finally finished createing region boundaries to plot
@@ -197,7 +200,11 @@ class MultiRegionPlot(QtCore.QObject):
     return self.data.loc[keys[0], keys[1:]]
 
   def __setitem__(self, keys: Tuple, vals: Sequence):
-    if len(keys) == 2:
+    if not isinstance(keys, tuple):
+      # Only one key passed, assume ID
+      regionIds = keys
+      setVals = slice(None)
+    elif len(keys) == 2:
       regionIds = keys[0]
       setVals = keys[1]
     else:

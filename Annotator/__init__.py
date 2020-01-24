@@ -1,8 +1,5 @@
 import sys
 
-# Shadow pip pg with development branch that fixes some pyqtgraph errors
-sys.path.append('./pyqtgraph')
-
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 
