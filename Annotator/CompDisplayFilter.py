@@ -185,13 +185,6 @@ class CompDisplayFilter(QtCore.QObject):
   def resetCompBounds(self):
     self._regionPlots.resetRegionList()
 
-  def _createIdPlot(self, instId, verts, validated):
-    idPlot = ClickableTextItem()
-    idPlot.sigClicked.connect(self.handleCompClick)
-    idPlot.update(str(instId), verts, validated)
-    self._mainImgArea.addItem(idPlot)
-    return idPlot
-
   @Slot(int)
   def handleCompClick(self, clickedId=None):
     idRow = np.nonzero(self._compMgr.compDf.index == clickedId)[0][0]

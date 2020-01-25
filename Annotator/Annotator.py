@@ -292,10 +292,9 @@ class Annotator(QtWidgets.QMainWindow):
     Forms a box with a center at the clicked location, and passes the box
     edges as vertices for a new component.
     """
-    neededParams = [REG_CTRLS.MAIN_IMG_PARAMS, (REG_CTRLS.NEW_COMP_SZ, REG_CTRLS.SEED_THRESH,
-                    REG_CTRLS.SEG_THRESH, REG_CTRLS.MIN_COMP_SZ)]
-    sideLen, seedThresh, segThresh, minSz = \
-      [param.value() for param in self.regCtrlEditor[neededParams]]
+    neededParams = (REG_CTRLS.NEW_COMP_SZ, REG_CTRLS.NEW_SEED_THRESH, REG_CTRLS.MIN_COMP_SZ)
+    sideLen, seedThresh, minSz = \
+      [param.value() for param in self.regCtrlEditor[REG_CTRLS.MAIN_IMG_PARAMS, neededParams]]
     vertBox = np.vstack((xyCoord, xyCoord))
     vertBox = getClippedBbox(self.mainImg.image.shape, vertBox, sideLen)
     miniImg = self.mainImg.image[
@@ -304,7 +303,7 @@ class Annotator(QtWidgets.QMainWindow):
     # Account for mini img offset and x-y -> row-col
     xyCoord = xyCoord[::-1]
     xyCoord -= vertBox[0,:]
-    bwCompMask = growSeedpoint(miniImg, xyCoord, minSz)
+    bwCompMask = growSeedpoint(miniImg, xyCoord, seedThresh, minSz)
 
     # Invert the mask to get what the component actually will be
     compVerts = getVertsFromBwComps(bwCompMask)
