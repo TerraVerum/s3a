@@ -191,6 +191,9 @@ def growBoundarySeeds(img: np.ndarray, seedThresh: float, minSz: int,
   bwBgSeedGrow = growSeedpoint(img, seeds, seedThresh, 0)
   bwOut = ~bwBgSeedGrow
 
+  # Merge sparsely connected regions
+  bwOut = closing(bwOut, np.ones((3,3), dtype=bool))
+
   # For now, just keep the largest component
   regions = regionprops(label(bwOut))
   if len(regions) > 0:

@@ -4,7 +4,7 @@ import re
 import sys
 from ast import literal_eval
 from enum import Enum
-from typing import Union, Any, Optional
+from typing import Union, Any, Optional, Sequence
 from functools import wraps
 
 import numpy as np
@@ -54,9 +54,10 @@ def _coerceTypes(func) -> df:
         self.compDf[col] = self.compDf[col].astype(origType)
   return doCoercion
 
-class AddTypes(Enum):
-  NEW: Enum = 'new'
-  MERGE: Enum = 'merge'
+class ModelOpts(Enum):
+  ADD_AS_NEW      : Enum = 'new'
+  ADD_AS_MERGE    : Enum = 'merge'
+  EXPORT_ALL      : Enum = 'export all components'
 
 class CsvIOError(Exception):
   def __init__(self, message):
@@ -122,7 +123,7 @@ class ComponentMgr(CompTableModel):
     super().__init__()
 
   @_coerceTypes
-  def addComps(self, newCompsDf: df, addtype: AddTypes = AddTypes.NEW):
+  def addComps(self, newCompsDf: df, addtype: ModelOpts = ModelOpts.ADD_AS_NEW):
     toEmit = self.defaultEmitDict.copy()
     existingIds = self.compDf.index
 
@@ -133,7 +134,7 @@ class ComponentMgr(CompTableModel):
     # Inform graphics elements of deletion if this ID is already in our dataframe
     toEmit.update(self.rmComps(dropIds, emitChange=False))
 
-    if addtype == AddTypes.NEW:
+    if addtype == ModelOpts.ADD_AS_NEW:
       # Treat all comps as new -> set their IDs to guaranteed new values
       newIds = np.arange(self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int)
       newCompsDf.loc[:,TC.INST_ID] = newIds
@@ -197,11 +198,15 @@ class ComponentMgr(CompTableModel):
       self.sigCompsChanged.emit(toEmit)
     return toEmit
 
-  def csvExport(self, outFile: str, **pdExportArgs) -> bool:
+  def csvExport(self, outFile: str,
+                exportIds:Union[ModelOpts, Sequence] = ModelOpts.EXPORT_ALL,
+                **pdExportArgs) \
+      -> bool:
     """
     Serializes the table data and returns the success or failure of the operation.
 
     :param outFile: Name of the output file location
+    :param exportIds: If :var:`ModelOpts.EXPORT_ALL`,
     :param pdExportArgs: Dictionary of values passed to underlying pandas export function.
            These will overwrite the default options for :func:`exportToFile
            <ComponentMgr.exportToFile>`
@@ -223,7 +228,11 @@ class ComponentMgr(CompTableModel):
       #  them, since this may be useful if it can be modified
       # TODO: Add some comment to the top of the CSV or some extra text file output with additional metrics
       #  about the export, like time, who did it, what image it was from, etc.
-      self.compDf.to_csv(outFile, index=False)
+      if isinstance(exportIds, ModelOpts) and exportIds == ModelOpts.EXPORT_ALL:
+        exportDf = self.compDf
+      else:
+        exportDf = self.compDf.loc[exportIds,:]
+      exportDf.to_csv(outFile, index=False)
       success = True
     except IOError:
       # success is already false
@@ -233,9 +242,9 @@ class ComponentMgr(CompTableModel):
       # False positive checker warning for some reason
       # noinspection PyTypeChecker
       np.set_printoptions(oldNpOpts)
-      return success
+    return success
 
-  def csvImport(self, inFile: str, loadType=AddTypes.NEW,
+  def csvImport(self, inFile: str, loadType=ModelOpts.ADD_AS_NEW,
                 imShape: Optional[tuple]=None) -> Optional[Exception]:
     """
     Deserializes data from a csv file to create a Component :class:`DataFrame`.

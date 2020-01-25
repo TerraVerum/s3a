@@ -23,6 +23,7 @@ class MainImageArea(pg.PlotWidget):
     self.allowNewComps = True
 
     self.setAspectLocked(True)
+    self.getViewBox().invertY()
     # -----
     # Image Item
     # -----
@@ -63,6 +64,7 @@ class FocusedComp(pg.PlotWidget):
     self.drawType = 'seedpoint'
 
     self.setAspectLocked(True)
+    self.getViewBox().invertY()
 
     self.compSer = makeCompDf().squeeze()
     self.deletedPrevComponent = False
