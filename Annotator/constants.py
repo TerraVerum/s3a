@@ -86,11 +86,16 @@ TEMPLATE_SCHEME_VALUES = SchemeValues()
 
 @dataclass
 class RegionControlsEditorValues(ABParamGroup):
-  MARGIN              : ABParam = newParam('Margin')
-  SEG_THRESH          : ABParam = newParam('Segmentation Threshold')
-  SEED_THRESH         : ABParam = newParam('Seedpoint Mean Threshold')
-  NEW_COMP_SZ         : ABParam = newParam('New Component Size')
+  MAIN_IMG_PARAMS     : ABParam = newParam('Main Image Region Parameters')
+  NEW_SEED_THRESH     : ABParam = newParam('Seedpoint threshold in main image')
+  MIN_COMP_SZ         : ABParam = newParam('Minimum New Component Size (px)')
+  NEW_COMP_SZ         : ABParam = newParam('New Component Size (px^2)')
   EST_BOUNDS_ON_START : ABParam = newParam('Estimate Boundaries on Image Load')
+
+  FOCUSED_IMG_PARAMS  : ABParam = newParam('Focused Component Region Parameters')
+  SEG_THRESH          : ABParam = newParam('Segmentation Threshold')
+  MARGIN              : ABParam = newParam('Margin')
+  SEED_THRESH         : ABParam = newParam('Seedpoint Mean Threshold')
 TEMPLATE_REG_CTRLS = RegionControlsEditorValues()
 
 if __name__ == '__main__':

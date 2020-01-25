@@ -169,6 +169,8 @@ class CompDisplayFilter(QtCore.QObject):
     xmin, xmax, ymin, ymax = [param[val][0] for param in (xParam, yParam) for val in ['min', 'max']]
 
     for vertIdx, verts in enumerate(compVerts):
+      # Remove nan values for computation
+      verts = verts[~np.isnan(verts[:,0]),:]
       xVerts = verts[:,0]
       yVerts = verts[:,1]
       isAllowed = np.all((xVerts >= xmin) & (xVerts <= xmax)) & \
@@ -193,9 +195,12 @@ class CompDisplayFilter(QtCore.QObject):
   @Slot(int)
   def handleCompClick(self, clickedId=None):
     idRow = np.nonzero(self._compMgr.compDf.index == clickedId)[0][0]
+    # Map this ID to its sorted position in the list
+    sortModel = self._compTbl.model()
+    idxForId = sortModel.mapToSource(sortModel.index(idRow, 0))
     # When the ID is selected, scroll to that row and highlight the ID
-    self._compTbl.scrollTo(self._compMgr.index(idRow, 0), self._compTbl.PositionAtCenter)
-    self._compTbl.selectRow(idRow)
+    self._compTbl.scrollTo(idxForId, self._compTbl.PositionAtCenter)
+    self._compTbl.selectRow(idxForId.row())
     self._compTbl.setFocus()
     # noinspection PyTypeChecker
     self.sigCompClicked.emit(self._compMgr.compDf.loc[clickedId,:])

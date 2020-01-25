@@ -17,7 +17,8 @@ from .ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMe
 from .CompDisplayFilter import CompDisplayFilter, CompSortFilter
 from .constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
 from .constants import TEMPLATE_REG_CTRLS as REG_CTRLS
-from .processing import getBwComps, getVertsFromBwComps, getClippedBbox
+from .processing import getBwComps, getVertsFromBwComps, getClippedBbox, growSeedpoint,\
+  growBoundarySeeds, nanConcatList
 from .tablemodel import ComponentMgr as ComponentMgr, AddTypes
 from .tablemodel import makeCompDf
 
@@ -96,14 +97,14 @@ class Annotator(QtWidgets.QMainWindow):
 
 
     # Edit fields
-    sig = self.regCtrlEditor[REG_CTRLS.SEED_THRESH].sigValueChanged
+    sig = self.regCtrlEditor[REG_CTRLS.FOCUSED_IMG_PARAMS, REG_CTRLS.SEED_THRESH].sigValueChanged
     sig.connect(self.seedThreshChanged)
     # Note: This signal must be false-triggered on startup to propagate
     # the field's initial value
     sig.emit(None, None)
     # Same with estimating boundaries
     if startImgFpath is not None \
-       and self.regCtrlEditor[REG_CTRLS.EST_BOUNDS_ON_START].value():
+       and self.regCtrlEditor[REG_CTRLS.MAIN_IMG_PARAMS, REG_CTRLS.EST_BOUNDS_ON_START].value():
       self.estimateBoundaries()
 
     # Menu options
@@ -158,7 +159,7 @@ class Annotator(QtWidgets.QMainWindow):
     if fname is not None:
       self.compMgr.rmComps()
       self.mainImg.setImage(fname)
-      if self.regCtrlEditor[REG_CTRLS.EST_BOUNDS_ON_START].value():
+      if self.regCtrlEditor[REG_CTRLS.MAIN_IMG_PARAMS, REG_CTRLS.EST_BOUNDS_ON_START].value():
         self.estimateBoundaries()
 
   def populateLoadLayoutOptions(self):
@@ -278,7 +279,8 @@ class Annotator(QtWidgets.QMainWindow):
   # ---------------
   @Slot()
   def seedThreshChanged(self):
-    self.compImg.seedThresh = self.regCtrlEditor[REG_CTRLS.SEED_THRESH].value()
+    self.compImg.seedThresh = self.regCtrlEditor[REG_CTRLS.FOCUSED_IMG_PARAMS,
+                                                 REG_CTRLS.SEED_THRESH].value()
 
 
   # ---------------
@@ -290,18 +292,27 @@ class Annotator(QtWidgets.QMainWindow):
     Forms a box with a center at the clicked location, and passes the box
     edges as vertices for a new component.
     """
-    sideLen = self.regCtrlEditor[REG_CTRLS.NEW_COMP_SZ].value()
+    neededParams = [REG_CTRLS.MAIN_IMG_PARAMS, (REG_CTRLS.NEW_COMP_SZ, REG_CTRLS.SEED_THRESH,
+                    REG_CTRLS.SEG_THRESH, REG_CTRLS.MIN_COMP_SZ)]
+    sideLen, seedThresh, segThresh, minSz = \
+      [param.value() for param in self.regCtrlEditor[neededParams]]
     vertBox = np.vstack((xyCoord, xyCoord))
     vertBox = getClippedBbox(self.mainImg.image.shape, vertBox, sideLen)
-    # Create square from bounding box
-    compVerts = [
-      [vertBox[0, 0], vertBox[0, 1]],
-      [vertBox[1, 0], vertBox[0, 1]],
-      [vertBox[1, 0], vertBox[1, 1]],
-      [vertBox[0, 0], vertBox[1, 1]]
+    miniImg = self.mainImg.image[
+      vertBox[0,1]:vertBox[1,1], vertBox[0,0]:vertBox[1,0],:
     ]
-    compVerts = np.vstack(compVerts)
+    # Account for mini img offset and x-y -> row-col
+    xyCoord = xyCoord[::-1]
+    xyCoord -= vertBox[0,:]
+    bwCompMask = growSeedpoint(miniImg, xyCoord, minSz)
 
+    # Invert the mask to get what the component actually will be
+    compVerts = getVertsFromBwComps(bwCompMask)
+    # Turn list-of-lists into plottable, nan-separated vertices
+    # Reverse for row-col -> x-y
+    compVerts = nanConcatList(compVerts)
+    # Make sure the vertices are translated to the appropriate coordinates
+    compVerts += vertBox[0,:]
     newComp = makeCompDf()
     newComp[TC.VERTICES] = [compVerts]
     self.compMgr.addComps(newComp)
@@ -311,8 +322,9 @@ class Annotator(QtWidgets.QMainWindow):
   @applyWaitCursor
   def updateCurComp(self, newComp: df):
     mainImg = self.mainImg.image
-    margin = self.regCtrlEditor[REG_CTRLS.MARGIN].value()
-    segThresh = self.regCtrlEditor[REG_CTRLS.SEG_THRESH].value()
+    neededParams = [REG_CTRLS.MARGIN, REG_CTRLS.SEG_THRESH]
+    margin, segThresh = [param.value() for param in
+              self.regCtrlEditor[REG_CTRLS.FOCUSED_IMG_PARAMS, neededParams]]
     prevComp = self.compImg.compSer
     rmPrevComp = self.compImg.updateAll(mainImg, newComp, margin, segThresh)
     # If all old vertices were deleted AND we switched images, signal deletion

@@ -36,11 +36,11 @@ class VertexRegion(pg.ImageItem):
 
     # cv.fillPoly requires list-of-lists format
     fillPolyArg = splitListAtNans(newVerts)
-    newImgShape = (np.nanmax(newVerts, 0)+1)[::-1]
+    nonNanVerts = newVerts[np.invert(np.isnan(newVerts[:,0])),:].astype(int)
+    newImgShape = (np.max(newVerts, 0)+1)[::-1]
     regionData = np.zeros(newImgShape, dtype='uint8')
     cv.fillPoly(regionData, fillPolyArg, 1)
     # Make vertices full brightness
-    nonNanVerts = newVerts[np.invert(np.isnan(newVerts[:,0])),:]
     regionData[nonNanVerts[:,1], nonNanVerts[:,0]] = 2
     self.setImage(regionData, levels=[0,2], lut=self.getLUTFromScheme())
     self.setPos(*self._offset)
@@ -55,7 +55,9 @@ class VertexRegion(pg.ImageItem):
 
   @staticmethod
   def getLUTFromScheme():
-    fillClr, vertClr = SCHEME_HOLDER.scheme.getFocImgProps((SV.REG_FILL_COLOR, SV.REG_VERT_COLOR))
+    params = SCHEME_HOLDER.scheme[SV.FOC_IMG_PARAMS, (SV.REG_FILL_COLOR, SV.REG_VERT_COLOR)]
+    fillClr, vertClr = [param.value() for param in params]
+
     lut = [(0,0,0,0)]
     for clr in fillClr, vertClr:
       lut.append(clr.getRgb())
@@ -154,11 +156,10 @@ class MultiRegionPlot(QtCore.QObject):
     # -----------
     # Update scheme
     # -----------
-    validFill, nonValidFill = SCHEME_HOLDER.scheme.getCompProps(
-      [SV.VALID_ID_COLOR, SV.NONVALID_ID_COLOR]
-    )
-    boundClr, boundWidth, idSz = SCHEME_HOLDER.scheme.getCompProps(
-      (SV.BOUNDARY_COLOR, SV.BOUNDARY_WIDTH, SV.ID_FONT_SIZE))
+    neededParams = (SV.VALID_ID_COLOR, SV.NONVALID_ID_COLOR,
+                    SV.BOUNDARY_COLOR, SV.BOUNDARY_WIDTH, SV.ID_FONT_SIZE)
+    validFill, nonValidFill, boundClr, boundWidth, idSz = [
+    param.value() for param in SCHEME_HOLDER.scheme[SV.COMP_PARAMS, neededParams]]
 
     # -----------
     # Update data

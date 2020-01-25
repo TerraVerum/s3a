@@ -65,18 +65,45 @@ def getVertsFromBwComps(bwmask: np.array, simplifyVerts=True) -> np.array:
   approxMethod = cv.CHAIN_APPROX_SIMPLE
   if not simplifyVerts:
     approxMethod = cv.CHAIN_APPROX_NONE
-  contours, _ = cv.findContours(bwmask.astype('uint8'), cv.RETR_TREE, approxMethod)
+  # Contours are on the inside of components, so dilate first to make sure they are on the
+  # outside
+  #bwmask = dilation(bwmask, np.ones((3,3), dtype=bool))
+  contours, _ = cv.findContours(bwmask.astype('uint8'), cv.RETR_EXTERNAL, approxMethod)
   compVertices = []
   for contour in contours:
     compVertices.append(contour[:,0,:])
   return compVertices
 
 def segmentComp(compImg: np.array, maxDist: np.float, kernSz=10) -> np.array:
+  # For maxDist of 0, the input isn't changed and it takes a long time
+  if maxDist < 1:
+    return compImg
   segImg = quickshift(compImg, kernel_size=kernSz, max_dist=maxDist)
   # Color segmented image with mean values
   return colorLabelsWithMean(segImg, compImg)
 
-def growSeedpoint(img: np.array, seeds: np.array, thresh: float) -> np.array:
+def rmSmallComps(bwMask: np.ndarray, minSz: int=0) -> np.ndarray:
+  """
+  Removes components smaller than :param:`minSz` from the input mask.
+
+  :param bwMask: Input mask
+  :param minSz: Minimum individual component size allowed. That is, regions smaller
+        than :param:`minSz` connected pixels will be removed from the output.
+  :return: output mask without small components
+  """
+  # make sure we don't modify the input data
+  bwMask = bwMask.copy()
+  if minSz < 1:
+    return bwMask
+  regions = regionprops(label(bwMask))
+  for region in regions:
+    if region.area < minSz:
+      coords = region.coords
+      bwMask[coords[:, 0], coords[:, 1]] = False
+  return bwMask
+
+def growSeedpoint(img: np.array, seeds: np.array, thresh: float, minSz: int=0) -> \
+    np.array:
   """
   Starting from *seed*, fills each connected pixel if the difference between
   neighboring pixels and the current component is less than *thresh*.
@@ -85,20 +112,21 @@ def growSeedpoint(img: np.array, seeds: np.array, thresh: float) -> np.array:
   function. I.e. if multiple seeds are specified, they are assumed to belong
   to the same label.
 
-  Parameters
-  ----------
-  img :    MxNxChan
+  :param img:    MxNxChan
     Input image
 
-  seeds :  Mx2 np array
+  :param seeds:  Mx2 np array
     Contains locations in output mask that are 'on'
     at the start of the algorithm. Pixels connected to these are
     iteratively added to the components if their intensities are
     close enough to each seed component.
 
-  thresh : float
+  :param thresh: float
     Threshold between component and neighbors. If neighbor pixels
     are below this value, they are added to the seed component.
+
+  :param minSz: Minimum individual component size allowed. That is, regions smaller
+    than :param:`minSz` connected pixels will be removed from the output.
   """
   bwOut = np.zeros(img.shape[0:2], dtype=bool)
   nChans = img.shape[2] if len(img.shape) > 2 else 1
@@ -125,7 +153,56 @@ def growSeedpoint(img: np.array, seeds: np.array, thresh: float) -> np.array:
       newBwOut = bwOut | neighbors
       changed = np.any(newBwOut != bwOut)
       bwOut = newBwOut
-  return bwOut
+  # Remove components smaller than minSz
+  return rmSmallComps(bwOut, minSz)
+
+def growBoundarySeeds(img: np.ndarray, seedThresh: float, minSz: int,
+                      segThresh: float=0, useAllBounds=False) -> np.ndarray:
+  """
+  Treats all border pixels of :param:`img` as seedpoints for growing. Once these are
+  grown, all regions are united, and the inverse area is returned. This has the effect
+  of thinning the boundary around a component to only return the component itself.
+
+  :param img: See :func:`growSeedpoint` *img* param.
+
+  :param seedThresh: See :func:`growSeedpoint` *thresh* param.
+
+  :param minSz: See :func:`growSeedpoint` *minSz* param.
+
+  :param useAllBounds: Whether the function should consider every single boundary pixel
+    as a seed. This can lead to very poor performance for large components.
+
+  :return: Mask without any regoions formed from border pixels.
+  """
+  img = segmentComp(img, seedThresh)
+  nrows, ncols, *_ = img.shape
+  maxRow, maxCol = nrows-1, ncols-1
+  if useAllBounds:
+    seedRows = np.concatenate([np.repeat(0, maxCol), np.repeat(maxRow, maxCol),
+                np.arange(nrows, dtype=int), np.arange(nrows, dtype=int)])
+    seedCols = np.concatenate([np.arange(ncols, dtype=int), np.arange(ncols, dtype=int),
+                np.repeat(0, maxRow), np.repeat(maxCol, maxRow)])
+    seeds = np.hstack((seedRows[:,None], seedCols[:,None]))
+  else:
+    # Just use image corners
+    seeds = np.array([[0,0], [0, maxCol], [maxRow, 0], [maxRow, maxCol]])
+  # Since these are background components, we don't want to remove small components until
+  # after inverting the mask
+  bwBgSeedGrow = growSeedpoint(img, seeds, seedThresh, 0)
+  bwOut = ~bwBgSeedGrow
+
+  # For now, just keep the largest component
+  regions = regionprops(label(bwOut))
+  if len(regions) > 0:
+    biggestRegion = regions[0]
+    for region in regions[1:]:
+      if region.area > biggestRegion.area:
+        biggestRegion = region
+    bwOut[:,:] = False
+    bwOut[biggestRegion.coords[:,0], biggestRegion.coords[:,1]] = True
+
+  return rmSmallComps(bwOut, minSz)
+
 
 def nanConcatList(vertList):
   """
@@ -139,22 +216,26 @@ def nanConcatList(vertList):
   for curVerts in vertList:
     allVerts.append(curVerts)
     allVerts.append(nanSep)
-  return np.vstack(allVerts)
+  # Take away last nan if it exists
+  if len(allVerts) > 0:
+    allVerts.pop()
+    return np.vstack(allVerts)
+  return np.array([]).reshape(-1,2)
 
 def splitListAtNans(concatVerts:np.ndarray):
   """
   Utility for taking a single list of nan-separated region vertices
   and breaking it into several regions with no nans.
   """
-  # concatVerts must end with nan if it came from nanConcatList
-  if not np.isnan(concatVerts[-1,0]):
-    concatVerts = nanConcatList(concatVerts)
   allVerts = []
   nanEntries = np.nonzero(np.isnan(concatVerts[:,0]))[0]
   curIdx = 0
   for nanEntry in nanEntries:
     curVerts = concatVerts[curIdx:nanEntry,:].astype('int')
     allVerts.append(curVerts)
+    curIdx = nanEntry+1
+  # Account for final grouping of verts
+  allVerts.append(concatVerts[curIdx:,:].astype('int'))
   return allVerts
 
 def sliceToArray(keySlice: slice, arrToSlice: np.ndarray):
@@ -191,7 +272,7 @@ def getClippedBbox(arrShape: tuple, bbox: np.ndarray, margin: int):
   for ii in range(2):
     bbox[0,ii] = np.maximum(0, bbox[0,ii]-margin)
     bbox[1,ii] = np.minimum(arrShape[1-ii], bbox[1,ii]+margin)
-  return bbox
+  return bbox.astype(int)
 
 
 if __name__ == '__main__':
