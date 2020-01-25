@@ -72,8 +72,7 @@ class ClickableTextItem(pg.TextItem):
     schemeClrProp = SV.NONVALID_ID_COLOR
     if validated:
       schemeClrProp = SV.VALID_ID_COLOR
-    txtSize, txtClr = SCHEME_HOLDER.scheme.getCompProps(
-        (SV.ID_FONT_SIZE, schemeClrProp))
+    txtSize, txtClr = SCHEME_HOLDER.scheme[SV.COMP_PARAMS, (SV.ID_FONT_SIZE, schemeClrProp)]
 
     curFont = self.textItem.font()
     curFont.setPointSize(txtSize)

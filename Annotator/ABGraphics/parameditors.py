@@ -2,6 +2,7 @@
 import pickle as pkl
 import sys
 from os.path import join
+from typing import Sequence, Union
 
 from pyqtgraph.Qt import QtCore, QtWidgets
 from pyqtgraph.parametertree import (Parameter, ParameterTree)
@@ -86,8 +87,23 @@ class ConstParamWidget(QtWidgets.QDialog):
     self.applyBtn.clicked.connect(self.applyBtnClicked)
 
   # Helper method for accessing simple parameter values
-  def __getitem__(self, key: ABParam):
-    return self.params.child(key.name)
+  def __getitem__(self, keys: Union[tuple, ABParam, Sequence]):
+    returnSingle = False
+    if isinstance(keys, tuple):
+      baseParam = [keys[0].name]
+      keys = keys[1]
+    else:
+      baseParam = []
+    if not hasattr(keys, '__iter__'):
+      keys = [keys]
+      returnSingle = True
+    outVals = []
+    for curKey in keys: # type: ABParam
+      outVals.append(self.params.child(*baseParam, curKey.name))
+    if returnSingle:
+      return outVals[0]
+    else:
+      return outVals
 
   def show(self):
     super().show()
@@ -135,11 +151,18 @@ class ConstParamWidget(QtWidgets.QDialog):
 class RegionControlsEditor(ConstParamWidget):
   def __init__(self, parent=None):
     _CONTROLS_DICT = [
-        {'name': REG_CTRLS.MARGIN.name, 'type': 'int', 'value': 5},
-        {'name': REG_CTRLS.SEG_THRESH.name, 'type': 'float', 'value': 6.},
-        {'name': REG_CTRLS.SEED_THRESH.name, 'type': 'float', 'value': 15.},
-        {'name': REG_CTRLS.NEW_COMP_SZ.name, 'type': 'int', 'value': 10},
-        {'name': REG_CTRLS.EST_BOUNDS_ON_START.name, 'type': 'bool', 'value': True}
+        {'name': REG_CTRLS.MAIN_IMG_PARAMS.name, 'type': 'group', 'children':[
+          {'name': REG_CTRLS.NEW_COMP_SZ.name, 'type': 'int', 'value': 15},
+          {'name': REG_CTRLS.MIN_COMP_SZ.name, 'type': 'int', 'value': 10},
+          {'name': REG_CTRLS.NEW_SEED_THRESH.name, 'type': 'float', 'value': 30.},
+          {'name': REG_CTRLS.EST_BOUNDS_ON_START.name, 'type': 'bool', 'value': True}
+        ]},
+        {'name': REG_CTRLS.FOCUSED_IMG_PARAMS.name, 'type': 'group', 'children':[
+          {'name': REG_CTRLS.MARGIN.name, 'type': 'int', 'value': 5},
+          {'name': REG_CTRLS.SEG_THRESH.name, 'type': 'float', 'value': 6.},
+          {'name': REG_CTRLS.SEED_THRESH.name, 'type': 'float', 'value': 15.},
+
+        ]},
       ]
     super().__init__(parent, paramDict=_CONTROLS_DICT, saveDir=REGION_CTRL_DIR, saveExt='regctrl')
 
@@ -180,24 +203,6 @@ class SchemeEditor(ConstParamWidget):
     ]
     super().__init__(parent, paramDict=_DEFAULT_SCHEME_DICT, saveDir=SCHEMES_DIR,
                      saveExt='scheme')
-
-  def _getProps(self, compOrFocIm: SV, whichProps):
-    returnList = True
-    if isinstance(whichProps, ABParam):
-      whichProps = [whichProps]
-      returnList = False
-    outProps = []
-    for prop in whichProps:
-      outProps.append(self.params.child(compOrFocIm.name, prop.name).value())
-    if not returnList:
-      outProps = outProps[0]
-    return outProps
-
-  def getCompProps(self, whichProps):
-    return self._getProps(SV.COMP_PARAMS, whichProps)
-
-  def getFocImgProps(self, whichProps):
-    return self._getProps(SV.FOC_IMG_PARAMS, whichProps)
 
 class _SchemeSingleton:
   _scheme = SchemeEditor()
