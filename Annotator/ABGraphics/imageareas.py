@@ -65,6 +65,7 @@ class FocusedComp(pg.PlotWidget):
     self.setAspectLocked(True)
 
     self.compSer = makeCompDf().squeeze()
+    self.deletedPrevComponent = False
 
     self.bbox = np.zeros((2,2), dtype='int32')
 
@@ -142,17 +143,17 @@ class FocusedComp(pg.PlotWidget):
   def updateAll(self, mainImg: np.array, newComp:df,
              margin: int, segThresh: float):
     newVerts = newComp[TC.VERTICES].squeeze()
-    deletePrevComponent = False
     # If the previous component had no vertices, signal its removal
-    if len(self.compSer[TC.VERTICES].squeeze()) == 0:
-      deletePrevComponent = True
+    if len(self.compSer[TC.VERTICES].squeeze()) == 0 and not self.deletedPrevComponent:
+      self.deletedPrevComponent = True
     # Since values INSIDE the dataframe are reset instead of modified, there is no
     # need to go through the trouble of deep copying
     self.compSer = newComp.copy(deep=False)
+    self.deletedPrevComponent = False
     self.updateBbox(mainImg.shape, newVerts, margin)
     self.updateCompImg(mainImg, segThresh)
     self.updateRegion(newVerts)
-    return deletePrevComponent
+    return self.deletedPrevComponent
 
   def updateBbox(self, mainImgShape, newVerts: np.ndarray, margin: int):
     # Ignore NAN entries during computation
