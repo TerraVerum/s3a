@@ -55,11 +55,12 @@ class CompTableView(QtWidgets.QTableView):
   def keyPressEvent(self, ev: QtGui.QKeyEvent) -> None:
     # Only delete rows if at least on cell is currently selected
     pressedKey = ev.key()
+    modifiers = ev.modifiers()
     isItemSelected = len(self.selectionModel().selectedIndexes()) > 0
     if isItemSelected:
       if pressedKey == QtCore.Qt.Key_Delete:
         self.removeTriggered()
-      elif pressedKey == QtCore.Qt.Key_D and QtCore.Qt.ControlModifier:
+      elif pressedKey == QtCore.Qt.Key_D and modifiers == QtCore.Qt.ControlModifier:
         self.overwriteTriggered()
     super().keyPressEvent(ev)
 

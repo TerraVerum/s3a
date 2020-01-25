@@ -55,6 +55,8 @@ class MainImageArea(pg.PlotWidget):
     self.imgItem.setImage(imgSrc)
 
 class FocusedComp(pg.PlotWidget):
+  sigEnterPressed = Signal()
+
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     # Whether drawn items should be added or removed from current component
@@ -99,6 +101,24 @@ class FocusedComp(pg.PlotWidget):
   def clickable(self, newVal):
     self.compImgItem.clickable = bool(newVal)
 
+  def keyPressEvent(self, ev: QtGui.QKeyEvent):
+    pressedKey = ev.key()
+    if pressedKey == QtCore.Qt.Key_Enter or pressedKey == QtCore.Qt.Key_Return:
+      self.sigEnterPressed.emit()
+      ev.accept()
+    super().keyPressEvent(ev)
+
+  def mouseMoveEvent(self, ev: QtGui.QKeyEvent):
+    if ev.modifiers() == QtCore.Qt.ControlModifier \
+       and ev.buttons() == QtCore.Qt.LeftButton:
+      # Simulate click in that location
+      posRelToImg = self.compImgItem.mapFromScene(ev.pos())
+      xyCoord = np.round(np.array([[posRelToImg.x(), posRelToImg.y()]], dtype='int'))
+      self.compImageClicked(xyCoord)
+      ev.accept()
+    else:
+      super().mouseMoveEvent(ev)
+
   def compImageClicked(self, newVert: np.ndarray):
     # Capture clicks only if component is present and user allows it
     # TODO: Expand to include ROI, superpixel, etc.
@@ -108,11 +128,8 @@ class FocusedComp(pg.PlotWidget):
     curRegionMask = self.region.embedMaskInImg(newArea.shape)
     if self.inAddMode:
       newArea |= curRegionMask
-      newArea = closing(newArea, np.ones((5,5)))
     else:
       newArea = ~newArea & curRegionMask
-      newArea = opening(newArea, np.ones((5,5)))
-    newArea = closing(newArea, np.ones((5,5)))
     # TODO: handle case of multiple regions existing after click. For now, just use
     # the largest
     vertsPerComp = getVertsFromBwComps(newArea)
@@ -155,6 +172,7 @@ class FocusedComp(pg.PlotWidget):
     self.updateBbox(mainImg.shape, newVerts, margin)
     self.updateCompImg(mainImg, segThresh)
     self.updateRegion(newVerts)
+    self.autoRange()
     return self.deletedPrevComponent
 
   def updateBbox(self, mainImgShape, newVerts: np.ndarray, margin: int):

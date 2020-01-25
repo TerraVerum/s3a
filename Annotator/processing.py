@@ -2,7 +2,7 @@ import cv2 as cv
 import numpy as np
 from skimage.filters import gaussian
 from skimage.measure import regionprops, label
-from skimage.morphology import closing, dilation
+from skimage.morphology import closing, dilation, opening
 from skimage.morphology import disk
 from skimage.segmentation import quickshift
 
@@ -128,11 +128,14 @@ def growSeedpoint(img: np.array, seeds: np.array, thresh: float, minSz: int=0) -
   :param minSz: Minimum individual component size allowed. That is, regions smaller
     than :param:`minSz` connected pixels will be removed from the output.
   """
+  nChans = img.shape[2] if img.ndim > 2 else 1
+  imRCShape = np.array(img.shape[0:2])[None,:]
   bwOut = np.zeros(img.shape[0:2], dtype=bool)
-  nChans = img.shape[2] if len(img.shape) > 2 else 1
   # Computationally cheaper to compare square of thresh instead of using
   # euclidean distance
   thresh = thresh**2
+  # Throw away seeds outside image boundaries
+  seeds = seeds[np.all(seeds < imRCShape, axis=1)]
   for seed in seeds:
     bwOut[seed[0], seed[1]] = True
     changed = True
@@ -153,6 +156,9 @@ def growSeedpoint(img: np.array, seeds: np.array, thresh: float, minSz: int=0) -
       newBwOut = bwOut | neighbors
       changed = np.any(newBwOut != bwOut)
       bwOut = newBwOut
+
+
+  bwOut = closing(bwOut, np.ones((3,3), dtype=bool))
   # Remove components smaller than minSz
   return rmSmallComps(bwOut, minSz)
 
@@ -191,8 +197,8 @@ def growBoundarySeeds(img: np.ndarray, seedThresh: float, minSz: int,
   bwBgSeedGrow = growSeedpoint(img, seeds, seedThresh, 0)
   bwOut = ~bwBgSeedGrow
 
-  # Merge sparsely connected regions
-  bwOut = closing(bwOut, np.ones((3,3), dtype=bool))
+  # Remove sparsely connected regions
+  bwOut = opening(bwOut)
 
   # For now, just keep the largest component
   regions = regionprops(label(bwOut))

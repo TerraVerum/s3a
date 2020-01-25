@@ -147,7 +147,8 @@ class ConstParamWidget(QtWidgets.QDialog):
     super().close()
 
   def keyPressEvent(self, ev: QtGui.QKeyEvent):
-    if ev.key() == QtCore.Qt.EnterKeyDefault:
+    pressedKey = ev.key()
+    if pressedKey == QtCore.Qt.Key_Enter or pressedKey == QtCore.Qt.Key_Return:
       self.applyBtnClicked()
     super().keyPressEvent(ev)
 
@@ -187,9 +188,9 @@ class RegionControlsEditor(ConstParamWidget):
   def __init__(self, parent=None):
     _CONTROLS_DICT = [
         {'name': REG_CTRLS.MAIN_IMG_PARAMS.name, 'type': 'group', 'children':[
-          {'name': REG_CTRLS.NEW_COMP_SZ.name, 'type': 'int', 'value': 15},
+          {'name': REG_CTRLS.NEW_COMP_SZ.name, 'type': 'int', 'value': 30},
           {'name': REG_CTRLS.MIN_COMP_SZ.name, 'type': 'int', 'value': 10},
-          {'name': REG_CTRLS.NEW_SEED_THRESH.name, 'type': 'float', 'value': 30.},
+          {'name': REG_CTRLS.NEW_SEED_THRESH.name, 'type': 'float', 'value': 40.},
           {'name': REG_CTRLS.EST_BOUNDS_ON_START.name, 'type': 'bool', 'value': True}
         ]},
         {'name': REG_CTRLS.FOCUSED_IMG_PARAMS.name, 'type': 'group', 'children':[
