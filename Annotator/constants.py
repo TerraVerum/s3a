@@ -14,8 +14,9 @@ SCHEMES_DIR     = os.path.join(BASE_DIR, 'MenuOpts', 'Schemes', '')
 LAYOUTS_DIR     = os.path.join(BASE_DIR, 'MenuOpts', 'Layouts', '')
 FILTERS_DIR     = os.path.join(BASE_DIR, 'MenuOpts', 'Filters', '')
 REGION_CTRL_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'RegionControls', '')
+EXPORT_CTRL_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'CompExportControls', '')
 # Ensure these directories exist
-for curDir in [SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR, REGION_CTRL_DIR]:
+for curDir in [SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR, REGION_CTRL_DIR, EXPORT_CTRL_DIR]:
   Path(curDir).mkdir(parents=True, exist_ok=True)
 
 
@@ -97,6 +98,11 @@ class RegionControlsEditorValues(ABParamGroup):
   MARGIN              : ABParam = newParam('Margin')
   SEED_THRESH         : ABParam = newParam('Seedpoint Mean Threshold')
 TEMPLATE_REG_CTRLS = RegionControlsEditorValues()
+
+@dataclass
+class ExportControlsEditor(ABParamGroup):
+  EXP_ONLY_VISIBLE : ABParam = newParam('Only export visible components')
+TEMPLATE_EXPORT_CTRLS = ExportControlsEditor()
 
 if __name__ == '__main__':
   c = ComponentTypes.fromString('capacitor')

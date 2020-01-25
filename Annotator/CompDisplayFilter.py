@@ -63,7 +63,7 @@ class CompDisplayFilter(QtCore.QObject):
     filterEditor.sigParamStateUpdated.connect(self._updateFilter)
 
     self._regionPlots = MultiRegionPlot()
-    self._displayedIds = np.array([], dtype=int)
+    self.displayedIds = np.array([], dtype=int)
 
     for plt in self._regionPlots.validIdPlt, self._regionPlots.nonValidIdPlt, \
                self._regionPlots.boundPlt:
@@ -99,10 +99,10 @@ class CompDisplayFilter(QtCore.QObject):
     # Remove all IDs that aren't displayed
     # FIXME: This isn't working correctly at the moment
     # self._regionPlots.drop(np.setdiff1d(self._regionPlots.data.index, self._displayedIds))
-    displayVertsValids = compDf.loc[self._displayedIds, regCols]
-    self._regionPlots.resetRegionList(self._displayedIds, displayVertsValids)
+    displayVertsValids = compDf.loc[self.displayedIds, regCols]
+    self._regionPlots.resetRegionList(self.displayedIds, displayVertsValids)
 
-    tblIdxsToShow = np.nonzero(np.in1d(compDf.index, self._displayedIds))[0]
+    tblIdxsToShow = np.nonzero(np.in1d(compDf.index, self.displayedIds))[0]
     for rowIdx in tblIdxsToShow:
       self._compTbl.showRow(rowIdx)
 
@@ -179,7 +179,7 @@ class CompDisplayFilter(QtCore.QObject):
     curComps = curComps.loc[vertsAllowed,:]
 
     # Give self the id list of surviving comps
-    self._displayedIds = curComps.index
+    self.displayedIds = curComps.index
 
   @Slot()
   def resetCompBounds(self):

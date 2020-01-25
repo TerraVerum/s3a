@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from ..constants import TEMPLATE_COMP
-from ..tablemodel import CompTableModel, ComponentMgr, AddTypes
+from ..tablemodel import CompTableModel, ComponentMgr, ModelOpts
 
 Slot = QtCore.pyqtSlot
 
@@ -49,8 +49,19 @@ class CompTableView(QtWidgets.QTableView):
     try:
       # If successful we were given a proxy model
       self.mgr = modelOrProxy.sourceModel()
-    except:
+    except AttributeError:
       self.mgr = modelOrProxy
+
+  def keyPressEvent(self, ev: QtGui.QKeyEvent) -> None:
+    # Only delete rows if at least on cell is currently selected
+    pressedKey = ev.key()
+    isItemSelected = len(self.selectionModel().selectedIndexes()) > 0
+    if isItemSelected:
+      if pressedKey == QtCore.Qt.Key_Delete:
+        self.removeTriggered()
+      elif pressedKey == QtCore.Qt.Key_D and QtCore.Qt.ControlModifier:
+        self.overwriteTriggered()
+    super().keyPressEvent(ev)
 
   def createContextMenu(self):
     menu = QtWidgets.QMenu(self)
@@ -101,7 +112,7 @@ class CompTableView(QtWidgets.QTableView):
     # Some bug is preventing the single assignment value from broadcasting
     setVals = [toOverwrite.iloc[0,colIdxs] for _ in range(len(idList)-1)]
     toOverwrite.iloc[1:, colIdxs] = setVals
-    self.mgr.addComps(toOverwrite, addtype=AddTypes.MERGE)
+    self.mgr.addComps(toOverwrite, addtype=ModelOpts.ADD_AS_MERGE)
     self.clearSelection()
 
 class TextDelegate(QtWidgets.QItemDelegate):

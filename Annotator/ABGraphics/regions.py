@@ -55,8 +55,8 @@ class VertexRegion(pg.ImageItem):
 
   @staticmethod
   def getLUTFromScheme():
-    params = SCHEME_HOLDER.scheme[SV.FOC_IMG_PARAMS, (SV.REG_FILL_COLOR, SV.REG_VERT_COLOR)]
-    fillClr, vertClr = [param.value() for param in params]
+    fillClr, vertClr = SCHEME_HOLDER.scheme[SV.FOC_IMG_PARAMS,
+                                            (SV.REG_FILL_COLOR, SV.REG_VERT_COLOR)]
 
     lut = [(0,0,0,0)]
     for clr in fillClr, vertClr:
@@ -158,8 +158,8 @@ class MultiRegionPlot(QtCore.QObject):
     # -----------
     neededParams = (SV.VALID_ID_COLOR, SV.NONVALID_ID_COLOR,
                     SV.BOUNDARY_COLOR, SV.BOUNDARY_WIDTH, SV.ID_FONT_SIZE)
-    validFill, nonValidFill, boundClr, boundWidth, idSz = [
-    param.value() for param in SCHEME_HOLDER.scheme[SV.COMP_PARAMS, neededParams]]
+    validFill, nonValidFill, boundClr, boundWidth, idSz = \
+      SCHEME_HOLDER.scheme[SV.COMP_PARAMS, neededParams]
 
     # -----------
     # Update data
