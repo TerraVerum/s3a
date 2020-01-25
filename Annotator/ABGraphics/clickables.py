@@ -8,8 +8,6 @@ import warnings
 
 from .parameditors import SCHEME_HOLDER
 from ..constants import TEMPLATE_SCHEME_VALUES as SV
-from .. import appInst
-
 
 class ClickableImageItem(pg.ImageItem):
   sigClicked = Signal(object)
@@ -20,12 +18,13 @@ class ClickableImageItem(pg.ImageItem):
   def mouseClickEvent(self, ev: QtGui.QMouseEvent):
     # Capture clicks only if component is present and user allows it
     # And user pressed control
-    keyMods = appInst.keyboardModifiers()
+    keyMods = ev.modifiers()
     if not ev.isAccepted() and ev.button() == QtCore.Qt.LeftButton \
        and self.clickable and self.image is not None \
        and (keyMods == QtCore.Qt.ControlModifier or not self.requireCtrlKey):
       xyCoord = np.round(np.array([[ev.pos().x(), ev.pos().y()]], dtype='int'))
       self.sigClicked.emit(xyCoord)
+    super().mouseClickEvent(ev)
 
 class ClickableScatterItem(pg.ScatterPlotItem):
   def __init__(self, *args, **kwargs):

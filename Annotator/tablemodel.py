@@ -162,6 +162,7 @@ class ComponentMgr(CompTableModel):
 
     self._nextCompId = np.max(self.compDf.index.to_numpy()) + 1
     self.sigCompsChanged.emit(toEmit)
+    return toEmit
 
   @_coerceTypes
   def rmComps(self, idsToRemove: Union[np.array, str] = 'all', emitChange=True) -> dict:

@@ -49,6 +49,11 @@ class Annotator(QtWidgets.QMainWindow):
     self.mainImg.setImage(startImgFpath)
 
     # ---------------
+    # FOCUSED COMPONENT IMAGE
+    # ---------------
+    self.compImg.sigEnterPressed.connect(self.acceptRegionBtnClicked)
+
+    # ---------------
     # COMPONENT MANAGER
     # ---------------
     self.compMgr = ComponentMgr()
@@ -310,8 +315,9 @@ class Annotator(QtWidgets.QMainWindow):
     xyCoord -= vertBox[0,:]
     bwCompMask = growSeedpoint(miniImg, xyCoord, seedThresh, minSz)
 
-    # Invert the mask to get what the component actually will be
     compVerts = getVertsFromBwComps(bwCompMask)
+    if len(compVerts) == 0:
+      return
     # Turn list-of-lists into plottable, nan-separated vertices
     # Reverse for row-col -> x-y
     compVerts = nanConcatList(compVerts)
@@ -320,6 +326,10 @@ class Annotator(QtWidgets.QMainWindow):
     newComp = makeCompDf()
     newComp[TC.VERTICES] = [compVerts]
     self.compMgr.addComps(newComp)
+    # Make sure index matches ID before updating current component
+    newComp = newComp.set_index(TC.INST_ID, drop=False)
+    # Set this component as active in the focused view
+    self.updateCurComp(newComp.squeeze())
 
 
   @Slot(object)
@@ -334,7 +344,6 @@ class Annotator(QtWidgets.QMainWindow):
     # for the previous focused component
     if rmPrevComp:
       self.compMgr.rmComps(prevComp[TC.INST_ID])
-
     self.curCompIdLbl.setText(f'Component ID: {newComp[TC.INST_ID]}')
 
 ## Start Qt event loop unless running in interactive mode or using pyside.
