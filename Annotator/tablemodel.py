@@ -13,6 +13,7 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 from tqdm import tqdm
 
+from Annotator.generalutils import coerceDfTypes
 from .constants import TEMPLATE_COMP as TC, CompParams, ComponentTypes
 
 Slot = QtCore.pyqtSlot
@@ -38,21 +39,6 @@ def makeCompDf(numRows=1) -> df:
   if dropRow:
     outDf = outDf.drop(index=TC.INST_ID.value)
   return outDf
-
-def _coerceTypes(func) -> df:
-  """
-  Pandas currently has a bug where datatypes are not preserved after update operations.
-  Current workaround is to coerce all types to their original values after each operation
-  """
-  @wraps(func)
-  def doCoercion(self, *args, **kwargs):
-    try:
-      return func(self, *args, **kwargs)
-    finally:
-      origTypes = makeCompDf(0).dtypes
-      for col, origType in zip(self.compDf, origTypes):
-        self.compDf[col] = self.compDf[col].astype(origType)
-  return doCoercion
 
 class ModelOpts(Enum):
   ADD_AS_NEW      : Enum = 'new'
@@ -122,7 +108,6 @@ class ComponentMgr(CompTableModel):
   def __init__(self):
     super().__init__()
 
-  @_coerceTypes
   def addComps(self, newCompsDf: df, addtype: ModelOpts = ModelOpts.ADD_AS_NEW):
     toEmit = self.defaultEmitDict.copy()
     existingIds = self.compDf.index
@@ -156,6 +141,9 @@ class ComponentMgr(CompTableModel):
     # Finally, add new comps
     compsToAdd = newCompsDf.iloc[~newChangedIdxs, :]
     self.compDf = pd.concat((self.compDf, compsToAdd), sort=False)
+    # Retain type information
+    coerceDfTypes(self.compDf, TC)
+
     toEmit['added'] = newIds[~newChangedIdxs]
     self.layoutChanged.emit()
 
@@ -164,7 +152,6 @@ class ComponentMgr(CompTableModel):
     self.sigCompsChanged.emit(toEmit)
     return toEmit
 
-  @_coerceTypes
   def rmComps(self, idsToRemove: Union[np.array, str] = 'all', emitChange=True) -> dict:
     toEmit = self.defaultEmitDict.copy()
     # Generate ID list
@@ -187,6 +174,9 @@ class ComponentMgr(CompTableModel):
     self.layoutAboutToBeChanged.emit()
     self.compDf = self.compDf.iloc[tfKeepIdx,:]
     self.layoutChanged.emit()
+
+    # Preserve type information after change
+    coerceDfTypes(self.compDf, TC)
 
     # Determine next ID for new components
     self._nextCompId = 0

@@ -5,12 +5,12 @@ import pyqtgraph as pg
 from PIL import Image
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui
-from skimage.morphology import closing, opening
 
 from .clickables import ClickableImageItem
 from .regions import VertexRegion, SaveablePolyROI
 from ..constants import TEMPLATE_COMP as TC
-from ..processing import segmentComp, getVertsFromBwComps, growSeedpoint, getClippedBbox
+from ..processing import segmentComp, getVertsFromBwComps, growSeedpoint
+from Annotator.generalutils import getClippedBbox
 from ..tablemodel import makeCompDf
 
 Signal = QtCore.pyqtSignal
@@ -24,6 +24,10 @@ class MainImageArea(pg.PlotWidget):
 
     self.setAspectLocked(True)
     self.getViewBox().invertY()
+
+    self.compSelector = QtCore.QRect(0,0,0,0)
+    self.beganSelect = False
+
     # -----
     # Image Item
     # -----
@@ -36,6 +40,28 @@ class MainImageArea(pg.PlotWidget):
   @property
   def image(self):
     return self.imgItem.image
+
+  #def mouseMoveEvent(self, ev: QtGui.QMouseEvent):
+    #if ev.buttons() == QtCore.Qt.LeftButton:
+      ## TODO: Add logic for determining which point is modified
+      ## based on where the mouse is located relative to initial anchor
+      #if self.beganSelect:
+        ## Already placed anchor, move the region now
+        #self.compSelector.setBottomRight(ev.pos())
+      #else:
+        #self.beganSelect = True
+        #self.compSelector.setTopRight(ev.pos())
+    #else:
+      #super().mouseMoveEvent(ev)
+
+  #def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
+    #if self.beganSelect:
+      #self.beganSelect = False
+
+    #else:
+      #pass
+    #super().mouseReleaseEvent(ev)
+
 
   @property
   def clickable(self):

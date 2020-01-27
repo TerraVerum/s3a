@@ -10,7 +10,7 @@ from pyqtgraph.Qt import QtCore
 from .ABGraphics import tableview
 from .ABGraphics.clickables import ClickableTextItem
 from .ABGraphics.parameditors import TableFilterEditor
-from .ABGraphics.regions import MultiRegionPlot
+from .ABGraphics.regions import MultiRegionPlot, makeMultiRegionDf
 from .constants import TEMPLATE_COMP as TC
 from .tablemodel import ComponentMgr, ComponentTypes
 
@@ -62,11 +62,14 @@ class CompDisplayFilter(QtCore.QObject):
     # Retrieve filter changes
     filterEditor.sigParamStateUpdated.connect(self._updateFilter)
 
+    # Update based on table selection
+    self._compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
+    #self.sigProxy = SignalProxy(self._compTbl.sigSelectionChanged, delay=0.25, slot=self._reflectTableSelectionChange)
+
     self._regionPlots = MultiRegionPlot()
     self.displayedIds = np.array([], dtype=int)
 
-    for plt in self._regionPlots.validIdPlt, self._regionPlots.nonValidIdPlt, \
-               self._regionPlots.boundPlt:
+    for plt in self._regionPlots.boundPlt, self._regionPlots.idPlts:
       mainImg.addItem(plt)
     self._regionPlots.sigIdClicked.connect(self.handleCompClick)
 
@@ -83,8 +86,9 @@ class CompDisplayFilter(QtCore.QObject):
     # TODO: Find out why this isn't working. For now, just reset the whole comp list
     #  each time components are changed, since the overhead isn't too terrible.
     regCols = (TC.VERTICES, TC.VALIDATED)
+    compCols = (TC.VERTICES, TC.VALIDATED)
     # changedIds = np.concatenate((idLists['added'], idLists['changed']))
-    # self._regionPlots[changedIds, regCols] = compDf.loc[changedIds, regCols]
+    # self._regionPlots[changedIds, regCols] = compDf.loc[changedIds, compCols]
 
     # Hide all ids and table rows, since they will be reshown as needed after display filtering
     for rowIdx in range(len(compDf)):
@@ -99,8 +103,9 @@ class CompDisplayFilter(QtCore.QObject):
     # Remove all IDs that aren't displayed
     # FIXME: This isn't working correctly at the moment
     # self._regionPlots.drop(np.setdiff1d(self._regionPlots.data.index, self._displayedIds))
-    displayVertsValids = compDf.loc[self.displayedIds, regCols]
-    self._regionPlots.resetRegionList(self.displayedIds, displayVertsValids)
+    newRegionInfo = makeMultiRegionDf(len(self.displayedIds), regCols)
+    newRegionInfo.loc[:, regCols] = compDf.loc[self.displayedIds, compCols]
+    self._regionPlots.resetRegionList(self.displayedIds, newRegionInfo)
 
     tblIdxsToShow = np.nonzero(np.in1d(compDf.index, self.displayedIds))[0]
     for rowIdx in tblIdxsToShow:
@@ -109,6 +114,10 @@ class CompDisplayFilter(QtCore.QObject):
   def _updateFilter(self, newFilterDict):
     self._filter = newFilterDict
     self.redrawComps(self._compMgr.defaultEmitDict)
+
+  @Slot(object)
+  def _reflectTableSelectionChange(self, selectedIds: np.ndarray):
+    self._regionPlots.selectById(selectedIds)
 
   def _populateDisplayedIds(self):
     curComps = self._compMgr.compDf

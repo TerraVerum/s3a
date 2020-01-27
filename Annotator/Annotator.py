@@ -12,14 +12,15 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
 
 from .ABGraphics.parameditors import ConstParamWidget, TableFilterEditor, \
   RegionControlsEditor, SCHEME_HOLDER, CompExportEditor
-from .ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
+from .ABGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc
 from .CompDisplayFilter import CompDisplayFilter, CompSortFilter
 from .constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
 from .constants import TEMPLATE_REG_CTRLS as REG_CTRLS
 from .constants import TEMPLATE_EXPORT_CTRLS as COMP_EXPORT
-from .processing import getBwComps, getVertsFromBwComps, getClippedBbox, growSeedpoint,\
-  growBoundarySeeds, nanConcatList
+from .processing import getBwComps, getVertsFromBwComps, growSeedpoint,\
+  growBoundarySeeds
+from Annotator.generalutils import nanConcatList, getClippedBbox
 from .tablemodel import ComponentMgr as ComponentMgr, ModelOpts
 from .tablemodel import makeCompDf
 
@@ -251,7 +252,8 @@ class Annotator(QtWidgets.QMainWindow):
 
   @disableAppDuringFunc
   def estimateBoundaries(self):
-    compVertices = getVertsFromBwComps(getBwComps(self.mainImg.image))
+    minSz = self.regCtrlEditor[REG_CTRLS.MAIN_IMG_PARAMS, REG_CTRLS.MIN_COMP_SZ]
+    compVertices = getVertsFromBwComps(getBwComps(self.mainImg.image, minSz))
     components = makeCompDf(len(compVertices))
     components[TC.VERTICES] = compVertices
     self.compMgr.addComps(components)

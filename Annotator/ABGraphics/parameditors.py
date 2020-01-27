@@ -7,7 +7,7 @@ from typing import Sequence, Union
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree)
 
-from .utils import dialogSaveToFile
+from .graphicsutils import dialogSaveToFile
 from ..constants import (
   SCHEMES_DIR, REGION_CTRL_DIR, FILTERS_DIR, EXPORT_CTRL_DIR,
   TEMPLATE_SCHEME_VALUES as SV,
@@ -238,7 +238,8 @@ class SchemeEditor(ConstParamWidget):
         {'name': SV.NONVALID_ID_COLOR.name, 'type': 'color', 'value': 'f00'},
         {'name': SV.BOUNDARY_COLOR.name, 'type': 'color', 'value': 'ff0'},
         {'name': SV.BOUNDARY_WIDTH.name, 'type': 'int', 'value': 2},
-        {'name': SV.ID_FONT_SIZE.name, 'type': 'int', 'value': 10}
+        {'name': SV.ID_FONT_SIZE.name, 'type': 'int', 'value': 10},
+        {'name': SV.SELECTED_ID_BORDER.name, 'type': 'color', 'value': '00f'}
       ]},
       {'name': SV.FOC_IMG_PARAMS.name, 'type': 'group', 'children': [
         {'name': SV.REG_VERT_COLOR.name, 'type': 'color', 'value': '0f0'},
