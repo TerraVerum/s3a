@@ -34,28 +34,26 @@ class ABViewBox(pg.ViewBox):
     # TODO: Make this more robust, since it is a temporary measure at the moment
     callSuperMethod = True
     modifiers = ev.modifiers()
-    if modifiers == QtCore.Qt.ShiftModifier:
+    if modifiers != QtCore.Qt.NoModifier:
       self.state['mouseMode'] = pg.ViewBox.RectMode
-      if ev.isFinish():  ## This is the final move in the drag; change the view scale now
-        pos = ev.pos()
+      if ev.isFinish():
         callSuperMethod = False
-        self.rbScaleBox.hide()
-        ax = QtCore.QRectF(Point(ev.buttonDownPos(ev.button())), Point(pos))
-        selectionBounds = self.childGroup.mapRectFromParent(ax)
-        self.sigSelectionCreated.emit(selectionBounds.getCoords())
-    elif modifiers == QtCore.Qt.ControlModifier:
-      self.state['mouseMode'] = pg.ViewBox.RectMode
-      if ev.isFinish():  ## This is the final move in the drag; change the view scale now
-        pos = ev.pos()
-        callSuperMethod = False
-        self.rbScaleBox.hide()
-        ax = QtCore.QRectF(Point(ev.buttonDownPos(ev.button())), Point(pos))
-        selectionBounds = self.childGroup.mapRectFromParent(ax)
-        self.sigComponentCreated.emit(selectionBounds.getCoords())
+        bounds = self.getSelectionBounds(ev)
+        if modifiers == QtCore.Qt.ShiftModifier:
+          self.sigSelectionCreated.emit(bounds)
+        elif modifiers == QtCore.Qt.ControlModifier:
+          self.sigComponentCreated.emit(bounds)
     else:
       self.state['mouseMode'] = pg.ViewBox.PanMode
     if callSuperMethod:
       super().mouseDragEvent(ev, axis)
+
+  def getSelectionBounds(self, ev):
+    pos = ev.pos()
+    self.rbScaleBox.hide()
+    ax = QtCore.QRectF(Point(ev.buttonDownPos(ev.button())), Point(pos))
+    selectionBounds = self.childGroup.mapRectFromParent(ax)
+    return selectionBounds.getCoords()
 
 
 class MainImageArea(pg.PlotWidget):
