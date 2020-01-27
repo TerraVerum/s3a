@@ -101,7 +101,7 @@ class SaveablePolyROI(pg.PolyLineROI):
     imgMask[roiSlices[0], roiSlices[1]] = roiMask
     return imgMask
 
-def makeMultiRegionDf(numRows=1, whichCols=None) -> df:
+def makeMultiRegionDf(numRows=1, whichCols=None, idList=None) -> df:
   df_list = []
   if whichCols is None:
     whichCols = (TC.INST_ID, TC.VERTICES, TC.VALIDATED)
@@ -112,6 +112,8 @@ def makeMultiRegionDf(numRows=1, whichCols=None) -> df:
     # each row no objects have the same reference
     df_list.append([field.value for field in whichCols])
   outDf = df(df_list, columns=whichCols)
+  if idList is not None:
+    outDf = outDf.set_index(idList)
   # Ensure base type fields are properly typed
   coerceDfTypes(outDf, whichCols)
 
@@ -223,7 +225,7 @@ class MultiRegionPlot(QtCore.QObject):
     newEntryIdxs = np.isin(regionIds, self.data.index, invert=True)
     keysDf = makeMultiRegionDf(len(regionIds), setVals)
     keysDf = keysDf.set_index(regionIds)
-    # Since we are only resetting one parameter (either valid or regions),
+    # Since we may only be resetting one parameter (either valid or regions),
     # Make sure to keep the old parameter value for the unset index
     keysDf.update(self.data)
     keysDf.loc[regionIds, setVals] = vals
@@ -232,7 +234,7 @@ class MultiRegionPlot(QtCore.QObject):
     # Now we can add entries that weren't in our original dataframe
     # If not all set values were provided in the new dataframe, fix this by embedding
     # it into the default dataframe
-    newDataDf = makeMultiRegionDf(np.sum(newEntryIdxs))
+    newDataDf = makeMultiRegionDf(np.sum(newEntryIdxs), idList=regionIds[newEntryIdxs])
     newDataDf.loc[:, keysDf.columns] = keysDf.loc[newEntryIdxs, :]
     self.data = pd.concat((self.data, newDataDf))
     # Retain type information
