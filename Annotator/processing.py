@@ -6,12 +6,19 @@ from skimage.morphology import closing, dilation, opening
 from skimage.morphology import disk
 from skimage.segmentation import quickshift
 
+from imageprocessing.algorithms import Algorithms as alg
+from imageprocessing.processing import ABImage
+
 from .generalutils import getClippedBbox
 from .graphicseval import overlayImgs
 
 def getBwComps(img: np.ndarray, minSz=30):
   bwOut = bwBgMask(img)
   return bwOut
+
+def getColorComps(img: np.array, minSiz=None) -> np.ndarray:
+  return colorBgMask(img.astype('uint8'))
+
 
 def getBwComps_experimental(img: np.ndarray, minSz=30, seedThresh=45, segThresh=0.) -> np.ndarray:
   img = (gaussian(img, 1)*255).astype('uint8')
@@ -70,6 +77,22 @@ def colorLabelsWithMean(labelImg, refImg) -> np.ndarray:
     outImg[curmask,:] = refImg[curmask,:].reshape(-1,3).mean(0)
   return outImg
 
+def colorBgMask(img: np.array) -> np.array:
+  image = ABImage(src=img)
+  process = alg.gmm_backround_mask(image=image,
+                                   n_components=5,
+                                   resize_image=(0.1, 0.1),
+                                   plot_results=True)
+  mask = process.get_result_with_id("Gaussian Mask").image.data
+  kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (5,5))
+  mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel=kernel)
+  kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (7,7))
+  mask = cv.morphologyEx(mask, cv.MORPH_DILATE, kernel=kernel)
+  import matplotlib.pyplot as plt
+  plt.figure()
+  plt.imshow(mask, cmap='gray')
+  plt.show()
+  return mask
 
 def bwBgMask(img: np.array) -> np.array:
   if img.dtype != 'uint8':
@@ -156,6 +179,7 @@ def growSeedpoint(img: np.array, seeds: np.array, thresh: float, minSz: int=0) -
   nChans = img.shape[2] if img.ndim > 2 else 1
   imRCShape = np.array(img.shape[0:2])[None,:]
   bwOut = np.zeros(img.shape[0:2], dtype=bool)
+  nChans = img.shape[2] if len(img.shape) > 2 else 1
   # Computationally cheaper to compare square of thresh instead of using
   # euclidean distance
   thresh = thresh**2
@@ -181,6 +205,7 @@ def growSeedpoint(img: np.array, seeds: np.array, thresh: float, minSz: int=0) -
       newBwOut = bwOut | neighbors
       changed = np.any(newBwOut != bwOut)
       bwOut = newBwOut
+
 
 
   bwOut = closing(bwOut, np.ones((3,3), dtype=bool))

@@ -7,3 +7,6 @@ scikit_image>=0.15.0
 pyqtgraph>=0.10.0
 pandas>=0.24
 Pillow>=6.0
+
+# adding requirement to have installed our imageprocessing code via pip
+imageprocessing
