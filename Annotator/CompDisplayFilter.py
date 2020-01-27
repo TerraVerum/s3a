@@ -86,7 +86,6 @@ class CompDisplayFilter(QtCore.QObject):
     # TODO: Find out why this isn't working. For now, just reset the whole comp list
     #  each time components are changed, since the overhead isn't too terrible.
     regCols = (TC.VERTICES, TC.VALIDATED)
-    compCols = (TC.VERTICES, TC.VALIDATED)
     # changedIds = np.concatenate((idLists['added'], idLists['changed']))
     # self._regionPlots[changedIds, regCols] = compDf.loc[changedIds, compCols]
 
@@ -103,9 +102,7 @@ class CompDisplayFilter(QtCore.QObject):
     # Remove all IDs that aren't displayed
     # FIXME: This isn't working correctly at the moment
     # self._regionPlots.drop(np.setdiff1d(self._regionPlots.data.index, self._displayedIds))
-    newRegionInfo = makeMultiRegionDf(len(self.displayedIds), regCols)
-    newRegionInfo.loc[:, regCols] = compDf.loc[self.displayedIds, compCols]
-    self._regionPlots.resetRegionList(self.displayedIds, newRegionInfo)
+    self._regionPlots.resetRegionList(self.displayedIds, compDf.loc[self.displayedIds, regCols])
 
     tblIdxsToShow = np.nonzero(np.in1d(compDf.index, self.displayedIds))[0]
     for rowIdx in tblIdxsToShow:
