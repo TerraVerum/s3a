@@ -152,6 +152,15 @@ class Annotator(QtWidgets.QMainWindow):
     self.filterEditor.close()
     self.scheme.close()
     self.regCtrlEditor.close()
+    self.compExportCtrl.close()
+
+
+  def _add_focusComp(self, newComp):
+    self.compMgr.addComps(newComp)
+    # Make sure index matches ID before updating current component
+    newComp = newComp.set_index(TC.INST_ID, drop=False)
+    # Set this component as active in the focused view
+    self.updateCurComp(newComp.squeeze())
 
   # ---------------
   # MENU CALLBACKS
@@ -328,11 +337,7 @@ class Annotator(QtWidgets.QMainWindow):
     compVerts += vertBox[0,:]
     newComp = makeCompDf()
     newComp[TC.VERTICES] = [compVerts]
-    self.compMgr.addComps(newComp)
-    # Make sure index matches ID before updating current component
-    newComp = newComp.set_index(TC.INST_ID, drop=False)
-    # Set this component as active in the focused view
-    self.updateCurComp(newComp.squeeze())
+    self._add_focusComp(newComp)
 
   @Slot(object)
   def mainImgCompCreated(self, compCoords):
@@ -345,10 +350,7 @@ class Annotator(QtWidgets.QMainWindow):
     ], dtype=int)
     newComp = makeCompDf(1)
     newComp[TC.VERTICES] = [newVerts]
-    self.compMgr.addComps(newComp)
-    newComp = newComp.set_index(TC.INST_ID, drop=False)
-    # Set this component as active in the focused view
-    self.updateCurComp(newComp.squeeze())
+    self._add_focusComp(newComp)
 
 
   @Slot(object)
