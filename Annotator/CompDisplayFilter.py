@@ -56,14 +56,17 @@ class CompDisplayFilter(QtCore.QObject):
     self._compTbl = compTbl
     self._compMgr = compMgr
 
+    # Attach to main image area signals
+    mainImg.sigSelectionCreated.connect(self._compPointsSelected)
+
     # Attach to manager signals
-    self._compMgr.sigCompsChanged.connect(self.redrawComps)
+    compMgr.sigCompsChanged.connect(self.redrawComps)
 
     # Retrieve filter changes
     filterEditor.sigParamStateUpdated.connect(self._updateFilter)
 
     # Update based on table selection
-    self._compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
+    compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
     #self.sigProxy = SignalProxy(self._compTbl.sigSelectionChanged, delay=0.25, slot=self._reflectTableSelectionChange)
 
     self._regionPlots = MultiRegionPlot()
@@ -115,6 +118,31 @@ class CompDisplayFilter(QtCore.QObject):
   @Slot(object)
   def _reflectTableSelectionChange(self, selectedIds: np.ndarray):
     self._regionPlots.selectById(selectedIds)
+
+  @Slot(object)
+  def _compPointsSelected(self, selectionBox: tuple):
+    """
+    :param selectionBox: bounding box of user selection: [xmin ymin xmax ymax]
+    """
+    selectedIds = self._regionPlots.idPlts.idsWithin(selectionBox)
+    self.updateCompSelection(selectedIds, scrollTo=len(selectedIds) > 0)
+
+  def updateCompSelection(self, selectedIds, scrollTo=True):
+    self._compTbl.clearSelection()
+    mode = QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows
+    selectionModel = self._compTbl.selectionModel()
+    sortModel = self._compTbl.model()
+    # Select in reverse order so the first element can be accessed by the end of the operation
+    for curId in selectedIds[::-1]:
+      idRow = np.nonzero(self._compMgr.compDf.index == curId)[0][0]
+      # Map this ID to its sorted position in the list
+      idxForId = sortModel.mapFromSource(self._compMgr.index(idRow, 0))
+      selectionModel.select(idxForId, mode)
+    if scrollTo:
+      # When the ID is selected, scroll to that row and highlight the ID
+      self._compTbl.scrollTo(idxForId, self._compTbl.PositionAtCenter)
+    self._compTbl.setFocus()
+
 
   def _populateDisplayedIds(self):
     curComps = self._compMgr.compDf
@@ -193,13 +221,6 @@ class CompDisplayFilter(QtCore.QObject):
 
   @Slot(int)
   def handleCompClick(self, clickedId=None):
-    idRow = np.nonzero(self._compMgr.compDf.index == clickedId)[0][0]
-    # Map this ID to its sorted position in the list
-    sortModel = self._compTbl.model()
-    idxForId = sortModel.mapToSource(sortModel.index(idRow, 0))
-    # When the ID is selected, scroll to that row and highlight the ID
-    self._compTbl.scrollTo(idxForId, self._compTbl.PositionAtCenter)
-    self._compTbl.selectRow(idxForId.row())
-    self._compTbl.setFocus()
+    self.updateCompSelection([clickedId], scrollTo=True)
     # noinspection PyTypeChecker
     self.sigCompClicked.emit(self._compMgr.compDf.loc[clickedId,:])
