@@ -47,6 +47,7 @@ class Annotator(QtWidgets.QMainWindow):
     # MAIN IMAGE
     # ---------------
     self.mainImg.imgItem.sigClicked.connect(self.mainImgItemClicked)
+    self.mainImg.sigComponentCreated.connect(self.mainImgCompCreated)
     self.mainImg.setImage(startImgFpath)
 
     # ---------------
@@ -329,6 +330,22 @@ class Annotator(QtWidgets.QMainWindow):
     newComp[TC.VERTICES] = [compVerts]
     self.compMgr.addComps(newComp)
     # Make sure index matches ID before updating current component
+    newComp = newComp.set_index(TC.INST_ID, drop=False)
+    # Set this component as active in the focused view
+    self.updateCurComp(newComp.squeeze())
+
+  @Slot(object)
+  def mainImgCompCreated(self, compCoords):
+    # TODO: Make this code more robust
+    newVerts = np.array([
+    [compCoords[0], compCoords[1]],
+    [compCoords[2], compCoords[1]],
+    [compCoords[2], compCoords[3]],
+    [compCoords[0], compCoords[3]],
+    ], dtype=int)
+    newComp = makeCompDf(1)
+    newComp[TC.VERTICES] = [newVerts]
+    self.compMgr.addComps(newComp)
     newComp = newComp.set_index(TC.INST_ID, drop=False)
     # Set this component as active in the focused view
     self.updateCurComp(newComp.squeeze())
