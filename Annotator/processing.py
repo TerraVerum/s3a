@@ -11,7 +11,7 @@ from .graphicseval import overlayImgs
 
 def getBwComps(img: np.ndarray, minSz=30):
   bwOut = bwBgMask(img)
-  return rmSmallComps(bwOut, minSz)
+  return bwOut
 
 def getBwComps_experimental(img: np.ndarray, minSz=30, seedThresh=45, segThresh=0.) -> np.ndarray:
   img = (gaussian(img, 1)*255).astype('uint8')
@@ -81,6 +81,12 @@ def bwBgMask(img: np.array) -> np.array:
   return mask
 
 def getVertsFromBwComps(bwmask: np.array, simplifyVerts=True) -> np.array:
+  # First, turn regions into boxes
+  regions = regionprops(label(bwmask))
+  for region in regions:
+    bbox = region.bbox
+    bwmask[bbox[0]:bbox[2], bbox[1]:bbox[3]] = True
+
   approxMethod = cv.CHAIN_APPROX_SIMPLE
   if not simplifyVerts:
     approxMethod = cv.CHAIN_APPROX_NONE

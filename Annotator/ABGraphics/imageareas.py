@@ -20,6 +20,8 @@ QCursor = QtGui.QCursor
 
 class ABViewBox(pg.ViewBox):
   sigSelectionCreated = Signal(object)
+  sigComponentCreated = Signal(object)
+
   def mouseDragEvent(self, ev, axis=None):
     """
     Most of the desired functionality for drawing a selection rectangle on the main image
@@ -29,6 +31,7 @@ class ABViewBox(pg.ViewBox):
     overloading only a small portion of
     :func:`ViewBox.mouseDragEvent()<pyqtgraph.ViewBox.mouseDragEvent>`.
     """
+    # TODO: Make this more robust, since it is a temporary measure at the moment
     callSuperMethod = True
     modifiers = ev.modifiers()
     if modifiers == QtCore.Qt.ShiftModifier:
@@ -40,6 +43,15 @@ class ABViewBox(pg.ViewBox):
         ax = QtCore.QRectF(Point(ev.buttonDownPos(ev.button())), Point(pos))
         selectionBounds = self.childGroup.mapRectFromParent(ax)
         self.sigSelectionCreated.emit(selectionBounds.getCoords())
+    elif modifiers == QtCore.Qt.ControlModifier:
+      self.state['mouseMode'] = pg.ViewBox.RectMode
+      if ev.isFinish():  ## This is the final move in the drag; change the view scale now
+        pos = ev.pos()
+        callSuperMethod = False
+        self.rbScaleBox.hide()
+        ax = QtCore.QRectF(Point(ev.buttonDownPos(ev.button())), Point(pos))
+        selectionBounds = self.childGroup.mapRectFromParent(ax)
+        self.sigComponentCreated.emit(selectionBounds.getCoords())
     else:
       self.state['mouseMode'] = pg.ViewBox.PanMode
     if callSuperMethod:
@@ -56,6 +68,7 @@ class MainImageArea(pg.PlotWidget):
     self.viewbox: ABViewBox = self.getViewBox()
     self.viewbox.invertY()
     self.sigSelectionCreated = self.viewbox.sigSelectionCreated
+    self.sigComponentCreated = self.viewbox.sigComponentCreated
 
     # -----
     # Image Item
