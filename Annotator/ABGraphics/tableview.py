@@ -11,8 +11,11 @@ from ..constants import TEMPLATE_COMP
 from ..tablemodel import CompTableModel, ComponentMgr, ModelOpts
 
 Slot = QtCore.pyqtSlot
+Signal = QtCore.pyqtSignal
 
 class CompTableView(QtWidgets.QTableView):
+  sigSelectionChanged = Signal(object)
+
   def __init__(self, *args):
     super().__init__(*args)
     self.setSortingEnabled(True)
@@ -31,9 +34,9 @@ class CompTableView(QtWidgets.QTableView):
     validOpts = [True, False]
     boolDelegate = ComboBoxDelegate(self, comboValues=validOpts)
 
-    colTitles = []
+    self.instIdColIdx = TEMPLATE_COMP.paramNames().index(TEMPLATE_COMP.INST_ID.name)
+
     for ii, field in enumerate(TEMPLATE_COMP):
-      colTitles.append(field.name)
       curval = field.value
       if isinstance(curval, bool):
         self.setItemDelegateForColumn(ii, boolDelegate)
@@ -51,6 +54,18 @@ class CompTableView(QtWidgets.QTableView):
       self.mgr = modelOrProxy.sourceModel()
     except AttributeError:
       self.mgr = modelOrProxy
+
+  def selectionChanged(self, curSel: QtCore.QItemSelection, prevSel: QtCore.QItemSelection):
+    """
+    When the selected rows in the table change, this retrieves the corresponding previously
+    and newly selected IDs. They are then emitted in sigSelectionChanged.
+    """
+    super().selectionChanged(curSel, prevSel)
+    selectedIds = []
+    selection = self.selectionModel().selectedIndexes()
+    for item in selection:
+      selectedIds.append(item.sibling(item.row(),self.instIdColIdx).data(QtCore.Qt.EditRole))
+    self.sigSelectionChanged.emit(pd.unique(selectedIds))
 
   def keyPressEvent(self, ev: QtGui.QKeyEvent) -> None:
     # Only delete rows if at least on cell is currently selected
@@ -84,7 +99,7 @@ class CompTableView(QtWidgets.QTableView):
                  dlg.Yes | dlg.Cancel)
     if confirm == dlg.Yes:
       # Proceed with operation
-      idList = [idx.sibling(idx.row(), 0).data(QtCore.Qt.EditRole) for idx in self.selectedIndexes()]
+      idList = [idx.sibling(idx.row(), self.instIdColIdx).data(QtCore.Qt.EditRole) for idx in self.selectedIndexes()]
       # Since each selection represents a row, remove duplicate row indices
       idList = pd.unique(idList)
       self.mgr.rmComps(idList)

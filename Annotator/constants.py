@@ -73,16 +73,17 @@ TEMPLATE_COMP = CompParams()
 
 @dataclass
 class SchemeValues(ABParamGroup):
-  COMP_PARAMS       : ABParam = newParam('Component Parameters')
-  VALID_ID_COLOR    : ABParam = newParam('Validated ID Color')
-  NONVALID_ID_COLOR : ABParam = newParam('Non-Validated ID Color')
-  BOUNDARY_COLOR    : ABParam = newParam('Component Boundary Color')
-  BOUNDARY_WIDTH    : ABParam = newParam('Component Boundary Width')
-  ID_FONT_SIZE      : ABParam = newParam('ID Font Size')
+  COMP_PARAMS        : ABParam = newParam('Component Parameters')
+  VALID_ID_COLOR     : ABParam = newParam('Validated ID Color')
+  NONVALID_ID_COLOR  : ABParam = newParam('Non-Validated ID Color')
+  BOUNDARY_COLOR     : ABParam = newParam('Component Boundary Color')
+  BOUNDARY_WIDTH     : ABParam = newParam('Component Boundary Width')
+  ID_FONT_SIZE       : ABParam = newParam('ID Font Size')
+  SELECTED_ID_BORDER : ABParam = newParam('Selected ID Border color')
 
-  FOC_IMG_PARAMS    : ABParam = newParam('Focused Image Parameters')
-  REG_VERT_COLOR    : ABParam = newParam('Vertex Color')
-  REG_FILL_COLOR    : ABParam = newParam('Fill Color')
+  FOC_IMG_PARAMS     : ABParam = newParam('Focused Image Parameters')
+  REG_VERT_COLOR     : ABParam = newParam('Vertex Color')
+  REG_FILL_COLOR     : ABParam = newParam('Fill Color')
 TEMPLATE_SCHEME_VALUES = SchemeValues()
 
 @dataclass

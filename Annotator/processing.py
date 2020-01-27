@@ -6,11 +6,30 @@ from skimage.morphology import closing, dilation, opening
 from skimage.morphology import disk
 from skimage.segmentation import quickshift
 
+from .generalutils import getClippedBbox
 from .graphicseval import overlayImgs
 
+def getBwComps(img: np.ndarray, minSz=30):
+  bwOut = bwBgMask(img)
+  return rmSmallComps(bwOut, minSz)
 
-def getBwComps(img: np.ndarray) -> np.ndarray:
-  return bwBgMask(img)
+def getBwComps_experimental(img: np.ndarray, minSz=30, seedThresh=45, segThresh=0.) -> np.ndarray:
+  img = (gaussian(img, 1)*255).astype('uint8')
+  initRegions = regionprops(label(bwBgMask(img)))
+  # Grow from the center of these estimatess
+  imshape = img.shape[0:2]
+  bwOut = np.zeros(imshape, dtype=bool)
+  for region in initRegions:
+    # Clipped bbox utility needs x-y ordering not row-col
+    bbox = np.array((region.bbox[1], region.bbox[0],
+                     region.bbox[3], region.bbox[2]))
+    bbox = getClippedBbox(imshape, bbox.reshape(2, 2), 5)[:, ::-1]
+    rowSlice = slice(*bbox[:,0])
+    colSlice = slice(*bbox[:,1])
+    miniImg = img[rowSlice, colSlice,:]
+    miniMask = growBoundarySeeds(miniImg, seedThresh, minSz, segThresh, useAllBounds=True)
+    bwOut[rowSlice, colSlice] = miniMask
+  return bwOut
 
 def getBwComps_segmentation(img: np.ndarray) -> np.ndarray:
   img = (gaussian(img, 1)*255).astype('uint8')
@@ -163,7 +182,7 @@ def growSeedpoint(img: np.array, seeds: np.array, thresh: float, minSz: int=0) -
   return rmSmallComps(bwOut, minSz)
 
 def growBoundarySeeds(img: np.ndarray, seedThresh: float, minSz: int,
-                      segThresh: float=0, useAllBounds=False) -> np.ndarray:
+                      segThresh: float=0., useAllBounds=False) -> np.ndarray:
   """
   Treats all border pixels of :param:`img` as seedpoints for growing. Once these are
   grown, all regions are united, and the inverse area is returned. This has the effect
@@ -180,7 +199,7 @@ def growBoundarySeeds(img: np.ndarray, seedThresh: float, minSz: int,
 
   :return: Mask without any regoions formed from border pixels.
   """
-  img = segmentComp(img, seedThresh)
+  img = segmentComp(img, segThresh)
   nrows, ncols, *_ = img.shape
   maxRow, maxCol = nrows-1, ncols-1
   if useAllBounds:
@@ -211,78 +230,6 @@ def growBoundarySeeds(img: np.ndarray, seedThresh: float, minSz: int,
     bwOut[biggestRegion.coords[:,0], biggestRegion.coords[:,1]] = True
 
   return rmSmallComps(bwOut, minSz)
-
-
-def nanConcatList(vertList):
-  """
-  Utility for concatenating all vertices within a list while adding
-  NaN entries between each separate list
-  """
-  if isinstance(vertList, np.ndarray):
-    vertList = [vertList]
-  nanSep = np.ones((1,2), dtype=int)*np.nan
-  allVerts = []
-  for curVerts in vertList:
-    allVerts.append(curVerts)
-    allVerts.append(nanSep)
-  # Take away last nan if it exists
-  if len(allVerts) > 0:
-    allVerts.pop()
-    return np.vstack(allVerts)
-  return np.array([]).reshape(-1,2)
-
-def splitListAtNans(concatVerts:np.ndarray):
-  """
-  Utility for taking a single list of nan-separated region vertices
-  and breaking it into several regions with no nans.
-  """
-  allVerts = []
-  nanEntries = np.nonzero(np.isnan(concatVerts[:,0]))[0]
-  curIdx = 0
-  for nanEntry in nanEntries:
-    curVerts = concatVerts[curIdx:nanEntry,:].astype('int')
-    allVerts.append(curVerts)
-    curIdx = nanEntry+1
-  # Account for final grouping of verts
-  allVerts.append(concatVerts[curIdx:,:].astype('int'))
-  return allVerts
-
-def sliceToArray(keySlice: slice, arrToSlice: np.ndarray):
-  """
-  Converts array slice into concrete array values
-  """
-  start, stop, step = keySlice.start, keySlice.stop, keySlice.step
-  if start is None:
-    start = 0
-  if stop is None:
-    stop = len(arrToSlice)
-  outArr = np.arange(start, stop, step)
-  # Remove elements that don't correspond to list indices
-  outArr = outArr[np.isin(outArr, arrToSlice)]
-  return outArr
-
-def getClippedBbox(arrShape: tuple, bbox: np.ndarray, margin: int):
-  """
-  Given a bounding box and margin, create a clipped bounding box that does not extend
-  past any dimension size from arrShape
-
-  Parameters
-  ----------
-  arrShape :    2-element tuple
-     Refrence array dimensions
-
-  bbox     :    2x2 array
-     [minX minY; maxX maxY] bounding box coordinates
-
-  margin   :    int
-     Offset from bounding box coords. This will not fully be added to the bounding box
-     if the new margin causes coordinates to fall off either end of the reference array shape.
-  """
-  for ii in range(2):
-    bbox[0,ii] = np.maximum(0, bbox[0,ii]-margin)
-    bbox[1,ii] = np.minimum(arrShape[1-ii], bbox[1,ii]+margin)
-  return bbox.astype(int)
-
 
 if __name__ == '__main__':
   from PIL import Image
