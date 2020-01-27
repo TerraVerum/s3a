@@ -6,8 +6,13 @@ from skimage.morphology import closing, dilation
 from skimage.morphology import disk
 from skimage.segmentation import quickshift
 
+from imageprocessing.algorithms import Algorithms as alg
+from imageprocessing.processing import ABImage
+
 from .graphicseval import overlayImgs
 
+def getColorComps(img: np.array) -> np.ndarray:
+  return colorBgMask(img.astype('uint8'))
 
 def getBwComps(img: np.ndarray) -> np.ndarray:
   return bwBgMask(img)
@@ -51,6 +56,22 @@ def colorLabelsWithMean(labelImg, refImg) -> np.ndarray:
     outImg[curmask,:] = refImg[curmask,:].reshape(-1,3).mean(0)
   return outImg
 
+def colorBgMask(img: np.array) -> np.array:
+  image = ABImage(src=img)
+  process = alg.gmm_backround_mask(image=image,
+                                   n_components=5,
+                                   resize_image=(0.1, 0.1),
+                                   plot_results=True)
+  mask = process.get_result_with_id("Gaussian Mask").image.data
+  kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (5,5))
+  mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel=kernel)
+  kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (7,7))
+  mask = cv.morphologyEx(mask, cv.MORPH_DILATE, kernel=kernel)
+  import matplotlib.pyplot as plt
+  plt.figure()
+  plt.imshow(mask, cmap='gray')
+  plt.show()
+  return mask
 
 def bwBgMask(img: np.array) -> np.array:
   if img.dtype != 'uint8':
