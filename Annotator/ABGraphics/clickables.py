@@ -31,16 +31,22 @@ class ClickableScatterItem(pg.ScatterPlotItem):
     super().__init__(*args, **kwargs)
     # TODO: Find out where the mouse is and make sure it's above a point before changing
     # the mouse cursor
-    #self.setAcceptHoverEvents(True)
 
     self.hoverCursor = QtCore.Qt.PointingHandCursor
 
+  def mouseMoveEvent(self, ev):
+    if self.pointsAt(ev.pos()):
+      self.setCursor(self.hoverCursor)
+    else:
+      self.unsetCursor()
 
-  def hoverEnterEvent(self, ev):
-    self.setCursor(self.hoverCursor)
-
-  def hoverLeaveEvent(self, ev):
-    self.unsetCursor()
+  def idsWithin(self, bbox: tuple):
+    pointLocs = self.getData()
+    tfIsInSelection = (pointLocs[0] >= bbox[0]) \
+      & (pointLocs[0] <= bbox[2]) \
+      & (pointLocs[1] >= bbox[1]) \
+      & (pointLocs[1] <= bbox[3])
+    return [point.data() for point in self.points()[tfIsInSelection]]
 
 # noinspection PyUnusedLocal
 class ClickableTextItem(pg.TextItem):

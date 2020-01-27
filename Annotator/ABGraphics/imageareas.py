@@ -5,6 +5,7 @@ import pyqtgraph as pg
 from PIL import Image
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui
+from pyqtgraph import Point
 
 from .clickables import ClickableImageItem
 from .regions import VertexRegion, SaveablePolyROI
@@ -16,17 +17,45 @@ from ..tablemodel import makeCompDf
 Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
 
+
+class ABViewBox(pg.ViewBox):
+  sigSelectionCreated = Signal(object)
+  def mouseDragEvent(self, ev, axis=None):
+    """
+    Most of the desired functionality for drawing a selection rectangle on the main image
+    already exists within the default viewbox. However, pyqtgraph behavior is to zoom on
+    the selected region once the drag is done. We don't want that -- instead, we want the
+    components within the selected rectangle to be selected within the table. This requires
+    overloading only a small portion of
+    :func:`ViewBox.mouseDragEvent()<pyqtgraph.ViewBox.mouseDragEvent>`.
+    """
+    callSuperMethod = True
+    modifiers = ev.modifiers()
+    if modifiers == QtCore.Qt.ShiftModifier:
+      self.state['mouseMode'] = pg.ViewBox.RectMode
+      if ev.isFinish():  ## This is the final move in the drag; change the view scale now
+        pos = ev.pos()
+        callSuperMethod = False
+        self.rbScaleBox.hide()
+        ax = QtCore.QRectF(Point(ev.buttonDownPos(ev.button())), Point(pos))
+        selectionBounds = self.childGroup.mapRectFromParent(ax)
+        self.sigSelectionCreated.emit(selectionBounds.getCoords())
+    else:
+      self.state['mouseMode'] = pg.ViewBox.PanMode
+    if callSuperMethod:
+      super().mouseDragEvent(ev, axis)
+
+
 class MainImageArea(pg.PlotWidget):
   def __init__(self, parent=None, background='default', imgSrc=None, **kargs):
-    super().__init__(parent, background, **kargs)
+    super().__init__(parent, background, viewBox=ABViewBox(), **kargs)
 
     self.allowNewComps = True
 
     self.setAspectLocked(True)
-    self.getViewBox().invertY()
-
-    self.compSelector = QtCore.QRect(0,0,0,0)
-    self.beganSelect = False
+    self.viewbox: ABViewBox = self.getViewBox()
+    self.viewbox.invertY()
+    self.sigSelectionCreated = self.viewbox.sigSelectionCreated
 
     # -----
     # Image Item
@@ -37,31 +66,14 @@ class MainImageArea(pg.PlotWidget):
     self.setImage(imgSrc)
     self.addItem(self.imgItem)
 
+  def keyPressEvent(self, ev: QtGui.QKeyEvent):
+    if ev.key() == QtCore.Qt.Key_Escape:
+      # Simulate empty bounding box to deselect points
+      self.sigSelectionCreated.emit((-1,-1,-1,-1))
+
   @property
   def image(self):
     return self.imgItem.image
-
-  #def mouseMoveEvent(self, ev: QtGui.QMouseEvent):
-    #if ev.buttons() == QtCore.Qt.LeftButton:
-      ## TODO: Add logic for determining which point is modified
-      ## based on where the mouse is located relative to initial anchor
-      #if self.beganSelect:
-        ## Already placed anchor, move the region now
-        #self.compSelector.setBottomRight(ev.pos())
-      #else:
-        #self.beganSelect = True
-        #self.compSelector.setTopRight(ev.pos())
-    #else:
-      #super().mouseMoveEvent(ev)
-
-  #def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
-    #if self.beganSelect:
-      #self.beganSelect = False
-
-    #else:
-      #pass
-    #super().mouseReleaseEvent(ev)
-
 
   @property
   def clickable(self):
