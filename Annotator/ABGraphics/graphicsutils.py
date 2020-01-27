@@ -11,6 +11,7 @@ from glob import glob
 from functools import partial
 
 from .. import appInst
+from .. import Annotator
 
 Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
@@ -24,6 +25,18 @@ def applyWaitCursor(func):
     finally:
       appInst.restoreOverrideCursor()
   return wrapWithWaitCursor
+
+def disableAppDuringFunc(func):
+  @wraps(func)
+  def disableApp(*args, **kwargs):
+    # Captures 'self' instance
+    mainWin: Annotator = args[0]
+    try:
+      mainWin.setEnabled(False)
+      return func(*args, **kwargs)
+    finally:
+      mainWin.setEnabled(True)
+  return disableApp
 
 def popupFilePicker(parent, winTitle: str, fileFilter: str) -> Optional[str]:
   retVal = None

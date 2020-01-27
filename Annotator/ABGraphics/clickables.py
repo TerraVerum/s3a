@@ -8,8 +8,6 @@ import warnings
 
 from .parameditors import SCHEME_HOLDER
 from ..constants import TEMPLATE_SCHEME_VALUES as SV
-from .. import appInst
-
 
 class ClickableImageItem(pg.ImageItem):
   sigClicked = Signal(object)
@@ -20,13 +18,35 @@ class ClickableImageItem(pg.ImageItem):
   def mouseClickEvent(self, ev: QtGui.QMouseEvent):
     # Capture clicks only if component is present and user allows it
     # And user pressed control
-    keyMods = appInst.keyboardModifiers()
+    keyMods = ev.modifiers()
     if not ev.isAccepted() and ev.button() == QtCore.Qt.LeftButton \
        and self.clickable and self.image is not None \
        and (keyMods == QtCore.Qt.ControlModifier or not self.requireCtrlKey):
       xyCoord = np.round(np.array([[ev.pos().x(), ev.pos().y()]], dtype='int'))
       self.sigClicked.emit(xyCoord)
+    super().mouseClickEvent(ev)
 
+class ClickableScatterItem(pg.ScatterPlotItem):
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    # TODO: Find out where the mouse is and make sure it's above a point before changing
+    # the mouse cursor
+
+    self.hoverCursor = QtCore.Qt.PointingHandCursor
+
+  def mouseMoveEvent(self, ev):
+    if self.pointsAt(ev.pos()):
+      self.setCursor(self.hoverCursor)
+    else:
+      self.unsetCursor()
+
+  def idsWithin(self, bbox: tuple):
+    pointLocs = self.getData()
+    tfIsInSelection = (pointLocs[0] >= bbox[0]) \
+      & (pointLocs[0] <= bbox[2]) \
+      & (pointLocs[1] >= bbox[1]) \
+      & (pointLocs[1] <= bbox[3])
+    return [point.data() for point in self.points()[tfIsInSelection]]
 
 # noinspection PyUnusedLocal
 class ClickableTextItem(pg.TextItem):
@@ -57,8 +77,7 @@ class ClickableTextItem(pg.TextItem):
     schemeClrProp = SV.NONVALID_ID_COLOR
     if validated:
       schemeClrProp = SV.VALID_ID_COLOR
-    txtSize, txtClr = SCHEME_HOLDER.scheme.getCompProps(
-        (SV.ID_FONT_SIZE, schemeClrProp))
+    txtSize, txtClr = SCHEME_HOLDER.scheme[SV.COMP_PARAMS, (SV.ID_FONT_SIZE, schemeClrProp)]
 
     curFont = self.textItem.font()
     curFont.setPointSize(txtSize)
