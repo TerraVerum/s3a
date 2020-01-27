@@ -132,15 +132,16 @@ class CompDisplayFilter(QtCore.QObject):
     mode = QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows
     selectionModel = self._compTbl.selectionModel()
     sortModel = self._compTbl.model()
-    # Select in reverse order so the first element can be accessed by the end of the operation
-    for curId in selectedIds[::-1]:
+    isFirst = True
+    for curId in selectedIds:
       idRow = np.nonzero(self._compMgr.compDf.index == curId)[0][0]
       # Map this ID to its sorted position in the list
       idxForId = sortModel.mapFromSource(self._compMgr.index(idRow, 0))
       selectionModel.select(idxForId, mode)
-    if scrollTo:
-      # When the ID is selected, scroll to that row and highlight the ID
-      self._compTbl.scrollTo(idxForId, self._compTbl.PositionAtCenter)
+      if isFirst and scrollTo:
+        self._compTbl.scrollTo(idxForId, self._compTbl.PositionAtCenter)
+        isFirst = False
+
     self._compTbl.setFocus()
 
 
