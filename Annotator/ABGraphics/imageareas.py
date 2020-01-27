@@ -5,24 +5,58 @@ import pyqtgraph as pg
 from PIL import Image
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui
-from skimage.morphology import closing, opening
+from pyqtgraph import Point
 
 from .clickables import ClickableImageItem
 from .regions import VertexRegion, SaveablePolyROI
 from ..constants import TEMPLATE_COMP as TC
-from ..processing import segmentComp, getVertsFromBwComps, growSeedpoint, getClippedBbox
+from ..processing import segmentComp, getVertsFromBwComps, growSeedpoint
+from Annotator.generalutils import getClippedBbox
 from ..tablemodel import makeCompDf
 
 Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
 
+
+class ABViewBox(pg.ViewBox):
+  sigSelectionCreated = Signal(object)
+  def mouseDragEvent(self, ev, axis=None):
+    """
+    Most of the desired functionality for drawing a selection rectangle on the main image
+    already exists within the default viewbox. However, pyqtgraph behavior is to zoom on
+    the selected region once the drag is done. We don't want that -- instead, we want the
+    components within the selected rectangle to be selected within the table. This requires
+    overloading only a small portion of
+    :func:`ViewBox.mouseDragEvent()<pyqtgraph.ViewBox.mouseDragEvent>`.
+    """
+    callSuperMethod = True
+    modifiers = ev.modifiers()
+    if modifiers == QtCore.Qt.ShiftModifier:
+      self.state['mouseMode'] = pg.ViewBox.RectMode
+      if ev.isFinish():  ## This is the final move in the drag; change the view scale now
+        pos = ev.pos()
+        callSuperMethod = False
+        self.rbScaleBox.hide()
+        ax = QtCore.QRectF(Point(ev.buttonDownPos(ev.button())), Point(pos))
+        selectionBounds = self.childGroup.mapRectFromParent(ax)
+        self.sigSelectionCreated.emit(selectionBounds.getCoords())
+    else:
+      self.state['mouseMode'] = pg.ViewBox.PanMode
+    if callSuperMethod:
+      super().mouseDragEvent(ev, axis)
+
+
 class MainImageArea(pg.PlotWidget):
   def __init__(self, parent=None, background='default', imgSrc=None, **kargs):
-    super().__init__(parent, background, **kargs)
+    super().__init__(parent, background, viewBox=ABViewBox(), **kargs)
 
     self.allowNewComps = True
 
     self.setAspectLocked(True)
+    self.viewbox: ABViewBox = self.getViewBox()
+    self.viewbox.invertY()
+    self.sigSelectionCreated = self.viewbox.sigSelectionCreated
+
     # -----
     # Image Item
     # -----
@@ -31,6 +65,11 @@ class MainImageArea(pg.PlotWidget):
     self.imgItem.setZValue(-100)
     self.setImage(imgSrc)
     self.addItem(self.imgItem)
+
+  def keyPressEvent(self, ev: QtGui.QKeyEvent):
+    if ev.key() == QtCore.Qt.Key_Escape:
+      # Simulate empty bounding box to deselect points
+      self.sigSelectionCreated.emit((-1,-1,-1,-1))
 
   @property
   def image(self):
@@ -54,6 +93,8 @@ class MainImageArea(pg.PlotWidget):
     self.imgItem.setImage(imgSrc)
 
 class FocusedComp(pg.PlotWidget):
+  sigEnterPressed = Signal()
+
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     # Whether drawn items should be added or removed from current component
@@ -63,8 +104,10 @@ class FocusedComp(pg.PlotWidget):
     self.drawType = 'seedpoint'
 
     self.setAspectLocked(True)
+    self.getViewBox().invertY()
 
     self.compSer = makeCompDf().squeeze()
+    self.deletedPrevComponent = False
 
     self.bbox = np.zeros((2,2), dtype='int32')
 
@@ -96,6 +139,24 @@ class FocusedComp(pg.PlotWidget):
   def clickable(self, newVal):
     self.compImgItem.clickable = bool(newVal)
 
+  def keyPressEvent(self, ev: QtGui.QKeyEvent):
+    pressedKey = ev.key()
+    if pressedKey == QtCore.Qt.Key_Enter or pressedKey == QtCore.Qt.Key_Return:
+      self.sigEnterPressed.emit()
+      ev.accept()
+    super().keyPressEvent(ev)
+
+  def mouseMoveEvent(self, ev: QtGui.QKeyEvent):
+    if ev.modifiers() == QtCore.Qt.ControlModifier \
+       and ev.buttons() == QtCore.Qt.LeftButton:
+      # Simulate click in that location
+      posRelToImg = self.compImgItem.mapFromScene(ev.pos())
+      xyCoord = np.round(np.array([[posRelToImg.x(), posRelToImg.y()]], dtype='int'))
+      self.compImageClicked(xyCoord)
+      ev.accept()
+    else:
+      super().mouseMoveEvent(ev)
+
   def compImageClicked(self, newVert: np.ndarray):
     # Capture clicks only if component is present and user allows it
     # TODO: Expand to include ROI, superpixel, etc.
@@ -105,11 +166,8 @@ class FocusedComp(pg.PlotWidget):
     curRegionMask = self.region.embedMaskInImg(newArea.shape)
     if self.inAddMode:
       newArea |= curRegionMask
-      newArea = closing(newArea, np.ones((5,5)))
     else:
       newArea = ~newArea & curRegionMask
-      newArea = opening(newArea, np.ones((5,5)))
-    newArea = closing(newArea, np.ones((5,5)))
     # TODO: handle case of multiple regions existing after click. For now, just use
     # the largest
     vertsPerComp = getVertsFromBwComps(newArea)
@@ -142,17 +200,18 @@ class FocusedComp(pg.PlotWidget):
   def updateAll(self, mainImg: np.array, newComp:df,
              margin: int, segThresh: float):
     newVerts = newComp[TC.VERTICES].squeeze()
-    deletePrevComponent = False
     # If the previous component had no vertices, signal its removal
-    if len(self.compSer[TC.VERTICES].squeeze()) == 0:
-      deletePrevComponent = True
+    if len(self.compSer[TC.VERTICES].squeeze()) == 0 and not self.deletedPrevComponent:
+      self.deletedPrevComponent = True
     # Since values INSIDE the dataframe are reset instead of modified, there is no
     # need to go through the trouble of deep copying
     self.compSer = newComp.copy(deep=False)
+    self.deletedPrevComponent = False
     self.updateBbox(mainImg.shape, newVerts, margin)
     self.updateCompImg(mainImg, segThresh)
     self.updateRegion(newVerts)
-    return deletePrevComponent
+    self.autoRange()
+    return self.deletedPrevComponent
 
   def updateBbox(self, mainImgShape, newVerts: np.ndarray, margin: int):
     # Ignore NAN entries during computation
@@ -164,6 +223,7 @@ class FocusedComp(pg.PlotWidget):
   def updateCompImg(self, mainImg, segThresh, bbox=None):
     if bbox is None:
       bbox = self.bbox
+    # Account for nan entries
     newCompImg = mainImg[bbox[0,1]:bbox[1,1],
                          bbox[0,0]:bbox[1,0],
                          :]

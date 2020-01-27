@@ -11,14 +11,17 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
 
 from .ABGraphics.parameditors import ConstParamWidget, TableFilterEditor, \
-  RegionControlsEditor, SCHEME_HOLDER
-from .ABGraphics.utils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
-  attemptLoadSettings, popupFilePicker
+  RegionControlsEditor, SCHEME_HOLDER, CompExportEditor
+from .ABGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
+  attemptLoadSettings, popupFilePicker, disableAppDuringFunc
 from .CompDisplayFilter import CompDisplayFilter, CompSortFilter
 from .constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
 from .constants import TEMPLATE_REG_CTRLS as REG_CTRLS
-from .processing import getBwComps, getVertsFromBwComps, getClippedBbox
-from .tablemodel import ComponentMgr as ComponentMgr, AddTypes
+from .constants import TEMPLATE_EXPORT_CTRLS as COMP_EXPORT
+from .processing import getBwComps, getVertsFromBwComps, growSeedpoint,\
+  growBoundarySeeds
+from Annotator.generalutils import nanConcatList, getClippedBbox
+from .tablemodel import ComponentMgr as ComponentMgr, ModelOpts
 from .tablemodel import makeCompDf
 
 Slot = QtCore.pyqtSlot
@@ -37,7 +40,7 @@ class Annotator(QtWidgets.QMainWindow):
     uiFile = os.path.join(uiPath, 'imgAnnotator.ui')
     baseModule = str(self.__module__).split('.')[0]
     uic.loadUi(uiFile, self, baseModule)
-    # Start off as a hidden window, force user to show()
+    self.setStatusBar(QtWidgets.QStatusBar())
 
     # Flesh out pg components
     # ---------------
@@ -45,6 +48,11 @@ class Annotator(QtWidgets.QMainWindow):
     # ---------------
     self.mainImg.imgItem.sigClicked.connect(self.mainImgItemClicked)
     self.mainImg.setImage(startImgFpath)
+
+    # ---------------
+    # FOCUSED COMPONENT IMAGE
+    # ---------------
+    self.compImg.sigEnterPressed.connect(self.acceptRegionBtnClicked)
 
     # ---------------
     # COMPONENT MANAGER
@@ -57,24 +65,20 @@ class Annotator(QtWidgets.QMainWindow):
     self.compTbl.setModel(self.sortFilterProxy)
 
     # ---------------
+    # LOAD PARAM EDITORS
+    # ---------------
+    self.regCtrlEditor = RegionControlsEditor()
+    self.scheme = SCHEME_HOLDER.scheme
+    self.filterEditor = TableFilterEditor()
+    self.compExportCtrl = CompExportEditor()
+
+    # ---------------
     # COMPONENT DISPLAY FILTER
     # ---------------
-    # TODO: Add filter widget for displaying only part of component data
-    self.filterEditor = TableFilterEditor()
     self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl, self.filterEditor)
 
     self.mainImg.imgItem.sigImageChanged.connect(self.clearBoundaries)
     self.compDisplay.sigCompClicked.connect(self.updateCurComp)
-
-    # ---------------
-    # LOAD REGION EDIT CONTROLS
-    # ---------------
-    self.regCtrlEditor = RegionControlsEditor()
-
-    # ---------------
-    # SCHEME INIT
-    # ---------------
-    self.scheme = SCHEME_HOLDER.scheme
 
     # ---------------
     # UI ELEMENT SIGNALS
@@ -96,14 +100,15 @@ class Annotator(QtWidgets.QMainWindow):
 
 
     # Edit fields
-    sig = self.regCtrlEditor[REG_CTRLS.SEED_THRESH].sigValueChanged
+    sigObj  = self.regCtrlEditor[REG_CTRLS.FOCUSED_IMG_PARAMS, REG_CTRLS.SEED_THRESH, True]
+    sig = sigObj.sigValueChanged
     sig.connect(self.seedThreshChanged)
     # Note: This signal must be false-triggered on startup to propagate
     # the field's initial value
     sig.emit(None, None)
     # Same with estimating boundaries
     if startImgFpath is not None \
-       and self.regCtrlEditor[REG_CTRLS.EST_BOUNDS_ON_START].value():
+       and self.regCtrlEditor[REG_CTRLS.MAIN_IMG_PARAMS, REG_CTRLS.EST_BOUNDS_ON_START]:
       self.estimateBoundaries()
 
     # Menu options
@@ -113,14 +118,16 @@ class Annotator(QtWidgets.QMainWindow):
 
     self.saveComps.triggered.connect(self.saveCompsActionTriggered)
     self.loadComps_merge.triggered.connect(lambda: self.loadCompsActionTriggered(
-      AddTypes.MERGE))
+      ModelOpts.ADD_AS_MERGE))
     self.loadComps_new.triggered.connect(lambda: self.loadCompsActionTriggered(
-      AddTypes.NEW))
+      ModelOpts.ADD_AS_NEW))
 
     # SETTINGS
-    menuObjs = [self.regCtrlEditor  , self.filterEditor, self.scheme]
-    menus    = [self.regionCtrlsMenu, self.filterMenu  , self.schemeMenu]
-    editBtns = [self.editRegionCtrls, self.editFilter  , self.editScheme]
+    menuObjs = [self.regCtrlEditor  , self.filterEditor, self.scheme, self.compExportCtrl]
+    menus    = [self.regionCtrlsMenu, self.filterMenu  , self.schemeMenu,
+                self.compExportMenu]
+    editBtns = [self.editRegionCtrls, self.editFilter  , self.editScheme,
+                self.editCompExportCtrls]
     for curObj, curMenu, curEditBtn in zip(menuObjs, menus, editBtns):
       curEditBtn.triggered.connect(curObj.show)
       loadFunc = partial(self.genericLoadActionTriggered, curObj)
@@ -156,8 +163,9 @@ class Annotator(QtWidgets.QMainWindow):
     fname = popupFilePicker(self, 'Select Main Image', fileFilter)
 
     if fname is not None:
+      self.compMgr.rmComps()
       self.mainImg.setImage(fname)
-      if self.regCtrlEditor[REG_CTRLS.EST_BOUNDS_ON_START].value():
+      if self.regCtrlEditor[REG_CTRLS.MAIN_IMG_PARAMS, REG_CTRLS.EST_BOUNDS_ON_START]:
         self.estimateBoundaries()
 
   def populateLoadLayoutOptions(self):
@@ -179,13 +187,18 @@ class Annotator(QtWidgets.QMainWindow):
 
   @Slot()
   def saveCompsActionTriggered(self):
+    onlyExportFiltered = self.compExportCtrl[COMP_EXPORT.EXP_ONLY_VISIBLE]
+    if onlyExportFiltered:
+      exportIds = self.compDisplay.displayedIds
+    else:
+      exportIds = ModelOpts.EXPORT_ALL
     fileDlg = QtWidgets.QFileDialog()
     fileFilter = "CSV Files (*.csv)"
     fname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilter)
     if len(fname) > 0:
-      self.compMgr.csvExport(fname)
+      self.compMgr.csvExport(fname, exportIds)
 
-  def loadCompsActionTriggered(self, loadType=AddTypes.NEW):
+  def loadCompsActionTriggered(self, loadType=ModelOpts.ADD_AS_NEW):
     fileFilter = "CSV Files (*.csv)"
     fname = popupFilePicker(self, 'Select Load File', fileFilter)
     if fname is not None:
@@ -235,11 +248,12 @@ class Annotator(QtWidgets.QMainWindow):
   def acceptRegionBtnClicked(self):
     self.compImg.saveNewVerts()
     modifiedComp = self.compImg.compSer
-    self.compMgr.addComps(modifiedComp.to_frame().T, addtype=AddTypes.MERGE)
+    self.compMgr.addComps(modifiedComp.to_frame().T, addtype=ModelOpts.ADD_AS_MERGE)
 
-  @applyWaitCursor
+  @disableAppDuringFunc
   def estimateBoundaries(self):
-    compVertices = getVertsFromBwComps(getBwComps(self.mainImg.image))
+    minSz = self.regCtrlEditor[REG_CTRLS.MAIN_IMG_PARAMS, REG_CTRLS.MIN_COMP_SZ]
+    compVertices = getVertsFromBwComps(getBwComps(self.mainImg.image, minSz))
     components = makeCompDf(len(compVertices))
     components[TC.VERTICES] = compVertices
     self.compMgr.addComps(components)
@@ -277,7 +291,8 @@ class Annotator(QtWidgets.QMainWindow):
   # ---------------
   @Slot()
   def seedThreshChanged(self):
-    self.compImg.seedThresh = self.regCtrlEditor[REG_CTRLS.SEED_THRESH].value()
+    self.compImg.seedThresh = self.regCtrlEditor[REG_CTRLS.FOCUSED_IMG_PARAMS,
+                                                 REG_CTRLS.SEED_THRESH]
 
 
   # ---------------
@@ -289,36 +304,48 @@ class Annotator(QtWidgets.QMainWindow):
     Forms a box with a center at the clicked location, and passes the box
     edges as vertices for a new component.
     """
-    sideLen = self.regCtrlEditor[REG_CTRLS.NEW_COMP_SZ].value()
+    neededParams = (REG_CTRLS.NEW_COMP_SZ, REG_CTRLS.NEW_SEED_THRESH, REG_CTRLS.MIN_COMP_SZ)
+    sideLen, seedThresh, minSz = \
+      self.regCtrlEditor[REG_CTRLS.MAIN_IMG_PARAMS, neededParams]
     vertBox = np.vstack((xyCoord, xyCoord))
     vertBox = getClippedBbox(self.mainImg.image.shape, vertBox, sideLen)
-    # Create square from bounding box
-    compVerts = [
-      [vertBox[0, 0], vertBox[0, 1]],
-      [vertBox[1, 0], vertBox[0, 1]],
-      [vertBox[1, 0], vertBox[1, 1]],
-      [vertBox[0, 0], vertBox[1, 1]]
+    miniImg = self.mainImg.image[
+      vertBox[0,1]:vertBox[1,1], vertBox[0,0]:vertBox[1,0],:
     ]
-    compVerts = np.vstack(compVerts)
+    # Account for mini img offset and x-y -> row-col
+    xyCoord = xyCoord[::-1]
+    xyCoord -= vertBox[0,:]
+    bwCompMask = growSeedpoint(miniImg, xyCoord, seedThresh, minSz)
 
+    compVerts = getVertsFromBwComps(bwCompMask)
+    if len(compVerts) == 0:
+      return
+    # Turn list-of-lists into plottable, nan-separated vertices
+    # Reverse for row-col -> x-y
+    compVerts = nanConcatList(compVerts)
+    # Make sure the vertices are translated to the appropriate coordinates
+    compVerts += vertBox[0,:]
     newComp = makeCompDf()
     newComp[TC.VERTICES] = [compVerts]
     self.compMgr.addComps(newComp)
+    # Make sure index matches ID before updating current component
+    newComp = newComp.set_index(TC.INST_ID, drop=False)
+    # Set this component as active in the focused view
+    self.updateCurComp(newComp.squeeze())
 
 
   @Slot(object)
   @applyWaitCursor
   def updateCurComp(self, newComp: df):
     mainImg = self.mainImg.image
-    margin = self.regCtrlEditor[REG_CTRLS.MARGIN].value()
-    segThresh = self.regCtrlEditor[REG_CTRLS.SEG_THRESH].value()
+    neededParams = [REG_CTRLS.MARGIN, REG_CTRLS.SEG_THRESH]
+    margin, segThresh = self.regCtrlEditor[REG_CTRLS.FOCUSED_IMG_PARAMS, neededParams]
     prevComp = self.compImg.compSer
     rmPrevComp = self.compImg.updateAll(mainImg, newComp, margin, segThresh)
     # If all old vertices were deleted AND we switched images, signal deletion
     # for the previous focused component
     if rmPrevComp:
       self.compMgr.rmComps(prevComp[TC.INST_ID])
-
     self.curCompIdLbl.setText(f'Component ID: {newComp[TC.INST_ID]}')
 
 ## Start Qt event loop unless running in interactive mode or using pyside.

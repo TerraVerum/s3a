@@ -4,7 +4,8 @@ import re
 import sys
 from ast import literal_eval
 from enum import Enum
-from typing import Union, Any, Optional
+from typing import Union, Any, Optional, Sequence
+from functools import wraps
 
 import numpy as np
 import pandas as pd
@@ -12,6 +13,7 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 from tqdm import tqdm
 
+from Annotator.generalutils import coerceDfTypes
 from .constants import TEMPLATE_COMP as TC, CompParams, ComponentTypes
 
 Slot = QtCore.pyqtSlot
@@ -23,15 +25,25 @@ def makeCompDf(numRows=1) -> df:
   This is the recommended method for component instantiation prior to table insertion.
   """
   df_list = []
+  dropRow = False
+  if numRows <= 0:
+    # Create one row and drop it, which ensures data types are correct in the empty
+    # dataframe
+    numRows = 1
+    dropRow = True
   for _ in range(numRows):
     # Make sure to construct a separate component instance for
     # each row no objects have the same reference
     df_list.append([field.value for field in CompParams()])
-  return df(df_list, columns=TC).set_index(TC.INST_ID, drop=False)
+  outDf = df(df_list, columns=TC).set_index(TC.INST_ID, drop=False)
+  if dropRow:
+    outDf = outDf.drop(index=TC.INST_ID.value)
+  return outDf
 
-class AddTypes(Enum):
-  NEW: Enum = 'new'
-  MERGE: Enum = 'merge'
+class ModelOpts(Enum):
+  ADD_AS_NEW      : Enum = 'new'
+  ADD_AS_MERGE    : Enum = 'merge'
+  EXPORT_ALL      : Enum = 'export all components'
 
 class CsvIOError(Exception):
   def __init__(self, message):
@@ -44,12 +56,14 @@ class CompTableModel(QtCore.QAbstractTableModel):
   defaultEmitDict = {'deleted': np.array([]), 'changed': np.array([]), 'added': np.array([])}
   sigCompsChanged = Signal(dict)
 
+  # Used for efficient deletion, where deleting non-contiguous rows takes 1 operation
+  # Instead of N operations
+
   def __init__(self):
     super().__init__()
     # Create component dataframe and remove created row. This is to
     # ensure datatypes are correct
-    self.compDf = makeCompDf()
-    self.compDf = self.compDf.drop(index=TC.INST_ID.value)
+    self.compDf = makeCompDf(0)
 
   # ------
   # Functions required to implement table model
@@ -64,7 +78,7 @@ class CompTableModel(QtCore.QAbstractTableModel):
     if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
       return self.colTitles[section]
 
-  def data(self, index, role=QtCore.Qt.DisplayRole):
+  def data(self, index: QtCore.QModelIndex, role: int) -> Any:
     outData = self.compDf.iloc[index.row(), index.column()]
     if role == QtCore.Qt.DisplayRole:
       return str(outData)
@@ -73,20 +87,20 @@ class CompTableModel(QtCore.QAbstractTableModel):
     else:
       return None
 
-  def setData(self, index, value, role=QtCore.Qt.EditRole):
+  def setData(self, index, value, role=QtCore.Qt.EditRole) -> bool:
     self.compDf.iloc[index.row(), index.column()] = value
     toEmit = self.defaultEmitDict.copy()
     toEmit['changed'] = np.array([self.compDf.index[index.row()]])
     self.sigCompsChanged.emit(toEmit)
     return True
 
-  def flags(self, index: QtCore.QModelIndex):
+  def flags(self, index: QtCore.QModelIndex) -> QtCore.Qt.ItemFlags:
     noEditColIdxs = [self.colTitles.index(col.name)for col in
                      [TC.INST_ID, TC.VERTICES]]
     if index.column() not in noEditColIdxs:
       return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable
     else:
-      return QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled
+      return QtCore.Qt.ItemIsEnabled
 
 class ComponentMgr(CompTableModel):
   _nextCompId = 0
@@ -94,7 +108,7 @@ class ComponentMgr(CompTableModel):
   def __init__(self):
     super().__init__()
 
-  def addComps(self, newCompsDf: df, addtype: AddTypes = AddTypes.NEW):
+  def addComps(self, newCompsDf: df, addtype: ModelOpts = ModelOpts.ADD_AS_NEW):
     toEmit = self.defaultEmitDict.copy()
     existingIds = self.compDf.index
 
@@ -105,7 +119,7 @@ class ComponentMgr(CompTableModel):
     # Inform graphics elements of deletion if this ID is already in our dataframe
     toEmit.update(self.rmComps(dropIds, emitChange=False))
 
-    if addtype == AddTypes.NEW:
+    if addtype == ModelOpts.ADD_AS_NEW:
       # Treat all comps as new -> set their IDs to guaranteed new values
       newIds = np.arange(self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int)
       newCompsDf.loc[:,TC.INST_ID] = newIds
@@ -127,14 +141,18 @@ class ComponentMgr(CompTableModel):
     # Finally, add new comps
     compsToAdd = newCompsDf.iloc[~newChangedIdxs, :]
     self.compDf = pd.concat((self.compDf, compsToAdd), sort=False)
+    # Retain type information
+    coerceDfTypes(self.compDf, TC)
+
     toEmit['added'] = newIds[~newChangedIdxs]
     self.layoutChanged.emit()
 
 
-    self._nextCompId = np.max(self.compDf.index) + 1
+    self._nextCompId = np.max(self.compDf.index.to_numpy()) + 1
     self.sigCompsChanged.emit(toEmit)
+    return toEmit
 
-  def rmComps(self, idsToRemove: Union[np.array, str] = 'all', emitChange=True) -> Optional[dict]:
+  def rmComps(self, idsToRemove: Union[np.array, str] = 'all', emitChange=True) -> dict:
     toEmit = self.defaultEmitDict.copy()
     # Generate ID list
     existingCompIds = self.compDf.index
@@ -157,6 +175,9 @@ class ComponentMgr(CompTableModel):
     self.compDf = self.compDf.iloc[tfKeepIdx,:]
     self.layoutChanged.emit()
 
+    # Preserve type information after change
+    coerceDfTypes(self.compDf, TC)
+
     # Determine next ID for new components
     self._nextCompId = 0
     if np.any(tfKeepIdx):
@@ -168,11 +189,15 @@ class ComponentMgr(CompTableModel):
       self.sigCompsChanged.emit(toEmit)
     return toEmit
 
-  def csvExport(self, outFile: str, **pdExportArgs) -> bool:
+  def csvExport(self, outFile: str,
+                exportIds:Union[ModelOpts, Sequence] = ModelOpts.EXPORT_ALL,
+                **pdExportArgs) \
+      -> bool:
     """
     Serializes the table data and returns the success or failure of the operation.
 
     :param outFile: Name of the output file location
+    :param exportIds: If :var:`ModelOpts.EXPORT_ALL`,
     :param pdExportArgs: Dictionary of values passed to underlying pandas export function.
            These will overwrite the default options for :func:`exportToFile
            <ComponentMgr.exportToFile>`
@@ -194,7 +219,11 @@ class ComponentMgr(CompTableModel):
       #  them, since this may be useful if it can be modified
       # TODO: Add some comment to the top of the CSV or some extra text file output with additional metrics
       #  about the export, like time, who did it, what image it was from, etc.
-      self.compDf.to_csv(outFile, index=False)
+      if isinstance(exportIds, ModelOpts) and exportIds == ModelOpts.EXPORT_ALL:
+        exportDf = self.compDf
+      else:
+        exportDf = self.compDf.loc[exportIds,:]
+      exportDf.to_csv(outFile, index=False)
       success = True
     except IOError:
       # success is already false
@@ -204,9 +233,9 @@ class ComponentMgr(CompTableModel):
       # False positive checker warning for some reason
       # noinspection PyTypeChecker
       np.set_printoptions(oldNpOpts)
-      return success
+    return success
 
-  def csvImport(self, inFile: str, loadType=AddTypes.NEW,
+  def csvImport(self, inFile: str, loadType=ModelOpts.ADD_AS_NEW,
                 imShape: Optional[tuple]=None) -> Optional[Exception]:
     """
     Deserializes data from a csv file to create a Component :class:`DataFrame`.

@@ -10,7 +10,7 @@ from pyqtgraph.Qt import QtCore
 from .ABGraphics import tableview
 from .ABGraphics.clickables import ClickableTextItem
 from .ABGraphics.parameditors import TableFilterEditor
-from .ABGraphics.regions import MultiRegionPlot
+from .ABGraphics.regions import MultiRegionPlot, makeMultiRegionDf
 from .constants import TEMPLATE_COMP as TC
 from .tablemodel import ComponentMgr, ComponentTypes
 
@@ -56,21 +56,25 @@ class CompDisplayFilter(QtCore.QObject):
     self._compTbl = compTbl
     self._compMgr = compMgr
 
+    # Attach to main image area signals
+    mainImg.sigSelectionCreated.connect(self._compPointsSelected)
+
     # Attach to manager signals
-    self._compMgr.sigCompsChanged.connect(self.redrawComps)
+    compMgr.sigCompsChanged.connect(self.redrawComps)
 
     # Retrieve filter changes
     filterEditor.sigParamStateUpdated.connect(self._updateFilter)
 
-    self._compBounds = MultiRegionPlot()
-    self._displayedIds = np.array([], dtype=int)
-    # Keep copy of old id plots to delete when they are removed from compMgr
-    # No need to keep vertices, since deleted vertices are handled by the
-    # MultiRegionPlot and table rows will still have the associated ID
-    self._oldPlotsDf = df(columns=['idPlot'])
-    self._oldPlotsDf.index.set_names([TC.INST_ID], inplace=True)
+    # Update based on table selection
+    compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
+    #self.sigProxy = SignalProxy(self._compTbl.sigSelectionChanged, delay=0.25, slot=self._reflectTableSelectionChange)
 
-    mainImg.addItem(self._compBounds)
+    self._regionPlots = MultiRegionPlot()
+    self.displayedIds = np.array([], dtype=int)
+
+    for plt in self._regionPlots.boundPlt, self._regionPlots.idPlts:
+      mainImg.addItem(plt)
+    self._regionPlots.sigIdClicked.connect(self.handleCompClick)
 
   def redrawComps(self, idLists):
     # Following mix of cases are possible:
@@ -79,62 +83,67 @@ class CompDisplayFilter(QtCore.QObject):
     # Plots: DRAWN, UNDRAWN
     # Note that hiding the ID is chosen instead of deleting, since that is a costly graphics
     # operation
-    id_indexDf = self._compMgr.compDf
+    compDf = self._compMgr.compDf
 
-    # For new components: Add hidden id plot. This will be shown later if filter allows
-    addedIds = idLists['added']
-    verts = id_indexDf.loc[addedIds, TC.VERTICES].values
-    valids = id_indexDf.loc[addedIds, TC.VALIDATED].values
-    newIdPlots = [None]*len(addedIds)
-    for pltIdx, (curId, curVerts, curValid) in enumerate(zip(addedIds, verts, valids)):
-      newPlt = self._createIdPlot(curId, curVerts, curValid)
-      # noinspection PyTypeChecker
-      newIdPlots[pltIdx] = newPlt
-    newIdPlots_Df = df(newIdPlots, index=addedIds, columns=self._oldPlotsDf.columns)
-    self._oldPlotsDf = pd.concat((self._oldPlotsDf, newIdPlots_Df), sort=False)
+    # Update and add changed/new components
+    # TODO: Find out why this isn't working. For now, just reset the whole comp list
+    #  each time components are changed, since the overhead isn't too terrible.
+    regCols = (TC.VERTICES, TC.VALIDATED)
+    # changedIds = np.concatenate((idLists['added'], idLists['changed']))
+    # self._regionPlots[changedIds, regCols] = compDf.loc[changedIds, compCols]
 
-    # Hide all other ids and table rows, since they will be reshown as needed after display filtering
-    for rowIdx, plt in enumerate(self._oldPlotsDf['idPlot']):
-      plt.hide()
+    # Hide all ids and table rows, since they will be reshown as needed after display filtering
+    for rowIdx in range(len(compDf)):
       self._compTbl.hideRow(rowIdx)
 
-    # Component deleted: Delete hidden id plot
-    idsToRm = idLists['deleted']
-    pltsToRm = self._oldPlotsDf['idPlot'].loc[idsToRm].dropna()
-    for plt in pltsToRm.values:
-      self._mainImgArea.removeItem(plt)
-    # Remove these plots from our handle list
-    self._oldPlotsDf = self._oldPlotsDf.drop(index=idsToRm)
+    # Component deleted: Nothing to do, since only displayed IDs will remain in the
+    # region manager anyway
+    #idsToRm = idLists['deleted']
 
-    # Component changed: update text plot
-    # No need to update regions, since the whole list is reset at the end of
-    # this function
-    idsToChange = idLists['changed']
-    changedVerts = id_indexDf.loc[idsToChange, TC.VERTICES]
-    changedValid = id_indexDf.loc[idsToChange, TC.VALIDATED]
-    plotsToChange = self._oldPlotsDf['idPlot'].loc[idsToChange]
-    for curId, curVerts, curValid, idPlot in \
-        zip(idsToChange, changedVerts, changedValid, plotsToChange):
-      idPlot.update(str(curId), curVerts, curValid)
-
-    # Update filter list: hide/unhide ids and verts as needed. This should occur in other
-    # functions that hook into signals sent from filter widget
-    # Only plot shown vertices
+    # Update filter list: hide/unhide ids and verts as needed.
     self._populateDisplayedIds()
+    # Remove all IDs that aren't displayed
+    # FIXME: This isn't working correctly at the moment
+    # self._regionPlots.drop(np.setdiff1d(self._regionPlots.data.index, self._displayedIds))
+    self._regionPlots.resetRegionList(self.displayedIds, compDf.loc[self.displayedIds, regCols])
 
-    pltsToShow = self._oldPlotsDf.loc[self._displayedIds, 'idPlot']
-    tblIdxsToShow = np.nonzero(np.in1d(id_indexDf.index, self._displayedIds))[0]
-    for plt in pltsToShow:
-      plt.show()
+    tblIdxsToShow = np.nonzero(np.in1d(compDf.index, self.displayedIds))[0]
     for rowIdx in tblIdxsToShow:
       self._compTbl.showRow(rowIdx)
-
-    displayVerts = id_indexDf.loc[self._displayedIds, TC.VERTICES]
-    self._compBounds.resetRegionList(self._displayedIds, displayVerts)
 
   def _updateFilter(self, newFilterDict):
     self._filter = newFilterDict
     self.redrawComps(self._compMgr.defaultEmitDict)
+
+  @Slot(object)
+  def _reflectTableSelectionChange(self, selectedIds: np.ndarray):
+    self._regionPlots.selectById(selectedIds)
+
+  @Slot(object)
+  def _compPointsSelected(self, selectionBox: tuple):
+    """
+    :param selectionBox: bounding box of user selection: [xmin ymin xmax ymax]
+    """
+    selectedIds = self._regionPlots.idPlts.idsWithin(selectionBox)
+    self.updateCompSelection(selectedIds, scrollTo=len(selectedIds) > 0)
+
+  def updateCompSelection(self, selectedIds, scrollTo=True):
+    self._compTbl.clearSelection()
+    mode = QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows
+    selectionModel = self._compTbl.selectionModel()
+    sortModel = self._compTbl.model()
+    isFirst = True
+    for curId in selectedIds:
+      idRow = np.nonzero(self._compMgr.compDf.index == curId)[0][0]
+      # Map this ID to its sorted position in the list
+      idxForId = sortModel.mapFromSource(self._compMgr.index(idRow, 0))
+      selectionModel.select(idxForId, mode)
+      if isFirst and scrollTo:
+        self._compTbl.scrollTo(idxForId, self._compTbl.PositionAtCenter)
+        isFirst = False
+
+    self._compTbl.setFocus()
+
 
   def _populateDisplayedIds(self):
     curComps = self._compMgr.compDf
@@ -195,6 +204,8 @@ class CompDisplayFilter(QtCore.QObject):
     xmin, xmax, ymin, ymax = [param[val][0] for param in (xParam, yParam) for val in ['min', 'max']]
 
     for vertIdx, verts in enumerate(compVerts):
+      # Remove nan values for computation
+      verts = verts[~np.isnan(verts[:,0]),:]
       xVerts = verts[:,0]
       yVerts = verts[:,1]
       isAllowed = np.all((xVerts >= xmin) & (xVerts <= xmax)) & \
@@ -203,22 +214,14 @@ class CompDisplayFilter(QtCore.QObject):
     curComps = curComps.loc[vertsAllowed,:]
 
     # Give self the id list of surviving comps
-    self._displayedIds = curComps.index
+    self.displayedIds = curComps.index
 
   @Slot()
   def resetCompBounds(self):
-    self._compBounds.resetRegionList()
+    self._regionPlots.resetRegionList()
 
-  def _createIdPlot(self, instId, verts, validated):
-    idPlot = ClickableTextItem()
-    idPlot.sigClicked.connect(self._rethrowCompClick)
-    idPlot.update(str(instId), verts, validated)
-    self._mainImgArea.addItem(idPlot)
-    return idPlot
-
-  @Slot()
-  def _rethrowCompClick(self):
+  @Slot(int)
+  def handleCompClick(self, clickedId=None):
+    self.updateCompSelection([clickedId], scrollTo=True)
     # noinspection PyTypeChecker
-    idPlot: ClickableTextItem = self.sender()
-    clickedId = int(idPlot.textItem.toPlainText())
     self.sigCompClicked.emit(self._compMgr.compDf.loc[clickedId,:])
