@@ -189,14 +189,14 @@ class RegionControlsEditor(ConstParamWidget):
     _CONTROLS_DICT = [
         {'name': REG_CTRLS.MAIN_IMG_PARAMS.name, 'type': 'group', 'children':[
           {'name': REG_CTRLS.NEW_COMP_SZ.name, 'type': 'int', 'value': 30},
-          {'name': REG_CTRLS.MIN_COMP_SZ.name, 'type': 'int', 'value': 10},
+          {'name': REG_CTRLS.MIN_COMP_SZ.name, 'type': 'int', 'value': 50},
           {'name': REG_CTRLS.NEW_SEED_THRESH.name, 'type': 'float', 'value': 40.},
           {'name': REG_CTRLS.EST_BOUNDS_ON_START.name, 'type': 'bool', 'value': True}
         ]},
         {'name': REG_CTRLS.FOCUSED_IMG_PARAMS.name, 'type': 'group', 'children':[
           {'name': REG_CTRLS.MARGIN.name, 'type': 'int', 'value': 5},
-          {'name': REG_CTRLS.SEG_THRESH.name, 'type': 'float', 'value': 6.},
-          {'name': REG_CTRLS.SEED_THRESH.name, 'type': 'float', 'value': 15.},
+          {'name': REG_CTRLS.SEG_THRESH.name, 'type': 'float', 'value': 3.},
+          {'name': REG_CTRLS.SEED_THRESH.name, 'type': 'float', 'value': 7.},
 
         ]},
       ]

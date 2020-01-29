@@ -5,6 +5,7 @@ from skimage.measure import regionprops, label
 from skimage.morphology import closing, dilation, opening
 from skimage.morphology import disk
 from skimage.segmentation import quickshift
+from PIL import Image
 
 from imageprocessing.algorithms import Algorithms as alg
 from imageprocessing.processing import ABImage
@@ -14,7 +15,7 @@ from .graphicseval import overlayImgs
 
 def getBwComps(img: np.ndarray, minSz=30):
   bwOut = bwBgMask(img)
-  return bwOut
+  return rmSmallComps(bwOut, minSz)
 
 def getColorComps(img: np.array, minSiz=None) -> np.ndarray:
   return colorBgMask(img.astype('uint8'))
@@ -97,11 +98,31 @@ def colorBgMask(img: np.array) -> np.array:
 def bwBgMask(img: np.array) -> np.array:
   if img.dtype != 'uint8':
     img = img.astype('uint8')
-  chans = cv.split(img)
-  mask = np.bitwise_and(1.25*chans[0] < chans[1],
-                        1.25*chans[2] < chans[1])
-  mask = np.invert(closing(mask, disk(5)))
-  return mask
+
+  boardColors = ['red', 'green', 'blue']
+  rr, gg, bb = [img[:,:,ii] for ii in range(img.shape[2])]
+  primaryClrMult = 1.25
+  chanMeans = np.mean(img.reshape(-1,3), axis=0)
+  maxVal = np.max(chanMeans)
+  maxChan = np.argmax(chanMeans)
+  if np.all(np.abs(maxVal - chanMeans) < 10) and val < 50:
+    bgColor = 'black'
+  else:
+    bgColor = boardColors[maxChan]
+    img = img.astype('float')
+
+  if bgColor == 'red':
+    bwcomps = (rr > primaryClrMult*gg) & (rr > primaryClrMult*bb)
+  elif bgColor == 'blue':
+    bwcomps = (bb > primaryClrMult*gg) & (bb > primaryClrMult*rr)
+  elif bgColor == 'black':
+    bwcomps = np.zeros((img.shape[0:2]), dtype='uint8')
+    cv.cvtColor(img, cv.COLOR_RGB2GRAY, bwcomps)
+    bwcomps = bwcomps > 100
+  else:
+    #Defaults to green
+    bwcomps = (gg > primaryClrMult*rr) & (gg > primaryClrMult*bb)
+  return opening(bwcomps, np.ones((3,3), dtype=bool))
 
 def getVertsFromBwComps(bwmask: np.array, simplifyVerts=True) -> np.array:
   # First, turn regions into boxes
