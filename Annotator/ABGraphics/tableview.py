@@ -6,6 +6,9 @@ from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
 import numpy as np
 import pandas as pd
+from pandas import DataFrame as df
+
+from typing import Sequence
 
 from ..constants import TEMPLATE_COMP
 from ..tablemodel import CompTableModel, ComponentMgr, ModelOpts
@@ -13,20 +16,93 @@ from ..tablemodel import CompTableModel, ComponentMgr, ModelOpts
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal
 
+class PopupTableDialog(QtWidgets.QDialog):
+  def __init__(self, *args):
+    super().__init__(*args)
+    self.setModal(True)
+    # -----------
+    # Table View
+    # -----------
+    self.tbl = CompTableView(minimal=True)
+
+    # -----------
+    # Warning Message
+    # -----------
+    self.titles = np.array(self.tbl.mgr.colTitles)
+    self.warnLbl = QtWidgets.QLabel(self)
+    self.warnLbl.setStyleSheet("font-weight: bold; color:red; font-size:14")
+    self.updateWarnMsg(self.titles)
+
+    # -----------
+    # Widget buttons
+    # -----------
+    self.applyBtn = QtWidgets.QPushButton('Apply')
+    self.closeBtn = QtWidgets.QPushButton('Close')
+
+    # -----------
+    # Widget layout
+    # -----------
+    btnLayout = QtWidgets.QHBoxLayout()
+    btnLayout.addWidget(self.applyBtn)
+    btnLayout.addWidget(self.closeBtn)
+
+    centralLayout = QtWidgets.QVBoxLayout()
+    centralLayout.addWidget(self.warnLbl)
+    centralLayout.addWidget(self.tbl)
+    centralLayout.addLayout(btnLayout)
+    self.setLayout(centralLayout)
+    self.setMinimumWidth(self.tbl.width())
+
+    # -----------
+    # UI Element Signals
+    # -----------
+    self.closeBtn.clicked.connect(self.close)
+    self.applyBtn.clicked.connect(self.accept)
+
+  def updateWarnMsg(self, updatableCols: List[str]):
+    warnMsg = f'Note! Only {", ".join(updatableCols)} will be updated from this view.'
+    self.warnLbl.setText(warnMsg)
+
+
+  @property
+  def data(self):
+    return self.tbl.mgr.compDf.iloc[[0],:]
+
+  def setData(self, compDf: df, colIdxs: Sequence):
+    self.tbl.mgr.rmComps()
+    self.tbl.mgr.addComps(compDf, addtype=ModelOpts.ADD_AS_MERGE)
+    self.updateWarnMsg(self.titles[colIdxs])
+
 class CompTableView(QtWidgets.QTableView):
+  """
+  Table for displaying :class:`ComponentMgr` data.
+  """
   sigSelectionChanged = Signal(object)
 
-  def __init__(self, *args):
+  def __init__(self, *args, minimal=False):
+    """
+    Creates the table.
+
+    :param minimal: Whether to make a table with minimal features.
+       If false, creates extensible table with context menu options.
+       Otherwise, only contains minimal features.
+    """
     super().__init__(*args)
     self.setSortingEnabled(True)
 
     self.mgr = ComponentMgr()
+    self.setModel(self.mgr)
 
-    # Create context menu for changing table rows
-    self.menu = self.createContextMenu()
-    self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-    cursor = QtGui.QCursor()
-    self.customContextMenuRequested.connect(lambda: self.menu.exec_(cursor.pos()))
+    if not minimal:
+      self.popup = PopupTableDialog()
+      # Create context menu for changing table rows
+      self.menu = self.createContextMenu()
+      self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+      cursor = QtGui.QCursor()
+      self.customContextMenuRequested.connect(lambda: self.menu.exec_(cursor.pos()))
+    else:
+      # Don't forget to disable custom delete option
+      self.keyPressEvent = super().keyPressEvent
 
     # Default to text box delegate
     self.setItemDelegate(TextDelegate(self))
@@ -86,9 +162,14 @@ class CompTableView(QtWidgets.QTableView):
     remAct = QtGui.QAction("Remove", menu)
     remAct.triggered.connect(self.removeTriggered)
     menu.addAction(remAct)
+
     overwriteAct = QtGui.QAction("Set Same As First", menu)
-    menu.addAction(overwriteAct)
     overwriteAct.triggered.connect(self.overwriteTriggered)
+    menu.addAction(overwriteAct)
+
+    setAsAct = QtGui.QAction("Set As...", menu)
+    menu.addAction(setAsAct)
+    setAsAct.triggered.connect(self.setAsTriggered)
 
     return menu
 
@@ -113,6 +194,17 @@ class CompTableView(QtWidgets.QTableView):
     confirm  = dlg.question(self, 'Overwrite Rows', warnMsg, dlg.Yes | dlg.Cancel)
     if confirm != dlg.Yes:
       return
+    idList, colIdxs = self.getIds_colsFromSelection()
+    if len(idList) <= 1:
+      return
+    toOverwrite = self.mgr.compDf.loc[idList].copy()
+    # Some bug is preventing the single assignment value from broadcasting
+    setVals = [toOverwrite.iloc[0,colIdxs] for _ in range(len(idList)-1)]
+    toOverwrite.iloc[1:, colIdxs] = setVals
+    self.mgr.addComps(toOverwrite, addtype=ModelOpts.ADD_AS_MERGE)
+    self.clearSelection()
+
+  def getIds_colsFromSelection(self):
     selectedIdxs = self.selectedIndexes()
     idList = []
     colIdxs = []
@@ -122,14 +214,21 @@ class CompTableView(QtWidgets.QTableView):
       colIdxs.append(idx.column())
     idList = pd.unique(idList)
     colIdxs = pd.unique(colIdxs)
-    if len(idList) <= 1:
-      return
-    toOverwrite = self.mgr.compDf.loc[idList].copy()
-    # Some bug is preventing the single assignment value from broadcasting
-    setVals = [toOverwrite.iloc[0,colIdxs] for _ in range(len(idList)-1)]
-    toOverwrite.iloc[1:, colIdxs] = setVals
-    self.mgr.addComps(toOverwrite, addtype=ModelOpts.ADD_AS_MERGE)
-    self.clearSelection()
+    return idList, colIdxs
+
+
+  def setAsTriggered(self):
+    idList, colIdxs = self.getIds_colsFromSelection()
+    dataToSet = self.mgr.compDf.iloc[[idList[0]],:].copy()
+    self.popup.setData(dataToSet, colIdxs)
+    wasAccepted = self.popup.exec()
+    if wasAccepted:
+      toOverwrite = self.mgr.compDf.loc[idList].copy()
+      # Some bug is preventing the single assignment value from broadcasting
+      overwriteData = self.popup.data
+      setVals = [overwriteData.iloc[0,colIdxs] for _ in range(len(idList))]
+      toOverwrite.iloc[:, colIdxs] = setVals
+      self.mgr.addComps(toOverwrite, addtype=ModelOpts.ADD_AS_MERGE)
 
 class TextDelegate(QtWidgets.QItemDelegate):
   def createEditor(self, parent, option, index):
