@@ -141,8 +141,8 @@ class Annotator(QtWidgets.QMainWindow):
     # LOAD LAYOUT OPTIONS
     # ---------------
     self.populateLoadLayoutOptions()
-    # Start with docks in default position
-    self.loadLayoutActionTriggered('Default')
+    # Start with docks in default position, hide error if default file doesn't exist
+    self.loadLayoutActionTriggered('Default', showError=False)
 
   # -----------------------------
   # MainWindow CLASS FUNCTIONS
@@ -183,9 +183,9 @@ class Annotator(QtWidgets.QMainWindow):
     addDirItemsToMenu(self.layoutMenu, layoutGlob, self.loadLayoutActionTriggered)
 
   @Slot(str)
-  def loadLayoutActionTriggered(self, layoutName):
+  def loadLayoutActionTriggered(self, layoutName, showError=True):
     layoutFilename = join(LAYOUTS_DIR, f'{layoutName}.dockstate')
-    dockStates = attemptLoadSettings(layoutFilename)
+    dockStates = attemptLoadSettings(layoutFilename, showErrorOnFail=showError)
     if dockStates is not None:
       self.restoreState(dockStates)
 

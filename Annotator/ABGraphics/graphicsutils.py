@@ -64,7 +64,7 @@ def dialogSaveToFile(parent, saveObj, winTitle, saveDir, saveExt, allowOverwrite
         pkl.dump(saveObj, saveFile)
   return returnVal
 
-def attemptLoadSettings(fpath, openMode='rb'):
+def attemptLoadSettings(fpath, openMode='rb', showErrorOnFail=True):
   """
   I/O helper function that, when given a file path, either returns the pickle object
   associated with that file or displays an error message and returns nothing.
@@ -75,7 +75,8 @@ def attemptLoadSettings(fpath, openMode='rb'):
     pklObj = pkl.load(curFile)
     curFile.close()
   except IOError as err:
-    QtWidgets.QErrorMessage().showMessage(f'Settings could not be loaded.\n'
+    if showErrorOnFail:
+      QtWidgets.QErrorMessage().showMessage(f'Settings could not be loaded.\n'
                                       f'Error: {err}')
   finally:
     return pklObj

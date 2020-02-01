@@ -266,16 +266,18 @@ class ComponentMgr(CompTableModel):
       csvDf.columns = TC
       csvDf = csvDf.set_index(TC.INST_ID, drop=False)
 
-      # Image shape from row-col -> x-y
-      imShape = np.array(imShape[1::-1])[None,:]
-      # Remove components whose vertices go over any image edges
-      vertMaxs = [verts.max(0) for verts in csvDf[TC.VERTICES] if len(verts) > 0]
-      vertMaxs = np.vstack(vertMaxs)
-      offendingIds = np.nonzero(np.any(vertMaxs >= imShape, axis=1))[0]
-      if len(offendingIds) > 0:
-        raise CsvIOError(f'Vertices on some components extend beyond image dimensions. '
-                         f'Perhaps this export came from a different image?\n'
-                         f'Offending IDs: {offendingIds}')
+
+      if imShape is not None:
+        # Image shape from row-col -> x-y
+        imShape = np.array(imShape[1::-1])[None,:]
+        # Remove components whose vertices go over any image edges
+        vertMaxs = [verts.max(0) for verts in csvDf[TC.VERTICES] if len(verts) > 0]
+        vertMaxs = np.vstack(vertMaxs)
+        offendingIds = np.nonzero(np.any(vertMaxs >= imShape, axis=1))[0]
+        if len(offendingIds) > 0:
+          raise CsvIOError(f'Vertices on some components extend beyond image dimensions. '
+                           f'Perhaps this export came from a different image?\n'
+                           f'Offending IDs: {offendingIds}')
     except Exception as ex:
       return ex
     # TODO: Apply this function to individual rows instead of the whole dataframe. This will allow malformed
