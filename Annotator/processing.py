@@ -182,6 +182,8 @@ def growSeedpoint(img: np.array, seeds: np.array, thresh: float, minSz: int=0) -
     than :param:`minSz` connected pixels will be removed from the output.
   """
   nChans = img.shape[2] if img.ndim > 2 else 1
+  if nChans < 1:
+    img = img[:,:,None]
   imRCShape = np.array(img.shape[0:2])[None,:]
   bwOut = np.zeros(img.shape[0:2], dtype=bool)
   nChans = img.shape[2] if len(img.shape) > 2 else 1
@@ -239,10 +241,10 @@ def growBoundarySeeds(img: np.ndarray, seedThresh: float, minSz: int,
   nrows, ncols, *_ = img.shape
   maxRow, maxCol = nrows-1, ncols-1
   if useAllBounds:
-    seedRows = np.concatenate([np.repeat(0, maxCol), np.repeat(maxRow, maxCol),
+    seedRows = np.concatenate([np.repeat(0, maxCol+1), np.repeat(maxRow, maxCol+1),
                 np.arange(nrows, dtype=int), np.arange(nrows, dtype=int)])
     seedCols = np.concatenate([np.arange(ncols, dtype=int), np.arange(ncols, dtype=int),
-                np.repeat(0, maxRow), np.repeat(maxCol, maxRow)])
+                np.repeat(0, maxRow+1), np.repeat(maxCol, maxRow+1)])
     seeds = np.hstack((seedRows[:,None], seedCols[:,None]))
   else:
     # Just use image corners
