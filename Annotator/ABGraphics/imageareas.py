@@ -152,7 +152,8 @@ class FocusedComp(pg.PlotWidget):
 
   def keyPressEvent(self, ev: QtGui.QKeyEvent):
     pressedKey = ev.key()
-    if pressedKey == QtCore.Qt.Key_Enter or pressedKey == QtCore.Qt.Key_Return:
+    if pressedKey == QtCore.Qt.Key_Enter or pressedKey == QtCore.Qt.Key_Return or \
+        pressedKey == QtCore.Qt.Key_1:
       self.sigEnterPressed.emit()
       ev.accept()
     super().keyPressEvent(ev)
@@ -166,6 +167,16 @@ class FocusedComp(pg.PlotWidget):
       self.compImageClicked(xyCoord)
       ev.accept()
     else:
+
+
+
+
+
+
+
+
+
+
       super().mouseMoveEvent(ev)
 
   def compImageClicked(self, newVert: np.ndarray):
