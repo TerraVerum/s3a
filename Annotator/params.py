@@ -1,14 +1,28 @@
+from __future__ import annotations
 from dataclasses import dataclass, fields, field
-from typing import Any
+from typing import Any, Optional
+from warnings import warn
+import weakref
 
+class ParamParseError(Exception): pass
 
 @dataclass
 class ABParam:
   name: str
   value: Any
+  group: Optional[ABParamGroup] = None
 
   def __str__(self):
     return f'{self.name}'
+
+  def __lt__(self, other):
+    """
+    Required for sorting by value in component table. Defer to alphabetic
+    sorting
+    :param other: Other :class:`ABParam` member for comparison
+    :return: Whether `self` is less than `other`
+    """
+    return str(self) < str(other)
 
   def __hash__(self):
     # Since every param within a group will have a unique name, just the name is
@@ -35,6 +49,36 @@ class ABParamGroup:
 
   def __len__(self):
     return len(fields(self))
+
+  def __post_init__(self):
+    for param in self:
+      param.group = weakref.proxy(self)
+
+  def fromString(self, paramName: str):
+    """
+    Allows user to create a :class:`ABParam` object from its string value
+    """
+    paramName = paramName.lower()
+    for param in self:
+      if param.name.lower() == paramName:
+        return param
+    # If we reach here the value didn't match any ComponentTypes values. Throw an error
+    defaultParam = self.getDefault()
+    baseWarnMsg = f'String representation "{paramName}" was not recognized. '
+    if defaultParam is None:
+      # No default specified, so we have to raise Exception
+      raise ParamParseError(baseWarnMsg + 'No class default is specified.')
+    # No exception needed, since the user specified a default type in the derived class
+    warn(baseWarnMsg + f'Defaulting to {defaultParam.name}')
+    return defaultParam
+
+  @classmethod
+  def getDefault(cls) -> Optional[ABParam]:
+    """
+    Returns the default Param from the group. This can be overloaded in derived classes to yield a safe
+    fallback class if the :func:`fromString` method fails.
+    """
+    return None
 
 def newParam(name, val=None):
   """

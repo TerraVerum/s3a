@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from enum import Enum
 
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
@@ -11,6 +9,7 @@ from pandas import DataFrame as df
 from typing import Sequence
 
 from ..constants import TEMPLATE_COMP
+from ..params import ABParam, ABParamGroup
 from ..tablemodel import CompTableModel, ComponentMgr, ModelOpts
 
 Slot = QtCore.pyqtSlot
@@ -59,7 +58,7 @@ class PopupTableDialog(QtWidgets.QDialog):
     self.closeBtn.clicked.connect(self.close)
     self.applyBtn.clicked.connect(self.accept)
 
-  def updateWarnMsg(self, updatableCols: List[str]):
+  def updateWarnMsg(self, updatableCols: Sequence[str]):
     warnMsg = f'Note! Only {", ".join(updatableCols)} will be updated from this view.'
     self.warnLbl.setText(warnMsg)
 
@@ -118,6 +117,8 @@ class CompTableView(QtWidgets.QTableView):
         self.setItemDelegateForColumn(ii, boolDelegate)
       elif isinstance(curval, Enum):
         self.setItemDelegateForColumn(ii, ComboBoxDelegate(self, comboValues=list(type(curval))))
+      elif isinstance(curval, ABParam):
+        self.setItemDelegateForColumn(ii, ComboBoxDelegate(self, comboValues=list(curval.group)))
       else:
         # Default to text box
         pass

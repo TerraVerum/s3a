@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import re
 import sys
 from ast import literal_eval
@@ -14,7 +12,8 @@ from pyqtgraph.Qt import QtCore
 from tqdm import tqdm
 
 from Annotator.generalutils import coerceDfTypes
-from .constants import TEMPLATE_COMP as TC, CompParams, ComponentTypes
+from .constants import TEMPLATE_COMP as TC, CompParams
+from .params import ABParam
 
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal
@@ -45,9 +44,7 @@ class ModelOpts(Enum):
   ADD_AS_MERGE    : Enum = 'merge'
   EXPORT_ALL      : Enum = 'export all components'
 
-class CsvIOError(Exception):
-  def __init__(self, message):
-    super().__init__(message)
+class CsvIOError(Exception): pass
 
 class CompTableModel(QtCore.QAbstractTableModel):
   colTitles = TC.paramNames()
@@ -291,7 +288,7 @@ def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> Any:
     # Format string to look like a list, use ast to convert that string INTO a list, make a numpy array from the list
     np.ndarray    : lambda strVal: np.array(literal_eval(re.sub(r'(\d|\])\s+', '\\1,', strVal.replace('\n', '')))),
     bool          : lambda strVal: strVal.lower() == 'true',
-    ComponentTypes: lambda strVal: ComponentTypes.fromString(strVal)
+    ABParam: lambda strVal: paramVal.group.fromString(strVal)
   }
   defaultFunc = lambda strVal: paramType(strVal)
   funcToUse = funcMap.get(paramType, defaultFunc)

@@ -1,6 +1,3 @@
-# Required to avoid cyclic dependency from CompTable annotation
-from __future__ import annotations
-
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
@@ -11,8 +8,8 @@ from .ABGraphics import tableview
 from .ABGraphics.clickables import ClickableTextItem
 from .ABGraphics.parameditors import TableFilterEditor
 from .ABGraphics.regions import MultiRegionPlot, makeMultiRegionDf
-from .constants import TEMPLATE_COMP as TC
-from .tablemodel import ComponentMgr, ComponentTypes
+from .constants import TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES
+from .tablemodel import ComponentMgr
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
@@ -176,8 +173,8 @@ class CompDisplayFilter(QtCore.QObject):
     compTypes = np.array(curComps.loc[:, TC.DEV_TYPE])
     curParam = self._filter[TC.DEV_TYPE.name][1]
     allowedTypes = []
-    for curType in ComponentTypes:
-      isAllowed = curParam[curType.value][0]
+    for curType in COMP_TYPES:
+      isAllowed = curParam[curType.name][0]
       if isAllowed:
         allowedTypes.append(curType)
     curComps = curComps.loc[np.isin(compTypes, allowedTypes),:]

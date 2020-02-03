@@ -11,7 +11,7 @@ from .graphicsutils import dialogSaveToFile
 from ..constants import (
   SCHEMES_DIR, REGION_CTRL_DIR, FILTERS_DIR, EXPORT_CTRL_DIR,
   TEMPLATE_SCHEME_VALUES as SV,
-  TEMPLATE_COMP as TC, ComponentTypes,
+  TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES,
   TEMPLATE_REG_CTRLS as REG_CTRLS,
   TEMPLATE_EXPORT_CTRLS as EXP_CTRL)
 from Annotator.params import ABParam
@@ -208,7 +208,7 @@ class TableFilterEditor(ConstParamWidget):
     # Make max 'infinity'
     minMaxParam[1]['value'] = sys.maxsize
     validatedParms = _genList(['Validated', 'Not Validated'], 'bool', True)
-    devTypeParam = _genList((name.value for name in ComponentTypes), 'bool', True)
+    devTypeParam = _genList((param.name for param in COMP_TYPES), 'bool', True)
     xyVerts = _genList(['X Bounds', 'Y Bounds'], 'group', minMaxParam, 'children')
     _FILTER_DICT = [
         {'name': TC.INST_ID.name, 'type': 'group', 'children': minMaxParam},

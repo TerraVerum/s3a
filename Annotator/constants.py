@@ -1,8 +1,6 @@
 import os
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
-from warnings import warn
 
 import numpy as np
 
@@ -19,43 +17,14 @@ EXPORT_CTRL_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'CompExportControls', '')
 for curDir in [SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR, REGION_CTRL_DIR, EXPORT_CTRL_DIR]:
   Path(curDir).mkdir(parents=True, exist_ok=True)
 
-
-class ComponentTypes(Enum):
-  CAP: Enum = 'Capacitor'
-  RES: Enum = 'Resistor'
-  IND: Enum = 'Inductor'
-  IC: Enum = 'IC'
-  N_A: Enum = 'Unassigned'
-
-  @classmethod
-  def fromString(cls, value):
-    """
-    Allows user to create a ComponentTypes object from its string value
-    """
-    value = value.lower()
-    for param in cls:
-      if param.value.lower() == value:
-        return param
-    # If we reach here the value didn't match any ComponentTypes values. Throw an error
-    warn('String representation of ComponentTypes was not recognized. Defaulting to Unassigned')
-    return cls.N_A
-
-  def __str__(self):
-    """
-    Redefine print representation for prettier display in table
-    :return: printable string representation of enum object
-    """
-    return f'{self.value}'
-
-  def __lt__(self, other):
-    """
-    Required for sorting by enum value in component table. Defer to alphabetic
-    sorting
-    :param other: Other :class:`ComponentTypes` member for comparison
-    :return: Whether `self` is less than `other`
-    """
-    return str(self) < str(other)
-
+@dataclass
+class ComponentTypes(ABParamGroup):
+  CAP: ABParam = newParam('Capacitor')
+  RES: ABParam = newParam('Resistor')
+  IND: ABParam = newParam('Inductor')
+  IC : ABParam = newParam('IC')
+  N_A: ABParam = newParam('Unassigned')
+TEMPLATE_COMP_TYPES = ComponentTypes()
 
 @dataclass
 class CompParams(ABParamGroup):
@@ -64,8 +33,8 @@ class CompParams(ABParamGroup):
   VERTICES  : ABParam = newParam('Vertices', np.ones((1, 2)) * np.nan)
   VALIDATED : ABParam = newParam('Validated', False)
 
+  DEV_TYPE   : ABParam = newParam('Device Type', TEMPLATE_COMP_TYPES.N_A)
   DEV_TEXT   : ABParam = newParam('Device Text', '')
-  DEV_TYPE   : ABParam = newParam('Device Type', ComponentTypes.N_A)
   BOARD_TEXT : ABParam = newParam('Board Text', '')
   LOGO       : ABParam = newParam('Logo', '')
   NOTES      : ABParam = newParam('Notes', '')
