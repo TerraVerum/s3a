@@ -19,7 +19,8 @@ from .constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
 from .constants import TEMPLATE_REG_CTRLS as REG_CTRLS
 from .constants import TEMPLATE_EXPORT_CTRLS as COMP_EXPORT
 from .processing import getBwComps, getVertsFromBwComps, growSeedpoint,\
-  growBoundarySeeds
+  growBoundarySeeds, pcaReduction
+from skimage import morphology
 from Annotator.generalutils import nanConcatList, getClippedBbox
 from .tablemodel import ComponentMgr as ComponentMgr, ModelOpts
 from .tablemodel import makeCompDf
@@ -54,6 +55,7 @@ class Annotator(QtWidgets.QMainWindow):
     # FOCUSED COMPONENT IMAGE
     # ---------------
     self.compImg.sigEnterPressed.connect(self.acceptRegionBtnClicked)
+    self.compImg.sigModeChanged.connect(self.compImgModeChanged)
 
     # ---------------
     # COMPONENT MANAGER
@@ -296,6 +298,12 @@ class Annotator(QtWidgets.QMainWindow):
     curTxt = self.addRmCombo.currentText()
     self.compImg.inAddMode = curTxt == 'Add'
 
+  @Slot(bool)
+  def compImgModeChanged(self, newMode):
+    self.addRmCombo.blockSignals(True)
+    self.addRmCombo.setCurrentIndex(not newMode)
+    self.addRmCombo.blockSignals(False)
+
   # ---------------
   # TEXT EDIT CALLBACKS
   # ---------------
@@ -342,14 +350,35 @@ class Annotator(QtWidgets.QMainWindow):
   @Slot(object)
   def mainImgCompCreated(self, compCoords):
     # TODO: Make this code more robust
-    newVerts = np.array([
-    [compCoords[0], compCoords[1]],
-    [compCoords[2], compCoords[1]],
-    [compCoords[2], compCoords[3]],
-    [compCoords[0], compCoords[3]],
-    ], dtype=int)
+    mainImg_np = self.mainImg.image
+    compCoords = np.reshape(compCoords, (2,2)).astype(int)
+    compCoords = getClippedBbox(mainImg_np.shape, compCoords, 0).flatten()
+    #newVerts = np.array([
+    #[compCoords[0], compCoords[1]],
+    #[compCoords[2], compCoords[1]],
+    #[compCoords[2], compCoords[3]],
+    #[compCoords[0], compCoords[3]],
+    #], dtype=int)
+    seedThresh, minSz = self.regCtrlEditor[REG_CTRLS.MAIN_IMG_PARAMS,
+                                             (REG_CTRLS.NEW_SEED_THRESH, REG_CTRLS.MIN_COMP_SZ)]
+    croppedImg = self.mainImg.image[compCoords[1]:compCoords[3], compCoords[0]:compCoords[2],:]
+    if croppedImg.size == 0: return
+    # Performance for using all bounds is prohibitive for large components
+    # TODO: Find a better method of determining whether to use all bounds
+    if np.prod(croppedImg.shape[0:2]) > 250e3:
+      shouldUseAllBounds = False
+    else:
+      shouldUseAllBounds = True
+    newRegion = growBoundarySeeds(croppedImg, seedThresh, minSz, useAllBounds=shouldUseAllBounds)
+    newRegion = morphology.opening(newRegion, morphology.square(3))
+
+    newVerts = getVertsFromBwComps(newRegion)
+    # Remember to account for the vertex offset
+    if len(newVerts) == 0: return
+    newVerts[0] += compCoords[0:2].reshape(1,2)
     newComp = makeCompDf(1)
-    newComp[TC.VERTICES] = [newVerts]
+    newComp[TC.VERTICES] = newVerts
+    #newComp[TC.VERTICES] = [newVerts]
     self._add_focusComp(newComp)
 
 

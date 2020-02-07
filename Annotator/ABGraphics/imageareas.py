@@ -45,6 +45,7 @@ class ABViewBox(pg.ViewBox):
           self.sigComponentCreated.emit(bounds)
     else:
       self.state['mouseMode'] = pg.ViewBox.PanMode
+      self.rbScaleBox.hide()
     if callSuperMethod:
       super().mouseDragEvent(ev, axis)
 
@@ -105,6 +106,7 @@ class MainImageArea(pg.PlotWidget):
 
 class FocusedComp(pg.PlotWidget):
   sigEnterPressed = Signal()
+  sigModeChanged = Signal(bool)
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -156,6 +158,14 @@ class FocusedComp(pg.PlotWidget):
         pressedKey == QtCore.Qt.Key_1:
       self.sigEnterPressed.emit()
       ev.accept()
+    elif pressedKey == QtCore.Qt.Key_A:
+      self.inAddMode = True
+      self.sigModeChanged.emit(self.inAddMode)
+      ev.accept()
+    elif pressedKey == QtCore.Qt.Key_R:
+      self.inAddMode = False
+      self.sigModeChanged.emit(self.inAddMode)
+      ev.accept()
     super().keyPressEvent(ev)
 
   def mouseMoveEvent(self, ev: QtGui.QKeyEvent):
@@ -167,16 +177,6 @@ class FocusedComp(pg.PlotWidget):
       self.compImageClicked(xyCoord)
       ev.accept()
     else:
-
-
-
-
-
-
-
-
-
-
       super().mouseMoveEvent(ev)
 
   def compImageClicked(self, newVert: np.ndarray):

@@ -19,11 +19,13 @@ for curDir in [SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR, REGION_CTRL_DIR, EXPORT_CT
 
 @dataclass
 class ComponentTypes(ABParamGroup):
-  CAP: ABParam = newParam('Capacitor')
-  RES: ABParam = newParam('Resistor')
-  IND: ABParam = newParam('Inductor')
-  IC : ABParam = newParam('IC')
-  N_A: ABParam = newParam('Unassigned')
+  CAP   : ABParam = newParam('Capacitor')
+  RES   : ABParam = newParam('Resistor')
+  IND   : ABParam = newParam('Inductor')
+  TRANS : ABParam = newParam('Transistor')
+  IC    : ABParam = newParam('IC')
+  OTHER : ABParam = newParam('Other')
+  N_A   : ABParam = newParam('Unassigned')
 TEMPLATE_COMP_TYPES = ComponentTypes()
 
 @dataclass
@@ -33,8 +35,8 @@ class CompParams(ABParamGroup):
   VERTICES  : ABParam = newParam('Vertices', np.ones((1, 2)) * np.nan)
   VALIDATED : ABParam = newParam('Validated', False)
 
-  DEV_TYPE   : ABParam = newParam('Device Type', TEMPLATE_COMP_TYPES.N_A)
   DEV_TEXT   : ABParam = newParam('Device Text', '')
+  DEV_TYPE   : ABParam = newParam('Device Type', TEMPLATE_COMP_TYPES.N_A)
   BOARD_TEXT : ABParam = newParam('Board Text', '')
   LOGO       : ABParam = newParam('Logo', '')
   NOTES      : ABParam = newParam('Notes', '')
