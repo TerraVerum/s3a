@@ -3,6 +3,7 @@ import pickle as pkl
 import sys
 from os.path import join
 from typing import Sequence, Union
+from functools import wraps
 
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree)
@@ -230,6 +231,33 @@ class CompExportEditor(ConstParamWidget):
     super().__init__(parent, paramDict=_EXPORT_DICT, saveDir=EXPORT_CTRL_DIR,
                      saveExt='exportctrl')
 
+class ShortcutEditor(ConstParamWidget):
+
+  def registerFuncShortcut(self, shortcutStrRepr='', *argsForFunc, name=None):
+    """
+    Designed for use as a function decorator. Allows the decorated function to be called from the GUI
+    by a user-specified shortcut. Additionally, this method registers the decorated function within the
+    :class:`ShortcutEditor` so the shortcut can be changed later as needed.
+    """
+    # First construct the shortcut
+    newShortcut = QtWidgets.QShortcut()
+    newShortcut.setKey(shortcutStrRepr)
+    def registerShortcutDecorator(func):
+      # This is where the decorated function will be passed. Activate it with the provided
+      # arguments when the shortcut is called
+      #newShortcut.activated.connect(lambda: func(*argsForFunc))
+      newShortcut.activated.connect(self.test)
+      # TODO: Register this within the ShortcutEditor so the Editor GUI allows shortcut changes
+      @wraps(func)
+      def funcWrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+      return funcWrapper
+    return registerShortcutDecorator
+
+  def test(self):
+    p = 1
+
+
 class SchemeEditor(ConstParamWidget):
   def __init__(self, parent=None):
     _DEFAULT_SCHEME_DICT = [
@@ -250,16 +278,10 @@ class SchemeEditor(ConstParamWidget):
                      saveExt='scheme')
 
 class _SchemeSingleton:
-  _scheme = SchemeEditor()
-
-  # Using properties intead of raw member ensures the same scheme is used across all class instances
-  @property
-  def scheme(self):
-    return _SchemeSingleton._scheme
-
-  @scheme.setter
-  def scheme(self, newScheme: SchemeEditor):
-    _SchemeSingleton._scheme = newScheme
+  scheme = SchemeEditor()
+  shortcuts = ShortcutEditor()
+  def __init__(self):
+    self.shortcuts.registerFuncShortcut(shortcutStrRepr='Ctrl+X')(self.scheme.close)
 
 # Encapsulate scheme within class so that changes to the scheme propagate to all GUI elements
 SCHEME_HOLDER = _SchemeSingleton()
