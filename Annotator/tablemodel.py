@@ -145,7 +145,7 @@ class ComponentMgr(CompTableModel):
     self.layoutChanged.emit()
 
 
-    self._nextCompId = np.max(self.compDf.index.to_numpy()) + 1
+    self._nextCompId = np.max(self.compDf.index.to_numpy(), initial=int(-1)) + 1
     self.sigCompsChanged.emit(toEmit)
     return toEmit
 

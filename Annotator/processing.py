@@ -5,6 +5,7 @@ from skimage.measure import regionprops, label
 from skimage.morphology import closing, dilation, opening
 from skimage.morphology import disk
 from skimage.segmentation import quickshift
+from sklearn.decomposition import PCA
 from PIL import Image
 
 from imageprocessing.algorithms import Algorithms as alg
@@ -110,10 +111,10 @@ def bwBgMask(img: np.array) -> np.array:
 
 def getVertsFromBwComps(bwmask: np.array, simplifyVerts=True) -> np.array:
   # First, turn regions into boxes
-  regions = regionprops(label(bwmask))
-  for region in regions:
-    bbox = region.bbox
-    bwmask[bbox[0]:bbox[2], bbox[1]:bbox[3]] = True
+  #regions = regionprops(label(bwmask))
+  #for region in regions:
+    #bbox = region.bbox
+    #bwmask[bbox[0]:bbox[2], bbox[1]:bbox[3]] = True
 
   approxMethod = cv.CHAIN_APPROX_SIMPLE
   if not simplifyVerts:
@@ -268,6 +269,17 @@ def growBoundarySeeds(img: np.ndarray, seedThresh: float, minSz: int,
     bwOut[biggestRegion.coords[:,0], biggestRegion.coords[:,1]] = True
 
   return rmSmallComps(bwOut, minSz)
+
+
+def pcaReduction(bwRegion: np.ndarray, numPcaComps:int=2):
+  from sklearn.decomposition import PCA
+  pca = PCA()
+  allPca = pca.fit_transform(bwRegion)
+  smallPca = allPca[:,0:numPcaComps]
+  #smallPca = allPca[:,numPcaComps]
+  out = pca.inverse_transform(np.hstack((smallPca, np.zeros((smallPca.shape[0], allPca.shape[1] - numPcaComps)))))
+  #out = pca.inverse_transform(np.hstack((smallPca[:,None], np.zeros((smallPca.shape[0], allPca.shape[1] - 1)))))
+  return out
 
 if __name__ == '__main__':
   from PIL import Image
