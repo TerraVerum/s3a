@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import re
 from dataclasses import dataclass, fields, field
 from typing import Any, Optional
 from warnings import warn
@@ -10,6 +12,7 @@ class ParamParseError(Exception): pass
 class ABParam:
   name: str
   value: Any
+  valType: Optional[Any] = None
   group: Optional[ABParamGroup] = None
 
   def __str__(self):
@@ -80,13 +83,24 @@ class ABParamGroup:
     """
     return None
 
-def newParam(name, val=None):
+def newParam(name, val=None, valType=None):
   """
   Factory for creating new parameters within a :class:`ABParamGroup`.
 
   :param name: Display name of the parameter
   :param val: Initial value of the parameter. This is used within the program to infer
          parameter type, shape, comparison methods, etc.
+  :param valType: Type of the variable if not easily inferrable from the value itself. For instance,
+  class:`ShortcutParameter<Annotator.ABGraphics.parameditors.ShortcutParameter>` is indicated with string values
+  (e.g. 'Ctrl+D'), so the user must explicitly specify that such an :class:`ABParam` is of type 'shortcut' (as
+  defined in :class:`ShortcutParameter<Annotator.ABGraphics.parameditors.ShortcutParameter>`) If the type *is* easily
+  inferrable, this may be left blank.
   :return: Field that can be inserted within the :class:`ABParamGroup` dataclass.
   """
-  return field(default_factory=lambda: ABParam(name, val))
+  if valType is None:
+    # Infer from value
+    # TODO: Is there an easier way?
+    # String rep of val type = <class 'type'>
+    # Parse for '' occurrences and grab in between the quotes
+    valType = re.search('\'.*\'', str(type(val))).group()[1:-1]
+  return field(default_factory=lambda: ABParam(name, val, valType))
