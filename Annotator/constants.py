@@ -80,8 +80,8 @@ class ABConsts(ABParamGroup):
   # --------------------------
   # SHORTCUT PARAMETERS
   # --------------------------
-  SHC_CLEAR_BOUNDAREIS      : ABParam = newParam('Clear Boundaries', 'Ctrl+Shift+C', 'shortcut')
-  SHC_ESTIMATE_BOUNDARIES   : ABParam = newParam('Estimate Boundaries', 'Ctrl+Shift+E', 'shortcut')
+  SHC_CLEAR_BOUNDAREIS      : ABParam = newParam('Clear Boundaries', '', 'shortcut')
+  SHC_ESTIMATE_BOUNDARIES   : ABParam = newParam('Estimate Boundaries', '', 'shortcut')
   SHC_DEL_TBL_ROWS          : ABParam = newParam('Delete Rows', 'Del', 'shortcut')
 
   # --------------------------
