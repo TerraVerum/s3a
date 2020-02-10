@@ -8,17 +8,22 @@ from pandas import DataFrame as df
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore
 
-from Annotator.constants import TEMPLATE_COMP as TC
+from Annotator.constants import TEMPLATE_COMP as TC, AB_CONSTS
 from Annotator.params import ABParamGroup, ABParam, newParam
-from .parameditors import SCHEME_HOLDER
+from .parameditors import AB_SINGLETON
 from .clickables import ClickableScatterItem
-from ..constants import TEMPLATE_SCHEME_VALUES as SV
 from Annotator.generalutils import splitListAtNans, coerceDfTypes
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
+@AB_SINGLETON.registerClass(AB_CONSTS.CLS_VERT_REGION)
 class VertexRegion(pg.ImageItem):
+  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_REG_FILL_COLOR)
+  def fillClr(self): pass
+  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_REG_VERT_COLOR)
+  def vertClr(self): pass
+
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
@@ -53,13 +58,9 @@ class VertexRegion(pg.ImageItem):
     outImg[embedSlices[0], embedSlices[1]] = self.image
     return outImg
 
-  @staticmethod
-  def getLUTFromScheme():
-    fillClr, vertClr = SCHEME_HOLDER.scheme[SV.FOC_IMG_PARAMS,
-                                            (SV.REG_FILL_COLOR, SV.REG_VERT_COLOR)]
-
+  def getLUTFromScheme(self):
     lut = [(0,0,0,0)]
-    for clr in fillClr, vertClr:
+    for clr in self.fillClr, self.vertClr:
       lut.append(clr.getRgb())
     return np.array(lut, dtype='uint8')
 
@@ -132,8 +133,23 @@ def _makeTxtSymbol(txt: str, fontSize: int):
   outSymbol = tr.map(outSymbol)
   return outSymbol
 
+@AB_SINGLETON.registerClass(AB_CONSTS.CLS_MULT_REG_PLT)
 class MultiRegionPlot(QtCore.QObject):
   sigIdClicked = Signal(int)
+
+  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_BOUNDARY_COLOR)
+  def boundClr(self): pass
+  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_BOUNDARY_WIDTH)
+  def boundWidth(self): pass
+  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_VALID_ID_COLOR)
+  def validIdClr(self): pass
+  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_NONVALID_ID_COLOR)
+  def nonvalidIdClr(self): pass
+  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_ID_MARKER_SZ)
+  def idMarkerSz(self): pass
+  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_SELECTED_ID_BORDER)
+  def selectedIdBorder(self): pass
+
   # Helper class for IDE assistance during dataframe access
   def __init__(self, parent=None):
     super().__init__(parent)
@@ -157,23 +173,13 @@ class MultiRegionPlot(QtCore.QObject):
     self[newIds,newRegionDf.columns] = newRegionDf
 
   def selectById(self, selectedIds):
-    selectedClr = SCHEME_HOLDER.scheme[SV.COMP_PARAMS, SV.SELECTED_ID_BORDER]
     pens = np.empty(len(self.data), dtype=object)
     pens.fill(None)
     selectedIdxs = np.isin(self.data.index, selectedIds)
-    pens[selectedIdxs] = pg.mkPen(selectedClr, width=3)
+    pens[selectedIdxs] = pg.mkPen(self.selectedIdBorder, width=3)
     self.idPlts.setPen(pens)
 
   def updatePlot(self):
-    # -----------
-    # Update scheme
-    # -----------
-    neededParams = (SV.VALID_ID_COLOR, SV.NONVALID_ID_COLOR,
-                    SV.BOUNDARY_COLOR, SV.BOUNDARY_WIDTH,
-                    SV.ID_FONT_SIZE, SV.SELECTED_ID_BORDER)
-    validFill, nonValidFill, boundClr, boundWidth, idSz, selectedClr = \
-      SCHEME_HOLDER.scheme[SV.COMP_PARAMS, neededParams]
-
     # -----------
     # Update data
     # -----------
@@ -195,13 +201,13 @@ class MultiRegionPlot(QtCore.QObject):
     scatSymbols = [None for curId in self.data.index]
 
     brushes = np.empty(len(self.data), dtype=object)
-    brushes.fill(pg.mkBrush(nonValidFill))
-    brushes[self.data.loc[:, TC.VALIDATED]] = pg.mkBrush(validFill)
+    brushes.fill(pg.mkBrush(self.nonvalidIdClr))
+    brushes[self.data.loc[:, TC.VALIDATED]] = pg.mkBrush(self.validIdClr)
 
-    self.idPlts.setData(x=idLocs[:,0], y=idLocs[:,1], size=idSz, brush=brushes,
+    self.idPlts.setData(x=idLocs[:,0], y=idLocs[:,1], size=self.idMarkerSz, brush=brushes,
                         data=self.data.index, symbol=scatSymbols)
     plotRegions = np.vstack(plotRegions)
-    boundPen = pg.mkPen(color=boundClr, width=boundWidth)
+    boundPen = pg.mkPen(color=self.boundClr, width=self.boundWidth)
     self.boundPlt.setData(plotRegions[:,0], plotRegions[:,1], pen=boundPen)
 
   def __getitem__(self, keys: Tuple[Any,...]):

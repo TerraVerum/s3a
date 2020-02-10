@@ -1,13 +1,15 @@
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
+from Annotator.params import ABParam
+
 Signal = QtCore.pyqtSignal
 
 import numpy as np
 import warnings
 
-from .parameditors import SCHEME_HOLDER
-from ..constants import TEMPLATE_SCHEME_VALUES as SV
+from .parameditors import AB_SINGLETON
+from ..constants import AB_CONSTS
 
 class ClickableImageItem(pg.ImageItem):
   sigClicked = Signal(object)
@@ -48,10 +50,12 @@ class ClickableScatterItem(pg.ScatterPlotItem):
       & (pointLocs[1] <= bbox[3])
     return [point.data() for point in self.points()[tfIsInSelection]]
 
-# noinspection PyUnusedLocal
 class ClickableTextItem(pg.TextItem):
-  sigClicked = Signal()
 
+  boundClr = AB_SINGLETON.scheme.registerMethod(AB_CONSTS.SCHEME_BOUNDARY_COLOR)
+
+
+  sigClicked = Signal()
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
@@ -77,13 +81,12 @@ class ClickableTextItem(pg.TextItem):
     schemeClrProp = SV.NONVALID_ID_COLOR
     if validated:
       schemeClrProp = SV.VALID_ID_COLOR
-    txtSize, txtClr = SCHEME_HOLDER.scheme[SV.COMP_PARAMS, (SV.ID_FONT_SIZE, schemeClrProp)]
 
     curFont = self.textItem.font()
-    curFont.setPointSize(txtSize)
+    curFont.setPointSize(self.txtSize)
     self.setFont(curFont)
 
-    self.setColor(txtClr)
+    self.setColor(self.txtClr)
 
     super().setText(newText)
 
