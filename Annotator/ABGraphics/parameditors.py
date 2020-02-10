@@ -1,20 +1,18 @@
 # -*- coding: utf-8 -*-
 import pickle as pkl
 import sys
+from dataclasses import dataclass, field
 from os.path import join
-from typing import Sequence, Union
-from functools import wraps
+from typing import Sequence, Union, Dict, Callable, Any, List
+from functools import wraps, partial
 
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-from pyqtgraph.parametertree import (Parameter, ParameterTree)
+from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
 
 from .graphicsutils import dialogSaveToFile
 from ..constants import (
-  SCHEMES_DIR, REGION_CTRL_DIR, FILTERS_DIR, EXPORT_CTRL_DIR,
-  TEMPLATE_SCHEME_VALUES as SV,
-  TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES,
-  TEMPLATE_REG_CTRLS as REG_CTRLS,
-  TEMPLATE_EXPORT_CTRLS as EXP_CTRL)
+  SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR,
+  TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES)
 from Annotator.params import ABParam
 
 Signal = QtCore.pyqtSignal
@@ -23,6 +21,42 @@ def _genList(nameIter, paramType, defaultVal, defaultParam='value'):
   """Helper for generating children elements"""
   return [{'name': name, 'type': paramType, defaultParam: defaultVal} for name in nameIter]
 
+@dataclass
+class ABShortcutCtorGroup:
+  constParam: ABParam
+  func: Callable
+  args: list
+
+class ABEditableShortcut(QtWidgets.QShortcut):
+  paramIdx: QtGui.QKeySequence
+
+class ShortcutParameterItem(parameterTypes.WidgetParameterItem):
+  """
+  Class for creating custom shortcuts. Must be made here since pyqtgraph doesn't
+  provide an implementation.
+  """
+
+  def __init__(self, param, depth):
+    super().__init__(param, depth)
+    self.item = None
+
+  def makeWidget(self):
+    item = QtWidgets.QKeySequenceEdit()
+    item.sigChanged = item.editingFinished
+    item.value = lambda: item.keySequence().toString()
+    item.setValue = item.setKeySequence
+    self.item = item
+    return self.item
+
+class ShortcutParameter(Parameter):
+  itemClass = ShortcutParameterItem
+parameterTypes.registerParameterType('shortcut', ShortcutParameter)
+
+@dataclass
+class ABBoundFnParams:
+  param: ABParam
+  func: Callable
+  defaultFnArgs: list
 
 class ConstParamWidget(QtWidgets.QDialog):
   sigParamStateCreated = Signal(str)
@@ -33,8 +67,12 @@ class ConstParamWidget(QtWidgets.QDialog):
     # Place in list so an empty value gets unpacked into super constructor
     if paramDict is None:
       paramDict = []
+
     super().__init__(parent)
     self.resize(500, 400)
+
+    self.paramsPerClass = {}
+    self.classToParamMapping = {}
 
     # -----------
     # Construct parameter tree
@@ -50,8 +88,8 @@ class ConstParamWidget(QtWidgets.QDialog):
     # -----------
     # Internal parameters for saving settings
     # -----------
-    self.SAVE_DIR = saveDir
-    self.FILE_TYPE = saveExt
+    self.saveDir = saveDir
+    self.fileType = saveExt
     self._saveDlgName = saveDlgName
     self._stateBeforeEdit = self.params.saveState()
 
@@ -140,12 +178,12 @@ class ConstParamWidget(QtWidgets.QDialog):
     super().show()
     self.setWindowState(QtCore.Qt.WindowActive)
 
-  def close(self):
+  def reject(self):
     """
     If window is closed apart from pressing 'accept', restore pre-edit state
     """
     self.params.restoreState(self._stateBeforeEdit)
-    super().close()
+    super().reject()
 
   def keyPressEvent(self, ev: QtGui.QKeyEvent):
     pressedKey = ev.key()
@@ -168,7 +206,7 @@ class ConstParamWidget(QtWidgets.QDialog):
     paramState = self.params.saveState()
     if saveName is False or saveName is None:
       saveName = dialogSaveToFile(self, paramState, self._saveDlgName,
-                                  self.SAVE_DIR, self.FILE_TYPE, allowOverwriteDefault=False)
+                                  self.saveDir, self.fileType, allowOverwriteDefault=False)
     else:
       with open(saveName, 'wb') as saveFile:
         pkl.dump(paramState, saveFile)
@@ -184,24 +222,113 @@ class ConstParamWidget(QtWidgets.QDialog):
   def loadState(self, newStateDict):
     self.params.restoreState(newStateDict, addChildren=False)
 
+  def registerProp(self, constParam: ABParam):
+    # First add registered property to self list
+    def funcWrapper(func):
+      func, clsName = self.registerMethod(constParam)(func, True)
 
-class RegionControlsEditor(ConstParamWidget):
+      @property
+      def paramGetter(clsObj):
+        # Use function wrapper instead of directly returning so no errors are thrown when class isn't fully instantiated
+        return self[self.classToParamMapping[clsName], constParam]
+      return paramGetter
+    return funcWrapper
+
+  def registerMethod(self, constParam: ABParam, fnArgs=None):
+    """
+    Designed for use as a function decorator. Registers the decorated function into a list
+    of methods known to the :class:`ShortcutEditor`. These functions are then accessable from
+    customizeable shortcuts.
+    """
+    if fnArgs is None:
+      fnArgs = []
+
+    def registerMethodDecorator(func: Callable, returnClsName=False):
+      boundFnParam = ABBoundFnParams(param=constParam, func=func, defaultFnArgs=fnArgs)
+      fullFuncName = func.__qualname__
+      lastDotIdx = fullFuncName.find('.')
+      if lastDotIdx < 0:
+        # This function isn't inside a class, so defer
+        # to the global namespace
+        fnParentClass = 'Global'
+      else:
+        # Get name of class containing this function
+        fnParentClass = fullFuncName[:lastDotIdx]
+
+      self._addParamToList(fnParentClass, boundFnParam)
+      if returnClsName:
+        return func, fnParentClass
+      else:
+        return func
+    return registerMethodDecorator
+
+  def _addParamToList(self, clsName: str, param: Union[ABParam, ABBoundFnParams]):
+    clsParams = self.paramsPerClass.get(clsName, [])
+    clsParams.append(param)
+    self.paramsPerClass[clsName] = clsParams
+
+  def registerClass(self, clsParam: ABParam):
+    """
+    Intended for use as a class decorator. Registers a class as able to hold
+    customizable shortcuts.
+    """
+    def classDecorator(cls):
+      clsName = cls.__qualname__
+      self.addParamsFromClass(clsName, clsParam)
+      # Now that class params are registered, save off default file
+      with open(join(self.saveDir, f'Default.{self.fileType}'), 'wb') as ofile:
+        pkl.dump(self.params.saveState(), ofile)
+      self.classToParamMapping[clsName] = clsParam
+      oldClsInit = cls.__init__
+      def newClassInit(clsObj, *args, **kwargs):
+        retVal = oldClsInit(clsObj, *args, **kwargs)
+        self._extendedClassInit(clsObj, clsParam)
+        return retVal
+      cls.__init__ = newClassInit
+      return cls
+    return classDecorator
+
+  def _extendedClassInit(self, clsObj: Any, clsParam: ABParam):
+    """
+    For editors that need to perform any initializations within the decorated class,
+      they must be able to access the decorated class' *init* function and modify it.
+      Allow this by providing an overloadable stub that is inserted into the decorated
+      class *init*.
+    """
+    return
+
+  def addParamsFromClass(self, clsName, clsParam: ABParam):
+    """
+    Once the top-level widget is set, we can construct the
+    parameter editor widget. Set the parent of each shortcut so they
+    can be used when focusing the main window, then construct the
+    editor widget.
+
+    :param clsName: Fully qualified name of the class
+
+    :param clsParam: :class:`ABParam` value encapsulating the human readable class name.
+           This is how the class will be displayed in the :class:`ShortcutEditor`.
+
+    :return: None
+    """
+    classParamList = self.paramsPerClass.get(clsName, [])
+    # Don't add a category unless at least one list element is present
+    if len(classParamList) == 0: return
+    # If a human-readable name was given, replace class name with human name
+    paramChildren = []
+    paramGroup = {'name': clsParam.name, 'type': 'group',
+                  'children': paramChildren}
+    for boundFn in classParamList:
+      paramForTree = {'name': boundFn.param.name,
+                       'type': boundFn.param.valType,
+                       'value': boundFn.param.value}
+      paramChildren.append(paramForTree)
+    self.params.addChild(paramGroup)
+    self._stateBeforeEdit = self.params.saveState()
+
+class GeneralPropsEditor(ConstParamWidget):
   def __init__(self, parent=None):
-    _CONTROLS_DICT = [
-        {'name': REG_CTRLS.MAIN_IMG_PARAMS.name, 'type': 'group', 'children':[
-          {'name': REG_CTRLS.NEW_COMP_SZ.name, 'type': 'int', 'value': 30},
-          {'name': REG_CTRLS.MIN_COMP_SZ.name, 'type': 'int', 'value': 50},
-          {'name': REG_CTRLS.NEW_SEED_THRESH.name, 'type': 'float', 'value': 40.},
-          {'name': REG_CTRLS.EST_BOUNDS_ON_START.name, 'type': 'bool', 'value': False}
-        ]},
-        {'name': REG_CTRLS.FOCUSED_IMG_PARAMS.name, 'type': 'group', 'children':[
-          {'name': REG_CTRLS.MARGIN.name, 'type': 'int', 'value': 5},
-          {'name': REG_CTRLS.SEG_THRESH.name, 'type': 'float', 'value': 3.},
-          {'name': REG_CTRLS.SEED_THRESH.name, 'type': 'float', 'value': 7.},
-
-        ]},
-      ]
-    super().__init__(parent, paramDict=_CONTROLS_DICT, saveDir=REGION_CTRL_DIR, saveExt='regctrl')
+    super().__init__(parent, paramDict=[], saveDir=GEN_PROPS_DIR, saveExt='regctrl')
 
 class TableFilterEditor(ConstParamWidget):
   def __init__(self, parent=None):
@@ -223,65 +350,50 @@ class TableFilterEditor(ConstParamWidget):
       ]
     super().__init__(parent, paramDict=_FILTER_DICT, saveDir=FILTERS_DIR, saveExt='filter')
 
-class CompExportEditor(ConstParamWidget):
-  def __init__(self, parent=None):
-    _EXPORT_DICT = [
-      {'name': EXP_CTRL.EXP_ONLY_VISIBLE.name, 'type': 'bool', 'default': False}
-    ]
-    super().__init__(parent, paramDict=_EXPORT_DICT, saveDir=EXPORT_CTRL_DIR,
-                     saveExt='exportctrl')
-
 class ShortcutEditor(ConstParamWidget):
 
-  def registerFuncShortcut(self, shortcutStrRepr='', *argsForFunc, name=None):
-    """
-    Designed for use as a function decorator. Allows the decorated function to be called from the GUI
-    by a user-specified shortcut. Additionally, this method registers the decorated function within the
-    :class:`ShortcutEditor` so the shortcut can be changed later as needed.
-    """
-    # First construct the shortcut
-    newShortcut = QtWidgets.QShortcut()
-    newShortcut.setKey(shortcutStrRepr)
-    def registerShortcutDecorator(func):
-      # This is where the decorated function will be passed. Activate it with the provided
-      # arguments when the shortcut is called
-      #newShortcut.activated.connect(lambda: func(*argsForFunc))
-      newShortcut.activated.connect(self.test)
-      # TODO: Register this within the ShortcutEditor so the Editor GUI allows shortcut changes
-      @wraps(func)
-      def funcWrapper(*args, **kwargs):
-        return func(*args, **kwargs)
-      return funcWrapper
-    return registerShortcutDecorator
+  def __init__(self, parent=None):
 
-  def test(self):
-    p = 1
+    self.shortcuts = []
+
+
+    # Unlike other param editors, these children don't get filled in until
+    # after the top-level widget is passed to the shortcut editor
+    super().__init__(parent, [], saveDir=SHORTCUTS_DIR, saveExt='shortcut')
+
+  def _extendedClassInit(self, clsObj: Any, clsParam: ABParam):
+    clsName = type(clsObj).__qualname__
+    boundParamList = self.paramsPerClass.get(clsName, [])
+    for boundParam in boundParamList:
+      seqCopy = QtGui.QKeySequence(boundParam.param.value)
+      shortcut = ABEditableShortcut(seqCopy, clsObj)
+      shortcut.paramIdx = (clsParam, boundParam.param)
+      shortcut.activated.connect(partial(boundParam.func, clsObj, *boundParam.defaultFnArgs))
+      shortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
+      self.shortcuts.append(shortcut)
+
+  def applyBtnClicked(self):
+    for shortcut in self.shortcuts: #type: ABEditableShortcut
+      shortcut.setKey(self[shortcut.paramIdx])
+    super().applyBtnClicked()
 
 
 class SchemeEditor(ConstParamWidget):
   def __init__(self, parent=None):
-    _DEFAULT_SCHEME_DICT = [
-      {'name': SV.COMP_PARAMS.name, 'type': 'group', 'children': [
-        {'name': SV.VALID_ID_COLOR.name, 'type': 'color', 'value': '0f0'},
-        {'name': SV.NONVALID_ID_COLOR.name, 'type': 'color', 'value': 'f00'},
-        {'name': SV.BOUNDARY_COLOR.name, 'type': 'color', 'value': 'ff0'},
-        {'name': SV.BOUNDARY_WIDTH.name, 'type': 'int', 'value': 2},
-        {'name': SV.ID_FONT_SIZE.name, 'type': 'int', 'value': 10},
-        {'name': SV.SELECTED_ID_BORDER.name, 'type': 'color', 'value': '00f'}
-      ]},
-      {'name': SV.FOC_IMG_PARAMS.name, 'type': 'group', 'children': [
-        {'name': SV.REG_VERT_COLOR.name, 'type': 'color', 'value': '0f0'},
-        {'name': SV.REG_FILL_COLOR.name, 'type': 'color', 'value': '00ff0046'}
-      ]},
-    ]
-    super().__init__(parent, paramDict=_DEFAULT_SCHEME_DICT, saveDir=SCHEMES_DIR,
+    super().__init__(parent, paramDict=[], saveDir=SCHEMES_DIR,
                      saveExt='scheme')
 
-class _SchemeSingleton:
+class _ABSingleton:
   scheme = SchemeEditor()
   shortcuts = ShortcutEditor()
-  def __init__(self):
-    self.shortcuts.registerFuncShortcut(shortcutStrRepr='Ctrl+X')(self.scheme.close)
+  generalProps = GeneralPropsEditor()
 
+  def registerClass(self, clsParam: ABParam):
+    def multiEditorClsDecorator(cls):
+      # Since all legwork is done inside the editors themselves, simply call each decorator from here as needed
+      for editor in [self.scheme, self.shortcuts, self.generalProps]:
+        cls = editor.registerClass(clsParam)(cls)
+      return cls
+    return multiEditorClsDecorator
 # Encapsulate scheme within class so that changes to the scheme propagate to all GUI elements
-SCHEME_HOLDER = _SchemeSingleton()
+AB_SINGLETON = _ABSingleton()

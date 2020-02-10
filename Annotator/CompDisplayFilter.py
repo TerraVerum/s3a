@@ -4,6 +4,8 @@ import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 
+from Annotator.ABGraphics.parameditors import AB_SINGLETON
+from Annotator.constants import AB_CONSTS
 from .ABGraphics import tableview
 from .ABGraphics.clickables import ClickableTextItem
 from .ABGraphics.parameditors import TableFilterEditor
@@ -40,7 +42,6 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
     except ValueError:
       # If that doesn't work, default to stringified comparison
       return str(leftObj) < str(rightObj)
-
 
 class CompDisplayFilter(QtCore.QObject):
   sigCompClicked = Signal(object)
