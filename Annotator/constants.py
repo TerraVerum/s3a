@@ -11,10 +11,12 @@ BASE_DIR = os.path.dirname(Path(__file__).absolute())
 SCHEMES_DIR     = os.path.join(BASE_DIR, 'MenuOpts', 'Schemes', '')
 LAYOUTS_DIR     = os.path.join(BASE_DIR, 'MenuOpts', 'Layouts', '')
 FILTERS_DIR     = os.path.join(BASE_DIR, 'MenuOpts', 'Filters', '')
-REGION_CTRL_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'RegionControls', '')
-EXPORT_CTRL_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'CompExportControls', '')
+GEN_PROPS_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'RegionControls', '')
+SHORTCUTS_DIR   = os.path.join(BASE_DIR, 'MenuOpts', 'Shortcuts', '')
+
 # Ensure these directories exist
-for curDir in [SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR, REGION_CTRL_DIR, EXPORT_CTRL_DIR]:
+for curDir in [SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR,
+               GEN_PROPS_DIR, SHORTCUTS_DIR]:
   Path(curDir).mkdir(parents=True, exist_ok=True)
 
 @dataclass
@@ -43,39 +45,51 @@ class CompParams(ABParamGroup):
 TEMPLATE_COMP = CompParams()
 
 @dataclass
-class SchemeValues(ABParamGroup):
-  COMP_PARAMS        : ABParam = newParam('Component Parameters')
-  VALID_ID_COLOR     : ABParam = newParam('Validated ID Color')
-  NONVALID_ID_COLOR  : ABParam = newParam('Non-Validated ID Color')
-  BOUNDARY_COLOR     : ABParam = newParam('Component Boundary Color')
-  BOUNDARY_WIDTH     : ABParam = newParam('Component Boundary Width')
-  ID_FONT_SIZE       : ABParam = newParam('ID Font Size')
-  SELECTED_ID_BORDER : ABParam = newParam('Selected ID Border color')
+class ABConsts(ABParamGroup):
+  # --------------------------
+  # CLASS NAMES
+  # --------------------------
+  CLS_ANNOTATOR: ABParam = newParam('Main Annotator')
+  CLS_COMP_TBL: ABParam = newParam('Component Table')
+  CLS_VERT_REGION: ABParam = newParam('Focused Image Graphics')
+  CLS_MULT_REG_PLT: ABParam = newParam('Main Image Graphics')
+  CLS_COMP_MGR : ABParam = newParam('Component Manager')
+  # --------------------------
+  # SCHEME PARAMETERS
+  # --------------------------
+  SCHEME_VALID_ID_COLOR     : ABParam = newParam('Validated ID Color', '0f0', 'color')
+  SCHEME_NONVALID_ID_COLOR  : ABParam = newParam('Non-Validated ID Color', 'f00', 'color')
+  SCHEME_BOUNDARY_COLOR     : ABParam = newParam('Component Boundary Color', 'ff0', 'color')
+  SCHEME_BOUNDARY_WIDTH     : ABParam = newParam('Component Boundary Width', 2)
+  SCHEME_ID_MARKER_SZ       : ABParam = newParam('ID Marker Size', 10)
+  SCHEME_SELECTED_ID_BORDER : ABParam = newParam('Selected ID Border color', '00f', 'color')
+  SCHEME_REG_VERT_COLOR     : ABParam = newParam('Vertex Color', '0f0', 'color')
+  SCHEME_REG_FILL_COLOR     : ABParam = newParam('Fill Color', '00ff0046', 'color')
 
-  FOC_IMG_PARAMS     : ABParam = newParam('Focused Image Parameters')
-  REG_VERT_COLOR     : ABParam = newParam('Vertex Color')
-  REG_FILL_COLOR     : ABParam = newParam('Fill Color')
-TEMPLATE_SCHEME_VALUES = SchemeValues()
+  # --------------------------
+  # REGION-CREATION PARAMETERS
+  # --------------------------
+  PROP_MAIN_IMG_SEED_THRESH  : ABParam = newParam('Seedpoint threshold in main image', 40.)
+  PROP_MIN_COMP_SZ           : ABParam = newParam('Minimum New Component Size (px)', 50)
+  PROP_NEW_COMP_SZ           : ABParam = newParam('New Component Side Length (px)', 30)
+  PROP_EST_BOUNDS_ON_START   : ABParam = newParam('Estimate Boundaries on Image Load', False)
+  PROP_SEG_THRESH            : ABParam = newParam('Segmentation Threshold', 3.)
+  PROP_MARGIN                : ABParam = newParam('Margin', 5)
+  PROP_SEED_THRESH           : ABParam = newParam('Seedpoint Mean Threshold', 7.)
 
-@dataclass
-class RegionControlsEditorValues(ABParamGroup):
-  MAIN_IMG_PARAMS     : ABParam = newParam('Main Image Region Parameters')
-  NEW_SEED_THRESH     : ABParam = newParam('Seedpoint threshold in main image')
-  MIN_COMP_SZ         : ABParam = newParam('Minimum New Component Size (px)')
-  NEW_COMP_SZ         : ABParam = newParam('New Component Size (px^2)')
-  EST_BOUNDS_ON_START : ABParam = newParam('Estimate Boundaries on Image Load')
+  # --------------------------
+  # SHORTCUT PARAMETERS
+  # --------------------------
+  SHC_CLEAR_BOUNDAREIS      : ABParam = newParam('Clear Boundaries', 'Ctrl+Shift+C', 'shortcut')
+  SHC_ESTIMATE_BOUNDARIES   : ABParam = newParam('Estimate Boundaries', 'Ctrl+Shift+E', 'shortcut')
+  SHC_DEL_TBL_ROWS          : ABParam = newParam('Delete Rows', 'Del', 'shortcut')
 
-  FOCUSED_IMG_PARAMS  : ABParam = newParam('Focused Component Region Parameters')
-  SEG_THRESH          : ABParam = newParam('Segmentation Threshold')
-  MARGIN              : ABParam = newParam('Margin')
-  SEED_THRESH         : ABParam = newParam('Seedpoint Mean Threshold')
-TEMPLATE_REG_CTRLS = RegionControlsEditorValues()
-
-@dataclass
-class ExportControlsEditor(ABParamGroup):
-  EXP_ONLY_VISIBLE : ABParam = newParam('Only export visible components')
-TEMPLATE_EXPORT_CTRLS = ExportControlsEditor()
+  # --------------------------
+  # COMPONENT EXPORT PARAMETERS
+  # --------------------------
+  EXP_ONLY_VISIBLE          : ABParam = newParam('Only export visible components', True)
+AB_CONSTS = ABConsts()
 
 if __name__ == '__main__':
-  c = ComponentTypes.fromString('capacitor')
+  c = ComponentTypes().fromString('capacitor')
   print(c)

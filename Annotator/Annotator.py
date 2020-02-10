@@ -10,14 +10,12 @@ import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
 
-from .ABGraphics.parameditors import ConstParamWidget, TableFilterEditor, \
-  RegionControlsEditor, SCHEME_HOLDER, CompExportEditor
+from Annotator.constants import AB_CONSTS
+from .ABGraphics.parameditors import ConstParamWidget, TableFilterEditor, AB_SINGLETON
 from .ABGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc
 from .CompDisplayFilter import CompDisplayFilter, CompSortFilter
 from .constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
-from .constants import TEMPLATE_REG_CTRLS as REG_CTRLS
-from .constants import TEMPLATE_EXPORT_CTRLS as COMP_EXPORT
 from .processing import getBwComps, getVertsFromBwComps, growSeedpoint,\
   growBoundarySeeds, pcaReduction
 from skimage import morphology
@@ -31,6 +29,7 @@ Signal = QtCore.pyqtSignal
 # Configure pg to correctly read image dimensions
 pg.setConfigOptions(imageAxisOrder='row-major')
 
+@AB_SINGLETON.registerClass(AB_CONSTS.CLS_ANNOTATOR)
 class Annotator(QtWidgets.QMainWindow):
   # Alerts GUI that a layout (either new or overwriting old) was saved
   sigLayoutSaved = Signal()
@@ -70,10 +69,9 @@ class Annotator(QtWidgets.QMainWindow):
     # ---------------
     # LOAD PARAM EDITORS
     # ---------------
-    self.regCtrlEditor = RegionControlsEditor()
-    self.scheme = SCHEME_HOLDER.scheme
-    self.filterEditor = TableFilterEditor()
-    self.compExportCtrl = CompExportEditor()
+    self.genPropsEditor = AB_SINGLETON.generalProps
+    self.scheme = AB_SINGLETON.scheme
+    self.filterEditor = TableFilterEditor(self)
 
     # ---------------
     # COMPONENT DISPLAY FILTER
@@ -103,15 +101,13 @@ class Annotator(QtWidgets.QMainWindow):
 
 
     # Edit fields
-    sigObj  = self.regCtrlEditor[REG_CTRLS.FOCUSED_IMG_PARAMS, REG_CTRLS.SEED_THRESH, True]
-    sig = sigObj.sigValueChanged
-    sig.connect(self.seedThreshChanged)
+    self.genPropsEditor.sigParamStateUpdated.connect(self.seedThreshChanged)
     # Note: This signal must be false-triggered on startup to propagate
     # the field's initial value
-    sig.emit(None, None)
+    self.compImg.seedThresh = self.seedGrowThresh
     # Same with estimating boundaries
     if startImgFpath is not None \
-       and self.regCtrlEditor[REG_CTRLS.MAIN_IMG_PARAMS, REG_CTRLS.EST_BOUNDS_ON_START]:
+       and self.estBoundsOnStart:
       self.estimateBoundaries()
 
     # Menu options
@@ -126,11 +122,9 @@ class Annotator(QtWidgets.QMainWindow):
       ModelOpts.ADD_AS_NEW))
 
     # SETTINGS
-    menuObjs = [self.regCtrlEditor  , self.filterEditor, self.scheme, self.compExportCtrl]
-    menus    = [self.regionCtrlsMenu, self.filterMenu  , self.schemeMenu,
-                self.compExportMenu]
-    editBtns = [self.editRegionCtrls, self.editFilter  , self.editScheme,
-                self.editCompExportCtrls]
+    menuObjs = [self.genPropsEditor , self.filterEditor, AB_SINGLETON.scheme, AB_SINGLETON.shortcuts]
+    menus    = [self.regionCtrlsMenu, self.filterMenu  , self.schemeMenu    , self.shortcutsMenu]
+    editBtns = [self.editRegionCtrls, self.editFilter  , self.editScheme    , self.editShortcuts]
     for curObj, curMenu, curEditBtn in zip(menuObjs, menus, editBtns):
       curEditBtn.triggered.connect(curObj.show)
       loadFunc = partial(self.genericLoadActionTriggered, curObj)
@@ -149,13 +143,29 @@ class Annotator(QtWidgets.QMainWindow):
   # -----------------------------
   # MainWindow CLASS FUNCTIONS
   # -----------------------------
+  # TODO: Move these properties into the class responsible for image processing/etc.
+  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_EST_BOUNDS_ON_START)
+  def estBoundsOnStart(self): pass
+  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_NEW_COMP_SZ)
+  def newCompSz(self): pass
+  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_MIN_COMP_SZ)
+  def minCompSz(self): pass
+  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_MAIN_IMG_SEED_THRESH)
+  def mainImgSeedThresh(self): pass
+  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_MARGIN)
+  def focusedCompMargin(self): pass
+  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_SEG_THRESH)
+  def segThresh(self): pass
+  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_SEED_THRESH)
+  def seedGrowThresh(self): pass
+
+
+
   def closeEvent(self, ev):
     # Clean up all child windows, which could potentially be left open
     self.filterEditor.close()
     self.scheme.close()
-    self.regCtrlEditor.close()
-    self.compExportCtrl.close()
-
+    self.genPropsEditor.close()
 
   def _add_focusComp(self, newComp):
     self.compMgr.addComps(newComp)
@@ -177,7 +187,7 @@ class Annotator(QtWidgets.QMainWindow):
     if fname is not None:
       self.compMgr.rmComps()
       self.mainImg.setImage(fname)
-      if self.regCtrlEditor[REG_CTRLS.MAIN_IMG_PARAMS, REG_CTRLS.EST_BOUNDS_ON_START]:
+      if self.estBoundsOnStart:
         self.estimateBoundaries()
 
   def populateLoadLayoutOptions(self):
@@ -225,11 +235,11 @@ class Annotator(QtWidgets.QMainWindow):
 
   def genericPopulateMenuOptions(self, objForMenu: ConstParamWidget, winMenu: QtWidgets.QMenu, triggerFn: Callable):
     addDirItemsToMenu(winMenu,
-                      join(objForMenu.SAVE_DIR, f'*.{objForMenu.FILE_TYPE}'),
+                      join(objForMenu.saveDir, f'*.{objForMenu.fileType}'),
                       triggerFn)
 
   def genericLoadActionTriggered(self, objForMenu: ConstParamWidget, nameToLoad: str):
-    dictFilename = join(objForMenu.SAVE_DIR, f'{nameToLoad}.{objForMenu.FILE_TYPE}')
+    dictFilename = join(objForMenu.saveDir, f'{nameToLoad}.{objForMenu.fileType}')
     loadDict = attemptLoadSettings(dictFilename)
     if loadDict is None:
       return
@@ -263,15 +273,16 @@ class Annotator(QtWidgets.QMainWindow):
     self.compMgr.addComps(modifiedComp.to_frame().T, addtype=ModelOpts.ADD_AS_MERGE)
 
   @disableAppDuringFunc
+  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_ESTIMATE_BOUNDARIES)
   def estimateBoundaries(self):
-    minSz = self.regCtrlEditor[REG_CTRLS.MAIN_IMG_PARAMS, REG_CTRLS.MIN_COMP_SZ]
-    compVertices = getVertsFromBwComps(getBwComps(self.mainImg.image, minSz))
+    compVertices = getVertsFromBwComps(getBwComps(self.mainImg.image, self.minCompSz))
     components = makeCompDf(len(compVertices))
     components[TC.VERTICES] = compVertices
     self.compMgr.addComps(components)
 
   @Slot()
   @applyWaitCursor
+  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_CLEAR_BOUNDAREIS)
   def clearBoundaries(self):
     self.compMgr.rmComps()
 
@@ -309,8 +320,7 @@ class Annotator(QtWidgets.QMainWindow):
   # ---------------
   @Slot()
   def seedThreshChanged(self):
-    self.compImg.seedThresh = self.regCtrlEditor[REG_CTRLS.FOCUSED_IMG_PARAMS,
-                                                 REG_CTRLS.SEED_THRESH]
+    self.compImg.seedThresh = self.seedGrowThresh
 
 
   # ---------------
@@ -322,18 +332,15 @@ class Annotator(QtWidgets.QMainWindow):
     Forms a box with a center at the clicked location, and passes the box
     edges as vertices for a new component.
     """
-    neededParams = (REG_CTRLS.NEW_COMP_SZ, REG_CTRLS.NEW_SEED_THRESH, REG_CTRLS.MIN_COMP_SZ)
-    sideLen, seedThresh, minSz = \
-      self.regCtrlEditor[REG_CTRLS.MAIN_IMG_PARAMS, neededParams]
     vertBox = np.vstack((xyCoord, xyCoord))
-    vertBox = getClippedBbox(self.mainImg.image.shape, vertBox, sideLen)
+    vertBox = getClippedBbox(self.mainImg.image.shape, vertBox, self.newCompSz)
     miniImg = self.mainImg.image[
       vertBox[0,1]:vertBox[1,1], vertBox[0,0]:vertBox[1,0],:
     ]
     # Account for mini img offset and x-y -> row-col
     xyCoord = xyCoord[::-1]
     xyCoord -= vertBox[0,:]
-    bwCompMask = growSeedpoint(miniImg, xyCoord, seedThresh, minSz)
+    bwCompMask = growSeedpoint(miniImg, xyCoord, self.seedGrowThresh, self.minCompSz)
 
     compVerts = getVertsFromBwComps(bwCompMask)
     if len(compVerts) == 0:
@@ -359,8 +366,6 @@ class Annotator(QtWidgets.QMainWindow):
     #[compCoords[2], compCoords[3]],
     #[compCoords[0], compCoords[3]],
     #], dtype=int)
-    seedThresh, minSz = self.regCtrlEditor[REG_CTRLS.MAIN_IMG_PARAMS,
-                                             (REG_CTRLS.NEW_SEED_THRESH, REG_CTRLS.MIN_COMP_SZ)]
     croppedImg = self.mainImg.image[compCoords[1]:compCoords[3], compCoords[0]:compCoords[2],:]
     if croppedImg.size == 0: return
     # Performance for using all bounds is prohibitive for large components
@@ -369,7 +374,7 @@ class Annotator(QtWidgets.QMainWindow):
       shouldUseAllBounds = False
     else:
       shouldUseAllBounds = True
-    newRegion = growBoundarySeeds(croppedImg, seedThresh, minSz, useAllBounds=shouldUseAllBounds)
+    newRegion = growBoundarySeeds(croppedImg, self.seedGrowThresh, self.minCompSz, useAllBounds=shouldUseAllBounds)
     newRegion = morphology.opening(newRegion, morphology.square(3))
 
     newVerts = getVertsFromBwComps(newRegion)
@@ -386,10 +391,8 @@ class Annotator(QtWidgets.QMainWindow):
   @applyWaitCursor
   def updateCurComp(self, newComp: df):
     mainImg = self.mainImg.image
-    neededParams = [REG_CTRLS.MARGIN, REG_CTRLS.SEG_THRESH]
-    margin, segThresh = self.regCtrlEditor[REG_CTRLS.FOCUSED_IMG_PARAMS, neededParams]
     prevComp = self.compImg.compSer
-    rmPrevComp = self.compImg.updateAll(mainImg, newComp, margin, segThresh)
+    rmPrevComp = self.compImg.updateAll(mainImg, newComp, self.focusedCompMargin, self.segThresh)
     # If all old vertices were deleted AND we switched images, signal deletion
     # for the previous focused component
     if rmPrevComp:

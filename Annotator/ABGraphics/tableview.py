@@ -8,9 +8,10 @@ from pandas import DataFrame as df
 
 from typing import Sequence
 
-from ..constants import TEMPLATE_COMP
+from ..constants import TEMPLATE_COMP, AB_CONSTS
 from ..params import ABParam, ABParamGroup
 from ..tablemodel import CompTableModel, ComponentMgr, ModelOpts
+from .parameditors import AB_SINGLETON
 
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal
@@ -62,16 +63,27 @@ class PopupTableDialog(QtWidgets.QDialog):
     warnMsg = f'Note! Only {", ".join(updatableCols)} will be updated from this view.'
     self.warnLbl.setText(warnMsg)
 
-
   @property
   def data(self):
     return self.tbl.mgr.compDf.iloc[[0],:]
 
   def setData(self, compDf: df, colIdxs: Sequence):
+    # Hide columns that weren't selected by the user since these changes
+    # Won't propagate
+    for ii in range(len(self.titles)):
+      if ii not in colIdxs:
+        self.tbl.hideColumn(ii)
     self.tbl.mgr.rmComps()
     self.tbl.mgr.addComps(compDf, addtype=ModelOpts.ADD_AS_MERGE)
     self.updateWarnMsg(self.titles[colIdxs])
 
+  def reject(self):
+    # On dialog close be sure to unhide all columns
+    for ii in range(len(self.titles)):
+      self.tbl.showColumn(ii)
+    super().reject()
+
+@AB_SINGLETON.registerClass(AB_CONSTS.CLS_COMP_TBL)
 class CompTableView(QtWidgets.QTableView):
   """
   Table for displaying :class:`ComponentMgr` data.
@@ -92,6 +104,7 @@ class CompTableView(QtWidgets.QTableView):
     self.mgr = ComponentMgr()
     self.setModel(self.mgr)
 
+    self.minimal = minimal
     if not minimal:
       self.popup = PopupTableDialog()
       # Create context menu for changing table rows
@@ -99,9 +112,7 @@ class CompTableView(QtWidgets.QTableView):
       self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
       cursor = QtGui.QCursor()
       self.customContextMenuRequested.connect(lambda: self.menu.exec_(cursor.pos()))
-    else:
-      # Don't forget to disable custom delete option
-      self.keyPressEvent = super().keyPressEvent
+
 
     # Default to text box delegate
     self.setItemDelegate(TextDelegate(self))
@@ -144,17 +155,15 @@ class CompTableView(QtWidgets.QTableView):
       selectedIds.append(item.sibling(item.row(),self.instIdColIdx).data(QtCore.Qt.EditRole))
     self.sigSelectionChanged.emit(pd.unique(selectedIds))
 
-  def keyPressEvent(self, ev: QtGui.QKeyEvent) -> None:
-    # Only delete rows if at least on cell is currently selected
-    pressedKey = ev.key()
-    modifiers = ev.modifiers()
-    isItemSelected = len(self.selectionModel().selectedIndexes()) > 0
-    if isItemSelected:
-      if pressedKey == QtCore.Qt.Key_Delete:
-        self.removeTriggered()
-      elif pressedKey == QtCore.Qt.Key_D and modifiers == QtCore.Qt.ControlModifier:
-        self.overwriteTriggered()
-    super().keyPressEvent(ev)
+  # def keyPressEvent(self, ev: QtGui.QKeyEvent) -> None:
+  #   # Only delete rows if at least on cell is currently selected
+  #   pressedKey = ev.key()
+  #   modifiers = ev.modifiers()
+  #   isItemSelected = len(self.selectionModel().selectedIndexes()) > 0
+  #   if isItemSelected:
+  #     if pressedKey == QtCore.Qt.Key_Delete:
+  #       self.removeTriggered()
+  #   super().keyPressEvent(ev)
 
   def createContextMenu(self):
     menu = QtWidgets.QMenu(self)
@@ -174,7 +183,10 @@ class CompTableView(QtWidgets.QTableView):
 
     return menu
 
+  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_DEL_TBL_ROWS)
   def removeTriggered(self):
+    if self.minimal: return
+
     # Make sure the user actually wants this
     dlg = QtWidgets.QMessageBox()
     confirm  = dlg.question(self, 'Remove Rows', 'Are you sure you want to remove these rows?',
@@ -188,6 +200,8 @@ class CompTableView(QtWidgets.QTableView):
       self.clearSelection()
 
   def overwriteTriggered(self):
+    if self.minimal: return
+
     # Make sure the user actually wants this
     dlg = QtWidgets.QMessageBox()
     warnMsg = f'This operation will overwrite *ALL* selected columns with the corresponding column values from'\
@@ -219,7 +233,11 @@ class CompTableView(QtWidgets.QTableView):
 
 
   def setAsTriggered(self):
+    if self.minimal: return
+
     idList, colIdxs = self.getIds_colsFromSelection()
+    if len(idList) == 0: return
+
     dataToSet = self.mgr.compDf.iloc[[idList[0]],:].copy()
     self.popup.setData(dataToSet, colIdxs)
     wasAccepted = self.popup.exec()

@@ -11,6 +11,8 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 from tqdm import tqdm
 
+from Annotator.ABGraphics.parameditors import AB_SINGLETON
+from Annotator.constants import AB_CONSTS
 from Annotator.generalutils import coerceDfTypes
 from .constants import TEMPLATE_COMP as TC, CompParams
 from .params import ABParam
@@ -99,7 +101,11 @@ class CompTableModel(QtCore.QAbstractTableModel):
     else:
       return QtCore.Qt.ItemIsEnabled
 
+@AB_SINGLETON.registerClass(AB_CONSTS.CLS_COMP_MGR)
 class ComponentMgr(CompTableModel):
+  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.EXP_ONLY_VISIBLE)
+  def exportOnlyVis(self): pass
+
   _nextCompId = 0
 
   def __init__(self):

@@ -56,7 +56,6 @@ class ABViewBox(pg.ViewBox):
     selectionBounds = self.childGroup.mapRectFromParent(ax)
     return selectionBounds.getCoords()
 
-
 class MainImageArea(pg.PlotWidget):
   def __init__(self, parent=None, background='default', imgSrc=None, **kargs):
     super().__init__(parent, background, viewBox=ABViewBox(), **kargs)
