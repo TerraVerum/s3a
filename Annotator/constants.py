@@ -33,15 +33,18 @@ TEMPLATE_COMP_TYPES = ComponentTypes()
 @dataclass
 class CompParams(ABParamGroup):
   # These 3 params MUST exist in the component
-  INST_ID   : ABParam = newParam('Instance ID', -1)
-  VERTICES  : ABParam = newParam('Vertices', np.ones((1, 2)) * np.nan)
-  VALIDATED : ABParam = newParam('Validated', False)
-
-  DEV_TEXT   : ABParam = newParam('Device Text', '')
-  DEV_TYPE   : ABParam = newParam('Device Type', TEMPLATE_COMP_TYPES.N_A)
-  BOARD_TEXT : ABParam = newParam('Board Text', '')
-  LOGO       : ABParam = newParam('Logo', '')
-  NOTES      : ABParam = newParam('Notes', '')
+  INST_ID       : ABParam = newParam('Instance ID', -1)
+  VERTICES      : ABParam = newParam('Vertices', np.ones((1, 2)) * np.nan)
+  VALIDATED     : ABParam = newParam('Validated', False)
+  ANN_FILENAME  : ABParam = newParam('Filename', '')
+  ANN_AUTHOR    : ABParam = newParam('Author', '')
+  ANN_TIMESTAMP : ABParam = newParam('Timestamp', '')
+  DEV_NAME      : ABParam = newParam('Device Name', '')
+  DEV_TEXT      : ABParam = newParam('Device Text', '')
+  DEV_TYPE      : ABParam = newParam('Device Type', TEMPLATE_COMP_TYPES.N_A)
+  BOARD_TEXT    : ABParam = newParam('Board Text', '')
+  LOGO          : ABParam = newParam('Logo', '')
+  NOTES         : ABParam = newParam('Notes', '')
 TEMPLATE_COMP = CompParams()
 
 @dataclass
