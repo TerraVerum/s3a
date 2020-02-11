@@ -4,7 +4,8 @@ import sys
 from dataclasses import dataclass, field
 from os.path import join
 from typing import Sequence, Union, Dict, Callable, Any, List
-from functools import wraps, partial
+from functools import partial
+import re
 
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
@@ -242,7 +243,7 @@ class ConstParamWidget(QtWidgets.QDialog):
   def registerMethod(self, constParam: ABParam, fnArgs=None):
     """
     Designed for use as a function decorator. Registers the decorated function into a list
-    of methods known to the :class:`ShortcutEditor`. These functions are then accessable from
+    of methods known to the :class:`ShortcutsEditor`. These functions are then accessable from
     customizeable shortcuts.
     """
     if fnArgs is None:
@@ -312,7 +313,7 @@ class ConstParamWidget(QtWidgets.QDialog):
     :param clsName: Fully qualified name of the class
 
     :param clsParam: :class:`ABParam` value encapsulating the human readable class name.
-           This is how the class will be displayed in the :class:`ShortcutEditor`.
+           This is how the class will be displayed in the :class:`ShortcutsEditor`.
 
     :return: None
     """
@@ -333,7 +334,7 @@ class ConstParamWidget(QtWidgets.QDialog):
     self.tree.resizeColumnToContents(0)
     self._stateBeforeEdit = self.params.saveState()
 
-class GeneralPropsEditor(ConstParamWidget):
+class GeneralPropertiesEditor(ConstParamWidget):
   def __init__(self, parent=None):
     super().__init__(parent, paramDict=[], saveDir=GEN_PROPS_DIR, saveExt='regctrl')
 
@@ -366,7 +367,7 @@ class TmpTblFilterEditor(ConstParamWidget):
       elif paramType == ABParamGroup:
         pass
 
-class ShortcutEditor(ConstParamWidget):
+class ShortcutsEditor(ConstParamWidget):
 
   def __init__(self, parent=None):
 
@@ -398,18 +399,26 @@ class SchemeEditor(ConstParamWidget):
                      saveExt='scheme')
 
 class _ABSingleton:
-  generalProps = GeneralPropsEditor()
-  filter = TableFilterEditor()
+  shortcuts = ShortcutsEditor()
   scheme = SchemeEditor()
-  shortcuts = ShortcutEditor()
+  generalProps = GeneralPropertiesEditor()
+  filter = TableFilterEditor()
 
   def __init__(self):
     # Code retrieved from https://stackoverflow.com/a/20214464/9463643
     editors = []
+    editorNames = []
     for prop in dir(self):
-      if not prop.startswith('__') and not callable(getattr(self, prop)):
-        editors.append(getattr(self, prop))
+      propObj = getattr(self, prop)
+      if not prop.startswith('__') and not callable(propObj):
+        editors.append(propObj)
+        # Strip 'editor', space at capital letter
+        propClsName = type(propObj).__name__
+        name = propClsName[:propClsName.index('Editor')]
+        name = re.sub(r'(\w)([A-Z])', r'\1 \2', name)
+        editorNames.append(name)
     self.editors = editors
+    self.editorNames = editorNames
 
   def registerClass(self, clsParam: ABParam):
     def multiEditorClsDecorator(cls):
