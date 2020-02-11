@@ -109,16 +109,7 @@ class Annotator(QtWidgets.QMainWindow):
       ModelOpts.ADD_AS_NEW))
 
     # SETTINGS
-    menuObjs = AB_SINGLETON.editors
-    menus    = [self.regionCtrlsMenu, self.filterMenu, self.schemeMenu, self.shortcutsMenu]
-    editBtns = [self.editRegionCtrls, self.editFilter, self.editScheme, self.editShortcuts]
-    for curObj, curMenu, curEditBtn in zip(menuObjs, menus, editBtns):
-      curEditBtn.triggered.connect(curObj.show)
-      loadFunc = partial(self.genericLoadActionTriggered, curObj)
-      populateFunc = partial(self.genericPopulateMenuOptions, curObj, curMenu, loadFunc)
-      curObj.sigParamStateCreated.connect(populateFunc)
-      # Initialize default menus
-      populateFunc()
+    self.createSettingsMenus()
 
     # ---------------
     # LOAD LAYOUT OPTIONS
@@ -139,8 +130,20 @@ class Annotator(QtWidgets.QMainWindow):
     AB_SINGLETON.close()
 
   def createSettingsMenus(self):
-    for editor in AB_SINGLETON.editors: #type: ConstParamWidget
-      menu = QtWidgets.QMenu(editor)
+    for editor, name in zip(AB_SINGLETON.editors, AB_SINGLETON.editorNames): \
+        #type: ConstParamWidget, str
+      menu = QtWidgets.QMenu(name, self)
+      editAct = QtWidgets.QAction('Edit' + name, self)
+      menu.addAction(editAct)
+      menu.addSeparator()
+      editAct.triggered.connect(editor.show)
+      loadFunc = partial(self.genericLoadActionTriggered, editor)
+      populateFunc = partial(self.genericPopulateMenuOptions, editor, menu, loadFunc)
+      editor.sigParamStateCreated.connect(populateFunc)
+      # Initialize default menus
+      populateFunc()
+      self.menuSettings.addMenu(menu)
+
 
   @Slot(object)
   def _add_focusComp(self, newComp):
