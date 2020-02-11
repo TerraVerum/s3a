@@ -13,7 +13,7 @@ from .graphicsutils import dialogSaveToFile
 from ..constants import (
   SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR,
   TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES)
-from Annotator.params import ABParam
+from Annotator.params import ABParam, ABParamGroup
 
 Signal = QtCore.pyqtSignal
 
@@ -175,8 +175,13 @@ class ConstParamWidget(QtWidgets.QDialog):
       return outVals
 
   def show(self):
-    super().show()
     self.setWindowState(QtCore.Qt.WindowActive)
+    # Necessary on MacOS
+    self.raise_()
+    # Necessary on Windows
+    self.activateWindow()
+    super().show()
+
 
   def reject(self):
     """
@@ -324,6 +329,8 @@ class ConstParamWidget(QtWidgets.QDialog):
                        'value': boundFn.param.value}
       paramChildren.append(paramForTree)
     self.params.addChild(paramGroup)
+    # Make sure all new names are properly displayed
+    self.tree.resizeColumnToContents(0)
     self._stateBeforeEdit = self.params.saveState()
 
 class GeneralPropsEditor(ConstParamWidget):
@@ -350,13 +357,20 @@ class TableFilterEditor(ConstParamWidget):
       ]
     super().__init__(parent, paramDict=_FILTER_DICT, saveDir=FILTERS_DIR, saveExt='filter')
 
+class TmpTblFilterEditor(ConstParamWidget):
+  def __init__(self):
+    for param in TC:
+      paramType = type(param.value)
+      if paramType == int:
+        curChild = self.createMinMaxFilter()
+      elif paramType == ABParamGroup:
+        pass
+
 class ShortcutEditor(ConstParamWidget):
 
   def __init__(self, parent=None):
 
     self.shortcuts = []
-
-
     # Unlike other param editors, these children don't get filled in until
     # after the top-level widget is passed to the shortcut editor
     super().__init__(parent, [], saveDir=SHORTCUTS_DIR, saveExt='shortcut')
@@ -384,16 +398,29 @@ class SchemeEditor(ConstParamWidget):
                      saveExt='scheme')
 
 class _ABSingleton:
+  generalProps = GeneralPropsEditor()
+  filter = TableFilterEditor()
   scheme = SchemeEditor()
   shortcuts = ShortcutEditor()
-  generalProps = GeneralPropsEditor()
+
+  def __init__(self):
+    # Code retrieved from https://stackoverflow.com/a/20214464/9463643
+    editors = []
+    for prop in dir(self):
+      if not prop.startswith('__') and not callable(getattr(self, prop)):
+        editors.append(getattr(self, prop))
+    self.editors = editors
 
   def registerClass(self, clsParam: ABParam):
     def multiEditorClsDecorator(cls):
       # Since all legwork is done inside the editors themselves, simply call each decorator from here as needed
-      for editor in [self.scheme, self.shortcuts, self.generalProps]:
+      for editor in self.editors:
         cls = editor.registerClass(clsParam)(cls)
       return cls
     return multiEditorClsDecorator
+
+  def close(self):
+    for editor in self.editors:
+      editor.close()
 # Encapsulate scheme within class so that changes to the scheme propagate to all GUI elements
 AB_SINGLETON = _ABSingleton()

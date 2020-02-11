@@ -1,7 +1,7 @@
 import pyqtgraph as pg
+from PyQt5 import QtCore
+from pyqtgraph import Point
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-
-from Annotator.params import ABParam
 
 Signal = QtCore.pyqtSignal
 
@@ -52,7 +52,13 @@ class ClickableScatterItem(pg.ScatterPlotItem):
 
 class ClickableTextItem(pg.TextItem):
 
-  boundClr = AB_SINGLETON.scheme.registerMethod(AB_CONSTS.SCHEME_BOUNDARY_COLOR)
+  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_BOUNDARY_COLOR)
+  def boundClr(self): pass
+  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_VALID_ID_COLOR)
+  def validIdClr(self): pass
+  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_NONVALID_ID_COLOR)
+  def invalidIdClr(self): pass
+
 
 
   sigClicked = Signal()
@@ -78,15 +84,15 @@ class ClickableTextItem(pg.TextItem):
     """
     Overload setting text to utilize scheme editor
     """
-    schemeClrProp = SV.NONVALID_ID_COLOR
+    schemeClrProp = self.invalidIdClr
     if validated:
-      schemeClrProp = SV.VALID_ID_COLOR
+      schemeClrProp = self.validIdClr
 
     curFont = self.textItem.font()
     curFont.setPointSize(self.txtSize)
     self.setFont(curFont)
 
-    self.setColor(self.txtClr)
+    self.setColor(schemeClrProp)
 
     super().setText(newText)
 
@@ -99,3 +105,41 @@ class ClickableTextItem(pg.TextItem):
       newPos = np.ones(2)*np.nan
     self.setPos(newPos[0], newPos[1])
     self.setText(newText, newValid)
+
+class DraggableViewBox(pg.ViewBox):
+  sigSelectionBoundsMade = Signal(object)
+  sigCreationBoundsMade = Signal(object)
+
+  def mouseDragEvent(self, ev, axis=None):
+    """
+    Most of the desired functionality for drawing a selection rectangle on the main image
+    already exists within the default viewbox. However, pyqtgraph behavior is to zoom on
+    the selected region once the drag is done. We don't want that -- instead, we want the
+    components within the selected rectangle to be selected within the table. This requires
+    overloading only a small portion of
+    :func:`ViewBox.mouseDragEvent()<pyqtgraph.ViewBox.mouseDragEvent>`.
+    """
+    # TODO: Make this more robust, since it is a temporary measure at the moment
+    callSuperMethod = True
+    modifiers = ev.modifiers()
+    if modifiers != QtCore.Qt.NoModifier:
+      self.state['mouseMode'] = pg.ViewBox.RectMode
+      if ev.isFinish():
+        callSuperMethod = False
+        bounds = self.getSelectionBounds(ev)
+        if modifiers == QtCore.Qt.ShiftModifier:
+          self.sigSelectionBoundsMade.emit(bounds)
+        elif modifiers == QtCore.Qt.ControlModifier:
+          self.sigCreationBoundsMade.emit(bounds)
+    else:
+      self.state['mouseMode'] = pg.ViewBox.PanMode
+      self.rbScaleBox.hide()
+    if callSuperMethod:
+      super().mouseDragEvent(ev, axis)
+
+  def getSelectionBounds(self, ev):
+    pos = ev.pos()
+    self.rbScaleBox.hide()
+    ax = QtCore.QRectF(Point(ev.buttonDownPos(ev.button())), Point(pos))
+    selectionBounds = self.childGroup.mapRectFromParent(ax)
+    return selectionBounds.getCoords()

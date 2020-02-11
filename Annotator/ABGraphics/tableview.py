@@ -155,16 +155,6 @@ class CompTableView(QtWidgets.QTableView):
       selectedIds.append(item.sibling(item.row(),self.instIdColIdx).data(QtCore.Qt.EditRole))
     self.sigSelectionChanged.emit(pd.unique(selectedIds))
 
-  # def keyPressEvent(self, ev: QtGui.QKeyEvent) -> None:
-  #   # Only delete rows if at least on cell is currently selected
-  #   pressedKey = ev.key()
-  #   modifiers = ev.modifiers()
-  #   isItemSelected = len(self.selectionModel().selectedIndexes()) > 0
-  #   if isItemSelected:
-  #     if pressedKey == QtCore.Qt.Key_Delete:
-  #       self.removeTriggered()
-  #   super().keyPressEvent(ev)
-
   def createContextMenu(self):
     menu = QtWidgets.QMenu(self)
     menu.setTitle('Table Actions')
@@ -183,7 +173,7 @@ class CompTableView(QtWidgets.QTableView):
 
     return menu
 
-  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_DEL_TBL_ROWS)
+  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SCH_TBL_DEL_ROWS)
   def removeTriggered(self):
     if self.minimal: return
 
@@ -199,6 +189,8 @@ class CompTableView(QtWidgets.QTableView):
       self.mgr.rmComps(idList)
       self.clearSelection()
 
+
+  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_TBL_SET_SAME_AS_FIRST)
   def overwriteTriggered(self):
     if self.minimal: return
 
@@ -231,7 +223,7 @@ class CompTableView(QtWidgets.QTableView):
     colIdxs = pd.unique(colIdxs)
     return idList, colIdxs
 
-
+  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_TBL_SET_AS)
   def setAsTriggered(self):
     if self.minimal: return
 

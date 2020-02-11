@@ -5,77 +5,111 @@ import pyqtgraph as pg
 from PIL import Image
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui
-from pyqtgraph import Point
+from skimage import morphology
 
+from Annotator.ABGraphics.clickables import DraggableViewBox
+from Annotator.ABGraphics.parameditors import AB_SINGLETON
+from Annotator.constants import AB_CONSTS
+from Annotator.processing import growBoundarySeeds
 from .clickables import ClickableImageItem
 from .regions import VertexRegion, SaveablePolyROI
 from ..constants import TEMPLATE_COMP as TC
 from ..processing import segmentComp, getVertsFromBwComps, growSeedpoint
-from Annotator.generalutils import getClippedBbox
+from Annotator.generalutils import getClippedBbox, nanConcatList
 from ..tablemodel import makeCompDf
 
 Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
 
-
-class ABViewBox(pg.ViewBox):
-  sigSelectionCreated = Signal(object)
-  sigComponentCreated = Signal(object)
-
-  def mouseDragEvent(self, ev, axis=None):
-    """
-    Most of the desired functionality for drawing a selection rectangle on the main image
-    already exists within the default viewbox. However, pyqtgraph behavior is to zoom on
-    the selected region once the drag is done. We don't want that -- instead, we want the
-    components within the selected rectangle to be selected within the table. This requires
-    overloading only a small portion of
-    :func:`ViewBox.mouseDragEvent()<pyqtgraph.ViewBox.mouseDragEvent>`.
-    """
-    # TODO: Make this more robust, since it is a temporary measure at the moment
-    callSuperMethod = True
-    modifiers = ev.modifiers()
-    if modifiers != QtCore.Qt.NoModifier:
-      self.state['mouseMode'] = pg.ViewBox.RectMode
-      if ev.isFinish():
-        callSuperMethod = False
-        bounds = self.getSelectionBounds(ev)
-        if modifiers == QtCore.Qt.ShiftModifier:
-          self.sigSelectionCreated.emit(bounds)
-        elif modifiers == QtCore.Qt.ControlModifier:
-          self.sigComponentCreated.emit(bounds)
-    else:
-      self.state['mouseMode'] = pg.ViewBox.PanMode
-      self.rbScaleBox.hide()
-    if callSuperMethod:
-      super().mouseDragEvent(ev, axis)
-
-  def getSelectionBounds(self, ev):
-    pos = ev.pos()
-    self.rbScaleBox.hide()
-    ax = QtCore.QRectF(Point(ev.buttonDownPos(ev.button())), Point(pos))
-    selectionBounds = self.childGroup.mapRectFromParent(ax)
-    return selectionBounds.getCoords()
-
+@AB_SINGLETON.registerClass(AB_CONSTS.CLS_MAIN_IMG_AREA)
 class MainImageArea(pg.PlotWidget):
+  sigComponentCreated = Signal(object)
+  # Hooked up during __init__
+  sigSelectionBoundsMade: Signal
+
+  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_NEW_COMP_SZ)
+  def newCompSz(self): pass
+  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_MIN_COMP_SZ)
+  def minCompSz(self): pass
+  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_MAIN_IMG_SEED_THRESH)
+  def mainImgSeedThresh(self): pass
+
+
   def __init__(self, parent=None, background='default', imgSrc=None, **kargs):
-    super().__init__(parent, background, viewBox=ABViewBox(), **kargs)
+    super().__init__(parent, background, viewBox=DraggableViewBox(), **kargs)
 
     self.allowNewComps = True
 
     self.setAspectLocked(True)
-    self.viewbox: ABViewBox = self.getViewBox()
+    self.viewbox: DraggableViewBox = self.getViewBox()
     self.viewbox.invertY()
-    self.sigSelectionCreated = self.viewbox.sigSelectionCreated
-    self.sigComponentCreated = self.viewbox.sigComponentCreated
+    self.viewbox.sigCreationBoundsMade.connect(self.createCompFromBounds)
+    self.sigSelectionBoundsMade = self.viewbox.sigSelectionBoundsMade
 
     # -----
     # Image Item
     # -----
     self.imgItem = ClickableImageItem()
+    self.imgItem.sigClicked.connect(self.createCompAtClick)
+    # Ensure image is behind plots
     # Ensure image is behind plots
     self.imgItem.setZValue(-100)
     self.setImage(imgSrc)
     self.addItem(self.imgItem)
+
+  def createCompFromBounds(self, bounds:tuple):
+    # TODO: Make this code more robust
+    img_np = self.image
+    compCoords = np.reshape(bounds, (2, 2)).astype(int)
+    compCoords = getClippedBbox(img_np.shape, compCoords, 0).flatten()
+    croppedImg = self.image[compCoords[1]:compCoords[3], compCoords[0]:compCoords[2], :]
+    if croppedImg.size == 0: return
+    # Performance for using all bounds is prohibitive for large components
+    # TODO: Find a better method of determining whether to use all bounds
+    if np.prod(croppedImg.shape[0:2]) > 250e3:
+      shouldUseAllBounds = False
+    else:
+      shouldUseAllBounds = True
+    newRegion = growBoundarySeeds(croppedImg, self.mainImgSeedThresh, self.minCompSz, useAllBounds=shouldUseAllBounds)
+    newRegion = morphology.opening(newRegion, morphology.square(3))
+
+    newVerts = getVertsFromBwComps(newRegion)
+    # Remember to account for the vertex offset
+    if len(newVerts) == 0: return
+    newVerts[0] += compCoords[0:2].reshape(1, 2)
+    newComp = makeCompDf(1)
+    newComp[TC.VERTICES] = newVerts
+    # newComp[TC.VERTICES] = [newVerts]
+    self.sigComponentCreated.emit(newComp)
+    return newComp
+
+  def createCompAtClick(self, xyCoord: tuple):
+    """
+    Forms a box with a center at the clicked location, and passes the box
+    edges as vertices for a new component.
+    """
+    vertBox = np.vstack((xyCoord, xyCoord))
+    vertBox = getClippedBbox(self.image.shape, vertBox, self.newCompSz)
+    miniImg = self.image[
+      vertBox[0,1]:vertBox[1,1], vertBox[0,0]:vertBox[1,0],:
+    ]
+    # Account for mini img offset and x-y -> row-col
+    xyCoord = xyCoord[::-1]
+    xyCoord -= vertBox[0,:]
+    bwCompMask = growSeedpoint(miniImg, xyCoord, self.mainImgSeedThresh, self.minCompSz)
+
+    compVerts = getVertsFromBwComps(bwCompMask)
+    if len(compVerts) == 0:
+      return
+    # Turn list-of-lists into plottable, nan-separated vertices
+    # Reverse for row-col -> x-y
+    compVerts = nanConcatList(compVerts)
+    # Make sure the vertices are translated to the appropriate coordinates
+    compVerts += vertBox[0,:]
+    newComp = makeCompDf()
+    newComp[TC.VERTICES] = [compVerts]
+    self.sigComponentCreated.emit(newComp)
+    return newComp
 
   def keyPressEvent(self, ev: QtGui.QKeyEvent):
     if ev.key() == QtCore.Qt.Key_Escape:
@@ -103,9 +137,18 @@ class MainImageArea(pg.PlotWidget):
 
     self.imgItem.setImage(imgSrc)
 
+@AB_SINGLETON.registerClass(AB_CONSTS.CLS_FOCUSED_IMG_AREA)
 class FocusedComp(pg.PlotWidget):
   sigEnterPressed = Signal()
   sigModeChanged = Signal(bool)
+
+  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_FOCUSED_SEED_THRESH)
+  def seedThresh(self): pass
+  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_MARGIN)
+  def compCropMargin(self): pass
+  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_SEG_THRESH)
+  def segThresh(self): pass
+
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -122,9 +165,6 @@ class FocusedComp(pg.PlotWidget):
     self.deletedPrevComponent = False
 
     self.bbox = np.zeros((2,2), dtype='int32')
-
-    # Items directly updated from the gui
-    self.seedThresh = 0.
 
     self.compImgItem = ClickableImageItem()
     self.compImgItem.requireCtrlKey = False
@@ -218,8 +258,7 @@ class FocusedComp(pg.PlotWidget):
     self.interactor.clearPoints()
     return self.compImgItem.setImage(image, autoLevels)
 
-  def updateAll(self, mainImg: np.array, newComp:df,
-             margin: int, segThresh: float):
+  def updateAll(self, mainImg: np.array, newComp:df):
     newVerts = newComp[TC.VERTICES].squeeze()
     # If the previous component had no vertices, signal its removal
     if len(self.compSer[TC.VERTICES].squeeze()) == 0 and not self.deletedPrevComponent:
@@ -228,27 +267,27 @@ class FocusedComp(pg.PlotWidget):
     # need to go through the trouble of deep copying
     self.compSer = newComp.copy(deep=False)
     self.deletedPrevComponent = False
-    self.updateBbox(mainImg.shape, newVerts, margin)
-    self.updateCompImg(mainImg, segThresh)
+    self.updateBbox(mainImg.shape, newVerts)
+    self.updateCompImg(mainImg)
     self.updateRegion(newVerts)
     self.autoRange()
     return self.deletedPrevComponent
 
-  def updateBbox(self, mainImgShape, newVerts: np.ndarray, margin: int):
+  def updateBbox(self, mainImgShape, newVerts: np.ndarray):
     # Ignore NAN entries during computation
     bbox = np.vstack([np.nanmin(newVerts, 0),
           np.nanmax(newVerts, 0)])
     # Account for margins
-    self.bbox = getClippedBbox(mainImgShape, bbox, margin)
+    self.bbox = getClippedBbox(mainImgShape, bbox, self.compCropMargin)
 
-  def updateCompImg(self, mainImg, segThresh, bbox=None):
+  def updateCompImg(self, mainImg, bbox=None):
     if bbox is None:
       bbox = self.bbox
     # Account for nan entries
     newCompImg = mainImg[bbox[0,1]:bbox[1,1],
                          bbox[0,0]:bbox[1,0],
                          :]
-    segImg = segmentComp(newCompImg, segThresh)
+    segImg = segmentComp(newCompImg, self.segThresh)
     self.setImage(segImg)
 
   def updateRegion(self, newVerts, offset=None):
