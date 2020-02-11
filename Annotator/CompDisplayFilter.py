@@ -9,6 +9,7 @@ from Annotator.constants import AB_CONSTS
 from .ABGraphics import tableview
 from .ABGraphics.clickables import ClickableTextItem
 from .ABGraphics.parameditors import TableFilterEditor
+from .ABGraphics.imageareas import MainImageArea
 from .ABGraphics.regions import MultiRegionPlot, makeMultiRegionDf
 from .constants import TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES
 from .tablemodel import ComponentMgr
@@ -46,16 +47,17 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
 class CompDisplayFilter(QtCore.QObject):
   sigCompClicked = Signal(object)
 
-  def __init__(self, compMgr: ComponentMgr, mainImg: pg.PlotWindow,
-               compTbl: tableview.CompTableView, filterEditor: TableFilterEditor):
+  def __init__(self, compMgr: ComponentMgr, mainImg: MainImageArea,
+               compTbl: tableview.CompTableView):
     super().__init__()
+    filterEditor = AB_SINGLETON.filter
     self._mainImgArea = mainImg
     self._filter = filterEditor.params.getValues()
     self._compTbl = compTbl
     self._compMgr = compMgr
 
     # Attach to main image area signals
-    mainImg.sigSelectionCreated.connect(self._compPointsSelected)
+    mainImg.sigSelectionBoundsMade.connect(self._compPointsSelected)
 
     # Attach to manager signals
     compMgr.sigCompsChanged.connect(self.redrawComps)

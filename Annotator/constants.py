@@ -54,6 +54,8 @@ class ABConsts(ABParamGroup):
   CLS_VERT_REGION: ABParam = newParam('Focused Image Graphics')
   CLS_MULT_REG_PLT: ABParam = newParam('Main Image Graphics')
   CLS_COMP_MGR : ABParam = newParam('Component Manager')
+  CLS_MAIN_IMG_AREA : ABParam = newParam('Main Image Area')
+  CLS_FOCUSED_IMG_AREA : ABParam = newParam('Focused Component Image Area')
   # --------------------------
   # SCHEME PARAMETERS
   # --------------------------
@@ -73,16 +75,18 @@ class ABConsts(ABParamGroup):
   PROP_MIN_COMP_SZ           : ABParam = newParam('Minimum New Component Size (px)', 50)
   PROP_NEW_COMP_SZ           : ABParam = newParam('New Component Side Length (px)', 30)
   PROP_EST_BOUNDS_ON_START   : ABParam = newParam('Estimate Boundaries on Image Load', False)
-  PROP_SEG_THRESH            : ABParam = newParam('Segmentation Threshold', 3.)
   PROP_MARGIN                : ABParam = newParam('Margin', 5)
-  PROP_SEED_THRESH           : ABParam = newParam('Seedpoint Mean Threshold', 7.)
+  PROP_SEG_THRESH            : ABParam = newParam('Segmentation Threshold', 3.)
+  PROP_FOCUSED_SEED_THRESH   : ABParam = newParam('Seedpoint Mean Threshold', 7.)
 
   # --------------------------
   # SHORTCUT PARAMETERS
   # --------------------------
-  SHC_CLEAR_BOUNDAREIS      : ABParam = newParam('Clear Boundaries', '', 'shortcut')
+  SHC_CLEAR_BOUNDARIES      : ABParam = newParam('Clear Boundaries', '', 'shortcut')
   SHC_ESTIMATE_BOUNDARIES   : ABParam = newParam('Estimate Boundaries', '', 'shortcut')
-  SHC_DEL_TBL_ROWS          : ABParam = newParam('Delete Rows', 'Del', 'shortcut')
+  SHC_TBL_SET_SAME_AS_FIRST : ABParam = newParam('Set Table Rows Same As First', '', 'shortcut')
+  SHC_TBL_SET_AS            : ABParam = newParam('Set Table Rows As...', '', 'shortcut')
+  SCH_TBL_DEL_ROWS          : ABParam = newParam('Delete Table Rows', 'Del', 'shortcut')
 
   # --------------------------
   # COMPONENT EXPORT PARAMETERS
