@@ -4,7 +4,7 @@ from skimage.filters import gaussian
 from skimage.measure import regionprops, label
 from skimage.morphology import closing, dilation, opening
 from skimage.morphology import disk
-from skimage.segmentation import quickshift
+from skimage.segmentation import quickshift, flood
 from sklearn.decomposition import PCA
 from PIL import Image
 
@@ -156,7 +156,41 @@ def rmSmallComps(bwMask: np.ndarray, minSz: int=0) -> np.ndarray:
       bwMask[coords[:, 0], coords[:, 1]] = False
   return bwMask
 
-def growSeedpoint(img: np.array, seeds: np.array, thresh: float, minSz: int=0) -> \
+def growSeedpoint(img: np.array, seeds: np.array, thresh: float, minSz: int=0):
+  bwOut = np.zeros(img.shape[:2], dtype=bool)
+  for seed in seeds:
+    for chan in range(img.shape[2]):
+      curBwMask = flood(img[...,chan], tuple(seed), tolerance=thresh)
+      bwOut |= curBwMask
+
+  bwOut = closing(bwOut, np.ones((3,3), dtype=bool))
+  bwOut = rmSmallComps(bwOut, minSz)
+  return bwOut
+
+def growSeedpoint_cv_fastButErratic(img: np.array, seeds: np.array, thresh: float, minSz: int=0):
+  if thresh > 255:
+    thresh = 255
+  if thresh < 0:
+    thresh = 0
+  imRCShape = img.shape[:2]
+  bwOut = np.zeros((imRCShape[0]+2, imRCShape[1]+2), np.uint8)
+  flooded = img.copy()
+  # Throw away seeds outside image boundaries
+  seeds = seeds[np.all(seeds < imRCShape, axis=1)]
+  seeds = np.fliplr(seeds)
+  for seed in seeds:
+    mask = np.zeros((imRCShape[0]+2, imRCShape[1]+2), np.uint8)
+    valAtSeed = img[seed[1],seed[0],:]
+    seed = tuple(seed.flatten())
+    cv.floodFill(flooded, mask, seed, 1, (thresh,)*3, (thresh,)*3,
+                 8 | cv.FLOODFILL_MASK_ONLY)
+    bwOut |= mask
+  bwOut = bwOut[1:-1,1:-1]
+  bwOut = closing(bwOut, np.ones((3,3), dtype=bool))
+  # Remove components smaller than minSz
+  return rmSmallComps(bwOut, minSz)
+
+def growSeedpoint_custom_slowButWorks(img: np.array, seeds: np.array, thresh: float, minSz: int=0) -> \
     np.array:
   """
   Starting from *seed*, fills each connected pixel if the difference between
@@ -186,7 +220,7 @@ def growSeedpoint(img: np.array, seeds: np.array, thresh: float, minSz: int=0) -
   if nChans < 1:
     img = img[:,:,None]
   imRCShape = np.array(img.shape[0:2])[None,:]
-  bwOut = np.zeros(img.shape[0:2], dtype=bool)
+  finalBwOut = np.zeros(img.shape[0:2], dtype=bool)
   nChans = img.shape[2] if len(img.shape) > 2 else 1
   # Computationally cheaper to compare square of thresh instead of using
   # euclidean distance
@@ -194,12 +228,13 @@ def growSeedpoint(img: np.array, seeds: np.array, thresh: float, minSz: int=0) -
   # Throw away seeds outside image boundaries
   seeds = seeds[np.all(seeds < imRCShape, axis=1)]
   for seed in seeds:
-    bwOut[seed[0], seed[1]] = True
+    curBwOut = np.zeros(img.shape[0:2], dtype=bool)
+    curBwOut[seed[0], seed[1]] = True
     changed = True
     while changed:
-      neighbors = dilation(bwOut, np.ones((3,3)))
-      neighbors[bwOut] = False
-      compMean = img[bwOut,:].reshape(-1,nChans).mean(0)
+      neighbors = dilation(curBwOut, np.ones((3,3)))
+      neighbors[curBwOut] = False
+      compMean = img[curBwOut,:].reshape(-1,nChans).mean(0)
       # Add neighbor pixels close to this mean value
       valsAtNeighbors = img[neighbors,:].reshape(-1,nChans)
       diffFromMean = ((valsAtNeighbors-compMean)**2).sum(1)
@@ -210,15 +245,16 @@ def growSeedpoint(img: np.array, seeds: np.array, thresh: float, minSz: int=0) -
         idxList = idxList[diffFromMean >= thresh]
         invalidIdxs.append(idxList)
       neighbors[invalidIdxs[0], invalidIdxs[1]] = False
-      newBwOut = bwOut | neighbors
-      changed = np.any(newBwOut != bwOut)
-      bwOut = newBwOut
+      newBwOut = curBwOut | neighbors
+      changed = np.any(newBwOut != curBwOut)
+      curBwOut = newBwOut
+    finalBwOut |= curBwOut
 
 
 
-  bwOut = closing(bwOut, np.ones((3,3), dtype=bool))
+  finalBwOut = closing(finalBwOut, np.ones((3,3), dtype=bool))
   # Remove components smaller than minSz
-  return rmSmallComps(bwOut, minSz)
+  return rmSmallComps(finalBwOut, minSz)
 
 def growBoundarySeeds(img: np.ndarray, seedThresh: float, minSz: int,
                       segThresh: float=0., useAllBounds=False) -> np.ndarray:
