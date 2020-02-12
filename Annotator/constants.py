@@ -78,38 +78,42 @@ class _ABConsts(ABParamGroup):
   # --------------------------
   # REGION-CREATION PARAMETERS
   # --------------------------
-  PROP_MAIN_IMG_SEED_THRESH : ABParam = newParam('Seedpoint threshold in main image', 40.)
+  PROP_MAIN_IMG_SEED_THRESH : ABParam = newParam('Seedpoint Threshold in Main Image', 10.)
   PROP_MIN_COMP_SZ          : ABParam = newParam('Minimum New Component Size (px)', 50)
   PROP_NEW_COMP_SZ          : ABParam = newParam('New Component Side Length (px)', 30)
   PROP_EST_BOUNDS_ON_START  : ABParam = newParam('Estimate Boundaries on Image Load', False)
   PROP_MARGIN               : ABParam = newParam('Margin', 5)
   PROP_SEG_THRESH           : ABParam = newParam('Segmentation Threshold', 3.)
-  PROP_FOCUSED_SEED_THRESH  : ABParam = newParam('Seedpoint Mean Threshold', 7.)
+  PROP_FOCUSED_SEED_THRESH  : ABParam = newParam('Seedpoint Threshold in Focused Image', 7.)
   PROP_UNDO_BUF_SZ          : ABParam = newParam('Size of Region Undo Buffer', 30)
-  PROP_STEPS_BW_SAVE        : ABParam = newParam('Operations Before Buffer Save', 5)
+  PROP_STEPS_BW_SAVE        : ABParam = newParam('Operations Between Buffer Saves', 5)
 
   # --------------------------
   # SHORTCUT PARAMETERS
   # --------------------------
   SHC_CLEAR_BOUNDARIES      : ABParam = newParam('Clear Boundaries', '', 'shortcut')
   SHC_ESTIMATE_BOUNDARIES   : ABParam = newParam('Estimate Boundaries', '', 'shortcut')
+  SHC_DESEL_ALL_BOUNDARIES  : ABParam = newParam('Deselect All Main Image Boundaries', 'Esc', 'shortcut')
   SHC_TBL_SET_SAME_AS_FIRST : ABParam = newParam('Set Table Rows Same As First', 'Ctrl+D', 'shortcut')
   SHC_TBL_SET_AS            : ABParam = newParam('Set Table Rows As...', 'Ctrl+Shift+D', 'shortcut')
   SHC_TBL_DEL_ROWS          : ABParam = newParam('Delete Table Rows', 'Del', 'shortcut')
   SHC_UNDO_MOD_REGION       : ABParam = newParam('Undo Modify Region', 'Ctrl+Z', 'shortcut')
   SHC_REDO_MOD_REGION       : ABParam = newParam('Redo Modify Region', 'Ctrl+Y', 'shortcut')
+  SHC_ACCEPT_REGION         : ABParam = newParam('Accept and Save Region Edits', '1', 'shortcut')
+  SHC_TOGGLE_REG_MODE       : ABParam = newParam('Toggle Between Add/Remove Region', 'Ctrl+T', 'shortcut')
 
   # --------------------------
   # COMPONENT EXPORT PARAMETERS
   # --------------------------
-  EXP_ONLY_VISIBLE: ABParam = newParam('Only export visible components', True)
+  EXP_ONLY_VISIBLE: ABParam = newParam('Only Export Visible Components', True)
 
 AB_CONSTS = _ABConsts()
 
-class AB_ENUMS(Enum):
+class _AbEnums(Enum):
   COMP_ADD_AS_MERGE = 'Add as Merge'
   COMP_ADD_AS_NEW   = 'Add as New'
   COMP_EXPORT_ALL: Enum = 'Export All Components'
+AB_ENUMS = _AbEnums
 
 if __name__ == '__main__':
   c = ComponentTypes().fromString('capacitor')

@@ -51,7 +51,7 @@ class RegionVertsUndoBuffer(ObjUndoBuffer):
 class MainImageArea(pg.PlotWidget):
   sigComponentCreated = Signal(object)
   # Hooked up during __init__
-  sigSelectionBoundsMade: Signal
+  sigSelectionBoundsMade = Signal(object)
 
   @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_NEW_COMP_SZ)
   def newCompSz(self): pass
@@ -83,6 +83,11 @@ class MainImageArea(pg.PlotWidget):
     self.setImage(imgSrc)
     self.addItem(self.imgItem)
 
+  # Spoof selection of empty area on escape to deselect components
+  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_DESEL_ALL_BOUNDARIES)
+  def deselectAllBoundaries(self):
+    self.sigSelectionBoundsMade.emit((-1,-1,-1,-1))
+
   def createCompFromBounds(self, bounds:tuple):
     # TODO: Make this code more robust
     img_np = self.image
@@ -102,6 +107,10 @@ class MainImageArea(pg.PlotWidget):
     newVerts = getVertsFromBwComps(newRegion)
     # Remember to account for the vertex offset
     if len(newVerts) == 0: return
+    # TODO: Determine more robust solution for separated vertices. For now use largest component
+    elif len(newVerts) > 1:
+      lens = np.array([len(v) for v in newVerts])
+      newVerts = newVerts[lens == lens.max()]
     newVerts[0] += compCoords[0:2].reshape(1, 2)
     newComp = makeCompDf(1)
     newComp[TC.VERTICES] = newVerts
@@ -137,11 +146,6 @@ class MainImageArea(pg.PlotWidget):
     self.sigComponentCreated.emit(newComp)
     return newComp
 
-  def keyPressEvent(self, ev: QtGui.QKeyEvent):
-    if ev.key() == QtCore.Qt.Key_Escape:
-      # Simulate empty bounding box to deselect points
-      self.sigSelectionCreated.emit((-1,-1,-1,-1))
-
   @property
   def image(self):
     return self.imgItem.image
@@ -165,7 +169,6 @@ class MainImageArea(pg.PlotWidget):
 
 @AB_SINGLETON.registerClass(AB_CONSTS.CLS_FOCUSED_IMG_AREA)
 class FocusedComp(pg.PlotWidget):
-  sigEnterPressed = Signal()
   sigModeChanged = Signal(bool)
 
   @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_FOCUSED_SEED_THRESH)
@@ -221,22 +224,6 @@ class FocusedComp(pg.PlotWidget):
   def clickable(self, newVal):
     self.compImgItem.clickable = bool(newVal)
 
-  def keyPressEvent(self, ev: QtGui.QKeyEvent):
-    pressedKey = ev.key()
-    if pressedKey == QtCore.Qt.Key_Enter or pressedKey == QtCore.Qt.Key_Return or \
-        pressedKey == QtCore.Qt.Key_1:
-      self.sigEnterPressed.emit()
-      ev.accept()
-    elif pressedKey == QtCore.Qt.Key_A:
-      self.inAddMode = True
-      self.sigModeChanged.emit(self.inAddMode)
-      ev.accept()
-    elif pressedKey == QtCore.Qt.Key_R:
-      self.inAddMode = False
-      self.sigModeChanged.emit(self.inAddMode)
-      ev.accept()
-    super().keyPressEvent(ev)
-
   def mouseMoveEvent(self, ev: QtGui.QKeyEvent):
     if ev.modifiers() == QtCore.Qt.ControlModifier \
        and ev.buttons() == QtCore.Qt.LeftButton:
@@ -246,7 +233,10 @@ class FocusedComp(pg.PlotWidget):
       # from the previous pixel location
       xyCoord = np.round(np.array([[posRelToImg.x(), posRelToImg.y()]], dtype='int'))
       if np.abs(xyCoord - self.lastXyVertFromMouseMove).sum() >= 1 \
-         and self.compImgItem.image is not None:
+         and self.compImgItem.image is not None \
+         and np.all(xyCoord[:,::-1] < self.compImgItem.image.shape[:2]) \
+         and np.all(xyCoord >= 0):
+        # Above line also makes sure the click was within the image
         self.compImageClicked(xyCoord)
         ev.accept()
         self.lastXyVertFromMouseMove = xyCoord

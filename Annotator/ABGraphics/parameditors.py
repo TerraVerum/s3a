@@ -79,6 +79,7 @@ class ConstParamWidget(QtWidgets.QDialog):
       paramDict = []
 
     super().__init__(parent)
+    self.setWindowTitle('Parameter Editor')
     self.resize(500, 400)
 
     self.paramsPerClass = {}
@@ -124,7 +125,6 @@ class ConstParamWidget(QtWidgets.QDialog):
     btnLayout.addWidget(self.saveAsBtn)
     btnLayout.addWidget(self.applyBtn)
     btnLayout.addWidget(self.closeBtn)
-    QtWidgets.QWidget.setTabOrder(self.applyBtn, self.saveAsBtn)
 
     centralLayout = QtWidgets.QVBoxLayout()
     centralLayout.addWidget(self.tree)
@@ -201,12 +201,6 @@ class ConstParamWidget(QtWidgets.QDialog):
     """
     self.params.restoreState(self._stateBeforeEdit)
     super().reject()
-
-  def keyPressEvent(self, ev: QtGui.QKeyEvent):
-    pressedKey = ev.key()
-    if pressedKey == QtCore.Qt.Key_Enter or pressedKey == QtCore.Qt.Key_Return:
-      self.applyBtnClicked()
-    super().keyPressEvent(ev)
 
   def applyBtnClicked(self):
     self._stateBeforeEdit = self.params.saveState()
