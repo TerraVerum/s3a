@@ -9,7 +9,7 @@ from skimage import morphology
 
 from Annotator.ABGraphics.clickables import DraggableViewBox
 from Annotator.ABGraphics.parameditors import AB_SINGLETON
-from Annotator.constants import AB_CONSTS
+from Annotator.constants import AB_CONSTS, AB_ENUMS
 from Annotator.processing import growBoundarySeeds
 from .clickables import ClickableImageItem
 from .regions import VertexRegion, SaveablePolyROI
@@ -59,6 +59,9 @@ class MainImageArea(pg.PlotWidget):
   def minCompSz(self): pass
   @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_MAIN_IMG_SEED_THRESH)
   def mainImgSeedThresh(self): pass
+
+  @AB_SINGLETON.clickModifiers.registerProp(AB_CONSTS.MOD_FOC_IMG_BEGIN_EDIT)
+  def enterEditMode(self): pass
 
 
   def __init__(self, parent=None, background='default', imgSrc=None, **kargs):
@@ -110,7 +113,7 @@ class MainImageArea(pg.PlotWidget):
     # TODO: Determine more robust solution for separated vertices. For now use largest component
     elif len(newVerts) > 1:
       lens = np.array([len(v) for v in newVerts])
-      newVerts = newVerts[lens == lens.max()]
+      newVerts = np.array(newVerts)[lens == lens.max()]
     newVerts[0] += compCoords[0:2].reshape(1, 2)
     newComp = makeCompDf(1)
     newComp[TC.VERTICES] = newVerts
@@ -336,15 +339,15 @@ class FocusedComp(pg.PlotWidget):
     self.regionBuffer.update(vertsToUse, bwImg)
     self.updateRegionFromVerts(vertsToUse, [0, 0])
 
-  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_UNDO_MOD_REGION, ["Undo"])
-  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_REDO_MOD_REGION, ["Redo"])
+  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_UNDO_MOD_REGION, [AB_ENUMS.BUFFER_UNDO])
+  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_REDO_MOD_REGION, [AB_ENUMS.BUFFER_REDO])
   def undoRedoRegionChange(self, undoOrRedo: str):
     # Ignore requests when no region present
     if self.compImgItem.image is None:
       return
-    if undoOrRedo == "Undo":
+    if undoOrRedo == AB_ENUMS.BUFFER_UNDO:
       self.updateRegionFromVerts(self.regionBuffer.undo_getObj(), [0, 0])
-    elif undoOrRedo == "Redo":
+    elif undoOrRedo == AB_ENUMS.BUFFER_REDO:
       self.updateRegionFromVerts(self.regionBuffer.redo_getObj(), [0, 0])
 
   def saveNewVerts(self):

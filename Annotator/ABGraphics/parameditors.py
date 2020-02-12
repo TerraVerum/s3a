@@ -13,8 +13,8 @@ from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
 from Annotator.params import ABParam, ABParamGroup
 from .graphicsutils import dialogSaveToFile
 from ..constants import (
-  SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR,
-  TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES)
+  SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR, CLICK_MODIFIERS_DIR,
+  TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES, AB_CONSTS)
 
 Signal = QtCore.pyqtSignal
 
@@ -147,10 +147,10 @@ class ConstParamWidget(QtWidgets.QDialog):
 
         * The first element of the tuple must correspond to the base name within the
           parameter grouping in order to properly extract the corresponding children.
-          For instance, to extract MARGIN from :class:`RegionControlsEditor`,
+          For instance, to extract MARGIN from :class:`GeneralPropertiesEditor`,
               you must first specify the group parent for that parameter:
-              >>> seedThresh = TEMPLATE_REG_CTRLS[REG_CTRLS.FOCUSED_IMG_PARAMS,
-              >>>   REG_CTRLS.MARGIN]
+              >>> margin = AB_SINGLETON.generalProps[AB_CONSTS.CLS_FOCUSED_IMG_AREA,
+              >>>   AB_CONSTS.MARGIN]
         * The second parameter must be a signle :class:`ABParam` objects or a sequence
           of :class:`ABParam` objects. If a sequence is given, a list of output values
           respecting input order is provided.
@@ -343,6 +343,10 @@ class GeneralPropertiesEditor(ConstParamWidget):
   def __init__(self, parent=None):
     super().__init__(parent, paramDict=[], saveDir=GEN_PROPS_DIR, saveExt='regctrl')
 
+class ClickModifiersEditor(ConstParamWidget):
+  def __init__(self, parent=None):
+    super().__init__(parent, saveDir=CLICK_MODIFIERS_DIR, saveExt='modifier')
+
 class TableFilterEditor(ConstParamWidget):
   def __init__(self, parent=None):
     minMaxParam = _genList(['min', 'max'], 'int', 0)
@@ -408,6 +412,7 @@ class _ABSingleton:
   scheme = SchemeEditor()
   generalProps = GeneralPropertiesEditor()
   filter = TableFilterEditor()
+  clickModifiers = ClickModifiersEditor()
 
   def __init__(self):
     # Code retrieved from https://stackoverflow.com/a/20214464/9463643
