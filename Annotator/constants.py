@@ -14,10 +14,11 @@ LAYOUTS_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'Layouts', '')
 FILTERS_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'Filters', '')
 GEN_PROPS_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'RegionControls', '')
 SHORTCUTS_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'Shortcuts', '')
+CLICK_MODIFIERS_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'Modifiers', '')
 
 # Ensure these directories exist
 for curDir in [SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR,
-               GEN_PROPS_DIR, SHORTCUTS_DIR]:
+               GEN_PROPS_DIR, SHORTCUTS_DIR, CLICK_MODIFIERS_DIR]:
   Path(curDir).mkdir(parents=True, exist_ok=True)
 
 
@@ -103,6 +104,13 @@ class _ABConsts(ABParamGroup):
   SHC_TOGGLE_REG_MODE       : ABParam = newParam('Toggle Between Add/Remove Region', 'Ctrl+T', 'shortcut')
 
   # --------------------------
+  # KEYBOARD MODIFIERS DURING CLICK
+  # --------------------------
+  MOD_MAIN_IMG_SEL_COMPS     : ABParam = newParam('Enter Component Selection Mode', 'Shift', 'shortcut')
+  MOD_MAIN_IMG_CREATE_COMPS  : ABParam = newParam('Enter Component Creation Mode', 'Ctrl', 'shortcut')
+  MOD_FOC_IMG_BEGIN_EDIT     : ABParam = newParam('Enter Region Edit Mode', 'Ctrl', 'shortcut')
+
+  # --------------------------
   # COMPONENT EXPORT PARAMETERS
   # --------------------------
   EXP_ONLY_VISIBLE: ABParam = newParam('Only Export Visible Components', True)
@@ -112,7 +120,10 @@ AB_CONSTS = _ABConsts()
 class _AbEnums(Enum):
   COMP_ADD_AS_MERGE = 'Add as Merge'
   COMP_ADD_AS_NEW   = 'Add as New'
-  COMP_EXPORT_ALL: Enum = 'Export All Components'
+  COMP_EXPORT_ALL   = 'Export All Components'
+
+  BUFFER_UNDO       = 'Undo'
+  BUFFER_REDO       = 'Redo'
 AB_ENUMS = _AbEnums
 
 if __name__ == '__main__':
