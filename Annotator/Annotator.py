@@ -3,6 +3,7 @@
 import os
 from functools import partial
 from os.path import join
+from pathlib import Path
 from typing import Callable
 
 import numpy as np
@@ -10,7 +11,7 @@ import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
 
-from Annotator.constants import AB_CONSTS, BASE_DIR
+from Annotator.constants import AB_CONSTS, BASE_DIR, ANN_AUTH_DIR
 from .ABGraphics.parameditors import ConstParamWidget, TableFilterEditor, AB_SINGLETON
 from .ABGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc
@@ -40,8 +41,13 @@ class Annotator(QtWidgets.QMainWindow):
     uiFile = os.path.join(uiPath, 'imgAnnotator.ui')
     baseModule = str(self.__module__).split('.')[0]
     uic.loadUi(uiFile, self, baseModule)
-    self.setStatusBar(QtWidgets.QStatusBar())
     self.setWindowTitle('AutoBoM Component Detection and Evaluation Tool')
+
+
+    AB_SINGLETON.annotationAuthor = self.getAuthorName()
+    self.statBar = QtWidgets.QStatusBar(self)
+    self.setStatusBar(self.statBar)
+    self.statBar.showMessage(AB_SINGLETON.annotationAuthor)
     #self.setWindowIcon(QtGui.QIcon(BASE_DIR + './ficsLogo.png'))
     # Flesh out pg components
     # ---------------
@@ -89,7 +95,7 @@ class Annotator(QtWidgets.QMainWindow):
 
     # Same with estimating boundaries
     if startImgFpath is not None \
-       and self.estBoundsOnStart:
+        and self.estBoundsOnStart:
       self.estimateBoundaries()
 
     # Menu options
@@ -114,6 +120,31 @@ class Annotator(QtWidgets.QMainWindow):
   # -----------------------------
   # MainWindow CLASS FUNCTIONS
   # -----------------------------
+  def getAuthorName(self):
+    annPath = Path(ANN_AUTH_DIR)
+    annFile = annPath.joinpath('defaultAuthor.txt')
+    if annFile.exists():
+      with open(annFile, 'r') as ifile:
+        name = ifile.readlines()[0]
+      dlg = QtWidgets.QMessageBox(self)
+      dlg.setModal(True)
+      reply = dlg.question(self, 'Default Author',
+                   f'The default author for this application is\n{name}.\n'
+                      f'Is this you?',
+                      dlg.Yes, dlg.No)
+      if reply == dlg.Yes:
+        return name
+    dlg = QtWidgets.QInputDialog()
+    dlg.setModal(True)
+    ok = False
+    name = ''
+    while not ok:
+      name, ok = dlg.getText(self, 'Enter Username', 'Please enter your username: ',
+                             QtWidgets.QLineEdit.Normal)
+    with open(annFile, 'w') as ofile:
+      ofile.write(name)
+    return name
+
   # TODO: Move these properties into the class responsible for image processing/etc.
   @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_EST_BOUNDS_ON_START)
   def estBoundsOnStart(self): pass
