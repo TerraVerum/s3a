@@ -20,7 +20,7 @@ from .processing import getBwComps, getVertsFromBwComps, growSeedpoint,\
   growBoundarySeeds, pcaReduction
 from skimage import morphology
 from Annotator.generalutils import nanConcatList, getClippedBbox
-from .tablemodel import ComponentMgr as ComponentMgr, ModelOpts
+from .tablemodel import ComponentMgr as ComponentMgr, AB_ENUMS
 from .tablemodel import makeCompDf
 
 Slot = QtCore.pyqtSlot
@@ -104,9 +104,9 @@ class Annotator(QtWidgets.QMainWindow):
 
     self.saveComps.triggered.connect(self.saveCompsActionTriggered)
     self.loadComps_merge.triggered.connect(lambda: self.loadCompsActionTriggered(
-      ModelOpts.ADD_AS_MERGE))
+      AB_ENUMS.COMP_ADD_AS_MERGE))
     self.loadComps_new.triggered.connect(lambda: self.loadCompsActionTriggered(
-      ModelOpts.ADD_AS_NEW))
+      AB_ENUMS.COMP_ADD_AS_NEW))
 
     # SETTINGS
     self.createSettingsMenus()
@@ -192,14 +192,14 @@ class Annotator(QtWidgets.QMainWindow):
     if onlyExportFiltered:
       exportIds = self.compDisplay.displayedIds
     else:
-      exportIds = ModelOpts.EXPORT_ALL
+      exportIds = AB_ENUMS.COMP_EXPORT_ALL
     fileDlg = QtWidgets.QFileDialog()
     fileFilter = "CSV Files (*.csv)"
     fname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilter)
     if len(fname) > 0:
       self.compMgr.csvExport(fname, exportIds)
 
-  def loadCompsActionTriggered(self, loadType=ModelOpts.ADD_AS_NEW):
+  def loadCompsActionTriggered(self, loadType=AB_ENUMS.COMP_ADD_AS_NEW):
     fileFilter = "CSV Files (*.csv)"
     fname = popupFilePicker(self, 'Select Load File', fileFilter)
     if fname is not None:
@@ -249,7 +249,7 @@ class Annotator(QtWidgets.QMainWindow):
   def acceptRegionBtnClicked(self):
     self.compImg.saveNewVerts()
     modifiedComp = self.compImg.compSer
-    self.compMgr.addComps(modifiedComp.to_frame().T, addtype=ModelOpts.ADD_AS_MERGE)
+    self.compMgr.addComps(modifiedComp.to_frame().T, addtype=AB_ENUMS.COMP_ADD_AS_MERGE)
 
   @disableAppDuringFunc
   @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_ESTIMATE_BOUNDARIES)

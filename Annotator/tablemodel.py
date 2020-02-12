@@ -12,7 +12,7 @@ from pyqtgraph.Qt import QtCore
 from tqdm import tqdm
 
 from Annotator.ABGraphics.parameditors import AB_SINGLETON
-from Annotator.constants import AB_CONSTS
+from Annotator.constants import AB_CONSTS, AB_ENUMS
 from Annotator.generalutils import coerceDfTypes
 from .constants import TEMPLATE_COMP as TC, CompParams
 from .params import ABParam
@@ -40,11 +40,6 @@ def makeCompDf(numRows=1) -> df:
   if dropRow:
     outDf = outDf.drop(index=TC.INST_ID.value)
   return outDf
-
-class ModelOpts(Enum):
-  ADD_AS_NEW      : Enum = 'new'
-  ADD_AS_MERGE    : Enum = 'merge'
-  EXPORT_ALL      : Enum = 'export all components'
 
 class CsvIOError(Exception): pass
 
@@ -111,7 +106,7 @@ class ComponentMgr(CompTableModel):
   def __init__(self):
     super().__init__()
 
-  def addComps(self, newCompsDf: df, addtype: ModelOpts = ModelOpts.ADD_AS_NEW):
+  def addComps(self, newCompsDf: df, addtype: AB_ENUMS = AB_ENUMS.COMP_ADD_AS_NEW):
     toEmit = self.defaultEmitDict.copy()
     existingIds = self.compDf.index
 
@@ -122,7 +117,7 @@ class ComponentMgr(CompTableModel):
     # Inform graphics elements of deletion if this ID is already in our dataframe
     toEmit.update(self.rmComps(dropIds, emitChange=False))
 
-    if addtype == ModelOpts.ADD_AS_NEW:
+    if addtype == AB_ENUMS.COMP_ADD_AS_NEW:
       # Treat all comps as new -> set their IDs to guaranteed new values
       newIds = np.arange(self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int)
       newCompsDf.loc[:,TC.INST_ID] = newIds
@@ -193,14 +188,14 @@ class ComponentMgr(CompTableModel):
     return toEmit
 
   def csvExport(self, outFile: str,
-                exportIds:Union[ModelOpts, Sequence] = ModelOpts.EXPORT_ALL,
+                exportIds:Union[AB_ENUMS, Sequence] = AB_ENUMS.COMP_EXPORT_ALL,
                 **pdExportArgs) \
       -> bool:
     """
     Serializes the table data and returns the success or failure of the operation.
 
     :param outFile: Name of the output file location
-    :param exportIds: If :var:`ModelOpts.EXPORT_ALL`,
+    :param exportIds: If :var:`AB_ENUMS.EXPORT_ALL`,
     :param pdExportArgs: Dictionary of values passed to underlying pandas export function.
            These will overwrite the default options for :func:`exportToFile
            <ComponentMgr.exportToFile>`
@@ -222,7 +217,7 @@ class ComponentMgr(CompTableModel):
       #  them, since this may be useful if it can be modified
       # TODO: Add some comment to the top of the CSV or some extra text file output with additional metrics
       #  about the export, like time, who did it, what image it was from, etc.
-      if isinstance(exportIds, ModelOpts) and exportIds == ModelOpts.EXPORT_ALL:
+      if isinstance(exportIds, AB_ENUMS) and exportIds == AB_ENUMS.EXPORT_ALL:
         exportDf = self.compDf
       else:
         exportDf = self.compDf.loc[exportIds,:]
@@ -238,7 +233,7 @@ class ComponentMgr(CompTableModel):
       np.set_printoptions(oldNpOpts)
     return success
 
-  def csvImport(self, inFile: str, loadType=ModelOpts.ADD_AS_NEW,
+  def csvImport(self, inFile: str, loadType=AB_ENUMS.COMP_ADD_AS_NEW,
                 imShape: Optional[tuple]=None) -> Optional[Exception]:
     """
     Deserializes data from a csv file to create a Component :class:`DataFrame`.
