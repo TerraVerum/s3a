@@ -188,7 +188,7 @@ class Annotator(QtWidgets.QMainWindow):
 
   @Slot()
   def saveCompsActionTriggered(self):
-    onlyExportFiltered = self.compExportCtrl[AB_CONSTS.EXP_ONLY_VISIBLE]
+    onlyExportFiltered = self.compMgr.exportOnlyVis
     if onlyExportFiltered:
       exportIds = self.compDisplay.displayedIds
     else:
