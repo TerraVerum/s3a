@@ -10,7 +10,7 @@ import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
 
-from Annotator.constants import AB_CONSTS
+from Annotator.constants import AB_CONSTS, BASE_DIR
 from .ABGraphics.parameditors import ConstParamWidget, TableFilterEditor, AB_SINGLETON
 from .ABGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc
@@ -41,19 +41,14 @@ class Annotator(QtWidgets.QMainWindow):
     baseModule = str(self.__module__).split('.')[0]
     uic.loadUi(uiFile, self, baseModule)
     self.setStatusBar(QtWidgets.QStatusBar())
-
+    self.setWindowTitle('AutoBoM Component Detection and Evaluation Tool')
+    #self.setWindowIcon(QtGui.QIcon(BASE_DIR + './ficsLogo.png'))
     # Flesh out pg components
     # ---------------
     # MAIN IMAGE
     # ---------------
     self.mainImg.sigComponentCreated.connect(self._add_focusComp)
     self.mainImg.setImage(startImgFpath)
-
-    # ---------------
-    # FOCUSED COMPONENT IMAGE
-    # ---------------
-    self.compImg.sigEnterPressed.connect(self.acceptRegionBtnClicked)
-    self.compImg.sigModeChanged.connect(self.compImgModeChanged)
 
     # ---------------
     # COMPONENT MANAGER
@@ -103,10 +98,8 @@ class Annotator(QtWidgets.QMainWindow):
     self.sigLayoutSaved.connect(self.populateLoadLayoutOptions)
 
     self.saveComps.triggered.connect(self.saveCompsActionTriggered)
-    self.loadComps_merge.triggered.connect(lambda: self.loadCompsActionTriggered(
-      AB_ENUMS.COMP_ADD_AS_MERGE))
-    self.loadComps_new.triggered.connect(lambda: self.loadCompsActionTriggered(
-      AB_ENUMS.COMP_ADD_AS_NEW))
+    self.loadComps_merge.triggered.connect(lambda: self.loadCompsActionTriggered(AB_ENUMS.COMP_ADD_AS_MERGE))
+    self.loadComps_new.triggered.connect(lambda: self.loadCompsActionTriggered(AB_ENUMS.COMP_ADD_AS_NEW))
 
     # SETTINGS
     self.createSettingsMenus()
@@ -245,6 +238,7 @@ class Annotator(QtWidgets.QMainWindow):
       return
     self.compImg.updateRegionFromVerts(self.compImg.compSer[TC.VERTICES].squeeze())
 
+  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_ACCEPT_REGION)
   @Slot()
   def acceptRegionBtnClicked(self):
     self.compImg.saveNewVerts()
@@ -254,7 +248,7 @@ class Annotator(QtWidgets.QMainWindow):
   @disableAppDuringFunc
   @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_ESTIMATE_BOUNDARIES)
   def estimateBoundaries(self):
-    compVertices = getVertsFromBwComps(getBwComps(self.mainImg.image, self.minCompSz))
+    compVertices = getVertsFromBwComps(getBwComps(self.mainImg.image, self.mainImg.minCompSz))
     components = makeCompDf(len(compVertices))
     components[TC.VERTICES] = compVertices
     self.compMgr.addComps(components)
@@ -288,10 +282,13 @@ class Annotator(QtWidgets.QMainWindow):
     curTxt = self.addRmCombo.currentText()
     self.compImg.inAddMode = curTxt == 'Add'
 
+  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_TOGGLE_REG_MODE)
   @Slot(bool)
-  def compImgModeChanged(self, newMode):
+  def toggleCompImgMode(self):
+    oldMode = self.compImg.inAddMode
+    self.compImg.inAddMode = not oldMode
     self.addRmCombo.blockSignals(True)
-    self.addRmCombo.setCurrentIndex(not newMode)
+    self.addRmCombo.setCurrentIndex(oldMode)
     self.addRmCombo.blockSignals(False)
 
   # ---------------
