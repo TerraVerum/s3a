@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 
 import numpy as np
@@ -30,7 +31,6 @@ class ComponentTypes(ABParamGroup):
   OTHER : ABParam = newParam('Other')
   N_A   : ABParam = newParam('Unassigned')
 
-
 TEMPLATE_COMP_TYPES = ComponentTypes()
 
 
@@ -47,12 +47,11 @@ class CompParams(ABParamGroup):
   LOGO       : ABParam = newParam('Logo', '')
   NOTES      : ABParam = newParam('Notes', '')
 
-
 TEMPLATE_COMP = CompParams()
 
 
 @dataclass
-class ABConsts(ABParamGroup):
+class _ABConsts(ABParamGroup):
   # --------------------------
   # CLASS NAMES
   # --------------------------
@@ -105,8 +104,12 @@ class ABConsts(ABParamGroup):
   # --------------------------
   EXP_ONLY_VISIBLE: ABParam = newParam('Only export visible components', True)
 
+AB_CONSTS = _ABConsts()
 
-AB_CONSTS = ABConsts()
+class AB_ENUMS(Enum):
+  COMP_ADD_AS_MERGE = 'Add as Merge'
+  COMP_ADD_AS_NEW   = 'Add as New'
+  COMP_EXPORT_ALL: Enum = 'Export All Components'
 
 if __name__ == '__main__':
   c = ComponentTypes().fromString('capacitor')
