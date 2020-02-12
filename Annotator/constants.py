@@ -43,7 +43,7 @@ class CompParams(ABParamGroup):
   VALIDATED       : ABParam = newParam('Validated', False)
   ANN_AUTHOR      : ABParam = newParam('Author', "")
   ANN_FILENAME    : ABParam = newParam('Filename', "")
-  ANN_TIMESTAMP   : ABParam = newParam('Author', "")
+  ANN_TIMESTAMP   : ABParam = newParam('Timestamp', "")
   DEV_TEXT        : ABParam = newParam('Device Text', '')
   DEV_TYPE        : ABParam = newParam('Device Type', TEMPLATE_COMP_TYPES.N_A)
   BOARD_TEXT      : ABParam = newParam('Board Text', '')
