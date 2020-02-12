@@ -133,7 +133,7 @@ class Annotator(QtWidgets.QMainWindow):
     for editor, name in zip(AB_SINGLETON.editors, AB_SINGLETON.editorNames): \
         #type: ConstParamWidget, str
       menu = QtWidgets.QMenu(name, self)
-      editAct = QtWidgets.QAction('Edit' + name, self)
+      editAct = QtWidgets.QAction('Edit ' + name, self)
       menu.addAction(editAct)
       menu.addSeparator()
       editAct.triggered.connect(editor.show)
@@ -235,7 +235,7 @@ class Annotator(QtWidgets.QMainWindow):
     # Only perform action if image currently exists
     if self.compImg.compImgItem.image is None:
       return
-    self.compImg.updateRegion(None)
+    self.compImg.updateRegionFromVerts(None)
 
   @Slot()
   def resetRegionBtnClicked(self):
@@ -243,7 +243,7 @@ class Annotator(QtWidgets.QMainWindow):
     # Only perform action if image currently exists
     if self.compImg.compImgItem.image is None:
       return
-    self.compImg.updateRegion(self.compImg.compSer[TC.VERTICES].squeeze())
+    self.compImg.updateRegionFromVerts(self.compImg.compSer[TC.VERTICES].squeeze())
 
   @Slot()
   def acceptRegionBtnClicked(self):

@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Optional
 
 import numpy as np
 import pyqtgraph as pg
@@ -15,11 +15,37 @@ from .clickables import ClickableImageItem
 from .regions import VertexRegion, SaveablePolyROI
 from ..constants import TEMPLATE_COMP as TC
 from ..processing import segmentComp, getVertsFromBwComps, growSeedpoint
-from Annotator.generalutils import getClippedBbox, nanConcatList
+from Annotator.generalutils import getClippedBbox, nanConcatList, ObjUndoBuffer
 from ..tablemodel import makeCompDf
 
 Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
+
+@AB_SINGLETON.registerClass(AB_CONSTS.CLS_REGION_BUF)
+class RegionVertsUndoBuffer(ObjUndoBuffer):
+  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_UNDO_BUF_SZ)
+  def maxBufferLen(self): pass
+
+  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_STEPS_BW_SAVE)
+  def stepsBetweenBufSave(self): pass
+
+  _bwPrevRegion: Optional[np.ndarray] = None
+
+  def __init__(self):
+    super().__init__(self.maxBufferLen, self.stepsBetweenBufSave)
+
+  def update(self, newVerts, newBwArea=None, overridingUpdateCondtn=None):
+    if self._bwPrevRegion is None:
+      # Ensure update takes place
+      self._bwPrevRegion = ~newBwArea
+    curPrevAreaDiff = np.bitwise_xor(newBwArea, self._bwPrevRegion).sum() / \
+                      newBwArea.size
+    # Force cancel update if region hasn't changed
+    if curPrevAreaDiff == 0:
+      overridingUpdateCondtn = False
+    # Don't forget to update bwArea after checking diff
+    self._bwPrevRegion = newBwArea
+    super().update(newVerts, curPrevAreaDiff > 0.05, overridingUpdateCondtn)
 
 @AB_SINGLETON.registerClass(AB_CONSTS.CLS_MAIN_IMG_AREA)
 class MainImageArea(pg.PlotWidget):
@@ -158,11 +184,13 @@ class FocusedComp(pg.PlotWidget):
     # image annotator UI
     self.drawType = 'seedpoint'
 
+    # For limiting number of mouse move-caused click simulations
+    self.lastXyVertFromMouseMove = np.array([0,0])
+
     self.setAspectLocked(True)
     self.getViewBox().invertY()
 
     self.compSer = makeCompDf().squeeze()
-    self.deletedPrevComponent = False
 
     self.bbox = np.zeros((2,2), dtype='int32')
 
@@ -172,6 +200,8 @@ class FocusedComp(pg.PlotWidget):
 
     self.region = VertexRegion()
     self.addItem(self.region)
+
+    self.regionBuffer = RegionVertsUndoBuffer()
 
     self.interactor = SaveablePolyROI([], pen=(6,9), closed=False, removable=True)
     self.addItem(self.interactor)
@@ -212,9 +242,14 @@ class FocusedComp(pg.PlotWidget):
        and ev.buttons() == QtCore.Qt.LeftButton:
       # Simulate click in that location
       posRelToImg = self.compImgItem.mapFromScene(ev.pos())
+      # Form of rate-limiting -- only simulate click if the next pixel is at least one away
+      # from the previous pixel location
       xyCoord = np.round(np.array([[posRelToImg.x(), posRelToImg.y()]], dtype='int'))
-      self.compImageClicked(xyCoord)
-      ev.accept()
+      if np.abs(xyCoord - self.lastXyVertFromMouseMove).sum() >= 1 \
+         and self.compImgItem.image is not None:
+        self.compImageClicked(xyCoord)
+        ev.accept()
+        self.lastXyVertFromMouseMove = xyCoord
     else:
       super().mouseMoveEvent(ev)
 
@@ -224,19 +259,13 @@ class FocusedComp(pg.PlotWidget):
     # Change vertex from x-y to row-col
     newVert = np.fliplr(newVert)
     newArea = growSeedpoint(self.compImgItem.image, newVert, self.seedThresh)
+    imgSize = newArea.shape
     curRegionMask = self.region.embedMaskInImg(newArea.shape)
     if self.inAddMode:
       newArea |= curRegionMask
     else:
       newArea = ~newArea & curRegionMask
-    # TODO: handle case of multiple regions existing after click. For now, just use
-    # the largest
-    vertsPerComp = getVertsFromBwComps(newArea)
-    vertsToUse = np.empty((0,2), dtype='int')
-    for verts in vertsPerComp:
-      if verts.shape[0] > vertsToUse.shape[0]:
-        vertsToUse = verts
-    self.updateRegion(vertsToUse, [0,0])
+    self.updateRegionFromBwMask(newArea)
 
   def addRoiVertex(self, newVert: QtCore.QPointF):
     # Account for moved ROI
@@ -260,18 +289,18 @@ class FocusedComp(pg.PlotWidget):
 
   def updateAll(self, mainImg: np.array, newComp:df):
     newVerts = newComp[TC.VERTICES].squeeze()
-    # If the previous component had no vertices, signal its removal
-    if len(self.compSer[TC.VERTICES].squeeze()) == 0 and not self.deletedPrevComponent:
-      self.deletedPrevComponent = True
     # Since values INSIDE the dataframe are reset instead of modified, there is no
     # need to go through the trouble of deep copying
     self.compSer = newComp.copy(deep=False)
-    self.deletedPrevComponent = False
+
+    # Reset the undo buffer
+    self.regionBuffer = RegionVertsUndoBuffer()
+
+    # Propagate all resultant changes
     self.updateBbox(mainImg.shape, newVerts)
     self.updateCompImg(mainImg)
-    self.updateRegion(newVerts)
+    self.updateRegionFromVerts(newVerts)
     self.autoRange()
-    return self.deletedPrevComponent
 
   def updateBbox(self, mainImgShape, newVerts: np.ndarray):
     # Ignore NAN entries during computation
@@ -290,7 +319,7 @@ class FocusedComp(pg.PlotWidget):
     segImg = segmentComp(newCompImg, self.segThresh)
     self.setImage(segImg)
 
-  def updateRegion(self, newVerts, offset=None):
+  def updateRegionFromVerts(self, newVerts, offset=None):
     # Component vertices are nan-separated regions
     if offset is None:
       offset = self.bbox[0,:]
@@ -303,6 +332,31 @@ class FocusedComp(pg.PlotWidget):
     centeredVerts -= offset
     self.region.updateVertices(centeredVerts)
 
+  def updateRegionFromBwMask(self, bwImg: np.ndarray):
+    vertsPerComp = getVertsFromBwComps(bwImg)
+    vertsToUse = np.empty((0, 2), dtype='int')
+    for verts in vertsPerComp:
+      # TODO: handle case of multiple regions existing in bwImg. For now, just use
+      #   the largest
+      if verts.shape[0] > vertsToUse.shape[0]:
+        vertsToUse = verts
+    # TODO: Find a computationally good way to check for large changes every time a
+    #  region is modified. The current solution can only work from mask-based updates
+    #  unless an expensive cv.floodFill is used
+    self.regionBuffer.update(vertsToUse, bwImg)
+    self.updateRegionFromVerts(vertsToUse, [0, 0])
+
+  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_UNDO_MOD_REGION, ["Undo"])
+  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_REDO_MOD_REGION, ["Redo"])
+  def undoRedoRegionChange(self, undoOrRedo: str):
+    # Ignore requests when no region present
+    if self.compImgItem.image is None:
+      return
+    if undoOrRedo == "Undo":
+      self.updateRegionFromVerts(self.regionBuffer.undo_getObj(), [0, 0])
+    elif undoOrRedo == "Redo":
+      self.updateRegionFromVerts(self.regionBuffer.redo_getObj(), [0, 0])
+
   def saveNewVerts(self):
     # Add in offset from main image to VertexRegion vertices
     self.compSer.loc[TC.VERTICES] = self.region.verts + self.bbox[0,:]
@@ -310,9 +364,7 @@ class FocusedComp(pg.PlotWidget):
   def _addRoiToRegion(self):
     imgMask = self.interactor.getImgMask(self.compImgItem)
     newRegion = np.bitwise_or(imgMask, self.region.image)
-    newVerts = getVertsFromBwComps(newRegion)
     # TODO: Handle case of poly not intersecting existing region
-    newVerts = newVerts[0]
-    self.updateRegion(newVerts, [0,0])
+    self.updateRegionFromBwMask(newRegion)
     # Now that the ROI was added to the region, remove it
     self.interactor.clearPoints()

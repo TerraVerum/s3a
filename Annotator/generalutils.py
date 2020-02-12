@@ -1,4 +1,10 @@
+from collections import deque
+from typing import Any, Optional
+
 import numpy as np
+
+from Annotator.ABGraphics.parameditors import AB_SINGLETON
+from Annotator.constants import AB_CONSTS
 
 from Annotator.params import ABParamGroup
 from pandas import DataFrame as df
@@ -88,3 +94,66 @@ def coerceDfTypes(dataframe: df, constParams: ABParamGroup):
     except TypeError:
       # Coercion isn't possible, nothing to do here
       pass
+
+
+class ObjUndoBuffer:
+  _maxBufferLen:Optional[int] = None
+  # Used to reduce the memory requirements for the undo buffer. More steps between
+  # saves means fewer required buffer entries
+  _maxStepsBetweenBufSave = 1
+  _stepsSinceBufSave = 0
+  _OLDEST_BUF_IDX = 0
+  _NEWEST_BUF_IDX = -1
+
+  # Used to keep track of where we are in the undo stack
+  _oldestId = -1
+  _newestId = -1
+
+  # Main structure of the class
+  _buffer: deque
+
+  def __init__(self, maxBufferLen=None, stepsBetweenBufSave=1):
+    self._buffer = deque(maxlen=maxBufferLen)
+    self._maxStepsBetweenBufSave = stepsBetweenBufSave
+
+  def undo_getObj(self) -> Any:
+    # Can't undo if the current index is the oldest in the deque
+    if self._oldestId != id(self._buffer[self._NEWEST_BUF_IDX]):
+      self._buffer.rotate()
+    return self._buffer[self._NEWEST_BUF_IDX]
+
+  def redo_getObj(self) -> Any:
+    # Can't undo if the current index is the oldest in the deque
+    if self._newestId != id(self._buffer[self._NEWEST_BUF_IDX]):
+      self._buffer.rotate(-1)
+    return self._buffer[self._NEWEST_BUF_IDX]
+
+  def update(self, newObj, supplementalUpdateCondtn=False, overridingUpdateCondtn=None):
+    # If the incoming vertices are part of a brand new region, throw away all history
+    # Also append if no verts are already in the deque
+    if not self._buffer:
+      self._buffer = deque(maxlen=self._maxBufferLen)
+      shouldAppendVerts = True
+    elif overridingUpdateCondtn is not None:
+      shouldAppendVerts = overridingUpdateCondtn
+    else:
+      # Otherwise, proceed as normal
+      # Need to clean out invalid entries when an undo was performed before the current
+      # operation
+      while self._buffer and self._oldestId != id(self._buffer[self._OLDEST_BUF_IDX]):
+        self._buffer.popleft()
+
+      # Check if current operation should go on the deque
+      self._stepsSinceBufSave += 1
+      shouldAppendVerts =  self._stepsSinceBufSave > self._maxStepsBetweenBufSave \
+          or supplementalUpdateCondtn
+    if shouldAppendVerts:
+      # Time to save the action.
+      # Note: we need to save the id of the first/last deque object so we know when the
+      # end of the undo stack has been reached
+      # This also changes when the max size has been reached, so we should reset each
+      # time a new object is added
+      self._buffer.append(newObj)
+      self._oldestId = id(self._buffer[self._OLDEST_BUF_IDX])
+      self._newestId = id(self._buffer[self._NEWEST_BUF_IDX])
+      self._stepsSinceBufSave = 0
