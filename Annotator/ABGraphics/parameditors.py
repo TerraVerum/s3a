@@ -1,20 +1,20 @@
 # -*- coding: utf-8 -*-
 import pickle as pkl
-import sys
-from dataclasses import dataclass, field
-from os.path import join
-from typing import Sequence, Union, Dict, Callable, Any, List
-from functools import partial
 import re
+import sys
+from dataclasses import dataclass
+from functools import partial
+from os.path import join
+from typing import Sequence, Union, Callable, Any, Optional
 
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
 
+from Annotator.params import ABParam, ABParamGroup
 from .graphicsutils import dialogSaveToFile
 from ..constants import (
   SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR,
   TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES)
-from Annotator.params import ABParam, ABParamGroup
 
 Signal = QtCore.pyqtSignal
 
@@ -39,18 +39,27 @@ class ShortcutParameterItem(parameterTypes.WidgetParameterItem):
 
   def __init__(self, param, depth):
     super().__init__(param, depth)
-    self.item = None
+    self.item: Optional[QtGui.QKeySequence] = None
 
   def makeWidget(self):
     item = QtWidgets.QKeySequenceEdit()
+
     item.sigChanged = item.editingFinished
     item.value = lambda: item.keySequence().toString()
     item.setValue = item.setKeySequence
     self.item = item
     return self.item
 
+  # def contextMenuEvent(self, ev: QtGui.QContextMenuEvent):
+  #   menu = self.contextMenu
+  #   delAct = QtWidgets.QAction('Set Blank')
+  #   delAct.triggered.connect(lambda: self.widget.setValue(''))
+  #   menu.addAction(delAct)
+  #   menu.exec(ev.globalPos())
+
 class ShortcutParameter(Parameter):
   itemClass = ShortcutParameterItem
+
 parameterTypes.registerParameterType('shortcut', ShortcutParameter)
 
 @dataclass
@@ -115,6 +124,7 @@ class ConstParamWidget(QtWidgets.QDialog):
     btnLayout.addWidget(self.saveAsBtn)
     btnLayout.addWidget(self.applyBtn)
     btnLayout.addWidget(self.closeBtn)
+    QtWidgets.QWidget.setTabOrder(self.applyBtn, self.saveAsBtn)
 
     centralLayout = QtWidgets.QVBoxLayout()
     centralLayout.addWidget(self.tree)
@@ -181,6 +191,7 @@ class ConstParamWidget(QtWidgets.QDialog):
     self.raise_()
     # Necessary on Windows
     self.activateWindow()
+    self.applyBtn.setFocus()
     super().show()
 
 
