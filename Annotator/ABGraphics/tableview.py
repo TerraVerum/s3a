@@ -173,7 +173,7 @@ class CompTableView(QtWidgets.QTableView):
 
     return menu
 
-  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SCH_TBL_DEL_ROWS)
+  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_TBL_DEL_ROWS)
   def removeTriggered(self):
     if self.minimal: return
 
