@@ -9,6 +9,7 @@ import numpy as np
 from Annotator.params import ABParam, ABParamGroup, newParam
 
 BASE_DIR = os.path.dirname(Path(__file__).absolute())
+ANN_AUTH_DIR = os.path.join(BASE_DIR, 'MenuOpts', '')
 SCHEMES_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'Schemes', '')
 LAYOUTS_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'Layouts', '')
 FILTERS_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'Filters', '')

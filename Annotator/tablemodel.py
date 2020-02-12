@@ -37,6 +37,9 @@ def makeCompDf(numRows=1) -> df:
     # each row no objects have the same reference
     df_list.append([field.value for field in CompParams()])
   outDf = df(df_list, columns=TC).set_index(TC.INST_ID, drop=False)
+  # Set the metadata for this application run
+  outDf[TC.ANN_AUTHOR] = AB_SINGLETON.annotationAuthor
+  outDf[TC.ANN_TIMESTAMP] = pd.datetime.utcnow()
   if dropRow:
     outDf = outDf.drop(index=TC.INST_ID.value)
   return outDf

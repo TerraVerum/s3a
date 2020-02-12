@@ -414,13 +414,15 @@ class _ABSingleton:
   filter = TableFilterEditor()
   clickModifiers = ClickModifiersEditor()
 
+  annotationAuthor = None
+
   def __init__(self):
     # Code retrieved from https://stackoverflow.com/a/20214464/9463643
     editors = []
     editorNames = []
     for prop in dir(self):
       propObj = getattr(self, prop)
-      if not prop.startswith('__') and not callable(propObj):
+      if isinstance(propObj, ConstParamWidget):
         editors.append(propObj)
         # Strip 'editor', space at capital letter
         propClsName = type(propObj).__name__
