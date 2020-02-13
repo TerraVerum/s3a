@@ -11,6 +11,8 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 from tqdm import tqdm
 
+from imageprocessing.annotations import ABAnnotationTable
+
 from Annotator.ABGraphics.parameditors import AB_SINGLETON
 from Annotator.constants import AB_CONSTS, AB_ENUMS
 from Annotator.generalutils import coerceDfTypes
@@ -20,7 +22,7 @@ from .params import ABParam
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal
 
-def makeCompDf(numRows=1) -> df:
+def makeCompDf(numRows=1) -> ABAnnotationTable:
   """
   Creates a dataframe for the requested number of components.
   This is the recommended method for component instantiation prior to table insertion.
@@ -40,6 +42,7 @@ def makeCompDf(numRows=1) -> df:
   # Set the metadata for this application run
   outDf[TC.ANN_AUTHOR] = AB_SINGLETON.annotationAuthor
   outDf[TC.ANN_TIMESTAMP] = pd.datetime.utcnow()
+  outDf[TC.ANN_FILENAME] = AB_CONSTS.ANN_CUR_FILE_INDICATOR
   if dropRow:
     outDf = outDf.drop(index=TC.INST_ID.value)
   return outDf
