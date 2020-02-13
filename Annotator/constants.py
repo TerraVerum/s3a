@@ -118,6 +118,11 @@ class _ABConsts(ABParamGroup):
   # --------------------------
   EXP_ONLY_VISIBLE: ABParam = newParam('Only Export Visible Components', True)
 
+  # --------------------------
+  # COMPONENT EXPORT PARAMETERS
+  # --------------------------
+  ANN_CUR_FILE_INDICATOR: ABParam = newParam('New')
+
 AB_CONSTS = _ABConsts()
 
 class _AbEnums(Enum):

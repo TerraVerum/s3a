@@ -3,6 +3,7 @@
 import os
 from functools import partial
 from os.path import join
+import sys
 from pathlib import Path
 from typing import Callable
 
@@ -14,7 +15,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
 from Annotator.constants import AB_CONSTS, BASE_DIR, ANN_AUTH_DIR
 from .ABGraphics.parameditors import ConstParamWidget, TableFilterEditor, AB_SINGLETON
 from .ABGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
-  attemptLoadSettings, popupFilePicker, disableAppDuringFunc
+  attemptLoadSettings, popupFilePicker, disableAppDuringFunc, dialogGetAuthorName
 from .CompDisplayFilter import CompDisplayFilter, CompSortFilter
 from .constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
 from .processing import getBwComps, getVertsFromBwComps, growSeedpoint,\
@@ -32,6 +33,9 @@ pg.setConfigOptions(imageAxisOrder='row-major')
 
 @AB_SINGLETON.registerClass(AB_CONSTS.CLS_ANNOTATOR)
 class Annotator(QtWidgets.QMainWindow):
+  """
+  Top-level widget for producing component bounding boxes from an input image.
+  """
   # Alerts GUI that a layout (either new or overwriting old) was saved
   sigLayoutSaved = Signal()
 
@@ -123,24 +127,11 @@ class Annotator(QtWidgets.QMainWindow):
   def getAuthorName(self):
     annPath = Path(ANN_AUTH_DIR)
     annFile = annPath.joinpath('defaultAuthor.txt')
-    if annFile.exists():
-      with open(annFile, 'r') as ifile:
-        name = ifile.readlines()[0]
-      dlg = QtWidgets.QMessageBox(self)
-      dlg.setModal(True)
-      reply = dlg.question(self, 'Default Author',
-                   f'The default author for this application is\n{name}.\n'
-                      f'Is this you?',
-                      dlg.Yes, dlg.No)
-      if reply == dlg.Yes:
-        return name
-    dlg = QtWidgets.QInputDialog()
-    dlg.setModal(True)
-    ok = False
-    name = ''
-    while not ok:
-      name, ok = dlg.getText(self, 'Enter Username', 'Please enter your username: ',
-                             QtWidgets.QLineEdit.Normal)
+    quitApp, name = dialogGetAuthorName(self, annFile)
+
+    if quitApp:
+      sys.exit(0)
+
     with open(annFile, 'w') as ofile:
       ofile.write(name)
     return name
