@@ -60,9 +60,6 @@ class MainImageArea(pg.PlotWidget):
   @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_MAIN_IMG_SEED_THRESH)
   def mainImgSeedThresh(self): pass
 
-  @AB_SINGLETON.clickModifiers.registerProp(AB_CONSTS.MOD_FOC_IMG_BEGIN_EDIT)
-  def enterEditMode(self): pass
-
 
   def __init__(self, parent=None, background='default', imgSrc=None, **kargs):
     super().__init__(parent, background, viewBox=DraggableViewBox(), **kargs)
@@ -100,7 +97,7 @@ class MainImageArea(pg.PlotWidget):
     if croppedImg.size == 0: return
     # Performance for using all bounds is prohibitive for large components
     # TODO: Find a better method of determining whether to use all bounds
-    if np.prod(croppedImg.shape[0:2]) > 250e3:
+    if np.prod(croppedImg.shape[0:2]) > 25e3:
       shouldUseAllBounds = False
     else:
       shouldUseAllBounds = True
