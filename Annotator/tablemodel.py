@@ -1,20 +1,17 @@
 import re
 import sys
 from ast import literal_eval
-from enum import Enum
 from typing import Union, Any, Optional, Sequence
-from functools import wraps
 
 import numpy as np
 import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
-from tqdm import tqdm
 
 from imageprocessing.annotations import ABAnnotationTable
 
 from Annotator.ABGraphics.parameditors import AB_SINGLETON
-from Annotator.constants import AB_CONSTS, AB_ENUMS
+from Annotator.constants import AB_CONSTS, AB_ENUMS, CsvIOError
 from Annotator.generalutils import coerceDfTypes
 from .constants import TEMPLATE_COMP as TC, CompParams
 from .params import ABParam
@@ -46,8 +43,6 @@ def makeCompDf(numRows=1) -> ABAnnotationTable:
   if dropRow:
     outDf = outDf.drop(index=TC.INST_ID.value)
   return outDf
-
-class CsvIOError(Exception): pass
 
 class CompTableModel(QtCore.QAbstractTableModel):
   colTitles = TC.paramNames()

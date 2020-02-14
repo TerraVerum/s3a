@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import re
+from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass, fields, field
 from typing import Any, Optional
 from warnings import warn
 import weakref
+
+import numpy as np
+from pandas import DataFrame, Series
+
 
 class ParamParseError(Exception): pass
 
@@ -13,6 +18,7 @@ class ABParam:
   name: str
   value: Any
   valType: Optional[Any] = None
+  helpText: str = ''
   group: Optional[ABParamGroup] = None
 
   def __str__(self):
@@ -83,7 +89,7 @@ class ABParamGroup:
     """
     return None
 
-def newParam(name, val=None, valType=None):
+def newParam(name, val=None, valType=None, helpText=''):
   """
   Factory for creating new parameters within a :class:`ABParamGroup`.
 
@@ -95,12 +101,52 @@ def newParam(name, val=None, valType=None):
   (e.g. 'Ctrl+D'), so the user must explicitly specify that such an :class:`ABParam` is of type 'shortcut' (as
   defined in :class:`ShortcutParameter<Annotator.ABGraphics.parameditors.ShortcutParameter>`) If the type *is* easily
   inferrable, this may be left blank.
+  :param helpText: Additional documentation for this parameter.
   :return: Field that can be inserted within the :class:`ABParamGroup` dataclass.
   """
   if valType is None:
     # Infer from value
     # TODO: Is there an easier way?
-    # String rep of val type = <class 'type'>
+    # The string representation of val 'type' is: <class 'type'>
     # Parse for '' occurrences and grab in between the quotes
     valType = re.search('\'.*\'', str(type(val))).group()[1:-1]
-  return field(default_factory=lambda: ABParam(name, val, valType))
+  return field(default_factory=lambda: ABParam(name, val, valType, helpText))
+
+
+class FRVertices:
+  xyPoints: np.ndarray
+
+  connected: bool = True
+
+  @property
+  def x(self):
+    return self.xyPoints[:,0]
+  @property
+  def y(self):
+      return self.xyPoints[:,1]
+
+  @property
+  def rows(self):
+      return self.y
+  @property
+  def cols(self):
+      return self.x
+
+
+class FREditablePropFunc(ABC):
+  sharedProps: ABParamGroup
+
+  @abstractmethod
+  def __call__(self, *args, **kwargs):
+    pass
+
+class FRImageProcessor(ABC):
+  image: np.ndarray
+
+  @abstractmethod
+  def vertsFromPoints(self, internPoints: FRVertices, externPoints: FRVertices) -> FRVertices:
+    pass
+
+  @abstractmethod
+  def globalCompEstimate(self):
+    pass

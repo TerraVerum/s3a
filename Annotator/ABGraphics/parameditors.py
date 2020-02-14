@@ -10,6 +10,7 @@ from typing import Sequence, Union, Callable, Any, Optional
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
 
+from Annotator.constants import IllRegisteredPropError
 from Annotator.params import ABParam, ABParamGroup
 from .graphicsutils import dialogSaveToFile
 from ..constants import (
@@ -45,10 +46,14 @@ class ShortcutParameterItem(parameterTypes.WidgetParameterItem):
     item = QtWidgets.QKeySequenceEdit()
 
     item.sigChanged = item.editingFinished
-    item.value = lambda: item.keySequence().toString()
+    item.value = item.keySequence
     item.setValue = item.setKeySequence
     self.item = item
     return self.item
+
+  def updateDisplayLabel(self, value=None):
+    # Make sure the key sequence is human readable
+    self.displayLabel.setText(self.widget.keySequence().toString())
 
   # def contextMenuEvent(self, ev: QtGui.QContextMenuEvent):
   #   menu = self.contextMenu
@@ -59,6 +64,13 @@ class ShortcutParameterItem(parameterTypes.WidgetParameterItem):
 
 class ShortcutParameter(Parameter):
   itemClass = ShortcutParameterItem
+
+  def __init__(self, **opts):
+    # Before initializing super, turn the string keystroke into a key sequence
+    value = opts.get('value', '')
+    keySeqVal = QtGui.QKeySequence(value)
+    opts['value'] = keySeqVal
+    super().__init__(**opts)
 
 parameterTypes.registerParameterType('shortcut', ShortcutParameter)
 
@@ -367,15 +379,6 @@ class TableFilterEditor(ConstParamWidget):
       ]
     super().__init__(parent, paramDict=_FILTER_DICT, saveDir=FILTERS_DIR, saveExt='filter')
 
-class TmpTblFilterEditor(ConstParamWidget):
-  def __init__(self):
-    for param in TC:
-      paramType = type(param.value)
-      if paramType == int:
-        curChild = self.createMinMaxFilter()
-      elif paramType == ABParamGroup:
-        pass
-
 class ShortcutsEditor(ConstParamWidget):
 
   def __init__(self, parent=None):
@@ -395,6 +398,12 @@ class ShortcutsEditor(ConstParamWidget):
       shortcut.activated.connect(partial(boundParam.func, clsObj, *boundParam.defaultFnArgs))
       shortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
       self.shortcuts.append(shortcut)
+
+  def registerProp(self, constParam: ABParam):
+    """
+    Properties should never be registered as shortcuts, so make sure this is disallowed
+    """
+    raise IllRegisteredPropError('Cannot register property/attribute as a shortcut')
 
   def applyBtnClicked(self):
     for shortcut in self.shortcuts: #type: ABEditableShortcut

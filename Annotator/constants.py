@@ -60,13 +60,18 @@ class _ABConsts(ABParamGroup):
   # CLASS NAMES
   # --------------------------
   CLS_ANNOTATOR        : ABParam = newParam('Main Annotator')
+
   CLS_COMP_TBL         : ABParam = newParam('Component Table')
+  CLS_COMP_MGR         : ABParam = newParam('Component Manager')
+
   CLS_VERT_REGION      : ABParam = newParam('Focused Image Graphics')
   CLS_MULT_REG_PLT     : ABParam = newParam('Main Image Graphics')
-  CLS_COMP_MGR         : ABParam = newParam('Component Manager')
+
+  CLS_REGION_BUF       : ABParam = newParam('Region Modification Buffer')
+
+  CLS_IMG_AREA         : ABParam = newParam('Base Image Area')
   CLS_MAIN_IMG_AREA    : ABParam = newParam('Main Image Area')
   CLS_FOCUSED_IMG_AREA : ABParam = newParam('Focused Component Image Area')
-  CLS_REGION_BUF       : ABParam = newParam('Region Modification Buffer')
   # --------------------------
   # SCHEME PARAMETERS
   # --------------------------
@@ -109,9 +114,8 @@ class _ABConsts(ABParamGroup):
   # --------------------------
   # KEYBOARD MODIFIERS DURING CLICK
   # --------------------------
-  MOD_MAIN_IMG_SEL_COMPS     : ABParam = newParam('Enter Component Selection Mode', 'Shift', 'shortcut')
-  MOD_MAIN_IMG_CREATE_COMPS  : ABParam = newParam('Enter Component Creation Mode', 'Ctrl', 'shortcut')
-  MOD_FOC_IMG_BEGIN_EDIT     : ABParam = newParam('Enter Region Edit Mode', 'Ctrl', 'shortcut')
+  MOD_MODE_SELECT  : ABParam = newParam('Enter Component Creation Mode', 'Ctrl', 'shortcut')
+  MOD_MODE_EDIT    : ABParam = newParam('Enter Component Selection Mode', 'Shift', 'shortcut')
 
   # --------------------------
   # COMPONENT EXPORT PARAMETERS
@@ -130,9 +134,20 @@ class _AbEnums(Enum):
   COMP_ADD_AS_NEW   = 'Add as New'
   COMP_EXPORT_ALL   = 'Export All Components'
 
+  DRAW_MODE_EDIT    = 'Add Mode'
+  DRAW_MODE_SELECT  = 'Selection Mode'
+  DRAW_MODE_NONE    = 'No Action Mode'
+
   BUFFER_UNDO       = 'Undo'
   BUFFER_REDO       = 'Redo'
 AB_ENUMS = _AbEnums
+
+# --------------
+# Errors used within the application
+# --------------
+class CsvIOError(Exception): pass
+class InvalidDrawModeError(Exception): pass
+class IllRegisteredPropError(Exception): pass
 
 if __name__ == '__main__':
   c = ComponentTypes().fromString('capacitor')
