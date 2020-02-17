@@ -10,12 +10,12 @@ from typing import Sequence, Union, Callable, Any, Optional
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
 
-from Annotator.constants import IllRegisteredPropError
-from Annotator.params import ABParam, ABParamGroup
+from Annotator.exceptions import IllRegisteredPropError
+from Annotator.params import FRParam, FRParamGroup
 from .graphicsutils import dialogSaveToFile
 from ..constants import (
   SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR, CLICK_MODIFIERS_DIR,
-  TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES, AB_CONSTS)
+  TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES, FR_CONSTS)
 
 Signal = QtCore.pyqtSignal
 
@@ -24,12 +24,12 @@ def _genList(nameIter, paramType, defaultVal, defaultParam='value'):
   return [{'name': name, 'type': paramType, defaultParam: defaultVal} for name in nameIter]
 
 @dataclass
-class ABShortcutCtorGroup:
-  constParam: ABParam
+class FRShortcutCtorGroup:
+  constParam: FRParam
   func: Callable
   args: list
 
-class ABEditableShortcut(QtWidgets.QShortcut):
+class FREditableShortcut(QtWidgets.QShortcut):
   paramIdx: QtGui.QKeySequence
 
 class ShortcutParameterItem(parameterTypes.WidgetParameterItem):
@@ -75,8 +75,8 @@ class ShortcutParameter(Parameter):
 parameterTypes.registerParameterType('shortcut', ShortcutParameter)
 
 @dataclass
-class ABBoundFnParams:
-  param: ABParam
+class FRBoundFnParams:
+  param: FRParam
   func: Callable
   defaultFnArgs: list
 
@@ -150,10 +150,10 @@ class ConstParamWidget(QtWidgets.QDialog):
     self.applyBtn.clicked.connect(self.applyBtnClicked)
 
   # Helper method for accessing simple parameter values
-  def __getitem__(self, keys: Union[tuple, ABParam, Sequence]):
+  def __getitem__(self, keys: Union[tuple, FRParam, Sequence]):
     """
     Convenience function for accessing child parameters within a parameter editor.
-      - If :param:`keys` is a single :class:`ABParam`, the value at that parameter is
+      - If :param:`keys` is a single :class:`FRParam`, the value at that parameter is
         extracted and returned to the user.
       - If :param:`keys` is a :class:`tuple`:
 
@@ -161,10 +161,10 @@ class ConstParamWidget(QtWidgets.QDialog):
           parameter grouping in order to properly extract the corresponding children.
           For instance, to extract MARGIN from :class:`GeneralPropertiesEditor`,
               you must first specify the group parent for that parameter:
-              >>> margin = AB_SINGLETON.generalProps[AB_CONSTS.CLS_FOCUSED_IMG_AREA,
-              >>>   AB_CONSTS.MARGIN]
-        * The second parameter must be a signle :class:`ABParam` objects or a sequence
-          of :class:`ABParam` objects. If a sequence is given, a list of output values
+              >>> margin = FR_SINGLETON.generalProps[FR_CONSTS.CLS_FOCUSED_IMG_AREA,
+              >>>   FR_CONSTS.MARGIN]
+        * The second parameter must be a signle :class:`FRParam` objects or a sequence
+          of :class:`FRParam` objects. If a sequence is given, a list of output values
           respecting input order is provided.
         * The third parameter is optional. If provided, the :class:`Parameter<pyqtgraph.Parameter>`
           object is returned instead of the :func:`value()<Parameter.value>` data
@@ -190,7 +190,7 @@ class ConstParamWidget(QtWidgets.QDialog):
     if not extractObj:
       oldExtractFunc = extractFunc
       extractFunc = lambda name: oldExtractFunc(name).value()
-    for curKey in keys: # type: ABParam
+    for curKey in keys: # type: FRParam
       outVals.append(extractFunc(curKey.name))
     if returnSingle:
       return outVals[0]
@@ -245,7 +245,7 @@ class ConstParamWidget(QtWidgets.QDialog):
   def loadState(self, newStateDict):
     self.params.restoreState(newStateDict, addChildren=False)
 
-  def registerProp(self, constParam: ABParam):
+  def registerProp(self, constParam: FRParam):
     # First add registered property to self list
     def funcWrapper(func):
       func, clsName = self.registerMethod(constParam)(func, True)
@@ -257,7 +257,7 @@ class ConstParamWidget(QtWidgets.QDialog):
       return paramGetter
     return funcWrapper
 
-  def registerMethod(self, constParam: ABParam, fnArgs=None):
+  def registerMethod(self, constParam: FRParam, fnArgs=None):
     """
     Designed for use as a function decorator. Registers the decorated function into a list
     of methods known to the :class:`ShortcutsEditor`. These functions are then accessable from
@@ -267,7 +267,7 @@ class ConstParamWidget(QtWidgets.QDialog):
       fnArgs = []
 
     def registerMethodDecorator(func: Callable, returnClsName=False):
-      boundFnParam = ABBoundFnParams(param=constParam, func=func, defaultFnArgs=fnArgs)
+      boundFnParam = FRBoundFnParams(param=constParam, func=func, defaultFnArgs=fnArgs)
       fullFuncName = func.__qualname__
       lastDotIdx = fullFuncName.find('.')
       if lastDotIdx < 0:
@@ -285,12 +285,12 @@ class ConstParamWidget(QtWidgets.QDialog):
         return func
     return registerMethodDecorator
 
-  def _addParamToList(self, clsName: str, param: Union[ABParam, ABBoundFnParams]):
+  def _addParamToList(self, clsName: str, param: Union[FRParam, FRBoundFnParams]):
     clsParams = self.paramsPerClass.get(clsName, [])
     clsParams.append(param)
     self.paramsPerClass[clsName] = clsParams
 
-  def registerClass(self, clsParam: ABParam):
+  def registerClass(self, clsParam: FRParam):
     """
     Intended for use as a class decorator. Registers a class as able to hold
     customizable shortcuts.
@@ -311,7 +311,7 @@ class ConstParamWidget(QtWidgets.QDialog):
       return cls
     return classDecorator
 
-  def _extendedClassInit(self, clsObj: Any, clsParam: ABParam):
+  def _extendedClassInit(self, clsObj: Any, clsParam: FRParam):
     """
     For editors that need to perform any initializations within the decorated class,
       they must be able to access the decorated class' *init* function and modify it.
@@ -320,7 +320,7 @@ class ConstParamWidget(QtWidgets.QDialog):
     """
     return
 
-  def addParamsFromClass(self, clsName, clsParam: ABParam):
+  def addParamsFromClass(self, clsName, clsParam: FRParam):
     """
     Once the top-level widget is set, we can construct the
     parameter editor widget. Set the parent of each shortcut so they
@@ -329,7 +329,7 @@ class ConstParamWidget(QtWidgets.QDialog):
 
     :param clsName: Fully qualified name of the class
 
-    :param clsParam: :class:`ABParam` value encapsulating the human readable class name.
+    :param clsParam: :class:`FRParam` value encapsulating the human readable class name.
            This is how the class will be displayed in the :class:`ShortcutsEditor`.
 
     :return: None
@@ -388,25 +388,25 @@ class ShortcutsEditor(ConstParamWidget):
     # after the top-level widget is passed to the shortcut editor
     super().__init__(parent, [], saveDir=SHORTCUTS_DIR, saveExt='shortcut')
 
-  def _extendedClassInit(self, clsObj: Any, clsParam: ABParam):
+  def _extendedClassInit(self, clsObj: Any, clsParam: FRParam):
     clsName = type(clsObj).__qualname__
     boundParamList = self.paramsPerClass.get(clsName, [])
     for boundParam in boundParamList:
       seqCopy = QtGui.QKeySequence(boundParam.param.value)
-      shortcut = ABEditableShortcut(seqCopy, clsObj)
+      shortcut = FREditableShortcut(seqCopy, clsObj)
       shortcut.paramIdx = (clsParam, boundParam.param)
       shortcut.activated.connect(partial(boundParam.func, clsObj, *boundParam.defaultFnArgs))
       shortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
       self.shortcuts.append(shortcut)
 
-  def registerProp(self, constParam: ABParam):
+  def registerProp(self, constParam: FRParam):
     """
     Properties should never be registered as shortcuts, so make sure this is disallowed
     """
     raise IllRegisteredPropError('Cannot register property/attribute as a shortcut')
 
   def applyBtnClicked(self):
-    for shortcut in self.shortcuts: #type: ABEditableShortcut
+    for shortcut in self.shortcuts: #type: FREditableShortcut
       shortcut.setKey(self[shortcut.paramIdx])
     super().applyBtnClicked()
 
@@ -416,7 +416,7 @@ class SchemeEditor(ConstParamWidget):
     super().__init__(parent, paramDict=[], saveDir=SCHEMES_DIR,
                      saveExt='scheme')
 
-class _ABSingleton:
+class _FRSingleton:
   shortcuts = ShortcutsEditor()
   scheme = SchemeEditor()
   generalProps = GeneralPropertiesEditor()
@@ -441,7 +441,7 @@ class _ABSingleton:
     self.editors = editors
     self.editorNames = editorNames
 
-  def registerClass(self, clsParam: ABParam):
+  def registerClass(self, clsParam: FRParam):
     def multiEditorClsDecorator(cls):
       # Since all legwork is done inside the editors themselves, simply call each decorator from here as needed
       for editor in self.editors:
@@ -453,4 +453,4 @@ class _ABSingleton:
     for editor in self.editors:
       editor.close()
 # Encapsulate scheme within class so that changes to the scheme propagate to all GUI elements
-AB_SINGLETON = _ABSingleton()
+FR_SINGLETON = _FRSingleton()

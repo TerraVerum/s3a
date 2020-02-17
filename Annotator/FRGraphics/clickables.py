@@ -1,15 +1,13 @@
 import pyqtgraph as pg
-from PyQt5 import QtCore
 from pyqtgraph import Point
-from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from pyqtgraph.Qt import QtCore, QtGui
 
 Signal = QtCore.pyqtSignal
 
 import numpy as np
-import warnings
 
-from .parameditors import AB_SINGLETON
-from ..constants import AB_CONSTS
+from .parameditors import FR_SINGLETON
+from ..constants import FR_CONSTS
 
 class ClickableImageItem(pg.ImageItem):
   sigClicked = Signal(object)
@@ -52,11 +50,11 @@ class ClickableScatterItem(pg.ScatterPlotItem):
 
 class ClickableTextItem(pg.TextItem):
 
-  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_BOUNDARY_COLOR)
+  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_BOUNDARY_COLOR)
   def boundClr(self): pass
-  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_VALID_ID_COLOR)
+  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_VALID_ID_COLOR)
   def validIdClr(self): pass
-  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_NONVALID_ID_COLOR)
+  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_NONVALID_ID_COLOR)
   def invalidIdClr(self): pass
 
 

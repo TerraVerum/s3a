@@ -1,16 +1,10 @@
 import numpy as np
-import pandas as pd
-import pyqtgraph as pg
-from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 
-from Annotator.ABGraphics.parameditors import AB_SINGLETON
-from Annotator.constants import AB_CONSTS
-from .ABGraphics import tableview
-from .ABGraphics.clickables import ClickableTextItem
-from .ABGraphics.parameditors import TableFilterEditor
-from .ABGraphics.imageareas import MainImageArea
-from .ABGraphics.regions import MultiRegionPlot, makeMultiRegionDf
+from Annotator.FRGraphics.parameditors import FR_SINGLETON
+from .FRGraphics import tableview
+from .FRGraphics.imageareas import MainImageArea
+from .FRGraphics.regions import MultiRegionPlot
 from .constants import TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES
 from .tablemodel import ComponentMgr
 
@@ -50,7 +44,7 @@ class CompDisplayFilter(QtCore.QObject):
   def __init__(self, compMgr: ComponentMgr, mainImg: MainImageArea,
                compTbl: tableview.CompTableView):
     super().__init__()
-    filterEditor = AB_SINGLETON.filter
+    filterEditor = FR_SINGLETON.filter
     self._mainImgArea = mainImg
     self._filter = filterEditor.params.getValues()
     self._compTbl = compTbl

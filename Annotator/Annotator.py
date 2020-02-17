@@ -12,17 +12,18 @@ import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
 
-from Annotator.constants import AB_CONSTS, BASE_DIR, ANN_AUTH_DIR
-from .ABGraphics.parameditors import ConstParamWidget, TableFilterEditor, AB_SINGLETON
-from .ABGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
+from Annotator.FRGraphics.annotator_ui import FRAnnotatorUI
+from Annotator.constants import FR_CONSTS, BASE_DIR, ANN_AUTH_DIR
+from .FRGraphics.parameditors import ConstParamWidget, TableFilterEditor, FR_SINGLETON
+from .FRGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc, dialogGetAuthorName
-from .CompDisplayFilter import CompDisplayFilter, CompSortFilter
+from .tableviewproxy import CompDisplayFilter, CompSortFilter
 from .constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
 from .processing import getBwComps, getVertsFromBwComps, growSeedpoint,\
   growBoundarySeeds, pcaReduction
 from skimage import morphology
 from Annotator.generalutils import nanConcatList, getClippedBbox
-from .tablemodel import ComponentMgr as ComponentMgr, AB_ENUMS
+from .tablemodel import ComponentMgr as ComponentMgr, FR_ENUMS
 from .tablemodel import makeCompDf
 
 Slot = QtCore.pyqtSlot
@@ -31,8 +32,8 @@ Signal = QtCore.pyqtSignal
 # Configure pg to correctly read image dimensions
 pg.setConfigOptions(imageAxisOrder='row-major')
 
-@AB_SINGLETON.registerClass(AB_CONSTS.CLS_ANNOTATOR)
-class Annotator(QtWidgets.QMainWindow):
+@FR_SINGLETON.registerClass(FR_CONSTS.CLS_ANNOTATOR)
+class Annotator(FRAnnotatorUI):
   """
   Top-level widget for producing component bounding boxes from an input image.
   """
@@ -41,17 +42,13 @@ class Annotator(QtWidgets.QMainWindow):
 
   def __init__(self, startImgFpath=None):
     super().__init__()
-    uiPath = os.path.dirname(os.path.abspath(__file__))
-    uiFile = os.path.join(uiPath, 'imgAnnotator.ui')
-    baseModule = str(self.__module__).split('.')[0]
-    uic.loadUi(uiFile, self, baseModule)
-    self.setWindowTitle('AutoBoM Component Detection and Evaluation Tool')
+    # uiPath = os.path.dirname(os.path.abspath(__file__))
+    # uiFile = os.path.join(uiPath, 'imgAnnotator.ui')
+    # baseModule = str(self.__module__).split('.')[0]
+    # uic.loadUi(uiFile, self, baseModule)
 
-
-    AB_SINGLETON.annotationAuthor = self.getAuthorName()
     self.statBar = QtWidgets.QStatusBar(self)
     self.setStatusBar(self.statBar)
-    self.statBar.showMessage(AB_SINGLETON.annotationAuthor)
     #self.setWindowIcon(QtGui.QIcon(BASE_DIR + './ficsLogo.png'))
     # Flesh out pg components
     # ---------------
@@ -87,14 +84,11 @@ class Annotator(QtWidgets.QMainWindow):
     self.resetRegionBtn.clicked.connect(self.resetRegionBtnClicked)
     self.acceptRegionBtn.clicked.connect(self.acceptRegionBtnClicked)
 
-    # Radio buttons
-    self.regionRadioBtnGroup.buttonClicked.connect(self.regionTypeChanged)
-
     # Dropdowns
-    self.addRmCombo.currentIndexChanged.connect(self.addRmComboChanged)
+    # self.addRmCombo.currentIndexChanged.connect(self.addRmComboChanged)
 
     # Checkboxes
-    self.allowEditsChk.stateChanged.connect(self.allowEditsChkChanged)
+    # self.allowEditsChk.stateChanged.connect(self.allowEditsChkChanged)
 
 
     # Same with estimating boundaries
@@ -108,8 +102,8 @@ class Annotator(QtWidgets.QMainWindow):
     self.sigLayoutSaved.connect(self.populateLoadLayoutOptions)
 
     self.saveComps.triggered.connect(self.saveCompsActionTriggered)
-    self.loadComps_merge.triggered.connect(lambda: self.loadCompsActionTriggered(AB_ENUMS.COMP_ADD_AS_MERGE))
-    self.loadComps_new.triggered.connect(lambda: self.loadCompsActionTriggered(AB_ENUMS.COMP_ADD_AS_NEW))
+    self.loadComps_merge.triggered.connect(lambda: self.loadCompsActionTriggered(FR_ENUMS.COMP_ADD_AS_MERGE))
+    self.loadComps_new.triggered.connect(lambda: self.loadCompsActionTriggered(FR_ENUMS.COMP_ADD_AS_NEW))
 
     # SETTINGS
     self.createSettingsMenus()
@@ -120,6 +114,10 @@ class Annotator(QtWidgets.QMainWindow):
     self.populateLoadLayoutOptions()
     # Start with docks in default position, hide error if default file doesn't exist
     self.loadLayoutActionTriggered('Default', showError=False)
+
+    self.showMaximized()
+    FR_SINGLETON.annotationAuthor = self.getAuthorName()
+    self.statBar.showMessage(FR_SINGLETON.annotationAuthor)
 
   # -----------------------------
   # MainWindow CLASS FUNCTIONS
@@ -137,15 +135,15 @@ class Annotator(QtWidgets.QMainWindow):
     return name
 
   # TODO: Move these properties into the class responsible for image processing/etc.
-  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_EST_BOUNDS_ON_START)
+  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_EST_BOUNDS_ON_START)
   def estBoundsOnStart(self): pass
 
   def closeEvent(self, ev):
     # Clean up all editor windows, which could potentially be left open
-    AB_SINGLETON.close()
+    FR_SINGLETON.close()
 
   def createSettingsMenus(self):
-    for editor, name in zip(AB_SINGLETON.editors, AB_SINGLETON.editorNames): \
+    for editor, name in zip(FR_SINGLETON.editors, FR_SINGLETON.editorNames): \
         #type: ConstParamWidget, str
       menu = QtWidgets.QMenu(name, self)
       editAct = QtWidgets.QAction('Edit ' + name, self)
@@ -186,7 +184,7 @@ class Annotator(QtWidgets.QMainWindow):
 
   def populateLoadLayoutOptions(self):
     layoutGlob = join(LAYOUTS_DIR, '*.dockstate')
-    addDirItemsToMenu(self.layoutMenu, layoutGlob, self.loadLayoutActionTriggered)
+    addDirItemsToMenu(self.menuLayout, layoutGlob, self.loadLayoutActionTriggered)
 
   @Slot(str)
   def loadLayoutActionTriggered(self, layoutName, showError=True):
@@ -207,14 +205,14 @@ class Annotator(QtWidgets.QMainWindow):
     if onlyExportFiltered:
       exportIds = self.compDisplay.displayedIds
     else:
-      exportIds = AB_ENUMS.COMP_EXPORT_ALL
+      exportIds = FR_ENUMS.COMP_EXPORT_ALL
     fileDlg = QtWidgets.QFileDialog()
     fileFilter = "CSV Files (*.csv)"
     fname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilter)
     if len(fname) > 0:
       self.compMgr.csvExport(fname, exportIds)
 
-  def loadCompsActionTriggered(self, loadType=AB_ENUMS.COMP_ADD_AS_NEW):
+  def loadCompsActionTriggered(self, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
     fileFilter = "CSV Files (*.csv)"
     fname = popupFilePicker(self, 'Select Load File', fileFilter)
     if fname is not None:
@@ -260,15 +258,15 @@ class Annotator(QtWidgets.QMainWindow):
       return
     self.compImg.updateRegionFromVerts(self.compImg.compSer[TC.VERTICES].squeeze())
 
-  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_ACCEPT_REGION)
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_ACCEPT_REGION)
   @Slot()
   def acceptRegionBtnClicked(self):
     self.compImg.saveNewVerts()
     modifiedComp = self.compImg.compSer
-    self.compMgr.addComps(modifiedComp.to_frame().T, addtype=AB_ENUMS.COMP_ADD_AS_MERGE)
+    self.compMgr.addComps(modifiedComp.to_frame().T, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
 
   @disableAppDuringFunc
-  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_ESTIMATE_BOUNDARIES)
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_ESTIMATE_BOUNDARIES)
   def estimateBoundaries(self):
     compVertices = getVertsFromBwComps(getBwComps(self.mainImg.image, self.mainImg.minCompSz))
     components = makeCompDf(len(compVertices))
@@ -277,7 +275,7 @@ class Annotator(QtWidgets.QMainWindow):
 
   @Slot()
   @applyWaitCursor
-  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_CLEAR_BOUNDARIES)
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_CLEAR_BOUNDARIES)
   def clearBoundaries(self):
     self.compMgr.rmComps()
 
@@ -304,7 +302,7 @@ class Annotator(QtWidgets.QMainWindow):
     curTxt = self.addRmCombo.currentText()
     self.compImg.inAddMode = curTxt == 'Add'
 
-  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_TOGGLE_REG_MODE)
+  # @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_TOGGLE_REG_MODE)
   @Slot(bool)
   def toggleCompImgMode(self):
     oldMode = self.compImg.inAddMode

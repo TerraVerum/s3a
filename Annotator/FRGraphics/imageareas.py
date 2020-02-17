@@ -7,9 +7,10 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui
 from skimage import morphology
 
-from Annotator.ABGraphics.clickables import DraggableViewBox
-from Annotator.ABGraphics.parameditors import AB_SINGLETON
-from Annotator.constants import AB_CONSTS, AB_ENUMS
+from Annotator.FRGraphics.clickables import DraggableViewBox
+from Annotator.FRGraphics.parameditors import FR_SINGLETON
+from Annotator.constants import FR_CONSTS, FR_ENUMS
+from Annotator.params import FRDrawShape, FRImageProcessor
 from Annotator.processing import growBoundarySeeds
 from .clickables import ClickableImageItem
 from .regions import VertexRegion, SaveablePolyROI
@@ -21,12 +22,12 @@ from ..tablemodel import makeCompDf
 Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
 
-@AB_SINGLETON.registerClass(AB_CONSTS.CLS_REGION_BUF)
+@FR_SINGLETON.registerClass(FR_CONSTS.CLS_REGION_BUF)
 class RegionVertsUndoBuffer(ObjUndoBuffer):
-  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_UNDO_BUF_SZ)
+  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_UNDO_BUF_SZ)
   def maxBufferLen(self): pass
 
-  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_STEPS_BW_SAVE)
+  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_STEPS_BW_SAVE)
   def stepsBetweenBufSave(self): pass
 
   _bwPrevRegion: Optional[np.ndarray] = None
@@ -47,17 +48,90 @@ class RegionVertsUndoBuffer(ObjUndoBuffer):
     self._bwPrevRegion = newBwArea
     super().update(newVerts, curPrevAreaDiff > 0.05, overridingUpdateCondtn)
 
-@AB_SINGLETON.registerClass(AB_CONSTS.CLS_MAIN_IMG_AREA)
+class FREditableImg(pg.PlotWidget):
+  def __init__(self, parent=None, background='default', processor: FRImageProcessor=None, **kargs):
+    super().__init__(parent, background, viewBox=DraggableViewBox(), **kargs)
+    self.setAspectLocked(True)
+
+    if processor is None:
+      processor = FRImageProcessor()
+    self.processor = processor
+
+    # -----
+    # DRAWING OPTIONS
+    # -----
+    self.drawShapeOpt = FR_CONSTS.DRAW_SHAPE_PAINT
+    self.drawActionOpt = FR_CONSTS.DRAW_ACT_PAN
+
+    # -----
+    # IMAGE
+    # -----
+    self.viewbox: DraggableViewBox = self.getViewBox()
+    self.image = pg.ImageItem()
+    self.image.setZValue(-100)
+    self.addItem(self.image)
+
+  def mousePressEvent(self, ev: QtGui.QMouseEvent):
+    self._buildRoi(ev)
+
+    super().mousePressEvent(ev)
+
+  def mouseMoveEvent(self, ev: QtGui.QMouseEvent):
+    """
+    Mouse move behavior is contingent on which shape is currently selected
+    """
+    # Nothing to do if panning or no button is pressed
+    if ev.buttons() == QtCore.Qt.LeftButton:
+      self._buildRoi(ev)
+    # We will reach here if no comparison above returns
+    super().mouseMoveEvent(ev)
+
+  def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
+    """
+    Perform a processing method depending on what the current draw action is
+    """
+    self._buildRoi(ev)
+
+    newVerts = self.processor.vertsFromPoints()
+
+  def _buildRoi(self, ev: QtGui.QMouseEvent):
+    """
+    Construct the current shape ROI depending on mouse movement and current shape parameters
+    :param ev: Mouse event
+    :param isRelease: Whether the event was a mouse press or mouse release
+    :return: None
+    """
+    # Nothing to do when panning
+    if self.drawActionOpt == FR_CONSTS.DRAW_ACT_PAN: return
+
+    posRelToImg = self.compImgItem.mapFromScene(ev.pos())
+    # Form of rate-limiting -- only simulate click if the next pixel is at least one away
+    # from the previous pixel location
+    xyCoord = np.round(np.array([[posRelToImg.x(), posRelToImg.y()]], dtype='int'))
+
+    # TODO: Create / move / etc. ROIs depending on requested behavior
+    if self.drawShapeOpt == FR_CONSTS.DRAW_SHAPE_FG_BG:
+      pass
+    elif self.drawShapeOpt == FR_CONSTS.DRAW_SHAPE_POLY:
+      pass
+    elif self.drawShapeOpt == FR_CONSTS.DRAW_SHAPE_PAINT:
+      pass
+    elif self.drawShapeOpt == FR_CONSTS.DRAW_SHAPE_RECT:
+      pass
+    elif self.drawShapeOpt == FR_CONSTS.DRAW_SHAPE_FREE:
+      pass
+
+@FR_SINGLETON.registerClass(FR_CONSTS.CLS_MAIN_IMG_AREA)
 class MainImageArea(pg.PlotWidget):
   sigComponentCreated = Signal(object)
   # Hooked up during __init__
   sigSelectionBoundsMade = Signal(object)
 
-  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_NEW_COMP_SZ)
+  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_NEW_COMP_SZ)
   def newCompSz(self): pass
-  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_MIN_COMP_SZ)
+  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_MIN_COMP_SZ)
   def minCompSz(self): pass
-  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_MAIN_IMG_SEED_THRESH)
+  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_MAIN_IMG_SEED_THRESH)
   def mainImgSeedThresh(self): pass
 
 
@@ -84,7 +158,7 @@ class MainImageArea(pg.PlotWidget):
     self.addItem(self.imgItem)
 
   # Spoof selection of empty area on escape to deselect components
-  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_DESEL_ALL_BOUNDARIES)
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DESEL_ALL_BOUNDARIES)
   def deselectAllBoundaries(self):
     self.sigSelectionBoundsMade.emit((-1,-1,-1,-1))
 
@@ -167,15 +241,15 @@ class MainImageArea(pg.PlotWidget):
 
     self.imgItem.setImage(imgSrc)
 
-@AB_SINGLETON.registerClass(AB_CONSTS.CLS_FOCUSED_IMG_AREA)
+@FR_SINGLETON.registerClass(FR_CONSTS.CLS_FOCUSED_IMG_AREA)
 class FocusedComp(pg.PlotWidget):
   sigModeChanged = Signal(bool)
 
-  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_FOCUSED_SEED_THRESH)
+  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_FOCUSED_SEED_THRESH)
   def seedThresh(self): pass
-  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_MARGIN)
+  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_MARGIN)
   def compCropMargin(self): pass
-  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.PROP_SEG_THRESH)
+  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_SEG_THRESH)
   def segThresh(self): pass
 
 
@@ -255,6 +329,7 @@ class FocusedComp(pg.PlotWidget):
       newArea |= curRegionMask
     else:
       newArea = ~newArea & curRegionMask
+
     self.updateRegionFromBwMask(newArea)
 
   def addRoiVertex(self, newVert: QtCore.QPointF):
@@ -336,15 +411,15 @@ class FocusedComp(pg.PlotWidget):
     self.regionBuffer.update(vertsToUse, bwImg)
     self.updateRegionFromVerts(vertsToUse, [0, 0])
 
-  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_UNDO_MOD_REGION, [AB_ENUMS.BUFFER_UNDO])
-  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_REDO_MOD_REGION, [AB_ENUMS.BUFFER_REDO])
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_UNDO_MOD_REGION, [FR_ENUMS.BUFFER_UNDO])
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_REDO_MOD_REGION, [FR_ENUMS.BUFFER_REDO])
   def undoRedoRegionChange(self, undoOrRedo: str):
     # Ignore requests when no region present
     if self.compImgItem.image is None:
       return
-    if undoOrRedo == AB_ENUMS.BUFFER_UNDO:
+    if undoOrRedo == FR_ENUMS.BUFFER_UNDO:
       self.updateRegionFromVerts(self.regionBuffer.undo_getObj(), [0, 0])
-    elif undoOrRedo == AB_ENUMS.BUFFER_REDO:
+    elif undoOrRedo == FR_ENUMS.BUFFER_REDO:
       self.updateRegionFromVerts(self.regionBuffer.redo_getObj(), [0, 0])
 
   def saveNewVerts(self):

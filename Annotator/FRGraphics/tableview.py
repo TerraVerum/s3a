@@ -8,10 +8,10 @@ from pandas import DataFrame as df
 
 from typing import Sequence
 
-from ..constants import TEMPLATE_COMP, AB_CONSTS
-from ..params import ABParam, ABParamGroup
-from ..tablemodel import CompTableModel, ComponentMgr, AB_ENUMS
-from .parameditors import AB_SINGLETON
+from ..constants import TEMPLATE_COMP, FR_CONSTS
+from ..params import FRParam, FRParamGroup
+from ..tablemodel import CompTableModel, ComponentMgr, FR_ENUMS
+from .parameditors import FR_SINGLETON
 
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal
@@ -74,7 +74,7 @@ class PopupTableDialog(QtWidgets.QDialog):
       if ii not in colIdxs:
         self.tbl.hideColumn(ii)
     self.tbl.mgr.rmComps()
-    self.tbl.mgr.addComps(compDf, addtype=AB_ENUMS.COMP_ADD_AS_MERGE)
+    self.tbl.mgr.addComps(compDf, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
     self.updateWarnMsg(self.titles[colIdxs])
 
   def reject(self):
@@ -83,7 +83,7 @@ class PopupTableDialog(QtWidgets.QDialog):
       self.tbl.showColumn(ii)
     super().reject()
 
-@AB_SINGLETON.registerClass(AB_CONSTS.CLS_COMP_TBL)
+@FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_TBL)
 class CompTableView(QtWidgets.QTableView):
   """
   Table for displaying :class:`ComponentMgr` data.
@@ -128,7 +128,7 @@ class CompTableView(QtWidgets.QTableView):
         self.setItemDelegateForColumn(ii, boolDelegate)
       elif isinstance(curval, Enum):
         self.setItemDelegateForColumn(ii, ComboBoxDelegate(self, comboValues=list(type(curval))))
-      elif isinstance(curval, ABParam):
+      elif isinstance(curval, FRParam):
         self.setItemDelegateForColumn(ii, ComboBoxDelegate(self, comboValues=list(curval.group)))
       else:
         # Default to text box
@@ -173,7 +173,7 @@ class CompTableView(QtWidgets.QTableView):
 
     return menu
 
-  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_TBL_DEL_ROWS)
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_TBL_DEL_ROWS)
   def removeTriggered(self):
     if self.minimal: return
 
@@ -190,7 +190,7 @@ class CompTableView(QtWidgets.QTableView):
       self.clearSelection()
 
 
-  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_TBL_SET_SAME_AS_FIRST)
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_TBL_SET_SAME_AS_FIRST)
   def overwriteTriggered(self):
     if self.minimal: return
 
@@ -208,7 +208,7 @@ class CompTableView(QtWidgets.QTableView):
     # Some bug is preventing the single assignment value from broadcasting
     setVals = [toOverwrite.iloc[0,colIdxs] for _ in range(len(idList)-1)]
     toOverwrite.iloc[1:, colIdxs] = setVals
-    self.mgr.addComps(toOverwrite, addtype=AB_ENUMS.COMP_ADD_AS_MERGE)
+    self.mgr.addComps(toOverwrite, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
     self.clearSelection()
 
   def getIds_colsFromSelection(self):
@@ -223,7 +223,7 @@ class CompTableView(QtWidgets.QTableView):
     colIdxs = pd.unique(colIdxs)
     return idList, colIdxs
 
-  @AB_SINGLETON.shortcuts.registerMethod(AB_CONSTS.SHC_TBL_SET_AS)
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_TBL_SET_AS)
   def setAsTriggered(self):
     if self.minimal: return
 
@@ -239,7 +239,7 @@ class CompTableView(QtWidgets.QTableView):
       overwriteData = self.popup.data
       setVals = [overwriteData.iloc[0,colIdxs] for _ in range(len(idList))]
       toOverwrite.iloc[:, colIdxs] = setVals
-      self.mgr.addComps(toOverwrite, addtype=AB_ENUMS.COMP_ADD_AS_MERGE)
+      self.mgr.addComps(toOverwrite, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
 
 class TextDelegate(QtWidgets.QItemDelegate):
   def createEditor(self, parent, option, index):

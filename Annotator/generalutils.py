@@ -3,10 +3,10 @@ from typing import Any, Optional
 
 import numpy as np
 
-from Annotator.ABGraphics.parameditors import AB_SINGLETON
-from Annotator.constants import AB_CONSTS
+from Annotator.FRGraphics.parameditors import FR_SINGLETON
+from Annotator.constants import FR_CONSTS
 
-from Annotator.params import ABParamGroup
+from Annotator.params import FRParamGroup
 from pandas import DataFrame as df
 
 
@@ -83,7 +83,7 @@ def getClippedBbox(arrShape: tuple, bbox: np.ndarray, margin: int):
     bbox[1,ii] = np.minimum(arrShape[1-ii], bbox[1,ii]+margin)
   return bbox.astype(int)
 
-def coerceDfTypes(dataframe: df, constParams: ABParamGroup):
+def coerceDfTypes(dataframe: df, constParams: FRParamGroup):
   """
   Pandas currently has a bug where datatypes are not preserved after update operations.
   Current workaround is to coerce all types to their original values after each operation
