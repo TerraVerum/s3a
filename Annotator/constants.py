@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 
 # Preference directories
-from Annotator.params import ABParam, ABParamGroup, newParam
+from Annotator.params import FRParam, FRParamGroup, newParam
 
 BASE_DIR = os.path.dirname(Path(__file__).absolute())
 ANN_AUTH_DIR = os.path.join(BASE_DIR, 'MenuOpts', '')
@@ -24,130 +24,140 @@ for curDir in [SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR,
 
 
 @dataclass
-class ComponentTypes(ABParamGroup):
-  CAP   : ABParam = newParam('Capacitor')
-  RES   : ABParam = newParam('Resistor')
-  IND   : ABParam = newParam('Inductor')
-  TRANS : ABParam = newParam('Transistor')
-  IC    : ABParam = newParam('IC')
-  OTHER : ABParam = newParam('Other')
-  N_A   : ABParam = newParam('Unassigned')
+class ComponentTypes(FRParamGroup):
+  CAP   : FRParam = newParam('Capacitor')
+  RES   : FRParam = newParam('Resistor')
+  IND   : FRParam = newParam('Inductor')
+  TRANS : FRParam = newParam('Transistor')
+  IC    : FRParam = newParam('IC')
+  OTHER : FRParam = newParam('Other')
+  N_A   : FRParam = newParam('Unassigned')
 
 TEMPLATE_COMP_TYPES = ComponentTypes()
 
 
 @dataclass
-class CompParams(ABParamGroup):
+class CompParams(FRParamGroup):
   # These 3 params MUST exist in the component
-  INST_ID         : ABParam = newParam('Instance ID', -1)
-  VERTICES        : ABParam = newParam('Vertices', np.ones((1, 2)) * np.nan)
-  VALIDATED       : ABParam = newParam('Validated', False)
-  ANN_AUTHOR      : ABParam = newParam('Author', "")
-  ANN_FILENAME    : ABParam = newParam('Filename', "")
-  ANN_TIMESTAMP   : ABParam = newParam('Timestamp', "")
-  DEV_TEXT        : ABParam = newParam('Device Text', '')
-  DEV_TYPE        : ABParam = newParam('Device Type', TEMPLATE_COMP_TYPES.N_A)
-  BOARD_TEXT      : ABParam = newParam('Board Text', '')
-  LOGO            : ABParam = newParam('Logo', '')
-  NOTES           : ABParam = newParam('Notes', '')
+  INST_ID         : FRParam = newParam('Instance ID', -1)
+  VERTICES        : FRParam = newParam('Vertices', np.ones((1, 2)) * np.nan)
+  VALIDATED       : FRParam = newParam('Validated', False)
+  ANN_AUTHOR      : FRParam = newParam('Author', "")
+  ANN_FILENAME    : FRParam = newParam('Filename', "")
+  ANN_TIMESTAMP   : FRParam = newParam('Timestamp', "")
+  DEV_TEXT        : FRParam = newParam('Device Text', '')
+  DEV_TYPE        : FRParam = newParam('Device Type', TEMPLATE_COMP_TYPES.N_A)
+  BOARD_TEXT      : FRParam = newParam('Board Text', '')
+  LOGO            : FRParam = newParam('Logo', '')
+  NOTES           : FRParam = newParam('Notes', '')
 
 TEMPLATE_COMP = CompParams()
 
 
 @dataclass
-class _ABConsts(ABParamGroup):
+class _FRConsts(FRParamGroup):
   # --------------------------
   # CLASS NAMES
   # --------------------------
-  CLS_ANNOTATOR        : ABParam = newParam('Main Annotator')
+  CLS_ANNOTATOR        : FRParam = newParam('Main Annotator')
 
-  CLS_COMP_TBL         : ABParam = newParam('Component Table')
-  CLS_COMP_MGR         : ABParam = newParam('Component Manager')
+  CLS_COMP_TBL         : FRParam = newParam('Component Table')
+  CLS_COMP_MGR         : FRParam = newParam('Component Manager')
 
-  CLS_VERT_REGION      : ABParam = newParam('Focused Image Graphics')
-  CLS_MULT_REG_PLT     : ABParam = newParam('Main Image Graphics')
+  CLS_VERT_REGION      : FRParam = newParam('Focused Image Graphics')
+  CLS_MULT_REG_PLT     : FRParam = newParam('Main Image Graphics')
 
-  CLS_REGION_BUF       : ABParam = newParam('Region Modification Buffer')
+  CLS_REGION_BUF       : FRParam = newParam('Region Modification Buffer')
 
-  CLS_IMG_AREA         : ABParam = newParam('Base Image Area')
-  CLS_MAIN_IMG_AREA    : ABParam = newParam('Main Image Area')
-  CLS_FOCUSED_IMG_AREA : ABParam = newParam('Focused Component Image Area')
+  CLS_IMG_AREA         : FRParam = newParam('Base Image Area')
+  CLS_MAIN_IMG_AREA    : FRParam = newParam('Main Image Area')
+  CLS_FOCUSED_IMG_AREA : FRParam = newParam('Focused Component Image Area')
   # --------------------------
   # SCHEME PARAMETERS
   # --------------------------
-  SCHEME_VALID_ID_COLOR     : ABParam = newParam('Validated ID Color', '0f0', 'color')
-  SCHEME_NONVALID_ID_COLOR  : ABParam = newParam('Non-Validated ID Color', 'f00', 'color')
-  SCHEME_BOUNDARY_COLOR     : ABParam = newParam('Component Boundary Color', 'ff0', 'color')
-  SCHEME_BOUNDARY_WIDTH     : ABParam = newParam('Component Boundary Width', 2)
-  SCHEME_ID_MARKER_SZ       : ABParam = newParam('ID Marker Size', 10)
-  SCHEME_SELECTED_ID_BORDER : ABParam = newParam('Selected ID Border color', '00f', 'color')
-  SCHEME_REG_VERT_COLOR     : ABParam = newParam('Vertex Color', '0f0', 'color')
-  SCHEME_REG_FILL_COLOR     : ABParam = newParam('Fill Color', '00ff0046', 'color')
+  SCHEME_VALID_ID_COLOR     : FRParam = newParam('Validated ID Color', '0f0', 'color')
+  SCHEME_NONVALID_ID_COLOR  : FRParam = newParam('Non-Validated ID Color', 'f00', 'color')
+  SCHEME_BOUNDARY_COLOR     : FRParam = newParam('Component Boundary Color', 'ff0', 'color')
+  SCHEME_BOUNDARY_WIDTH     : FRParam = newParam('Component Boundary Width', 2)
+  SCHEME_ID_MARKER_SZ       : FRParam = newParam('ID Marker Size', 10)
+  SCHEME_SELECTED_ID_BORDER : FRParam = newParam('Selected ID Border color', '00f', 'color')
+  SCHEME_REG_VERT_COLOR     : FRParam = newParam('Vertex Color', '0f0', 'color')
+  SCHEME_REG_FILL_COLOR     : FRParam = newParam('Fill Color', '00ff0046', 'color')
 
   # --------------------------
   # REGION-CREATION PARAMETERS
   # --------------------------
-  PROP_MAIN_IMG_SEED_THRESH : ABParam = newParam('Seedpoint Threshold in Main Image', 10.)
-  PROP_MIN_COMP_SZ          : ABParam = newParam('Minimum New Component Size (px)', 50)
-  PROP_NEW_COMP_SZ          : ABParam = newParam('New Component Side Length (px)', 30)
-  PROP_EST_BOUNDS_ON_START  : ABParam = newParam('Estimate Boundaries on Image Load', False)
-  PROP_MARGIN               : ABParam = newParam('Margin', 5)
-  PROP_SEG_THRESH           : ABParam = newParam('Segmentation Threshold', 3.)
-  PROP_FOCUSED_SEED_THRESH  : ABParam = newParam('Seedpoint Threshold in Focused Image', 7.)
-  PROP_UNDO_BUF_SZ          : ABParam = newParam('Size of Region Undo Buffer', 30)
-  PROP_STEPS_BW_SAVE        : ABParam = newParam('Operations Between Buffer Saves', 5)
+  PROP_MAIN_IMG_SEED_THRESH : FRParam = newParam('Seedpoint Threshold in Main Image', 10.)
+  PROP_MIN_COMP_SZ          : FRParam = newParam('Minimum New Component Size (px)', 50)
+  PROP_NEW_COMP_SZ          : FRParam = newParam('New Component Side Length (px)', 30)
+  PROP_EST_BOUNDS_ON_START  : FRParam = newParam('Estimate Boundaries on Image Load', False)
+  PROP_MARGIN               : FRParam = newParam('Margin', 5)
+  PROP_SEG_THRESH           : FRParam = newParam('Segmentation Threshold', 3.)
+  PROP_FOCUSED_SEED_THRESH  : FRParam = newParam('Seedpoint Threshold in Focused Image', 7.)
+  PROP_UNDO_BUF_SZ          : FRParam = newParam('Size of Region Undo Buffer', 30)
+  PROP_STEPS_BW_SAVE        : FRParam = newParam('Operations Between Buffer Saves', 5)
 
   # --------------------------
   # SHORTCUT PARAMETERS
   # --------------------------
-  SHC_CLEAR_BOUNDARIES      : ABParam = newParam('Clear Boundaries', '', 'shortcut')
-  SHC_ESTIMATE_BOUNDARIES   : ABParam = newParam('Estimate Boundaries', '', 'shortcut')
-  SHC_DESEL_ALL_BOUNDARIES  : ABParam = newParam('Deselect All Main Image Boundaries', 'Esc', 'shortcut')
-  SHC_TBL_SET_SAME_AS_FIRST : ABParam = newParam('Set Table Rows Same As First', 'Ctrl+D', 'shortcut')
-  SHC_TBL_SET_AS            : ABParam = newParam('Set Table Rows As...', 'Ctrl+Shift+D', 'shortcut')
-  SHC_TBL_DEL_ROWS          : ABParam = newParam('Delete Table Rows', 'Del', 'shortcut')
-  SHC_UNDO_MOD_REGION       : ABParam = newParam('Undo Modify Region', 'Ctrl+Z', 'shortcut')
-  SHC_REDO_MOD_REGION       : ABParam = newParam('Redo Modify Region', 'Ctrl+Y', 'shortcut')
-  SHC_ACCEPT_REGION         : ABParam = newParam('Accept and Save Region Edits', '1', 'shortcut')
-  SHC_TOGGLE_REG_MODE       : ABParam = newParam('Toggle Between Add/Remove Region', 'Ctrl+T', 'shortcut')
+  SHC_CLEAR_BOUNDARIES      : FRParam = newParam('Clear Boundaries', '', 'shortcut')
+  SHC_ESTIMATE_BOUNDARIES   : FRParam = newParam('Estimate Boundaries', '', 'shortcut')
+  SHC_DESEL_ALL_BOUNDARIES  : FRParam = newParam('Deselect All Main Image Boundaries', 'Esc', 'shortcut')
+  SHC_TBL_SET_SAME_AS_FIRST : FRParam = newParam('Set Table Rows Same As First', 'Ctrl+D', 'shortcut')
+  SHC_TBL_SET_AS            : FRParam = newParam('Set Table Rows As...', 'Ctrl+Shift+D', 'shortcut')
+  SHC_TBL_DEL_ROWS          : FRParam = newParam('Delete Table Rows', 'Del', 'shortcut')
+  SHC_UNDO_MOD_REGION       : FRParam = newParam('Undo Modify Region', 'Ctrl+Z', 'shortcut')
+  SHC_REDO_MOD_REGION       : FRParam = newParam('Redo Modify Region', 'Ctrl+Y', 'shortcut')
+  SHC_ACCEPT_REGION         : FRParam = newParam('Accept and Save Region Edits', '1', 'shortcut')
+  SHC_TOGGLE_REG_MODE       : FRParam = newParam('Toggle Between Add/Remove Region', 'Ctrl+T', 'shortcut')
 
   # --------------------------
   # KEYBOARD MODIFIERS DURING CLICK
   # --------------------------
-  MOD_MODE_SELECT  : ABParam = newParam('Enter Component Creation Mode', 'Ctrl', 'shortcut')
-  MOD_MODE_EDIT    : ABParam = newParam('Enter Component Selection Mode', 'Shift', 'shortcut')
+  MOD_MODE_SELECT  : FRParam = newParam('Enter Component Creation Mode', 'Ctrl', 'shortcut')
+  MOD_MODE_EDIT    : FRParam = newParam('Enter Component Selection Mode', 'Shift', 'shortcut')
 
   # --------------------------
   # COMPONENT EXPORT PARAMETERS
   # --------------------------
-  EXP_ONLY_VISIBLE: ABParam = newParam('Only Export Visible Components', True)
+  EXP_ONLY_VISIBLE: FRParam = newParam('Only Export Visible Components', True)
 
   # --------------------------
   # COMPONENT EXPORT PARAMETERS
   # --------------------------
-  ANN_CUR_FILE_INDICATOR: ABParam = newParam('New')
+  ANN_CUR_FILE_INDICATOR: FRParam = newParam('New')
 
-AB_CONSTS = _ABConsts()
+  # --------------------------
+  # DRAWING
+  # -------------------
+  # Shapes
+  DRAW_SHAPE_RECT: FRParam = newParam('Rect')
+  DRAW_SHAPE_POLY: FRParam = newParam('Polygon')
+  DRAW_SHAPE_FREE: FRParam = newParam('Freehand')
+  DRAW_SHAPE_PAINT: FRParam = newParam('Paint')
+  DRAW_SHAPE_FG_BG: FRParam = newParam('FG/BG')
+  # Actions
+  DRAW_ACT_ADD: FRParam = newParam('Add')
+  DRAW_ACT_REM: FRParam = newParam('Remove')
+  DRAW_ACT_SELECT: FRParam = newParam('Select')
+  DRAW_ACT_PAN: FRParam = newParam('Pan')
 
-class _AbEnums(Enum):
+FR_CONSTS = _FRConsts()
+
+class _FREnums(Enum):
+  # --------------------------
+  # COMPONENTS
+  # --------------------------
   COMP_ADD_AS_MERGE = 'Add as Merge'
   COMP_ADD_AS_NEW   = 'Add as New'
   COMP_EXPORT_ALL   = 'Export All Components'
 
-  DRAW_MODE_EDIT    = 'Add Mode'
-  DRAW_MODE_SELECT  = 'Selection Mode'
-  DRAW_MODE_NONE    = 'No Action Mode'
-
+  # --------------------------
+  # REGION CREATION
+  # --------------------------
   BUFFER_UNDO       = 'Undo'
   BUFFER_REDO       = 'Redo'
-AB_ENUMS = _AbEnums
-
-# --------------
-# Errors used within the application
-# --------------
-class CsvIOError(Exception): pass
-class InvalidDrawModeError(Exception): pass
-class IllRegisteredPropError(Exception): pass
+FR_ENUMS = _FREnums
 
 if __name__ == '__main__':
   c = ComponentTypes().fromString('capacitor')

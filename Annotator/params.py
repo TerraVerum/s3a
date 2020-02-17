@@ -1,25 +1,22 @@
 from __future__ import annotations
 
 import re
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields, field
 from typing import Any, Optional
 from warnings import warn
 import weakref
 
 import numpy as np
-from pandas import DataFrame, Series
-
-
-class ParamParseError(Exception): pass
+from .exceptions import ParamParseError
 
 @dataclass
-class ABParam:
+class FRParam:
   name: str
   value: Any
   valType: Optional[Any] = None
   helpText: str = ''
-  group: Optional[ABParamGroup] = None
+  group: Optional[FRParamGroup] = None
 
   def __str__(self):
     return f'{self.name}'
@@ -28,7 +25,7 @@ class ABParam:
     """
     Required for sorting by value in component table. Defer to alphabetic
     sorting
-    :param other: Other :class:`ABParam` member for comparison
+    :param other: Other :class:`FRParam` member for comparison
     :return: Whether `self` is less than `other`
     """
     return str(self) < str(other)
@@ -39,7 +36,7 @@ class ABParam:
     return hash(self.name,)
 
 @dataclass
-class ABParamGroup:
+class FRParamGroup:
   """
   Hosts all child parameters and offers convenience function for iterating over them
   """
@@ -65,7 +62,7 @@ class ABParamGroup:
 
   def fromString(self, paramName: str):
     """
-    Allows user to create a :class:`ABParam` object from its string value
+    Allows user to create a :class:`FRParam` object from its string value
     """
     paramName = paramName.lower()
     for param in self:
@@ -82,7 +79,7 @@ class ABParamGroup:
     return defaultParam
 
   @classmethod
-  def getDefault(cls) -> Optional[ABParam]:
+  def getDefault(cls) -> Optional[FRParam]:
     """
     Returns the default Param from the group. This can be overloaded in derived classes to yield a safe
     fallback class if the :func:`fromString` method fails.
@@ -91,18 +88,18 @@ class ABParamGroup:
 
 def newParam(name, val=None, valType=None, helpText=''):
   """
-  Factory for creating new parameters within a :class:`ABParamGroup`.
+  Factory for creating new parameters within a :class:`FRParamGroup`.
 
   :param name: Display name of the parameter
   :param val: Initial value of the parameter. This is used within the program to infer
          parameter type, shape, comparison methods, etc.
   :param valType: Type of the variable if not easily inferrable from the value itself. For instance,
-  class:`ShortcutParameter<Annotator.ABGraphics.parameditors.ShortcutParameter>` is indicated with string values
-  (e.g. 'Ctrl+D'), so the user must explicitly specify that such an :class:`ABParam` is of type 'shortcut' (as
-  defined in :class:`ShortcutParameter<Annotator.ABGraphics.parameditors.ShortcutParameter>`) If the type *is* easily
+  class:`ShortcutParameter<Annotator.FRGraphics.parameditors.ShortcutParameter>` is indicated with string values
+  (e.g. 'Ctrl+D'), so the user must explicitly specify that such an :class:`FRParam` is of type 'shortcut' (as
+  defined in :class:`ShortcutParameter<Annotator.FRGraphics.parameditors.ShortcutParameter>`) If the type *is* easily
   inferrable, this may be left blank.
   :param helpText: Additional documentation for this parameter.
-  :return: Field that can be inserted within the :class:`ABParamGroup` dataclass.
+  :return: Field that can be inserted within the :class:`FRParamGroup` dataclass.
   """
   if valType is None:
     # Infer from value
@@ -110,7 +107,7 @@ def newParam(name, val=None, valType=None, helpText=''):
     # The string representation of val 'type' is: <class 'type'>
     # Parse for '' occurrences and grab in between the quotes
     valType = re.search('\'.*\'', str(type(val))).group()[1:-1]
-  return field(default_factory=lambda: ABParam(name, val, valType, helpText))
+  return field(default_factory=lambda: FRParam(name, val, valType, helpText))
 
 
 class FRVertices:
@@ -133,8 +130,11 @@ class FRVertices:
       return self.x
 
 
+class FRDrawShape:
+  pass
+
 class FREditablePropFunc(ABC):
-  sharedProps: ABParamGroup
+  sharedProps: FRParamGroup
 
   @abstractmethod
   def __call__(self, *args, **kwargs):
@@ -142,9 +142,10 @@ class FREditablePropFunc(ABC):
 
 class FRImageProcessor(ABC):
   image: np.ndarray
+  roiShape: FRDrawShape
 
   @abstractmethod
-  def vertsFromPoints(self, internPoints: FRVertices, externPoints: FRVertices) -> FRVertices:
+  def vertsFromPoints(self) -> FRVertices:
     pass
 
   @abstractmethod

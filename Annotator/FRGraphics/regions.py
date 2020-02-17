@@ -8,20 +8,20 @@ from pandas import DataFrame as df
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore
 
-from Annotator.constants import TEMPLATE_COMP as TC, AB_CONSTS
-from Annotator.params import ABParamGroup, ABParam, newParam
-from .parameditors import AB_SINGLETON
+from Annotator.constants import TEMPLATE_COMP as TC, FR_CONSTS
+from Annotator.params import FRParamGroup, FRParam, newParam
+from .parameditors import FR_SINGLETON
 from .clickables import ClickableScatterItem
 from Annotator.generalutils import splitListAtNans, coerceDfTypes
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
-@AB_SINGLETON.registerClass(AB_CONSTS.CLS_VERT_REGION)
+@FR_SINGLETON.registerClass(FR_CONSTS.CLS_VERT_REGION)
 class VertexRegion(pg.ImageItem):
-  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_REG_FILL_COLOR)
+  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_REG_FILL_COLOR)
   def fillClr(self): pass
-  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_REG_VERT_COLOR)
+  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_REG_VERT_COLOR)
   def vertClr(self): pass
 
   def __init__(self, *args, **kwargs):
@@ -106,7 +106,7 @@ def makeMultiRegionDf(numRows=1, whichCols=None, idList=None) -> df:
   df_list = []
   if whichCols is None:
     whichCols = (TC.INST_ID, TC.VERTICES, TC.VALIDATED)
-  elif isinstance(whichCols, ABParam):
+  elif isinstance(whichCols, FRParam):
     whichCols = [whichCols]
   for _ in range(numRows):
     # Make sure to construct a separate component instance for
@@ -133,21 +133,21 @@ def _makeTxtSymbol(txt: str, fontSize: int):
   outSymbol = tr.map(outSymbol)
   return outSymbol
 
-@AB_SINGLETON.registerClass(AB_CONSTS.CLS_MULT_REG_PLT)
+@FR_SINGLETON.registerClass(FR_CONSTS.CLS_MULT_REG_PLT)
 class MultiRegionPlot(QtCore.QObject):
   sigIdClicked = Signal(int)
 
-  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_BOUNDARY_COLOR)
+  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_BOUNDARY_COLOR)
   def boundClr(self): pass
-  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_BOUNDARY_WIDTH)
+  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_BOUNDARY_WIDTH)
   def boundWidth(self): pass
-  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_VALID_ID_COLOR)
+  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_VALID_ID_COLOR)
   def validIdClr(self): pass
-  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_NONVALID_ID_COLOR)
+  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_NONVALID_ID_COLOR)
   def nonvalidIdClr(self): pass
-  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_ID_MARKER_SZ)
+  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_ID_MARKER_SZ)
   def idMarkerSz(self): pass
-  @AB_SINGLETON.scheme.registerProp(AB_CONSTS.SCHEME_SELECTED_ID_BORDER)
+  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_SELECTED_ID_BORDER)
   def selectedIdBorder(self): pass
 
   # Helper class for IDE assistance during dataframe access

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
@@ -154,3 +154,16 @@ def addDirItemsToMenu(parentMenu, dirRegex, triggerFunc, removeExistingChildren=
     name = name[0:name.rfind('.')]
     curAction = parentMenu.addAction(name)
     curAction.triggered.connect(partial(triggerFunc, name))
+
+def create_addMenuAct(parent: QtWidgets.QMenu, title: str, asMenu=False) -> Union[QtWidgets.QMenu, QtWidgets.QAction]:
+  menu = None
+  if asMenu:
+    menu = QtWidgets.QMenu(title)
+    act = menu.menuAction()
+  else:
+    act = QtWidgets.QAction(title)
+  parent.addAction(act)
+  if asMenu:
+    return menu
+  else:
+    return act

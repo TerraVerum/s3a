@@ -10,11 +10,12 @@ from pyqtgraph.Qt import QtCore
 
 from imageprocessing.annotations import ABAnnotationTable
 
-from Annotator.ABGraphics.parameditors import AB_SINGLETON
-from Annotator.constants import AB_CONSTS, AB_ENUMS, CsvIOError
+from Annotator.FRGraphics.parameditors import FR_SINGLETON
+from Annotator.constants import FR_CONSTS, FR_ENUMS
+from Annotator.exceptions import CsvIOError
 from Annotator.generalutils import coerceDfTypes
 from .constants import TEMPLATE_COMP as TC, CompParams
-from .params import ABParam
+from .params import FRParam
 
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal
@@ -37,9 +38,9 @@ def makeCompDf(numRows=1) -> ABAnnotationTable:
     df_list.append([field.value for field in CompParams()])
   outDf = df(df_list, columns=TC).set_index(TC.INST_ID, drop=False)
   # Set the metadata for this application run
-  outDf[TC.ANN_AUTHOR] = AB_SINGLETON.annotationAuthor
+  outDf[TC.ANN_AUTHOR] = FR_SINGLETON.annotationAuthor
   outDf[TC.ANN_TIMESTAMP] = pd.datetime.utcnow()
-  outDf[TC.ANN_FILENAME] = AB_CONSTS.ANN_CUR_FILE_INDICATOR
+  outDf[TC.ANN_FILENAME] = FR_CONSTS.ANN_CUR_FILE_INDICATOR
   if dropRow:
     outDf = outDf.drop(index=TC.INST_ID.value)
   return outDf
@@ -97,9 +98,9 @@ class CompTableModel(QtCore.QAbstractTableModel):
     else:
       return QtCore.Qt.ItemIsEnabled
 
-@AB_SINGLETON.registerClass(AB_CONSTS.CLS_COMP_MGR)
+@FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_MGR)
 class ComponentMgr(CompTableModel):
-  @AB_SINGLETON.generalProps.registerProp(AB_CONSTS.EXP_ONLY_VISIBLE)
+  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.EXP_ONLY_VISIBLE)
   def exportOnlyVis(self): pass
 
   _nextCompId = 0
@@ -107,7 +108,7 @@ class ComponentMgr(CompTableModel):
   def __init__(self):
     super().__init__()
 
-  def addComps(self, newCompsDf: df, addtype: AB_ENUMS = AB_ENUMS.COMP_ADD_AS_NEW):
+  def addComps(self, newCompsDf: df, addtype: FR_ENUMS = FR_ENUMS.COMP_ADD_AS_NEW):
     toEmit = self.defaultEmitDict.copy()
     existingIds = self.compDf.index
 
@@ -118,7 +119,7 @@ class ComponentMgr(CompTableModel):
     # Inform graphics elements of deletion if this ID is already in our dataframe
     toEmit.update(self.rmComps(dropIds, emitChange=False))
 
-    if addtype == AB_ENUMS.COMP_ADD_AS_NEW:
+    if addtype == FR_ENUMS.COMP_ADD_AS_NEW:
       # Treat all comps as new -> set their IDs to guaranteed new values
       newIds = np.arange(self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int)
       newCompsDf.loc[:,TC.INST_ID] = newIds
@@ -189,14 +190,14 @@ class ComponentMgr(CompTableModel):
     return toEmit
 
   def csvExport(self, outFile: str,
-                exportIds:Union[AB_ENUMS, Sequence] = AB_ENUMS.COMP_EXPORT_ALL,
+                exportIds:Union[FR_ENUMS, Sequence] = FR_ENUMS.COMP_EXPORT_ALL,
                 **pdExportArgs) \
       -> bool:
     """
     Serializes the table data and returns the success or failure of the operation.
 
     :param outFile: Name of the output file location
-    :param exportIds: If :var:`AB_ENUMS.EXPORT_ALL`,
+    :param exportIds: If :var:`FR_ENUMS.EXPORT_ALL`,
     :param pdExportArgs: Dictionary of values passed to underlying pandas export function.
            These will overwrite the default options for :func:`exportToFile
            <ComponentMgr.exportToFile>`
@@ -218,7 +219,7 @@ class ComponentMgr(CompTableModel):
       #  them, since this may be useful if it can be modified
       # TODO: Add some comment to the top of the CSV or some extra text file output with additional metrics
       #  about the export, like time, who did it, what image it was from, etc.
-      if isinstance(exportIds, AB_ENUMS) and exportIds == AB_ENUMS.EXPORT_ALL:
+      if isinstance(exportIds, FR_ENUMS) and exportIds == FR_ENUMS.EXPORT_ALL:
         exportDf = self.compDf
       else:
         exportDf = self.compDf.loc[exportIds,:]
@@ -234,7 +235,7 @@ class ComponentMgr(CompTableModel):
       np.set_printoptions(oldNpOpts)
     return success
 
-  def csvImport(self, inFile: str, loadType=AB_ENUMS.COMP_ADD_AS_NEW,
+  def csvImport(self, inFile: str, loadType=FR_ENUMS.COMP_ADD_AS_NEW,
                 imShape: Optional[tuple]=None) -> Optional[Exception]:
     """
     Deserializes data from a csv file to create a Component :class:`DataFrame`.
@@ -290,7 +291,7 @@ def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> Any:
     # Format string to look like a list, use ast to convert that string INTO a list, make a numpy array from the list
     np.ndarray    : lambda strVal: np.array(literal_eval(re.sub(r'(\d|\])\s+', '\\1,', strVal.replace('\n', '')))),
     bool          : lambda strVal: strVal.lower() == 'true',
-    ABParam: lambda strVal: paramVal.group.fromString(strVal)
+    FRParam: lambda strVal: paramVal.group.fromString(strVal)
   }
   defaultFunc = lambda strVal: paramType(strVal)
   funcToUse = funcMap.get(paramType, defaultFunc)
