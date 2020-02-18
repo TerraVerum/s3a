@@ -8,6 +8,7 @@ from warnings import warn
 import weakref
 
 import numpy as np
+
 from .exceptions import ParamParseError
 
 @dataclass
@@ -129,9 +130,10 @@ class FRVertices:
   def cols(self):
       return self.x
 
-
+@dataclass
 class FRDrawShape:
-  pass
+  type: FRParam
+  points: FRVertices = field(default_factory=lambda: np.ones((0,2), dtype=int))
 
 class FREditablePropFunc(ABC):
   sharedProps: FRParamGroup
@@ -142,12 +144,11 @@ class FREditablePropFunc(ABC):
 
 class FRImageProcessor(ABC):
   image: np.ndarray
-  roiShape: FRDrawShape
 
-  @abstractmethod
-  def vertsFromPoints(self) -> FRVertices:
+
+  def localCompEstimate(self, prevCompMask: np.ndarray, drawShape: FRDrawShape) -> np.ndarray:
     pass
 
-  @abstractmethod
-  def globalCompEstimate(self):
+
+  def globalCompEstimate(self) -> np.ndarray:
     pass
