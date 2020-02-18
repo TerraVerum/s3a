@@ -6,6 +6,7 @@ import pandas as pd
 from dataclasses import dataclass
 from pandas import DataFrame as df
 import pyqtgraph as pg
+from pyqtgraph.GraphicsScene.mouseEvents import MouseDragEvent
 from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 
 from Annotator.constants import TEMPLATE_COMP as TC, FR_CONSTS
@@ -87,31 +88,36 @@ class _FRGeneralROI(pg.ROI):
       self.menu = menu
     return self.menu
 
-  def getImgMask(self, imgItem: pg.ImageItem):
+  def getImgMask(self, imgItem: pg.PlotWidget):
     return FRShape.getImgMask(self, imgItem)
 
 class FRShape:
-  roiForShape: Dict[FRParam, Callable[[], pg.ROI]] = {
-    FR_CONSTS.DRAW_SHAPE_POLY: pg.PolygonROI,
-    FR_CONSTS.DRAW_SHAPE_RECT: pg.RectROI,
-    FR_CONSTS.DRAW_SHAPE_FREE: pg.MultiRectROI,
-    FR_CONSTS.DRAW_SHAPE_FG_BG: pg.MultiRectROI,
-    FR_CONSTS.DRAW_SHAPE_PAINT: pg.MultiRectROI
-  }
-
-  def __init__(self, newShape=None):
+  def __init__(self, parent: pg.GraphicsView):
     self.doneDrawing = True
 
-    self.enclosedRoi = pg.PolygonROI([], invertible=True)
-    """For most ROIs, this is the only variable of interest. It will be the Rect for 
-    rectangular ROIs, the polygon for Poly ROIs, etc."""
+    roiCtors: Dict[FRParam, Callable[[], pg.ROI]] = {
+      FR_CONSTS.DRAW_SHAPE_POLY: pg.PolyLineROI,
+      FR_CONSTS.DRAW_SHAPE_RECT: pg.RectROI,
+      FR_CONSTS.DRAW_SHAPE_FREE: pg.LineSegmentROI,
+      FR_CONSTS.DRAW_SHAPE_FG_BG: pg.LineSegmentROI,
+      FR_CONSTS.DRAW_SHAPE_PAINT: pg.LineSegmentROI
+    }
+    # Make a new graphics item for each roi type
+    self.roiForShape: Dict[FRParam, pg.ROI] = {}
+    for shape, roiCtor in roiCtors.items():
+      newRoi = roiCtor([-1,-1], [0,0], invertible=True)
+      newRoi.setZValue(1000)
+      self.roiForShape[shape] = newRoi
+      newRoi.hide()
+      parent.addItem(newRoi)
 
-    self.periphRoi = pg.PolygonROI([], invertible=True)
-    """Used by shapes that don't create an enclosed area, like painter, fg/bg, ..."""
-
-    if newShape is None:
-      newShape = FR_CONSTS.DRAW_SHAPE_PAINT
     self._shape = FR_CONSTS.DRAW_SHAPE_RECT
+
+  def _clearAllRois(self):
+    for roi in self.roiForShape.values():
+      while roi.handles:
+        roi.removeHandle(roi.handles[0]['item'])
+        roi.hide()
 
   def buildRoi(self, imgItem: pg.ImageItem, ev: QtGui.QMouseEvent) -> bool:
     """
@@ -123,14 +129,20 @@ class FRShape:
     posRelToImg = imgItem.mapFromScene(ev.pos())
     # Form of rate-limiting -- only simulate click if the next pixel is at least one away
     # from the previous pixel location
-    xyCoord = np.round(np.array([[posRelToImg.x(), posRelToImg.y()]], dtype='int'))
+    xyCoord = np.array([posRelToImg.x(), posRelToImg.y()], dtype='int')
     if ev.type() == ev.MouseButtonPress:
-      if self.doneDrawing:
-        self.doneDrawing = False
-        # Need to start a new shape
-        imgItem.parentItem().addItem(self.enclosedRoi)
-        # self.enclosedRoi.addScaleHandle([0,0])
-        # ev.accept()
+      curRoi = self.roiForShape[self.shape]
+      self.doneDrawing = False
+      # Need to start a new shape
+      self._clearAllRois()
+      curRoi.show()
+      curRoi.setPos(xyCoord)
+      curRoi.setSize(0)
+      newHandle = curRoi.addScaleHandle([1,1], [0,0])
+
+      # spoofDragEvent = MouseDragEvent(ev, [], None, start=True, finish=False)
+      # curRoi.mouseDragEvent(spoofDragEvent)
+      # ev.accept()
 
     return self.doneDrawing
 

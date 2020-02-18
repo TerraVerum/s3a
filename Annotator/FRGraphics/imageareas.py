@@ -53,6 +53,7 @@ class FREditableImg(pg.PlotWidget):
     super().__init__(parent, background, **kargs)
     self.setAspectLocked(True)
     self.getViewBox().invertY()
+    self.setMouseEnabled(True)
 
     if processor is None:
       processor = FRImageProcessor()
@@ -63,7 +64,7 @@ class FREditableImg(pg.PlotWidget):
     # -----
     self.drawShapeOpt = FR_CONSTS.DRAW_SHAPE_PAINT
     self.drawActionOpt = FR_CONSTS.DRAW_ACT_PAN
-    self.drawShape = FRShape(self.drawShapeOpt)
+    self.drawShape = FRShape(self)
 
     # -----
     # IMAGE
@@ -76,8 +77,7 @@ class FREditableImg(pg.PlotWidget):
     if ev.buttons() == QtCore.Qt.LeftButton:
       self.drawShape.buildRoi(self.image, ev)
 
-    if not ev.isAccepted():
-      super().mousePressEvent(ev)
+    super().mousePressEvent(ev)
 
   def mouseMoveEvent(self, ev: QtGui.QMouseEvent):
     """
@@ -86,34 +86,17 @@ class FREditableImg(pg.PlotWidget):
     # Nothing to do if panning or no button is pressed
     if ev.buttons() == QtCore.Qt.LeftButton:
       self.drawShape.buildRoi(self.image, ev)
-    if not ev.isAccepted():
-      super().mouseMoveEvent(ev)
+    super().mouseMoveEvent(ev)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
     """
     Perform a processing method depending on what the current draw action is
     """
-    isRoiDone = self._buildRoi(ev)
+    isRoiDone = self.drawShape.buildRoi(self.image, ev)
 
     if isRoiDone:
       newVerts = self.processor.vertsFromPoints()
-
-  def _buildRoi(self, ev: QtGui.QMouseEvent) -> bool:
-    """
-    Construct the current shape ROI depending on mouse movement and current shape parameters
-    :param ev: Mouse event
-    :return: Whether the ROI is now complete
-    """
-    isRoiDone = False
-    # Nothing to do when panning
-    if self.drawActionOpt == FR_CONSTS.DRAW_ACT_PAN: return isRoiDone
-
-    posRelToImg = self.compImgItem.mapFromScene(ev.pos())
-    # Form of rate-limiting -- only simulate click if the next pixel is at least one away
-    # from the previous pixel location
-    xyCoord = np.round(np.array([[posRelToImg.x(), posRelToImg.y()]], dtype='int'))
-
-    return isRoiDone
+    super().mouseReleaseEvent(ev)
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_MAIN_IMG_AREA)
 class MainImageArea(pg.PlotWidget):
@@ -145,7 +128,6 @@ class MainImageArea(pg.PlotWidget):
     # -----
     self.imgItem = ClickableImageItem()
     self.imgItem.sigClicked.connect(self.createCompAtClick)
-    # Ensure image is behind plots
     # Ensure image is behind plots
     self.imgItem.setZValue(-100)
     self.setImage(imgSrc)
