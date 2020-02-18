@@ -1,4 +1,4 @@
-from typing import Tuple, Sequence, Optional, Any
+from typing import Tuple, Sequence, Optional, Any, Dict, Callable
 
 import cv2 as cv
 import numpy as np
@@ -6,7 +6,7 @@ import pandas as pd
 from dataclasses import dataclass
 from pandas import DataFrame as df
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtGui, QtCore
+from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 
 from Annotator.constants import TEMPLATE_COMP as TC, FR_CONSTS
 from Annotator.params import FRParamGroup, FRParam, newParam
@@ -18,7 +18,7 @@ Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_VERT_REGION)
-class VertexRegion(pg.ImageItem):
+class FRVertexRegion(pg.ImageItem):
   @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_REG_FILL_COLOR)
   def fillClr(self): pass
   @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_REG_VERT_COLOR)
@@ -64,15 +64,15 @@ class VertexRegion(pg.ImageItem):
       lut.append(clr.getRgb())
     return np.array(lut, dtype='uint8')
 
-class SaveablePolyROI(pg.PolyLineROI):
+class _FRGeneralROI(pg.ROI):
   def __init__(self, initialPoints=None, *args, **kwargs):
     if initialPoints is None:
-      initialPoints = []
+      initialPoints = [0,0]
     # Since this won't execute until after module import, it doesn't cause
     # a dependency
     super().__init__(initialPoints, *args, **kwargs)
     # Force new menu options
-    self.finishPolyAct = QtGui.QAction()
+    self.finishPolyAct = QtWidgets.QAction()
     self.getMenu()
 
   def getMenu(self, *args, **kwargs):
@@ -80,27 +80,93 @@ class SaveablePolyROI(pg.PolyLineROI):
     Adds context menu option to add current ROI area to existing region
     """
     if self.menu is None:
-      menu = super().getMenu()
-      finishPolyAct = QtGui.QAction("Finish Polygon", menu)
+      menu: QtWidgets.QMenu = super().getMenu()
+      finishPolyAct = QtWidgets.QAction("Finish Polygon", menu)
       menu.addAction(finishPolyAct)
       self.finishPolyAct = finishPolyAct
       self.menu = menu
     return self.menu
 
   def getImgMask(self, imgItem: pg.ImageItem):
+    return FRShape.getImgMask(self, imgItem)
+
+class FRShape:
+  roiForShape: Dict[FRParam, Callable[[], pg.ROI]] = {
+    FR_CONSTS.DRAW_SHAPE_POLY: pg.PolygonROI,
+    FR_CONSTS.DRAW_SHAPE_RECT: pg.RectROI,
+    FR_CONSTS.DRAW_SHAPE_FREE: pg.MultiRectROI,
+    FR_CONSTS.DRAW_SHAPE_FG_BG: pg.MultiRectROI,
+    FR_CONSTS.DRAW_SHAPE_PAINT: pg.MultiRectROI
+  }
+
+  def __init__(self, newShape=None):
+    self.doneDrawing = True
+
+    self.enclosedRoi = pg.PolygonROI([], invertible=True)
+    """For most ROIs, this is the only variable of interest. It will be the Rect for 
+    rectangular ROIs, the polygon for Poly ROIs, etc."""
+
+    self.periphRoi = pg.PolygonROI([], invertible=True)
+    """Used by shapes that don't create an enclosed area, like painter, fg/bg, ..."""
+
+    if newShape is None:
+      newShape = FR_CONSTS.DRAW_SHAPE_PAINT
+    self._shape = FR_CONSTS.DRAW_SHAPE_RECT
+
+  def buildRoi(self, imgItem: pg.ImageItem, ev: QtGui.QMouseEvent) -> bool:
+    """
+        Construct the current shape ROI depending on mouse movement and current shape parameters
+        :param imgItem: Image the ROI is drawn upon. Either focused image or main image
+        :param ev: Mouse event
+        :return: Whether the ROI is now complete
+        """
+    posRelToImg = imgItem.mapFromScene(ev.pos())
+    # Form of rate-limiting -- only simulate click if the next pixel is at least one away
+    # from the previous pixel location
+    xyCoord = np.round(np.array([[posRelToImg.x(), posRelToImg.y()]], dtype='int'))
+    if ev.type() == ev.MouseButtonPress:
+      if self.doneDrawing:
+        self.doneDrawing = False
+        # Need to start a new shape
+        imgItem.parentItem().addItem(self.enclosedRoi)
+        # self.enclosedRoi.addScaleHandle([0,0])
+        # ev.accept()
+
+    return self.doneDrawing
+
+
+  def getImgMask(self, imgItem: pg.ImageItem):
+    roi = self.enclosedRoi
     imgMask = np.zeros(imgItem.image.shape[0:2], dtype='bool')
-    roiSlices,_ = self.getArraySlice(imgMask, imgItem)
+    roiSlices, _ = roi.getArraySlice(imgMask, imgItem)
     # TODO: Clip regions that extend beyond image dimensions
     roiSz = [curslice.stop - curslice.start for curslice in roiSlices]
     # renderShapeMask takes width, height args. roiSlices has row/col sizes,
     # so switch this order when passing to renderShapeMask
     roiSz = roiSz[::-1]
-    roiMask = self.renderShapeMask(*roiSz).astype('uint8')
+    roiMask = roi.renderShapeMask(*roiSz).astype('uint8')
     # Also, the return value for renderShapeMask is given in col-major form.
     # Transpose this, since all other data is in row-major.
     roiMask = roiMask.T
     imgMask[roiSlices[0], roiSlices[1]] = roiMask
     return imgMask
+
+  @property
+  def shape(self): return self._shape
+  @shape.setter
+  def shape(self, newShape: FRParam):
+    """
+    When the shape is changed, be sure to reset the underlying ROIs
+    :param newShape: New shape
+    :return: None
+    """
+    # Reset the underlying ROIs for a different shape than we currently are using
+    if newShape != self._shape:
+      self.enclosedRoi = self.roiForShape.get(newShape, pg.ROI)()
+    self._shape = newShape
+
+
+
 
 def makeMultiRegionDf(numRows=1, whichCols=None, idList=None) -> df:
   df_list = []
