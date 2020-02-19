@@ -9,7 +9,8 @@ import pyqtgraph as pg
 from pyqtgraph.GraphicsScene.mouseEvents import MouseDragEvent
 from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 
-from Annotator.FRGraphics.rois import FRRectROI, FRExtendedROI, FRPolygonROI
+from Annotator.FRGraphics.rois import FRRectROI, FRExtendedROI, FRPolygonROI, \
+  FRPaintFillROI
 from Annotator.constants import TEMPLATE_COMP as TC, FR_CONSTS
 from Annotator.params import FRParamGroup, FRParam, newParam, FRVertices
 from .parameditors import FR_SINGLETON
@@ -72,14 +73,14 @@ class FRShapeCollection:
     self.shapeFinished = True
     # Make a new graphics item for each roi type
     self.roiForShape: Dict[FRParam, Union[pg.ROI, FRExtendedROI]] = {}
-    self._shape = FR_CONSTS.DRAW_SHAPE_POLY
+    self._shape = FR_CONSTS.DRAW_SHAPE_PAINT
 
     roiCtors: Dict[FRParam, Callable[[], pg.ROI]] = {
       FR_CONSTS.DRAW_SHAPE_POLY: FRPolygonROI,
       FR_CONSTS.DRAW_SHAPE_RECT: FRRectROI,
+      FR_CONSTS.DRAW_SHAPE_PAINT: FRPaintFillROI
       #FR_CONSTS.DRAW_SHAPE_FREE: pg.LineSegmentROI,
       #FR_CONSTS.DRAW_SHAPE_FG_BG: pg.LineSegmentROI,
-      #FR_CONSTS.DRAW_SHAPE_PAINT: pg.LineSegmentROI
     }
     for shape, roiCtor in roiCtors.items():
       newRoi = roiCtor()

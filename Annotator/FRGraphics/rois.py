@@ -100,22 +100,9 @@ class FRPolygonROI(pg.PolyLineROI):
   def __init__(self, *args, **kwargs):
     # Since this won't execute until after module import, it doesn't cause
     # a dependency
-    super().__init__([], closed=False, movable=False, removable=True, *args, **kwargs)
+    super().__init__([], closed=False, movable=False, removable=False, *args, **kwargs)
     # Force new menu options
-    self.finishPolyAct = QtGui.QAction()
-    self.getMenu()
-
-  def getMenu(self, *args, **kwargs):
-    """
-    Adds context menu option to add current ROI area to existing region
-    """
-    if self.menu is None:
-      menu = super().getMenu()
-      finishPolyAct = QtGui.QAction("Finish Polygon", menu)
-      menu.addAction(finishPolyAct)
-      self.finishPolyAct = finishPolyAct
-      self.menu = menu
-    return self.menu
+    self.finishPolyAct = QtWidgets.QAction()
 
   def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: FRVertices) -> (
       bool, Optional[FRVertices]):
@@ -166,7 +153,39 @@ class FRPolygonROI(pg.PolyLineROI):
     xyEvCoords.y = (xyEvCoords.y - self.y())
     # If enough points exist and new point is 'close' to origin,
     # consider the ROI complete
-    prevPoints = [h['pos'] for h in self.handles]
     newVert = QtCore.QPointF(xyEvCoords.x, xyEvCoords.y)
-    self.setPoints(prevPoints + [newVert])
+    self.addFreeHandle(newVert)
+    if len(self.handles) > 1:
+      self.addSegment(self.handles[-2]['item'], self.handles[-1]['item'])
 
+class FRPaintFillROI(FRPolygonROI):
+
+  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: FRVertices) -> (
+      bool, Optional[FRVertices]):
+    """
+    See function signature for :func:`FRExtendedROI.updateShape`
+    """
+    success = True
+    verts = None
+    evType = ev.type()
+    # If not left click, do nothing
+    if (int(ev.buttons()) & QtCore.Qt.LeftButton) == 0:
+      self.constructingRoi = False
+      self.setPoints([])
+      return self.constructingRoi, verts
+
+    if (evType == ev.MouseButtonPress) | (evType == ev.MouseMove):
+      # Started / doing floodfill
+      if not self.constructingRoi:
+        # Just started. Add a visible point for eye candy
+        self.addVertex(xyEvCoords)
+      verts = xyEvCoords
+      self.constructingRoi = True
+    # No occurrence of mouse release, since that would violate the 'if' check for
+    # button press
+    else:
+      success = False
+
+    if success:
+      ev.accept()
+    return self.constructingRoi, verts
