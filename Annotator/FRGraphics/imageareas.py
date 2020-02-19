@@ -13,7 +13,7 @@ from ..constants import FR_CONSTS, FR_ENUMS
 from ..params import FRImageProcessor
 from ..processing import growBoundarySeeds
 from .clickables import ClickableImageItem
-from .regions import FRVertexRegion, FRShape
+from .regions import FRVertexRegion, FRShapeCollection
 from ..constants import TEMPLATE_COMP as TC
 from ..processing import segmentComp, getVertsFromBwComps, growSeedpoint
 from Annotator.generalutils import getClippedBbox, nanConcatList, ObjUndoBuffer
@@ -64,18 +64,18 @@ class FREditableImg(pg.PlotWidget):
     # -----
     self.drawShapeOpt = FR_CONSTS.DRAW_SHAPE_PAINT
     self.drawActionOpt = FR_CONSTS.DRAW_ACT_PAN
-    self.drawShape = FRShape(self)
+    self.drawShape = FRShapeCollection(self)
 
     # -----
     # IMAGE
     # -----
-    self.image = pg.ImageItem()
-    self.image.setZValue(-100)
-    self.addItem(self.image)
+    self.imgItem = pg.ImageItem()
+    self.imgItem.setZValue(-100)
+    self.addItem(self.imgItem)
 
   def mousePressEvent(self, ev: QtGui.QMouseEvent):
     if ev.buttons() == QtCore.Qt.LeftButton:
-      self.drawShape.buildRoi(self.image, ev)
+      self.drawShape.buildRoi(self.imgItem, ev)
 
     super().mousePressEvent(ev)
 
@@ -83,7 +83,7 @@ class FREditableImg(pg.PlotWidget):
     """
     Mouse move behavior is contingent on which shape is currently selected
     """
-    self.drawShape.buildRoi(self.image, ev)
+    self.drawShape.buildRoi(self.imgItem, ev)
     super().mouseMoveEvent(ev)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
@@ -92,7 +92,7 @@ class FREditableImg(pg.PlotWidget):
 
     :return: Whether the mouse release completes the current ROI
     """
-    self.drawShape.buildRoi(self.image, ev)
+    self.drawShape.buildRoi(self.imgItem, ev)
 
     super().mouseReleaseEvent(ev)
 
@@ -126,7 +126,7 @@ class MainImageArea(pg.PlotWidget):
     # -----
     self.imgItem = ClickableImageItem()
     self.imgItem.sigClicked.connect(self.createCompAtClick)
-    # Ensure image is behind plots
+    # Ensure imgItem is behind plots
     self.imgItem.setZValue(-100)
     self.setImage(imgSrc)
     self.addItem(self.imgItem)
@@ -265,7 +265,7 @@ class FocusedComp(FREditableImg):
                          bbox[0,0]:bbox[1,0],
                          :]
     segImg = segmentComp(newCompImg, self.segThresh)
-    self.image.setImage(segImg)
+    self.imgItem.setImage(segImg)
 
   def updateRegionFromVerts(self, newVerts, offset=None):
     # Component vertices are nan-separated regions
@@ -308,197 +308,3 @@ class FocusedComp(FREditableImg):
   def saveNewVerts(self):
     # Add in offset from main image to FRVertexRegion vertices
     self.compSer.loc[TC.VERTICES] = self.region.verts + self.bbox[0,:]
-
-
-
-# @FR_SINGLETON.registerClass(FR_CONSTS.CLS_FOCUSED_IMG_AREA)
-# class FocusedComp(pg.PlotWidget):
-#   sigModeChanged = Signal(bool)
-#
-#   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_FOCUSED_SEED_THRESH)
-#   def seedThresh(self): pass
-#   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_MARGIN)
-#   def compCropMargin(self): pass
-#   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_SEG_THRESH)
-#   def segThresh(self): pass
-#
-#
-#   def __init__(self, *args, **kwargs):
-#     super().__init__(*args, **kwargs)
-#     # Whether drawn items should be added or removed from current component
-#     self.inAddMode = True
-#     # Type of region to add once the user clicks. See radio buttons on the
-#     # image annotator UI
-#     self.drawType = 'seedpoint'
-#
-#     # For limiting number of mouse move-caused click simulations
-#     self.lastXyVertFromMouseMove = np.array([0,0])
-#
-#     self.setAspectLocked(True)
-#     self.getViewBox().invertY()
-#
-#     self.compSer = makeCompDf().squeeze()
-#
-#     self.bbox = np.zeros((2,2), dtype='int32')
-#
-#     self.compImgItem = ClickableImageItem()
-#     self.compImgItem.requireCtrlKey = False
-#     self.addItem(self.compImgItem)
-#
-#     self.region = FRVertexRegion()
-#     self.addItem(self.region)
-#
-#     self.regionBuffer = RegionVertsUndoBuffer()
-#
-#     # self.interactor = _FRGeneralROI([], pen=(6, 9), removable=True)
-#     # self.addItem(self.interactor)
-#
-#     # Remove points when user asks to delete polygon
-#     # self.interactor.sigRemoveRequested.connect(self.interactor.clearPoints)
-#     # Expand current mask by region on request
-#     # self.interactor.finishPolyAct.triggered.connect(self._addRoiToRegion)
-#
-#     self.compImgItem.sigClicked.connect(self.compImageClicked)
-#
-#   @property
-#   def clickable(self):
-#     return self.compImgItem.clickable
-#
-#   @clickable.setter
-#   def clickable(self, newVal):
-#     self.compImgItem.clickable = bool(newVal)
-#
-#   def mouseMoveEvent(self, ev: QtGui.QKeyEvent):
-#     if ev.modifiers() == QtCore.Qt.ControlModifier \
-#        and ev.buttons() == QtCore.Qt.LeftButton:
-#       # Simulate click in that location
-#       posRelToImg = self.compImgItem.mapFromScene(ev.pos())
-#       # Form of rate-limiting -- only simulate click if the next pixel is at least one away
-#       # from the previous pixel location
-#       xyCoord = np.round(np.array([[posRelToImg.x(), posRelToImg.y()]], dtype='int'))
-#       if np.abs(xyCoord - self.lastXyVertFromMouseMove).sum() >= 1 \
-#          and self.compImgItem.image is not None \
-#          and np.all(xyCoord[:,::-1] < self.compImgItem.image.shape[:2]) \
-#          and np.all(xyCoord >= 0):
-#         # Above line also makes sure the click was within the image
-#         self.compImageClicked(xyCoord)
-#         ev.accept()
-#         self.lastXyVertFromMouseMove = xyCoord
-#     else:
-#       super().mouseMoveEvent(ev)
-#
-#   def compImageClicked(self, newVert: np.ndarray):
-#     # Capture clicks only if component is present and user allows it
-#     # TODO: Expand to include ROI, superpixel, etc.
-#     # Change vertex from x-y to row-col
-#     newVert = np.fliplr(newVert)
-#     newArea = growSeedpoint(self.compImgItem.image, newVert, self.seedThresh)
-#     imgSize = newArea.shape
-#     curRegionMask = self.region.embedMaskInImg(newArea.shape)
-#     if self.inAddMode:
-#       newArea |= curRegionMask
-#     else:
-#       newArea = ~newArea & curRegionMask
-#
-#     self.updateRegionFromBwMask(newArea)
-#
-#   def addRoiVertex(self, newVert: QtCore.QPointF):
-#     # Account for moved ROI
-#     newVert.setX(newVert.x() - self.interactor.x())
-#     newVert.setY(newVert.y() - self.interactor.y())
-#     # If enough points exist and new point is 'close' to origin,
-#     # consider the ROI complete
-#     handles = self.interactor.handles
-#     lastPos = handles[-1]['pos'] if len(handles) > 2 else None
-#     if lastPos is not None and abs(lastPos.x() - newVert.x()) < 5 \
-#                            and abs(lastPos.y() - newVert.y()) < 5:
-#       self.interactor.finishPolyAct.triggered.emit()
-#     else:
-#       # Add point as normal
-#       prevVerts = [handle['pos'] for handle in handles]
-#       self.interactor.setPoints(prevVerts + [newVert])
-#
-#   def setImage(self, image=None, autoLevels=None):
-#     return self.compImgItem.setImage(image, autoLevels)
-#
-#   def updateAll(self, mainImg: np.array, newComp:df):
-#     newVerts = newComp[TC.VERTICES].squeeze()
-#     # Since values INSIDE the dataframe are reset instead of modified, there is no
-#     # need to go through the trouble of deep copying
-#     self.compSer = newComp.copy(deep=False)
-#
-#     # Reset the undo buffer
-#     self.regionBuffer = RegionVertsUndoBuffer()
-#
-#     # Propagate all resultant changes
-#     self.updateBbox(mainImg.shape, newVerts)
-#     self.updateCompImg(mainImg)
-#     self.updateRegionFromVerts(newVerts)
-#     self.autoRange()
-#
-#   def updateBbox(self, mainImgShape, newVerts: np.ndarray):
-#     # Ignore NAN entries during computation
-#     bbox = np.vstack([np.nanmin(newVerts, 0),
-#           np.nanmax(newVerts, 0)])
-#     # Account for margins
-#     self.bbox = getClippedBbox(mainImgShape, bbox, self.compCropMargin)
-#
-#   def updateCompImg(self, mainImg, bbox=None):
-#     if bbox is None:
-#       bbox = self.bbox
-#     # Account for nan entries
-#     newCompImg = mainImg[bbox[0,1]:bbox[1,1],
-#                          bbox[0,0]:bbox[1,0],
-#                          :]
-#     segImg = segmentComp(newCompImg, self.segThresh)
-#     self.setImage(segImg)
-#
-#   def updateRegionFromVerts(self, newVerts, offset=None):
-#     # Component vertices are nan-separated regions
-#     if offset is None:
-#       offset = self.bbox[0,:]
-#     if newVerts is None:
-#       newVerts = np.ones((0,2), dtype=int)
-#     # 0-center new vertices relative to FocusedComp image
-#     # Make a copy of each list first so we aren't modifying the
-#     # original data
-#     centeredVerts = newVerts.copy()
-#     centeredVerts -= offset
-#     self.region.updateVertices(centeredVerts)
-#
-#   def updateRegionFromBwMask(self, bwImg: np.ndarray):
-#     vertsPerComp = getVertsFromBwComps(bwImg)
-#     vertsToUse = np.empty((0, 2), dtype='int')
-#     for verts in vertsPerComp:
-#       # TODO: handle case of multiple regions existing in bwImg. For now, just use
-#       #   the largest
-#       if verts.shape[0] > vertsToUse.shape[0]:
-#         vertsToUse = verts
-#     # TODO: Find a computationally good way to check for large changes every time a
-#     #  region is modified. The current solution can only work from mask-based updates
-#     #  unless an expensive cv.floodFill is used
-#     self.regionBuffer.update(vertsToUse, bwImg)
-#     self.updateRegionFromVerts(vertsToUse, [0, 0])
-#
-#   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_UNDO_MOD_REGION, [FR_ENUMS.BUFFER_UNDO])
-#   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_REDO_MOD_REGION, [FR_ENUMS.BUFFER_REDO])
-#   def undoRedoRegionChange(self, undoOrRedo: str):
-#     # Ignore requests when no region present
-#     if self.compImgItem.image is None:
-#       return
-#     if undoOrRedo == FR_ENUMS.BUFFER_UNDO:
-#       self.updateRegionFromVerts(self.regionBuffer.undo_getObj(), [0, 0])
-#     elif undoOrRedo == FR_ENUMS.BUFFER_REDO:
-#       self.updateRegionFromVerts(self.regionBuffer.redo_getObj(), [0, 0])
-#
-#   def saveNewVerts(self):
-#     # Add in offset from main image to FRVertexRegion vertices
-#     self.compSer.loc[TC.VERTICES] = self.region.verts + self.bbox[0,:]
-#
-#   def _addRoiToRegion(self):
-#     imgMask = self.interactor.getImgMask(self.compImgItem)
-#     newRegion = np.bitwise_or(imgMask, self.region.image)
-#     # TODO: Handle case of poly not intersecting existing region
-#     self.updateRegionFromBwMask(newRegion)
-#     # Now that the ROI was added to the region, remove it
-#     self.interactor.clearPoints()

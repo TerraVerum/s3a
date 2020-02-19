@@ -3,14 +3,14 @@ from __future__ import annotations
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields, field
+from functools import partial
 from typing import Any, Optional, Union
 from warnings import warn
 import weakref
 
 import numpy as np
 
-from Annotator.exceptions import FRIllFormedVertices
-from .exceptions import FRParamParseError
+from .exceptions import FRParamParseError, FRIllFormedVertices
 
 @dataclass
 class FRParam:
@@ -111,7 +111,6 @@ def newParam(name, val=None, valType=None, helpText=''):
     valType = re.search('\'.*\'', str(type(val))).group()[1:-1]
   return field(default_factory=lambda: FRParam(name, val, valType, helpText))
 
-@dataclass
 class FRVertices(np.ndarray):
 
   connected: bool = True
@@ -123,8 +122,8 @@ class FRVertices(np.ndarray):
       # Default to empty Nx2 array
       shape = (0, 2)
     elif len(shape) != 2 or shape[1] != 2:
-      raise FRIllFormedVertices("Vertices for FRVertices must be Nx2.")
-    # Also force integer type
+      raise FRIllFormedVertices(f"Vertices for FRVertices must be Nx2.\n"
+                                f"Received shape was {shape}")
     return super().__new__(FRVertices, shape, *args, **kwargs)
 
   @staticmethod
@@ -144,18 +143,24 @@ class FRVertices(np.ndarray):
     return outObj
 
   @property
-  def x(self):
-    return self[:,0]
-  @property
-  def y(self):
-      return self[:,1]
+  def x(self): return self[:,[0]]
+  @x.setter
+  def x(self, newX): self[:,0] = newX
 
   @property
-  def rows(self):
-      return self.y
+  def y(self): return self[:, [1]]
+  @y.setter
+  def y(self, newY): self[:, 1] = newY
+
   @property
-  def cols(self):
-      return self.x
+  def rows(self): return self.y
+  @rows.setter
+  def rows(self, newY): self.y = newY
+
+  @property
+  def cols(self): return self.x
+  @cols.setter
+  def cols(self, newX): self.x = newX
 
 @dataclass
 class FRDrawShape:
