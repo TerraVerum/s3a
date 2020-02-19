@@ -10,7 +10,7 @@ from typing import Sequence, Union, Callable, Any, Optional
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
 
-from Annotator.exceptions import IllRegisteredPropError
+from Annotator.exceptions import FRIllRegisteredPropError
 from Annotator.params import FRParam, FRParamGroup
 from .graphicsutils import dialogSaveToFile
 from ..constants import (
@@ -403,7 +403,7 @@ class ShortcutsEditor(ConstParamWidget):
     """
     Properties should never be registered as shortcuts, so make sure this is disallowed
     """
-    raise IllRegisteredPropError('Cannot register property/attribute as a shortcut')
+    raise FRIllRegisteredPropError('Cannot register property/attribute as a shortcut')
 
   def applyBtnClicked(self):
     for shortcut in self.shortcuts: #type: FREditableShortcut

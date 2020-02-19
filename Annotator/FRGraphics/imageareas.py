@@ -83,19 +83,17 @@ class FREditableImg(pg.PlotWidget):
     """
     Mouse move behavior is contingent on which shape is currently selected
     """
-    # Nothing to do if panning or no button is pressed
-    if ev.buttons() == QtCore.Qt.LeftButton:
-      self.drawShape.buildRoi(self.image, ev)
+    self.drawShape.buildRoi(self.image, ev)
     super().mouseMoveEvent(ev)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
     """
     Perform a processing method depending on what the current draw action is
-    """
-    isRoiDone = self.drawShape.buildRoi(self.image, ev)
 
-    if isRoiDone:
-      newVerts = self.processor.vertsFromPoints()
+    :return: Whether the mouse release completes the current ROI
+    """
+    self.drawShape.buildRoi(self.image, ev)
+
     super().mouseReleaseEvent(ev)
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_MAIN_IMG_AREA)

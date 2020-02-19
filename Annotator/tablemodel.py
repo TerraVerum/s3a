@@ -12,7 +12,7 @@ from imageprocessing.annotations import ABAnnotationTable
 
 from Annotator.FRGraphics.parameditors import FR_SINGLETON
 from Annotator.constants import FR_CONSTS, FR_ENUMS
-from Annotator.exceptions import CsvIOError
+from Annotator.exceptions import FRCsvIOError
 from Annotator.generalutils import coerceDfTypes
 from .constants import TEMPLATE_COMP as TC, CompParams
 from .params import FRParam
@@ -275,7 +275,7 @@ class ComponentMgr(CompTableModel):
         vertMaxs = np.vstack(vertMaxs)
         offendingIds = np.nonzero(np.any(vertMaxs >= imShape, axis=1))[0]
         if len(offendingIds) > 0:
-          raise CsvIOError(f'Vertices on some components extend beyond image dimensions. '
+          raise FRCsvIOError(f'Vertices on some components extend beyond image dimensions. '
                            f'Perhaps this export came from a different image?\n'
                            f'Offending IDs: {offendingIds}')
     except Exception as ex:

@@ -3,13 +3,14 @@ from __future__ import annotations
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields, field
-from typing import Any, Optional
+from typing import Any, Optional, Union
 from warnings import warn
 import weakref
 
 import numpy as np
 
-from .exceptions import ParamParseError
+from Annotator.exceptions import FRIllFormedVertices
+from .exceptions import FRParamParseError
 
 @dataclass
 class FRParam:
@@ -74,7 +75,7 @@ class FRParamGroup:
     baseWarnMsg = f'String representation "{paramName}" was not recognized. '
     if defaultParam is None:
       # No default specified, so we have to raise Exception
-      raise ParamParseError(baseWarnMsg + 'No class default is specified.')
+      raise FRParamParseError(baseWarnMsg + 'No class default is specified.')
     # No exception needed, since the user specified a default type in the derived class
     warn(baseWarnMsg + f'Defaulting to {defaultParam.name}')
     return defaultParam
@@ -110,18 +111,44 @@ def newParam(name, val=None, valType=None, helpText=''):
     valType = re.search('\'.*\'', str(type(val))).group()[1:-1]
   return field(default_factory=lambda: FRParam(name, val, valType, helpText))
 
-
-class FRVertices:
-  xyPoints: np.ndarray
+@dataclass
+class FRVertices(np.ndarray):
 
   connected: bool = True
 
+  @staticmethod
+  def __new__(cls, shape=None, *args, **kwargs):
+    # Make sure the shape is appropriate for vertices
+    if shape is None:
+      # Default to empty Nx2 array
+      shape = (0, 2)
+    elif len(shape) != 2 or shape[1] != 2:
+      raise FRIllFormedVertices("Vertices for FRVertices must be Nx2.")
+    # Also force integer type
+    return super().__new__(FRVertices, shape, *args, **kwargs)
+
+  @staticmethod
+  def createFromArr(npArrToCopy: Union[np.ndarray, list]) -> FRVertices:
+    """
+    Construct a FRVertices object from the given numpy array (copy constructor).
+    Using the __init__ of this class instead of directly copy()ing the data ensures the
+    shape of :param:`npArrToCopy` is correct.
+
+    :param npArrToCopy:
+    :return: FRVertices object
+    """
+    if isinstance(npArrToCopy, list):
+      npArrToCopy = np.array(npArrToCopy)
+    outObj = FRVertices(npArrToCopy.shape)
+    outObj[:] = npArrToCopy
+    return outObj
+
   @property
   def x(self):
-    return self.xyPoints[:,0]
+    return self[:,0]
   @property
   def y(self):
-      return self.xyPoints[:,1]
+      return self[:,1]
 
   @property
   def rows(self):
@@ -133,7 +160,7 @@ class FRVertices:
 @dataclass
 class FRDrawShape:
   type: FRParam
-  points: FRVertices = field(default_factory=lambda: np.ones((0,2), dtype=int))
+  points: FRVertices = field(default_factory=FRVertices)
 
 class FREditablePropFunc(ABC):
   sharedProps: FRParamGroup
@@ -152,3 +179,9 @@ class FRImageProcessor(ABC):
 
   def globalCompEstimate(self) -> np.ndarray:
     pass
+
+
+if __name__ == '__main__':
+    x = np.ones((5,2))
+    t = FRVertices.createFromArr(x)
+    print(t)

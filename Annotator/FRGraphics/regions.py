@@ -1,4 +1,4 @@
-from typing import Tuple, Sequence, Optional, Any, Dict, Callable
+from typing import Tuple, Sequence, Optional, Any, Dict, Callable, Union
 
 import cv2 as cv
 import numpy as np
@@ -9,8 +9,9 @@ import pyqtgraph as pg
 from pyqtgraph.GraphicsScene.mouseEvents import MouseDragEvent
 from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 
+from Annotator.FRGraphics.rois import FRRectROI, FRExtendedROI
 from Annotator.constants import TEMPLATE_COMP as TC, FR_CONSTS
-from Annotator.params import FRParamGroup, FRParam, newParam
+from Annotator.params import FRParamGroup, FRParam, newParam, FRVertices
 from .parameditors import FR_SINGLETON
 from .clickables import ClickableScatterItem
 from Annotator.generalutils import splitListAtNans, coerceDfTypes
@@ -88,22 +89,24 @@ class _FRGeneralROI(pg.ROI):
       self.menu = menu
     return self.menu
 
-  def getImgMask(self, imgItem: pg.PlotWidget):
-    return FRShape.getImgMask(self, imgItem)
+  def getImgMask(self, imgItem: pg.ImageItem):
+    # FIXME: Broken! This class must be phased out.
+    return np.zeros(imgItem.image.shape, dtype=imgItem.image.dtype)
 
 class FRShape:
   def __init__(self, parent: pg.GraphicsView):
-    self.doneDrawing = True
+    self.shapeVerts = FRVertices()
+    # Make a new graphics item for each roi type
+    self.roiForShape: Dict[FRParam, Union[pg.ROI, FRExtendedROI]] = {}
+    self._shape = FR_CONSTS.DRAW_SHAPE_RECT
 
     roiCtors: Dict[FRParam, Callable[[], pg.ROI]] = {
       FR_CONSTS.DRAW_SHAPE_POLY: pg.PolyLineROI,
-      FR_CONSTS.DRAW_SHAPE_RECT: pg.RectROI,
+      FR_CONSTS.DRAW_SHAPE_RECT: FRRectROI,
       FR_CONSTS.DRAW_SHAPE_FREE: pg.LineSegmentROI,
       FR_CONSTS.DRAW_SHAPE_FG_BG: pg.LineSegmentROI,
       FR_CONSTS.DRAW_SHAPE_PAINT: pg.LineSegmentROI
     }
-    # Make a new graphics item for each roi type
-    self.roiForShape: Dict[FRParam, pg.ROI] = {}
     for shape, roiCtor in roiCtors.items():
       newRoi = roiCtor([-1,-1], [0,0], invertible=True)
       newRoi.setZValue(1000)
@@ -111,57 +114,35 @@ class FRShape:
       newRoi.hide()
       parent.addItem(newRoi)
 
-    self._shape = FR_CONSTS.DRAW_SHAPE_RECT
 
   def _clearAllRois(self):
     for roi in self.roiForShape.values():
       while roi.handles:
+        # TODO: Submit bug request in pyqtgraph. removeHandle of ROI takes handle or
+        #  integer index, removeHandle of PolyLine requires handle object.
         roi.removeHandle(roi.handles[0]['item'])
         roi.hide()
 
-  def buildRoi(self, imgItem: pg.ImageItem, ev: QtGui.QMouseEvent) -> bool:
+  def buildRoi(self, imgItem: pg.ImageItem, ev: QtGui.QMouseEvent):
     """
         Construct the current shape ROI depending on mouse movement and current shape parameters
         :param imgItem: Image the ROI is drawn upon. Either focused image or main image
         :param ev: Mouse event
-        :return: Whether the ROI is now complete
         """
     posRelToImg = imgItem.mapFromScene(ev.pos())
     # Form of rate-limiting -- only simulate click if the next pixel is at least one away
     # from the previous pixel location
-    xyCoord = np.array([posRelToImg.x(), posRelToImg.y()], dtype='int')
-    if ev.type() == ev.MouseButtonPress:
-      curRoi = self.roiForShape[self.shape]
-      self.doneDrawing = False
-      # Need to start a new shape
-      self._clearAllRois()
+    xyCoord = np.array([posRelToImg.x(), posRelToImg.y()], dtype='float')
+    curRoi = self.roiForShape[self.shape]
+    constructingRoi, self.shapeVerts = curRoi.updateShape(ev, xyCoord)
+    self.shapeFinished = self.shapeVerts is not None
+
+    if not constructingRoi:
+      # Vertices from the completed shape are already stored, so clean up the shapes.
+      curRoi.hide()
+    else:
+      # Still constructing ROI. Show it
       curRoi.show()
-      curRoi.setPos(xyCoord)
-      curRoi.setSize(0)
-      newHandle = curRoi.addScaleHandle([1,1], [0,0])
-
-      # spoofDragEvent = MouseDragEvent(ev, [], None, start=True, finish=False)
-      # curRoi.mouseDragEvent(spoofDragEvent)
-      # ev.accept()
-
-    return self.doneDrawing
-
-
-  def getImgMask(self, imgItem: pg.ImageItem):
-    roi = self.enclosedRoi
-    imgMask = np.zeros(imgItem.image.shape[0:2], dtype='bool')
-    roiSlices, _ = roi.getArraySlice(imgMask, imgItem)
-    # TODO: Clip regions that extend beyond image dimensions
-    roiSz = [curslice.stop - curslice.start for curslice in roiSlices]
-    # renderShapeMask takes width, height args. roiSlices has row/col sizes,
-    # so switch this order when passing to renderShapeMask
-    roiSz = roiSz[::-1]
-    roiMask = roi.renderShapeMask(*roiSz).astype('uint8')
-    # Also, the return value for renderShapeMask is given in col-major form.
-    # Transpose this, since all other data is in row-major.
-    roiMask = roiMask.T
-    imgMask[roiSlices[0], roiSlices[1]] = roiMask
-    return imgMask
 
   @property
   def shape(self): return self._shape
@@ -174,7 +155,7 @@ class FRShape:
     """
     # Reset the underlying ROIs for a different shape than we currently are using
     if newShape != self._shape:
-      self.enclosedRoi = self.roiForShape.get(newShape, pg.ROI)()
+      self._clearAllRois()
     self._shape = newShape
 
 
