@@ -9,7 +9,7 @@ import pyqtgraph as pg
 from pyqtgraph.GraphicsScene.mouseEvents import MouseDragEvent
 from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 
-from Annotator.FRGraphics.rois import FRRectROI, FRExtendedROI
+from Annotator.FRGraphics.rois import FRRectROI, FRExtendedROI, FRPolygonROI
 from Annotator.constants import TEMPLATE_COMP as TC, FR_CONSTS
 from Annotator.params import FRParamGroup, FRParam, newParam, FRVertices
 from .parameditors import FR_SINGLETON
@@ -66,49 +66,23 @@ class FRVertexRegion(pg.ImageItem):
       lut.append(clr.getRgb())
     return np.array(lut, dtype='uint8')
 
-class _FRGeneralROI(pg.ROI):
-  def __init__(self, initialPoints=None, *args, **kwargs):
-    if initialPoints is None:
-      initialPoints = [0,0]
-    # Since this won't execute until after module import, it doesn't cause
-    # a dependency
-    super().__init__(initialPoints, *args, **kwargs)
-    # Force new menu options
-    self.finishPolyAct = QtWidgets.QAction()
-    self.getMenu()
-
-  def getMenu(self, *args, **kwargs):
-    """
-    Adds context menu option to add current ROI area to existing region
-    """
-    if self.menu is None:
-      menu: QtWidgets.QMenu = super().getMenu()
-      finishPolyAct = QtWidgets.QAction("Finish Polygon", menu)
-      menu.addAction(finishPolyAct)
-      self.finishPolyAct = finishPolyAct
-      self.menu = menu
-    return self.menu
-
-  def getImgMask(self, imgItem: pg.ImageItem):
-    # FIXME: Broken! This class must be phased out.
-    return np.zeros(imgItem.image.shape, dtype=imgItem.image.dtype)
-
-class FRShape:
+class FRShapeCollection:
   def __init__(self, parent: pg.GraphicsView):
     self.shapeVerts = FRVertices()
+    self.shapeFinished = True
     # Make a new graphics item for each roi type
     self.roiForShape: Dict[FRParam, Union[pg.ROI, FRExtendedROI]] = {}
-    self._shape = FR_CONSTS.DRAW_SHAPE_RECT
+    self._shape = FR_CONSTS.DRAW_SHAPE_POLY
 
     roiCtors: Dict[FRParam, Callable[[], pg.ROI]] = {
-      FR_CONSTS.DRAW_SHAPE_POLY: pg.PolyLineROI,
+      FR_CONSTS.DRAW_SHAPE_POLY: FRPolygonROI,
       FR_CONSTS.DRAW_SHAPE_RECT: FRRectROI,
-      FR_CONSTS.DRAW_SHAPE_FREE: pg.LineSegmentROI,
-      FR_CONSTS.DRAW_SHAPE_FG_BG: pg.LineSegmentROI,
-      FR_CONSTS.DRAW_SHAPE_PAINT: pg.LineSegmentROI
+      #FR_CONSTS.DRAW_SHAPE_FREE: pg.LineSegmentROI,
+      #FR_CONSTS.DRAW_SHAPE_FG_BG: pg.LineSegmentROI,
+      #FR_CONSTS.DRAW_SHAPE_PAINT: pg.LineSegmentROI
     }
     for shape, roiCtor in roiCtors.items():
-      newRoi = roiCtor([-1,-1], [0,0], invertible=True)
+      newRoi = roiCtor()
       newRoi.setZValue(1000)
       self.roiForShape[shape] = newRoi
       newRoi.hide()
@@ -126,13 +100,13 @@ class FRShape:
   def buildRoi(self, imgItem: pg.ImageItem, ev: QtGui.QMouseEvent):
     """
         Construct the current shape ROI depending on mouse movement and current shape parameters
-        :param imgItem: Image the ROI is drawn upon. Either focused image or main image
+        :param imgItem: Image the ROI is drawn upon. Either focused imgItem or main imgItem
         :param ev: Mouse event
         """
     posRelToImg = imgItem.mapFromScene(ev.pos())
     # Form of rate-limiting -- only simulate click if the next pixel is at least one away
     # from the previous pixel location
-    xyCoord = np.array([posRelToImg.x(), posRelToImg.y()], dtype='float')
+    xyCoord = FRVertices.createFromArr([[posRelToImg.x(), posRelToImg.y()]])
     curRoi = self.roiForShape[self.shape]
     constructingRoi, self.shapeVerts = curRoi.updateShape(ev, xyCoord)
     self.shapeFinished = self.shapeVerts is not None
