@@ -1,12 +1,15 @@
-from typing import Optional
+from abc import abstractmethod
+from typing import Optional, Callable, Dict
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph import ROI, PolyLineROI, RectROI, LineSegmentROI
 import numpy as np
 
+from Annotator.constants import FR_CONSTS
 from Annotator.exceptions import FRInvalidROIEvType
-from Annotator.params import FRVertices
+from Annotator.params import FRVertices, FRParam
+
 
 def _getImgMask(roi: pg.ROI, imgItem: pg.ImageItem):
   imgMask = np.zeros(imgItem.image.shape[0:2], dtype='bool')
@@ -189,3 +192,9 @@ class FRPaintFillROI(FRPolygonROI):
     if success:
       ev.accept()
     return self.constructingRoi, verts
+
+SHAPE_ROI_MAPPING: Dict[FRParam, Callable[[], FRExtendedROI]] = {
+  FR_CONSTS.DRAW_SHAPE_PAINT: FRPaintFillROI,
+  FR_CONSTS.DRAW_SHAPE_RECT: FRRectROI,
+  FR_CONSTS.DRAW_SHAPE_POLY: FRPolygonROI,
+}

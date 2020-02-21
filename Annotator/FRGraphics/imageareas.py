@@ -62,9 +62,10 @@ class FREditableImg(pg.PlotWidget):
     # -----
     # DRAWING OPTIONS
     # -----
-    self.drawShapeOpt = FR_CONSTS.DRAW_SHAPE_PAINT
-    self.drawActionOpt = FR_CONSTS.DRAW_ACT_PAN
-    self.drawShape = FRShapeCollection(self)
+    # Overwrite with acceptable
+    self.drawAction = FR_CONSTS.DRAW_ACT_PAN
+    # Overwrite this with acceptable shapes
+    self.drawShape = FRShapeCollection(parent=self)
 
     # -----
     # IMAGE
@@ -240,6 +241,9 @@ class FocusedComp(FREditableImg):
     # Since values INSIDE the dataframe are reset instead of modified, there is no
     # need to go through the trouble of deep copying
     self.compSer = newComp.copy(deep=False)
+    self.drawShape.allowableShapes = {
+      FR_CONSTS.DRAW_SHAPE_PAINT, FR_CONSTS.DRAW_SHAPE_RECT, FR_CONSTS.DRAW_SHAPE_POLY
+    }
 
     # Reset the undo buffer
     self.regionBuffer = RegionVertsUndoBuffer()

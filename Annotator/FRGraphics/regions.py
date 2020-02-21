@@ -1,4 +1,4 @@
-from typing import Tuple, Sequence, Optional, Any, Dict, Callable, Union
+from typing import Tuple, Sequence, Optional, Any, Dict, Callable, Union, Set
 
 import cv2 as cv
 import numpy as np
@@ -9,8 +9,7 @@ import pyqtgraph as pg
 from pyqtgraph.GraphicsScene.mouseEvents import MouseDragEvent
 from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 
-from Annotator.FRGraphics.rois import FRRectROI, FRExtendedROI, FRPolygonROI, \
-  FRPaintFillROI
+from Annotator.FRGraphics.rois import SHAPE_ROI_MAPPING, FRExtendedROI
 from Annotator.constants import TEMPLATE_COMP as TC, FR_CONSTS
 from Annotator.params import FRParamGroup, FRParam, newParam, FRVertices
 from .parameditors import FR_SINGLETON
@@ -68,33 +67,38 @@ class FRVertexRegion(pg.ImageItem):
     return np.array(lut, dtype='uint8')
 
 class FRShapeCollection:
-  def __init__(self, parent: pg.GraphicsView):
+  def __init__(self, allowableShapes: Set[FRParam]=None, parent: pg.GraphicsView=None):
+    if allowableShapes is None:
+      allowableShapes = set()
     self.shapeVerts = FRVertices()
     self.shapeFinished = True
     # Make a new graphics item for each roi type
     self.roiForShape: Dict[FRParam, Union[pg.ROI, FRExtendedROI]] = {}
     self._shape = FR_CONSTS.DRAW_SHAPE_PAINT
+    self._allowableShapes = allowableShapes
+    self._parent = parent
 
-    roiCtors: Dict[FRParam, Callable[[], pg.ROI]] = {
-      FR_CONSTS.DRAW_SHAPE_POLY: FRPolygonROI,
-      FR_CONSTS.DRAW_SHAPE_RECT: FRRectROI,
-      FR_CONSTS.DRAW_SHAPE_PAINT: FRPaintFillROI
-      #FR_CONSTS.DRAW_SHAPE_FREE: pg.LineSegmentROI,
-      #FR_CONSTS.DRAW_SHAPE_FG_BG: pg.LineSegmentROI,
-    }
-    for shape, roiCtor in roiCtors.items():
-      newRoi = roiCtor()
-      newRoi.setZValue(1000)
-      self.roiForShape[shape] = newRoi
-      newRoi.hide()
-      parent.addItem(newRoi)
+    for shape, roiCtor in SHAPE_ROI_MAPPING.items():
+      if shape in allowableShapes:
+        newRoi = roiCtor()
+        newRoi.setZValue(1000)
+        self.roiForShape[shape] = newRoi
+        newRoi.hide()
+    self.addRoisToView(parent)
 
+  def addRoisToView(self, view: pg.GraphicsView):
+    self._parent = view
+    if view is not None:
+      for roi in self.roiForShape.values():
+        roi.hide()
+        view.addItem(roi)
 
   def _clearAllRois(self):
     for roi in self.roiForShape.values():
       while roi.handles:
         # TODO: Submit bug request in pyqtgraph. removeHandle of ROI takes handle or
-        #  integer index, removeHandle of PolyLine requires handle object.
+        #  integer index, removeHandle of PolyLine requires handle object. So,
+        #  even though PolyLine should be able  to handle remove by index, it can't
         roi.removeHandle(roi.handles[0]['item'])
         roi.hide()
 
@@ -132,6 +136,22 @@ class FRShapeCollection:
     if newShape != self._shape:
       self._clearAllRois()
     self._shape = newShape
+
+  @property
+  def allowableShapes(self): return self._allowableShapes
+
+  @allowableShapes.setter
+  def allowableShapes(self, newAllowedShapes: Set[FRParam]):
+    # Clear the current ROI list from the view
+    self._allowableShapes = newAllowedShapes
+    if self._parent is not None:
+      for roi in self.roiForShape.values():
+        self._parent.removeItem(roi)
+    self.roiForShape: Dict[FRParam, Union[pg.ROI, FRExtendedROI]] = {}
+    for shape in newAllowedShapes:
+      self.roiForShape[shape] = SHAPE_ROI_MAPPING[shape]()
+    self.addRoisToView(self._parent)
+
 
 
 
