@@ -14,6 +14,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
 
 from Annotator.FRGraphics.annotator_ui import FRAnnotatorUI
 from Annotator.constants import FR_CONSTS, BASE_DIR, ANN_AUTH_DIR
+from Annotator.params import FRVertices
 from .FRGraphics.parameditors import ConstParamWidget, TableFilterEditor, FR_SINGLETON
 from .FRGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc, dialogGetAuthorName
@@ -133,6 +134,11 @@ class Annotator(FRAnnotatorUI):
     with open(annFile, 'w') as ofile:
       ofile.write(name)
     return name
+
+  # Spoof selection of empty area on escape to deselect components
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DESEL_ALL_BOUNDARIES)
+  def deselectAllBoundaries(self):
+    self.compDisplay.updateCompSelection([])
 
   # TODO: Move these properties into the class responsible for image processing/etc.
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_EST_BOUNDS_ON_START)
