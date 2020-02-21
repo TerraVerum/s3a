@@ -4,9 +4,11 @@ import numpy as np
 import pyqtgraph as pg
 from PIL import Image
 from pandas import DataFrame as df
+from pyqtgraph import Point
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from skimage import morphology
 
+from Annotator.FRGraphics.clickables import RightPanViewBox
 from .clickables import ClickableImageItem
 from .clickables import DraggableViewBox
 from .drawopts import FRDrawOpts
@@ -53,7 +55,7 @@ class FREditableImg(pg.PlotWidget):
   def __init__(self, parent=None, processor: FRImageProcessor=None,
                allowableShapes: Tuple[FRParam,...]=None, allowableActions: Tuple[FRParam,...]=None,
                **kargs):
-    super().__init__(parent, **kargs)
+    super().__init__(parent, viewBox=RightPanViewBox(), **kargs)
     self.setAspectLocked(True)
     self.getViewBox().invertY()
     self.setMouseEnabled(True)
@@ -103,16 +105,19 @@ class FREditableImg(pg.PlotWidget):
       self.shapeCollection.curShape = self.drawOptsWidget.shapeBtnParamMap[btn]
 
   def mousePressEvent(self, ev: QtGui.QMouseEvent):
-    if ev.buttons() == QtCore.Qt.LeftButton:
+    if ev.buttons() == QtCore.Qt.LeftButton \
+        and self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
       self.shapeCollection.buildRoi(self.imgItem, ev)
 
     super().mousePressEvent(ev)
 
   def mouseMoveEvent(self, ev: QtGui.QMouseEvent):
     """
-    Mouse move behavior is contingent on which shape is currently selected
+    Mouse move behavior is contingent on which shape is currently selected,
+    unless we are panning
     """
-    self.shapeCollection.buildRoi(self.imgItem, ev)
+    if self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
+      self.shapeCollection.buildRoi(self.imgItem, ev)
     super().mouseMoveEvent(ev)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
@@ -121,6 +126,7 @@ class FREditableImg(pg.PlotWidget):
 
     :return: Whether the mouse release completes the current ROI
     """
+    # if ev.buttons() == QtCore.Qt.LeftButton:
     self.shapeCollection.buildRoi(self.imgItem, ev)
 
     super().mouseReleaseEvent(ev)

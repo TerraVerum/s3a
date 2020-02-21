@@ -1,5 +1,6 @@
 import pyqtgraph as pg
 from pyqtgraph import Point
+from pyqtgraph.GraphicsScene.mouseEvents import MouseDragEvent
 from pyqtgraph.Qt import QtCore, QtGui
 
 Signal = QtCore.pyqtSignal
@@ -103,6 +104,15 @@ class ClickableTextItem(pg.TextItem):
       newPos = np.ones(2)*np.nan
     self.setPos(newPos[0], newPos[1])
     self.setText(newText, newValid)
+
+
+class RightPanViewBox(pg.ViewBox):
+  def mouseDragEvent(self, ev: MouseDragEvent, axis=None):
+    if ev.buttons() == QtCore.Qt.RightButton \
+        or ev.button() == QtCore.Qt.RightButton:
+      ev.buttons = lambda: QtCore.Qt.LeftButton
+      ev.button = ev.buttons
+    super().mouseDragEvent(ev)
 
 class DraggableViewBox(pg.ViewBox):
   sigSelectionBoundsMade = Signal(object)
