@@ -74,16 +74,15 @@ class FRShapeCollection:
     self.shapeFinished = True
     # Make a new graphics item for each roi type
     self.roiForShape: Dict[FRParam, Union[pg.ROI, FRExtendedROI]] = {}
-    self._shape = FR_CONSTS.DRAW_SHAPE_PAINT
+    self._curShape = FR_CONSTS.DRAW_SHAPE_PAINT
     self._allowableShapes = allowableShapes
     self._parent = parent
 
-    for shape, roiCtor in SHAPE_ROI_MAPPING.items():
-      if shape in allowableShapes:
-        newRoi = roiCtor()
-        newRoi.setZValue(1000)
-        self.roiForShape[shape] = newRoi
-        newRoi.hide()
+    for shape in allowableShapes:
+      newRoi = SHAPE_ROI_MAPPING[shape]()
+      newRoi.setZValue(1000)
+      self.roiForShape[shape] = newRoi
+      newRoi.hide()
     self.addRoisToView(parent)
 
   def addRoisToView(self, view: pg.GraphicsView):
@@ -112,7 +111,7 @@ class FRShapeCollection:
     # Form of rate-limiting -- only simulate click if the next pixel is at least one away
     # from the previous pixel location
     xyCoord = FRVertices.createFromArr([[posRelToImg.x(), posRelToImg.y()]])
-    curRoi = self.roiForShape[self.shape]
+    curRoi = self.roiForShape[self.curShape]
     constructingRoi, self.shapeVerts = curRoi.updateShape(ev, xyCoord)
     self.shapeFinished = self.shapeVerts is not None
 
@@ -124,37 +123,18 @@ class FRShapeCollection:
       curRoi.show()
 
   @property
-  def shape(self): return self._shape
-  @shape.setter
-  def shape(self, newShape: FRParam):
+  def curShape(self): return self._curShape
+  @curShape.setter
+  def curShape(self, newShape: FRParam):
     """
     When the shape is changed, be sure to reset the underlying ROIs
     :param newShape: New shape
     :return: None
     """
     # Reset the underlying ROIs for a different shape than we currently are using
-    if newShape != self._shape:
+    if newShape != self._curShape:
       self._clearAllRois()
-    self._shape = newShape
-
-  @property
-  def allowableShapes(self): return self._allowableShapes
-
-  @allowableShapes.setter
-  def allowableShapes(self, newAllowedShapes: Set[FRParam]):
-    # Clear the current ROI list from the view
-    self._allowableShapes = newAllowedShapes
-    if self._parent is not None:
-      for roi in self.roiForShape.values():
-        self._parent.removeItem(roi)
-    self.roiForShape: Dict[FRParam, Union[pg.ROI, FRExtendedROI]] = {}
-    for shape in newAllowedShapes:
-      self.roiForShape[shape] = SHAPE_ROI_MAPPING[shape]()
-    self.addRoisToView(self._parent)
-
-
-
-
+    self._curShape = newShape
 
 def makeMultiRegionDf(numRows=1, whichCols=None, idList=None) -> df:
   df_list = []

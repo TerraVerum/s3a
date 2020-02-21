@@ -6,7 +6,7 @@ from Annotator.constants import FR_CONSTS
 Slot = QtCore.pyqtSlot
 
 from .graphicsutils import create_addMenuAct
-from .imageareas import MainImageArea, FocusedComp
+from .imageareas import MainImageArea, FocusedImg
 from .tableview import CompTableView
 
 
@@ -32,15 +32,9 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
 
     # Important widgets
     self.mainImg = MainImageArea(centralwidget)
-    self.mainDrawOpts = FRDrawOpts(centralwidget, ALL_DRAW_SHAPES,
-                                   (FR_CONSTS.DRAW_ACT_ADD, FR_CONSTS.DRAW_ACT_SELECT, FR_CONSTS.DRAW_ACT_PAN))
-    # TODO: Implement these options
-    self.mainDrawOpts.shapeBtns[FR_CONSTS.DRAW_SHAPE_FREE].setEnabled(False)
-    self.mainDrawOpts.shapeBtns[FR_CONSTS.DRAW_SHAPE_POLY].setEnabled(False)
-    self.mainDrawOpts.shapeBtns[FR_CONSTS.DRAW_SHAPE_FG_BG].setEnabled(False)
     # Hookup
     self.setCentralWidget(centralwidget)
-    layout.addWidget(self.mainDrawOpts)
+    # layout.addWidget(self.mainImg.drawOptsWidget)
     layout.addWidget(self.mainImg)
 
     # -----
@@ -54,13 +48,7 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     regionBtnLayout = QtWidgets.QHBoxLayout()
 
     # Important widgets
-    self.focusedDrawOpts = FRDrawOpts(centralwidget, ALL_DRAW_SHAPES,
-                                      (FR_CONSTS.DRAW_ACT_ADD, FR_CONSTS.DRAW_ACT_REM, FR_CONSTS.DRAW_ACT_PAN))
-    # TODO: Implement these options
-    for shape in ALL_DRAW_SHAPES:
-      self.focusedDrawOpts.shapeBtns[shape].setEnabled(False)
-    self.focusedDrawOpts.shapeBtns[FR_CONSTS.DRAW_SHAPE_PAINT].setEnabled(True)
-    self.compImg = FocusedComp(focusedImgContents)
+    self.compImg = FocusedImg(focusedImgContents)
     self.curCompIdLbl = QtWidgets.QLabel(self.CUR_COMP_LBL)
     self.clearRegionBtn = QtWidgets.QPushButton('Clear', focusedImgContents)
     self.resetRegionBtn = QtWidgets.QPushButton('Reset', focusedImgContents)
@@ -72,7 +60,7 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     regionBtnLayout.addWidget(self.resetRegionBtn)
     regionBtnLayout.addWidget(self.acceptRegionBtn)
 
-    focusedLayout.addWidget(self.focusedDrawOpts)
+    focusedLayout.addWidget(self.compImg.drawOptsWidget)
     focusedLayout.addWidget(self.curCompIdLbl, 0, QtCore.Qt.AlignHCenter)
     focusedLayout.addWidget(self.compImg)
     focusedLayout.addLayout(regionBtnLayout)

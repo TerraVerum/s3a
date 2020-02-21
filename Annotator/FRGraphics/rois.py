@@ -75,7 +75,7 @@ class FRRectROI(pg.RectROI):
     evType = ev.type()
     if evType == QtCore.QEvent.MouseButtonPress:
       # Need to start a new shape
-      self.setPos(xyEvCoords)
+      self.setPos(xyEvCoords.flatten())
       self.setSize(0)
       self.addScaleHandle([1, 1], [0, 0])
       constructingRoi = True

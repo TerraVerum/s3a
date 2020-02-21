@@ -295,23 +295,6 @@ class Annotator(FRAnnotatorUI):
     self.compImg.regionType = regionType.lower()
 
   # ---------------
-  # COMBO BOX CALLBACKS
-  # ---------------
-  @Slot(int)
-  def addRmComboChanged(self):
-    curTxt = self.addRmCombo.currentText()
-    self.compImg.inAddMode = curTxt == 'Add'
-
-  # @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_TOGGLE_REG_MODE)
-  @Slot(bool)
-  def toggleCompImgMode(self):
-    oldMode = self.compImg.inAddMode
-    self.compImg.inAddMode = not oldMode
-    self.addRmCombo.blockSignals(True)
-    self.addRmCombo.setCurrentIndex(oldMode)
-    self.addRmCombo.blockSignals(False)
-
-  # ---------------
   # CUSTOM UI ELEMENT CALLBACKS
   # ---------------
   @Slot(object)

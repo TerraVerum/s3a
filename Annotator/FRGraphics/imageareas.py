@@ -1,25 +1,26 @@
-from typing import Union, Optional
+from typing import Union, Optional, Tuple
 
 import numpy as np
 import pyqtgraph as pg
 from PIL import Image
 from pandas import DataFrame as df
-from pyqtgraph.Qt import QtCore, QtGui
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from skimage import morphology
 
-from .clickables import DraggableViewBox
-from .parameditors import FR_SINGLETON
-from ..constants import FR_CONSTS, FR_ENUMS
-from ..params import FRImageProcessor
-from ..processing import growBoundarySeeds
 from .clickables import ClickableImageItem
+from .clickables import DraggableViewBox
+from .drawopts import FRDrawOpts
+from .parameditors import FR_SINGLETON
 from .regions import FRVertexRegion, FRShapeCollection
-from ..constants import TEMPLATE_COMP as TC
-from ..processing import segmentComp, getVertsFromBwComps, growSeedpoint
-from Annotator.generalutils import getClippedBbox, nanConcatList, ObjUndoBuffer
+from ..constants import TEMPLATE_COMP as TC, FR_CONSTS, FR_ENUMS
+from ..generalutils import getClippedBbox, nanConcatList, ObjUndoBuffer
+from ..params import FRImageProcessor
+from ..params import FRParam
+from ..processing import segmentComp, getVertsFromBwComps, growSeedpoint, growBoundarySeeds
 from ..tablemodel import makeCompDf
 
 Signal = QtCore.pyqtSignal
+Slot = QtCore.pyqtSlot
 QCursor = QtGui.QCursor
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_REGION_BUF)
@@ -49,8 +50,10 @@ class RegionVertsUndoBuffer(ObjUndoBuffer):
     super().update(newVerts, curPrevAreaDiff > 0.05, overridingUpdateCondtn)
 
 class FREditableImg(pg.PlotWidget):
-  def __init__(self, parent=None, background='default', processor: FRImageProcessor=None, **kargs):
-    super().__init__(parent, background, **kargs)
+  def __init__(self, parent=None, processor: FRImageProcessor=None,
+               allowableShapes: Tuple[FRParam,...]=None, allowableActions: Tuple[FRParam,...]=None,
+               **kargs):
+    super().__init__(parent, **kargs)
     self.setAspectLocked(True)
     self.getViewBox().invertY()
     self.setMouseEnabled(True)
@@ -65,7 +68,15 @@ class FREditableImg(pg.PlotWidget):
     # Overwrite with acceptable
     self.drawAction = FR_CONSTS.DRAW_ACT_PAN
     # Overwrite this with acceptable shapes
-    self.drawShape = FRShapeCollection(parent=self)
+    self.shapeCollection = FRShapeCollection(parent=self, allowableShapes=allowableShapes)
+
+    # Make sure panning is allowed before creating draw widget
+    if FR_CONSTS.DRAW_ACT_PAN not in allowableActions:
+      allowableActions += (FR_CONSTS.DRAW_ACT_PAN,)
+    self.drawOptsWidget = FRDrawOpts(parent, allowableShapes, allowableActions)
+    btnGroups = [self.drawOptsWidget.shapeBtnGroup, self.drawOptsWidget.actionBtnGroup]
+    for group in btnGroups:
+      group.buttonToggled.connect(self._handleBtnToggle)
 
     # -----
     # IMAGE
@@ -74,9 +85,26 @@ class FREditableImg(pg.PlotWidget):
     self.imgItem.setZValue(-100)
     self.addItem(self.imgItem)
 
+  @Slot(QtWidgets.QAbstractButton, bool)
+  def _handleBtnToggle(self, btn: QtWidgets.QPushButton, isChecked: bool):
+    """
+    This function will be called for each button check and corresponding UNCHECK
+    of the previously selected button. So, only listen for the changes of the
+    checked button, since this is the new action/shape
+    :param btn: the toggled QPushButton
+    :param isChecked: Whether the button was checked or unchecked
+    :return: None
+    """
+    if not isChecked: return
+    if btn in self.drawOptsWidget.actionBtnParamMap:
+      self.drawAction = self.drawOptsWidget.actionBtnParamMap[btn]
+    else:
+      # Shape toggle
+      self.shapeCollection.curShape = self.drawOptsWidget.shapeBtnParamMap[btn]
+
   def mousePressEvent(self, ev: QtGui.QMouseEvent):
     if ev.buttons() == QtCore.Qt.LeftButton:
-      self.drawShape.buildRoi(self.imgItem, ev)
+      self.shapeCollection.buildRoi(self.imgItem, ev)
 
     super().mousePressEvent(ev)
 
@@ -84,7 +112,7 @@ class FREditableImg(pg.PlotWidget):
     """
     Mouse move behavior is contingent on which shape is currently selected
     """
-    self.drawShape.buildRoi(self.imgItem, ev)
+    self.shapeCollection.buildRoi(self.imgItem, ev)
     super().mouseMoveEvent(ev)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
@@ -93,7 +121,7 @@ class FREditableImg(pg.PlotWidget):
 
     :return: Whether the mouse release completes the current ROI
     """
-    self.drawShape.buildRoi(self.imgItem, ev)
+    self.shapeCollection.buildRoi(self.imgItem, ev)
 
     super().mouseReleaseEvent(ev)
 
@@ -217,7 +245,7 @@ class MainImageArea(pg.PlotWidget):
     self.imgItem.setImage(imgSrc)
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_FOCUSED_IMG_AREA)
-class FocusedComp(FREditableImg):
+class FocusedImg(FREditableImg):
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_FOCUSED_SEED_THRESH)
   def seedThresh(self): pass
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_MARGIN)
@@ -225,15 +253,20 @@ class FocusedComp(FREditableImg):
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_SEG_THRESH)
   def segThresh(self): pass
 
-  def __init__(self, parent=None):
-    super().__init__(parent)
-    self.inAddMode = True
+  def __init__(self, parent=None, processor: FRImageProcessor = None, **kargs):
+    allowableShapes = (
+      FR_CONSTS.DRAW_SHAPE_RECT, FR_CONSTS.DRAW_SHAPE_POLY, FR_CONSTS.DRAW_SHAPE_PAINT
+    )
+    allowableActions = (
+      FR_CONSTS.DRAW_ACT_ADD, FR_CONSTS.DRAW_ACT_REM
+    )
+    super().__init__(parent, processor, allowableShapes, allowableActions, **kargs)
     self.region = FRVertexRegion()
     self.addItem(self.region)
 
     self.compSer = makeCompDf().squeeze()
 
-    self.bbox = np.zeros((2,2), dtype='int32')
+    self.bbox = np.zeros((2, 2), dtype='int32')
     self.regionBuffer = RegionVertsUndoBuffer()
 
   def updateAll(self, mainImg: np.array, newComp:df):
@@ -241,9 +274,6 @@ class FocusedComp(FREditableImg):
     # Since values INSIDE the dataframe are reset instead of modified, there is no
     # need to go through the trouble of deep copying
     self.compSer = newComp.copy(deep=False)
-    self.drawShape.allowableShapes = {
-      FR_CONSTS.DRAW_SHAPE_PAINT, FR_CONSTS.DRAW_SHAPE_RECT, FR_CONSTS.DRAW_SHAPE_POLY
-    }
 
     # Reset the undo buffer
     self.regionBuffer = RegionVertsUndoBuffer()
@@ -277,7 +307,7 @@ class FocusedComp(FREditableImg):
       offset = self.bbox[0,:]
     if newVerts is None:
       newVerts = np.ones((0,2), dtype=int)
-    # 0-center new vertices relative to FocusedComp image
+    # 0-center new vertices relative to FocusedImg image
     # Make a copy of each list first so we aren't modifying the
     # original data
     centeredVerts = newVerts.copy()
