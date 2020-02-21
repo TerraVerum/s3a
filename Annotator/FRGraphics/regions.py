@@ -66,15 +66,16 @@ class FRVertexRegion(pg.ImageItem):
       lut.append(clr.getRgb())
     return np.array(lut, dtype='uint8')
 
-class FRShapeCollection:
-  def __init__(self, allowableShapes: Set[FRParam]=None, parent: pg.GraphicsView=None):
+class FRShapeCollection(QtCore.QObject):
+  sigShapeFinished = Signal(object)
+  def __init__(self, allowableShapes: Tuple[FRParam,...]=None, parent: pg.GraphicsView=None):
+    super().__init__(parent)
     if allowableShapes is None:
       allowableShapes = set()
     self.shapeVerts = FRVertices()
-    self.shapeFinished = True
     # Make a new graphics item for each roi type
     self.roiForShape: Dict[FRParam, Union[pg.ROI, FRExtendedROI]] = {}
-    self._curShape = FR_CONSTS.DRAW_SHAPE_PAINT
+    self._curShape = allowableShapes[0]
     self._allowableShapes = allowableShapes
     self._parent = parent
 
@@ -113,7 +114,8 @@ class FRShapeCollection:
     xyCoord = FRVertices.createFromArr([[posRelToImg.x(), posRelToImg.y()]])
     curRoi = self.roiForShape[self.curShape]
     constructingRoi, self.shapeVerts = curRoi.updateShape(ev, xyCoord)
-    self.shapeFinished = self.shapeVerts is not None
+    if self.shapeVerts is not None:
+      self.sigShapeFinished.emit(curRoi)
 
     if not constructingRoi:
       # Vertices from the completed shape are already stored, so clean up the shapes.

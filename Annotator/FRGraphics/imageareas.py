@@ -9,6 +9,8 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from skimage import morphology
 
 from Annotator.FRGraphics.clickables import RightPanViewBox
+from Annotator.FRGraphics.rois import FRExtendedROI
+from Annotator.params import FRDrawShape
 from .clickables import ClickableImageItem
 from .clickables import DraggableViewBox
 from .drawopts import FRDrawOpts
@@ -67,9 +69,7 @@ class FREditableImg(pg.PlotWidget):
     # -----
     # DRAWING OPTIONS
     # -----
-    # Overwrite with acceptable
     self.drawAction = FR_CONSTS.DRAW_ACT_PAN
-    # Overwrite this with acceptable shapes
     self.shapeCollection = FRShapeCollection(parent=self, allowableShapes=allowableShapes)
 
     # Make sure panning is allowed before creating draw widget
@@ -132,7 +132,7 @@ class FREditableImg(pg.PlotWidget):
     super().mouseReleaseEvent(ev)
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_MAIN_IMG_AREA)
-class MainImageArea(pg.PlotWidget):
+class MainImageArea(FREditableImg):
   sigComponentCreated = Signal(object)
   # Hooked up during __init__
   sigSelectionBoundsMade = Signal(object)
@@ -145,31 +145,34 @@ class MainImageArea(pg.PlotWidget):
   def mainImgSeedThresh(self): pass
 
 
-  def __init__(self, parent=None, background='default', imgSrc=None, **kargs):
-    super().__init__(parent, background, viewBox=DraggableViewBox(), **kargs)
+  def __init__(self, parent=None, imgSrc=None, **kargs):
+    allowedShapes = (FR_CONSTS.DRAW_SHAPE_RECT, FR_CONSTS.DRAW_SHAPE_POLY)
+    allowedActions = (FR_CONSTS.DRAW_ACT_SELECT,)
+    super().__init__(parent, allowableShapes=allowedShapes,
+                     allowableActions=allowedActions, **kargs)
 
-    self.allowNewComps = True
-
-    self.setAspectLocked(True)
-    self.viewbox: DraggableViewBox = self.getViewBox()
-    self.viewbox.invertY()
-    self.viewbox.sigCreationBoundsMade.connect(self.createCompFromBounds)
-    self.sigSelectionBoundsMade = self.viewbox.sigSelectionBoundsMade
-
+    # self.viewbox.sigCreationBoundsMade.connect(self.createCompFromBounds)
+    # self.sigSelectionBoundsMade = self.viewbox.sigSelectionBoundsMade
+    self.shapeCollection.sigShapeFinished.connect(self._handleShapeFinished)
     # -----
     # Image Item
     # -----
-    self.imgItem = ClickableImageItem()
-    self.imgItem.sigClicked.connect(self.createCompAtClick)
-    # Ensure imgItem is behind plots
-    self.imgItem.setZValue(-100)
     self.setImage(imgSrc)
-    self.addItem(self.imgItem)
 
   # Spoof selection of empty area on escape to deselect components
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DESEL_ALL_BOUNDARIES)
   def deselectAllBoundaries(self):
     self.sigSelectionBoundsMade.emit((-1,-1,-1,-1))
+
+  def _handleShapeFinished(self, roi: FRExtendedROI):
+    if self.drawAction == FR_CONSTS.DRAW_ACT_SELECT \
+        and roi.connected:
+      # Selection
+      self.sigSelectionBoundsMade.emit(self.shapeCollection.shapeVerts)
+    else:
+      # Component modification subject to processor
+      drawShape = FRDrawShape(self.shapeCollection.curShape,self.shapeCollection.shapeVerts)
+      self.processor.localCompEstimate(roi, drawShape)
 
   def createCompFromBounds(self, bounds:tuple):
     # TODO: Make this code more robust
@@ -232,14 +235,6 @@ class MainImageArea(pg.PlotWidget):
   @property
   def image(self):
     return self.imgItem.image
-
-  @property
-  def clickable(self):
-    return self.compImgItem.clickable
-
-  @clickable.setter
-  def clickable(self, newVal):
-    self.compImgItem.clickable = bool(newVal)
 
   def setImage(self, imgSrc: Union[str, np.ndarray]=None):
     """

@@ -2,6 +2,7 @@ import numpy as np
 from pyqtgraph.Qt import QtCore
 
 from Annotator.FRGraphics.parameditors import FR_SINGLETON
+from Annotator.params import FRVertices
 from .FRGraphics import tableview
 from .FRGraphics.imageareas import MainImageArea
 from .FRGraphics.regions import MultiRegionPlot
@@ -114,11 +115,11 @@ class CompDisplayFilter(QtCore.QObject):
     self._regionPlots.selectById(selectedIds)
 
   @Slot(object)
-  def _compPointsSelected(self, selectionBox: tuple):
+  def _compPointsSelected(self, selection: FRVertices):
     """
     :param selectionBox: bounding box of user selection: [xmin ymin xmax ymax]
     """
-    selectedIds = self._regionPlots.idPlts.idsWithin(selectionBox)
+    selectedIds = self._regionPlots.idPlts.idsWithin(selection)
     self.updateCompSelection(selectedIds, scrollTo=len(selectedIds) > 0)
 
   def updateCompSelection(self, selectedIds, scrollTo=True):

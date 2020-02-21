@@ -3,6 +3,8 @@ from pyqtgraph import Point
 from pyqtgraph.GraphicsScene.mouseEvents import MouseDragEvent
 from pyqtgraph.Qt import QtCore, QtGui
 
+from Annotator.params import FRVertices
+
 Signal = QtCore.pyqtSignal
 
 import numpy as np
@@ -41,12 +43,17 @@ class ClickableScatterItem(pg.ScatterPlotItem):
     else:
       self.unsetCursor()
 
-  def idsWithin(self, bbox: tuple):
-    pointLocs = self.getData()
-    tfIsInSelection = (pointLocs[0] >= bbox[0]) \
-      & (pointLocs[0] <= bbox[2]) \
-      & (pointLocs[1] >= bbox[1]) \
-      & (pointLocs[1] <= bbox[3])
+  def idsWithin(self, selection: FRVertices):
+    # TODO: Optimize for rectangular selections
+    polyPoints = [QtCore.QPointF(*row) for row in selection]
+    selectionPoly = QtGui.QPolygonF(polyPoints)
+    pointLocs = np.column_stack(self.getData())
+    # tfIsInSelection = (pointLocs[0] >= bbox[0]) \
+    #   & (pointLocs[0] <= bbox[2]) \
+    #   & (pointLocs[1] >= bbox[1]) \
+    #   & (pointLocs[1] <= bbox[3])
+    tfIsInSelection = np.array([selectionPoly.containsPoint(QtCore.QPointF(*row), QtCore.Qt.WindingFill)
+                                for row in pointLocs], dtype=bool)
     return [point.data() for point in self.points()[tfIsInSelection]]
 
 class ClickableTextItem(pg.TextItem):
