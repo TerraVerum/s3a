@@ -10,7 +10,7 @@ from skimage import morphology
 
 from Annotator.FRGraphics.clickables import RightPanViewBox
 from Annotator.FRGraphics.rois import FRExtendedROI
-from Annotator.params import FRDrawShape
+from Annotator.params import FRDrawShape, FRVertices
 from .clickables import ClickableImageItem
 from .clickables import DraggableViewBox
 from .drawopts import FRDrawOpts
@@ -158,11 +158,6 @@ class MainImageArea(FREditableImg):
     # Image Item
     # -----
     self.setImage(imgSrc)
-
-  # Spoof selection of empty area on escape to deselect components
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DESEL_ALL_BOUNDARIES)
-  def deselectAllBoundaries(self):
-    self.sigSelectionBoundsMade.emit((-1,-1,-1,-1))
 
   def _handleShapeFinished(self, roi: FRExtendedROI):
     if self.drawAction == FR_CONSTS.DRAW_ACT_SELECT \
