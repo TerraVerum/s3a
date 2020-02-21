@@ -20,8 +20,6 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
 
     self.setDockNestingEnabled(True)
 
-    ALL_DRAW_SHAPES = (FR_CONSTS.DRAW_SHAPE_PAINT, FR_CONSTS.DRAW_SHAPE_FREE, FR_CONSTS.DRAW_SHAPE_RECT,
-                       FR_CONSTS.DRAW_SHAPE_POLY, FR_CONSTS.DRAW_SHAPE_FG_BG)
 
     # -----
     # MAIN IMAGE AREA
@@ -34,7 +32,7 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     self.mainImg = MainImageArea(centralwidget)
     # Hookup
     self.setCentralWidget(centralwidget)
-    # layout.addWidget(self.mainImg.drawOptsWidget)
+    layout.addWidget(self.mainImg.drawOptsWidget)
     layout.addWidget(self.mainImg)
 
     # -----

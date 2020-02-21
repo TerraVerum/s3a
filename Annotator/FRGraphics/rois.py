@@ -1,4 +1,4 @@
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from typing import Optional, Callable, Dict
 
 import pyqtgraph as pg
@@ -34,11 +34,7 @@ def _clearPoints(roi: pg.ROI):
 # COLLECTION OF OVERLOADED ROIS THAT KNOW HOW TO UPDATE THEMSELEVES AS NEEDED WITHIN
 # THE ANNOTATOR REGIONS
 # --------
-class FRExtendedROI(pg.ROI):
-  """
-  Purely for specifying the interface provided by the following classes. This is mainly
-  so PyCharm knows what methds and signatures are provided by the ROIs below.
-  """
+class FRROIExtension():
   connected: bool
 
   def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: np.ndarray) -> (bool, Optional[FRVertices]):
@@ -54,11 +50,21 @@ class FRExtendedROI(pg.ROI):
                  `None` is returned instead.
     """
 
-class FRRectROI(pg.RectROI):
+class FRExtendedROI(pg.ROI, FRROIExtension):
+  """
+  Purely for specifying the interface provided by the following classes. This is mainly
+  so PyCharm knows what methds and signatures are provided by the ROIs below.
+  """
+
+  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: np.ndarray) -> (bool, Optional[FRVertices]):
+    pass
+
+
+class FRRectROI(pg.RectROI, FRROIExtension):
   connected = True
 
   def __init__(self):
-    super().__init__([-1,-1], [0,0])
+    super().__init__([-1,-1], [0,0], invertible=True)
 
   def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: np.ndarray) -> (
       bool, Optional[FRVertices]):
@@ -69,7 +75,8 @@ class FRRectROI(pg.RectROI):
     verts = None
     constructingRoi = False
     # If not left click, do nothing
-    if (int(ev.buttons()) & QtCore.Qt.LeftButton) == 0:
+    if (int(ev.buttons()) & QtCore.Qt.LeftButton) == 0 \
+       and ev.button() != QtCore.Qt.LeftButton:
       return constructingRoi, verts
 
     evType = ev.type()
@@ -96,7 +103,7 @@ class FRRectROI(pg.RectROI):
 
     return constructingRoi, verts
 
-class FRPolygonROI(pg.PolyLineROI):
+class FRPolygonROI(pg.PolyLineROI, FRROIExtension):
   connected = True
   constructingRoi = False
 

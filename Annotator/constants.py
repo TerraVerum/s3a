@@ -135,7 +135,7 @@ class _FRConsts(FRParamGroup):
   DRAW_SHAPE_POLY: FRParam = newParam('Polygon')
   DRAW_SHAPE_FREE: FRParam = newParam('Freehand')
   DRAW_SHAPE_PAINT: FRParam = newParam('Paint')
-  DRAW_SHAPE_FG_BG: FRParam = newParam('FG/BG')
+  DRAW_SHAPE_NONE: FRParam = newParam('None')
   # Actions
   DRAW_ACT_ADD: FRParam = newParam('Add')
   DRAW_ACT_REM: FRParam = newParam('Remove')
