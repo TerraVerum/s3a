@@ -16,6 +16,8 @@ from .graphicseval import overlayImgs
 
 def getBwComps(img: np.ndarray, minSz=30):
   bwOut = bwBgMask(img)
+  bwOut = opening(bwOut, np.ones((10,10), dtype=bool))
+  bwOut = closing(bwOut, np.ones((7,7), dtype=bool))
   return rmSmallComps(bwOut, minSz)
 
 def getColorComps(img: np.array, minSiz=None) -> np.ndarray:
