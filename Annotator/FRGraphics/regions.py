@@ -29,26 +29,26 @@ class FRVertexRegion(pg.ImageItem):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
-    self._offset = np.array([0,0], dtype=int)
-    self.verts = [np.zeros((0,2), dtype=int)]
+    self._offset = FRVertices()
+    self.verts = FRVertices()
 
-  def updateVertices(self, newVerts: np.ndarray):
+  def updateVertices(self, newVerts: FRVertices):
     self.verts = newVerts.copy()
 
     if len(newVerts) == 0:
       self.setImage(np.zeros((1,1), dtype='bool'))
       return
-    self._offset = np.nanmin(newVerts, 0)
+    self._offset = newVerts.min()
     newVerts -= self._offset
 
     # cv.fillPoly requires list-of-lists format
-    fillPolyArg = splitListAtNans(newVerts)
-    nonNanVerts = newVerts[np.invert(np.isnan(newVerts[:,0])),:].astype(int)
-    newImgShape = (np.max(newVerts, 0)+1)[::-1]
+    fillPolyArg = splitListAtNans(newVerts.to_numpy())
+    nonNanVerts: pd.Series = newVerts.dropna(0).astype(int)
+    newImgShape = nonNanVerts.max()[::-1] + 1
     regionData = np.zeros(newImgShape, dtype='uint8')
     cv.fillPoly(regionData, fillPolyArg, 1)
     # Make vertices full brightness
-    regionData[nonNanVerts[:,1], nonNanVerts[:,0]] = 2
+    regionData[nonNanVerts.y, nonNanVerts.x] = 2
     self.setImage(regionData, levels=[0,2], lut=self.getLUTFromScheme())
     self.setPos(*self._offset)
 
@@ -93,7 +93,7 @@ class FRShapeCollection(QtCore.QObject):
         roi.hide()
         view.addItem(roi)
 
-  def _clearAllRois(self):
+  def clearAllRois(self):
     for roi in self.roiForShape.values():
       while roi.handles:
         # TODO: Submit bug request in pyqtgraph. removeHandle of ROI takes handle or
@@ -111,7 +111,7 @@ class FRShapeCollection(QtCore.QObject):
     posRelToImg = imgItem.mapFromScene(ev.pos())
     # Form of rate-limiting -- only simulate click if the next pixel is at least one away
     # from the previous pixel location
-    xyCoord = FRVertices.createFromArr([[posRelToImg.x(), posRelToImg.y()]])
+    xyCoord = FRVertices([[posRelToImg.x(), posRelToImg.y()]])
     curRoi = self.roiForShape[self.curShape]
     constructingRoi, self.shapeVerts = curRoi.updateShape(ev, xyCoord)
     if self.shapeVerts is not None:
@@ -135,7 +135,7 @@ class FRShapeCollection(QtCore.QObject):
     """
     # Reset the underlying ROIs for a different shape than we currently are using
     if newShape != self._curShape:
-      self._clearAllRois()
+      self.clearAllRois()
     self._curShape = newShape
 
 def makeMultiRegionDf(numRows=1, whichCols=None, idList=None) -> df:

@@ -1,8 +1,5 @@
 from pyqtgraph.Qt import  QtCore, QtWidgets
 
-from Annotator.FRGraphics.drawopts import FRDrawOpts
-from Annotator.constants import FR_CONSTS
-
 Slot = QtCore.pyqtSlot
 
 from .graphicsutils import create_addMenuAct

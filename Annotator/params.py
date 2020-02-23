@@ -9,6 +9,7 @@ from warnings import warn
 import weakref
 
 import numpy as np
+from pandas import DataFrame
 
 from .exceptions import FRParamParseError, FRIllFormedVertices
 
@@ -111,63 +112,46 @@ def newParam(name, val=None, valType=None, helpText=''):
     valType = re.search('\'.*\'', str(type(val))).group()[1:-1]
   return field(default_factory=lambda: FRParam(name, val, valType, helpText))
 
-class FRVertices(np.ndarray):
 
-  connected: bool = True
+class FRVertices(DataFrame):
 
-  @staticmethod
-  def __new__(cls, shape=None, *args, **kwargs):
-    # Make sure the shape is appropriate for vertices
-    if shape is None:
-      # Default to empty Nx2 array
-      shape = (0, 2)
-    elif len(shape) != 2 or shape[1] != 2:
-      raise FRIllFormedVertices(f"Vertices for FRVertices must be Nx2.\n"
-                                f"Received shape was {shape}")
-    return super().__new__(FRVertices, shape, *args, **kwargs)
-
-  @staticmethod
-  def createFromArr(npArrToCopy: Union[np.ndarray, list]) -> FRVertices:
+  def __init__(self, data=None, connected=True, **kwargs):
     """
-    Construct a FRVertices object from the given numpy array (copy constructor).
-    Using the __init__ of this class instead of directly copy()ing the data ensures the
-    shape of :param:`npArrToCopy` is correct.
-
-    :param npArrToCopy:
-    :return: FRVertices object
+    Overload pandas dataframe and only allow columns conducive for storing shape
+    vertex points
     """
-    if isinstance(npArrToCopy, list):
-      npArrToCopy = np.array(npArrToCopy)
-    outObj = FRVertices(npArrToCopy.shape)
-    outObj[:] = npArrToCopy
-    return outObj
+    columns = ['x', 'y']
+    super().__init__(data, columns=columns, **kwargs)
 
-  @property
-  def x(self): return self[:,[0]]
-  @x.setter
-  def x(self, newX): self[:,0] = newX
+    self.connected = connected
 
-  @property
-  def y(self): return self[:, [1]]
-  @y.setter
-  def y(self, newY): self[:, 1] = newY
+  def asPoint(self) -> np.ndarray:
+    """
+    Treats the current FRVertices object as if it only contained one vertex that can
+    be treated as a point. If that condition holds, this point is returned as a
+    numpy array (x,y)
+    :return: Numpy point (x,y)
+    """
+    if len(self) > 1:
+      raise FRIllFormedVertices(f'Cannot call asPoint on vertex list containing'
+                                f' more than one row. List currently contains {len(self)}'
+                                f' points.')
+    return self.to_numpy().flatten()
+
+  def astype(self, *args, **kwargs):
+    """
+    Preserve type information when type casting
+    """
+    return FRVertices(super().astype(*args, **kwargs))
 
   @property
   def rows(self): return self.y
-  @rows.setter
-  def rows(self, newY): self.y = newY
 
   @property
   def cols(self): return self.x
-  @cols.setter
-  def cols(self, newX): self.x = newX
 
-@dataclass
-class FRDrawShape:
-  type: FRParam
-  points: FRVertices = field(default_factory=FRVertices)
 
-class FREditablePropFunc(ABC):
+class FRProcFunc(ABC):
   sharedProps: FRParamGroup
 
   @abstractmethod
@@ -177,16 +161,11 @@ class FREditablePropFunc(ABC):
 class FRImageProcessor(ABC):
   image: np.ndarray
 
-
-  def localCompEstimate(self, prevCompMask: np.ndarray, drawShape: FRDrawShape) -> np.ndarray:
+  @abstractmethod
+  def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices=None, bgVerts: FRVertices=None) -> \
+      np.ndarray:
     pass
 
-
+  @abstractmethod
   def globalCompEstimate(self) -> np.ndarray:
     pass
-
-
-if __name__ == '__main__':
-    x = np.ones((5,2))
-    t = FRVertices.createFromArr(x)
-    print(t)

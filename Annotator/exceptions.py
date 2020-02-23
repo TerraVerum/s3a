@@ -7,6 +7,3 @@ class FRIllRegisteredPropError(Exception): pass
 class FRParamParseError(Exception): pass
 class FRInvalidROIEvType(Exception): pass
 class FRIllFormedVertices(Exception): pass
-
-from pyqtgraph.Qt import QtWidgets
-class _MainWin(QtWidgets.QMainWindow): pass

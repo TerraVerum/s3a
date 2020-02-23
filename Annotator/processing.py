@@ -13,6 +13,7 @@ from imageprocessing.processing import ABImage
 
 from .generalutils import getClippedBbox
 from .graphicseval import overlayImgs
+from .params import FRVertices
 
 def getBwComps(img: np.ndarray, minSz=30):
   bwOut = bwBgMask(img)
@@ -158,9 +159,9 @@ def rmSmallComps(bwMask: np.ndarray, minSz: int=0) -> np.ndarray:
       bwMask[coords[:, 0], coords[:, 1]] = False
   return bwMask
 
-def growSeedpoint(img: np.array, seeds: np.array, thresh: float, minSz: int=0):
+def growSeedpoint(img: np.array, seeds: FRVertices, thresh: float, minSz: int=0):
   bwOut = np.zeros(img.shape[:2], dtype=bool)
-  for seed in seeds:
+  for seed in seeds.itertuples(index=False):
     for chan in range(img.shape[2]):
       curBwMask = flood(img[...,chan], tuple(seed), tolerance=thresh)
       bwOut |= curBwMask

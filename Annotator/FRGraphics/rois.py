@@ -1,5 +1,5 @@
 from abc import abstractmethod, ABC
-from typing import Optional, Callable, Dict
+from typing import Optional, Callable, Dict, Tuple
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
@@ -35,7 +35,8 @@ def _clearPoints(roi: pg.ROI):
 # THE ANNOTATOR REGIONS
 # --------
 class FRROIExtension():
-  connected: bool
+  connected = True
+  _offset = FRVertices([[0,0]], dtype=int).squeeze()
 
   def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: np.ndarray) -> (bool, Optional[FRVertices]):
     """
@@ -50,6 +51,18 @@ class FRROIExtension():
                  `None` is returned instead.
     """
 
+  @property
+  @abstractmethod
+  def vertices(self): pass
+
+  def embedMaskInImg(self, toEmbedShape: Tuple[int, int]):
+    outImg = np.zeros(toEmbedShape[0:2], dtype=bool)
+    roiSz = np.array(self.size()).astype(int)
+    # Offset is x-y, shape is row-col. So, swap order of offset relative to current axis
+    embedSlices = [slice(self._offset[1-ii], roiSz[ii]+self._offset[1-ii]) for ii in range(2)]
+    outImg[embedSlices[0], embedSlices[1]] = self.renderShapeMask(*roiSz[::-1])
+    return outImg
+
 class FRExtendedROI(pg.ROI, FRROIExtension):
   """
   Purely for specifying the interface provided by the following classes. This is mainly
@@ -58,6 +71,9 @@ class FRExtendedROI(pg.ROI, FRROIExtension):
 
   def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: np.ndarray) -> (bool, Optional[FRVertices]):
     pass
+
+  @property
+  def vertices(self): return
 
 
 class FRRectROI(pg.RectROI, FRROIExtension):
@@ -82,7 +98,7 @@ class FRRectROI(pg.RectROI, FRROIExtension):
     evType = ev.type()
     if evType == QtCore.QEvent.MouseButtonPress:
       # Need to start a new shape
-      self.setPos(xyEvCoords.flatten())
+      self.setPos(xyEvCoords.asPoint())
       self.setSize(0)
       self.addScaleHandle([1, 1], [0, 0])
       constructingRoi = True
@@ -91,7 +107,7 @@ class FRRectROI(pg.RectROI, FRROIExtension):
       constructingRoi = True
     elif evType == QtCore.QEvent.MouseButtonRelease:
       # Done drawing the ROI, complete shape, get vertices
-      verts = self.getVerts()
+      verts = self.vertices
       constructingRoi = False
     else:
       success = False
@@ -102,7 +118,8 @@ class FRRectROI(pg.RectROI, FRROIExtension):
 
     return constructingRoi, verts
 
-  def getVerts(self) -> FRVertices:
+  @property
+  def vertices(self) -> FRVertices:
     origin = np.array([self.pos()])
     sz = np.array([self.size()])
     # Sz will be negative at inverted shape dimensions
@@ -112,7 +129,7 @@ class FRRectROI(pg.RectROI, FRROIExtension):
     otherCorners = [sz * [0, 1], sz * [1, 1], sz * [1, 0]]
 
     verts_np = np.vstack([origin, *(origin + otherCorners)])
-    verts = FRVertices.createFromArr(verts_np)
+    verts = FRVertices(verts_np, connected=self.connected)
     return verts
 
 class FRPolygonROI(pg.PolyLineROI, FRROIExtension):
@@ -138,7 +155,7 @@ class FRPolygonROI(pg.PolyLineROI, FRROIExtension):
       # Start a new shape if this is the first press, or create a new handle of an existing shape
       if not self.constructingRoi:
         # ROI is new
-        self.setPos(xyEvCoords.flatten())
+        self.setPos(xyEvCoords.asPoint())
         self.setPoints([])
       self.addVertex(xyEvCoords)
       self.constructingRoi = True
@@ -147,11 +164,11 @@ class FRPolygonROI(pg.PolyLineROI, FRROIExtension):
       pass
     elif evType == QtCore.QEvent.MouseButtonRelease:
       # Check if the placed point is close enough to the first vertex. If so, the shape is done
-      origin = np.array(self.pos())
-      verts_list = np.array([(h['pos'].x(), h['pos'].y()) for h in self.handles]) + origin
-      if (len(verts_list) > 2) \
-      and np.all(np.abs(verts_list[0] - verts_list[-1]) < 5):
-        verts = FRVertices.createFromArr(verts_list)
+      verts = self.vertices
+      verts_np = verts.to_numpy()
+      if (len(verts_np) > 2) \
+      and np.all(np.abs(verts_np[0] - verts_np[-1]) < 5):
+        verts = FRVertices(verts_np)
         self.constructingRoi = False
       else:
         # Not done constructing shape, indicate this by clearing the returned list
@@ -181,7 +198,18 @@ class FRPolygonROI(pg.PolyLineROI, FRROIExtension):
     if len(self.handles) > 1:
       self.addSegment(self.handles[-2]['item'], self.handles[-1]['item'])
 
+  @property
+  def vertices(self):
+    origin = np.array(self.pos())
+    if len(self.handles) > 0:
+      verts_np = np.array([(h['pos'].x(), h['pos'].y()) for h in self.handles]) + origin
+      return FRVertices(verts_np, connected=self.connected)
+    else:
+      return FRVertices(connected=self.connected)
+
 class FRPaintFillROI(FRPolygonROI):
+
+  connected = False
 
   def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: FRVertices) -> (
       bool, Optional[FRVertices]):

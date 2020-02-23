@@ -2,6 +2,7 @@ import numpy as np
 from pyqtgraph.Qt import QtCore
 
 from Annotator.FRGraphics.parameditors import FR_SINGLETON
+from Annotator.constants import FR_CONSTS
 from Annotator.params import FRVertices
 from .FRGraphics import tableview
 from .FRGraphics.imageareas import MainImageArea
@@ -39,12 +40,13 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
       # If that doesn't work, default to stringified comparison
       return str(leftObj) < str(rightObj)
 
+@FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_TBL)
 class CompDisplayFilter(QtCore.QObject):
   sigCompClicked = Signal(object)
 
   def __init__(self, compMgr: ComponentMgr, mainImg: MainImageArea,
-               compTbl: tableview.CompTableView):
-    super().__init__()
+               compTbl: tableview.CompTableView, parent=None):
+    super().__init__(parent)
     filterEditor = FR_SINGLETON.filter
     self._mainImgArea = mainImg
     self._filter = filterEditor.params.getValues()
@@ -122,6 +124,7 @@ class CompDisplayFilter(QtCore.QObject):
     selectedIds = self._regionPlots.idPlts.idsWithin(selection)
     self.updateCompSelection(selectedIds, scrollTo=len(selectedIds) > 0)
 
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DESEL_ALL_BOUNDARIES, [[]])
   def updateCompSelection(self, selectedIds, scrollTo=True):
     self._compTbl.clearSelection()
     mode = QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows
