@@ -34,9 +34,9 @@ def _clearPoints(roi: pg.ROI):
 # COLLECTION OF OVERLOADED ROIS THAT KNOW HOW TO UPDATE THEMSELEVES AS NEEDED WITHIN
 # THE ANNOTATOR REGIONS
 # --------
-class FRROIExtension():
+class FRROIExtension:
   connected = True
-  _offset = FRVertices([[0,0]], dtype=int).squeeze()
+  # _offset = FRVertices([[0,0]], dtype=int).squeeze()
 
   def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: np.ndarray) -> (bool, Optional[FRVertices]):
     """
@@ -164,8 +164,7 @@ class FRPolygonROI(pg.PolyLineROI, FRROIExtension):
       pass
     elif evType == QtCore.QEvent.MouseButtonRelease:
       # Check if the placed point is close enough to the first vertex. If so, the shape is done
-      verts = self.vertices
-      verts_np = verts.to_numpy()
+      verts_np = self.vertices.to_numpy()
       if (len(verts_np) > 2) \
       and np.all(np.abs(verts_np[0] - verts_np[-1]) < 5):
         verts = FRVertices(verts_np)
