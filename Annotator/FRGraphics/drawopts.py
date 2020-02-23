@@ -2,6 +2,8 @@ from typing import Tuple, Dict
 
 from PyQt5 import QtWidgets, QtGui, QtCore
 
+from bidict import bidict
+
 from Annotator.params import FRParamGroup
 from ..constants import FR_CONSTS
 from ..params import FRParam
@@ -20,10 +22,10 @@ class FRDrawOpts(QtWidgets.QWidget):
     self.setLayout(self.topLayout)
 
     # SHAPES
-    shapeUiGroup, self.shapeBtnGroup, self.shapeBtnParamMap = self._create_addBtnToGroup(shapes)
+    shapeUiGroup, self.shapeBtnGroup, self.shapeBtnParamMap = self._create_addBtnToGroup(shapes, "Shapes")
     self.topLayout.addWidget(shapeUiGroup)
     # ACTIONS
-    actionUiGroup, self.actionBtnGroup, self.actionBtnParamMap = self._create_addBtnToGroup(actions)
+    actionUiGroup, self.actionBtnGroup, self.actionBtnParamMap = self._create_addBtnToGroup(actions, "Actions")
     self.topLayout.addWidget(actionUiGroup)
     self.topLayout.setDirection(self.topLayout.LeftToRight)
     self.horizWidth = self.layout().minimumSize().width()
@@ -36,20 +38,42 @@ class FRDrawOpts(QtWidgets.QWidget):
     super().resizeEvent(ev)
 
     # RESIZE BEHAVIOR
-  def _create_addBtnToGroup(self, whichBtns: FR_CONSTS) \
-      -> Tuple[QtWidgets.QGroupBox, QtWidgets.QButtonGroup, Dict[QtWidgets.QPushButton, FRParam]]:
+  def _create_addBtnToGroup(self, whichBtns: FR_CONSTS, groupTitle: str) \
+      -> Tuple[QtWidgets.QGroupBox, QtWidgets.QButtonGroup, bidict]:
     uiGroup = QtWidgets.QGroupBox(self)
+    uiGroup.setTitle(groupTitle)
     uiLayout = QtWidgets.QHBoxLayout(uiGroup)
     btnGroup = QtWidgets.QButtonGroup(uiGroup)
-    btnDict: Dict[QtWidgets.QPushButton, FRParam] = {}
+    # btnDict: Dict[QtWidgets.QPushButton, FRParam] = {}
+    btnDict = bidict()
     for btnParam in whichBtns: # type: FRParam
       # TODO: Use picture instead of name
-      newBtn = QtWidgets.QPushButton(btnParam.name, uiGroup)
+      if btnParam.value is not None:
+        newBtn = QtWidgets.QPushButton(QtGui.QIcon(btnParam.value), '', uiGroup)
+        newBtn.setToolTip(btnParam.name)
+      else:
+        newBtn = QtWidgets.QPushButton(btnParam.name, uiGroup)
       newBtn.setCheckable(True)
       btnGroup.addButton(newBtn)
       uiLayout.addWidget(newBtn)
       btnDict[newBtn] = btnParam
     return uiGroup, btnGroup, btnDict
+    
+  def selectOpt(self, shapeOrAction: FRParam):
+    """
+    Programmatically selects a shape or action from the existing button group.
+    Whether a shape or action is passed in is inferred from which button group
+    :param:`shapeOrAction` belongs to
+
+    :param shapeOrAction: The button to select
+    :return: None
+    """
+    # TODO: This should probably be more robust
+    if shapeOrAction in self.shapeBtnParamMap.inverse:
+      self.shapeBtnParamMap.inverse[shapeOrAction].setChecked(True)
+    elif shapeOrAction in self.actionBtnParamMap.inverse:
+      self.actionBtnParamMap.inverse[shapeOrAction].setChecked(True)
+  
 
 def _create_addActionsToToolbar(toolbar: QtWidgets.QToolBar, whichBtns: FR_CONSTS) -> QtWidgets.QActionGroup:
   uiGroup = QtWidgets.QGroupBox('Test', toolbar)

@@ -16,10 +16,14 @@ FILTERS_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'Filters', '')
 GEN_PROPS_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'RegionControls', '')
 SHORTCUTS_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'Shortcuts', '')
 CLICK_MODIFIERS_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'Modifiers', '')
+ALG_MAIN_IMG_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'MainImg', '')
+ALG_FOC_IMG_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'FocusedImg', '')
+ICON_DIR = os.path.join(BASE_DIR, 'Icons', '')
 
 # Ensure these directories exist
 for curDir in [SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR,
-               GEN_PROPS_DIR, SHORTCUTS_DIR, CLICK_MODIFIERS_DIR]:
+               GEN_PROPS_DIR, SHORTCUTS_DIR, CLICK_MODIFIERS_DIR,
+               ALG_MAIN_IMG_DIR, ALG_FOC_IMG_DIR]:
   Path(curDir).mkdir(parents=True, exist_ok=True)
 
 
@@ -100,8 +104,10 @@ class _FRConsts(FRParamGroup):
   # --------------------------
   # SHORTCUT PARAMETERS
   # --------------------------
-  SHC_CLEAR_BOUNDARIES      : FRParam = newParam('Clear Boundaries', '', 'shortcut')
-  SHC_ESTIMATE_BOUNDARIES   : FRParam = newParam('Estimate Boundaries', '', 'shortcut')
+  SHC_CLEAR_BOUNDARIES      : FRParam = newParam('Clear Boundaries', 'Ctrl+C', 'shortcut')
+  SHC_ESTIMATE_BOUNDARIES   : FRParam = newParam('Estimate Boundaries', 'Ctrl+E', 'shortcut')
+  SHC_CLEAR_SHAPE_MAIN      : FRParam = newParam('Clear Draw Shape in Main Image', 'Esc', 'shortcut')
+  SHC_CLEAR_SHAPE_FOC       : FRParam = newParam('Clear Draw Shape in Focused Image', 'Esc', 'shortcut')
   SHC_DESEL_ALL_BOUNDARIES  : FRParam = newParam('Deselect All Main Image Boundaries', 'Esc', 'shortcut')
   SHC_TBL_SET_SAME_AS_FIRST : FRParam = newParam('Set Table Rows Same As First', 'Ctrl+D', 'shortcut')
   SHC_TBL_SET_AS            : FRParam = newParam('Set Table Rows As...', 'Ctrl+Shift+D', 'shortcut')
@@ -131,16 +137,16 @@ class _FRConsts(FRParamGroup):
   # DRAWING
   # -------------------
   # Shapes
-  DRAW_SHAPE_RECT: FRParam = newParam('Rect')
-  DRAW_SHAPE_POLY: FRParam = newParam('Polygon')
-  DRAW_SHAPE_FREE: FRParam = newParam('Freehand')
-  DRAW_SHAPE_PAINT: FRParam = newParam('Paint')
-  DRAW_SHAPE_NONE: FRParam = newParam('None')
+  DRAW_SHAPE_RECT : FRParam = newParam('Rectangle', f'{ICON_DIR}rectangle.svg', 'icon')
+  DRAW_SHAPE_POLY : FRParam = newParam('Polygon', f'{ICON_DIR}polygon.svg', 'icon')
+  DRAW_SHAPE_FREE : FRParam = newParam('Freehand')
+  DRAW_SHAPE_PAINT: FRParam = newParam('Paint', f'{ICON_DIR}paint.svg', 'icon')
+  DRAW_SHAPE_NONE : FRParam = newParam('None')
   # Actions
-  DRAW_ACT_ADD: FRParam = newParam('Add')
-  DRAW_ACT_REM: FRParam = newParam('Remove')
-  DRAW_ACT_SELECT: FRParam = newParam('Select')
-  DRAW_ACT_PAN: FRParam = newParam('Pan')
+  DRAW_ACT_ADD    : FRParam = newParam('Add to Foreground', f'{ICON_DIR}foreground.png', 'icon')
+  DRAW_ACT_REM    : FRParam = newParam('Add to Background', f'{ICON_DIR}background.png', 'icon')
+  DRAW_ACT_SELECT : FRParam = newParam('Select', f'{ICON_DIR}select.svg', 'icon')
+  DRAW_ACT_PAN    : FRParam = newParam('Pan', f'{ICON_DIR}pan.svg', 'icon')
 
 FR_CONSTS = _FRConsts()
 

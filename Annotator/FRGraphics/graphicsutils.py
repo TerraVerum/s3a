@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Optional, Union
 
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
@@ -12,7 +13,6 @@ from glob import glob
 from functools import partial
 
 from .. import appInst
-from .. import Annotator
 
 Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
@@ -31,7 +31,7 @@ def disableAppDuringFunc(func):
   @wraps(func)
   def disableApp(*args, **kwargs):
     # Captures 'self' instance
-    mainWin: Annotator = args[0]
+    mainWin = args[0]
     try:
       mainWin.setEnabled(False)
       return func(*args, **kwargs)

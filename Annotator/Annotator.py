@@ -1,31 +1,24 @@
 # -*- coding: utf-8 -*-
 
-import os
+import sys
 from functools import partial
 from os.path import join
-import sys
 from pathlib import Path
 from typing import Callable
 
-import numpy as np
 import pyqtgraph as pg
 from pandas import DataFrame as df
-from pyqtgraph.Qt import QtCore, QtWidgets, QtGui, uic
+from pyqtgraph.Qt import QtCore, QtWidgets
 
-from Annotator.FRGraphics.annotator_ui import FRAnnotatorUI
-from Annotator.constants import FR_CONSTS, BASE_DIR, ANN_AUTH_DIR
-from Annotator.params import FRVertices
-from .FRGraphics.parameditors import ConstParamWidget, TableFilterEditor, FR_SINGLETON
+from .FRGraphics.annotator_ui import FRAnnotatorUI
 from .FRGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc, dialogGetAuthorName
-from .tableviewproxy import CompDisplayFilter, CompSortFilter
+from .FRGraphics.parameditors import ConstParamWidget, FR_SINGLETON
+from .constants import FR_CONSTS, ANN_AUTH_DIR
 from .constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
-from .processing import getBwComps, getVertsFromBwComps, growSeedpoint,\
-  growBoundarySeeds, pcaReduction
-from skimage import morphology
-from Annotator.generalutils import nanConcatList, getClippedBbox
-from .tablemodel import ComponentMgr as ComponentMgr, FR_ENUMS
-from .tablemodel import makeCompDf
+from .processing import getBwComps, getVertsFromBwComps
+from .tablemodel import ComponentMgr as ComponentMgr, FR_ENUMS, makeCompDf
+from .tableviewproxy import CompDisplayFilter, CompSortFilter
 
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal
@@ -43,10 +36,6 @@ class Annotator(FRAnnotatorUI):
 
   def __init__(self, startImgFpath=None):
     super().__init__()
-    # uiPath = os.path.dirname(os.path.abspath(__file__))
-    # uiFile = os.path.join(uiPath, 'imgAnnotator.ui')
-    # baseModule = str(self.__module__).split('.')[0]
-    # uic.loadUi(uiFile, self, baseModule)
 
     self.statBar = QtWidgets.QStatusBar(self)
     self.setStatusBar(self.statBar)
@@ -71,7 +60,8 @@ class Annotator(FRAnnotatorUI):
     # ---------------
     # COMPONENT DISPLAY FILTER
     # ---------------
-    self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl)
+    self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl,
+                                         self)
 
     self.mainImg.imgItem.sigImageChanged.connect(self.clearBoundaries)
     self.compDisplay.sigCompClicked.connect(self.updateCurComp)
@@ -116,7 +106,7 @@ class Annotator(FRAnnotatorUI):
     # Start with docks in default position, hide error if default file doesn't exist
     self.loadLayoutActionTriggered('Default', showError=False)
 
-    self.showMaximized()
+    QtCore.QTimer.singleShot(0, self.showMaximized)
     FR_SINGLETON.annotationAuthor = self.getAuthorName()
     self.statBar.showMessage(FR_SINGLETON.annotationAuthor)
 
@@ -134,11 +124,6 @@ class Annotator(FRAnnotatorUI):
     with open(annFile, 'w') as ofile:
       ofile.write(name)
     return name
-
-  # Spoof selection of empty area on escape to deselect components
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DESEL_ALL_BOUNDARIES)
-  def deselectAllBoundaries(self):
-    self.compDisplay.updateCompSelection([])
 
   # TODO: Move these properties into the class responsible for image processing/etc.
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_EST_BOUNDS_ON_START)
@@ -231,12 +216,14 @@ class Annotator(FRAnnotatorUI):
         errMsg = f'Failed to import components. {type(err)}:\n{err}'
         QtWidgets.QMessageBox().information(self, 'Error During Import', errMsg)
 
-  def genericPopulateMenuOptions(self, objForMenu: ConstParamWidget, winMenu: QtWidgets.QMenu, triggerFn: Callable):
+  @staticmethod
+  def genericPopulateMenuOptions(objForMenu: ConstParamWidget, winMenu: QtWidgets.QMenu, triggerFn: Callable):
     addDirItemsToMenu(winMenu,
                       join(objForMenu.saveDir, f'*.{objForMenu.fileType}'),
                       triggerFn)
 
-  def genericLoadActionTriggered(self, objForMenu: ConstParamWidget, nameToLoad: str):
+  @staticmethod
+  def genericLoadActionTriggered(objForMenu: ConstParamWidget, nameToLoad: str):
     dictFilename = join(objForMenu.saveDir, f'{nameToLoad}.{objForMenu.fileType}')
     loadDict = attemptLoadSettings(dictFilename)
     if loadDict is None:
@@ -286,21 +273,6 @@ class Annotator(FRAnnotatorUI):
     self.compMgr.rmComps()
 
   # ---------------
-  # CHECK BOX CALLBACKS
-  # ---------------
-  @Slot()
-  def allowEditsChkChanged(self):
-    self.compImg.clickable = self.allowEditsChk.isChecked()
-
-  # ---------------
-  # RADIO BUTTON CALLBACKS
-  # ---------------
-  @Slot()
-  def regionTypeChanged(self):
-    regionType = self.regionRadioBtnGroup.checkedButton().text()
-    self.compImg.regionType = regionType.lower()
-
-  # ---------------
   # CUSTOM UI ELEMENT CALLBACKS
   # ---------------
   @Slot(object)
@@ -319,5 +291,4 @@ class Annotator(FRAnnotatorUI):
 if __name__ == '__main__':
   app = pg.mkQApp()
   win = Annotator()
-  win.show()
   app.exec()

@@ -5,17 +5,21 @@ import sys
 from dataclasses import dataclass
 from functools import partial
 from os.path import join
-from typing import Sequence, Union, Callable, Any, Optional
+from typing import Sequence, Union, Callable, Any, Optional, List, Dict
+
+import numpy as np
 
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
 
-from Annotator.exceptions import FRIllRegisteredPropError
-from Annotator.params import FRParam, FRParamGroup
+from Annotator.constants import ALG_MAIN_IMG_DIR, ALG_FOC_IMG_DIR
 from .graphicsutils import dialogSaveToFile
+from .. import appInst
 from ..constants import (
   SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR, CLICK_MODIFIERS_DIR,
   TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES, FR_CONSTS)
+from ..exceptions import FRIllRegisteredPropError
+from ..params import FRParam
 
 Signal = QtCore.pyqtSignal
 
@@ -84,23 +88,23 @@ class ConstParamWidget(QtWidgets.QDialog):
   sigParamStateCreated = Signal(str)
   sigParamStateUpdated = Signal(dict)
 
-  def __init__(self, parent=None, paramDict=None, saveDir='.',
-               saveExt='param', saveDlgName='Save As', createDefaultOutput=True):
+  def __init__(self, parent=None, paramList: List[Dict]=None, saveDir='.',
+               saveExt='param', saveDlgName='Save As'):
     # Place in list so an empty value gets unpacked into super constructor
-    if paramDict is None:
-      paramDict = []
+    if paramList is None:
+      paramList = []
 
     super().__init__(parent)
     self.setWindowTitle('Parameter Editor')
     self.resize(500, 400)
 
-    self.paramsPerClass = {}
-    self.classToParamMapping = {}
+    self.boundFnsPerClass: Dict[str, List[FRBoundFnParams]] = {}
+    self.classToParamMapping: Dict[str, FRParam] = {}
 
     # -----------
     # Construct parameter tree
     # -----------
-    self.params = Parameter(name='Parameters', type='group', children=paramDict)
+    self.params = Parameter(name='Parameters', type='group', children=paramList)
     self.tree = ParameterTree()
     self.tree.setParameters(self.params, showTop=False)
 
@@ -115,13 +119,6 @@ class ConstParamWidget(QtWidgets.QDialog):
     self.fileType = saveExt
     self._saveDlgName = saveDlgName
     self._stateBeforeEdit = self.params.saveState()
-
-    # -----------
-    # Save default state if desired
-    # -----------
-    if createDefaultOutput:
-      with open(join(saveDir, f'Default.{saveExt}'), 'wb') as ofile:
-        pkl.dump(self.params.saveState(), ofile)
 
     # -----------
     # Additional widget buttons
@@ -150,7 +147,7 @@ class ConstParamWidget(QtWidgets.QDialog):
     self.applyBtn.clicked.connect(self.applyBtnClicked)
 
   # Helper method for accessing simple parameter values
-  def __getitem__(self, keys: Union[tuple, FRParam, Sequence]):
+  def __getitem__(self, keys: Union[tuple, FRParam, Sequence[FRParam]]):
     """
     Convenience function for accessing child parameters within a parameter editor.
       - If :param:`keys` is a single :class:`FRParam`, the value at that parameter is
@@ -286,11 +283,11 @@ class ConstParamWidget(QtWidgets.QDialog):
     return registerMethodDecorator
 
   def _addParamToList(self, clsName: str, param: Union[FRParam, FRBoundFnParams]):
-    clsParams = self.paramsPerClass.get(clsName, [])
+    clsParams = self.boundFnsPerClass.get(clsName, [])
     clsParams.append(param)
-    self.paramsPerClass[clsName] = clsParams
+    self.boundFnsPerClass[clsName] = clsParams
 
-  def registerClass(self, clsParam: FRParam):
+  def registerClass(self, clsParam: FRParam, saveDefault=True):
     """
     Intended for use as a class decorator. Registers a class as able to hold
     customizable shortcuts.
@@ -299,10 +296,12 @@ class ConstParamWidget(QtWidgets.QDialog):
       clsName = cls.__qualname__
       self.addParamsFromClass(clsName, clsParam)
       # Now that class params are registered, save off default file
-      with open(join(self.saveDir, f'Default.{self.fileType}'), 'wb') as ofile:
-        pkl.dump(self.params.saveState(), ofile)
+      if saveDefault:
+        with open(join(self.saveDir, f'Default.{self.fileType}'), 'wb') as ofile:
+          pkl.dump(self.params.saveState(), ofile)
       self.classToParamMapping[clsName] = clsParam
       oldClsInit = cls.__init__
+      self._extendedClassDecorator(cls, clsParam)
       def newClassInit(clsObj, *args, **kwargs):
         retVal = oldClsInit(clsObj, *args, **kwargs)
         self._extendedClassInit(clsObj, clsParam)
@@ -320,6 +319,11 @@ class ConstParamWidget(QtWidgets.QDialog):
     """
     return
 
+  def _extendedClassDecorator(self, cls: Any, clsParam: FRParam):
+    """
+    Editors needing additional class decorator boilerplates will place it in this overloaded function
+    """
+
   def addParamsFromClass(self, clsName, clsParam: FRParam):
     """
     Once the top-level widget is set, we can construct the
@@ -334,7 +338,7 @@ class ConstParamWidget(QtWidgets.QDialog):
 
     :return: None
     """
-    classParamList = self.paramsPerClass.get(clsName, [])
+    classParamList = self.boundFnsPerClass.get(clsName, [])
     # Don't add a category unless at least one list element is present
     if len(classParamList) == 0: return
     # If a human-readable name was given, replace class name with human name
@@ -346,14 +350,26 @@ class ConstParamWidget(QtWidgets.QDialog):
                        'type': boundFn.param.valType,
                        'value': boundFn.param.value}
       paramChildren.append(paramForTree)
-    self.params.addChild(paramGroup)
+    # If this group already exists, append the children to the existing group
+    # instead of adding a new child
+    paramExists = False
+    existingParamIdx = None
+    for ii, param in enumerate(self.params.childs):
+      if param.name() == clsParam.name:
+        paramExists = True
+        existingParamIdx = ii
+        break
+    if paramExists:
+      self.params.childs[ii].addChildren(paramChildren)
+    else:
+      self.params.addChild(paramGroup)
     # Make sure all new names are properly displayed
     self.tree.resizeColumnToContents(0)
     self._stateBeforeEdit = self.params.saveState()
 
 class GeneralPropertiesEditor(ConstParamWidget):
   def __init__(self, parent=None):
-    super().__init__(parent, paramDict=[], saveDir=GEN_PROPS_DIR, saveExt='regctrl')
+    super().__init__(parent, paramList=[], saveDir=GEN_PROPS_DIR, saveExt='regctrl')
 
 class ClickModifiersEditor(ConstParamWidget):
   def __init__(self, parent=None):
@@ -377,7 +393,7 @@ class TableFilterEditor(ConstParamWidget):
         {'name': TC.DEV_TEXT.name, 'type': 'str', 'value': '.*'},
         {'name': TC.VERTICES.name, 'type': 'group', 'children': xyVerts}
       ]
-    super().__init__(parent, paramDict=_FILTER_DICT, saveDir=FILTERS_DIR, saveExt='filter')
+    super().__init__(parent, paramList=_FILTER_DICT, saveDir=FILTERS_DIR, saveExt='filter')
 
 class ShortcutsEditor(ConstParamWidget):
 
@@ -390,10 +406,20 @@ class ShortcutsEditor(ConstParamWidget):
 
   def _extendedClassInit(self, clsObj: Any, clsParam: FRParam):
     clsName = type(clsObj).__qualname__
-    boundParamList = self.paramsPerClass.get(clsName, [])
+    boundParamList = self.boundFnsPerClass.get(clsName, [])
     for boundParam in boundParamList:
+      appInst.topLevelWidgets()
       seqCopy = QtGui.QKeySequence(boundParam.param.value)
-      shortcut = FREditableShortcut(seqCopy, clsObj)
+      # If the registered class is not a graphical widget, the shortcut
+      # needs a global context
+      allWidgets = appInst.topLevelWidgets()
+      isGlobalWidget = [isinstance(o, QtWidgets.QMainWindow) for o in allWidgets]
+      mainWin = allWidgets[np.argmax(isGlobalWidget)]
+
+      try:
+        shortcut = FREditableShortcut(seqCopy, clsObj)
+      except TypeError:
+        shortcut = FREditableShortcut(seqCopy, mainWin)
       shortcut.paramIdx = (clsParam, boundParam.param)
       shortcut.activated.connect(partial(boundParam.func, clsObj, *boundParam.defaultFnArgs))
       shortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
@@ -410,36 +436,95 @@ class ShortcutsEditor(ConstParamWidget):
       shortcut.setKey(self[shortcut.paramIdx])
     super().applyBtnClicked()
 
+class AlgorithmPropertiesEditor(ConstParamWidget):
+  def __init__(self, saveDir, algMgr: ConstParamWidget, parent=None):
+    self.algMgr = algMgr
+    super().__init__(parent, saveDir=saveDir, saveExt='alg')
+    algOptDict = {
+      'name': 'Algorithm', 'type': 'list', 'values': [], 'value': 'N/A'
+    }
+    self.treeAlgOpts: Parameter = Parameter(name='Algorithm Selection', type='group', children=[algOptDict])
+    self.algOpts = self.treeAlgOpts.children()[0]
+    # Since constructor forces self.params to be top level item, we need to reconstruct
+    # the tree to avoid this
+    self.tree.setParameters(self.algOpts, showTop=False)
+    self.tree.addParameters(self.params, showTop=False)
+    # self.params.addChild(self.algOpts)
+    self.algOpts.sigValueChanged.connect(self.setupNewAlg)
+
+  def setupNewAlg(self, _param: Parameter, newAlgName: FRParam):
+    # Copy from opts intead of directly accessing the parameter to avoid
+    # overwriting the values in the original manager
+    newChildren: list = self.algMgr.params.child(newAlgName).opts['children']
+    self.params.clearChildren()
+    self.params = Parameter(name='Parameters', type='group',
+                            children=newChildren)
+    # self.params.addChild(self.algOpts)
+    # self.params.addChildren(newChildren)
+    self.tree.addParameters(self.params, showTop=False)
+
+class AlgPropsMgr(ConstParamWidget):
+
+  def __init__(self, parent=None):
+    super().__init__(parent, saveExt='', saveDir='')
+    self.algPropEditors = [AlgorithmPropertiesEditor(ALG_FOC_IMG_DIR, self),
+                           AlgorithmPropertiesEditor(ALG_MAIN_IMG_DIR, self)]
+
+  def registerClass(self, clsParam: FRParam, saveDefault=False):
+    # Don't save a default file for this class
+    return super().registerClass(clsParam, saveDefault)
+
+  def _extendedClassDecorator(self, cls: Any, clsParam: FRParam):
+    # When an algorithm is added to the manager, attach dropdown options
+    # to each class using editable algorithms
+    for editor in self.algPropEditors:  # type: AlgorithmPropertiesEditor
+      newLimits = editor.algOpts.opts.get('limits', []) + [clsParam.name]
+      editor.algOpts.setLimits(newLimits)
+      editor.algOpts.setDefault(newLimits[0])
+
+
 
 class SchemeEditor(ConstParamWidget):
   def __init__(self, parent=None):
-    super().__init__(parent, paramDict=[], saveDir=SCHEMES_DIR,
-                     saveExt='scheme')
+    super().__init__(parent, paramList=[], saveDir=SCHEMES_DIR, saveExt='scheme')
 
 class _FRSingleton:
+  algParamMgr_ = AlgPropsMgr()
+
   shortcuts = ShortcutsEditor()
   scheme = SchemeEditor()
   generalProps = GeneralPropertiesEditor()
   filter = TableFilterEditor()
   clickModifiers = ClickModifiersEditor()
+  focusedImageAlg = algParamMgr_.algPropEditors[0]
+  mainImageAlg = algParamMgr_.algPropEditors[1]
 
   annotationAuthor = None
 
   def __init__(self):
+    # editors = []
+    # editorNames = []
     # Code retrieved from https://stackoverflow.com/a/20214464/9463643
-    editors = []
-    editorNames = []
-    for prop in dir(self):
-      propObj = getattr(self, prop)
-      if isinstance(propObj, ConstParamWidget):
-        editors.append(propObj)
-        # Strip 'editor', space at capital letter
-        propClsName = type(propObj).__name__
-        name = propClsName[:propClsName.index('Editor')]
-        name = re.sub(r'(\w)([A-Z])', r'\1 \2', name)
-        editorNames.append(name)
-    self.editors = editors
-    self.editorNames = editorNames
+    # for prop in dir(self):
+    #   propObj = getattr(self, prop)
+    #   if isinstance(propObj, ConstParamWidget) \
+    #       and prop[-1] != '_':
+    #     editors.append(propObj)
+    #     # Strip 'editor', space at capital letter
+    #     propClsName = type(propObj).__name__
+    #     name = propClsName[:propClsName.index('Editor')]
+    #     name = re.sub(r'(\w)([A-Z])', r'\1 \2', name)
+    #     editorNames.append(name)
+    # self.editors = editors
+    # self.editorNames = editorNames
+    self.editors = [
+      self.scheme, self.shortcuts, self.generalProps, self.filter,
+      self.clickModifiers, self.focusedImageAlg, self.mainImageAlg
+    ]
+    self.editorNames = [
+      'Scheme', 'Shortcuts', 'General Properties', 'Filter',
+      'Click Modifiers', 'Focused Image Algorithms', 'Main Image Algorithms'
+    ]
 
   def registerClass(self, clsParam: FRParam):
     def multiEditorClsDecorator(cls):

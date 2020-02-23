@@ -10,7 +10,8 @@ from skimage import morphology
 
 from Annotator.FRGraphics.clickables import RightPanViewBox
 from Annotator.FRGraphics.rois import FRExtendedROI
-from Annotator.params import FRDrawShape, FRVertices
+from Annotator.interfaceimpls import RegionGrow
+from Annotator.params import FRVertices
 from .clickables import ClickableImageItem
 from .clickables import DraggableViewBox
 from .drawopts import FRDrawOpts
@@ -62,14 +63,23 @@ class FREditableImg(pg.PlotWidget):
     self.getViewBox().invertY()
     self.setMouseEnabled(True)
 
+    # -----
+    # IMAGE
+    # -----
+    self.imgItem = pg.ImageItem()
+    self.imgItem.setZValue(-100)
+    self.addItem(self.imgItem)
+
+
     if processor is None:
-      processor = FRImageProcessor()
+      processor = RegionGrow()
+    processor.image = self.imgItem.image
     self.processor = processor
 
     # -----
     # DRAWING OPTIONS
     # -----
-    self.drawAction = FR_CONSTS.DRAW_ACT_PAN
+    self.drawAction: FRParam = FR_CONSTS.DRAW_ACT_PAN
     self.shapeCollection = FRShapeCollection(parent=self, allowableShapes=allowableShapes)
 
     # Make sure panning is allowed before creating draw widget
@@ -79,13 +89,8 @@ class FREditableImg(pg.PlotWidget):
     btnGroups = [self.drawOptsWidget.shapeBtnGroup, self.drawOptsWidget.actionBtnGroup]
     for group in btnGroups:
       group.buttonToggled.connect(self._handleBtnToggle)
-
-    # -----
-    # IMAGE
-    # -----
-    self.imgItem = pg.ImageItem()
-    self.imgItem.setZValue(-100)
-    self.addItem(self.imgItem)
+    self.drawOptsWidget.selectOpt(self.drawAction)
+    self.drawOptsWidget.selectOpt(self.shapeCollection.curShape)
 
   @Slot(QtWidgets.QAbstractButton, bool)
   def _handleBtnToggle(self, btn: QtWidgets.QPushButton, isChecked: bool):
@@ -131,6 +136,9 @@ class FREditableImg(pg.PlotWidget):
 
     super().mouseReleaseEvent(ev)
 
+  def clearCurDrawShape(self):
+    self.shapeCollection.clearAllRois()
+
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_MAIN_IMG_AREA)
 class MainImageArea(FREditableImg):
   sigComponentCreated = Signal(object)
@@ -147,7 +155,7 @@ class MainImageArea(FREditableImg):
 
   def __init__(self, parent=None, imgSrc=None, **kargs):
     allowedShapes = (FR_CONSTS.DRAW_SHAPE_RECT, FR_CONSTS.DRAW_SHAPE_POLY)
-    allowedActions = (FR_CONSTS.DRAW_ACT_SELECT,)
+    allowedActions = (FR_CONSTS.DRAW_ACT_SELECT,FR_CONSTS.DRAW_ACT_ADD)
     super().__init__(parent, allowableShapes=allowedShapes,
                      allowableActions=allowedActions, **kargs)
 
@@ -164,10 +172,27 @@ class MainImageArea(FREditableImg):
         and roi.connected:
       # Selection
       self.sigSelectionBoundsMade.emit(self.shapeCollection.shapeVerts)
-    else:
+    elif self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
       # Component modification subject to processor
-      drawShape = FRDrawShape(self.shapeCollection.curShape,self.shapeCollection.shapeVerts)
-      self.processor.localCompEstimate(roi, drawShape)
+      prevComp = np.zeros(self.image.shape[0:2], dtype=bool)
+      fgBgVerts = [None, None]
+      if self.drawAction == FR_CONSTS.DRAW_ACT_ADD:
+        # Assume user selected foreground
+        fgBgVerts[0] = self.shapeCollection.shapeVerts
+      elif self.drawAction == FR_CONSTS.DRAW_ACT_REM:
+        fgBgVerts[1] = self.shapeCollection.shapeVerts
+      newVerts = self.processor.localCompEstimate(prevComp, *fgBgVerts)
+      if len(newVerts) == 0: return
+        # TODO: Determine more robust solution for separated vertices. For now use largest component
+      elif len(newVerts) > 1:
+        lens = np.array([len(v) for v in newVerts])
+        newVerts = np.array(newVerts)[lens == lens.max()]
+      newComp = makeCompDf(1)
+      newComp[TC.VERTICES] = newVerts
+      # newComp[TC.VERTICES] = [newVerts]
+      self.sigComponentCreated.emit(newComp)
+      return newComp
+
 
   def createCompFromBounds(self, bounds:tuple):
     # TODO: Make this code more robust
@@ -239,6 +264,11 @@ class MainImageArea(FREditableImg):
       imgSrc = np.array(Image.open(imgSrc))
 
     self.imgItem.setImage(imgSrc)
+    self.processor.image = imgSrc
+
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_CLEAR_SHAPE_MAIN)
+  def clearCurDrawShape(self):
+    super().clearCurDrawShape()
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_FOCUSED_IMG_AREA)
 class FocusedImg(FREditableImg):
@@ -277,7 +307,7 @@ class FocusedImg(FREditableImg):
     # Propagate all resultant changes
     self.updateBbox(mainImg.shape, newVerts)
     self.updateCompImg(mainImg)
-    self.updateRegionFromVerts(newVerts)
+    self.updateRegionFromVerts(FRVertices(newVerts))
     self.autoRange()
 
   def updateBbox(self, mainImgShape, newVerts: np.ndarray):
@@ -297,12 +327,12 @@ class FocusedImg(FREditableImg):
     segImg = segmentComp(newCompImg, self.segThresh)
     self.imgItem.setImage(segImg)
 
-  def updateRegionFromVerts(self, newVerts, offset=None):
+  def updateRegionFromVerts(self, newVerts: FRVertices, offset=None):
     # Component vertices are nan-separated regions
     if offset is None:
       offset = self.bbox[0,:]
     if newVerts is None:
-      newVerts = np.ones((0,2), dtype=int)
+      newVerts = FRVertices(dtype=int)
     # 0-center new vertices relative to FocusedImg image
     # Make a copy of each list first so we aren't modifying the
     # original data
@@ -335,6 +365,10 @@ class FocusedImg(FREditableImg):
     elif undoOrRedo == FR_ENUMS.BUFFER_REDO:
       self.updateRegionFromVerts(self.regionBuffer.redo_getObj(), [0, 0])
 
+  def clearCurDrawShape(self):
+    super().clearCurDrawShape()
+
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_CLEAR_SHAPE_FOC)
   def saveNewVerts(self):
     # Add in offset from main image to FRVertexRegion vertices
     self.compSer.loc[TC.VERTICES] = self.region.verts + self.bbox[0,:]
