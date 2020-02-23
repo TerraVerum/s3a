@@ -132,7 +132,8 @@ class FREditableImg(pg.PlotWidget):
     :return: Whether the mouse release completes the current ROI
     """
     # if ev.buttons() == QtCore.Qt.LeftButton:
-    self.shapeCollection.buildRoi(self.imgItem, ev)
+    if self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
+      self.shapeCollection.buildRoi(self.imgItem, ev)
 
     super().mouseReleaseEvent(ev)
 

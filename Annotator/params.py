@@ -11,7 +11,9 @@ import weakref
 import numpy as np
 from pandas import DataFrame
 
-from .exceptions import FRParamParseError, FRIllFormedVertices
+# from Annotator.exceptions import FRParamParseError, FRIllFormedVertices
+class FRParamParseError(Exception): pass
+class FRIllFormedVertices(Exception): pass
 
 @dataclass
 class FRParam:
@@ -115,15 +117,30 @@ def newParam(name, val=None, valType=None, helpText=''):
 
 class FRVertices(DataFrame):
 
-  def __init__(self, data=None, connected=True, **kwargs):
+  _metadata = ['connected']
+
+  def __init__(self, *args, **kwargs):
     """
     Overload pandas dataframe and only allow columns conducive for storing shape
     vertex points
     """
-    columns = ['x', 'y']
-    super().__init__(data, columns=columns, **kwargs)
+    self.connected = kwargs.pop('connected', True)
+    columns = {'columns': ['x', 'y']}
+    kwargs.update(columns)
+    super().__init__(*args, **kwargs)
 
-    self.connected = connected
+  @property
+  def _constructor(self):
+    """
+    This black magic is required for pandas subclassing so that dataframes retain
+    subclass information after math operations
+    """
+    def f(*args, **kwargs):
+      tmp = DataFrame(*args, **kwargs)
+      df = FRVertices(tmp.values).__finalize__(self)
+      return df
+
+    return f
 
   def asPoint(self) -> np.ndarray:
     """
@@ -150,6 +167,27 @@ class FRVertices(DataFrame):
   @property
   def cols(self): return self.x
 
+# class FRVertices(np.ndarray):
+#   connected = True
+#   def __new__(cls, shape=None, connected=True, **kwargs):
+#     if shape is None:
+#       shape = (0,2)
+#     arr = super().__new__(cls, shape, dtype=[('x', 'f4'), ('y', 'f4')], **kwargs)
+#     arr.connected = connected
+#     return arr
+#
+#   def __array_finalize__(self, obj):
+#     shape = self.shape
+#     shapeLen = len(shape)
+#     # indicates point, so the one dimension must have only 2 elements
+#     if 1 < shapeLen < 2 and shape[0] != 2:
+#       raise FRIllFormedVertices(f'A one-dimensional vertex array must be shape (2,).'
+#                                 f' Receieved array of shape {shape}')
+#     elif shapeLen > 2 or shapeLen > 1 and shape[1] != 2:
+#       raise FRIllFormedVertices(f'Vertex list must be Nx2. Received shape {shape}.')
+#     if obj is None: return
+#     super().__array_finalize__(obj)
+
 
 class FRProcFunc(ABC):
   sharedProps: FRParamGroup
@@ -159,7 +197,6 @@ class FRProcFunc(ABC):
     pass
 
 class FRImageProcessor(ABC):
-  image: np.ndarray
 
   @abstractmethod
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices=None, bgVerts: FRVertices=None) -> \
