@@ -1,6 +1,6 @@
 from typing import Tuple, Dict
 
-from PyQt5 import QtWidgets, QtGui, QtCore
+from pyqtgraph.Qt import QtWidgets, QtGui, QtCore
 
 from bidict import bidict
 

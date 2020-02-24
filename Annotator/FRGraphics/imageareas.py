@@ -10,6 +10,7 @@ from skimage import morphology
 
 from Annotator.FRGraphics.clickables import RightPanViewBox
 from Annotator.FRGraphics.rois import FRExtendedROI
+from Annotator.generalutils import splitListAtNans
 from Annotator.interfaceimpls import RegionGrow
 from Annotator.params import FRVertices
 from .clickables import ClickableImageItem
@@ -99,9 +100,6 @@ class FREditableImg(pg.PlotWidget):
     Overloaded in child classes to process new regions
     """
     newVerts = self.processor.localCompEstimate(prevComp, *fgBgVerts)
-    if len(newVerts) > 1:
-      lens = np.array([len(v) for v in newVerts])
-      newVerts = newVerts[np.argmax(lens)]
     return newVerts
 
   @Slot(QtWidgets.QAbstractButton, bool)
@@ -189,11 +187,9 @@ class MainImageArea(FREditableImg):
       newVerts = super().handleShapeFinished(roi, fgBgVerts, prevComp)
       if len(newVerts) == 0:
         return
-      elif not isinstance(newVerts, list):
-        newVerts = [newVerts]
       # TODO: Determine more robust solution for separated vertices. For now use largest component
       newComp = makeCompDf(1)
-      newComp[TC.VERTICES] = newVerts
+      newComp[TC.VERTICES] = [newVerts]
       self.sigComponentCreated.emit(newComp)
 
   @property
@@ -256,7 +252,7 @@ class FocusedImg(FREditableImg):
 
     newVerts = super().handleShapeFinished(roi, fgBgVerts, prevComp)
     if len(newVerts) > 0:
-      self.region.updateVertices(newVerts[0])
+      self.region.updateVertices(newVerts)
 
   def updateAll(self, mainImg: np.array, newComp:df):
     newVerts = newComp[TC.VERTICES].squeeze()

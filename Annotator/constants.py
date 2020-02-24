@@ -9,22 +9,24 @@ import numpy as np
 from Annotator.params import FRParam, FRParamGroup, newParam
 
 BASE_DIR = os.path.dirname(Path(__file__).absolute())
-ANN_AUTH_DIR = os.path.join(BASE_DIR, 'MenuOpts', '')
-SCHEMES_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'Schemes', '')
-LAYOUTS_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'Layouts', '')
-FILTERS_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'Filters', '')
-GEN_PROPS_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'RegionControls', '')
-SHORTCUTS_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'Shortcuts', '')
-CLICK_MODIFIERS_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'Modifiers', '')
-ALG_MAIN_IMG_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'MainImg', '')
-ALG_FOC_IMG_DIR = os.path.join(BASE_DIR, 'MenuOpts', 'FocusedImg', '')
+MENU_OPTS_DIR = os.path.join(BASE_DIR, 'MenuOpts', '')
 ICON_DIR = os.path.join(BASE_DIR, 'Icons', '')
+ANN_AUTH_DIR = os.path.join(MENU_OPTS_DIR)
+
+# -----
+# EDITORS
+# -----
+SCHEMES_DIR = os.path.join(MENU_OPTS_DIR, 'Schemes', '')
+LAYOUTS_DIR = os.path.join(MENU_OPTS_DIR, 'Layouts', '')
+FILTERS_DIR = os.path.join(MENU_OPTS_DIR, 'Filters', '')
+GEN_PROPS_DIR = os.path.join(MENU_OPTS_DIR, 'RegionControls', '')
+SHORTCUTS_DIR = os.path.join(MENU_OPTS_DIR, 'Shortcuts', '')
+CLICK_MODIFIERS_DIR = os.path.join(MENU_OPTS_DIR, 'Modifiers', '')
 
 # Ensure these directories exist
-for curDir in [SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR,
-               GEN_PROPS_DIR, SHORTCUTS_DIR, CLICK_MODIFIERS_DIR,
-               ALG_MAIN_IMG_DIR, ALG_FOC_IMG_DIR]:
-  Path(curDir).mkdir(parents=True, exist_ok=True)
+# for curDir in [SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR,
+#                GEN_PROPS_DIR, SHORTCUTS_DIR, CLICK_MODIFIERS_DIR,]:
+#   Path(curDir).mkdir(parents=True, exist_ok=True)
 
 
 @dataclass
