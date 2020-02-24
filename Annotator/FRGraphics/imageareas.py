@@ -1,4 +1,4 @@
-from typing import Union, Optional, Tuple
+from typing import Union, Optional, Tuple, List
 
 import numpy as np
 import pyqtgraph as pg
@@ -82,6 +82,7 @@ class FREditableImg(pg.PlotWidget):
     # -----
     self.drawAction: FRParam = FR_CONSTS.DRAW_ACT_PAN
     self.shapeCollection = FRShapeCollection(parent=self, allowableShapes=allowableShapes)
+    self.shapeCollection.sigShapeFinished.connect(self.handleShapeFinished)
 
     # Make sure panning is allowed before creating draw widget
     if FR_CONSTS.DRAW_ACT_PAN not in allowableActions:
@@ -92,6 +93,16 @@ class FREditableImg(pg.PlotWidget):
       group.buttonToggled.connect(self._handleBtnToggle)
     self.drawOptsWidget.selectOpt(self.drawAction)
     self.drawOptsWidget.selectOpt(self.shapeCollection.curShape)
+
+  def handleShapeFinished(self, roi: FRExtendedROI, fgBgVerts: List[FRVertices]=None, prevComp=None):
+    """
+    Overloaded in child classes to process new regions
+    """
+    newVerts = self.processor.localCompEstimate(prevComp, *fgBgVerts)
+    if len(newVerts) > 1:
+      lens = np.array([len(v) for v in newVerts])
+      newVerts = newVerts[np.argmax(lens)]
+    return newVerts
 
   @Slot(QtWidgets.QAbstractButton, bool)
   def _handleBtnToggle(self, btn: QtWidgets.QPushButton, isChecked: bool):
@@ -153,15 +164,12 @@ class MainImageArea(FREditableImg):
     super().__init__(parent, allowableShapes=allowedShapes,
                      allowableActions=allowedActions, **kargs)
 
-    # self.viewbox.sigCreationBoundsMade.connect(self.createCompFromBounds)
-    # self.sigSelectionBoundsMade = self.viewbox.sigSelectionBoundsMade
-    self.shapeCollection.sigShapeFinished.connect(self._handleShapeFinished)
     # -----
     # Image Item
     # -----
     self.setImage(imgSrc)
 
-  def _handleShapeFinished(self, roi: FRExtendedROI):
+  def handleShapeFinished(self, roi: FRExtendedROI, fgBgVerts: List[FRVertices]=None, prevComp=None):
     if self.drawAction == FR_CONSTS.DRAW_ACT_SELECT \
         and roi.connected:
       # Selection
@@ -177,20 +185,16 @@ class MainImageArea(FREditableImg):
         fgBgVerts[0] = verts
       else:
         fgBgVerts[1] = verts
-      newVerts = self.processor.localCompEstimate(prevComp, *fgBgVerts)
 
-      if len(newVerts) == 0: return
-        # TODO: Determine more robust solution for separated vertices. For now use largest component
-      elif len(newVerts) > 1:
-        lens = np.array([len(v) for v in newVerts])
-        newVerts = [newVerts[np.argmax(lens)]]
+      newVerts = super().handleShapeFinished(roi, fgBgVerts, prevComp)
+      if len(newVerts) == 0:
+        return
+      elif not isinstance(newVerts, list):
+        newVerts = [newVerts]
+      # TODO: Determine more robust solution for separated vertices. For now use largest component
       newComp = makeCompDf(1)
       newComp[TC.VERTICES] = newVerts
-      # newComp[TC.VERTICES] = [newVerts]
       self.sigComponentCreated.emit(newComp)
-      return newComp
-
-
 
   @property
   def image(self):
@@ -235,6 +239,25 @@ class FocusedImg(FREditableImg):
     self.bbox = np.zeros((2, 2), dtype='int32')
     self.regionBuffer = RegionVertsUndoBuffer()
 
+  def handleShapeFinished(self, roi: FRExtendedROI, fgBgVerts: List[FRVertices]=None, prevComp=None):
+    if self.drawAction == FR_CONSTS.DRAW_ACT_PAN:
+      return
+
+    # Component modification subject to processor
+    prevComp = self.region.embedMaskInImg(self.imgItem.image.shape[0:2])
+    # For now assume a single point indicates foreground where multiple indicate
+    # background selection
+    verts = self.shapeCollection.shapeVerts.astype(int)
+    fgBgVerts = [None, None]
+    if self.drawAction == FR_CONSTS.DRAW_ACT_ADD:
+      fgBgVerts[0] = verts
+    elif self.drawAction == FR_CONSTS.DRAW_ACT_REM:
+      fgBgVerts[1] = verts
+
+    newVerts = super().handleShapeFinished(roi, fgBgVerts, prevComp)
+    if len(newVerts) > 0:
+      self.region.updateVertices(newVerts[0])
+
   def updateAll(self, mainImg: np.array, newComp:df):
     newVerts = newComp[TC.VERTICES].squeeze()
     # Since values INSIDE the dataframe are reset instead of modified, there is no
@@ -266,6 +289,7 @@ class FocusedImg(FREditableImg):
                          :]
     segImg = segmentComp(newCompImg, self.segThresh)
     self.imgItem.setImage(segImg)
+    self.processor.image = segImg
 
   def updateRegionFromVerts(self, newVerts: FRVertices, offset=None):
     # Component vertices are nan-separated regions

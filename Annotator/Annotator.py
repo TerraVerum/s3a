@@ -10,6 +10,7 @@ import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
 
+from Annotator.interfaceimpls import RegionGrow
 from .FRGraphics.annotator_ui import FRAnnotatorUI
 from .FRGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc, dialogGetAuthorName
@@ -46,6 +47,10 @@ class Annotator(FRAnnotatorUI):
     # ---------------
     self.mainImg.sigComponentCreated.connect(self._add_focusComp)
     self.mainImg.setImage(startImgFpath)
+
+    # ---------------
+    # FOCUSED IMAGE
+    # ---------------
 
     # ---------------
     # COMPONENT MANAGER
@@ -261,7 +266,7 @@ class Annotator(FRAnnotatorUI):
   @disableAppDuringFunc
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_ESTIMATE_BOUNDARIES)
   def estimateBoundaries(self):
-    compVertices = getVertsFromBwComps(getBwComps(self.mainImg.image, self.mainImg.minCompSz))
+    compVertices = self.mainImg.processor.globalCompEstimate()
     components = makeCompDf(len(compVertices))
     components[TC.VERTICES] = compVertices
     self.compMgr.addComps(components)
