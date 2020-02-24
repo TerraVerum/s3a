@@ -11,5 +11,4 @@ if appInst is None:
 # Now that the app was created with sys args, populate pg instance
 pg.mkQApp()
 # Change names so they can be labeled on export
-from .Annotator import Annotator
 from .tablemodel import makeCompDf

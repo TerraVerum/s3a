@@ -10,14 +10,12 @@ import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
 
-from Annotator.interfaceimpls import RegionGrow
 from .FRGraphics.annotator_ui import FRAnnotatorUI
 from .FRGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc, dialogGetAuthorName
 from .FRGraphics.parameditors import ConstParamWidget, FR_SINGLETON
 from .constants import FR_CONSTS, ANN_AUTH_DIR
 from .constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
-from .processing import getBwComps, getVertsFromBwComps
 from .tablemodel import ComponentMgr as ComponentMgr, FR_ENUMS, makeCompDf
 from .tableviewproxy import CompDisplayFilter, CompSortFilter
 
@@ -244,7 +242,7 @@ class Annotator(FRAnnotatorUI):
   def clearRegionBtnClicked(self):
     # Reset drawn comp vertices to nothing
     # Only perform action if image currently exists
-    if self.compImg.compImgItem.image is None:
+    if self.compImg.imgItem.image is None:
       return
     self.compImg.updateRegionFromVerts(None)
 

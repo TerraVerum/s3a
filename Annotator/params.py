@@ -169,6 +169,7 @@ def newParam(name, val=None, valType=None, helpText=''):
 
 class FRVertices(np.ndarray):
   connected = True
+
   def __new__(cls, inputArr: Union[list, np.ndarray]=None, connected=True, **kwargs):
     if inputArr is None:
       inputArr = np.zeros((0,2))

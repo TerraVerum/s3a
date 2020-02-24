@@ -160,8 +160,16 @@ def rmSmallComps(bwMask: np.ndarray, minSz: int=0) -> np.ndarray:
   return bwMask
 
 def growSeedpoint(img: np.array, seeds: FRVertices, thresh: float, minSz: int=0):
-  bwOut = np.zeros(img.shape[:2], dtype=bool)
-  seeds = seeds[:, ::-1]
+  shape = np.array(img.shape[0:2])
+  bwOut = np.zeros(shape, dtype=bool)
+  # Turn x-y vertices into row-col seeds
+  seeds = seeds[:, ::-1].astype(int)
+  # Remove seeds that don't fit in the image or are nan
+  seeds = seeds.nonNanEntries()
+  seeds = seeds[np.all(seeds >= 0, 1)]
+  # Compare row-col shape against x-y vertices
+  seeds = seeds[np.all(seeds < shape[None, ::-1], 1)]
+
   for seed in seeds:
     for chan in range(img.shape[2]):
       curBwMask = flood(img[...,chan], tuple(seed), tolerance=thresh)
@@ -324,7 +332,7 @@ def pcaReduction(bwRegion: np.ndarray, numPcaComps:int=2):
 if __name__ == '__main__':
   from PIL import Image
   import pyqtgraph as pg
-  im = np.array(Image.open('../med.tif'))
+  im = np.array(Image.open('../med.png'))
   im = getBwComps(im)
   pg.image(im)
   pg.show()

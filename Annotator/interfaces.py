@@ -36,7 +36,7 @@ class FRVertexDefinedImg:
     if len(newVerts) == 0:
       self.image_np = np.zeros((1, 1), dtype='bool')
       return
-    self._offset = newVerts.min(0)
+    self._offset = newVerts.nonNanEntries().min(0)
     newVerts -= self._offset
 
     # cv.fillPoly requires list-of-lists format

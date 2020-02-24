@@ -1,16 +1,14 @@
+
 from collections import deque
 from typing import Any, Optional
 
 import numpy as np
 
-from Annotator.FRGraphics.parameditors import FR_SINGLETON
-from Annotator.constants import FR_CONSTS
-
-from Annotator.params import FRParamGroup
+from Annotator.params import FRParamGroup, FRVertices
 from pandas import DataFrame as df
 
 
-def nanConcatList(vertList):
+def nanConcatList(vertList) -> FRVertices:
   """
   Utility for concatenating all vertices within a list while adding
   NaN entries between each separate list
@@ -23,10 +21,10 @@ def nanConcatList(vertList):
     allVerts.append(curVerts)
     allVerts.append(nanSep)
   # Take away last nan if it exists
-  if len(allVerts) > 0:
-    allVerts.pop()
-    return np.vstack(allVerts)
-  return np.array([]).reshape(-1,2)
+  # if len(allVerts) > 0:
+  #   allVerts.pop()
+    return FRVertices(np.vstack(allVerts))
+  return FRVertices()
 
 
 def splitListAtNans(concatVerts:np.ndarray):
