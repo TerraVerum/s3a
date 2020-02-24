@@ -1,17 +1,20 @@
 from typing import Tuple, Sequence, Optional, Any, Dict, Union
 
+import cv2 as cv
 import numpy as np
 import pandas as pd
 from pandas import DataFrame as df
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore
 
+from Annotator.FRGraphics.parameditors import FR_SINGLETON
 from Annotator.FRGraphics.rois import SHAPE_ROI_MAPPING, FRExtendedROI
 from Annotator.constants import TEMPLATE_COMP as TC, FR_CONSTS
+from Annotator.interfaces import FRVertexDefinedImg
 from Annotator.params import FRParam, FRVertices
 from .parameditors import FR_SINGLETON
 from .clickables import ClickableScatterItem
-from Annotator.generalutils import coerceDfTypes
+from Annotator.generalutils import coerceDfTypes, splitListAtNans
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
@@ -236,3 +239,29 @@ class MultiRegionPlot(QtCore.QObject):
 
   def drop(self, ids):
     self.data.drop(index=ids, inplace=True)
+
+
+@FR_SINGLETON.registerClass(FR_CONSTS.CLS_VERT_REGION)
+class FRVertexRegion(pg.ImageItem, FRVertexDefinedImg):
+  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_REG_FILL_COLOR)
+  def fillClr(self): pass
+  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_REG_VERT_COLOR)
+  def vertClr(self): pass
+
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+
+    self._offset = FRVertices()
+    self.verts = FRVertices()
+
+  def updateVertices(self, newVerts: FRVertices):
+    super().updateVertices(newVerts)
+    self.setImage(self.image_np, levels=[0,2], lut=self.getLUTFromScheme())
+    self.setPos(*self._offset)
+
+
+  def getLUTFromScheme(self):
+    lut = [(0,0,0,0)]
+    for clr in self.fillClr, self.vertClr:
+      lut.append(clr.getRgb())
+    return np.array(lut, dtype='uint8')
