@@ -11,7 +11,7 @@ from .FRGraphics.parameditors import FR_SINGLETON
 from .generalutils import getClippedBbox
 from Annotator.interfaces import FRImageProcessor
 from .params import FRVertices
-from .processing import getVertsFromBwComps
+from .processing import getVertsFromBwComps, getBwComps
 
 
 @dataclass
@@ -44,11 +44,14 @@ class RegionGrow(FRImageProcessor):
       # If given background points, invert the component and grow the background
       fgVerts = bgVerts
       needsInvert = True
+    fgVerts[fgVerts < 0] = 0
+    shape = prevCompMask.shape[0:2]
+    for idx in range(2):
+      fgVerts[fgVerts[:, idx] > shape[idx], idx] = shape[idx]
     croppedImg, cropOffset = self.getCroppedImg(fgVerts, self.margin)
     if croppedImg.size == 0:
       return prevCompMask
-    offset = fgVerts.min(0).astype(int)
-    centeredFgVerts = fgVerts - cropOffset
+    centeredFgVerts = fgVerts - cropOffset[0:2]
 
     # For small enough shapes, get all boundary pixels instead of just shape vertices
     if fgVerts.connected and np.prod(croppedImg.shape[0:2]) < 50e3:
@@ -66,16 +69,18 @@ class RegionGrow(FRImageProcessor):
 
     if needsInvert:
       newRegion = np.invert(newRegion)
+    prevCompMask[cropOffset[1]:cropOffset[3], cropOffset[0]:cropOffset[2]] |= newRegion
 
       # Remember to account for the vertex offset
-    newVerts = getVertsFromBwComps(newRegion)
-    for vertList in newVerts:
-      vertList += cropOffset
+    newVerts = getVertsFromBwComps(prevCompMask)
+    #for vertList in newVerts:
+      #vertList += cropOffset[0:2]
+    newVerts = [FRVertices(v) for v in newVerts]
     return newVerts
 
 
   def globalCompEstimate(self) -> np.ndarray:
-    return np.zeros(self.image.shape)
+    return  getVertsFromBwComps(getBwComps(self.image, self.minCompSz))
 
   def getCroppedImg(self, verts: FRVertices, margin: int) -> (np.ndarray, np.ndarray):
     verts = verts.astype(int)
@@ -83,4 +88,4 @@ class RegionGrow(FRImageProcessor):
     compCoords = np.vstack([verts.min(0), verts.max(0)])
     compCoords = getClippedBbox(img_np.shape, compCoords, margin).flatten()
     croppedImg = self.image[compCoords[1]:compCoords[3], compCoords[0]:compCoords[2], :]
-    return croppedImg, compCoords[0:2]
+    return croppedImg, compCoords
