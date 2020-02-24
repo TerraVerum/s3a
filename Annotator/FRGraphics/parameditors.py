@@ -44,6 +44,26 @@ def _camelCaseToTitle(name: str) -> str:
     name = re.sub(r'(\w)([A-Z])', r'\1 \2', name)
     return name.title()
 
+def _class_fnNamesFromFnQualname(qualname: str) -> (str, str):
+  """
+  From the fully qualified function name (e.g. module.class.fn), return the function
+  name and class name (module.class, fn).
+  :param qualname: output of fn.__qualname__
+  :return: (clsName, fnName)
+  """
+  lastDotIdx = qualname.find('.')
+  fnName = qualname
+  if lastDotIdx < 0:
+    # This function isn't inside a class, so defer
+    # to the global namespace
+    fnParentClass = 'Global'
+  else:
+    # Get name of class containing this function
+    fnParentClass = qualname[:lastDotIdx]
+    fnName = qualname[lastDotIdx:]
+  return fnParentClass, fnName
+
+
 @dataclass
 class FRShortcutCtorGroup:
   constParam: FRParam
@@ -116,7 +136,9 @@ class ConstParamWidget(QtWidgets.QDialog):
     self.resize(500, 400)
 
     self.boundFnsPerClass: Dict[str, List[FRBoundFnParams]] = {}
-    self.classToParamMapping: Dict[str, FRParam] = {}
+    self.classNameToParamMapping: Dict[str, FRParam] = {}
+    self.classInstToEditorMapping: Dict[Any, ConstParamWidget] = {}
+
 
     # -----------
     # Construct parameter tree
@@ -270,9 +292,10 @@ class ConstParamWidget(QtWidgets.QDialog):
       func, clsName = self.registerMethod(constParam)(func, True)
 
       @property
-      def paramGetter(clsObj):
+      def paramGetter(*args, **kwargs):
         # Use function wrapper instead of directly returning so no errors are thrown when class isn't fully instantiated
-        return self[self.classToParamMapping[clsName], constParam]
+        xpondingEditor = self.classInstToEditorMapping[args[0]]
+        return xpondingEditor[self.classNameToParamMapping[clsName], constParam]
       return paramGetter
     return funcWrapper
 
@@ -287,15 +310,7 @@ class ConstParamWidget(QtWidgets.QDialog):
 
     def registerMethodDecorator(func: Callable, returnClsName=False):
       boundFnParam = FRBoundFnParams(param=constParam, func=func, defaultFnArgs=fnArgs)
-      fullFuncName = func.__qualname__
-      lastDotIdx = fullFuncName.find('.')
-      if lastDotIdx < 0:
-        # This function isn't inside a class, so defer
-        # to the global namespace
-        fnParentClass = 'Global'
-      else:
-        # Get name of class containing this function
-        fnParentClass = fullFuncName[:lastDotIdx]
+      fnParentClass, _ = _class_fnNamesFromFnQualname(func.__qualname__)
 
       self._addParamToList(fnParentClass, boundFnParam)
       if returnClsName:
@@ -322,10 +337,11 @@ class ConstParamWidget(QtWidgets.QDialog):
         Path(self.saveDir).mkdir(parents=True, exist_ok=True)
         with open(join(self.saveDir, f'Default.{self.fileType}'), 'wb') as ofile:
           pkl.dump(self.params.saveState(), ofile)
-      self.classToParamMapping[clsName] = clsParam
+      self.classNameToParamMapping[clsName] = clsParam
       oldClsInit = cls.__init__
-      self._extendedClassDecorator(cls, clsParam)
+      self._extendedClassDecorator(cls, clsParam, **opts)
       def newClassInit(clsObj, *args, **kwargs):
+        self.classInstToEditorMapping[clsObj] = self
         retVal = oldClsInit(clsObj, *args, **kwargs)
         self._extendedClassInit(clsObj, clsParam)
         return retVal
@@ -342,7 +358,7 @@ class ConstParamWidget(QtWidgets.QDialog):
     """
     return
 
-  def _extendedClassDecorator(self, cls: Any, clsParam: FRParam):
+  def _extendedClassDecorator(self, cls: Any, clsParam: FRParam, **opts):
     """
     Editors needing additional class decorator boilerplates will place it in this overloaded function
     """
@@ -460,7 +476,7 @@ class ShortcutsEditor(ConstParamWidget):
     super().applyBtnClicked()
 
 class AlgorithmPropertiesEditor(ConstParamWidget):
-  def __init__(self, saveDir, algMgr: AlgorithmPropertiesEditor, name=None, parent=None):
+  def __init__(self, saveDir, algMgr: AlgPropsMgr, name=None, parent=None):
     self.algMgr = algMgr
     super().__init__(parent, saveDir=saveDir, saveExt='alg', name=name)
     algOptDict = {
@@ -475,19 +491,31 @@ class AlgorithmPropertiesEditor(ConstParamWidget):
     # self.params.addChild(self.algOpts)
     self.algOpts.sigValueChanged.connect(self.changeActiveAlg)
 
-    self.buildParams(algMgr)
+    self.build_attachParams(algMgr)
 
-    self.processor: Optional[FRImageProcessor] = None
+    self.curProcessor: Optional[FRImageProcessor] = None
+    self.processors: List[FRImageProcessor] = []
 
-  def buildParams(self, algMgr: AlgorithmPropertiesEditor):
+  def build_attachParams(self, algMgr: AlgPropsMgr):
     # Step 1: Construct parameter tree
     params = algMgr.params.opts.copy()
     self.params.clearChildren()
     self.params.addChildren(params['children'])
+
     # Step 2: Instantiate all processor algorithms
-    # Step 3: For each instantiated process, hook up accessor functions to self's
-    #         parameter tree
-    # Step 4: Determine the active processor object and assign to self.processor
+    for processorCtor in algMgr.processorCtors:
+      processor = processorCtor()
+      self.processors.append(processor)
+      # Step 3: For each instantiated process, hook up accessor functions to self's
+      #         parameter tree
+      algMgr.classInstToEditorMapping[processor] = self
+
+      procName = type(processor).__qualname__
+      clsName, procName = _class_fnNamesFromFnQualname(procName)
+      procParam = algMgr.classNameToParamMapping[clsName]
+      procBoundFnList = algMgr.boundFnsPerClass[clsName]
+
+    # Step 4: Determine the active processor object
     pass
 
   def changeActiveAlg(self, _param: Parameter, newAlgName: FRParam):
@@ -509,16 +537,14 @@ class AlgPropsMgr(ConstParamWidget):
     #                        AlgorithmPropertiesEditor(ALG_MAIN_IMG_DIR, self)]
     self.algPropEditors: List[AlgorithmPropertiesEditor] = []
     self.processorCtors : List[Callable[[Any,...], FRImageProcessor]] = []
-    self.argsForCtor: Dict[FRParam, list] = {}
 
   def registerClass(self, clsParam: FRParam, **opts):
     # Don't save a default file for this class
-    ctorArgs = opts.get('args', [])
-    self.argsForCtor[clsParam] = ctorArgs
     return super().registerClass(clsParam, saveDefault=False)
 
-  def _extendedClassDecorator(self, cls: Any, clsParam: FRParam):
-    procCtor = partial(cls.__init__, *self.argsForCtor[clsParam])
+  def _extendedClassDecorator(self, cls: Any, clsParam: FRParam, **opts):
+    ctorArgs = opts.get('args', [])
+    procCtor = partial(cls.__init__, *ctorArgs)
     self.processorCtors.append(procCtor)
 
   # def _extendedClassDecorator(self, cls: Any, clsParam: FRParam):
@@ -529,12 +555,14 @@ class AlgPropsMgr(ConstParamWidget):
   #     editor.algOpts.setLimits(newLimits)
   #     editor.algOpts.setDefault(newLimits[0])
 
-  def createProcessorForClass(self, cls) -> FRImageProcessor:
+  def createProcessorForClass(self, cls, ctorArgs: List[Any]=None) -> FRImageProcessor:
+    if ctorArgs is None:
+      ctorArgs = []
     clsName = cls.__name__
     editorDir = join(MENU_OPTS_DIR, clsName)
     newEditor = AlgorithmPropertiesEditor(editorDir, self, name=_camelCaseToTitle(clsName))
     self.algPropEditors.append(newEditor)
-    return newEditor.processor
+    return newEditor.curProcessor
 
 
 
