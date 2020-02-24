@@ -161,7 +161,7 @@ def rmSmallComps(bwMask: np.ndarray, minSz: int=0) -> np.ndarray:
 
 def growSeedpoint(img: np.array, seeds: FRVertices, thresh: float, minSz: int=0):
   bwOut = np.zeros(img.shape[:2], dtype=bool)
-  for seed in seeds.itertuples(index=False):
+  for seed in seeds:
     for chan in range(img.shape[2]):
       curBwMask = flood(img[...,chan], tuple(seed), tolerance=thresh)
       bwOut |= curBwMask

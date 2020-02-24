@@ -164,10 +164,10 @@ class FRPolygonROI(pg.PolyLineROI, FRROIExtension):
       pass
     elif evType == QtCore.QEvent.MouseButtonRelease:
       # Check if the placed point is close enough to the first vertex. If so, the shape is done
-      verts_np = self.vertices.to_numpy()
-      if (len(verts_np) > 2) \
-      and np.all(np.abs(verts_np[0] - verts_np[-1]) < 5):
-        verts = FRVertices(verts_np)
+      vertsToCheck = self.vertices
+      if (len(vertsToCheck) > 2) \
+      and np.all(np.abs(vertsToCheck[0] - vertsToCheck[-1]) < 5):
+        verts = vertsToCheck
         self.constructingRoi = False
       else:
         # Not done constructing shape, indicate this by clearing the returned list
