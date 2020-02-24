@@ -19,7 +19,8 @@ from .parameditors import FR_SINGLETON
 from .regions import FRShapeCollection
 from ..constants import TEMPLATE_COMP as TC, FR_CONSTS, FR_ENUMS
 from ..generalutils import getClippedBbox, nanConcatList, ObjUndoBuffer
-from Annotator.interfaces import FRImageProcessor, FRVertexRegion
+from Annotator.interfaces import FRImageProcessor
+from Annotator.FRGraphics.regions import FRVertexRegion
 from ..params import FRParam
 from ..processing import segmentComp, getVertsFromBwComps, growSeedpoint, growBoundarySeeds
 from ..tablemodel import makeCompDf
@@ -146,14 +147,6 @@ class MainImageArea(FREditableImg):
   # Hooked up during __init__
   sigSelectionBoundsMade = Signal(object)
 
-  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_NEW_COMP_SZ)
-  def newCompSz(self): pass
-  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_MIN_COMP_SZ)
-  def minCompSz(self): pass
-  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_MAIN_IMG_SEED_THRESH)
-  def mainImgSeedThresh(self): pass
-
-
   def __init__(self, parent=None, imgSrc=None, **kargs):
     allowedShapes = (FR_CONSTS.DRAW_SHAPE_RECT, FR_CONSTS.DRAW_SHAPE_POLY)
     allowedActions = (FR_CONSTS.DRAW_ACT_SELECT,FR_CONSTS.DRAW_ACT_ADD)
@@ -176,18 +169,21 @@ class MainImageArea(FREditableImg):
     elif self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
       # Component modification subject to processor
       prevComp = np.zeros(self.image.shape[0:2], dtype=bool)
+      # For now assume a single point indicates foreground where multiple indicate
+      # background selection
+      verts = self.shapeCollection.shapeVerts.astype(int)
       fgBgVerts = [None, None]
-      if self.drawAction == FR_CONSTS.DRAW_ACT_ADD:
-        # Assume user selected foreground
-        fgBgVerts[0] = self.shapeCollection.shapeVerts
-      elif self.drawAction == FR_CONSTS.DRAW_ACT_REM:
-        fgBgVerts[1] = self.shapeCollection.shapeVerts
+      if np.all(verts - verts[0] == 0):
+        fgBgVerts[0] = verts
+      else:
+        fgBgVerts[1] = verts
       newVerts = self.processor.localCompEstimate(prevComp, *fgBgVerts)
+
       if len(newVerts) == 0: return
         # TODO: Determine more robust solution for separated vertices. For now use largest component
       elif len(newVerts) > 1:
         lens = np.array([len(v) for v in newVerts])
-        newVerts = np.array(newVerts)[lens == lens.max()]
+        newVerts = [newVerts[np.argmax(lens)]]
       newComp = makeCompDf(1)
       newComp[TC.VERTICES] = newVerts
       # newComp[TC.VERTICES] = [newVerts]
@@ -195,63 +191,6 @@ class MainImageArea(FREditableImg):
       return newComp
 
 
-  def createCompFromBounds(self, bounds:tuple):
-    # TODO: Make this code more robust
-    img_np = self.image
-    compCoords = np.reshape(bounds, (2, 2)).astype(int)
-    compCoords = getClippedBbox(img_np.shape, compCoords, 0).flatten()
-    croppedImg = self.image[compCoords[1]:compCoords[3], compCoords[0]:compCoords[2], :]
-    if croppedImg.size == 0: return
-    # Performance for using all bounds is prohibitive for large components
-    # TODO: Find a better method of determining whether to use all bounds
-    if np.prod(croppedImg.shape[0:2]) > 25e3:
-      shouldUseAllBounds = False
-    else:
-      shouldUseAllBounds = True
-    newRegion = growBoundarySeeds(croppedImg, self.mainImgSeedThresh, self.minCompSz, useAllBounds=shouldUseAllBounds)
-    newRegion = morphology.opening(newRegion, morphology.square(3))
-
-    newVerts = getVertsFromBwComps(newRegion)
-    # Remember to account for the vertex offset
-    if len(newVerts) == 0: return
-    # TODO: Determine more robust solution for separated vertices. For now use largest component
-    elif len(newVerts) > 1:
-      lens = np.array([len(v) for v in newVerts])
-      newVerts = np.array(newVerts)[lens == lens.max()]
-    newVerts[0] += compCoords[0:2].reshape(1, 2)
-    newComp = makeCompDf(1)
-    newComp[TC.VERTICES] = newVerts
-    # newComp[TC.VERTICES] = [newVerts]
-    self.sigComponentCreated.emit(newComp)
-    return newComp
-
-  def createCompAtClick(self, xyCoord: tuple):
-    """
-    Forms a box with a center at the clicked location, and passes the box
-    edges as vertices for a new component.
-    """
-    vertBox = np.vstack((xyCoord, xyCoord))
-    vertBox = getClippedBbox(self.image.shape, vertBox, self.newCompSz)
-    miniImg = self.image[
-      vertBox[0,1]:vertBox[1,1], vertBox[0,0]:vertBox[1,0],:
-    ]
-    # Account for mini img offset and x-y -> row-col
-    xyCoord = xyCoord[::-1]
-    xyCoord -= vertBox[0,:]
-    bwCompMask = growSeedpoint(miniImg, xyCoord, self.mainImgSeedThresh, self.minCompSz)
-
-    compVerts = getVertsFromBwComps(bwCompMask)
-    if len(compVerts) == 0:
-      return
-    # Turn list-of-lists into plottable, nan-separated vertices
-    # Reverse for row-col -> x-y
-    compVerts = nanConcatList(compVerts)
-    # Make sure the vertices are translated to the appropriate coordinates
-    compVerts += vertBox[0,:]
-    newComp = makeCompDf()
-    newComp[TC.VERTICES] = [compVerts]
-    self.sigComponentCreated.emit(newComp)
-    return newComp
 
   @property
   def image(self):

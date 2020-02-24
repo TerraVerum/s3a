@@ -18,9 +18,10 @@ from .processing import getVertsFromBwComps
 class _FRDefaultAlgImpls(FRParamGroup):
   CLS_REGION_GROW : FRParam = newParam('Region Growing')
 
-  PROP_MAIN_IMG_SEED_THRESH: FRParam = newParam('Seedpoint Threshold in Main Image', 10.)
+  PROP_SEED_THRESH: FRParam = newParam('Seedpoint Threshold in Main Image', 10.)
   PROP_MIN_COMP_SZ: FRParam = newParam('Minimum New Component Size (px)', 50)
   PROP_NEW_COMP_SZ: FRParam = newParam('New Component Side Length (px)', 30)
+  PROP_MARGIN     : FRParam = newParam('New Component Margin (px)', 5)
 
 IMPLS = _FRDefaultAlgImpls()
 
@@ -30,9 +31,10 @@ class RegionGrow(FRImageProcessor):
   def newCompSz(self): pass
   @FR_SINGLETON.algParamMgr_.registerProp(IMPLS.PROP_MIN_COMP_SZ)
   def minCompSz(self): pass
-  @FR_SINGLETON.algParamMgr_.registerProp(IMPLS.PROP_MAIN_IMG_SEED_THRESH)
-  def mainImgSeedThresh(self): pass
-
+  @FR_SINGLETON.algParamMgr_.registerProp(IMPLS.PROP_MARGIN)
+  def margin(self): pass
+  @FR_SINGLETON.algParamMgr_.registerProp(IMPLS.PROP_SEED_THRESH)
+  def seedThresh(self): pass
 
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices = None,
                         bgVerts: FRVertices = None) -> np.ndarray:
@@ -42,28 +44,24 @@ class RegionGrow(FRImageProcessor):
       # If given background points, invert the component and grow the background
       fgVerts = bgVerts
       needsInvert = True
-    croppedImg, cropOffset = self.getCroppedImg(fgVerts, self.newCompSz)
+    croppedImg, cropOffset = self.getCroppedImg(fgVerts, self.margin)
     if croppedImg.size == 0:
       return prevCompMask
-    offset = np.array([fgVerts.min(0)], dtype=int)
-    centeredFgVerts = fgVerts - offset
+    offset = fgVerts.min(0).astype(int)
+    centeredFgVerts = fgVerts - cropOffset
 
-    if fgVerts.connected:
+    # For small enough shapes, get all boundary pixels instead of just shape vertices
+    if fgVerts.connected and np.prod(croppedImg.shape[0:2]) < 50e3:
       # Use all vertex points, not just the defined corners
       fillPolyArg = splitListAtNans(centeredFgVerts)
       tmpImg = np.zeros(croppedImg.shape[0:2], dtype='uint8')
       tmpBwShape = cv.fillPoly(tmpImg, fillPolyArg, 1)
-      if np.prod(croppedImg.shape[0:2]) > 25e3:
-        # Performance for using all bounds is prohibitive for large components
-        approxMethod = cv.CHAIN_APPROX_SIMPLE
-      else:
-        approxMethod = cv.CHAIN_APPROX_NONE
-      contours, _ = cv.findContours(tmpBwShape, cv.RETR_EXTERNAL, approxMethod)
+      contours, _ = cv.findContours(tmpBwShape, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_NONE)
       if len(contours) == 0:
         return prevCompMask
       centeredFgVerts = FRVertices(nanConcatList([contours[0][:,0,:]]))
     # TODO: Find a better method of determining whether to use all bounds
-    newRegion = growSeedpoint(croppedImg, centeredFgVerts, self.mainImgSeedThresh, self.minCompSz)
+    newRegion = growSeedpoint(croppedImg, centeredFgVerts, self.seedThresh, self.minCompSz)
     newRegion = morphology.opening(newRegion, morphology.square(3))
 
     if needsInvert:
@@ -72,7 +70,7 @@ class RegionGrow(FRImageProcessor):
       # Remember to account for the vertex offset
     newVerts = getVertsFromBwComps(newRegion)
     for vertList in newVerts:
-      vertList += offset + cropOffset
+      vertList += cropOffset
     return newVerts
 
 
