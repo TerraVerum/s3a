@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
 import pickle as pkl
 import re
 import sys
@@ -459,7 +460,7 @@ class ShortcutsEditor(ConstParamWidget):
     super().applyBtnClicked()
 
 class AlgorithmPropertiesEditor(ConstParamWidget):
-  def __init__(self, saveDir, algMgr: ConstParamWidget, name=None, parent=None):
+  def __init__(self, saveDir, algMgr: AlgorithmPropertiesEditor, name=None, parent=None):
     self.algMgr = algMgr
     super().__init__(parent, saveDir=saveDir, saveExt='alg', name=name)
     algOptDict = {
@@ -472,11 +473,24 @@ class AlgorithmPropertiesEditor(ConstParamWidget):
     self.tree.setParameters(self.algOpts, showTop=False)
     self.tree.addParameters(self.params, showTop=False)
     # self.params.addChild(self.algOpts)
-    self.algOpts.sigValueChanged.connect(self.setupNewAlg)
+    self.algOpts.sigValueChanged.connect(self.changeActiveAlg)
 
-    self.processor: FRImageProcessor = None
+    self.buildParams(algMgr)
 
-  def setupNewAlg(self, _param: Parameter, newAlgName: FRParam):
+    self.processor: Optional[FRImageProcessor] = None
+
+  def buildParams(self, algMgr: AlgorithmPropertiesEditor):
+    # Step 1: Construct parameter tree
+    params = algMgr.params.opts.copy()
+    self.params.clearChildren()
+    self.params.addChildren(params['children'])
+    # Step 2: Instantiate all processor algorithms
+    # Step 3: For each instantiated process, hook up accessor functions to self's
+    #         parameter tree
+    # Step 4: Determine the active processor object and assign to self.processor
+    pass
+
+  def changeActiveAlg(self, _param: Parameter, newAlgName: FRParam):
     # Copy from opts intead of directly accessing the parameter to avoid
     # overwriting the values in the original manager
     newChildren: list = self.algMgr.params.child(newAlgName).opts['children']
