@@ -124,7 +124,7 @@ class CompDisplayFilter(QtCore.QObject):
     selectedIds = self._regionPlots.idPlts.idsWithin(selection)
     self.updateCompSelection(selectedIds, scrollTo=len(selectedIds) > 0)
 
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DESEL_ALL_BOUNDARIES, [[]])
+  # @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DESEL_ALL_BOUNDARIES, [[]])
   def updateCompSelection(self, selectedIds, scrollTo=True):
     self._compTbl.clearSelection()
     mode = QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows
