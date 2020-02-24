@@ -16,10 +16,10 @@ from .clickables import ClickableImageItem
 from .clickables import DraggableViewBox
 from .drawopts import FRDrawOpts
 from .parameditors import FR_SINGLETON
-from .regions import FRVertexRegion, FRShapeCollection
+from .regions import FRShapeCollection
 from ..constants import TEMPLATE_COMP as TC, FR_CONSTS, FR_ENUMS
 from ..generalutils import getClippedBbox, nanConcatList, ObjUndoBuffer
-from ..params import FRImageProcessor
+from Annotator.interfaces import FRImageProcessor, FRVertexRegion
 from ..params import FRParam
 from ..processing import segmentComp, getVertsFromBwComps, growSeedpoint, growBoundarySeeds
 from ..tablemodel import makeCompDf

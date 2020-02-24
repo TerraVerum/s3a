@@ -45,7 +45,7 @@ class ClickableScatterItem(pg.ScatterPlotItem):
 
   def idsWithin(self, selection: FRVertices):
     # TODO: Optimize for rectangular selections
-    polyPoints = [QtCore.QPointF(*row) for row in selection.to_numpy()]
+    polyPoints = [QtCore.QPointF(*row) for row in selection]
     selectionPoly = QtGui.QPolygonF(polyPoints)
     pointLocs = np.column_stack(self.getData())
     # tfIsInSelection = (pointLocs[0] >= bbox[0]) \

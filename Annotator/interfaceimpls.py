@@ -9,7 +9,7 @@ from Annotator.params import FRParamGroup, FRParam, newParam
 from Annotator.processing import growSeedpoint
 from .FRGraphics.parameditors import FR_SINGLETON
 from .generalutils import getClippedBbox
-from .params import FRImageProcessor
+from Annotator.interfaces import FRImageProcessor
 from .params import FRVertices
 from .processing import getVertsFromBwComps
 
@@ -43,12 +43,14 @@ class RegionGrow(FRImageProcessor):
       fgVerts = bgVerts
       needsInvert = True
     croppedImg, cropOffset = self.getCroppedImg(fgVerts, self.newCompSz)
-    offset = np.array([fgVerts.min()], dtype=int)
+    if croppedImg.size == 0:
+      return prevCompMask
+    offset = np.array([fgVerts.min(0)], dtype=int)
     centeredFgVerts = fgVerts - offset
 
     if fgVerts.connected:
       # Use all vertex points, not just the defined corners
-      fillPolyArg = splitListAtNans(centeredFgVerts.to_numpy())
+      fillPolyArg = splitListAtNans(centeredFgVerts)
       tmpImg = np.zeros(croppedImg.shape[0:2], dtype='uint8')
       tmpBwShape = cv.fillPoly(tmpImg, fillPolyArg, 1)
       if np.prod(croppedImg.shape[0:2]) > 25e3:
@@ -57,9 +59,9 @@ class RegionGrow(FRImageProcessor):
       else:
         approxMethod = cv.CHAIN_APPROX_NONE
       contours, _ = cv.findContours(tmpBwShape, cv.RETR_EXTERNAL, approxMethod)
+      if len(contours) == 0:
+        return prevCompMask
       centeredFgVerts = FRVertices(nanConcatList([contours[0][:,0,:]]))
-    if croppedImg.size == 0:
-      return prevCompMask
     # TODO: Find a better method of determining whether to use all bounds
     newRegion = growSeedpoint(croppedImg, centeredFgVerts, self.mainImgSeedThresh, self.minCompSz)
     newRegion = morphology.opening(newRegion, morphology.square(3))
@@ -80,7 +82,7 @@ class RegionGrow(FRImageProcessor):
   def getCroppedImg(self, verts: FRVertices, margin: int) -> (np.ndarray, np.ndarray):
     verts = verts.astype(int)
     img_np = self.image
-    compCoords = np.vstack([verts.min(), verts.max()])
+    compCoords = np.vstack([verts.min(0), verts.max(0)])
     compCoords = getClippedBbox(img_np.shape, compCoords, margin).flatten()
     croppedImg = self.image[compCoords[1]:compCoords[3], compCoords[0]:compCoords[2], :]
     return croppedImg, compCoords[0:2]

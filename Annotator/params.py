@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import re
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields, field
-from functools import partial
 from typing import Any, Optional, Union
 from warnings import warn
 import weakref
@@ -12,6 +10,8 @@ import numpy as np
 from pandas import DataFrame
 
 # from Annotator.exceptions import FRParamParseError, FRIllFormedVertices
+
+
 class FRParamParseError(Exception): pass
 class FRIllFormedVertices(Exception): pass
 
@@ -115,94 +115,111 @@ def newParam(name, val=None, valType=None, helpText=''):
   return field(default_factory=lambda: FRParam(name, val, valType, helpText))
 
 
-class FRVertices(DataFrame):
+# class FRVertices(DataFrame):
+#
+#   _metadata = ['connected']
+#
+#   def __init__(self, *args, **kwargs):
+#     """
+#     Overload pandas dataframe and only allow columns conducive for storing shape
+#     vertex points
+#     """
+#     self.connected = kwargs.pop('connected', True)
+#     columns = {'columns': ['x', 'y']}
+#     kwargs.update(columns)
+#     super().__init__(*args, **kwargs)
+#
+#   @property
+#   def _constructor(self):
+#     """
+#     This black magic is required for pandas subclassing so that dataframes retain
+#     subclass information after math operations
+#     """
+#     def f(*args, **kwargs):
+#       tmp = DataFrame(*args, **kwargs)
+#       df = FRVertices(tmp.values).__finalize__(self)
+#       return df
+#
+#     return f
+#
+#   def asPoint(self) -> np.ndarray:
+#     """
+#     Treats the current FRVertices object as if it only contained one vertex that can
+#     be treated as a point. If that condition holds, this point is returned as a
+#     numpy array (x,y)
+#     :return: Numpy point (x,y)
+#     """
+#     if len(self) > 1:
+#       raise FRIllFormedVertices(f'Cannot call asPoint on vertex list containing'
+#                                 f' more than one row. List currently contains {len(self)}'
+#                                 f' points.')
+#     return self.to_numpy().flatten()
+#
+#   def astype(self, *args, **kwargs):
+#     """
+#     Preserve type information when type casting
+#     """
+#     return FRVertices(super().astype(*args, **kwargs))
+#
+#   @property
+#   def rows(self): return self.y
+#
+#   @property
+#   def cols(self): return self.x
 
-  _metadata = ['connected']
+class FRVertices(np.ndarray):
+  connected = True
+  def __new__(cls, inputArr: Union[list, np.ndarray]=None, connected=True, **kwargs):
+    if inputArr is None:
+      inputArr = np.zeros((0,2))
+    arr = np.asarray(inputArr).view(cls)
+    arr.connected = connected
+    return arr
 
-  def __init__(self, *args, **kwargs):
-    """
-    Overload pandas dataframe and only allow columns conducive for storing shape
-    vertex points
-    """
-    self.connected = kwargs.pop('connected', True)
-    columns = {'columns': ['x', 'y']}
-    kwargs.update(columns)
-    super().__init__(*args, **kwargs)
+  def __array_finalize__(self, obj):
+    shape = self.shape
+    shapeLen = len(shape)
+    # indicates point, so the one dimension must have only 2 elements
+    if 1 < shapeLen < 2 and shape[0] != 2:
+      raise FRIllFormedVertices(f'A one-dimensional vertex array must be shape (2,).'
+                                f' Receieved array of shape {shape}')
+    elif shapeLen > 2 or shapeLen > 1 and shape[1] != 2:
+      raise FRIllFormedVertices(f'Vertex list must be Nx2. Received shape {shape}.')
+    if obj is None: return
+    self.connected = getattr(obj, 'connected', True)
+
+  def asPoint(self):
+    if self.size == 2:
+      return self.flatten()
+    # Reaching here means the user requested vertices as point when
+    # more than one point is in the list
+    raise FRIllFormedVertices(f'asPoint() can only be called when one vertex is in'
+                              f' the vertex list. Currently has shape {self.shape}')
+
+  def nonNanEntries(self):
+    return self[~np.isnan(self[:,0])]
+
 
   @property
-  def _constructor(self):
-    """
-    This black magic is required for pandas subclassing so that dataframes retain
-    subclass information after math operations
-    """
-    def f(*args, **kwargs):
-      tmp = DataFrame(*args, **kwargs)
-      df = FRVertices(tmp.values).__finalize__(self)
-      return df
+  def x(self):
+    # Copy to array first so dimensionality checks are no longer required
+    return np.array(self).reshape(-1,2)[:,[0]]
+  @x.setter
+  def x(self, newX): self.reshape(-1,2)[:,0] = newX
 
-    return f
-
-  def asPoint(self) -> np.ndarray:
-    """
-    Treats the current FRVertices object as if it only contained one vertex that can
-    be treated as a point. If that condition holds, this point is returned as a
-    numpy array (x,y)
-    :return: Numpy point (x,y)
-    """
-    if len(self) > 1:
-      raise FRIllFormedVertices(f'Cannot call asPoint on vertex list containing'
-                                f' more than one row. List currently contains {len(self)}'
-                                f' points.')
-    return self.to_numpy().flatten()
-
-  def astype(self, *args, **kwargs):
-    """
-    Preserve type information when type casting
-    """
-    return FRVertices(super().astype(*args, **kwargs))
+  @property
+  def y(self):
+    return np.array(self).reshape(-1,2)[:,[1]]
+  @y.setter
+  def y(self, newY): self.reshape(-1,2)[:,1] = newY
 
   @property
   def rows(self): return self.y
+  @rows.setter
+  def rows(self, newRows): self.y = newRows
 
   @property
-  def cols(self): return self.x
+  def cols(self):return self.x
+  @cols.setter
+  def cols(self, newCols):self.x = newCols
 
-# class FRVertices(np.ndarray):
-#   connected = True
-#   def __new__(cls, shape=None, connected=True, **kwargs):
-#     if shape is None:
-#       shape = (0,2)
-#     arr = super().__new__(cls, shape, dtype=[('x', 'f4'), ('y', 'f4')], **kwargs)
-#     arr.connected = connected
-#     return arr
-#
-#   def __array_finalize__(self, obj):
-#     shape = self.shape
-#     shapeLen = len(shape)
-#     # indicates point, so the one dimension must have only 2 elements
-#     if 1 < shapeLen < 2 and shape[0] != 2:
-#       raise FRIllFormedVertices(f'A one-dimensional vertex array must be shape (2,).'
-#                                 f' Receieved array of shape {shape}')
-#     elif shapeLen > 2 or shapeLen > 1 and shape[1] != 2:
-#       raise FRIllFormedVertices(f'Vertex list must be Nx2. Received shape {shape}.')
-#     if obj is None: return
-#     super().__array_finalize__(obj)
-
-
-class FRProcFunc(ABC):
-  sharedProps: FRParamGroup
-
-  @abstractmethod
-  def __call__(self, *args, **kwargs):
-    pass
-
-class FRImageProcessor(ABC):
-
-  @abstractmethod
-  def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices=None, bgVerts: FRVertices=None) -> \
-      np.ndarray:
-    pass
-
-  @abstractmethod
-  def globalCompEstimate(self) -> np.ndarray:
-    pass

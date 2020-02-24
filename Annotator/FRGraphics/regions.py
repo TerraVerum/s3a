@@ -1,70 +1,21 @@
-from typing import Tuple, Sequence, Optional, Any, Dict, Callable, Union, Set
+from typing import Tuple, Sequence, Optional, Any, Dict, Union
 
-import cv2 as cv
 import numpy as np
 import pandas as pd
-from dataclasses import dataclass
 from pandas import DataFrame as df
 import pyqtgraph as pg
-from pyqtgraph.GraphicsScene.mouseEvents import MouseDragEvent
-from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
+from pyqtgraph.Qt import QtGui, QtCore
 
 from Annotator.FRGraphics.rois import SHAPE_ROI_MAPPING, FRExtendedROI
 from Annotator.constants import TEMPLATE_COMP as TC, FR_CONSTS
-from Annotator.params import FRParamGroup, FRParam, newParam, FRVertices
+from Annotator.params import FRParam, FRVertices
 from .parameditors import FR_SINGLETON
 from .clickables import ClickableScatterItem
-from Annotator.generalutils import splitListAtNans, coerceDfTypes
+from Annotator.generalutils import coerceDfTypes
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
-@FR_SINGLETON.registerClass(FR_CONSTS.CLS_VERT_REGION)
-class FRVertexRegion(pg.ImageItem):
-  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_REG_FILL_COLOR)
-  def fillClr(self): pass
-  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_REG_VERT_COLOR)
-  def vertClr(self): pass
-
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-
-    self._offset = FRVertices()
-    self.verts = FRVertices()
-
-  def updateVertices(self, newVerts: FRVertices):
-    self.verts = newVerts.copy()
-
-    if len(newVerts) == 0:
-      self.setImage(np.zeros((1,1), dtype='bool'))
-      return
-    self._offset = newVerts.min()
-    newVerts -= self._offset
-
-    # cv.fillPoly requires list-of-lists format
-    fillPolyArg = splitListAtNans(newVerts.to_numpy())
-    nonNanVerts: pd.Series = newVerts.dropna(0).astype(int)
-    newImgShape = nonNanVerts.max()[::-1] + 1
-    regionData = np.zeros(newImgShape, dtype='uint8')
-    cv.fillPoly(regionData, fillPolyArg, 1)
-    # Make vertices full brightness
-    regionData[nonNanVerts.y, nonNanVerts.x] = 2
-    self.setImage(regionData, levels=[0,2], lut=self.getLUTFromScheme())
-    self.setPos(*self._offset)
-
-  def embedMaskInImg(self, toEmbedShape: Tuple[int, int]):
-    outImg = np.zeros(toEmbedShape, dtype=bool)
-    selfShape = self.image.shape
-    # Offset is x-y, shape is row-col. So, swap order of offset relative to current axis
-    embedSlices = [slice(self._offset[1-ii], selfShape[ii]+self._offset[1-ii]) for ii in range(2)]
-    outImg[embedSlices[0], embedSlices[1]] = self.image
-    return outImg
-
-  def getLUTFromScheme(self):
-    lut = [(0,0,0,0)]
-    for clr in self.fillClr, self.vertClr:
-      lut.append(clr.getRgb())
-    return np.array(lut, dtype='uint8')
 
 class FRShapeCollection(QtCore.QObject):
   sigShapeFinished = Signal(object)
