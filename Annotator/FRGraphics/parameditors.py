@@ -141,8 +141,16 @@ class FRParamEditor(QtWidgets.QDialog):
     if paramList is None:
       paramList = []
 
+    if name is None:
+      try:
+        propClsName = type(self).__name__
+        name = propClsName[:propClsName.index('Editor')]
+        name = _camelCaseToTitle(name)
+      except ValueError:
+        name = "Parameter Editor"
+
     super().__init__(parent)
-    self.setWindowTitle('Parameter Editor')
+    self.setWindowTitle(name)
     self.resize(500, 400)
 
     self.boundFnsPerClass: Dict[str, List[FRBoundFnParams]] = {}
@@ -302,11 +310,16 @@ class FRParamEditor(QtWidgets.QDialog):
       func, clsName = self.registerMethod(constParam)(func, True)
 
       @property
-      def paramGetter(*args, **kwargs):
+      def paramAccessor(*args, **kwargs):
         # Use function wrapper instead of directly returning so no errors are thrown when class isn't fully instantiated
         xpondingEditor = self.classInstToEditorMapping[args[0]]
         return xpondingEditor[self.classNameToParamMapping[clsName], constParam]
-      return paramGetter
+      @paramAccessor.setter
+      def paramAccessor(clsObj, newVal):
+        xpondingEditor = self.classInstToEditorMapping[clsObj]
+        param = xpondingEditor[self.classNameToParamMapping[clsName], constParam, True]
+        param.setValue(newVal)
+      return paramAccessor
     return funcWrapper
 
   def registerMethod(self, constParam: FRParam, fnArgs=None):
@@ -353,7 +366,7 @@ class FRParamEditor(QtWidgets.QDialog):
       def newClassInit(clsObj, *args, **kwargs):
         self.classInstToEditorMapping[clsObj] = self
         retVal = oldClsInit(clsObj, *args, **kwargs)
-        
+
         self._extendedClassInit(clsObj, clsParam)
         return retVal
       cls.__init__ = newClassInit
@@ -571,7 +584,7 @@ class AlgPropsMgr(FRParamEditor):
 
   def createProcessorForClass(self, clsObj) -> AlgCollectionEditor:
     clsName = type(clsObj).__name__
-    editorDir = join(MENU_OPTS_DIR, clsName)
+    editorDir = join(MENU_OPTS_DIR, clsName, '')
     newEditor = AlgCollectionEditor(editorDir, self, name=_camelCaseToTitle(clsName))
     FR_SINGLETON.editors.append(newEditor)
     FR_SINGLETON.editorNames.append(newEditor.name)
@@ -599,13 +612,7 @@ class _FRSingleton:
       [self.scheme, self.shortcuts, self.generalProps, self.filter, self.clickModifiers]
     self.editorNames: List[str] = []
     for editor in self.editors:
-      if editor.name is not None:
         self.editorNames.append(editor.name)
-      else:
-        propClsName = type(editor).__name__
-        name = propClsName[:propClsName.index('Editor')]
-        name = _camelCaseToTitle(name)
-        self.editorNames.append(name)
 
   def registerClass(self, clsParam: FRParam):
     def multiEditorClsDecorator(cls):

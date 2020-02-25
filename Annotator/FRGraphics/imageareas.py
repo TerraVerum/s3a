@@ -1,6 +1,7 @@
 from typing import Union, Optional, Tuple, List
 
 import numpy as np
+import cv2 as cv
 import pyqtgraph as pg
 from PIL import Image
 from pandas import DataFrame as df
@@ -8,11 +9,11 @@ from pyqtgraph import Point
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from skimage import morphology
 
-from Annotator.FRGraphics.clickables import RightPanViewBox
-from Annotator.FRGraphics.rois import FRExtendedROI
-from Annotator.generalutils import splitListAtNans, largestList
-from Annotator.interfaceimpls import RegionGrow
-from Annotator.params import FRVertices
+from .clickables import RightPanViewBox
+from .rois import FRExtendedROI
+from ..generalutils import splitListAtNans, largestList
+from ..interfaceimpls import RegionGrow
+from ..params import FRVertices
 from .clickables import ClickableImageItem
 from .clickables import DraggableViewBox
 from .drawopts import FRDrawOpts
@@ -20,8 +21,8 @@ from .parameditors import FR_SINGLETON
 from .regions import FRShapeCollection
 from ..constants import TEMPLATE_COMP as TC, FR_CONSTS, FR_ENUMS
 from ..generalutils import getClippedBbox, nanConcatList, ObjUndoBuffer
-from Annotator.interfaces import FRImageProcessor
-from Annotator.FRGraphics.regions import FRVertexRegion
+from ..interfaces import FRImageProcessor
+from .regions import FRVertexRegion
 from ..params import FRParam
 from ..processing import segmentComp, getVertsFromBwComps, growSeedpoint, growBoundarySeeds
 from ..tablemodel import makeCompDf
@@ -241,6 +242,7 @@ class FocusedImg(FREditableImg):
       fgBgVerts[0] = verts
     elif self.drawAction == FR_CONSTS.DRAW_ACT_REM:
       fgBgVerts[1] = verts
+    # Check for flood fill
 
     newVerts = super().handleShapeFinished(roi, fgBgVerts, prevComp)
     if len(newVerts) > 0:
@@ -291,6 +293,9 @@ class FocusedImg(FREditableImg):
     centeredVerts = newVerts.copy()
     centeredVerts -= offset
     self.region.updateVertices(centeredVerts)
+    bwImg = np.zeros(self.imgItem.image.shape[0:2], dtype='uint8')
+    bwImg = cv.fillPoly(bwImg, splitListAtNans(newVerts), 1).astype(bool)
+    self.regionBuffer.update(centeredVerts, bwImg)
 
   def updateRegionFromBwMask(self, bwImg: np.ndarray):
     vertsPerComp = getVertsFromBwComps(bwImg)

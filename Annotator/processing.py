@@ -13,7 +13,6 @@ from imageprocessing.processing import ABImage
 from typing import List
 
 from .generalutils import getClippedBbox
-from .graphicseval import overlayImgs
 from .params import FRVertices
 
 def getBwComps(img: np.ndarray, minSz=30):
@@ -163,15 +162,15 @@ def growSeedpoint(img: np.array, seeds: FRVertices, thresh: float, minSz: int=0)
   seeds = seeds.nonNanEntries()
   seeds = seeds[np.all(seeds >= 0, 1)]
   # Compare row-col shape against x-y vertices
-  seeds = seeds[np.all(seeds < shape[None, ::-1], 1)]
+  seeds = seeds[np.all(seeds < shape, 1)]
 
   for seed in seeds:
     for chan in range(img.shape[2]):
       curBwMask = flood(img[...,chan], tuple(seed), tolerance=thresh)
       bwOut |= curBwMask
 
-  bwOut = closing(bwOut, np.ones((3,3), dtype=bool))
-  bwOut = rmSmallComps(bwOut, minSz)
+  #bwOut = closing(bwOut, np.ones((3,3), dtype=bool))
+  #bwOut = rmSmallComps(bwOut, minSz)
   return bwOut
 
 def growSeedpoint_cv_fastButErratic(img: np.array, seeds: np.array, thresh: float, minSz: int=0):
