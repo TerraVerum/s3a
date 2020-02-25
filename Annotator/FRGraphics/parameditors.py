@@ -131,7 +131,7 @@ class FRBoundFnParams:
   func: Callable
   defaultFnArgs: list
 
-class ConstParamWidget(QtWidgets.QDialog):
+class FRParamEditor(QtWidgets.QDialog):
   sigParamStateCreated = Signal(str)
   sigParamStateUpdated = Signal(dict)
 
@@ -147,7 +147,7 @@ class ConstParamWidget(QtWidgets.QDialog):
 
     self.boundFnsPerClass: Dict[str, List[FRBoundFnParams]] = {}
     self.classNameToParamMapping: Dict[str, FRParam] = {}
-    self.classInstToEditorMapping: Dict[Any, ConstParamWidget] = {}
+    self.classInstToEditorMapping: Dict[Any, FRParamEditor] = {}
 
 
     # -----------
@@ -353,6 +353,7 @@ class ConstParamWidget(QtWidgets.QDialog):
       def newClassInit(clsObj, *args, **kwargs):
         self.classInstToEditorMapping[clsObj] = self
         retVal = oldClsInit(clsObj, *args, **kwargs)
+        
         self._extendedClassInit(clsObj, clsParam)
         return retVal
       cls.__init__ = newClassInit
@@ -416,15 +417,15 @@ class ConstParamWidget(QtWidgets.QDialog):
     self.tree.resizeColumnToContents(0)
     self._stateBeforeEdit = self.params.saveState()
 
-class GeneralPropertiesEditor(ConstParamWidget):
+class GeneralPropertiesEditor(FRParamEditor):
   def __init__(self, parent=None):
     super().__init__(parent, paramList=[], saveDir=GEN_PROPS_DIR, saveExt='regctrl')
 
-class ClickModifiersEditor(ConstParamWidget):
+class ClickModifiersEditor(FRParamEditor):
   def __init__(self, parent=None):
     super().__init__(parent, saveDir=CLICK_MODIFIERS_DIR, saveExt='modifier')
 
-class TableFilterEditor(ConstParamWidget):
+class TableFilterEditor(FRParamEditor):
   def __init__(self, parent=None):
     minMaxParam = _genList(['min', 'max'], 'int', 0)
     # Make max 'infinity'
@@ -444,7 +445,7 @@ class TableFilterEditor(ConstParamWidget):
       ]
     super().__init__(parent, paramList=_FILTER_DICT, saveDir=FILTERS_DIR, saveExt='filter')
 
-class ShortcutsEditor(ConstParamWidget):
+class ShortcutsEditor(FRParamEditor):
 
   def __init__(self, parent=None):
 
@@ -485,7 +486,7 @@ class ShortcutsEditor(ConstParamWidget):
       shortcut.setKey(self[shortcut.paramIdx])
     super().applyBtnClicked()
 
-class AlgCollectionEditor(ConstParamWidget):
+class AlgCollectionEditor(FRParamEditor):
   def __init__(self, saveDir, algMgr: AlgPropsMgr, name=None, parent=None):
     self.algMgr = algMgr
     super().__init__(parent, saveDir=saveDir, saveExt='alg', name=name)
@@ -553,7 +554,7 @@ class AlgCollectionEditor(ConstParamWidget):
     self.curProcessor = nameProcCombo[1]
     self.curProcessor.image = self.image
 
-class AlgPropsMgr(ConstParamWidget):
+class AlgPropsMgr(FRParamEditor):
 
   def __init__(self, parent=None):
     super().__init__(parent, saveExt='', saveDir='')
@@ -578,7 +579,7 @@ class AlgPropsMgr(ConstParamWidget):
     return newEditor
 
 
-class SchemeEditor(ConstParamWidget):
+class SchemeEditor(FRParamEditor):
   def __init__(self, parent=None):
     super().__init__(parent, paramList=[], saveDir=SCHEMES_DIR, saveExt='scheme')
 
@@ -594,7 +595,7 @@ class _FRSingleton:
   annotationAuthor = None
 
   def __init__(self):
-    self.editors: List[ConstParamWidget] =\
+    self.editors: List[FRParamEditor] =\
       [self.scheme, self.shortcuts, self.generalProps, self.filter, self.clickModifiers]
     self.editorNames: List[str] = []
     for editor in self.editors:

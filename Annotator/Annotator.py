@@ -13,7 +13,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets
 from .FRGraphics.annotator_ui import FRAnnotatorUI
 from .FRGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc, dialogGetAuthorName
-from .FRGraphics.parameditors import ConstParamWidget, FR_SINGLETON
+from .FRGraphics.parameditors import FRParamEditor, FR_SINGLETON
 from .constants import FR_CONSTS, ANN_AUTH_DIR
 from .constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
 from .tablemodel import ComponentMgr as ComponentMgr, FR_ENUMS, makeCompDf
@@ -138,7 +138,7 @@ class Annotator(FRAnnotatorUI):
 
   def createSettingsMenus(self):
     for editor, name in zip(FR_SINGLETON.editors, FR_SINGLETON.editorNames): \
-        #type: ConstParamWidget, str
+        #type: FRParamEditor, str
       menu = QtWidgets.QMenu(name, self)
       editAct = QtWidgets.QAction('Edit ' + name, self)
       menu.addAction(editAct)
@@ -220,13 +220,13 @@ class Annotator(FRAnnotatorUI):
         QtWidgets.QMessageBox().information(self, 'Error During Import', errMsg)
 
   @staticmethod
-  def genericPopulateMenuOptions(objForMenu: ConstParamWidget, winMenu: QtWidgets.QMenu, triggerFn: Callable):
+  def genericPopulateMenuOptions(objForMenu: FRParamEditor, winMenu: QtWidgets.QMenu, triggerFn: Callable):
     addDirItemsToMenu(winMenu,
                       join(objForMenu.saveDir, f'*.{objForMenu.fileType}'),
                       triggerFn)
 
   @staticmethod
-  def genericLoadActionTriggered(objForMenu: ConstParamWidget, nameToLoad: str):
+  def genericLoadActionTriggered(objForMenu: FRParamEditor, nameToLoad: str):
     dictFilename = join(objForMenu.saveDir, f'{nameToLoad}.{objForMenu.fileType}')
     loadDict = attemptLoadSettings(dictFilename)
     if loadDict is None:
