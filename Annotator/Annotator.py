@@ -264,7 +264,7 @@ class Annotator(FRAnnotatorUI):
   @disableAppDuringFunc
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_ESTIMATE_BOUNDARIES)
   def estimateBoundaries(self):
-    compVertices = self.mainImg.processor.globalCompEstimate()
+    compVertices = self.mainImg.procCollection.curProcessor.globalCompEstimate()
     components = makeCompDf(len(compVertices))
     components[TC.VERTICES] = compVertices
     self.compMgr.addComps(components)
