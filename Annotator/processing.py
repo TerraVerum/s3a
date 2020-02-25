@@ -10,6 +10,7 @@ from PIL import Image
 
 from imageprocessing.algorithms import Algorithms as alg
 from imageprocessing.processing import ABImage
+from typing import List
 
 from .generalutils import getClippedBbox
 from .graphicseval import overlayImgs
@@ -112,13 +113,7 @@ def bwBgMask(img: np.array) -> np.array:
   return mask
 
 
-def getVertsFromBwComps(bwmask: np.array, simplifyVerts=True) -> np.array:
-  # First, turn regions into boxes
-  #regions = regionprops(label(bwmask))
-  #for region in regions:
-    #bbox = region.bbox
-    #bwmask[bbox[0]:bbox[2], bbox[1]:bbox[3]] = True
-
+def getVertsFromBwComps(bwmask: np.array, simplifyVerts=True) -> List[FRVertices]:
   approxMethod = cv.CHAIN_APPROX_SIMPLE
   if not simplifyVerts:
     approxMethod = cv.CHAIN_APPROX_NONE
@@ -128,7 +123,7 @@ def getVertsFromBwComps(bwmask: np.array, simplifyVerts=True) -> np.array:
   contours, _ = cv.findContours(bwmask.astype('uint8'), cv.RETR_EXTERNAL, approxMethod)
   compVertices = []
   for contour in contours:
-    compVertices.append(contour[:,0,:])
+    compVertices.append(FRVertices(contour[:,0,:]))
   return compVertices
 
 def segmentComp(compImg: np.array, maxDist: np.float, kernSz=10) -> np.array:

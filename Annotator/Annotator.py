@@ -250,7 +250,7 @@ class Annotator(FRAnnotatorUI):
   def resetRegionBtnClicked(self):
     # Reset drawn comp vertices to nothing
     # Only perform action if image currently exists
-    if self.compImg.compImgItem.image is None:
+    if self.compImg.imgItem.image is None:
       return
     self.compImg.updateRegionFromVerts(self.compImg.compSer[TC.VERTICES].squeeze())
 

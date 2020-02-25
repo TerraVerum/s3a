@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import cv2 as cv
 import pandas as pd
-from typing import Tuple
+from typing import Tuple, List
 
 from Annotator.generalutils import splitListAtNans
 from Annotator.params import FRParamGroup, FRVertices
@@ -54,11 +54,11 @@ class FRImageProcessor(ABC):
 
   @abstractmethod
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices=None, bgVerts: FRVertices=None) -> \
-      np.ndarray:
+      FRVertices:
     pass
 
   @abstractmethod
-  def globalCompEstimate(self) -> np.ndarray:
+  def globalCompEstimate(self) -> List[FRVertices]:
     pass
 
 

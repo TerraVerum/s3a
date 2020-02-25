@@ -1,6 +1,6 @@
 
 from collections import deque
-from typing import Any, Optional
+from typing import Any, Optional, List
 
 import numpy as np
 
@@ -92,6 +92,14 @@ def coerceDfTypes(dataframe: df, constParams: FRParamGroup):
     except TypeError:
       # Coercion isn't possible, nothing to do here
       pass
+
+def largestList(verts: List[FRVertices]) -> FRVertices:
+  maxLenList = []
+  for vertList in verts:
+    if len(vertList) > len(maxLenList): maxLenList = vertList
+  # for vertList in newVerts:
+  # vertList += cropOffset[0:2]
+  return FRVertices(maxLenList)
 
 
 class ObjUndoBuffer:
