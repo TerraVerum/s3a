@@ -25,7 +25,11 @@ class _FRDefaultAlgImpls(FRParamGroup):
   PROP_MIN_COMP_SZ: FRParam = newParam('Minimum New Component Size (px)', 50)
   PROP_NEW_COMP_SZ: FRParam = newParam('New Component Side Length (px)', 30)
   PROP_MARGIN     : FRParam = newParam('New Component Margin (px)', 5)
-  PROP_N_A     : FRParam = newParam('No Editable Properties', None, 'none')
+  PROP_GROW_OUT   : FRParam = newParam('Grow outward', False)
+  PROP_N_A        : FRParam = newParam('No Editable Properties', None, 'none')
+
+  SHC_GROW_OUT    : FRParam = newParam('Grow Outward', 'Ctrl+G,O', 'none')
+  SHC_GROW_IN    : FRParam = newParam('Grow Inward', 'Ctrl+G,I', 'none')
 
 IMPLS = _FRDefaultAlgImpls()
 
@@ -43,11 +47,19 @@ class RegionGrow(FRImageProcessor):
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices = None,
                         bgVerts: FRVertices = None) -> FRVertices:
     # TODO: Make this code more robust
-    needsInvert = False
     if fgVerts is None:
-      # If given background points, invert the component and grow the background
+      # Add to background
+      bitOperation = lambda curRegion, other: curRegion & (~other)
       fgVerts = bgVerts
-      needsInvert = True
+    else:
+      # Add to foreground
+      bitOperation = np.bitwise_or
+    if len(fgVerts) == 1:
+      # Grow outward
+      growFunc = growSeedpoint
+    else:
+      # Grow inward
+      growFunc = lambda *args: ~growSeedpoint(*args)
     croppedImg, cropOffset = self.getCroppedImg(fgVerts, self.margin)
     if croppedImg.size == 0:
       return largestList(getVertsFromBwComps(prevCompMask))
@@ -62,18 +74,31 @@ class RegionGrow(FRImageProcessor):
       centeredFgVerts = nanConcatList(getVertsFromBwComps(tmpBwShape,
                                                           simplifyVerts=False))
 
-    newRegion = ~growSeedpoint(croppedImg, centeredFgVerts, self.seedThresh, self.minCompSz)
-    newRegion = morphology.opening(newRegion, morphology.square(3))
-    if needsInvert:
-      prevCompMask[cropOffset[1]:cropOffset[3], cropOffset[0]:cropOffset[2]] |= (~newRegion)
-    else:
-      prevCompMask[cropOffset[1]:cropOffset[3], cropOffset[0]:cropOffset[2]] |= newRegion
+    newRegion = growFunc(croppedImg, centeredFgVerts, self.seedThresh, self.minCompSz)
+    #newRegion = morphology.opening(newRegion, morphology.square(3))
+    rowColSlices = (slice(cropOffset[1], cropOffset[3]),
+                    slice(cropOffset[0], cropOffset[2]))
+    prevCompMask[rowColSlices] = bitOperation(prevCompMask[rowColSlices], newRegion)
 
     # Remember to account for the vertex offset
     newVerts = getVertsFromBwComps(prevCompMask)
     # TODO: pyqt crashses when sending signal with nan values. Find out why? in the
     #  meantime only use the largest component
     return largestList(newVerts)
+
+  def _getFgArea(self, img: np.ndarray, prevComp: np.ndarray, fgVerts: FRVertices) -> \
+      FRVertices:
+    # x-y list of coordinates in current component
+    compValsAtIdx = prevComp[fgVerts.rows, fgVerts.cols]
+    vertsInComp = fgVerts[compValsAtIdx > 0]
+    vertsOutsideComp = fgVerts[compValsAtIdx < 1]
+
+    insideRegion = growSeedpoint(img, vertsInComp, self.seedThresh, self.minCompSz)
+    outsideRegion = ~growSeedpoint(img, vertsOutsideComp, self.seedThresh, self.minCompSz)
+    return insideRegion | outsideRegion
+
+  def addToBg(self, bgVerts) -> FRVertices:
+    pass
 
 
   def globalCompEstimate(self) -> List[FRVertices]:
