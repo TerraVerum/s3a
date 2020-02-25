@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from functools import partial
 from os.path import join
 from pathlib import Path
-from typing import Sequence, Union, Callable, Any, Optional, List, Dict
+from typing import Sequence, Union, Callable, Any, Optional, List, Dict, Tuple
 
 import numpy as np
 from asn1crypto.core import Any
@@ -113,6 +113,16 @@ class ShortcutParameter(Parameter):
     opts['value'] = keySeqVal
     super().__init__(**opts)
 
+
+class NoneParameter(parameterTypes.SimpleParameter):
+
+  def __init__(self, **opts):
+    opts['type'] = 'str'
+    super().__init__(**opts)
+    self.setWritable(False)
+
+
+parameterTypes.registerParameterType('none', NoneParameter)
 parameterTypes.registerParameterType('shortcut', ShortcutParameter)
 
 @dataclass
@@ -399,7 +409,7 @@ class ConstParamWidget(QtWidgets.QDialog):
         existingParamIdx = ii
         break
     if paramExists:
-      self.params.childs[ii].addChildren(paramChildren)
+      self.params.childs[existingParamIdx].addChildren(paramChildren)
     else:
       self.params.addChild(paramGroup)
     # Make sure all new names are properly displayed
@@ -475,7 +485,7 @@ class ShortcutsEditor(ConstParamWidget):
       shortcut.setKey(self[shortcut.paramIdx])
     super().applyBtnClicked()
 
-class AlgorithmPropertiesEditor(ConstParamWidget):
+class AlgCollectionEditor(ConstParamWidget):
   def __init__(self, saveDir, algMgr: AlgPropsMgr, name=None, parent=None):
     self.algMgr = algMgr
     super().__init__(parent, saveDir=saveDir, saveExt='alg', name=name)
@@ -486,56 +496,67 @@ class AlgorithmPropertiesEditor(ConstParamWidget):
     self.algOpts = self.treeAlgOpts.children()[0]
     # Since constructor forces self.params to be top level item, we need to reconstruct
     # the tree to avoid this
-    self.tree.setParameters(self.algOpts, showTop=False)
-    self.tree.addParameters(self.params, showTop=False)
-    # self.params.addChild(self.algOpts)
+    self.tree.setParameters(self.algOpts)
     self.algOpts.sigValueChanged.connect(self.changeActiveAlg)
+
+    # Allows only the current processor params to be shown in the tree
+    #self.tree.addParameters(self.params, showTop=False)
+
+    self.curProcessor: Optional[FRImageProcessor] = None
+    self.processors: Dict[str, Tuple[str, FRImageProcessor]] = {}
+    self._image = np.zeros((1,1), dtype='uint8')
+
 
     self.build_attachParams(algMgr)
 
-    self.curProcessor: Optional[FRImageProcessor] = None
-    self.processors: List[FRImageProcessor] = []
+  @property
+  def image(self):
+    return self._image
+  @image.setter
+  def image(self, newImg: np.ndarray):
+    self.curProcessor.image = newImg
+    self._image = newImg
 
   def build_attachParams(self, algMgr: AlgPropsMgr):
     # Step 1: Construct parameter tree
-    params = algMgr.params.opts.copy()
+    mgrParams = algMgr.params.saveState()
     self.params.clearChildren()
-    self.params.addChildren(params['children'])
+    self.params.addChildren(mgrParams['children'])
+    for param in self.params.children():
+      self.tree.addParameters(param)
 
     # Step 2: Instantiate all processor algorithms
     for processorCtor in algMgr.processorCtors:
       processor = processorCtor()
-      self.processors.append(processor)
       # Step 3: For each instantiated process, hook up accessor functions to self's
-      #         parameter tree
+      # parameter tree
       algMgr.classInstToEditorMapping[processor] = self
 
-      procName = type(processor).__qualname__
-      clsName, procName = _class_fnNamesFromFnQualname(procName)
+      clsName = type(processor).__qualname__
       procParam = algMgr.classNameToParamMapping[clsName]
-      procBoundFnList = algMgr.boundFnsPerClass[clsName]
+      self.processors.update({procParam.name: (procParam.name, processor)})
 
     # Step 4: Determine the active processor object
-    pass
+    self.algOpts.setLimits(self.processors)
+    # Simulate arbitrary parameter selection
 
-  def changeActiveAlg(self, _param: Parameter, newAlgName: FRParam):
-    # Copy from opts intead of directly accessing the parameter to avoid
-    # overwriting the values in the original manager
-    newChildren: list = self.algMgr.params.child(newAlgName).opts['children']
-    self.params.clearChildren()
-    self.params = Parameter(name='Parameters', type='group',
-                            children=newChildren)
-    # self.params.addChild(self.algOpts)
-    # self.params.addChildren(newChildren)
-    self.tree.addParameters(self.params, showTop=False)
+  def changeActiveAlg(self, selectedParam: Parameter, nameProcCombo: Tuple[str, FRImageProcessor]):
+    # Hide all except current selection
+    # TODO: Find out why hide() isn't working. Documentation indicates it should
+    # Instead, use the parentChanged utility as a hacky workaround
+    curParamSet = self.params.child(nameProcCombo[0])
+    for ii, child in enumerate(self.params.children()):
+      shouldHide = child is not curParamSet
+      # Offset by 1 to account for self.algOpts
+      self.tree.setRowHidden(1 + ii, QtCore.QModelIndex(), shouldHide)
+    # selectedParam.show()
+    self.curProcessor = nameProcCombo[1]
+    self.curProcessor.image = self.image
 
 class AlgPropsMgr(ConstParamWidget):
 
   def __init__(self, parent=None):
     super().__init__(parent, saveExt='', saveDir='')
-    # self.algPropEditors = [AlgorithmPropertiesEditor(ALG_FOC_IMG_DIR, self),
-    #                        AlgorithmPropertiesEditor(ALG_MAIN_IMG_DIR, self)]
-    self.algPropEditors: List[AlgorithmPropertiesEditor] = []
     self.processorCtors : List[Callable[[Any,...], FRImageProcessor]] = []
 
   def registerClass(self, clsParam: FRParam, **opts):
@@ -544,26 +565,17 @@ class AlgPropsMgr(ConstParamWidget):
 
   def _extendedClassDecorator(self, cls: Any, clsParam: FRParam, **opts):
     ctorArgs = opts.get('args', [])
-    procCtor = partial(cls.__init__, *ctorArgs)
+    procCtor = partial(cls, *ctorArgs)
     self.processorCtors.append(procCtor)
 
-  # def _extendedClassDecorator(self, cls: Any, clsParam: FRParam):
-  #   # When an algorithm is added to the manager, attach dropdown options
-  #   # to each class using editable algorithms
-  #   for editor in self.algPropEditors:  # type: AlgorithmPropertiesEditor
-  #     newLimits = editor.algOpts.opts.get('limits', []) + [clsParam.name]
-  #     editor.algOpts.setLimits(newLimits)
-  #     editor.algOpts.setDefault(newLimits[0])
-
-  def createProcessorForClass(self, cls, ctorArgs: List[Any]=None) -> FRImageProcessor:
-    if ctorArgs is None:
-      ctorArgs = []
-    clsName = cls.__name__
+  def createProcessorForClass(self, clsObj) -> AlgCollectionEditor:
+    clsName = type(clsObj).__name__
     editorDir = join(MENU_OPTS_DIR, clsName)
-    newEditor = AlgorithmPropertiesEditor(editorDir, self, name=_camelCaseToTitle(clsName))
-    self.algPropEditors.append(newEditor)
-    return newEditor.curProcessor
-
+    newEditor = AlgCollectionEditor(editorDir, self, name=_camelCaseToTitle(clsName))
+    FR_SINGLETON.editors.append(newEditor)
+    FR_SINGLETON.editorNames.append(newEditor.name)
+    # Wrap in property so changes propagate to the calling class
+    return newEditor
 
 
 class SchemeEditor(ConstParamWidget):
@@ -571,7 +583,7 @@ class SchemeEditor(ConstParamWidget):
     super().__init__(parent, paramList=[], saveDir=SCHEMES_DIR, saveExt='scheme')
 
 class _FRSingleton:
-  algParamMgr_ = AlgPropsMgr()
+  algParamMgr = AlgPropsMgr()
 
   shortcuts = ShortcutsEditor()
   scheme = SchemeEditor()
@@ -582,24 +594,8 @@ class _FRSingleton:
   annotationAuthor = None
 
   def __init__(self):
-    # editors = []
-    # editorNames = []
-    # Code retrieved from https://stackoverflow.com/a/20214464/9463643
-    # for prop in dir(self):
-    #   propObj = getattr(self, prop)
-    #   if isinstance(propObj, ConstParamWidget) \
-    #       and prop[-1] != '_':
-    #     editors.append(propObj)
-    #     # Strip 'editor', space at capital letter
-    #     propClsName = type(propObj).__name__
-    #     name = propClsName[:propClsName.index('Editor')]
-    #     name = re.sub(r'(\w)([A-Z])', r'\1 \2', name)
-    #     editorNames.append(name)
-    # self.editors = editors
-    # self.editorNames = editorNames
     self.editors: List[ConstParamWidget] =\
-      [self.scheme, self.shortcuts, self.generalProps, self.filter, self.clickModifiers,
-       *self.algParamMgr_.algPropEditors]
+      [self.scheme, self.shortcuts, self.generalProps, self.filter, self.clickModifiers]
     self.editorNames: List[str] = []
     for editor in self.editors:
       if editor.name is not None:

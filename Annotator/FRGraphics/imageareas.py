@@ -10,7 +10,7 @@ from skimage import morphology
 
 from Annotator.FRGraphics.clickables import RightPanViewBox
 from Annotator.FRGraphics.rois import FRExtendedROI
-from Annotator.generalutils import splitListAtNans
+from Annotator.generalutils import splitListAtNans, largestList
 from Annotator.interfaceimpls import RegionGrow
 from Annotator.params import FRVertices
 from .clickables import ClickableImageItem
@@ -57,9 +57,8 @@ class RegionVertsUndoBuffer(ObjUndoBuffer):
     super().update(newVerts, curPrevAreaDiff > 0.05, overridingUpdateCondtn)
 
 class FREditableImg(pg.PlotWidget):
-  def __init__(self, parent=None, processor: FRImageProcessor=None,
-               allowableShapes: Tuple[FRParam,...]=None, allowableActions: Tuple[FRParam,...]=None,
-               **kargs):
+  def __init__(self, parent=None, allowableShapes: Tuple[FRParam,...]=None,
+               allowableActions: Tuple[FRParam,...]=None, **kargs):
     super().__init__(parent, viewBox=RightPanViewBox(), **kargs)
     self.setAspectLocked(True)
     self.getViewBox().invertY()
@@ -73,10 +72,8 @@ class FREditableImg(pg.PlotWidget):
     self.addItem(self.imgItem)
 
 
-    if processor is None:
-      processor = RegionGrow()
-    processor.image = self.imgItem.image
-    self.processor = processor
+    self.procCollection = FR_SINGLETON.algParamMgr.createProcessorForClass(self)
+    self.procCollection.image = self.imgItem.image
 
     # -----
     # DRAWING OPTIONS
@@ -99,7 +96,7 @@ class FREditableImg(pg.PlotWidget):
     """
     Overloaded in child classes to process new regions
     """
-    newVerts = self.processor.localCompEstimate(prevComp, *fgBgVerts)
+    newVerts = self.procCollection.curProcessor.localCompEstimate(prevComp, *fgBgVerts)
     return newVerts
 
   @Slot(QtWidgets.QAbstractButton, bool)
@@ -178,13 +175,8 @@ class MainImageArea(FREditableImg):
       # For now assume a single point indicates foreground where multiple indicate
       # background selection
       verts = self.shapeCollection.shapeVerts.astype(int)
-      fgBgVerts = [None, None]
-      if np.all(verts - verts[0] == 0):
-        fgBgVerts[0] = verts
-      else:
-        fgBgVerts[1] = verts
 
-      newVerts = super().handleShapeFinished(roi, fgBgVerts, prevComp)
+      newVerts = super().handleShapeFinished(roi, [verts, None], prevComp)
       if len(newVerts) == 0:
         return
       # TODO: Determine more robust solution for separated vertices. For now use largest component
@@ -204,7 +196,7 @@ class MainImageArea(FREditableImg):
       imgSrc = np.array(Image.open(imgSrc))
 
     self.imgItem.setImage(imgSrc)
-    self.processor.image = imgSrc
+    self.procCollection.image = imgSrc
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_CLEAR_SHAPE_MAIN)
   def clearCurDrawShape(self):
@@ -226,7 +218,7 @@ class FocusedImg(FREditableImg):
     allowableActions = (
       FR_CONSTS.DRAW_ACT_ADD, FR_CONSTS.DRAW_ACT_REM
     )
-    super().__init__(parent, processor, allowableShapes, allowableActions, **kargs)
+    super().__init__(parent, allowableShapes, allowableActions, **kargs)
     self.region = FRVertexRegion()
     self.addItem(self.region)
 
@@ -285,7 +277,7 @@ class FocusedImg(FREditableImg):
                          :]
     segImg = segmentComp(newCompImg, self.segThresh)
     self.imgItem.setImage(segImg)
-    self.processor.image = segImg
+    self.procCollection.image = segImg
 
   def updateRegionFromVerts(self, newVerts: FRVertices, offset=None):
     # Component vertices are nan-separated regions
@@ -302,12 +294,7 @@ class FocusedImg(FREditableImg):
 
   def updateRegionFromBwMask(self, bwImg: np.ndarray):
     vertsPerComp = getVertsFromBwComps(bwImg)
-    vertsToUse = np.empty((0, 2), dtype='int')
-    for verts in vertsPerComp:
-      # TODO: handle case of multiple regions existing in bwImg. For now, just use
-      #   the largest
-      if verts.shape[0] > vertsToUse.shape[0]:
-        vertsToUse = verts
+    vertsToUse = largestList(vertsPerComp)
     # TODO: Find a computationally good way to check for large changes every time a
     #  region is modified. The current solution can only work from mask-based updates
     #  unless an expensive cv.floodFill is used
@@ -318,7 +305,7 @@ class FocusedImg(FREditableImg):
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_REDO_MOD_REGION, [FR_ENUMS.BUFFER_REDO])
   def undoRedoRegionChange(self, undoOrRedo: str):
     # Ignore requests when no region present
-    if self.compImgItem.image is None:
+    if self.imgItem.image is None:
       return
     if undoOrRedo == FR_ENUMS.BUFFER_UNDO:
       self.updateRegionFromVerts(self.regionBuffer.undo_getObj(), [0, 0])
