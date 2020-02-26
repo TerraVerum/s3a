@@ -101,6 +101,7 @@ class _FRConsts(FRParamGroup):
   PROP_FOCUSED_SEED_THRESH  : FRParam = newParam('Seedpoint Threshold in Focused Image', 7.)
   PROP_UNDO_BUF_SZ          : FRParam = newParam('Size of Region Undo Buffer', 30)
   PROP_STEPS_BW_SAVE        : FRParam = newParam('Operations Between Buffer Saves', 5)
+  PROP_CHECK_LARGE_CHANGES  : FRParam = newParam('Save buffer during large region changes', True)
 
   # --------------------------
   # SHORTCUT PARAMETERS
