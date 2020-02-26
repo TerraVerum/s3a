@@ -21,7 +21,6 @@ LAYOUTS_DIR = os.path.join(MENU_OPTS_DIR, 'Layouts', '')
 FILTERS_DIR = os.path.join(MENU_OPTS_DIR, 'Filters', '')
 GEN_PROPS_DIR = os.path.join(MENU_OPTS_DIR, 'RegionControls', '')
 SHORTCUTS_DIR = os.path.join(MENU_OPTS_DIR, 'Shortcuts', '')
-CLICK_MODIFIERS_DIR = os.path.join(MENU_OPTS_DIR, 'Modifiers', '')
 
 # Ensure these directories exist
 # for curDir in [SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR,
@@ -117,7 +116,13 @@ class _FRConsts(FRParamGroup):
   SHC_UNDO_MOD_REGION       : FRParam = newParam('Undo Modify Region', 'Ctrl+Z', 'shortcut')
   SHC_REDO_MOD_REGION       : FRParam = newParam('Redo Modify Region', 'Ctrl+Y', 'shortcut')
   SHC_ACCEPT_REGION         : FRParam = newParam('Accept and Save Region Edits', '1', 'shortcut')
-  SHC_TOGGLE_REG_MODE       : FRParam = newParam('Toggle Between Add/Remove Region', 'Ctrl+T', 'shortcut')
+  SHC_DRAW_FG               : FRParam = newParam('Add to Foreground', 'Ctrl+D,F', 'shortcut')
+  SHC_DRAW_BG               : FRParam = newParam('Add to Background', 'Ctrl+D,B', 'shortcut')
+  SHC_DRAW_SELECT           : FRParam = newParam('Enter "Select" Mode', 'Ctrl+D,S', 'shortcut')
+  SHC_DRAW_PAN              : FRParam = newParam('Enter "Pan" Mode', 'Ctrl+D,N', 'shortcut')
+  SHC_DRAW_RECT             : FRParam = newParam('Enter Rect Draw Shape', 'Ctrl+D,R', 'shortcut')
+  SHC_DRAW_POLY             : FRParam = newParam('Enter Polygon Draw Shape', 'Ctrl+D,Y', 'shortcut')
+  SHC_DRAW_PAINT            : FRParam = newParam('Enter Paint Draw Shape', 'Ctrl+D,T', 'shortcut')
 
   # --------------------------
   # KEYBOARD MODIFIERS DURING CLICK
