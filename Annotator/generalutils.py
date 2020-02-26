@@ -134,14 +134,12 @@ class ObjUndoBuffer:
       self._buffer.rotate(-1)
     return self._buffer[self._NEWEST_BUF_IDX]
 
-  def update(self, newObj, supplementalUpdateCondtn=False, overridingUpdateCondtn=None):
+  def update(self, newObj, alternateUpdateCondtn=False):
     # If the incoming vertices are part of a brand new region, throw away all history
     # Also append if no verts are already in the deque
     if not self._buffer:
       self._buffer = deque(maxlen=self._maxBufferLen)
       shouldAppendVerts = True
-    elif overridingUpdateCondtn is not None:
-      shouldAppendVerts = overridingUpdateCondtn
     else:
       # Otherwise, proceed as normal
       # Need to clean out invalid entries when an undo was performed before the current
@@ -152,7 +150,7 @@ class ObjUndoBuffer:
       # Check if current operation should go on the deque
       self._stepsSinceBufSave += 1
       shouldAppendVerts =  self._stepsSinceBufSave > self._maxStepsBetweenBufSave \
-          or supplementalUpdateCondtn
+          or alternateUpdateCondtn
     if shouldAppendVerts:
       # Time to save the action.
       # Note: we need to save the id of the first/last deque object so we know when the

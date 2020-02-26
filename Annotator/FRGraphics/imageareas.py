@@ -32,27 +32,39 @@ QCursor = QtGui.QCursor
 class RegionVertsUndoBuffer(ObjUndoBuffer):
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_UNDO_BUF_SZ)
   def maxBufferLen(self): pass
-
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_STEPS_BW_SAVE)
   def stepsBetweenBufSave(self): pass
+  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_CHECK_LARGE_CHANGES)
+  def checkLargeRegionChanges(self): pass
 
-  _bwPrevRegion: Optional[np.ndarray] = None
+
+
+  _prevBwMask: np.ndarray = np.array([[1,1]], dtype=bool)
 
   def __init__(self):
+    """
+    Save buffer for region modification.
+    """
     super().__init__(self.maxBufferLen, self.stepsBetweenBufSave)
 
-  def update(self, newVerts, newBwArea=None, overridingUpdateCondtn=None):
-    if self._bwPrevRegion is None:
-      # Ensure update takes place
-      self._bwPrevRegion = ~newBwArea
-    curPrevAreaDiff = np.bitwise_xor(newBwArea, self._bwPrevRegion).sum() / \
-                      newBwArea.size
-    # Force cancel update if region hasn't changed
-    if curPrevAreaDiff == 0:
-      overridingUpdateCondtn = False
-    # Don't forget to update bwArea after checking diff
-    self._bwPrevRegion = newBwArea
-    super().update(newVerts, curPrevAreaDiff > 0.05, overridingUpdateCondtn)
+  def update(self, newVerts: FRVertices, alternateUpdateCondtn=False):
+    # Ensure update takes place
+    if self.checkLargeRegionChanges and not alternateUpdateCondtn:
+      oldShape = self._prevBwMask.shape
+      oldNewDims = np.vstack([oldShape, newVerts.max(0)])
+      newShape = np.max(oldNewDims, 0)
+
+      newRegion = np.zeros(newShape, dtype='uint8')
+      newRegion = cv.fillPoly(newRegion, splitListAtNans(newVerts), 1)
+      newRegion = newRegion.astype(bool)
+
+      oldRegion_newSize = np.zeros(newShape, dtype=bool)
+      oldRegion_newSize[0:oldShape[0], 0:oldShape[1]] = self._prevBwMask
+
+      curPrevAreaDiff = (newRegion ^ oldRegion_newSize).sum()/newRegion.size
+      self._prevBwMask = newRegion
+      alternateUpdateCondtn = curPrevAreaDiff > 0.05
+    super().update(newVerts, alternateUpdateCondtn)
 
 class FREditableImg(pg.PlotWidget):
   def __init__(self, parent=None, allowableShapes: Tuple[FRParam,...]=None,
@@ -90,7 +102,8 @@ class FREditableImg(pg.PlotWidget):
     self.drawOptsWidget.selectOpt(self.drawAction)
     self.drawOptsWidget.selectOpt(self.shapeCollection.curShape)
 
-  def handleShapeFinished(self, roi: FRExtendedROI, fgBgVerts: List[FRVertices]=None, prevComp=None):
+  def handleShapeFinished(self, roi: FRExtendedROI, fgBgVerts: List[FRVertices]=None, prevComp=None) \
+      -> FRVertices:
     """
     Overloaded in child classes to process new regions
     """
@@ -222,8 +235,6 @@ class MainImageArea(FREditableImg):
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_FOCUSED_IMG_AREA)
 class FocusedImg(FREditableImg):
-  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_FOCUSED_SEED_THRESH)
-  def seedThresh(self): pass
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_MARGIN)
   def compCropMargin(self): pass
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_SEG_THRESH)
@@ -275,7 +286,7 @@ class FocusedImg(FREditableImg):
 
     newVerts = super().handleShapeFinished(roi, fgBgVerts, prevComp)
     if len(newVerts) > 0:
-      self.region.updateVertices(newVerts)
+      self.updateRegionFromVerts(newVerts, offset=[[0,0]], saveHist=True)
 
   def updateAll(self, mainImg: np.array, newComp:df):
     newVerts = newComp[TC.VERTICES].squeeze()
@@ -289,7 +300,7 @@ class FocusedImg(FREditableImg):
     # Propagate all resultant changes
     self.updateBbox(mainImg.shape, newVerts)
     self.updateCompImg(mainImg)
-    self.updateRegionFromVerts(FRVertices(newVerts))
+    self.updateRegionFromVerts(FRVertices(newVerts), saveHist=True)
     self.autoRange()
 
   def updateBbox(self, mainImgShape, newVerts: np.ndarray):
@@ -310,32 +321,20 @@ class FocusedImg(FREditableImg):
     self.imgItem.setImage(segImg)
     self.procCollection.image = segImg
 
-  def updateRegionFromVerts(self, newVerts: FRVertices, offset=None):
+  def updateRegionFromVerts(self, newVerts: FRVertices, offset=None, saveHist=False):
     # Component vertices are nan-separated regions
-    bwImg = np.zeros(self.imgItem.image.shape[0:2], dtype='uint8')
     if offset is None:
       offset = self.bbox[0,:]
     if newVerts is None:
       newVerts = FRVertices(dtype=int)
-    else:
-      bwImg = cv.fillPoly(bwImg, splitListAtNans(newVerts), 1)
-    bwImg = bwImg.astype(bool)
-    self.regionBuffer.update(newVerts, bwImg)
     # 0-center new vertices relative to FocusedImg image
     # Make a copy of each list first so we aren't modifying the
     # original data
     centeredVerts = newVerts.copy()
     centeredVerts -= offset
+    if saveHist:
+      self.regionBuffer.update(newVerts)
     self.region.updateVertices(centeredVerts)
-
-  def updateRegionFromBwMask(self, bwImg: np.ndarray):
-    vertsPerComp = getVertsFromBwComps(bwImg)
-    vertsToUse = largestList(vertsPerComp)
-    # TODO: Find a computationally good way to check for large changes every time a
-    #  region is modified. The current solution can only work from mask-based updates
-    #  unless an expensive cv.floodFill is used
-    self.regionBuffer.update(vertsToUse, bwImg)
-    self.updateRegionFromVerts(vertsToUse, [0, 0])
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_UNDO_MOD_REGION, [FR_ENUMS.BUFFER_UNDO])
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_REDO_MOD_REGION, [FR_ENUMS.BUFFER_REDO])
@@ -344,9 +343,9 @@ class FocusedImg(FREditableImg):
     if self.imgItem.image is None:
       return
     if undoOrRedo == FR_ENUMS.BUFFER_UNDO:
-      self.updateRegionFromVerts(self.regionBuffer.undo_getObj(), [0, 0])
+      self.updateRegionFromVerts(self.regionBuffer.undo_getObj(), offset=[[0,0]])
     elif undoOrRedo == FR_ENUMS.BUFFER_REDO:
-      self.updateRegionFromVerts(self.regionBuffer.redo_getObj(), [0, 0])
+      self.updateRegionFromVerts(self.regionBuffer.redo_getObj(), offset=[[0,0]])
 
   def clearCurDrawShape(self):
     super().clearCurDrawShape()
