@@ -1,30 +1,27 @@
 from typing import Union, Optional, Tuple, List
 
-import numpy as np
 import cv2 as cv
+import numpy as np
 import pyqtgraph as pg
 from PIL import Image
 from pandas import DataFrame as df
-from pyqtgraph import Point
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from skimage import morphology
 
 from .clickables import RightPanViewBox
-from .rois import FRExtendedROI
-from ..generalutils import splitListAtNans, largestList
-from ..interfaceimpls import RegionGrow
-from ..params import FRVertices
-from .clickables import ClickableImageItem
-from .clickables import DraggableViewBox
 from .drawopts import FRDrawOpts
 from .parameditors import FR_SINGLETON
 from .regions import FRShapeCollection
-from ..constants import TEMPLATE_COMP as TC, FR_CONSTS, FR_ENUMS
-from ..generalutils import getClippedBbox, nanConcatList, ObjUndoBuffer
-from ..interfaces import FRImageProcessor
+# Required to trigger property registration
+from ..interfaceimpls import RegionGrow
 from .regions import FRVertexRegion
+from .rois import FRExtendedROI
+from ..constants import TEMPLATE_COMP as TC, FR_CONSTS, FR_ENUMS
+from ..generalutils import getClippedBbox, ObjUndoBuffer
+from ..generalutils import splitListAtNans, largestList
+from ..interfaces import FRImageProcessor
 from ..params import FRParam
-from ..processing import segmentComp, getVertsFromBwComps, growSeedpoint, growBoundarySeeds
+from ..params import FRVertices
+from ..processing import segmentComp, getVertsFromBwComps
 from ..tablemodel import makeCompDf
 
 Signal = QtCore.pyqtSignal
@@ -99,6 +96,15 @@ class FREditableImg(pg.PlotWidget):
     """
     newVerts = self.procCollection.curProcessor.localCompEstimate(prevComp, *fgBgVerts)
     return newVerts
+
+  def switchBtnMode(self, newMode: FRParam):
+    for curDict in [self.drawOptsWidget.actionBtnParamMap.inv,
+                    self.drawOptsWidget.shapeBtnParamMap.inv]:
+      if newMode in curDict:
+        curDict[newMode].setChecked(True)
+        return
+    # If this is reached, a param was passed in that doesn't correspond to a valid button
+    # TODO: return soemthing else?
 
   @Slot(QtWidgets.QAbstractButton, bool)
   def _handleBtnToggle(self, btn: QtWidgets.QPushButton, isChecked: bool):
@@ -185,6 +191,17 @@ class MainImageArea(FREditableImg):
       newComp[TC.VERTICES] = [newVerts]
       self.sigComponentCreated.emit(newComp)
 
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_FG, [FR_CONSTS.DRAW_ACT_ADD])
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_PAN, [FR_CONSTS.DRAW_ACT_PAN])
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_SELECT,
+                                         [FR_CONSTS.DRAW_ACT_SELECT])
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_RECT,
+                                         [FR_CONSTS.DRAW_SHAPE_RECT])
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_POLY,
+                                         [FR_CONSTS.DRAW_SHAPE_POLY])
+  def switchBtnMode(self, newMode: FRParam):
+    super().switchBtnMode(newMode)
+
   @property
   def image(self):
     return self.imgItem.image
@@ -227,6 +244,18 @@ class FocusedImg(FREditableImg):
 
     self.bbox = np.zeros((2, 2), dtype='int32')
     self.regionBuffer = RegionVertsUndoBuffer()
+
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_BG, [FR_CONSTS.DRAW_ACT_REM])
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_FG, [FR_CONSTS.DRAW_ACT_ADD])
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_PAN, [FR_CONSTS.DRAW_ACT_PAN])
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_RECT,
+                                         [FR_CONSTS.DRAW_SHAPE_RECT])
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_POLY,
+                                         [FR_CONSTS.DRAW_SHAPE_POLY])
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_PAINT,
+                                         [FR_CONSTS.DRAW_SHAPE_PAINT])
+  def switchBtnMode(self, newMode: FRParam):
+    super().switchBtnMode(newMode)
 
   def handleShapeFinished(self, roi: FRExtendedROI, fgBgVerts: List[FRVertices]=None, prevComp=None):
     if self.drawAction == FR_CONSTS.DRAW_ACT_PAN:
@@ -283,19 +312,21 @@ class FocusedImg(FREditableImg):
 
   def updateRegionFromVerts(self, newVerts: FRVertices, offset=None):
     # Component vertices are nan-separated regions
+    bwImg = np.zeros(self.imgItem.image.shape[0:2], dtype='uint8')
     if offset is None:
       offset = self.bbox[0,:]
     if newVerts is None:
       newVerts = FRVertices(dtype=int)
+    else:
+      bwImg = cv.fillPoly(bwImg, splitListAtNans(newVerts), 1)
+    bwImg = bwImg.astype(bool)
+    self.regionBuffer.update(newVerts, bwImg)
     # 0-center new vertices relative to FocusedImg image
     # Make a copy of each list first so we aren't modifying the
     # original data
     centeredVerts = newVerts.copy()
     centeredVerts -= offset
     self.region.updateVertices(centeredVerts)
-    bwImg = np.zeros(self.imgItem.image.shape[0:2], dtype='uint8')
-    bwImg = cv.fillPoly(bwImg, splitListAtNans(newVerts), 1).astype(bool)
-    self.regionBuffer.update(centeredVerts, bwImg)
 
   def updateRegionFromBwMask(self, bwImg: np.ndarray):
     vertsPerComp = getVertsFromBwComps(bwImg)
@@ -320,7 +351,6 @@ class FocusedImg(FREditableImg):
   def clearCurDrawShape(self):
     super().clearCurDrawShape()
 
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_CLEAR_SHAPE_FOC)
   def saveNewVerts(self):
     # Add in offset from main image to FRVertexRegion vertices
     self.compSer.loc[TC.VERTICES] = self.region.verts + self.bbox[0,:]

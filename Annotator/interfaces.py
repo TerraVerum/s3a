@@ -50,7 +50,7 @@ class FRVertexDefinedImg:
     self.image_np = regionData
 
 class FRImageProcessor(ABC):
-  image: np.ndarray
+  image: np.ndarray = np.zeros((1,1), dtype=bool)
 
   @abstractmethod
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices=None, bgVerts: FRVertices=None) -> \

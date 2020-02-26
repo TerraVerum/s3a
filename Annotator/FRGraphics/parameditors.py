@@ -20,7 +20,7 @@ from Annotator.interfaces import FRImageProcessor
 from .graphicsutils import dialogSaveToFile
 from .. import appInst
 from ..constants import (
-  SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR, CLICK_MODIFIERS_DIR,
+  SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR,
   TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES, FR_CONSTS)
 from ..exceptions import FRIllRegisteredPropError
 from ..params import FRParam
@@ -434,9 +434,6 @@ class GeneralPropertiesEditor(FRParamEditor):
   def __init__(self, parent=None):
     super().__init__(parent, paramList=[], saveDir=GEN_PROPS_DIR, saveExt='regctrl')
 
-class ClickModifiersEditor(FRParamEditor):
-  def __init__(self, parent=None):
-    super().__init__(parent, saveDir=CLICK_MODIFIERS_DIR, saveExt='modifier')
 
 class TableFilterEditor(FRParamEditor):
   def __init__(self, parent=None):
@@ -512,6 +509,10 @@ class AlgCollectionEditor(FRParamEditor):
     # the tree to avoid this
     self.tree.setParameters(self.algOpts)
     self.algOpts.sigValueChanged.connect(self.changeActiveAlg)
+
+    Path(self.saveDir).mkdir(parents=True, exist_ok=True)
+    with open(join(self.saveDir, f'Default.{self.fileType}'), 'wb') as ofile:
+      pkl.dump(self.params.saveState(), ofile)
 
     # Allows only the current processor params to be shown in the tree
     #self.tree.addParameters(self.params, showTop=False)
@@ -603,13 +604,12 @@ class _FRSingleton:
   scheme = SchemeEditor()
   generalProps = GeneralPropertiesEditor()
   filter = TableFilterEditor()
-  clickModifiers = ClickModifiersEditor()
 
   annotationAuthor = None
 
   def __init__(self):
     self.editors: List[FRParamEditor] =\
-      [self.scheme, self.shortcuts, self.generalProps, self.filter, self.clickModifiers]
+      [self.scheme, self.shortcuts, self.generalProps, self.filter]
     self.editorNames: List[str] = []
     for editor in self.editors:
         self.editorNames.append(editor.name)
