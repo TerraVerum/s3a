@@ -34,8 +34,6 @@ class RegionVertsUndoBuffer(ObjUndoBuffer):
   def maxBufferLen(self): pass
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_STEPS_BW_SAVE)
   def stepsBetweenBufSave(self): pass
-  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_CHECK_LARGE_CHANGES)
-  def checkLargeRegionChanges(self): pass
 
 
 
@@ -49,21 +47,22 @@ class RegionVertsUndoBuffer(ObjUndoBuffer):
 
   def update(self, newVerts: FRVertices, alternateUpdateCondtn=False):
     # Ensure update takes place
-    if self.checkLargeRegionChanges and not alternateUpdateCondtn:
-      oldShape = self._prevBwMask.shape
-      oldNewDims = np.vstack([oldShape, newVerts.max(0)])
-      newShape = np.max(oldNewDims, 0)
-
-      newRegion = np.zeros(newShape, dtype='uint8')
-      newRegion = cv.fillPoly(newRegion, splitListAtNans(newVerts), 1)
-      newRegion = newRegion.astype(bool)
-
-      oldRegion_newSize = np.zeros(newShape, dtype=bool)
-      oldRegion_newSize[0:oldShape[0], 0:oldShape[1]] = self._prevBwMask
-
-      curPrevAreaDiff = (newRegion ^ oldRegion_newSize).sum()/newRegion.size
-      self._prevBwMask = newRegion
-      alternateUpdateCondtn = curPrevAreaDiff > 0.05
+    # TODO: Doesn't seem necessary?
+    # if self.checkLargeRegionChanges and not alternateUpdateCondtn:
+    #   oldShape = self._prevBwMask.shape
+    #   oldNewDims = np.vstack([oldShape, newVerts.max(0)])
+    #   newShape = np.max(oldNewDims, 0)
+    #
+    #   newRegion = np.zeros(newShape, dtype='uint8')
+    #   newRegion = cv.fillPoly(newRegion, splitListAtNans(newVerts), 1)
+    #   newRegion = newRegion.astype(bool)
+    #
+    #   oldRegion_newSize = np.zeros(newShape, dtype=bool)
+    #   oldRegion_newSize[0:oldShape[0], 0:oldShape[1]] = self._prevBwMask
+    #
+    #   curPrevAreaDiff = (newRegion ^ oldRegion_newSize).sum()/newRegion.size
+    #   self._prevBwMask = newRegion
+    #   alternateUpdateCondtn = curPrevAreaDiff > 0.05
     super().update(newVerts, alternateUpdateCondtn)
 
 class FREditableImg(pg.PlotWidget):
@@ -332,9 +331,12 @@ class FocusedImg(FREditableImg):
     # original data
     centeredVerts = newVerts.copy()
     centeredVerts -= offset
-    if saveHist:
-      self.regionBuffer.update(newVerts)
-    self.region.updateVertices(centeredVerts)
+    shouldUpdate = len(self.region.verts) != len(centeredVerts) \
+      or not np.all(self.region.verts == centeredVerts)
+    if shouldUpdate:
+      if saveHist:
+        self.regionBuffer.update(newVerts)
+      self.region.updateVertices(centeredVerts)
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_UNDO_MOD_REGION, [FR_ENUMS.BUFFER_UNDO])
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_REDO_MOD_REGION, [FR_ENUMS.BUFFER_REDO])
