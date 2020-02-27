@@ -22,12 +22,6 @@ FILTERS_DIR = os.path.join(MENU_OPTS_DIR, 'Filters', '')
 GEN_PROPS_DIR = os.path.join(MENU_OPTS_DIR, 'RegionControls', '')
 SHORTCUTS_DIR = os.path.join(MENU_OPTS_DIR, 'Shortcuts', '')
 
-# Ensure these directories exist
-# for curDir in [SCHEMES_DIR, LAYOUTS_DIR, FILTERS_DIR,
-#                GEN_PROPS_DIR, SHORTCUTS_DIR, CLICK_MODIFIERS_DIR,]:
-#   Path(curDir).mkdir(parents=True, exist_ok=True)
-
-
 @dataclass
 class ComponentTypes(FRParamGroup):
   CAP   : FRParam = newParam('Capacitor')
