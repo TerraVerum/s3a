@@ -285,7 +285,7 @@ class FocusedImg(FREditableImg):
 
     newVerts = super().handleShapeFinished(roi, fgBgVerts, prevComp)
     if len(newVerts) > 0:
-      self.updateRegionFromVerts(newVerts, offset=[[0,0]], saveHist=True)
+      self.updateRegionFromVerts(newVerts, offset=[[0,0]])
 
   def updateAll(self, mainImg: np.array, newComp:df):
     newVerts = newComp[TC.VERTICES].squeeze()
@@ -299,7 +299,7 @@ class FocusedImg(FREditableImg):
     # Propagate all resultant changes
     self.updateBbox(mainImg.shape, newVerts)
     self.updateCompImg(mainImg)
-    self.updateRegionFromVerts(FRVertices(newVerts), saveHist=True)
+    self.updateRegionFromVerts(FRVertices(newVerts))
     self.autoRange()
 
   def updateBbox(self, mainImgShape, newVerts: np.ndarray):
@@ -320,7 +320,7 @@ class FocusedImg(FREditableImg):
     self.imgItem.setImage(segImg)
     self.procCollection.image = segImg
 
-  def updateRegionFromVerts(self, newVerts: FRVertices, offset=None, saveHist=False):
+  def updateRegionFromVerts(self, newVerts: FRVertices, offset=None):
     # Component vertices are nan-separated regions
     if offset is None:
       offset = self.bbox[0,:]
@@ -334,8 +334,7 @@ class FocusedImg(FREditableImg):
     shouldUpdate = len(self.region.verts) != len(centeredVerts) \
       or not np.all(self.region.verts == centeredVerts)
     if shouldUpdate:
-      if saveHist:
-        self.regionBuffer.update(newVerts)
+      self.regionBuffer.update(newVerts)
       self.region.updateVertices(centeredVerts)
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_UNDO_MOD_REGION, [FR_ENUMS.BUFFER_UNDO])
@@ -345,9 +344,9 @@ class FocusedImg(FREditableImg):
     if self.imgItem.image is None:
       return
     if undoOrRedo == FR_ENUMS.BUFFER_UNDO:
-      self.updateRegionFromVerts(self.regionBuffer.undo_getObj(), offset=[[0,0]])
+      self.region.updateVertices(self.regionBuffer.undo_getObj())
     elif undoOrRedo == FR_ENUMS.BUFFER_REDO:
-      self.updateRegionFromVerts(self.regionBuffer.redo_getObj(), offset=[[0,0]])
+      self.region.updateVertices(self.regionBuffer.redo_getObj())
 
   def clearCurDrawShape(self):
     super().clearCurDrawShape()
