@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import re
+import json
 from dataclasses import dataclass, fields, field
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, List
 from warnings import warn
 import weakref
 
 import numpy as np
-from pandas import DataFrame
+
 
 # from Annotator.exceptions import FRParamParseError, FRIllFormedVertices
 
@@ -115,58 +116,6 @@ def newParam(name, val=None, valType=None, helpText=''):
   return field(default_factory=lambda: FRParam(name, val, valType, helpText))
 
 
-# class FRVertices(DataFrame):
-#
-#   _metadata = ['connected']
-#
-#   def __init__(self, *args, **kwargs):
-#     """
-#     Overload pandas dataframe and only allow columns conducive for storing shape
-#     vertex points
-#     """
-#     self.connected = kwargs.pop('connected', True)
-#     columns = {'columns': ['x', 'y']}
-#     kwargs.update(columns)
-#     super().__init__(*args, **kwargs)
-#
-#   @property
-#   def _constructor(self):
-#     """
-#     This black magic is required for pandas subclassing so that dataframes retain
-#     subclass information after math operations
-#     """
-#     def f(*args, **kwargs):
-#       tmp = DataFrame(*args, **kwargs)
-#       df = FRVertices(tmp.values).__finalize__(self)
-#       return df
-#
-#     return f
-#
-#   def asPoint(self) -> np.ndarray:
-#     """
-#     Treats the current FRVertices object as if it only contained one vertex that can
-#     be treated as a point. If that condition holds, this point is returned as a
-#     numpy array (x,y)
-#     :return: Numpy point (x,y)
-#     """
-#     if len(self) > 1:
-#       raise FRIllFormedVertices(f'Cannot call asPoint on vertex list containing'
-#                                 f' more than one row. List currently contains {len(self)}'
-#                                 f' points.')
-#     return self.to_numpy().flatten()
-#
-#   def astype(self, *args, **kwargs):
-#     """
-#     Preserve type information when type casting
-#     """
-#     return FRVertices(super().astype(*args, **kwargs))
-#
-#   @property
-#   def rows(self): return self.y
-#
-#   @property
-#   def cols(self): return self.x
-
 class FRVertices(np.ndarray):
   connected = True
 
@@ -226,4 +175,22 @@ class FRVertices(np.ndarray):
   def cols(self):return self.x
   @cols.setter
   def cols(self, newCols):self.x = newCols
+
+class FRComplexVertices:
+  """
+  Unlike a simple list of vertices, :class:`FRComplexVertices` allows shapes with holes.
+  It also knows how to serialize/deserialize itself for file storage.
+  """
+  globalVerts: List[FRVertices]
+  """List of vertices in the component. Organized similar to opencv's contours."""
+
+  hierarchy: np.ndarray
+  """See hierarchy from opencv.findContours"""
+
+  localPos: FRVertices
+  """
+  Offset into the global image. Useful for defining :class:FRComplexVertices
+  within an ROI
+  """
+
 
