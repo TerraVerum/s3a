@@ -1,6 +1,5 @@
-from typing import Union, Optional, Tuple, List
+from typing import Union, Tuple, List
 
-import cv2 as cv
 import numpy as np
 import pyqtgraph as pg
 from PIL import Image
@@ -12,16 +11,14 @@ from .drawopts import FRDrawOpts
 from .parameditors import FR_SINGLETON
 from .regions import FRShapeCollection
 # Required to trigger property registration
-from ..interfaceimpls import RegionGrow
 from .regions import FRVertexRegion
 from .rois import FRExtendedROI
 from ..constants import TEMPLATE_COMP as TC, FR_CONSTS, FR_ENUMS
 from ..generalutils import getClippedBbox, ObjUndoBuffer
-from ..generalutils import splitListAtNans, largestList
 from ..interfaces import FRImageProcessor
 from ..params import FRParam
 from ..params import FRVertices
-from ..processing import segmentComp, getVertsFromBwComps
+from ..processing import segmentComp
 from ..tablemodel import makeCompDf
 
 Signal = QtCore.pyqtSignal
@@ -29,7 +26,7 @@ Slot = QtCore.pyqtSlot
 QCursor = QtGui.QCursor
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_REGION_BUF)
-class RegionVertsUndoBuffer(ObjUndoBuffer):
+class FRRegionVertsUndoBuffer(ObjUndoBuffer):
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_UNDO_BUF_SZ)
   def maxBufferLen(self): pass
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_STEPS_BW_SAVE)
@@ -167,7 +164,7 @@ class FREditableImg(pg.PlotWidget):
     self.shapeCollection.clearAllRois()
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_MAIN_IMG_AREA)
-class MainImageArea(FREditableImg):
+class FRMainImage(FREditableImg):
   sigComponentCreated = Signal(object)
   # Hooked up during __init__
   sigSelectionBoundsMade = Signal(object)
@@ -233,7 +230,7 @@ class MainImageArea(FREditableImg):
     super().clearCurDrawShape()
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_FOCUSED_IMG_AREA)
-class FocusedImg(FREditableImg):
+class FRFocusedImage(FREditableImg):
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_MARGIN)
   def compCropMargin(self): pass
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_SEG_THRESH)
@@ -253,7 +250,7 @@ class FocusedImg(FREditableImg):
     self.compSer = makeCompDf().squeeze()
 
     self.bbox = np.zeros((2, 2), dtype='int32')
-    self.regionBuffer = RegionVertsUndoBuffer()
+    self.regionBuffer = FRRegionVertsUndoBuffer()
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_BG, [FR_CONSTS.DRAW_ACT_REM])
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_FG, [FR_CONSTS.DRAW_ACT_ADD])
@@ -284,8 +281,7 @@ class FocusedImg(FREditableImg):
     # Check for flood fill
 
     newVerts = super().handleShapeFinished(roi, fgBgVerts, prevComp)
-    if len(newVerts) > 0:
-      self.updateRegionFromVerts(newVerts, offset=[[0,0]])
+    self.updateRegionFromVerts(newVerts, offset=[[0,0]])
 
   def updateAll(self, mainImg: np.array, newComp:df):
     newVerts = newComp[TC.VERTICES].squeeze()
@@ -294,7 +290,7 @@ class FocusedImg(FREditableImg):
     self.compSer = newComp.copy(deep=False)
 
     # Reset the undo buffer
-    self.regionBuffer = RegionVertsUndoBuffer()
+    self.regionBuffer = FRRegionVertsUndoBuffer()
 
     # Propagate all resultant changes
     self.updateBbox(mainImg.shape, newVerts)
@@ -326,7 +322,7 @@ class FocusedImg(FREditableImg):
       offset = self.bbox[0,:]
     if newVerts is None:
       newVerts = FRVertices(dtype=int)
-    # 0-center new vertices relative to FocusedImg image
+    # 0-center new vertices relative to FRFocusedImage image
     # Make a copy of each list first so we aren't modifying the
     # original data
     centeredVerts = newVerts.copy()
@@ -334,19 +330,20 @@ class FocusedImg(FREditableImg):
     shouldUpdate = len(self.region.verts) != len(centeredVerts) \
       or not np.all(self.region.verts == centeredVerts)
     if shouldUpdate:
-      self.regionBuffer.update(newVerts)
+      self.regionBuffer.update(centeredVerts)
       self.region.updateVertices(centeredVerts)
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_UNDO_MOD_REGION, [FR_ENUMS.BUFFER_UNDO])
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_REDO_MOD_REGION, [FR_ENUMS.BUFFER_REDO])
   def undoRedoRegionChange(self, undoOrRedo: str):
     # Ignore requests when no region present
+    offset = FRVertices([[0,0]], dtype=int)
     if self.imgItem.image is None:
       return
     if undoOrRedo == FR_ENUMS.BUFFER_UNDO:
-      self.region.updateVertices(self.regionBuffer.undo_getObj())
+      self.region.updateVertices(self.regionBuffer.undo_getObj(), offset=offset)
     elif undoOrRedo == FR_ENUMS.BUFFER_REDO:
-      self.region.updateVertices(self.regionBuffer.redo_getObj())
+      self.region.updateVertices(self.regionBuffer.redo_getObj(), offset=offset)
 
   def clearCurDrawShape(self):
     super().clearCurDrawShape()

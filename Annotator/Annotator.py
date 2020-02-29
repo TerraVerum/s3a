@@ -11,7 +11,8 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
 
 from .FRGraphics.annotator_ui import FRAnnotatorUI
-from .FRGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
+from .FRGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, \
+  addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc, dialogGetAuthorName
 from .FRGraphics.parameditors import FRParamEditor, FR_SINGLETON
 from .constants import FR_CONSTS, ANN_AUTH_DIR

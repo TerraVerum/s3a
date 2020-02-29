@@ -171,9 +171,12 @@ class FRVertices(np.ndarray):
   connected = True
 
   def __new__(cls, inputArr: Union[list, np.ndarray]=None, connected=True, **kwargs):
+    # See numpy docs on subclassing ndarray
     if inputArr is None:
       inputArr = np.zeros((0,2))
-    arr = np.asarray(inputArr).view(cls)
+      if 'dtype' not in kwargs:
+        kwargs['dtype'] = int
+    arr = np.asarray(inputArr, **kwargs).view(cls)
     arr.connected = connected
     return arr
 
@@ -191,7 +194,7 @@ class FRVertices(np.ndarray):
 
   def asPoint(self):
     if self.size == 2:
-      return self.flatten()
+      return self.reshape(-1)
     # Reaching here means the user requested vertices as point when
     # more than one point is in the list
     raise FRIllFormedVertices(f'asPoint() can only be called when one vertex is in'

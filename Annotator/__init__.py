@@ -11,5 +11,3 @@ if appInst is None:
   appInst = QtWidgets.QApplication(sys.argv)
 # Now that the app was created with sys args, populate pg instance
 pg.mkQApp()
-# Change names so they can be labeled on export
-from .tablemodel import makeCompDf
