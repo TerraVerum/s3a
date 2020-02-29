@@ -3,7 +3,7 @@ from pyqtgraph.Qt import  QtCore, QtWidgets
 Slot = QtCore.pyqtSlot
 
 from .graphicsutils import create_addMenuAct
-from .imageareas import MainImageArea, FocusedImg
+from .imageareas import FRMainImage, FRFocusedImage
 from .tableview import CompTableView
 
 
@@ -26,7 +26,7 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     layout = QtWidgets.QVBoxLayout(centralwidget)
 
     # Important widgets
-    self.mainImg = MainImageArea(centralwidget)
+    self.mainImg = FRMainImage(centralwidget)
     # Hookup
     self.setCentralWidget(centralwidget)
     layout.addWidget(self.mainImg.drawOptsWidget)
@@ -43,7 +43,7 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     regionBtnLayout = QtWidgets.QHBoxLayout()
 
     # Important widgets
-    self.compImg = FocusedImg(focusedImgContents)
+    self.compImg = FRFocusedImage(focusedImgContents)
     self.curCompIdLbl = QtWidgets.QLabel(self.CUR_COMP_LBL)
     self.clearRegionBtn = QtWidgets.QPushButton('Clear', focusedImgContents)
     self.resetRegionBtn = QtWidgets.QPushButton('Reset', focusedImgContents)

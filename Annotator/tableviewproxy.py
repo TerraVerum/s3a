@@ -5,7 +5,7 @@ from Annotator.FRGraphics.parameditors import FR_SINGLETON
 from Annotator.constants import FR_CONSTS
 from Annotator.params import FRVertices
 from .FRGraphics import tableview
-from .FRGraphics.imageareas import MainImageArea
+from .FRGraphics.imageareas import FRMainImage
 from .FRGraphics.regions import MultiRegionPlot
 from .constants import TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES
 from .tablemodel import ComponentMgr
@@ -44,7 +44,7 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
 class CompDisplayFilter(QtCore.QObject):
   sigCompClicked = Signal(object)
 
-  def __init__(self, compMgr: ComponentMgr, mainImg: MainImageArea,
+  def __init__(self, compMgr: ComponentMgr, mainImg: FRMainImage,
                compTbl: tableview.CompTableView, parent=None):
     super().__init__(parent)
     filterEditor = FR_SINGLETON.filter

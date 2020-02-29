@@ -10,7 +10,6 @@ from pyqtgraph.Qt import QtGui, QtCore
 from Annotator.FRGraphics.parameditors import FR_SINGLETON
 from Annotator.FRGraphics.rois import SHAPE_ROI_MAPPING, FRExtendedROI
 from Annotator.constants import TEMPLATE_COMP as TC, FR_CONSTS
-from Annotator.interfaces import FRVertexDefinedImg
 from Annotator.params import FRParam, FRVertices
 from .parameditors import FR_SINGLETON
 from .clickables import ClickableScatterItem
@@ -241,6 +240,43 @@ class MultiRegionPlot(QtCore.QObject):
     self.data.drop(index=ids, inplace=True)
 
 
+class FRVertexDefinedImg:
+  def __init__(self):
+    self.image_np = np.zeros((1, 1), dtype='uint8')
+    self._offset = FRVertices([[0,0]], dtype='uint8')
+    self.verts = FRVertices(dtype=int)
+
+  def embedMaskInImg(self, toEmbedShape: Tuple[int, int]):
+    outImg = np.zeros(toEmbedShape, dtype=bool)
+    selfShape = self.image_np.shape
+    offset_pt = self._offset.asPoint()
+    # Offset is x-y, shape is row-col. So, swap order of offset relative to current axis
+    embedSlices = [slice(offset_pt[1 - ii], selfShape[ii] + offset_pt[1 - ii]) for ii in range(2)]
+    outImg[embedSlices[0], embedSlices[1]] = self.image_np
+    return outImg
+
+  def updateVertices(self, newVerts: FRVertices, offset: FRVertices=None):
+    self.verts = newVerts.copy()
+    if len(newVerts) == 0:
+      self.image_np = np.zeros((1, 1), dtype='bool')
+      return
+
+    if offset is not None:
+      self._offset = offset.astype(int)
+
+    newVerts -= self._offset
+
+    # cv.fillPoly requires list-of-lists format
+    fillPolyArg = splitListAtNans(newVerts)
+    nonNanVerts = newVerts.nonNanEntries().astype(int)
+    newImgShape = nonNanVerts.max(0)[::-1] + 1
+    regionData = np.zeros(newImgShape, dtype='uint8')
+    cv.fillPoly(regionData, fillPolyArg, 1)
+    # Make vertices full brightness
+    regionData[nonNanVerts.rows, nonNanVerts.cols] = 2
+    self.image_np = regionData
+
+
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_VERT_REGION)
 class FRVertexRegion(pg.ImageItem, FRVertexDefinedImg):
   @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_REG_FILL_COLOR)
@@ -248,16 +284,10 @@ class FRVertexRegion(pg.ImageItem, FRVertexDefinedImg):
   @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_REG_VERT_COLOR)
   def vertClr(self): pass
 
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-
-    self._offset = FRVertices()
-    self.verts = FRVertices()
-
-  def updateVertices(self, newVerts: FRVertices):
-    super().updateVertices(newVerts)
+  def updateVertices(self, newVerts: FRVertices, offset: FRVertices=None):
+    super().updateVertices(newVerts, offset)
     self.setImage(self.image_np, levels=[0,2], lut=self.getLUTFromScheme())
-    self.setPos(*self._offset)
+    self.setPos(*self._offset.asPoint())
 
 
   def getLUTFromScheme(self):

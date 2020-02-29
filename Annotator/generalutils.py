@@ -27,7 +27,7 @@ def nanConcatList(vertList) -> FRVertices:
   return FRVertices()
 
 
-def splitListAtNans(concatVerts:np.ndarray):
+def splitListAtNans(concatVerts:FRVertices):
   """
   Utility for taking a single list of nan-separated region vertices
   and breaking it into several regions with no nans.
