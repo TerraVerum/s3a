@@ -576,6 +576,8 @@ class AlgCollectionEditor(FRParamEditor):
     self.params.addChildren(mgrParams['children'])
     for param in self.params.children():
       self.tree.addParameters(param)
+    # Make sure all new names are properly displayed
+    self.tree.resizeColumnToContents(0)
 
     self.algOpts.setLimits(self.processors)
 
