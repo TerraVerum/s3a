@@ -6,10 +6,9 @@ from dataclasses import dataclass
 from functools import partial
 from os.path import join
 from pathlib import Path
-from typing import Sequence, Union, Callable, Any, Optional, List, Dict, Tuple
+from typing import Sequence, Union, Callable, Any, Optional, List, Dict, Tuple, Set
 
 import numpy as np
-from asn1crypto.core import Any
 
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
@@ -153,8 +152,28 @@ class FRParamEditor(QtWidgets.QDialog):
     self.resize(500, 400)
 
     self.boundFnsPerClass: Dict[str, List[FRBoundFnParams]] = {}
+    """Holds the parameters associated with this registered class"""
+
     self.classNameToParamMapping: Dict[str, FRParam] = {}
+    """
+    Allows the editor to associate a class name with its human-readable parameter
+    name
+    """
+
     self.classInstToEditorMapping: Dict[Any, FRParamEditor] = {}
+    """
+    For editors that register parameters for *other* editors (like
+    :class:`AlgPropsMgr`), this allows parameters to be updated from the
+    correct editor
+    """
+
+    self.instantiatedClassTypes = set()
+    """
+    Records whether classes with registered parameters have been instantiated. This way,
+    base classes with registered parameters but no instances will not appear in the 
+    parameter editor.
+    """
+
 
 
     # -----------
@@ -353,19 +372,22 @@ class FRParamEditor(QtWidgets.QDialog):
     """
     def classDecorator(cls):
       clsName = cls.__qualname__
-      self.addParamsFromClass(clsName, clsParam)
-      # Now that class params are registered, save off default file
-      if opts.get('saveDefault', True):
-        Path(self.saveDir).mkdir(parents=True, exist_ok=True)
-        with open(join(self.saveDir, f'Default.{self.fileType}'), 'wb') as ofile:
-          pkl.dump(self.params.saveState(), ofile)
-      self.classNameToParamMapping[clsName] = clsParam
       oldClsInit = cls.__init__
       self._extendedClassDecorator(cls, clsParam, **opts)
       def newClassInit(clsObj, *args, **kwargs):
         self.classInstToEditorMapping[clsObj] = self
-        retVal = oldClsInit(clsObj, *args, **kwargs)
+        # Don't add class parameters again if two of the same class instances were added
+        if cls not in self.instantiatedClassTypes:
+          self.instantiatedClassTypes.add(cls)
+          self.addParamsFromClass(cls, clsParam)
+          # Now that class params are registered, save off default file
+          if opts.get('saveDefault', True):
+            Path(self.saveDir).mkdir(parents=True, exist_ok=True)
+            with open(join(self.saveDir, f'Default.{self.fileType}'), 'wb') as ofile:
+              pkl.dump(self.params.saveState(), ofile)
+          self.classNameToParamMapping[clsName] = clsParam
 
+        retVal = oldClsInit(clsObj, *args, **kwargs)
         self._extendedClassInit(clsObj, clsParam)
         return retVal
       cls.__init__ = newClassInit
@@ -386,45 +408,50 @@ class FRParamEditor(QtWidgets.QDialog):
     Editors needing additional class decorator boilerplates will place it in this overloaded function
     """
 
-  def addParamsFromClass(self, clsName, clsParam: FRParam):
+  def addParamsFromClass(self, cls: Any, clsParam: FRParam):
     """
-    Once the top-level widget is set, we can construct the
-    parameter editor widget. Set the parent of each shortcut so they
-    can be used when focusing the main window, then construct the
-    editor widget.
+    For a given class, adds the registered parameters from that class to the respective
+    editor. This is how the dropdown menus in the editors are populated with the
+    user-specified variables.
 
-    :param clsName: Fully qualified name of the class
+    :param cls: Current class
 
     :param clsParam: :class:`FRParam` value encapsulating the human readable class name.
            This is how the class will be displayed in the :class:`ShortcutsEditor`.
 
     :return: None
     """
-    classParamList = self.boundFnsPerClass.get(clsName, [])
-    # Don't add a category unless at least one list element is present
-    if len(classParamList) == 0: return
-    # If a human-readable name was given, replace class name with human name
-    paramChildren = []
-    paramGroup = {'name': clsParam.name, 'type': 'group',
-                  'children': paramChildren}
-    for boundFn in classParamList:
-      paramForTree = {'name': boundFn.param.name,
-                       'type': boundFn.param.valType,
-                       'value': boundFn.param.value}
-      paramChildren.append(paramForTree)
-    # If this group already exists, append the children to the existing group
-    # instead of adding a new child
-    paramExists = False
-    existingParamIdx = None
-    for ii, param in enumerate(self.params.childs):
-      if param.name() == clsParam.name:
-        paramExists = True
-        existingParamIdx = ii
-        break
-    if paramExists:
-      self.params.childs[existingParamIdx].addChildren(paramChildren)
-    else:
-      self.params.addChild(paramGroup)
+    # Make sure to add parameters from registered base classes, too
+    iterClasses = [cls.__qualname__]
+    for baseCls in cls.__bases__:
+      iterClasses.append(baseCls.__qualname__)
+
+    for clsName in iterClasses:
+      classParamList = self.boundFnsPerClass.get(clsName, [])
+      # Don't add a category unless at least one list element is present
+      if len(classParamList) == 0: continue
+      # If a human-readable name was given, replace class name with human name
+      paramChildren = []
+      paramGroup = {'name': clsParam.name, 'type': 'group',
+                    'children': paramChildren}
+      for boundFn in classParamList:
+        paramForTree = {'name': boundFn.param.name,
+                         'type': boundFn.param.valType,
+                         'value': boundFn.param.value}
+        paramChildren.append(paramForTree)
+      # If this group already exists, append the children to the existing group
+      # instead of adding a new child
+      paramExists = False
+      existingParamIdx = None
+      for ii, param in enumerate(self.params.childs):
+        if param.name() == clsParam.name:
+          paramExists = True
+          existingParamIdx = ii
+          break
+      if paramExists:
+        self.params.childs[existingParamIdx].addChildren(paramChildren)
+      else:
+        self.params.addChild(paramGroup)
     # Make sure all new names are properly displayed
     self.tree.resizeColumnToContents(0)
     self._stateBeforeEdit = self.params.saveState()
@@ -532,17 +559,10 @@ class AlgCollectionEditor(FRParamEditor):
     self._image = newImg
 
   def build_attachParams(self, algMgr: AlgPropsMgr):
-    # Step 1: Construct parameter tree
-    mgrParams = algMgr.params.saveState()
-    self.params.clearChildren()
-    self.params.addChildren(mgrParams['children'])
-    for param in self.params.children():
-      self.tree.addParameters(param)
-
-    # Step 2: Instantiate all processor algorithms
+    # Step 1: Instantiate all processor algorithms
     for processorCtor in algMgr.processorCtors:
       processor = processorCtor()
-      # Step 3: For each instantiated process, hook up accessor functions to self's
+      # Step 2: For each instantiated process, hook up accessor functions to self's
       # parameter tree
       algMgr.classInstToEditorMapping[processor] = self
 
@@ -550,9 +570,14 @@ class AlgCollectionEditor(FRParamEditor):
       procParam = algMgr.classNameToParamMapping[clsName]
       self.processors.update({procParam.name: (procParam.name, processor)})
 
-    # Step 4: Determine the active processor object
+    # Step 3: Construct parameter tree
+    mgrParams = algMgr.params.saveState()
+    self.params.clearChildren()
+    self.params.addChildren(mgrParams['children'])
+    for param in self.params.children():
+      self.tree.addParameters(param)
+
     self.algOpts.setLimits(self.processors)
-    # Simulate arbitrary parameter selection
 
   def changeActiveAlg(self, selectedParam: Parameter, nameProcCombo: Tuple[str, FRImageProcessor]):
     # Hide all except current selection
@@ -585,7 +610,8 @@ class AlgPropsMgr(FRParamEditor):
   def createProcessorForClass(self, clsObj) -> AlgCollectionEditor:
     clsName = type(clsObj).__name__
     editorDir = join(MENU_OPTS_DIR, clsName, '')
-    newEditor = AlgCollectionEditor(editorDir, self, name=_camelCaseToTitle(clsName))
+    # Strip "FR" from class name before retrieving name
+    newEditor = AlgCollectionEditor(editorDir, self, name=_camelCaseToTitle(clsName[2:]))
     FR_SINGLETON.editors.append(newEditor)
     FR_SINGLETON.editorNames.append(newEditor.name)
     # Wrap in property so changes propagate to the calling class

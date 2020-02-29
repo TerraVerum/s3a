@@ -143,10 +143,6 @@ class BasicShapes(FRImageProcessor):
 
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_SQUARES)
 class OnlySquares(BasicShapes):
-  # Required for registering a processor that has no editable properties
-  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_N_A)
-  def _(self): pass
-
   def globalCompEstimate(self) -> List[FRVertices]:
     polyVerts = getVertsFromBwComps(getBwComps(self.image, self.minCompSz))
     outVerts = []
