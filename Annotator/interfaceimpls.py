@@ -21,15 +21,16 @@ class _FRDefaultAlgImpls(FRParamGroup):
   CLS_BASIC       : FRParam = newParam('Basic Shapes')
   CLS_SQUARES     : FRParam = newParam('Only Squares')
 
-  PROP_SEED_THRESH: FRParam = newParam('Seedpoint Threshold in Main Image', 10.)
-  PROP_MIN_COMP_SZ: FRParam = newParam('Minimum New Component Size (px)', 50)
-  PROP_NEW_COMP_SZ: FRParam = newParam('New Component Side Length (px)', 30)
-  PROP_MARGIN     : FRParam = newParam('New Component Margin (px)', 5)
-  PROP_GROW_OUT   : FRParam = newParam('Grow outward', False)
-  PROP_N_A        : FRParam = newParam('No Editable Properties', None, 'none')
+  PROP_SEED_THRESH    : FRParam = newParam('Seedpoint Threshold in Main Image', 10.)
+  PROP_MIN_COMP_SZ    : FRParam = newParam('Minimum New Component Size (px)', 50)
+  PROP_NEW_COMP_SZ    : FRParam = newParam('New Component Side Length (px)', 30)
+  PROP_MARGIN         : FRParam = newParam('New Component Margin (px)', 5)
+  PROP_GROW_OUT       : FRParam = newParam('Grow outward', False)
+  PROP_ALLOW_MULT_REG : FRParam = newParam('Allow Noncontiguous Vertices', False)
+  PROP_N_A            : FRParam = newParam('No Editable Properties', None, 'none')
 
-  SHC_GROW_OUT    : FRParam = newParam('Grow Outward', 'Ctrl+G,O', 'none')
-  SHC_GROW_IN    : FRParam = newParam('Grow Inward', 'Ctrl+G,I', 'none')
+  SHC_GROW_OUT : FRParam = newParam('Grow Outward', 'Ctrl+G,O', 'none')
+  SHC_GROW_IN  : FRParam = newParam('Grow Inward', 'Ctrl+G,I', 'none')
 
 IMPLS = _FRDefaultAlgImpls()
 
@@ -43,6 +44,8 @@ class RegionGrow(FRImageProcessor):
   def margin(self): pass
   @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_SEED_THRESH)
   def seedThresh(self): pass
+  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_ALLOW_MULT_REG)
+  def allowMultReg(self):pass
 
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices = None,
                         bgVerts: FRVertices = None) -> np.ndarray:
@@ -81,9 +84,18 @@ class RegionGrow(FRImageProcessor):
     rowColSlices = (slice(cropOffset[1], cropOffset[3]),
                     slice(cropOffset[0], cropOffset[2]))
     prevCompMask[rowColSlices] = bitOperation(prevCompMask[rowColSlices], newRegion)
-
+    if not self.allowMultReg:
+      # Take out all except the largest region
+      regions = regionprops(label(prevCompMask))
+      if len(regions) == 0: return prevCompMask
+      maxRegion = regions[0]
+      for region in regions:
+        if region.area > maxRegion.area:
+          maxRegion = region
+      prevCompMask[:] = False
+      prevCompMask[maxRegion.coords[:,0], maxRegion.coords[:,1]] = True
     # Remember to account for the vertex offset
-    return prevCompMask
+    return rmSmallComps(prevCompMask)
 
 
   def globalCompEstimate(self) -> List[FRComplexVertices]:
