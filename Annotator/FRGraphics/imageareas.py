@@ -1,4 +1,4 @@
-from typing import Union, Tuple, List
+from typing import Union, Tuple, List, Optional
 
 import numpy as np
 import pyqtgraph as pg
@@ -75,13 +75,11 @@ class FREditableImg(pg.PlotWidget):
     self.drawOptsWidget.selectOpt(self.drawAction)
     self.drawOptsWidget.selectOpt(self.shapeCollection.curShape)
 
-  def handleShapeFinished(self, roi: FRExtendedROI, fgBgVerts: List[FRVertices]=None, prevComp=None) \
-      -> np.ndarray:
+  def handleShapeFinished(self, roi: FRExtendedROI, fgVerts: FRVertices=None, bgVerts: FRVertices=None, prevComp=None) \
+      -> Optional[np.ndarray]:
     """
     Overloaded in child classes to process new regions
     """
-    newVerts = self.procCollection.curProcessor.localCompEstimate(prevComp, *fgBgVerts)
-    return newVerts
 
   def switchBtnMode(self, newMode: FRParam):
     for curDict in [self.drawOptsWidget.actionBtnParamMap.inv,
@@ -159,7 +157,8 @@ class FRMainImage(FREditableImg):
 
     self.switchBtnMode(FR_CONSTS.DRAW_ACT_ADD)
 
-  def handleShapeFinished(self, roi: FRExtendedROI, fgBgVerts: List[FRVertices]=None, prevComp=None):
+  def handleShapeFinished(self, roi: FRExtendedROI, fgVerts: FRVertices=None, bgVerts: FRVertices=None,
+                          prevComp=None) -> Optional[np.ndarray]:
     if self.drawAction == FR_CONSTS.DRAW_ACT_SELECT \
         and roi.connected:
       # Selection
@@ -171,7 +170,8 @@ class FRMainImage(FREditableImg):
       # background selection
       verts = self.shapeCollection.shapeVerts.astype(int)
 
-      newVerts = getVertsFromBwComps(super().handleShapeFinished(roi, [verts, None], prevComp))
+      newCompMask = self.procCollection.curProcessor.localCompEstimate(prevComp, verts, None)
+      newVerts = getVertsFromBwComps(newCompMask)
       if len(newVerts) == 0:
         return
       # TODO: Determine more robust solution for separated vertices. For now use largest component
@@ -225,7 +225,7 @@ class FRFocusedImage(FREditableImg):
 
     self.compSer = makeCompDf().squeeze()
     # Image representation of component boundaries
-    self.comp_np = np.zeros((1,1), bool)
+    self.compMask = np.zeros((1,1), bool)
 
     self.bbox = np.zeros((2, 2), dtype='int32')
     self.regionBuffer = FRRegionVertsUndoBuffer()
@@ -242,12 +242,12 @@ class FRFocusedImage(FREditableImg):
   def switchBtnMode(self, newMode: FRParam):
     super().switchBtnMode(newMode)
 
-  def handleShapeFinished(self, roi: FRExtendedROI, fgBgVerts: List[FRVertices]=None, prevComp=None):
+  def handleShapeFinished(self, roi: FRExtendedROI, fgVerts: FRVertices=None, bgVerts: FRVertices=None,
+                          prevComp=None) -> Optional[np.ndarray]:
     if self.drawAction == FR_CONSTS.DRAW_ACT_PAN:
       return
 
     # Component modification subject to processor
-    self.comp_np = self.region.embedMaskInImg(self.imgItem.image.shape[0:2])
     # For now assume a single point indicates foreground where multiple indicate
     # background selection
     verts = self.shapeCollection.shapeVerts.astype(int)
@@ -258,11 +258,12 @@ class FRFocusedImage(FREditableImg):
       fgBgVerts[1] = verts
     # Check for flood fill
 
-    newCompMask = super().handleShapeFinished(roi, fgBgVerts, prevComp)
-    self.region.updateFromMask(newCompMask)
+    self.compMask = self.procCollection.curProcessor.localCompEstimate(
+      self.compMask, *fgBgVerts)
+    self.region.updateFromMask(self.compMask)
 
   def updateAll(self, mainImg: np.array, newComp:df):
-    newVerts: FRComplexVertices = newComp[TC.VERTICES].squeeze()
+    newVerts: FRComplexVertices = newComp[TC.VERTICES]
     # Since values INSIDE the dataframe are reset instead of modified, there is no
     # need to go through the trouble of deep copying
     self.compSer = newComp.copy(deep=False)
@@ -277,7 +278,7 @@ class FRFocusedImage(FREditableImg):
     self.autoRange()
 
   def updateBbox(self, mainImgShape, newVerts: FRComplexVertices):
-    concatVerts = np.vstack(newVerts)
+    concatVerts = newVerts.stack()
     # Ignore NAN entries during computation
     bbox = np.vstack([concatVerts.min(0),
                       concatVerts.max(0)])
@@ -309,10 +310,12 @@ class FRFocusedImage(FREditableImg):
       vertList -= offset
     shouldUpdate = not self.region.vertsUpToDate \
                    or len(self.region.verts) != len(centeredVerts) \
-                   or not np.all(self.region.verts == centeredVerts)
+                   or not np.all(np.vstack([selfLst == newLst for selfLst, newLst
+                                  in zip(self.region.verts, centeredVerts)]))
     if shouldUpdate:
       self.regionBuffer.update(centeredVerts)
       self.region.updateFromVertices(centeredVerts)
+      self.compMask = self.region.embedMaskInImg(self.imgItem.image.shape[:2])
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_UNDO_MOD_REGION, [FR_ENUMS.BUFFER_UNDO])
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_REDO_MOD_REGION, [FR_ENUMS.BUFFER_REDO])

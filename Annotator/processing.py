@@ -124,6 +124,8 @@ def getVertsFromBwComps(bwmask: np.array, simplifyVerts=True, externOnly=False) 
   compVertices = []
   for contour in contours:
     compVertices.append(FRVertices(contour[:,0,:]))
+  if hierarchy is None:
+    hierarchy = np.ones((0,1,4), int)*-1
   return FRComplexVertices(compVertices, hierarchy[:,0,:])
 
 def segmentComp(compImg: np.array, maxDist: np.float, kernSz=10) -> np.array:
@@ -158,10 +160,9 @@ def growSeedpoint(img: np.array, seeds: FRVertices, thresh: float, minSz: int=0)
   shape = np.array(img.shape[0:2])
   bwOut = np.zeros(shape, dtype=bool)
   # Turn x-y vertices into row-col seeds
-  seeds = np.vstack(seeds)[:, ::-1]
+  seeds = seeds[:, ::-1]
   # Remove seeds that don't fit in the image
   seeds = seeds[np.all(seeds >= 0, 1)]
-  # Compare row-col shape against x-y vertices
   seeds = seeds[np.all(seeds < shape, 1)]
 
   for seed in seeds:
