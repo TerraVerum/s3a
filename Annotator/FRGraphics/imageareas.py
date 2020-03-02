@@ -176,7 +176,7 @@ class FRMainImage(FREditableImg):
         return
       # TODO: Determine more robust solution for separated vertices. For now use largest component
       newComp = makeCompDf(1)
-      newComp[TC.VERTICES] = [newVerts]
+      newComp[TC.VERTICES] = [newVerts.copy()]
       self.sigComponentCreated.emit(newComp)
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_FG, [FR_CONSTS.DRAW_ACT_ADD])
@@ -305,7 +305,7 @@ class FRFocusedImage(FREditableImg):
     # Make a copy of each list first so we aren't modifying the
     # original data
     centeredVerts = newVerts.copy()
-    for vertList in newVerts:
+    for vertList in centeredVerts:
       vertList -= offset
     shouldUpdate = not self.region.vertsUpToDate \
                    or len(self.region.verts) != len(centeredVerts) \
@@ -332,9 +332,9 @@ class FRFocusedImage(FREditableImg):
   def saveNewVerts(self):
     # Add in offset from main image to FRVertexRegion vertices
     if not self.region.vertsUpToDate:
-      newVerts = getVertsFromBwComps(self.region.image_np)
+      newVerts = getVertsFromBwComps(self.region.image_np).copy()
     else:
-      newVerts = self.region.verts
+      newVerts = self.region.verts.copy()
     for vertList in newVerts:
       vertList += self.bbox[0,:]
     self.compSer.loc[TC.VERTICES] = newVerts

@@ -7,7 +7,7 @@ from typing import List
 
 from Annotator.generalutils import splitListAtNans, nanConcatList, largestList
 from Annotator.params import FRParamGroup, FRParam, newParam, FRComplexVertices
-from Annotator.processing import growSeedpoint
+from Annotator.processing import growSeedpoint, rmSmallComps
 from .FRGraphics.parameditors import FR_SINGLETON
 from .generalutils import getClippedBbox
 from Annotator.interfaces import FRImageProcessor
@@ -107,7 +107,7 @@ class BasicShapes(FRImageProcessor):
     return [FRComplexVertices(lst) for lst in initialList]
 
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices=None, bgVerts: FRVertices=None) -> \
-      FRVertices:
+      np.ndarray:
     # Don't modify the original version
     prevCompMask = prevCompMask.copy()
     # Convert indices into boolean index masks
@@ -123,7 +123,7 @@ class BasicShapes(FRImageProcessor):
     subRegion = ~masks[0] & masks[1]
     prevCompMask |= addRegion
     prevCompMask &= (~subRegion)
-    return prevCompMask
+    return rmSmallComps(prevCompMask, self.minCompSz)
 
 
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_SQUARES)

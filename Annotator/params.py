@@ -193,7 +193,7 @@ class FRComplexVertices(np.ndarray):
     elif hierarchy is None and numInpts <= 1:
       # Default hierarchy for a one- or zero-object contour list
       hierarchy = np.ones((numInpts, 4), dtype=int)*-1
-    arr = np.asarray(inputArr, **kwargs).view(cls)
+    arr = np.asarray(inputArr, dtype=object, **kwargs).view(cls)
     arr.hierarchy = hierarchy
     return arr
 
@@ -239,12 +239,10 @@ class FRComplexVertices(np.ndarray):
     """
     return self[self.hierarchy[:,3] == -1]
 
-
   def holeVerts(self) -> FRComplexVertices:
     """
     Retrieves all vertex lists corresponding to holes in the complex shape
     """
-    if len(self) == 0: return np.array([])
     return self[self.hierarchy[:, 3] != -1]
 
   def __str__(self) -> str:
@@ -257,3 +255,9 @@ class FRComplexVertices(np.ndarray):
     return f'Mean:\t{np.round(concatVerts.mean(0), 1)}\n' \
            f'Min:\t{concatVerts.min(0)}\n' \
            f'Max:\t{concatVerts.max(0)}'
+
+  def copy(self, order='C'):
+    """
+    Ensures inner list elements also get copied, which doesn't happen in the default copy.
+    """
+    return FRComplexVertices([lst.copy() for lst in self], self.hierarchy)
