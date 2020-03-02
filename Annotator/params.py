@@ -173,7 +173,7 @@ class FRVertices(np.ndarray):
   @cols.setter
   def cols(self, newCols):self.x = newCols
 
-class FRComplexVertices(np.ndarray):
+class FRComplexVertices(list):
   """
   Allows holes in the component shape. Subclassing ndarray instead of list allows primitive algebraic ops on the list
   contents (e.g. subtracting/adding offset). Since normal usage doesn't typically require a mutable structure, the
@@ -182,28 +182,23 @@ class FRComplexVertices(np.ndarray):
   hierarchy = np.ones((0,4), dtype=int)
   """See cv.findContours for hierarchy explanation. Used in cv.RETR_CCOMP mode."""
 
-  def __new__(cls, inputArr: Union[List[FRVertices], np.ndarray]=None, hierarchy: np.ndarray=None, **kwargs):
-    if inputArr is None:
+  def __init__(self, inputArr: Union[List[FRVertices], np.ndarray]=None, hierarchy: np.ndarray=None, **kwargs):
+    if inputArr is None or len(inputArr) == 0:
       inputArr = [FRVertices()]
+    super().__init__(inputArr)
     # No hierarchy required unless list is longer than length 1
     numInpts = len(inputArr)
-    if numInpts  > 1 and hierarchy is None:
+    if numInpts > 1 and hierarchy is None:
       raise FRIllFormedVertices(f'Must pass a hierarchy with any complex vertices of more than one vertex list, '
                                 f'received vertex list of length {numInpts}')
     elif hierarchy is None and numInpts <= 1:
       # Default hierarchy for a one- or zero-object contour list
       hierarchy = np.ones((numInpts, 4), dtype=int)*-1
-    arr = np.asarray(inputArr, dtype=object, **kwargs).view(cls)
-    arr.hierarchy = hierarchy
-    return arr
-
-  def __array_finalize__(self, obj):
-    if obj is None: return
-    self.hierarchy = getattr(obj, 'hierarchy', None)
+    self.hierarchy = hierarchy
 
   @property
   def x_flat(self):
-    return np.vstack(self).view(FRVertices).x
+    return self.stack().x
 
   @property
   def x(self):
@@ -215,7 +210,7 @@ class FRComplexVertices(np.ndarray):
 
   @property
   def y_flat(self):
-    return np.vstack(self).view(FRVertices).y
+    return self.stack().y
 
   @property
   def y(self):
@@ -233,17 +228,26 @@ class FRComplexVertices(np.ndarray):
       raise FRIllFormedVertices(f'Can only treat FRComplexVertices with one inner list as a point.'
                                 f' Current list has {len(self)} elements.')
 
+  def stack(self, newDtype=int) -> FRVertices:
+    if len(self) == 0:
+      # Check required for np vstack since it won't work with a 0-element array
+      return FRVertices()
+    else:
+      return FRVertices(np.vstack(self), dtype=newDtype)
+
   def filledVerts(self) -> FRComplexVertices:
     """
     Retrieves all vertex lists corresponding to filled regions in the complex shape
     """
-    return self[self.hierarchy[:,3] == -1]
+    idxs = np.nonzero(self.hierarchy[:,3] == -1)[0]
+    return FRComplexVertices([self[ii] for ii in idxs])
 
   def holeVerts(self) -> FRComplexVertices:
     """
     Retrieves all vertex lists corresponding to holes in the complex shape
     """
-    return self[self.hierarchy[:, 3] != -1]
+    idxs = np.nonzero(self.hierarchy[:,3] != -1)[0]
+    return FRComplexVertices([self[ii] for ii in idxs])
 
   def __str__(self) -> str:
     """
@@ -251,7 +255,7 @@ class FRComplexVertices(np.ndarray):
     :return: Human readable string representation
     """
     if len(self) <= 4: return super().__str__()
-    concatVerts = np.vstack(self)
+    concatVerts = self.stack()
     return f'Mean:\t{np.round(concatVerts.mean(0), 1)}\n' \
            f'Min:\t{concatVerts.min(0)}\n' \
            f'Max:\t{concatVerts.max(0)}'

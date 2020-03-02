@@ -270,7 +270,7 @@ class ComponentMgr(CompTableModel):
         # Image shape from row-col -> x-y
         imShape = np.array(imShape[1::-1])[None,:]
         # Remove components whose vertices go over any image edges
-        vertMaxs = [np.vstack(verts).max(0) for verts in csvDf[TC.VERTICES] if len(verts) > 0]
+        vertMaxs = [verts.stack().max(0) for verts in csvDf[TC.VERTICES] if len(verts) > 0]
         vertMaxs = np.vstack(vertMaxs)
         offendingIds = np.nonzero(np.any(vertMaxs >= imShape, axis=1))[0]
         if len(offendingIds) > 0:

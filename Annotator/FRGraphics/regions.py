@@ -184,7 +184,6 @@ class MultiRegionPlot(QtCore.QObject):
       # Before stacking regions, add first point of region to end of region vertices.
       # This will make the whole region connected in the output plot
       # Insert nan to make separate components unconnected
-      #concatRegion = np.vstack((concatRegion, concatRegion[0,:], self._nanSep))
       plotRegions.append(concatRegion)
     idLocs = np.vstack(idLocs)
     # TODO: If the 'development' branch of pyqtgraph is set up, the clickable portion of each
@@ -277,7 +276,7 @@ class FRVertexDefinedImg(pg.ImageItem):
     for vertList in newVerts:
       vertList -= self._offset
 
-    newImgShape = np.vstack(newVerts).max(0)[::-1] + 1
+    newImgShape = newVerts.stack().max(0)[::-1] + 1
     regionData = np.zeros(newImgShape, dtype='uint8')
     cv.fillPoly(regionData, newVerts, 1)
     # Make vertices full brightness

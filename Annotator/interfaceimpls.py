@@ -46,8 +46,11 @@ class RegionGrow(FRImageProcessor):
 
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices = None,
                         bgVerts: FRVertices = None) -> np.ndarray:
-    # Don't modify the original version
-    prevCompMask = prevCompMask.copy()
+    if prevCompMask is None:
+      prevCompMask = np.zeros(self.image.shape[:2], dtype=bool)
+    else:
+      # Don't modify the original version
+      prevCompMask = prevCompMask.copy()
     # TODO: Make this code more robust
     if fgVerts is None:
       # Add to background
@@ -72,8 +75,7 @@ class RegionGrow(FRImageProcessor):
       # Use all vertex points, not just the defined corners
       tmpImg = np.zeros(croppedImg.shape[0:2], dtype='uint8')
       tmpBwShape = cv.fillPoly(tmpImg, [centeredFgVerts], 1)
-      centeredFgVerts = getVertsFromBwComps(tmpBwShape,simplifyVerts=False).filledVerts()
-      centeredFgVerts = np.vstack(centeredFgVerts)
+      centeredFgVerts = getVertsFromBwComps(tmpBwShape,simplifyVerts=False).filledVerts().stack()
 
     newRegion = growFunc(croppedImg, centeredFgVerts, self.seedThresh, self.minCompSz)
     rowColSlices = (slice(cropOffset[1], cropOffset[3]),
