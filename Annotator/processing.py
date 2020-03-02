@@ -13,7 +13,7 @@ from imageprocessing.processing import ABImage
 from typing import List
 
 from .generalutils import getClippedBbox
-from .params import FRVertices
+from .params import FRVertices, FRComplexVertices
 
 def getBwComps(img: np.ndarray, minSz=30):
   bwOut = bwBgMask(img)
@@ -52,8 +52,6 @@ def getBwComps_segmentation(img: np.ndarray) -> np.ndarray:
   colorBroadcast = np.zeros((1,1,3),dtype='uint8')
   colorBroadcast[0,0,2] = 255
 
-  win = overlayImgs(colorLabelsWithMean(segImg, img), img, bwHullImg.astype('uint8')[:,:,None]*colorBroadcast)
-  win.show()
   seedpoints = getVertsFromBwComps(bwHullImg, simplifyVerts=False)
   for compVerts in seedpoints:
     # Vertices are x-y, convert to row-col
@@ -112,18 +110,21 @@ def bwBgMask(img: np.array) -> np.array:
   return mask
 
 
-def getVertsFromBwComps(bwmask: np.array, simplifyVerts=True) -> List[FRVertices]:
-  approxMethod = cv.CHAIN_APPROX_SIMPLE
+def getVertsFromBwComps(bwmask: np.array, simplifyVerts=True, externOnly=False) -> FRComplexVertices:
+  approxMethod = cv.CHAIN_APPROX_TC89_KCOS
   if not simplifyVerts:
     approxMethod = cv.CHAIN_APPROX_NONE
+  retrMethod = cv.RETR_CCOMP
+  if externOnly:
+    retrMethod = cv.RETR_EXTERNAL
   # Contours are on the inside of components, so dilate first to make sure they are on the
   # outside
   #bwmask = dilation(bwmask, np.ones((3,3), dtype=bool))
-  contours, _ = cv.findContours(bwmask.astype('uint8'), cv.RETR_EXTERNAL, approxMethod)
+  contours, hierarchy = cv.findContours(bwmask.astype('uint8'), retrMethod, approxMethod)
   compVertices = []
   for contour in contours:
     compVertices.append(FRVertices(contour[:,0,:]))
-  return compVertices
+  return FRComplexVertices(compVertices, hierarchy[:,0,:])
 
 def segmentComp(compImg: np.array, maxDist: np.float, kernSz=10) -> np.array:
   # For maxDist of 0, the input isn't changed and it takes a long time
@@ -157,9 +158,8 @@ def growSeedpoint(img: np.array, seeds: FRVertices, thresh: float, minSz: int=0)
   shape = np.array(img.shape[0:2])
   bwOut = np.zeros(shape, dtype=bool)
   # Turn x-y vertices into row-col seeds
-  seeds = seeds[:, ::-1].astype(int)
-  # Remove seeds that don't fit in the image or are nan
-  seeds = seeds.nonNanEntries()
+  seeds = np.vstack(seeds)[:, ::-1]
+  # Remove seeds that don't fit in the image
   seeds = seeds[np.all(seeds >= 0, 1)]
   # Compare row-col shape against x-y vertices
   seeds = seeds[np.all(seeds < shape, 1)]
