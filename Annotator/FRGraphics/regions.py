@@ -14,7 +14,7 @@ from Annotator.params import FRParam, FRVertices, FRComplexVertices
 from Annotator.processing import getVertsFromBwComps
 from .parameditors import FR_SINGLETON
 from .clickables import ClickableScatterItem
-from Annotator.generalutils import coerceDfTypes, splitListAtNans
+from Annotator.generalutils import coerceDfTypes, nanConcatList
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
@@ -178,13 +178,13 @@ class MultiRegionPlot(QtCore.QObject):
     idLocs = [np.ones((0,2))]
 
     for region in self.data.loc[:, TC.VERTICES]:
-      concatRegion = np.vstack(region)
-      idLoc = np.mean(concatRegion, 0)
+      concatRegion = nanConcatList(region)
+      idLoc = np.nanmean(concatRegion, 0)
       idLocs.append(idLoc)
       # Before stacking regions, add first point of region to end of region vertices.
       # This will make the whole region connected in the output plot
       # Insert nan to make separate components unconnected
-      concatRegion = np.vstack((concatRegion, concatRegion[0,:], self._nanSep))
+      #concatRegion = np.vstack((concatRegion, concatRegion[0,:], self._nanSep))
       plotRegions.append(concatRegion)
     idLocs = np.vstack(idLocs)
     # TODO: If the 'development' branch of pyqtgraph is set up, the clickable portion of each

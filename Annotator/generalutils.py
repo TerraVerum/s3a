@@ -13,18 +13,18 @@ def nanConcatList(vertList) -> FRVertices:
   Utility for concatenating all vertices within a list while adding
   NaN entries between each separate list
   """
-  if isinstance(vertList, np.ndarray):
-    vertList = [vertList]
   nanSep = np.ones((1,2), dtype=int)*np.nan
   allVerts = []
   for curVerts in vertList:
     allVerts.append(curVerts)
+    # Close the current shape
+    allVerts.append(curVerts[0,:])
     allVerts.append(nanSep)
   # Take away last nan if it exists
   # if len(allVerts) > 0:
   #   allVerts.pop()
-    return FRVertices(np.vstack(allVerts))
-  return FRVertices()
+  return FRVertices(np.vstack(allVerts), dtype=float)
+  #return FRVertices(dtype=float)
 
 
 def splitListAtNans(concatVerts:FRVertices):
