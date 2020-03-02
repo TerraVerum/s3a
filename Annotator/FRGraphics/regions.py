@@ -10,7 +10,8 @@ from pyqtgraph.Qt import QtGui, QtCore
 from Annotator.FRGraphics.parameditors import FR_SINGLETON
 from Annotator.FRGraphics.rois import SHAPE_ROI_MAPPING, FRExtendedROI
 from Annotator.constants import TEMPLATE_COMP as TC, FR_CONSTS
-from Annotator.params import FRParam, FRVertices
+from Annotator.params import FRParam, FRVertices, FRComplexVertices
+from Annotator.processing import getVertsFromBwComps
 from .parameditors import FR_SINGLETON
 from .clickables import ClickableScatterItem
 from Annotator.generalutils import coerceDfTypes, splitListAtNans
@@ -64,7 +65,7 @@ class FRShapeCollection(QtCore.QObject):
     posRelToImg = imgItem.mapFromScene(ev.pos())
     # Form of rate-limiting -- only simulate click if the next pixel is at least one away
     # from the previous pixel location
-    xyCoord = FRVertices([[posRelToImg.x(), posRelToImg.y()]])
+    xyCoord = FRVertices([[posRelToImg.x(), posRelToImg.y()]], dtype=float)
     curRoi = self.roiForShape[self.curShape]
     constructingRoi, self.shapeVerts = curRoi.updateShape(ev, xyCoord)
     if self.shapeVerts is not None:
@@ -145,6 +146,7 @@ class MultiRegionPlot(QtCore.QObject):
     self.boundPlt = pg.PlotDataItem(connect='finite')
     self.idPlts = ClickableScatterItem(pen=None)
     self.idPlts.sigClicked.connect(self.scatPltClicked)
+    # Cache nan sep due to its frequent use
     self._nanSep = np.empty((1,2)) * np.nan
     self.data = makeMultiRegionDf(0)
 
@@ -176,18 +178,19 @@ class MultiRegionPlot(QtCore.QObject):
     idLocs = [np.ones((0,2))]
 
     for region in self.data.loc[:, TC.VERTICES]:
-      idLoc = np.nanmean(region, 0).reshape(1,2)
+      concatRegion = np.vstack(region)
+      idLoc = np.mean(concatRegion, 0)
       idLocs.append(idLoc)
       # Before stacking regions, add first point of region to end of region vertices.
       # This will make the whole region connected in the output plot
       # Insert nan to make separate components unconnected
-      region = np.vstack((region, region[0,:], self._nanSep))
-      plotRegions.append(region)
+      concatRegion = np.vstack((concatRegion, concatRegion[0,:], self._nanSep))
+      plotRegions.append(concatRegion)
     idLocs = np.vstack(idLocs)
     # TODO: If the 'development' branch of pyqtgraph is set up, the clickable portion of each
-    # plot will be the ID of the component. Otherwise it must be a non-descript item.
+    #   plot can be the ID of the component. Otherwise it must be a non-descript item.
     #scatSymbols = [_makeTxtSymbol(str(curId), idSz) for curId in self.data.index]
-    scatSymbols = [None for curId in self.data.index]
+    scatSymbols = [None]*len(self.data)
 
     brushes = np.empty(len(self.data), dtype=object)
     brushes.fill(pg.mkBrush(self.nonvalidIdClr))
@@ -239,7 +242,7 @@ class MultiRegionPlot(QtCore.QObject):
   def drop(self, ids):
     self.data.drop(index=ids, inplace=True)
 
-@FR_SINGLETON.registerClass(FR_CONSTS.CLS_VERT_REGION)
+@FR_SINGLETON.registerClass(FR_CONSTS.CLS_VERT_IMG)
 class FRVertexDefinedImg(pg.ImageItem):
   @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_REG_FILL_COLOR)
   def fillClr(self):pass
@@ -248,9 +251,10 @@ class FRVertexDefinedImg(pg.ImageItem):
 
   def __init__(self):
     super().__init__()
+    self.vertsUpToDate = True
     self.image_np = np.zeros((1, 1), dtype='uint8')
-    self._offset = FRVertices([[0,0]], dtype='uint8')
-    self.verts = FRVertices(dtype=int)
+    self._offset = FRVertices([[0,0]])
+    self.verts = FRComplexVertices()
 
   def embedMaskInImg(self, toEmbedShape: Tuple[int, int]):
     outImg = np.zeros(toEmbedShape, dtype=bool)
@@ -261,7 +265,7 @@ class FRVertexDefinedImg(pg.ImageItem):
     outImg[embedSlices[0], embedSlices[1]] = self.image_np
     return outImg
 
-  def updateVertices(self, newVerts: FRVertices, offset: FRVertices=None):
+  def updateFromVertices(self, newVerts: FRComplexVertices, offset: FRVertices=None):
     self.verts = newVerts.copy()
     if len(newVerts) == 0:
       self.image_np = np.zeros((1, 1), dtype='bool')
@@ -270,20 +274,29 @@ class FRVertexDefinedImg(pg.ImageItem):
     if offset is not None:
       self._offset = offset.astype(int).view(FRVertices)
 
-    newVerts -= self._offset
+    for vertList in newVerts:
+      vertList -= self._offset
 
-    # cv.fillPoly requires list-of-lists format
-    fillPolyArg = splitListAtNans(newVerts)
-    nonNanVerts = newVerts.nonNanEntries().astype(int)
-    newImgShape = nonNanVerts.max(0)[::-1] + 1
+    newImgShape = np.vstack(newVerts).max(0)[::-1] + 1
     regionData = np.zeros(newImgShape, dtype='uint8')
-    cv.fillPoly(regionData, fillPolyArg, 1)
+    cv.fillPoly(regionData, newVerts, 1)
     # Make vertices full brightness
-    regionData[nonNanVerts.rows, nonNanVerts.cols] = 2
+    regionData[newVerts.y_flat, newVerts.x_flat] = 2
     self.image_np = regionData
 
     self.setImage(regionData, levels=[0, 2], lut=self.getLUTFromScheme())
     self.setPos(*self._offset.asPoint())
+    self.vertsUpToDate = True
+
+  def updateFromMask(self, newMask: np.ndarray):
+    # It is expensive to color the vertices, so only find contours if specified by the user
+    newMask = newMask.astype('uint8')
+    if self.fillClr != self.vertClr:
+      verts = getVertsFromBwComps(newMask)
+      newMask[verts.y_flat, verts.x_flat] = 2
+    self.setImage(newMask, levels=[0,2], lut=self.getLUTFromScheme())
+    self.setPos(0,0)
+    self.vertsUpToDate = False
 
   def getLUTFromScheme(self):
     lut = [(0, 0, 0, 0)]

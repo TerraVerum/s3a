@@ -82,7 +82,7 @@ class FRRectROI(pg.RectROI, FRROIExtension):
   def __init__(self):
     super().__init__([-1,-1], [0,0], invertible=True)
 
-  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: np.ndarray) -> (
+  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: FRVertices) -> (
       bool, Optional[FRVertices]):
     """
     See function signature for :func:`FRExtendedROI.updateShape`
@@ -129,7 +129,7 @@ class FRRectROI(pg.RectROI, FRROIExtension):
     otherCorners = [sz * [0, 1], sz * [1, 1], sz * [1, 0]]
 
     verts_np = np.vstack([origin, *(origin + otherCorners)])
-    verts = FRVertices(verts_np, connected=self.connected)
+    verts = FRVertices(verts_np, connected=self.connected, dtype=float)
     return verts
 
 class FRPolygonROI(pg.PolyLineROI, FRROIExtension):
@@ -202,9 +202,9 @@ class FRPolygonROI(pg.PolyLineROI, FRROIExtension):
     origin = np.array(self.pos())
     if len(self.handles) > 0:
       verts_np = np.array([(h['pos'].x(), h['pos'].y()) for h in self.handles]) + origin
-      return FRVertices(verts_np, connected=self.connected)
+      return FRVertices(verts_np, connected=self.connected, dtype=float)
     else:
-      return FRVertices(connected=self.connected)
+      return FRVertices(connected=self.connected, dtype=float)
 
 class FRPaintFillROI(FRPolygonROI):
 

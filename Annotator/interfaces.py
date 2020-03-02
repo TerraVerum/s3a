@@ -11,7 +11,7 @@ class FRImageProcessor(ABC):
 
   @abstractmethod
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices=None, bgVerts: FRVertices=None) -> \
-      FRVertices:
+      np.ndarray:
     pass
 
   @abstractmethod

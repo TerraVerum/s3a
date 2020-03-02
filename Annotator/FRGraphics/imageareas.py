@@ -7,6 +7,8 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 from Annotator.FRGraphics.regions import FRVertexDefinedImg
+from Annotator.params import FRComplexVertices
+from Annotator.processing import getVertsFromBwComps
 from .clickables import RightPanViewBox
 from .drawopts import FRDrawOpts
 from .parameditors import FR_SINGLETON
@@ -74,7 +76,7 @@ class FREditableImg(pg.PlotWidget):
     self.drawOptsWidget.selectOpt(self.shapeCollection.curShape)
 
   def handleShapeFinished(self, roi: FRExtendedROI, fgBgVerts: List[FRVertices]=None, prevComp=None) \
-      -> FRVertices:
+      -> np.ndarray:
     """
     Overloaded in child classes to process new regions
     """
@@ -155,6 +157,8 @@ class FRMainImage(FREditableImg):
     # -----
     self.setImage(imgSrc)
 
+    self.switchBtnMode(FR_CONSTS.DRAW_ACT_ADD)
+
   def handleShapeFinished(self, roi: FRExtendedROI, fgBgVerts: List[FRVertices]=None, prevComp=None):
     if self.drawAction == FR_CONSTS.DRAW_ACT_SELECT \
         and roi.connected:
@@ -167,7 +171,7 @@ class FRMainImage(FREditableImg):
       # background selection
       verts = self.shapeCollection.shapeVerts.astype(int)
 
-      newVerts = super().handleShapeFinished(roi, [verts, None], prevComp)
+      newVerts = getVertsFromBwComps(super().handleShapeFinished(roi, [verts, None], prevComp))
       if len(newVerts) == 0:
         return
       # TODO: Determine more robust solution for separated vertices. For now use largest component
@@ -220,9 +224,14 @@ class FRFocusedImage(FREditableImg):
     self.addItem(self.region)
 
     self.compSer = makeCompDf().squeeze()
+    # Image representation of component boundaries
+    self.comp_np = np.zeros((1,1), bool)
 
     self.bbox = np.zeros((2, 2), dtype='int32')
     self.regionBuffer = FRRegionVertsUndoBuffer()
+
+    self.switchBtnMode(FR_CONSTS.DRAW_ACT_ADD)
+    self.switchBtnMode(FR_CONSTS.DRAW_SHAPE_PAINT)
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_BG, [FR_CONSTS.DRAW_ACT_REM])
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_FG, [FR_CONSTS.DRAW_ACT_ADD])
@@ -238,7 +247,7 @@ class FRFocusedImage(FREditableImg):
       return
 
     # Component modification subject to processor
-    prevComp = self.region.embedMaskInImg(self.imgItem.image.shape[0:2])
+    self.comp_np = self.region.embedMaskInImg(self.imgItem.image.shape[0:2])
     # For now assume a single point indicates foreground where multiple indicate
     # background selection
     verts = self.shapeCollection.shapeVerts.astype(int)
@@ -249,11 +258,11 @@ class FRFocusedImage(FREditableImg):
       fgBgVerts[1] = verts
     # Check for flood fill
 
-    newVerts = super().handleShapeFinished(roi, fgBgVerts, prevComp)
-    self.updateRegionFromVerts(newVerts, offset=[[0,0]])
+    newCompMask = super().handleShapeFinished(roi, fgBgVerts, prevComp)
+    self.region.updateFromMask(newCompMask)
 
   def updateAll(self, mainImg: np.array, newComp:df):
-    newVerts = newComp[TC.VERTICES].squeeze()
+    newVerts: FRComplexVertices = newComp[TC.VERTICES].squeeze()
     # Since values INSIDE the dataframe are reset instead of modified, there is no
     # need to go through the trouble of deep copying
     self.compSer = newComp.copy(deep=False)
@@ -264,13 +273,14 @@ class FRFocusedImage(FREditableImg):
     # Propagate all resultant changes
     self.updateBbox(mainImg.shape, newVerts)
     self.updateCompImg(mainImg)
-    self.updateRegionFromVerts(FRVertices(newVerts))
+    self.updateRegionFromVerts(newVerts)
     self.autoRange()
 
-  def updateBbox(self, mainImgShape, newVerts: np.ndarray):
+  def updateBbox(self, mainImgShape, newVerts: FRComplexVertices):
+    concatVerts = np.vstack(newVerts)
     # Ignore NAN entries during computation
-    bbox = np.vstack([np.nanmin(newVerts, 0),
-          np.nanmax(newVerts, 0)])
+    bbox = np.vstack([concatVerts.min(0),
+                      concatVerts.max(0)])
     # Account for margins
     self.bbox = getClippedBbox(mainImgShape, bbox, self.compCropMargin)
 
@@ -285,22 +295,24 @@ class FRFocusedImage(FREditableImg):
     self.imgItem.setImage(segImg)
     self.procCollection.image = segImg
 
-  def updateRegionFromVerts(self, newVerts: FRVertices, offset=None):
+  def updateRegionFromVerts(self, newVerts: FRComplexVertices, offset=None):
     # Component vertices are nan-separated regions
     if offset is None:
       offset = self.bbox[0,:]
     if newVerts is None:
-      newVerts = FRVertices(dtype=int)
+      newVerts = [FRVertices(dtype=int)]
     # 0-center new vertices relative to FRFocusedImage image
     # Make a copy of each list first so we aren't modifying the
     # original data
     centeredVerts = newVerts.copy()
-    centeredVerts -= offset
-    shouldUpdate = len(self.region.verts) != len(centeredVerts) \
-      or not np.all(self.region.verts == centeredVerts)
+    for vertList in newVerts:
+      vertList -= offset
+    shouldUpdate = not self.region.vertsUpToDate \
+                   or len(self.region.verts) != len(centeredVerts) \
+                   or not np.all(self.region.verts == centeredVerts)
     if shouldUpdate:
       self.regionBuffer.update(centeredVerts)
-      self.region.updateVertices(centeredVerts)
+      self.region.updateFromVertices(centeredVerts)
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_UNDO_MOD_REGION, [FR_ENUMS.BUFFER_UNDO])
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_REDO_MOD_REGION, [FR_ENUMS.BUFFER_REDO])
@@ -310,13 +322,19 @@ class FRFocusedImage(FREditableImg):
     if self.imgItem.image is None:
       return
     if undoOrRedo == FR_ENUMS.BUFFER_UNDO:
-      self.region.updateVertices(self.regionBuffer.undo_getObj(), offset=offset)
+      self.region.updateFromVertices(self.regionBuffer.undo_getObj(), offset=offset)
     elif undoOrRedo == FR_ENUMS.BUFFER_REDO:
-      self.region.updateVertices(self.regionBuffer.redo_getObj(), offset=offset)
+      self.region.updateFromVertices(self.regionBuffer.redo_getObj(), offset=offset)
 
   def clearCurDrawShape(self):
     super().clearCurDrawShape()
 
   def saveNewVerts(self):
     # Add in offset from main image to FRVertexRegion vertices
-    self.compSer.loc[TC.VERTICES] = self.region.verts + self.bbox[0,:]
+    if not self.region.vertsUpToDate:
+      newVerts = getVertsFromBwComps(self.region.image_np)
+    else:
+      newVerts = self.region.verts
+    for vertList in newVerts:
+      vertList += self.bbox[0,:]
+    self.compSer.loc[TC.VERTICES] = newVerts

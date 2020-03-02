@@ -123,8 +123,9 @@ class FRVertices(np.ndarray):
     # See numpy docs on subclassing ndarray
     if inputArr is None:
       inputArr = np.zeros((0,2))
-      if 'dtype' not in kwargs:
-        kwargs['dtype'] = int
+    # Default to integer type if not specified, since this is how pixel coordinates will be represented anyway
+    if 'dtype' not in kwargs:
+      kwargs['dtype'] = int
     arr = np.asarray(inputArr, **kwargs).view(cls)
     arr.connected = connected
     return arr
@@ -149,10 +150,6 @@ class FRVertices(np.ndarray):
     raise FRIllFormedVertices(f'asPoint() can only be called when one vertex is in'
                               f' the vertex list. Currently has shape {self.shape}')
 
-  def nonNanEntries(self):
-    return self[~np.isnan(self[:,0])]
-
-
   @property
   def x(self):
     # Copy to array first so dimensionality checks are no longer required
@@ -176,21 +173,87 @@ class FRVertices(np.ndarray):
   @cols.setter
   def cols(self, newCols):self.x = newCols
 
-class FRComplexVertices:
+class FRComplexVertices(np.ndarray):
   """
-  Unlike a simple list of vertices, :class:`FRComplexVertices` allows shapes with holes.
-  It also knows how to serialize/deserialize itself for file storage.
+  Allows holes in the component shape. Subclassing ndarray instead of list allows primitive algebraic ops on the list
+  contents (e.g. subtracting/adding offset). Since normal usage doesn't typically require a mutable structure, the
+  loss is minimal.
   """
-  globalVerts: List[FRVertices]
-  """List of vertices in the component. Organized similar to opencv's contours."""
+  hierarchy = np.ones((0,4), dtype=int)
+  """See cv.findContours for hierarchy explanation. Used in cv.RETR_CCOMP mode."""
 
-  hierarchy: np.ndarray
-  """See hierarchy from opencv.findContours"""
+  def __new__(cls, inputArr: Union[List[FRVertices], np.ndarray]=None, hierarchy: np.ndarray=None, **kwargs):
+    if inputArr is None:
+      inputArr = [FRVertices()]
+    # No hierarchy required unless list is longer than length 1
+    numInpts = len(inputArr)
+    if numInpts  > 1 and hierarchy is None:
+      raise FRIllFormedVertices(f'Must pass a hierarchy with any complex vertices of more than one vertex list, '
+                                f'received vertex list of length {numInpts}')
+    elif hierarchy is None and numInpts <= 1:
+      # Default hierarchy for a one- or zero-object contour list
+      hierarchy = np.ones((numInpts, 4), dtype=int)*-1
+    arr = np.asarray(inputArr, **kwargs).view(cls)
+    arr.hierarchy = hierarchy
+    return arr
 
-  localPos: FRVertices
-  """
-  Offset into the global image. Useful for defining :class:FRComplexVertices
-  within an ROI
-  """
+  def __array_finalize__(self, obj):
+    if obj is None: return
+    self.hierarchy = getattr(obj, 'hierarchy', None)
+
+  @property
+  def x_flat(self):
+    return np.vstack(self).view(FRVertices).x
+
+  @property
+  def x(self):
+    return [lst.x for lst in self]
+  @x.setter
+  def x(self, newX):
+    for lst, newLstX in zip(self, newX):
+      lst.x = newLstX
+
+  @property
+  def y_flat(self):
+    return np.vstack(self).view(FRVertices).y
+
+  @property
+  def y(self):
+    return [lst.y for lst in self]
+
+  @y.setter
+  def y(self, newY):
+    for lst, newLstY in zip(self, newY):
+      lst.y = newLstY
+
+  def asPoint(self):
+    if len(self) == 1:
+      return self[0].asPoint()
+    else:
+      raise FRIllFormedVertices(f'Can only treat FRComplexVertices with one inner list as a point.'
+                                f' Current list has {len(self)} elements.')
+
+  def filledVerts(self) -> FRComplexVertices:
+    """
+    Retrieves all vertex lists corresponding to filled regions in the complex shape
+    """
+    return self[self.hierarchy[:,3] == -1]
 
 
+  def holeVerts(self) -> FRComplexVertices:
+    """
+    Retrieves all vertex lists corresponding to holes in the complex shape
+    """
+    if len(self) == 0: return np.array([])
+    return self[self.hierarchy[:, 3] != -1]
+
+  def __str__(self) -> str:
+    """
+    Improve the readability of vertex list in table by just displaying stats of larger arrays
+    :return: Human readable string representation
+    """
+    if len(self) <= 4: return super().__str__()
+    concatVerts = np.vstack(self)
+    return f'Mean:\t{np.round(concatVerts.mean(0), 1)}\n' \
+           f'Min:\t{concatVerts.min(0)}\n' \
+           f'Max:\t{concatVerts.max(0)}'

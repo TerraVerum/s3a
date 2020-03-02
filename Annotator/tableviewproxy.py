@@ -202,10 +202,8 @@ class CompDisplayFilter(QtCore.QObject):
     xmin, xmax, ymin, ymax = [param[val][0] for param in (xParam, yParam) for val in ['min', 'max']]
 
     for vertIdx, verts in enumerate(compVerts):
-      # Remove nan values for computation
-      verts = verts[~np.isnan(verts[:,0]),:]
-      xVerts = verts[:,0]
-      yVerts = verts[:,1]
+      xVerts = verts.x_flat
+      yVerts = verts.y_flat
       isAllowed = np.all((xVerts >= xmin) & (xVerts <= xmax)) & \
                   np.all((yVerts >= ymin) & (yVerts <= ymax))
       vertsAllowed[vertIdx] = isAllowed

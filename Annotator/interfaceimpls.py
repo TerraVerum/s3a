@@ -2,11 +2,11 @@ from dataclasses import dataclass
 
 import cv2 as cv
 import numpy as np
-from skimage import morphology
+from skimage.measure import regionprops, label
 from typing import List
 
 from Annotator.generalutils import splitListAtNans, nanConcatList, largestList
-from Annotator.params import FRParamGroup, FRParam, newParam
+from Annotator.params import FRParamGroup, FRParam, newParam, FRComplexVertices
 from Annotator.processing import growSeedpoint
 from .FRGraphics.parameditors import FR_SINGLETON
 from .generalutils import getClippedBbox
@@ -45,7 +45,9 @@ class RegionGrow(FRImageProcessor):
   def seedThresh(self): pass
 
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices = None,
-                        bgVerts: FRVertices = None) -> FRVertices:
+                        bgVerts: FRVertices = None) -> np.ndarray:
+    # Don't modify the original version
+    prevCompMask = prevCompMask.copy()
     # TODO: Make this code more robust
     if fgVerts is None:
       # Add to background
@@ -62,50 +64,32 @@ class RegionGrow(FRImageProcessor):
       growFunc = lambda *args: ~growSeedpoint(*args)
     croppedImg, cropOffset = self.getCroppedImg(fgVerts, self.margin)
     if croppedImg.size == 0:
-      return largestList(getVertsFromBwComps(prevCompMask))
+      return prevCompMask
     centeredFgVerts = fgVerts - cropOffset[0:2]
 
     # For small enough shapes, get all boundary pixels instead of just shape vertices
     if fgVerts.connected and np.prod(croppedImg.shape[0:2]) < 50e3:
       # Use all vertex points, not just the defined corners
-      fillPolyArg = splitListAtNans(centeredFgVerts)
       tmpImg = np.zeros(croppedImg.shape[0:2], dtype='uint8')
-      tmpBwShape = cv.fillPoly(tmpImg, fillPolyArg, 1)
-      centeredFgVerts = nanConcatList(getVertsFromBwComps(tmpBwShape,
-                                                          simplifyVerts=False))
+      tmpBwShape = cv.fillPoly(tmpImg, [centeredFgVerts], 1)
+      centeredFgVerts = getVertsFromBwComps(tmpBwShape,simplifyVerts=False).filledVerts()
+      centeredFgVerts = np.vstack(centeredFgVerts)
 
     newRegion = growFunc(croppedImg, centeredFgVerts, self.seedThresh, self.minCompSz)
-    #newRegion = morphology.opening(newRegion, morphology.square(3))
     rowColSlices = (slice(cropOffset[1], cropOffset[3]),
                     slice(cropOffset[0], cropOffset[2]))
     prevCompMask[rowColSlices] = bitOperation(prevCompMask[rowColSlices], newRegion)
 
     # Remember to account for the vertex offset
-    newVerts = getVertsFromBwComps(prevCompMask)
-    # TODO: pyqt crashses when sending signal with nan values. Find out why? in the
-    #  meantime only use the largest component
-    return largestList(newVerts)
-
-  def _getFgArea(self, img: np.ndarray, prevComp: np.ndarray, fgVerts: FRVertices) -> \
-      FRVertices:
-    # x-y list of coordinates in current component
-    compValsAtIdx = prevComp[fgVerts.rows, fgVerts.cols]
-    vertsInComp = fgVerts[compValsAtIdx > 0]
-    vertsOutsideComp = fgVerts[compValsAtIdx < 1]
-
-    insideRegion = growSeedpoint(img, vertsInComp, self.seedThresh, self.minCompSz)
-    outsideRegion = ~growSeedpoint(img, vertsOutsideComp, self.seedThresh, self.minCompSz)
-    return insideRegion | outsideRegion
-
-  def addToBg(self, bgVerts) -> FRVertices:
-    pass
+    return prevCompMask
 
 
-  def globalCompEstimate(self) -> List[FRVertices]:
-    return  getVertsFromBwComps(getBwComps(self.image, self.minCompSz))
+  def globalCompEstimate(self) -> List[FRComplexVertices]:
+    initialList = getVertsFromBwComps(getBwComps(self.image, self.minCompSz), externOnly=True)
+    return [FRComplexVertices(lst) for lst in initialList]
 
   def getCroppedImg(self, verts: FRVertices, margin: int) -> (np.ndarray, np.ndarray):
-    verts = verts.nonNanEntries().astype(int)
+    verts = np.vstack(verts)
     img_np = self.image
     compCoords = np.vstack([verts.min(0), verts.max(0)])
     compCoords = getClippedBbox(img_np.shape, compCoords, margin).flatten()
@@ -114,16 +98,18 @@ class RegionGrow(FRImageProcessor):
 
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_BASIC)
 class BasicShapes(FRImageProcessor):
-
   # If a class has no editable properties, this must be indicated for proper registration parsing
   @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_MIN_COMP_SZ)
   def minCompSz(self): pass
 
-  def globalCompEstimate(self) -> List[FRVertices]:
-    return getVertsFromBwComps(getBwComps(self.image, self.minCompSz))
+  def globalCompEstimate(self) -> List[FRComplexVertices]:
+    initialList = getVertsFromBwComps(getBwComps(self.image, self.minCompSz), externOnly=True)
+    return [FRComplexVertices(lst) for lst in initialList]
 
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices=None, bgVerts: FRVertices=None) -> \
       FRVertices:
+    # Don't modify the original version
+    prevCompMask = prevCompMask.copy()
     # Convert indices into boolean index masks
     masks = []
     for ii, verts in enumerate((fgVerts, bgVerts)):
@@ -137,29 +123,24 @@ class BasicShapes(FRImageProcessor):
     subRegion = ~masks[0] & masks[1]
     prevCompMask |= addRegion
     prevCompMask &= (~subRegion)
-    newVerts = getVertsFromBwComps(prevCompMask)
-    return largestList(newVerts)
+    return prevCompMask
 
 
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_SQUARES)
 class OnlySquares(BasicShapes):
-  def globalCompEstimate(self) -> List[FRVertices]:
-    polyVerts = getVertsFromBwComps(getBwComps(self.image, self.minCompSz))
+  def globalCompEstimate(self) -> List[FRComplexVertices]:
+    polyVerts = getVertsFromBwComps(getBwComps(self.image, self.minCompSz), externOnly=True)
     outVerts = []
     for vertList in polyVerts:
-      squareVerts = np.vstack([vertList.min(0), vertList.max(0)])
-      outVerts.append(FRVertices(squareVerts))
+      squareVerts = np.vstack([vertList.min(0), vertList.max(0)]).view(FRVertices)
+      outVerts.append(FRComplexVertices(squareVerts))
     return outVerts
 
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices = None, bgVerts: FRVertices = None) -> \
       np.ndarray:
     # Convert indices into boolean index masks
-    verts = super().localCompEstimate(prevCompMask, fgVerts, bgVerts).nonNanEntries()
-    squareCoord = np.vstack([verts.min(0), verts.max(0)])
-
-    return FRVertices([
-      squareCoord[0,:],
-      [squareCoord[0,0], squareCoord[1,1]],
-      squareCoord[1,:],
-      [squareCoord[1,0], squareCoord[0,1]],
-    ])
+    compMask = super().localCompEstimate(prevCompMask, fgVerts, bgVerts)
+    outMask = np.zeros(compMask.shape, dtype=bool)
+    for region in regionprops(label(compMask)):
+      outMask[region.bbox[0]:region.bbox[2],region.bbox[1]:region.bbox[3]] = True
+    return outMask

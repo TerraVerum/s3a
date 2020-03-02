@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 
 # Preference directories
-from Annotator.params import FRParam, FRParamGroup, newParam
+from Annotator.params import FRParam, FRParamGroup, newParam, FRVertices, FRComplexVertices
 
 BASE_DIR = os.path.dirname(Path(__file__).absolute())
 MENU_OPTS_DIR = os.path.join(BASE_DIR, 'MenuOpts', '')
@@ -39,7 +39,7 @@ TEMPLATE_COMP_TYPES = ComponentTypes()
 class CompParams(FRParamGroup):
   # These 3 params MUST exist in the component
   INST_ID         : FRParam = newParam('Instance ID', -1)
-  VERTICES        : FRParam = newParam('Vertices', np.ones((1, 2)) * np.nan)
+  VERTICES        : FRParam = newParam('Vertices', FRComplexVertices())
   VALIDATED       : FRParam = newParam('Validated', False)
   ANN_AUTHOR      : FRParam = newParam('Author', "")
   ANN_FILENAME    : FRParam = newParam('Filename', "")
@@ -63,7 +63,7 @@ class _FRConsts(FRParamGroup):
   CLS_COMP_TBL         : FRParam = newParam('Component Table')
   CLS_COMP_MGR         : FRParam = newParam('Component Manager')
 
-  CLS_VERT_REGION      : FRParam = newParam('Focused Image Graphics')
+  CLS_VERT_IMG         : FRParam = newParam('Focused Image Graphics')
   CLS_MULT_REG_PLT     : FRParam = newParam('Main Image Graphics')
 
   CLS_REGION_BUF       : FRParam = newParam('Region Modification Buffer')
