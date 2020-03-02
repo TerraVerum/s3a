@@ -6,15 +6,12 @@ from dataclasses import dataclass, fields, field
 from typing import Any, Optional, Union, List
 from warnings import warn
 import weakref
+from ast import literal_eval
 
 import numpy as np
 
-
-# from Annotator.exceptions import FRParamParseError, FRIllFormedVertices
-
-
-class FRParamParseError(Exception): pass
-class FRIllFormedVertices(Exception): pass
+from Annotator import constants
+from Annotator.exceptions import FRParamParseError, FRIllFormedVertices
 
 @dataclass
 class FRParam:
@@ -182,7 +179,10 @@ class FRComplexVertices(list):
   hierarchy = np.ones((0,4), dtype=int)
   """See cv.findContours for hierarchy explanation. Used in cv.RETR_CCOMP mode."""
 
-  def __init__(self, inputArr: Union[List[FRVertices], np.ndarray]=None, hierarchy: np.ndarray=None, **kwargs):
+  def __init__(self, inputArr: Union[List[FRVertices], np.ndarray]=None,
+               hierarchy: Union[np.ndarray, constants.FR_ENUMS]=None):
+    if hierarchy is None:
+      hierarchy = constants.FR_ENUMS.HIER_ALL_FILLED
     if inputArr is None or len(inputArr) == 0:
       inputArr = [FRVertices()]
     super().__init__(inputArr)
@@ -191,7 +191,8 @@ class FRComplexVertices(list):
     if numInpts > 1 and hierarchy is None:
       raise FRIllFormedVertices(f'Must pass a hierarchy with any complex vertices of more than one vertex list, '
                                 f'received vertex list of length {numInpts}')
-    elif hierarchy is None and numInpts <= 1:
+    elif (hierarchy is None and numInpts <= 1) \
+        or hierarchy is constants.FR_ENUMS.HIER_ALL_FILLED:
       # Default hierarchy for a one- or zero-object contour list
       hierarchy = np.ones((numInpts, 4), dtype=int)*-1
     self.hierarchy = hierarchy
@@ -254,14 +255,22 @@ class FRComplexVertices(list):
     Improve the readability of vertex list in table by just displaying stats of larger arrays
     :return: Human readable string representation
     """
-    if len(self) <= 4: return super().__str__()
     concatVerts = self.stack()
+    if len(concatVerts) <= 4: return str(concatVerts)
     return f'Mean:\t{np.round(concatVerts.mean(0), 1)}\n' \
            f'Min:\t{concatVerts.min(0)}\n' \
            f'Max:\t{concatVerts.max(0)}'
 
-  def copy(self, order='C'):
-    """
-    Ensures inner list elements also get copied, which doesn't happen in the default copy.
-    """
+  def copy(self) -> FRComplexVertices:
     return FRComplexVertices([lst.copy() for lst in self], self.hierarchy)
+
+  def serialize(self):
+    return str([arr.tolist() for arr in self])
+
+  @staticmethod
+  def deserialize(strObj: str) -> FRComplexVertices:
+    # TODO: Infer appropriate hierarchy from the serialized string. It is possible by finding whether vertices are given
+    #  in CW or CCW order. This doesn't affect how they are drawn, but it does effect the return values of "holeVerts()"
+    #  and "filledVerts()"
+    outerLst = literal_eval(strObj)
+    return FRComplexVertices([FRVertices(lst) for lst in outerLst])

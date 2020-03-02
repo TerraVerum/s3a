@@ -88,7 +88,7 @@ class RegionGrow(FRImageProcessor):
 
   def globalCompEstimate(self) -> List[FRComplexVertices]:
     initialList = getVertsFromBwComps(getBwComps(self.image, self.minCompSz), externOnly=True)
-    return [FRComplexVertices(lst) for lst in initialList]
+    return [FRComplexVertices([lst]) for lst in initialList]
 
   def getCroppedImg(self, verts: FRVertices, margin: int) -> (np.ndarray, np.ndarray):
     verts = np.vstack(verts)
