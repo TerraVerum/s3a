@@ -112,7 +112,6 @@ class ClickableTextItem(pg.TextItem):
     self.setPos(newPos[0], newPos[1])
     self.setText(newText, newValid)
 
-
 class RightPanViewBox(pg.ViewBox):
   def mouseDragEvent(self, ev: MouseDragEvent, axis=None):
     if ev.buttons() == QtCore.Qt.RightButton \
@@ -120,41 +119,3 @@ class RightPanViewBox(pg.ViewBox):
       ev.buttons = lambda: QtCore.Qt.LeftButton
       ev.button = ev.buttons
     super().mouseDragEvent(ev)
-
-class DraggableViewBox(pg.ViewBox):
-  sigSelectionBoundsMade = Signal(object)
-  sigCreationBoundsMade = Signal(object)
-
-  def mouseDragEvent(self, ev, axis=None):
-    """
-    Most of the desired functionality for drawing a selection rectangle on the main image
-    already exists within the default viewbox. However, pyqtgraph behavior is to zoom on
-    the selected region once the drag is done. We don't want that -- instead, we want the
-    components within the selected rectangle to be selected within the table. This requires
-    overloading only a small portion of
-    :func:`ViewBox.mouseDragEvent()<pyqtgraph.ViewBox.mouseDragEvent>`.
-    """
-    # TODO: Make this more robust, since it is a temporary measure at the moment
-    callSuperMethod = True
-    modifiers = ev.modifiers()
-    if modifiers != QtCore.Qt.NoModifier:
-      self.state['mouseMode'] = pg.ViewBox.RectMode
-      if ev.isFinish():
-        callSuperMethod = False
-        bounds = self.getSelectionBounds(ev)
-        if modifiers == QtCore.Qt.ShiftModifier:
-          self.sigSelectionBoundsMade.emit(bounds)
-        elif modifiers == QtCore.Qt.ControlModifier:
-          self.sigCreationBoundsMade.emit(bounds)
-    else:
-      self.state['mouseMode'] = pg.ViewBox.PanMode
-      self.rbScaleBox.hide()
-    if callSuperMethod:
-      super().mouseDragEvent(ev, axis)
-
-  def getSelectionBounds(self, ev):
-    pos = ev.pos()
-    self.rbScaleBox.hide()
-    ax = QtCore.QRectF(Point(ev.buttonDownPos(ev.button())), Point(pos))
-    selectionBounds = self.childGroup.mapRectFromParent(ax)
-    return selectionBounds.getCoords()
