@@ -6,16 +6,15 @@ from PIL import Image
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
+from Annotator.FRGraphics.regions import FRVertexDefinedImg
 from .clickables import RightPanViewBox
 from .drawopts import FRDrawOpts
 from .parameditors import FR_SINGLETON
 from .regions import FRShapeCollection
 # Required to trigger property registration
-from .regions import FRVertexRegion
 from .rois import FRExtendedROI
 from ..constants import TEMPLATE_COMP as TC, FR_CONSTS, FR_ENUMS
 from ..generalutils import getClippedBbox, ObjUndoBuffer
-from ..interfaces import FRImageProcessor
 from ..params import FRParam
 from ..params import FRVertices
 from ..processing import segmentComp
@@ -32,35 +31,11 @@ class FRRegionVertsUndoBuffer(ObjUndoBuffer):
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_STEPS_BW_SAVE)
   def stepsBetweenBufSave(self): pass
 
-
-
-  _prevBwMask: np.ndarray = np.array([[1,1]], dtype=bool)
-
   def __init__(self):
     """
     Save buffer for region modification.
     """
     super().__init__(self.maxBufferLen, self.stepsBetweenBufSave)
-
-  def update(self, newVerts: FRVertices, alternateUpdateCondtn=False):
-    # Ensure update takes place
-    # TODO: Doesn't seem necessary?
-    # if self.checkLargeRegionChanges and not alternateUpdateCondtn:
-    #   oldShape = self._prevBwMask.shape
-    #   oldNewDims = np.vstack([oldShape, newVerts.max(0)])
-    #   newShape = np.max(oldNewDims, 0)
-    #
-    #   newRegion = np.zeros(newShape, dtype='uint8')
-    #   newRegion = cv.fillPoly(newRegion, splitListAtNans(newVerts), 1)
-    #   newRegion = newRegion.astype(bool)
-    #
-    #   oldRegion_newSize = np.zeros(newShape, dtype=bool)
-    #   oldRegion_newSize[0:oldShape[0], 0:oldShape[1]] = self._prevBwMask
-    #
-    #   curPrevAreaDiff = (newRegion ^ oldRegion_newSize).sum()/newRegion.size
-    #   self._prevBwMask = newRegion
-    #   alternateUpdateCondtn = curPrevAreaDiff > 0.05
-    super().update(newVerts, alternateUpdateCondtn)
 
 class FREditableImg(pg.PlotWidget):
   def __init__(self, parent=None, allowableShapes: Tuple[FRParam,...]=None,
@@ -202,12 +177,9 @@ class FRMainImage(FREditableImg):
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_FG, [FR_CONSTS.DRAW_ACT_ADD])
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_PAN, [FR_CONSTS.DRAW_ACT_PAN])
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_SELECT,
-                                         [FR_CONSTS.DRAW_ACT_SELECT])
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_RECT,
-                                         [FR_CONSTS.DRAW_SHAPE_RECT])
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_POLY,
-                                         [FR_CONSTS.DRAW_SHAPE_POLY])
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_SELECT, [FR_CONSTS.DRAW_ACT_SELECT])
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_RECT, [FR_CONSTS.DRAW_SHAPE_RECT])
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_POLY, [FR_CONSTS.DRAW_SHAPE_POLY])
   def switchBtnMode(self, newMode: FRParam):
     super().switchBtnMode(newMode)
 
@@ -236,7 +208,7 @@ class FRFocusedImage(FREditableImg):
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_SEG_THRESH)
   def segThresh(self): pass
 
-  def __init__(self, parent=None, processor: FRImageProcessor = None, **kargs):
+  def __init__(self, parent=None, **kargs):
     allowableShapes = (
       FR_CONSTS.DRAW_SHAPE_RECT, FR_CONSTS.DRAW_SHAPE_POLY, FR_CONSTS.DRAW_SHAPE_PAINT
     )
@@ -244,7 +216,7 @@ class FRFocusedImage(FREditableImg):
       FR_CONSTS.DRAW_ACT_ADD, FR_CONSTS.DRAW_ACT_REM
     )
     super().__init__(parent, allowableShapes, allowableActions, **kargs)
-    self.region = FRVertexRegion()
+    self.region = FRVertexDefinedImg()
     self.addItem(self.region)
 
     self.compSer = makeCompDf().squeeze()
@@ -255,12 +227,9 @@ class FRFocusedImage(FREditableImg):
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_BG, [FR_CONSTS.DRAW_ACT_REM])
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_FG, [FR_CONSTS.DRAW_ACT_ADD])
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_PAN, [FR_CONSTS.DRAW_ACT_PAN])
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_RECT,
-                                         [FR_CONSTS.DRAW_SHAPE_RECT])
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_POLY,
-                                         [FR_CONSTS.DRAW_SHAPE_POLY])
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_PAINT,
-                                         [FR_CONSTS.DRAW_SHAPE_PAINT])
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_RECT, [FR_CONSTS.DRAW_SHAPE_RECT])
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_POLY, [FR_CONSTS.DRAW_SHAPE_POLY])
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_PAINT, [FR_CONSTS.DRAW_SHAPE_PAINT])
   def switchBtnMode(self, newMode: FRParam):
     super().switchBtnMode(newMode)
 

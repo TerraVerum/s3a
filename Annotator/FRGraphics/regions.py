@@ -239,9 +239,15 @@ class MultiRegionPlot(QtCore.QObject):
   def drop(self, ids):
     self.data.drop(index=ids, inplace=True)
 
+@FR_SINGLETON.registerClass(FR_CONSTS.CLS_VERT_REGION)
+class FRVertexDefinedImg(pg.ImageItem):
+  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_REG_FILL_COLOR)
+  def fillClr(self):pass
+  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_REG_VERT_COLOR)
+  def vertClr(self): pass
 
-class FRVertexDefinedImg:
   def __init__(self):
+    super().__init__()
     self.image_np = np.zeros((1, 1), dtype='uint8')
     self._offset = FRVertices([[0,0]], dtype='uint8')
     self.verts = FRVertices(dtype=int)
@@ -262,7 +268,7 @@ class FRVertexDefinedImg:
       return
 
     if offset is not None:
-      self._offset = offset.astype(int)
+      self._offset = offset.astype(int).view(FRVertices)
 
     newVerts -= self._offset
 
@@ -276,22 +282,11 @@ class FRVertexDefinedImg:
     regionData[nonNanVerts.rows, nonNanVerts.cols] = 2
     self.image_np = regionData
 
-
-@FR_SINGLETON.registerClass(FR_CONSTS.CLS_VERT_REGION)
-class FRVertexRegion(pg.ImageItem, FRVertexDefinedImg):
-  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_REG_FILL_COLOR)
-  def fillClr(self): pass
-  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_REG_VERT_COLOR)
-  def vertClr(self): pass
-
-  def updateVertices(self, newVerts: FRVertices, offset: FRVertices=None):
-    super().updateVertices(newVerts, offset)
-    self.setImage(self.image_np, levels=[0,2], lut=self.getLUTFromScheme())
+    self.setImage(regionData, levels=[0, 2], lut=self.getLUTFromScheme())
     self.setPos(*self._offset.asPoint())
 
-
   def getLUTFromScheme(self):
-    lut = [(0,0,0,0)]
+    lut = [(0, 0, 0, 0)]
     for clr in self.fillClr, self.vertClr:
       lut.append(clr.getRgb())
     return np.array(lut, dtype='uint8')
