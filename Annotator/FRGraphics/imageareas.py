@@ -172,7 +172,7 @@ class FRMainImage(FREditableImg):
 
       newCompMask = self.procCollection.curProcessor.localCompEstimate(prevComp, verts, None)
       newVerts = getVertsFromBwComps(newCompMask)
-      if len(newVerts) == 0:
+      if len(newVerts.stack()) == 0:
         return
       # TODO: Determine more robust solution for separated vertices. For now use largest component
       newComp = makeCompDf(1)
@@ -261,6 +261,7 @@ class FRFocusedImage(FREditableImg):
     self.compMask = self.procCollection.curProcessor.localCompEstimate(
       self.compMask, *fgBgVerts)
     self.region.updateFromMask(self.compMask)
+    self.regionBuffer.update((self.compMask, (0,0)))
 
   def updateAll(self, mainImg: np.array, newComp:df):
     newVerts: FRComplexVertices = newComp[TC.VERTICES]
@@ -301,7 +302,7 @@ class FRFocusedImage(FREditableImg):
     if offset is None:
       offset = self.bbox[0,:]
     if newVerts is None:
-      newVerts = [FRVertices(dtype=int)]
+      newVerts = FRComplexVertices()
     # 0-center new vertices relative to FRFocusedImage image
     # Make a copy of each list first so we aren't modifying the
     # original data
@@ -313,21 +314,21 @@ class FRFocusedImage(FREditableImg):
                    or not np.all(np.vstack([selfLst == newLst for selfLst, newLst
                                   in zip(self.region.verts, centeredVerts)]))
     if shouldUpdate:
-      self.regionBuffer.update(centeredVerts)
       self.region.updateFromVertices(centeredVerts)
+      regionPos = self.region.pos().x(), self.region.pos().y()
+      self.regionBuffer.update((self.region.image, regionPos))
       self.compMask = self.region.embedMaskInImg(self.imgItem.image.shape[:2])
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_UNDO_MOD_REGION, [FR_ENUMS.BUFFER_UNDO])
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_REDO_MOD_REGION, [FR_ENUMS.BUFFER_REDO])
   def undoRedoRegionChange(self, undoOrRedo: str):
     # Ignore requests when no region present
-    offset = FRVertices([[0,0]], dtype=int)
     if self.imgItem.image is None:
       return
     if undoOrRedo == FR_ENUMS.BUFFER_UNDO:
-      self.region.updateFromVertices(self.regionBuffer.undo_getObj(), offset=offset)
+      self.region.updateFromMask(*self.regionBuffer.undo_getObj())
     elif undoOrRedo == FR_ENUMS.BUFFER_REDO:
-      self.region.updateFromVertices(self.regionBuffer.redo_getObj(), offset=offset)
+      self.region.updateFromMask(*self.regionBuffer.redo_getObj())
 
   def clearCurDrawShape(self):
     super().clearCurDrawShape()
@@ -335,7 +336,9 @@ class FRFocusedImage(FREditableImg):
   def saveNewVerts(self):
     # Add in offset from main image to FRVertexRegion vertices
     if not self.region.vertsUpToDate:
-      newVerts = getVertsFromBwComps(self.region.image_np).copy()
+      newVerts = getVertsFromBwComps(self.region.image)
+      self.region.verts = newVerts
+      self.region.vertsUpToDate = True
     else:
       newVerts = self.region.verts.copy()
     for vertList in newVerts:

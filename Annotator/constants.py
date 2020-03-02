@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 
 # Preference directories
-from Annotator.params import FRParam, FRParamGroup, newParam, FRVertices, FRComplexVertices
+from Annotator.params import *
 
 BASE_DIR = os.path.dirname(Path(__file__).absolute())
 MENU_OPTS_DIR = os.path.join(BASE_DIR, 'MenuOpts', '')
@@ -21,6 +21,26 @@ LAYOUTS_DIR = os.path.join(MENU_OPTS_DIR, 'Layouts', '')
 FILTERS_DIR = os.path.join(MENU_OPTS_DIR, 'Filters', '')
 GEN_PROPS_DIR = os.path.join(MENU_OPTS_DIR, 'RegionControls', '')
 SHORTCUTS_DIR = os.path.join(MENU_OPTS_DIR, 'Shortcuts', '')
+
+class _FREnums(Enum):
+  # --------------------------
+  # COMPONENTS
+  # --------------------------
+  COMP_ADD_AS_MERGE = 'Add as Merge'
+  COMP_ADD_AS_NEW   = 'Add as New'
+  COMP_EXPORT_ALL   = 'Export All Components'
+
+  # --------------------------
+  # REGION CREATION
+  # --------------------------
+  BUFFER_UNDO       = 'Undo'
+  BUFFER_REDO       = 'Redo'
+
+  # --------------------------
+  # VERTICES
+  # --------------------------
+  HIER_ALL_FILLED  = 'All Filled'
+FR_ENUMS = _FREnums
 
 @dataclass
 class ComponentTypes(FRParamGroup):
@@ -151,21 +171,6 @@ class _FRConsts(FRParamGroup):
   DRAW_ACT_PAN    : FRParam = newParam('Pan', f'{ICON_DIR}pan.svg', 'icon')
 
 FR_CONSTS = _FRConsts()
-
-class _FREnums(Enum):
-  # --------------------------
-  # COMPONENTS
-  # --------------------------
-  COMP_ADD_AS_MERGE = 'Add as Merge'
-  COMP_ADD_AS_NEW   = 'Add as New'
-  COMP_EXPORT_ALL   = 'Export All Components'
-
-  # --------------------------
-  # REGION CREATION
-  # --------------------------
-  BUFFER_UNDO       = 'Undo'
-  BUFFER_REDO       = 'Redo'
-FR_ENUMS = _FREnums
 
 if __name__ == '__main__':
   c = ComponentTypes().fromString('capacitor')

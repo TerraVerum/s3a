@@ -251,50 +251,48 @@ class FRVertexDefinedImg(pg.ImageItem):
   def __init__(self):
     super().__init__()
     self.vertsUpToDate = True
-    self.image_np = np.zeros((1, 1), dtype='uint8')
     self._offset = FRVertices([[0,0]])
     self.verts = FRComplexVertices()
 
   def embedMaskInImg(self, toEmbedShape: Tuple[int, int]):
     outImg = np.zeros(toEmbedShape, dtype=bool)
-    selfShape = self.image_np.shape
+    selfShape = self.image.shape
     offset_pt = self._offset.asPoint()
     # Offset is x-y, shape is row-col. So, swap order of offset relative to current axis
     embedSlices = [slice(offset_pt[1 - ii], selfShape[ii] + offset_pt[1 - ii]) for ii in range(2)]
-    outImg[embedSlices[0], embedSlices[1]] = self.image_np
+    outImg[embedSlices[0], embedSlices[1]] = self.image
     return outImg
 
   def updateFromVertices(self, newVerts: FRComplexVertices, offset: FRVertices=None):
     self.verts = newVerts.copy()
-    if len(newVerts) == 0:
-      self.image_np = np.zeros((1, 1), dtype='bool')
-      return
+    if len(newVerts.x_flat) == 0:
+      regionData = np.zeros((1, 1), dtype='bool')
+    else:
+      if offset is not None:
+        self._offset = offset.astype(int).view(FRVertices)
 
-    if offset is not None:
-      self._offset = offset.astype(int).view(FRVertices)
+      for vertList in newVerts:
+        vertList -= self._offset
 
-    for vertList in newVerts:
-      vertList -= self._offset
+      newImgShape = newVerts.stack().max(0)[::-1] + 1
+      regionData = np.zeros(newImgShape, dtype='uint8')
+      cv.fillPoly(regionData, newVerts, 1)
+      # Make vertices full brightness
+      regionData[newVerts.y_flat, newVerts.x_flat] = 2
 
-    newImgShape = newVerts.stack().max(0)[::-1] + 1
-    regionData = np.zeros(newImgShape, dtype='uint8')
-    cv.fillPoly(regionData, newVerts, 1)
-    # Make vertices full brightness
-    regionData[newVerts.y_flat, newVerts.x_flat] = 2
-    self.image_np = regionData
 
     self.setImage(regionData, levels=[0, 2], lut=self.getLUTFromScheme())
     self.setPos(*self._offset.asPoint())
     self.vertsUpToDate = True
 
-  def updateFromMask(self, newMask: np.ndarray):
+  def updateFromMask(self, newMask: np.ndarray, maskPos=(0,0)):
     # It is expensive to color the vertices, so only find contours if specified by the user
     newMask = newMask.astype('uint8')
-    if self.fillClr != self.vertClr:
+    if newMask.max() < 2 or self.fillClr != self.vertClr:
       verts = getVertsFromBwComps(newMask)
       newMask[verts.y_flat, verts.x_flat] = 2
     self.setImage(newMask, levels=[0,2], lut=self.getLUTFromScheme())
-    self.setPos(0,0)
+    self.setPos(*maskPos)
     self.vertsUpToDate = False
 
   def getLUTFromScheme(self):

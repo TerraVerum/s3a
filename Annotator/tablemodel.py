@@ -14,6 +14,7 @@ from Annotator.FRGraphics.parameditors import FR_SINGLETON
 from Annotator.constants import FR_CONSTS, FR_ENUMS
 from Annotator.exceptions import FRCsvIOError
 from Annotator.generalutils import coerceDfTypes
+from Annotator.params import FRComplexVertices
 from .constants import TEMPLATE_COMP as TC, CompParams
 from .params import FRParam
 
@@ -114,7 +115,8 @@ class ComponentMgr(CompTableModel):
 
     # Delete entries with no vertices, since they make work within the app difficult.
     # TODO: Is this the appropriate response?
-    dropIds = newCompsDf.index[newCompsDf[TC.VERTICES].map(lambda el: len(el) == 0)]
+    verts = newCompsDf[TC.VERTICES]
+    dropIds = newCompsDf.index[verts.map(lambda complexVerts: len(complexVerts.stack()) == 0)]
     newCompsDf.drop(index=dropIds, inplace=True)
     # Inform graphics elements of deletion if this ID is already in our dataframe
     toEmit.update(self.rmComps(dropIds, emitChange=False))
@@ -223,6 +225,11 @@ class ComponentMgr(CompTableModel):
         exportDf = self.compDf
       else:
         exportDf = self.compDf.loc[exportIds,:]
+      exportDf: df = exportDf.copy(deep=True)
+      # Format special columns appropriately
+      for col in exportDf:
+        if hasattr(col.value, 'serialize'):
+          exportDf[col] = exportDf[col].map(type(col.value).serialize)
       exportDf.to_csv(outFile, index=False)
       success = True
     except IOError:
@@ -232,7 +239,7 @@ class ComponentMgr(CompTableModel):
       pd.reset_option('display.max_rows')
       # False positive checker warning for some reason
       # noinspection PyTypeChecker
-      np.set_printoptions(oldNpOpts)
+      np.set_printoptions(**oldNpOpts)
     return success
 
   def csvImport(self, inFile: str, loadType=FR_ENUMS.COMP_ADD_AS_NEW,
@@ -288,9 +295,10 @@ def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> Any:
   paramType = type(paramVal)
   funcMap = {
     # Format string to look like a list, use ast to convert that string INTO a list, make a numpy array from the list
-    np.ndarray    : lambda strVal: np.array(literal_eval(re.sub(r'(\d|\])\s+', '\\1,', strVal.replace('\n', '')))),
-    bool          : lambda strVal: strVal.lower() == 'true',
-    FRParam: lambda strVal: paramVal.group.fromString(strVal)
+    np.ndarray        : lambda strVal: np.array(literal_eval(re.sub(r'(\d|\])\s+', '\\1,', strVal.replace('\n', '')))),
+    FRComplexVertices : FRComplexVertices.deserialize,
+    bool              : lambda strVal: strVal.lower() == 'true',
+    FRParam           : lambda strVal: paramVal.group.fromString(strVal)
   }
   defaultFunc = lambda strVal: paramType(strVal)
   funcToUse = funcMap.get(paramType, defaultFunc)

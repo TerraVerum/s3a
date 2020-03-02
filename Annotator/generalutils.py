@@ -17,6 +17,7 @@ def nanConcatList(vertList) -> FRVertices:
   allVerts = []
   for curVerts in vertList:
     allVerts.append(curVerts)
+    if len(curVerts) == 0: continue
     # Close the current shape
     allVerts.append(curVerts[0,:])
     allVerts.append(nanSep)

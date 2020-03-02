@@ -253,7 +253,7 @@ class Annotator(FRAnnotatorUI):
     # Only perform action if image currently exists
     if self.compImg.imgItem.image is None:
       return
-    self.compImg.updateRegionFromVerts(self.compImg.compSer[TC.VERTICES].squeeze())
+    self.compImg.updateRegionFromVerts(self.compImg.compSer[TC.VERTICES])
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_ACCEPT_REGION)
   @Slot()
