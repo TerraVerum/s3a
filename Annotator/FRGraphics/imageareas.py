@@ -246,6 +246,9 @@ class FRFocusedImage(FREditableImg):
   def clearCurDrawShape(self):
     super().clearCurDrawShape()
 
+  def resetImage(self):
+    self.updateAll(None)
+
   def handleShapeFinished(self, roi: FRExtendedROI, fgVerts: FRVertices=None, bgVerts: FRVertices=None,
                           prevComp=None) -> Optional[np.ndarray]:
     if self.drawAction == FR_CONSTS.DRAW_ACT_PAN:
@@ -269,7 +272,12 @@ class FRFocusedImage(FREditableImg):
       self.region.updateFromMask(self.compMask)
       self.regionBuffer.update((self.compMask, (0,0)))
 
-  def updateAll(self, mainImg: np.array, newComp:df):
+  def updateAll(self, mainImg: Optional[np.array], newComp:Optional[df]=None):
+    if mainImg is None:
+      mainImg = np.zeros((1,1,3))
+      self.imgItem.setImage(mainImg)
+      self.region.updateFromVertices(FRComplexVertices())
+      return
     newVerts: FRComplexVertices = newComp[TC.VERTICES]
     # Since values INSIDE the dataframe are reset instead of modified, there is no
     # need to go through the trouble of deep copying
