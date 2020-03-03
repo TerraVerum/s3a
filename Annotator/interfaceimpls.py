@@ -52,7 +52,7 @@ class FRBasicImageProcessorImpl(FRImageProcessor):
     Performs basic operations shared by all FICS-specified image processors. That is, whether they allow holes,
     regions comprised of multiple separate segments, their minimum size, and margin around specified vertices.
     """
-    if np.nonzero(prevCompMask) <= 1: return prevCompMask
+    if np.count_nonzero(prevCompMask) <= 1: return prevCompMask
     if not self.allowHoles:
       # Fill in outer contours
       tmpVerts = getVertsFromBwComps(prevCompMask, externOnly=True)
