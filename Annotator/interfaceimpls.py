@@ -22,15 +22,16 @@ class _FRDefaultAlgImpls(FRParamGroup):
   CLS_SQUARES     : FRParam = newParam('Only Squares')
   CLS_BASIC       : FRParam = newParam('Shared Impl. Functionality')
 
-  PROP_SEED_THRESH    : FRParam = newParam('Seedpoint Threshold in Main Image', 10.)
-  PROP_MIN_COMP_SZ    : FRParam = newParam('Minimum New Component Size (px)', 50)
-  PROP_MARGIN         : FRParam = newParam('FG/BG Vertex Margin', 30)
+  PROP_SEED_THRESH    : FRParam = newParam('Seedpoint Threshold', 10.)
+  PROP_MIN_COMP_SZ    : FRParam = newParam('Minimum New Component Pixels', 50)
+  PROP_MARGIN         : FRParam = newParam('Max Seedpoint Side Length', 30, None,
+                                           'During seedpoint growth, the resulting '
+                                           'component can grow very large if not restricted. '
+                                           'Enforcing a larest size requirement limits '
+                                           'these drawbacks.')
   PROP_ALLOW_MULT_REG : FRParam = newParam('Allow Noncontiguous Vertices', False)
   PROP_ALLOW_HOLES    : FRParam = newParam('Allow Holes in Component', False)
   PROP_N_A            : FRParam = newParam('No Editable Properties', None, 'none')
-
-  SHC_GROW_OUT : FRParam = newParam('Grow Outward', 'Ctrl+G,O', 'none')
-  SHC_GROW_IN  : FRParam = newParam('Grow Inward', 'Ctrl+G,I', 'none')
 
 IMPLS = _FRDefaultAlgImpls()
 
@@ -51,6 +52,7 @@ class FRBasicImageProcessorImpl(FRImageProcessor):
     Performs basic operations shared by all FICS-specified image processors. That is, whether they allow holes,
     regions comprised of multiple separate segments, their minimum size, and margin around specified vertices.
     """
+    if np.nonzero(prevCompMask) <= 1: return prevCompMask
     if not self.allowHoles:
       # Fill in outer contours
       tmpVerts = getVertsFromBwComps(prevCompMask, externOnly=True)
@@ -86,6 +88,9 @@ class RegionGrow(FRBasicImageProcessorImpl):
       # Don't modify the original version
       prevCompMask = prevCompMask.copy()
     # TODO: Make this code more robust
+    # -----
+    # DETERMINE BITWISE RELATIONSHIP B/W OLD AND NEW MASKS
+    # -----
     if fgVerts is None:
       # Add to background
       bitOperation = lambda curRegion, other: curRegion & (~other)
@@ -93,13 +98,22 @@ class RegionGrow(FRBasicImageProcessorImpl):
     else:
       # Add to foreground
       bitOperation = np.bitwise_or
-    if len(fgVerts) == 1:
+
+    # -----
+    # DETERMINE INWARD/OUTWARD GROWTH BASED ON VERTEX SHAPE
+    # -----
+    if np.all(fgVerts == fgVerts[0,:]):
+      # Remove unnecessary redundant seedpoints
+      fgVerts = fgVerts[[0],:]
+    if fgVerts.shape[0] == 1:
       # Grow outward
       growFunc = growSeedpoint
+      compMargin = self.margin
     else:
       # Grow inward
       growFunc = lambda *args: ~growSeedpoint(*args)
-    croppedImg, cropOffset = self.getCroppedImg(fgVerts, self.margin)
+      compMargin = 0
+    croppedImg, cropOffset = self.getCroppedImg(fgVerts, compMargin)
     if croppedImg.size == 0:
       return prevCompMask
     centeredFgVerts = fgVerts - cropOffset[0:2]
