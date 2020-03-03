@@ -170,7 +170,7 @@ class FRParamEditor(QtWidgets.QDialog):
     self.instantiatedClassTypes = set()
     """
     Records whether classes with registered parameters have been instantiated. This way,
-    base classes with registered parameters but no instances will not appear in the 
+    base classes with registered parameters but no instances will not appear in the
     parameter editor.
     """
 
@@ -602,12 +602,13 @@ class AlgPropsMgr(FRParamEditor):
 
   def registerClass(self, clsParam: FRParam, **opts):
     # Don't save a default file for this class
-    return super().registerClass(clsParam, saveDefault=False)
+    return super().registerClass(clsParam, saveDefault=False, **opts)
 
   def _extendedClassDecorator(self, cls: Any, clsParam: FRParam, **opts):
-    ctorArgs = opts.get('args', [])
-    procCtor = partial(cls, *ctorArgs)
-    self.processorCtors.append(procCtor)
+    if opts.get('addToList', True):
+      ctorArgs = opts.get('args', [])
+      procCtor = partial(cls, *ctorArgs)
+      self.processorCtors.append(procCtor)
 
   def createProcessorForClass(self, clsObj) -> AlgCollectionEditor:
     clsName = type(clsObj).__name__

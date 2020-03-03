@@ -18,15 +18,15 @@ from .processing import getVertsFromBwComps, getBwComps
 @dataclass
 class _FRDefaultAlgImpls(FRParamGroup):
   CLS_REGION_GROW : FRParam = newParam('Region Growing')
-  CLS_BASIC       : FRParam = newParam('Basic Shapes')
+  CLS_SHAPES      : FRParam = newParam('Basic Shapes')
   CLS_SQUARES     : FRParam = newParam('Only Squares')
+  CLS_BASIC       : FRParam = newParam('Shared Impl. Functionality')
 
   PROP_SEED_THRESH    : FRParam = newParam('Seedpoint Threshold in Main Image', 10.)
   PROP_MIN_COMP_SZ    : FRParam = newParam('Minimum New Component Size (px)', 50)
-  PROP_NEW_COMP_SZ    : FRParam = newParam('New Component Side Length (px)', 30)
-  PROP_MARGIN         : FRParam = newParam('New Component Margin (px)', 5)
-  PROP_GROW_OUT       : FRParam = newParam('Grow outward', False)
+  PROP_MARGIN         : FRParam = newParam('FG/BG Vertex Margin', 30)
   PROP_ALLOW_MULT_REG : FRParam = newParam('Allow Noncontiguous Vertices', False)
+  PROP_ALLOW_HOLES    : FRParam = newParam('Allow Holes in Component', False)
   PROP_N_A            : FRParam = newParam('No Editable Properties', None, 'none')
 
   SHC_GROW_OUT : FRParam = newParam('Grow Outward', 'Ctrl+G,O', 'none')
@@ -34,18 +34,49 @@ class _FRDefaultAlgImpls(FRParamGroup):
 
 IMPLS = _FRDefaultAlgImpls()
 
-@FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_REGION_GROW)
-class RegionGrow(FRImageProcessor):
-  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_NEW_COMP_SZ)
-  def newCompSz(self): pass
+@FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_BASIC, addToList=False)
+class FRBasicImageProcessorImpl(FRImageProcessor):
   @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_MIN_COMP_SZ)
   def minCompSz(self): pass
   @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_MARGIN)
   def margin(self): pass
+  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_ALLOW_MULT_REG)
+  def allowMultReg(self): pass
+  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_ALLOW_HOLES)
+  def allowHoles(self): pass
+
+  def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices = None, bgVerts: FRVertices = None) -> \
+      np.ndarray:
+    """
+    Performs basic operations shared by all FICS-specified image processors. That is, whether they allow holes,
+    regions comprised of multiple separate segments, their minimum size, and margin around specified vertices.
+    """
+    if not self.allowHoles:
+      # Fill in outer contours
+      tmpVerts = getVertsFromBwComps(prevCompMask, externOnly=True)
+      tmpMask = prevCompMask.astype('uint8')
+      prevCompMask = cv.fillPoly(tmpMask, tmpVerts, 1) > 0
+    if not self.allowMultReg:
+      # Take out all except the largest region
+      regions = regionprops(label(prevCompMask))
+      if len(regions) == 0: return prevCompMask
+      maxRegion = regions[0]
+      for region in regions:
+        if region.area > maxRegion.area:
+          maxRegion = region
+      prevCompMask[:] = False
+      prevCompMask[maxRegion.coords[:,0], maxRegion.coords[:,1]] = True
+    # Remember to account for the vertex offset
+    return rmSmallComps(prevCompMask, self.minCompSz)
+
+  def globalCompEstimate(self) -> List[FRComplexVertices]:
+    pass
+
+
+@FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_REGION_GROW)
+class RegionGrow(FRBasicImageProcessorImpl):
   @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_SEED_THRESH)
   def seedThresh(self): pass
-  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_ALLOW_MULT_REG)
-  def allowMultReg(self):pass
 
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices = None,
                         bgVerts: FRVertices = None) -> np.ndarray:
@@ -84,18 +115,7 @@ class RegionGrow(FRImageProcessor):
     rowColSlices = (slice(cropOffset[1], cropOffset[3]),
                     slice(cropOffset[0], cropOffset[2]))
     prevCompMask[rowColSlices] = bitOperation(prevCompMask[rowColSlices], newRegion)
-    if not self.allowMultReg:
-      # Take out all except the largest region
-      regions = regionprops(label(prevCompMask))
-      if len(regions) == 0: return prevCompMask
-      maxRegion = regions[0]
-      for region in regions:
-        if region.area > maxRegion.area:
-          maxRegion = region
-      prevCompMask[:] = False
-      prevCompMask[maxRegion.coords[:,0], maxRegion.coords[:,1]] = True
-    # Remember to account for the vertex offset
-    return rmSmallComps(prevCompMask)
+    return super().localCompEstimate(prevCompMask)
 
 
   def globalCompEstimate(self) -> List[FRComplexVertices]:
@@ -110,12 +130,8 @@ class RegionGrow(FRImageProcessor):
     croppedImg = self.image[compCoords[1]:compCoords[3], compCoords[0]:compCoords[2], :]
     return croppedImg, compCoords
 
-@FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_BASIC)
-class BasicShapes(FRImageProcessor):
-  # If a class has no editable properties, this must be indicated for proper registration parsing
-  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_MIN_COMP_SZ)
-  def minCompSz(self): pass
-
+@FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_SHAPES)
+class BasicShapes(FRBasicImageProcessorImpl):
   def globalCompEstimate(self) -> List[FRComplexVertices]:
     initialList = getVertsFromBwComps(getBwComps(self.image, self.minCompSz), externOnly=True)
     return [FRComplexVertices(lst) for lst in initialList]
@@ -137,7 +153,7 @@ class BasicShapes(FRImageProcessor):
     subRegion = ~masks[0] & masks[1]
     prevCompMask |= addRegion
     prevCompMask &= (~subRegion)
-    return rmSmallComps(prevCompMask, self.minCompSz)
+    return super().localCompEstimate(prevCompMask)
 
 
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_SQUARES)
