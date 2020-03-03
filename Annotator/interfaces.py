@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from typing import List
 
-from Annotator.params import FRParamGroup, FRVertices
+from Annotator.params import FRParamGroup, FRVertices, FRComplexVertices
 
 
 class FRImageProcessor(ABC):
@@ -15,7 +15,7 @@ class FRImageProcessor(ABC):
     pass
 
   @abstractmethod
-  def globalCompEstimate(self) -> List[FRVertices]:
+  def globalCompEstimate(self) -> List[FRComplexVertices]:
     pass
 
 
