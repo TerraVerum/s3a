@@ -174,6 +174,7 @@ class Annotator(FRAnnotatorUI):
     if fname is not None:
       self.compMgr.rmComps()
       self.mainImg.setImage(fname)
+      self.compImg.updateAll(None, None)
       if self.estBoundsOnStart:
         self.estimateBoundaries()
 

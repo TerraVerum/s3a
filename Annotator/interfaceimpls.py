@@ -23,7 +23,7 @@ class _FRDefaultAlgImpls(FRParamGroup):
   CLS_BASIC       : FRParam = newParam('Shared Impl. Functionality')
 
   PROP_SEED_THRESH    : FRParam = newParam('Seedpoint Threshold in Main Image', 10.)
-  PROP_MIN_COMP_SZ    : FRParam = newParam('Minimum New Component Size (px)', 50)
+  PROP_MIN_COMP_SZ    : FRParam = newParam('Minimum Component Size (px)', 50)
   PROP_MARGIN         : FRParam = newParam('FG/BG Vertex Margin', 30)
   PROP_ALLOW_MULT_REG : FRParam = newParam('Allow Noncontiguous Vertices', False)
   PROP_ALLOW_HOLES    : FRParam = newParam('Allow Holes in Component', False)
