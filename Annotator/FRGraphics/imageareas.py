@@ -242,6 +242,10 @@ class FRFocusedImage(FREditableImg):
   def switchBtnMode(self, newMode: FRParam):
     super().switchBtnMode(newMode)
 
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_CLEAR_SHAPE_FOC)
+  def clearCurDrawShape(self):
+    super().clearCurDrawShape()
+
   def handleShapeFinished(self, roi: FRExtendedROI, fgVerts: FRVertices=None, bgVerts: FRVertices=None,
                           prevComp=None) -> Optional[np.ndarray]:
     if self.drawAction == FR_CONSTS.DRAW_ACT_PAN:
