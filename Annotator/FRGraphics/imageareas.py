@@ -263,7 +263,11 @@ class FRFocusedImage(FREditableImg):
     self.region.updateFromMask(self.compMask)
     self.regionBuffer.update((self.compMask, (0,0)))
 
-  def updateAll(self, mainImg: np.array, newComp:df):
+  def updateAll(self, mainImg: np.array=None, newComp:df=None):
+    if mainImg is None:
+      mainImg = np.zeros((1,1,3), dtype=np.uint8)
+    if newComp is None:
+      newComp = makeCompDf(1)
     newVerts: FRComplexVertices = newComp[TC.VERTICES]
     # Since values INSIDE the dataframe are reset instead of modified, there is no
     # need to go through the trouble of deep copying
