@@ -262,10 +262,12 @@ class FRFocusedImage(FREditableImg):
       fgBgVerts[1] = verts
     # Check for flood fill
 
-    self.compMask = self.procCollection.curProcessor.localCompEstimate(
+    newMask = self.procCollection.curProcessor.localCompEstimate(
       self.compMask, *fgBgVerts)
-    self.region.updateFromMask(self.compMask)
-    self.regionBuffer.update((self.compMask, (0,0)))
+    if not np.all(newMask == self.compMask):
+      self.compMask = newMask
+      self.region.updateFromMask(self.compMask)
+      self.regionBuffer.update((self.compMask, (0,0)))
 
   def updateAll(self, mainImg: np.array, newComp:df):
     newVerts: FRComplexVertices = newComp[TC.VERTICES]
@@ -330,9 +332,11 @@ class FRFocusedImage(FREditableImg):
     if self.imgItem.image is None:
       return
     if undoOrRedo == FR_ENUMS.BUFFER_UNDO:
-      self.region.updateFromMask(*self.regionBuffer.undo_getObj())
+      newMask, offset = self.regionBuffer.undo_getObj()
     elif undoOrRedo == FR_ENUMS.BUFFER_REDO:
-      self.region.updateFromMask(*self.regionBuffer.redo_getObj())
+      newMask, offset = self.regionBuffer.redo_getObj()
+    self.region.updateFromMask(newMask, offset)
+    self.compMask = self.region.embedMaskInImg(self.compMask.shape)
 
   def clearCurDrawShape(self):
     super().clearCurDrawShape()
@@ -341,7 +345,7 @@ class FRFocusedImage(FREditableImg):
     # Add in offset from main image to FRVertexRegion vertices
     if not self.region.vertsUpToDate:
       newVerts = getVertsFromBwComps(self.region.image)
-      self.region.verts = newVerts
+      self.region.verts = newVerts.copy()
       self.region.vertsUpToDate = True
     else:
       newVerts = self.region.verts.copy()
