@@ -34,7 +34,7 @@ class Annotator(FRAnnotatorUI):
   # Alerts GUI that a layout (either new or overwriting old) was saved
   sigLayoutSaved = Signal()
 
-  def __init__(self, startImgFpath=None):
+  def __init__(self, startImgFpath=None, authorName:str=None):
     super().__init__()
 
     self.statBar = QtWidgets.QStatusBar(self)
@@ -110,8 +110,11 @@ class Annotator(FRAnnotatorUI):
     # Start with docks in default position, hide error if default file doesn't exist
     self.loadLayoutActionTriggered('Default', showError=False)
 
-    QtCore.QTimer.singleShot(0, self.showMaximized)
-    FR_SINGLETON.annotationAuthor = self.getAuthorName()
+    #QtCore.QTimer.singleShot(0, self.showMaximized)
+    self.showMaximized()
+    if authorName is None:
+      authorName = self.getAuthorName()
+    FR_SINGLETON.annotationAuthor = authorName
     self.statBar.showMessage(FR_SINGLETON.annotationAuthor)
 
   # -----------------------------
