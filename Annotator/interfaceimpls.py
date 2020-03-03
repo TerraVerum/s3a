@@ -109,6 +109,7 @@ class RegionGrow(FRBasicImageProcessorImpl):
       # Grow outward
       growFunc = growSeedpoint
       compMargin = self.margin
+      fgVerts.connected = False
     else:
       # Grow inward
       growFunc = lambda *args: ~growSeedpoint(*args)
@@ -118,14 +119,22 @@ class RegionGrow(FRBasicImageProcessorImpl):
       return prevCompMask
     centeredFgVerts = fgVerts - cropOffset[0:2]
 
+    filledMask = None
+    tmpImgToFill = np.zeros(croppedImg.shape[0:2], dtype='uint8')
+
     # For small enough shapes, get all boundary pixels instead of just shape vertices
     if fgVerts.connected and np.prod(croppedImg.shape[0:2]) < 50e3:
       # Use all vertex points, not just the defined corners
-      tmpImg = np.zeros(croppedImg.shape[0:2], dtype='uint8')
-      tmpBwShape = cv.fillPoly(tmpImg, [centeredFgVerts], 1)
-      centeredFgVerts = getVertsFromBwComps(tmpBwShape,simplifyVerts=False).filledVerts().stack()
+      filledMask = cv.fillPoly(tmpImgToFill, [centeredFgVerts], 1) > 0
+      centeredFgVerts = getVertsFromBwComps(filledMask,simplifyVerts=False).filledVerts().stack()
 
     newRegion = growFunc(croppedImg, centeredFgVerts, self.seedThresh, self.minCompSz)
+    if fgVerts.connected:
+      # For connected vertices, zero out region locations outside the user defined area
+      if filledMask is None:
+        filledMask = cv.fillPoly(tmpImgToFill, [centeredFgVerts], 1) > 0
+      newRegion[~filledMask] = False
+
     rowColSlices = (slice(cropOffset[1], cropOffset[3]),
                     slice(cropOffset[0], cropOffset[2]))
     prevCompMask[rowColSlices] = bitOperation(prevCompMask[rowColSlices], newRegion)
