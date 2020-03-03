@@ -111,7 +111,7 @@ def bwBgMask(img: np.array) -> np.array:
 
 
 def getVertsFromBwComps(bwmask: np.array, simplifyVerts=True, externOnly=False) -> FRComplexVertices:
-  approxMethod = cv.CHAIN_APPROX_TC89_L1
+  approxMethod = cv.CHAIN_APPROX_SIMPLE
   if not simplifyVerts:
     approxMethod = cv.CHAIN_APPROX_NONE
   retrMethod = cv.RETR_CCOMP
