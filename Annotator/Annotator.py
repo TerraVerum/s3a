@@ -34,7 +34,7 @@ class Annotator(FRAnnotatorUI):
   # Alerts GUI that a layout (either new or overwriting old) was saved
   sigLayoutSaved = Signal()
 
-  def __init__(self, startImgFpath=None):
+  def __init__(self, startImgFpath=None, authorName:str=None):
     super().__init__()
 
     self.statBar = QtWidgets.QStatusBar(self)
@@ -110,8 +110,11 @@ class Annotator(FRAnnotatorUI):
     # Start with docks in default position, hide error if default file doesn't exist
     self.loadLayoutActionTriggered('Default', showError=False)
 
-    QtCore.QTimer.singleShot(0, self.showMaximized)
-    FR_SINGLETON.annotationAuthor = self.getAuthorName()
+    #QtCore.QTimer.singleShot(0, self.showMaximized)
+    self.showMaximized()
+    if authorName is None:
+      authorName = self.getAuthorName()
+    FR_SINGLETON.annotationAuthor = authorName
     self.statBar.showMessage(FR_SINGLETON.annotationAuthor)
 
   # -----------------------------
@@ -168,13 +171,13 @@ class Annotator(FRAnnotatorUI):
   @Slot()
   @applyWaitCursor
   def openImgActionTriggered(self):
-    fileFilter = "Image Files (*.png; *.tif; *.jpg; *.jpeg; *.bmp)"
+    fileFilter = "Image Files (*.png; *.tif; *.jpg; *.jpeg; *.bmp; *.jfif);; All files(*.*)"
     fname = popupFilePicker(self, 'Select Main Image', fileFilter)
 
     if fname is not None:
       self.compMgr.rmComps()
       self.mainImg.setImage(fname)
-      self.compImg.updateAll(None, None)
+      self.compImg.resetImage()
       if self.estBoundsOnStart:
         self.estimateBoundaries()
 
@@ -284,12 +287,7 @@ class Annotator(FRAnnotatorUI):
   @applyWaitCursor
   def updateCurComp(self, newComp: df):
     mainImg = self.mainImg.image
-    prevComp = self.compImg.compSer
-    rmPrevComp = self.compImg.updateAll(mainImg, newComp)
-    # If all old vertices were deleted AND we switched images, signal deletion
-    # for the previous focused component
-    if rmPrevComp:
-      self.compMgr.rmComps(prevComp[TC.INST_ID])
+    self.compImg.updateAll(mainImg, newComp)
     self.curCompIdLbl.setText(f'Component ID: {newComp[TC.INST_ID]}')
 
 ## Start Qt event loop unless running in interactive mode or using pyside.

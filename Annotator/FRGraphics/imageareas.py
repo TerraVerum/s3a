@@ -242,6 +242,13 @@ class FRFocusedImage(FREditableImg):
   def switchBtnMode(self, newMode: FRParam):
     super().switchBtnMode(newMode)
 
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_CLEAR_SHAPE_FOC)
+  def clearCurDrawShape(self):
+    super().clearCurDrawShape()
+
+  def resetImage(self):
+    self.updateAll(None)
+
   def handleShapeFinished(self, roi: FRExtendedROI, fgVerts: FRVertices=None, bgVerts: FRVertices=None,
                           prevComp=None) -> Optional[np.ndarray]:
     if self.drawAction == FR_CONSTS.DRAW_ACT_PAN:
@@ -258,16 +265,19 @@ class FRFocusedImage(FREditableImg):
       fgBgVerts[1] = verts
     # Check for flood fill
 
-    self.compMask = self.procCollection.curProcessor.localCompEstimate(
+    newMask = self.procCollection.curProcessor.localCompEstimate(
       self.compMask, *fgBgVerts)
-    self.region.updateFromMask(self.compMask)
-    self.regionBuffer.update((self.compMask, (0,0)))
+    if not np.all(newMask == self.compMask):
+      self.compMask = newMask
+      self.region.updateFromMask(self.compMask)
+      self.regionBuffer.update((self.compMask, (0,0)))
 
-  def updateAll(self, mainImg: np.array=None, newComp:df=None):
+  def updateAll(self, mainImg: Optional[np.array], newComp:Optional[df]=None):
     if mainImg is None:
-      mainImg = np.zeros((1,1,3), dtype=np.uint8)
-    if newComp is None:
-      newComp = makeCompDf(1)
+      mainImg = np.zeros((1,1,3))
+      self.imgItem.setImage(mainImg)
+      self.region.updateFromVertices(FRComplexVertices())
+      return
     newVerts: FRComplexVertices = newComp[TC.VERTICES]
     # Since values INSIDE the dataframe are reset instead of modified, there is no
     # need to go through the trouble of deep copying
@@ -330,9 +340,11 @@ class FRFocusedImage(FREditableImg):
     if self.imgItem.image is None:
       return
     if undoOrRedo == FR_ENUMS.BUFFER_UNDO:
-      self.region.updateFromMask(*self.regionBuffer.undo_getObj())
+      newMask, offset = self.regionBuffer.undo_getObj()
     elif undoOrRedo == FR_ENUMS.BUFFER_REDO:
-      self.region.updateFromMask(*self.regionBuffer.redo_getObj())
+      newMask, offset = self.regionBuffer.redo_getObj()
+    self.region.updateFromMask(newMask, offset)
+    self.compMask = self.region.embedMaskInImg(self.compMask.shape)
 
   def clearCurDrawShape(self):
     super().clearCurDrawShape()
@@ -341,7 +353,7 @@ class FRFocusedImage(FREditableImg):
     # Add in offset from main image to FRVertexRegion vertices
     if not self.region.vertsUpToDate:
       newVerts = getVertsFromBwComps(self.region.image)
-      self.region.verts = newVerts
+      self.region.verts = newVerts.copy()
       self.region.vertsUpToDate = True
     else:
       newVerts = self.region.verts.copy()

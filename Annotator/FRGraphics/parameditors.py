@@ -330,8 +330,10 @@ class FRParamEditor(QtWidgets.QDialog):
       @property
       def paramAccessor(*args, **kwargs):
         # Use function wrapper instead of directly returning so no errors are thrown when class isn't fully instantiated
+        # Retrieve class name from the class instance, since this function call may have resulted from an inhereted class
+        trueCls = type(args[0]).__qualname__
         xpondingEditor = self.classInstToEditorMapping[args[0]]
-        return xpondingEditor[self.classNameToParamMapping[clsName], constParam]
+        return xpondingEditor[self.classNameToParamMapping[trueCls], constParam]
       @paramAccessor.setter
       def paramAccessor(clsObj, newVal):
         xpondingEditor = self.classInstToEditorMapping[clsObj]
