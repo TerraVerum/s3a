@@ -29,6 +29,8 @@ class FRShapeCollection(QtCore.QObject):
     self.shapeVerts = FRVertices()
     # Make a new graphics item for each roi type
     self.roiForShape: Dict[FRParam, Union[pg.ROI, FRExtendedROI]] = {}
+    self.forceBlockRois = True
+
     self._curShape = allowableShapes[0]
     self._allowableShapes = allowableShapes
     self._parent = parent
@@ -55,6 +57,8 @@ class FRShapeCollection(QtCore.QObject):
         #  even though PolyLine should be able  to handle remove by index, it can't
         roi.removeHandle(roi.handles[0]['item'])
         roi.hide()
+      self.forceBlockRois = True
+
 
   def buildRoi(self, imgItem: pg.ImageItem, ev: QtGui.QMouseEvent):
     """
@@ -62,6 +66,10 @@ class FRShapeCollection(QtCore.QObject):
         :param imgItem: Image the ROI is drawn upon. Either focused imgItem or main imgItem
         :param ev: Mouse event
         """
+    # Unblock on mouse press
+    if ev.type() == ev.MouseButtonPress and ev.button() == QtCore.Qt.LeftButton:
+      self.forceBlockRois = False
+    if self.forceBlockRois: return
     posRelToImg = imgItem.mapFromScene(ev.pos())
     # Form of rate-limiting -- only simulate click if the next pixel is at least one away
     # from the previous pixel location

@@ -78,8 +78,8 @@ def getClippedBbox(arrShape: tuple, bbox: np.ndarray, margin: int):
      if the new margin causes coordinates to fall off either end of the reference array shape.
   """
   for ii in range(2):
-    bbox[0,ii] = np.maximum(0, bbox[0,ii]-margin)
-    bbox[1,ii] = np.minimum(arrShape[1-ii], bbox[1,ii]+margin)
+    bbox[0,ii] = max(0, min(bbox[0,ii]-margin, arrShape[1-ii]))
+    bbox[1,ii] = min(arrShape[1-ii], max(0, bbox[1,ii]+margin+1))
   return bbox.astype(int)
 
 def coerceDfTypes(dataframe: df, constParams: FRParamGroup):
