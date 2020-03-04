@@ -196,7 +196,8 @@ class FRMainImage(FREditableImg):
     Allows the user to change the main image either from a filepath or array data
     """
     if isinstance(imgSrc, str):
-      imgSrc = np.array(Image.open(imgSrc))
+      # TODO: Handle alpha channel images. For now, discard that data
+      imgSrc = np.array(Image.open(imgSrc))[:,:,0:3]
 
     self.imgItem.setImage(imgSrc)
     self.procCollection.image = imgSrc
