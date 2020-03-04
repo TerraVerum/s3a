@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import cv2 as cv
 import numpy as np
 from skimage.measure import regionprops, label
+from skimage.morphology import opening, closing, disk
 from typing import List
 
 from Annotator.generalutils import splitListAtNans, nanConcatList, largestList
@@ -31,6 +32,7 @@ class _FRDefaultAlgImpls(FRParamGroup):
                                            'these drawbacks.')
   PROP_ALLOW_MULT_REG : FRParam = newParam('Allow Noncontiguous Vertices', False)
   PROP_ALLOW_HOLES    : FRParam = newParam('Allow Holes in Component', False)
+  PROP_STREL_SZ       : FRParam = newParam('Open->Close Struct. El. Width', 3)
   PROP_N_A            : FRParam = newParam('No Editable Properties', None, 'none')
 
 IMPLS = _FRDefaultAlgImpls()
@@ -45,6 +47,9 @@ class FRBasicImageProcessorImpl(FRImageProcessor):
   def allowMultReg(self): pass
   @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_ALLOW_HOLES)
   def allowHoles(self): pass
+  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_STREL_SZ)
+  def strelSz(self): pass
+  
 
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices = None, bgVerts: FRVertices = None) -> \
       np.ndarray:
@@ -138,6 +143,8 @@ class RegionGrow(FRBasicImageProcessorImpl):
     rowColSlices = (slice(cropOffset[1], cropOffset[3]),
                     slice(cropOffset[0], cropOffset[2]))
     prevCompMask[rowColSlices] = bitOperation(prevCompMask[rowColSlices], newRegion)
+    openCloseStrel = disk(self.strelSz)
+    prevCompMask = opening(closing(prevCompMask))
     return super().localCompEstimate(prevCompMask)
 
 
