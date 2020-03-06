@@ -1,17 +1,15 @@
 from enum import Enum
-
-from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
+from typing import Sequence
 
 import numpy as np
 import pandas as pd
 from pandas import DataFrame as df
+from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
-from typing import Sequence
-
-from ..constants import TEMPLATE_COMP, FR_CONSTS
-from ..params import FRParam, FRParamGroup
-from ..tablemodel import CompTableModel, ComponentMgr, FR_ENUMS
 from .parameditors import FR_SINGLETON
+from ..projectvars import TEMPLATE_COMP, FR_CONSTS, FR_ENUMS
+from ..structures import FRParam
+from ..tablemodel import CompTableModel, ComponentMgr
 
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal

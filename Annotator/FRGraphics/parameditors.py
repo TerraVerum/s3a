@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import pickle as pkl
 import re
 import sys
@@ -6,22 +7,20 @@ from dataclasses import dataclass
 from functools import partial
 from os.path import join
 from pathlib import Path
-from typing import Sequence, Union, Callable, Any, Optional, List, Dict, Tuple, Set
+from typing import Sequence, Union, Callable, Any, Optional, List, Dict, Tuple
 
 import numpy as np
-
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
 
-from Annotator.constants import MENU_OPTS_DIR
-from Annotator.interfaces import FRImageProcessor
 from .graphicsutils import dialogSaveToFile
 from .. import appInst
-from ..constants import (
-  SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR,
+from ..interfaces import FRImageProcessor
+from ..structures import FRIllRegisteredPropError
+from ..projectvars import (
+  MENU_OPTS_DIR, SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR,
   TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES, FR_CONSTS)
-from ..exceptions import FRIllRegisteredPropError
-from ..params import FRParam
+from ..structures import FRParam
 
 Signal = QtCore.pyqtSignal
 

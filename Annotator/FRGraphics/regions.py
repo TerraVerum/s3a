@@ -3,18 +3,17 @@ from typing import Tuple, Sequence, Optional, Any, Dict, Union
 import cv2 as cv
 import numpy as np
 import pandas as pd
-from pandas import DataFrame as df
 import pyqtgraph as pg
+from pandas import DataFrame as df
 from pyqtgraph.Qt import QtGui, QtCore
 
-from Annotator.FRGraphics.parameditors import FR_SINGLETON
-from Annotator.FRGraphics.rois import SHAPE_ROI_MAPPING, FRExtendedROI
-from Annotator.constants import TEMPLATE_COMP as TC, FR_CONSTS
-from Annotator.params import FRParam, FRVertices, FRComplexVertices
-from Annotator.processing import getVertsFromBwComps
-from .parameditors import FR_SINGLETON
 from .clickables import ClickableScatterItem
-from Annotator.generalutils import coerceDfTypes, nanConcatList
+from .parameditors import FR_SINGLETON
+from ..FRGraphics.rois import SHAPE_ROI_MAPPING, FRExtendedROI
+from ..generalutils import coerceDfTypes, nanConcatList
+from ..processingutils import getVertsFromBwComps
+from ..projectvars import TEMPLATE_COMP as TC, FR_CONSTS
+from ..structures import FRParam, FRVertices, FRComplexVertices
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot

@@ -1,14 +1,15 @@
 import os
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 
-import numpy as np
-
 # Preference directories
-from Annotator.params import *
+from Annotator.structures.params import FRParam, FRParamGroup, newParam
+from Annotator.structures.vertices import FRComplexVertices
 
-BASE_DIR = os.path.dirname(Path(__file__).absolute())
+__all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR',
+           'SCHEMES_DIR', 'LAYOUTS_DIR', 'FILTERS_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
+           'FR_CONSTS', 'TEMPLATE_COMP_TYPES', 'TEMPLATE_COMP', 'CompParams', 'ComponentTypes']
+BASE_DIR = Path(__file__).parent.parent.absolute()
 MENU_OPTS_DIR = os.path.join(BASE_DIR, 'MenuOpts', '')
 ICON_DIR = os.path.join(BASE_DIR, 'Icons', '')
 ANN_AUTH_DIR = os.path.join(MENU_OPTS_DIR)
@@ -22,25 +23,6 @@ FILTERS_DIR = os.path.join(MENU_OPTS_DIR, 'Filters', '')
 GEN_PROPS_DIR = os.path.join(MENU_OPTS_DIR, 'RegionControls', '')
 SHORTCUTS_DIR = os.path.join(MENU_OPTS_DIR, 'Shortcuts', '')
 
-class _FREnums(Enum):
-  # --------------------------
-  # COMPONENTS
-  # --------------------------
-  COMP_ADD_AS_MERGE = 'Add as Merge'
-  COMP_ADD_AS_NEW   = 'Add as New'
-  COMP_EXPORT_ALL   = 'Export All Components'
-
-  # --------------------------
-  # REGION CREATION
-  # --------------------------
-  BUFFER_UNDO       = 'Undo'
-  BUFFER_REDO       = 'Redo'
-
-  # --------------------------
-  # VERTICES
-  # --------------------------
-  HIER_ALL_FILLED  = 'All Filled'
-FR_ENUMS = _FREnums
 
 @dataclass
 class ComponentTypes(FRParamGroup):
@@ -51,9 +33,7 @@ class ComponentTypes(FRParamGroup):
   IC    : FRParam = newParam('IC')
   OTHER : FRParam = newParam('Other')
   N_A   : FRParam = newParam('Unassigned')
-
 TEMPLATE_COMP_TYPES = ComponentTypes()
-
 
 @dataclass
 class CompParams(FRParamGroup):
@@ -69,7 +49,6 @@ class CompParams(FRParamGroup):
   BOARD_TEXT      : FRParam = newParam('Board Text', '')
   LOGO            : FRParam = newParam('Logo', '')
   NOTES           : FRParam = newParam('Notes', '')
-
 TEMPLATE_COMP = CompParams()
 
 
@@ -114,7 +93,7 @@ class _FRConsts(FRParamGroup):
   PROP_SEG_THRESH           : FRParam = newParam('Segmentation Threshold', 0.)
   PROP_FOCUSED_SEED_THRESH  : FRParam = newParam('Seedpoint Threshold in Focused Image', 7.)
   PROP_UNDO_BUF_SZ          : FRParam = newParam('Size of Region Undo Buffer', 30)
-  PROP_STEPS_BW_SAVE        : FRParam = newParam('Operations Between Buffer Saves', 5)
+  PROP_STEPS_BW_SAVE        : FRParam = newParam('Operations Between Buffer Saves', 1)
   PROP_CHECK_LARGE_CHANGES  : FRParam = newParam('Save buffer during large region changes', True)
 
   # --------------------------
@@ -169,9 +148,4 @@ class _FRConsts(FRParamGroup):
   DRAW_ACT_REM    : FRParam = newParam('Add to Background', f'{ICON_DIR}background.png', 'icon')
   DRAW_ACT_SELECT : FRParam = newParam('Select', f'{ICON_DIR}select.svg', 'icon')
   DRAW_ACT_PAN    : FRParam = newParam('Pan', f'{ICON_DIR}pan.svg', 'icon')
-
 FR_CONSTS = _FRConsts()
-
-if __name__ == '__main__':
-  c = ComponentTypes().fromString('capacitor')
-  print(c)

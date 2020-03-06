@@ -2,12 +2,10 @@
 
 import sys
 from os import path
-from pyqtgraph.Qt import QtWidgets
 
 from . import appInst
 from .Annotator import Annotator
-from .interfaceimpls import *
-from .constants import BASE_DIR
+from Annotator.projectvars.constants import BASE_DIR
 
 startImgFpath = path.join(BASE_DIR, '../Images/fast.png')
 if len(sys.argv) > 1:

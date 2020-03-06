@@ -1,30 +1,13 @@
-from abc import abstractmethod, ABC
-from typing import Optional, Callable, Dict, Tuple
+from abc import abstractmethod
+from typing import Optional, Callable, Dict
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-from pyqtgraph import ROI, PolyLineROI, RectROI, LineSegmentROI
 import numpy as np
 
-from Annotator.constants import FR_CONSTS
-from Annotator.exceptions import FRInvalidROIEvType
-from Annotator.params import FRVertices, FRParam
-
-
-def _getImgMask(roi: pg.ROI, imgItem: pg.ImageItem):
-  imgMask = np.zeros(imgItem.image.shape[0:2], dtype='bool')
-  roiSlices, _ = roi.getArraySlice(imgMask, imgItem)
-  # TODO: Clip regions that extend beyond imgItem dimensions
-  roiSz = [curslice.stop - curslice.start for curslice in roiSlices]
-  # renderShapeMask takes width, height args. roiSlices has row/col sizes,
-  # so switch this order when passing to renderShapeMask
-  roiSz = roiSz[::-1]
-  roiMask = roi.renderShapeMask(*roiSz).astype('uint8')
-  # Also, the return value for renderShapeMask is given in col-major form.
-  # Transpose this, since all other data is in row-major.
-  roiMask = roiMask.T
-  imgMask[roiSlices[0], roiSlices[1]] = roiMask
-  return imgMask
+from ..projectvars import FR_CONSTS
+from ..structures import FRVertices
+from ..structures import FRParam
 
 def _clearPoints(roi: pg.ROI):
   while roi.handles:
@@ -36,7 +19,6 @@ def _clearPoints(roi: pg.ROI):
 # --------
 class FRROIExtension:
   connected = True
-  # _offset = FRVertices([[0,0]], dtype=int).squeeze()
 
   def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: np.ndarray) -> (bool, Optional[FRVertices]):
     """
@@ -54,14 +36,6 @@ class FRROIExtension:
   @property
   @abstractmethod
   def vertices(self): pass
-
-  def embedMaskInImg(self, toEmbedShape: Tuple[int, int]):
-    outImg = np.zeros(toEmbedShape[0:2], dtype=bool)
-    roiSz = np.array(self.size()).astype(int)
-    # Offset is x-y, shape is row-col. So, swap order of offset relative to current axis
-    embedSlices = [slice(self._offset[1-ii], roiSz[ii]+self._offset[1-ii]) for ii in range(2)]
-    outImg[embedSlices[0], embedSlices[1]] = self.renderShapeMask(*roiSz[::-1])
-    return outImg
 
 class FRExtendedROI(pg.ROI, FRROIExtension):
   """

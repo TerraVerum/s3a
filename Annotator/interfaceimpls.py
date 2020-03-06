@@ -1,19 +1,19 @@
 from dataclasses import dataclass
+from typing import List
 
 import cv2 as cv
 import numpy as np
 from skimage.measure import regionprops, label
 from skimage.morphology import opening, closing, disk
-from typing import List
 
-from Annotator.generalutils import splitListAtNans, nanConcatList, largestList
-from Annotator.params import FRParamGroup, FRParam, newParam, FRComplexVertices
-from Annotator.processing import growSeedpoint, rmSmallComps
 from .FRGraphics.parameditors import FR_SINGLETON
 from .generalutils import getClippedBbox
-from Annotator.interfaces import FRImageProcessor
-from .params import FRVertices
-from .processing import getVertsFromBwComps, getBwComps
+from .generalutils import splitListAtNans
+from .interfaces import FRImageProcessor
+from .processingutils import getVertsFromBwComps, getBwComps
+from .processingutils import growSeedpoint, rmSmallComps
+from .structures import FRParam, FRParamGroup, newParam
+from .structures import FRVertices, FRComplexVertices
 
 
 @dataclass

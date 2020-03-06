@@ -1,16 +1,15 @@
 import pyqtgraph as pg
-from pyqtgraph import Point
 from pyqtgraph.GraphicsScene.mouseEvents import MouseDragEvent
 from pyqtgraph.Qt import QtCore, QtGui
 
-from Annotator.params import FRVertices
+from ..structures import FRVertices
 
 Signal = QtCore.pyqtSignal
 
 import numpy as np
 
 from .parameditors import FR_SINGLETON
-from ..constants import FR_CONSTS
+from Annotator.projectvars import FR_CONSTS
 
 class ClickableImageItem(pg.ImageItem):
   sigClicked = Signal(object)
