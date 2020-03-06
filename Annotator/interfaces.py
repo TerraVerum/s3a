@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from typing import List
 
-from Annotator.params import FRParamGroup, FRVertices, FRComplexVertices
+from .structures.vertices import FRVertices, FRComplexVertices
 
 
 class FRImageProcessor(ABC):

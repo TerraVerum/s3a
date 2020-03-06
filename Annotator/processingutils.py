@@ -5,15 +5,10 @@ from skimage.measure import regionprops, label
 from skimage.morphology import closing, dilation, opening
 from skimage.morphology import disk
 from skimage.segmentation import quickshift, flood
-from sklearn.decomposition import PCA
-from PIL import Image
 
-from imageprocessing.algorithms import Algorithms as alg
-from imageprocessing.processing import ABImage
-from typing import List
-
+from Annotator.structures.vertices import FRVertices, FRComplexVertices
 from .generalutils import getClippedBbox
-from .params import FRVertices, FRComplexVertices
+
 
 def getBwComps(img: np.ndarray, minSz=30):
   bwOut = bwBgMask(img)
@@ -21,56 +16,6 @@ def getBwComps(img: np.ndarray, minSz=30):
   bwOut = closing(bwOut, np.ones((7,7), dtype=bool))
   return rmSmallComps(bwOut, minSz)
 
-def getColorComps(img: np.array, minSiz=None) -> np.ndarray:
-  return colorBgMask(img.astype('uint8'))
-
-
-def getBwComps_experimental(img: np.ndarray, minSz=30, seedThresh=45, segThresh=0.) -> np.ndarray:
-  img = (gaussian(img, 1)*255).astype('uint8')
-  initRegions = regionprops(label(bwBgMask(img)))
-  # Grow from the center of these estimatess
-  imshape = img.shape[0:2]
-  bwOut = np.zeros(imshape, dtype=bool)
-  for region in initRegions:
-    # Clipped bbox utility needs x-y ordering not row-col
-    bbox = np.array((region.bbox[1], region.bbox[0],
-                     region.bbox[3], region.bbox[2]))
-    bbox = getClippedBbox(imshape, bbox.reshape(2, 2), 5)[:, ::-1]
-    rowSlice = slice(*bbox[:,0])
-    colSlice = slice(*bbox[:,1])
-    miniImg = img[rowSlice, colSlice,:]
-    miniMask = growBoundarySeeds(miniImg, seedThresh, minSz, segThresh, useAllBounds=True)
-    bwOut[rowSlice, colSlice] = miniMask
-  return bwOut
-
-def getBwComps_segmentation(img: np.ndarray) -> np.ndarray:
-  img = (gaussian(img, 1)*255).astype('uint8')
-  margin = 5
-  bwHullImg = regionConvHulls(img)
-  bwHullImg = dilation(bwHullImg, np.ones((margin,margin)))
-  segImg = quickshift(img, ratio=0.9, max_dist=25)
-  colorBroadcast = np.zeros((1,1,3),dtype='uint8')
-  colorBroadcast[0,0,2] = 255
-
-  seedpoints = getVertsFromBwComps(bwHullImg, simplifyVerts=False)
-  for compVerts in seedpoints:
-    # Vertices are x-y, convert to row-col
-    edgeLabels = np.unique(segImg[compVerts[:,1], compVerts[:,0]])
-    comparisonMat = segImg[:,:,None] == edgeLabels[None,None,:]
-    isEdgePix = np.any(comparisonMat, axis=2)
-    bwHullImg[isEdgePix] = False
-  return bwHullImg
-
-def regionConvHulls(img: np.ndarray):
-  compMask = bwBgMask(img)
-  outImg = np.zeros(img.shape[0:2], dtype=bool)
-  labeledImg = label(compMask)
-  regions = regionprops(labeledImg)
-  for region in regions:
-    bbox = region.bbox
-    convHull = region.convex_image
-    outImg[bbox[0]:bbox[2],bbox[1]:bbox[3]] = convHull
-  return outImg
 
 def colorLabelsWithMean(labelImg, refImg) -> np.ndarray:
   outImg = np.empty(refImg.shape)
@@ -79,23 +24,6 @@ def colorLabelsWithMean(labelImg, refImg) -> np.ndarray:
     curmask = labelImg == curLabel
     outImg[curmask,:] = refImg[curmask,:].reshape(-1,3).mean(0)
   return outImg
-
-def colorBgMask(img: np.array) -> np.array:
-  image = ABImage(src=img)
-  process = alg.gmm_backround_mask(image=image,
-                                   n_components=5,
-                                   resize_image=(0.1, 0.1),
-                                   plot_results=True)
-  mask = process.get_result_with_id("Gaussian Mask").image.data
-  kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (5,5))
-  mask = cv.morphologyEx(mask, cv.MORPH_OPEN, kernel=kernel)
-  kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (7,7))
-  mask = cv.morphologyEx(mask, cv.MORPH_DILATE, kernel=kernel)
-  import matplotlib.pyplot as plt
-  plt.figure()
-  plt.imshow(mask, cmap='gray')
-  plt.show()
-  return mask
 
 def bwBgMask(img: np.array) -> np.array:
   if img.dtype != 'uint8':
@@ -312,22 +240,3 @@ def growBoundarySeeds(img: np.ndarray, seedThresh: float, minSz: int,
     bwOut[biggestRegion.coords[:,0], biggestRegion.coords[:,1]] = True
 
   return rmSmallComps(bwOut, minSz)
-
-
-def pcaReduction(bwRegion: np.ndarray, numPcaComps:int=2):
-  from sklearn.decomposition import PCA
-  pca = PCA()
-  allPca = pca.fit_transform(bwRegion)
-  smallPca = allPca[:,0:numPcaComps]
-  #smallPca = allPca[:,numPcaComps]
-  out = pca.inverse_transform(np.hstack((smallPca, np.zeros((smallPca.shape[0], allPca.shape[1] - numPcaComps)))))
-  #out = pca.inverse_transform(np.hstack((smallPca[:,None], np.zeros((smallPca.shape[0], allPca.shape[1] - 1)))))
-  return out
-
-if __name__ == '__main__':
-  from PIL import Image
-  import pyqtgraph as pg
-  im = np.array(Image.open('../med.png'))
-  im = getBwComps(im)
-  pg.image(im)
-  pg.show()

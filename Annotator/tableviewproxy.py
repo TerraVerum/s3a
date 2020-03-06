@@ -1,13 +1,12 @@
 import numpy as np
 from pyqtgraph.Qt import QtCore
 
-from Annotator.FRGraphics.parameditors import FR_SINGLETON
-from Annotator.constants import FR_CONSTS
-from Annotator.params import FRVertices
 from .FRGraphics import tableview
 from .FRGraphics.imageareas import FRMainImage
+from .FRGraphics.parameditors import FR_SINGLETON
 from .FRGraphics.regions import MultiRegionPlot
-from .constants import TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES
+from .projectvars import FR_CONSTS, TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES
+from .structures import FRVertices
 from .tablemodel import ComponentMgr
 
 Signal = QtCore.pyqtSignal

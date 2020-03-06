@@ -11,13 +11,14 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
 
 from .FRGraphics.annotator_ui import FRAnnotatorUI
-from .FRGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, \
-  addDirItemsToMenu, \
+from .FRGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc, dialogGetAuthorName
-from .FRGraphics.parameditors import FRParamEditor, FR_SINGLETON
-from .constants import FR_CONSTS, ANN_AUTH_DIR
-from .constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
-from .tablemodel import ComponentMgr as ComponentMgr, FR_ENUMS, makeCompDf
+from .FRGraphics.parameditors import FRParamEditor
+from .interfaceimpls import *
+from .projectvars.constants import FR_CONSTS, ANN_AUTH_DIR
+from .projectvars.constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
+from .projectvars.enums import FR_ENUMS
+from .tablemodel import ComponentMgr as ComponentMgr, makeCompDf
 from .tableviewproxy import CompDisplayFilter, CompSortFilter
 
 Slot = QtCore.pyqtSlot
