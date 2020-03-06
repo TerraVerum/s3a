@@ -424,8 +424,19 @@ class FRParamEditor(QtWidgets.QDialog):
     :return: None
     """
     # Make sure to add parameters from registered base classes, too
-    iterClasses = [cls.__qualname__]
-    for baseCls in cls.__bases__:
+    iterClasses = []
+    baseClasses = [cls]
+    nextClsPtr = 0
+    # Get all bases of bases, too
+    while nextClsPtr < len(baseClasses):
+      curCls = baseClasses[nextClsPtr]
+      curBases = curCls.__bases__
+      # Only add base classes that haven't already been added to prevent infinite recursion
+      baseClasses.extend([tmpCls for tmpCls in curBases if tmpCls not in baseClasses])
+      nextClsPtr += 1
+
+    baseClses = []
+    for baseCls in baseClasses:
       iterClasses.append(baseCls.__qualname__)
 
     for clsName in iterClasses:
@@ -616,7 +627,8 @@ class AlgPropsMgr(FRParamEditor):
     clsName = type(clsObj).__name__
     editorDir = join(MENU_OPTS_DIR, clsName, '')
     # Strip "FR" from class name before retrieving name
-    newEditor = AlgCollectionEditor(editorDir, self, name=_camelCaseToTitle(clsName[2:]))
+    settingsName = _camelCaseToTitle(clsName[2:]) + ' Processor'
+    newEditor = AlgCollectionEditor(editorDir, self, name=settingsName)
     FR_SINGLETON.editors.append(newEditor)
     FR_SINGLETON.editorNames.append(newEditor.name)
     # Wrap in property so changes propagate to the calling class
