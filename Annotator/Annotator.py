@@ -110,8 +110,10 @@ class Annotator(FRAnnotatorUI):
     # Start with docks in default position, hide error if default file doesn't exist
     self.loadLayoutActionTriggered('Default', showError=False)
 
-    #QtCore.QTimer.singleShot(0, self.showMaximized)
-    self.showMaximized()
+    # Placing in a single shot timer ensures the app has enough time to load and assess screen
+    # dimensions before resizing. Otherwise, the maximize doesn't work properly
+    QtCore.QTimer.singleShot(0, self.showMaximized)
+    # self.showMaximized()
     if authorName is None:
       authorName = self.getAuthorName()
     FR_SINGLETON.annotationAuthor = authorName
