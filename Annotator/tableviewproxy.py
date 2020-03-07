@@ -1,10 +1,10 @@
 import numpy as np
 from pyqtgraph.Qt import QtCore
 
-from .FRGraphics import tableview
-from .FRGraphics.imageareas import FRMainImage
-from .FRGraphics.parameditors import FR_SINGLETON
-from .FRGraphics.regions import MultiRegionPlot
+from .frgraphics import tableview
+from .frgraphics.imageareas import FRMainImage
+from .frgraphics.parameditors import FR_SINGLETON
+from .frgraphics.regions import MultiRegionPlot
 from .projectvars import FR_CONSTS, TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES
 from .structures import FRVertices
 from .tablemodel import ComponentMgr

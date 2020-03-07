@@ -6,7 +6,7 @@ import numpy as np
 from skimage.measure import regionprops, label
 from skimage.morphology import opening, closing, disk
 
-from .FRGraphics.parameditors import FR_SINGLETON
+from .frgraphics.parameditors import FR_SINGLETON
 from .generalutils import getClippedBbox
 from .generalutils import splitListAtNans
 from .interfaces import FRImageProcessor

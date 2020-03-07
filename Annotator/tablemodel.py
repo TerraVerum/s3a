@@ -8,7 +8,7 @@ import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 
-from .FRGraphics.parameditors import FR_SINGLETON
+from .frgraphics.parameditors import FR_SINGLETON
 from .generalutils import coerceDfTypes
 from .projectvars import FR_ENUMS, TEMPLATE_COMP as TC, CompParams
 from .projectvars.constants import FR_CONSTS

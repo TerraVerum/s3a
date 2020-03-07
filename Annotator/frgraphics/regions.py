@@ -9,7 +9,7 @@ from pyqtgraph.Qt import QtGui, QtCore
 
 from .clickables import ClickableScatterItem
 from .parameditors import FR_SINGLETON
-from ..FRGraphics.rois import SHAPE_ROI_MAPPING, FRExtendedROI
+from ..frgraphics.rois import SHAPE_ROI_MAPPING, FRExtendedROI
 from ..generalutils import coerceDfTypes, nanConcatList
 from ..processingutils import getVertsFromBwComps
 from ..projectvars import TEMPLATE_COMP as TC, FR_CONSTS
