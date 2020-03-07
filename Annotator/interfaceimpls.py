@@ -77,7 +77,8 @@ class FRBasicImageProcessorImpl(FRImageProcessor):
     return rmSmallComps(prevCompMask, self.minCompSz)
 
   def globalCompEstimate(self) -> List[FRComplexVertices]:
-    pass
+    initialList = getVertsFromBwComps(getBwComps(self.image, self.minCompSz), externOnly=True)
+    return [FRComplexVertices([lst]) for lst in initialList]
 
 
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_REGION_GROW)
@@ -147,11 +148,6 @@ class RegionGrow(FRBasicImageProcessorImpl):
     prevCompMask = opening(closing(prevCompMask))
     return super().localCompEstimate(prevCompMask)
 
-
-  def globalCompEstimate(self) -> List[FRComplexVertices]:
-    initialList = getVertsFromBwComps(getBwComps(self.image, self.minCompSz), externOnly=True)
-    return [FRComplexVertices([lst]) for lst in initialList]
-
   def getCroppedImg(self, verts: FRVertices, margin: int) -> (np.ndarray, np.ndarray):
     verts = np.vstack(verts)
     img_np = self.image
@@ -162,10 +158,6 @@ class RegionGrow(FRBasicImageProcessorImpl):
 
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_SHAPES)
 class BasicShapes(FRBasicImageProcessorImpl):
-  def globalCompEstimate(self) -> List[FRComplexVertices]:
-    initialList = getVertsFromBwComps(getBwComps(self.image, self.minCompSz), externOnly=True)
-    return [FRComplexVertices(lst) for lst in initialList]
-
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices=None, bgVerts: FRVertices=None) -> \
       np.ndarray:
     # Don't modify the original version
@@ -189,11 +181,15 @@ class BasicShapes(FRBasicImageProcessorImpl):
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_SQUARES)
 class OnlySquares(BasicShapes):
   def globalCompEstimate(self) -> List[FRComplexVertices]:
-    polyVerts = getVertsFromBwComps(getBwComps(self.image, self.minCompSz), externOnly=True)
+    polyVerts = super().globalCompEstimate()
     outVerts = []
     for vertList in polyVerts:
-      squareVerts = np.vstack([vertList.min(0), vertList.max(0)]).view(FRVertices)
-      outVerts.append(FRComplexVertices(squareVerts))
+      squareCorners = np.vstack([vertList.stack().min(0), vertList.stack().max(0)])
+      # Turn square diagonals into proper vertices
+      colIdx = [0,1,0,1,0,1,0,1]
+      rowIdx = [0,0,0,1,1,1,1,0]
+      squareVerts = squareCorners[rowIdx, colIdx].reshape(-1,2)
+      outVerts.append(FRComplexVertices([squareVerts]))
     return outVerts
 
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices = None, bgVerts: FRVertices = None) -> \
