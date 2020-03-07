@@ -1,15 +1,12 @@
 from __future__ import annotations
 from ast import literal_eval
-from enum import Enum
 from typing import Union, List
 
 import numpy as np
 
 from .exceptions import FRIllFormedVerticesError
+from ..projectvars.enums import FR_ENUMS
 
-class _VertEnums(Enum):
-  HIER_ALL_FILLED = 'All Filled'
-VERT_ENUMS = _VertEnums
 
 class FRVertices(np.ndarray):
   connected = True
@@ -79,9 +76,9 @@ class FRComplexVertices(list):
   """See cv.findContours for hierarchy explanation. Used in cv.RETR_CCOMP mode."""
 
   def __init__(self, inputArr: Union[List[FRVertices], np.ndarray]=None,
-               hierarchy: Union[np.ndarray, VERT_ENUMS]=None):
+               hierarchy: Union[np.ndarray, FR_ENUMS]=None):
     if hierarchy is None:
-      hierarchy = VERT_ENUMS.HIER_ALL_FILLED
+      hierarchy = FR_ENUMS.HIER_ALL_FILLED
     if inputArr is None or len(inputArr) == 0:
       inputArr = [FRVertices()]
     super().__init__(inputArr)
@@ -91,7 +88,7 @@ class FRComplexVertices(list):
       raise FRIllFormedVerticesError(f'Must pass a hierarchy with any complex vertices of more than one vertex list, '
                                 f'received vertex list of length {numInpts}')
     elif (hierarchy is None and numInpts <= 1) \
-        or hierarchy is VERT_ENUMS.HIER_ALL_FILLED:
+        or hierarchy is FR_ENUMS.HIER_ALL_FILLED:
       # Default hierarchy for a one- or zero-object contour list
       hierarchy = np.ones((numInpts, 4), dtype=int)*-1
     self.hierarchy = hierarchy
