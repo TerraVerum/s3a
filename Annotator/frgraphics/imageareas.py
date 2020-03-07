@@ -12,7 +12,7 @@ from .parameditors import FR_SINGLETON
 from .regions import FRShapeCollection
 # Required to trigger property registration
 from .rois import FRExtendedROI
-from ..FRGraphics.regions import FRVertexDefinedImg
+from ..frgraphics.regions import FRVertexDefinedImg
 from ..generalutils import getClippedBbox, ObjUndoBuffer
 from ..processingutils import getVertsFromBwComps
 from ..processingutils import segmentComp
