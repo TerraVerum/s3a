@@ -10,11 +10,11 @@ import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
 
+from .interfaceimpls import *
 from .frgraphics.annotator_ui import FRAnnotatorUI
 from .frgraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc, dialogGetAuthorName
-from .frgraphics.parameditors import FRParamEditor
-from .interfaceimpls import *
+from .frgraphics.parameditors import FRParamEditor, FR_SINGLETON
 from .projectvars.constants import FR_CONSTS, ANN_AUTH_DIR
 from .projectvars.constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
 from .projectvars.enums import FR_ENUMS
