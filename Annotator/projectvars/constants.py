@@ -3,8 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 # Preference directories
-from Annotator.structures.params import FRParam, FRParamGroup, newParam
-from Annotator.structures.vertices import FRComplexVertices
+from ..structures import FRComplexVertices, FRParam, FRParamGroup, newParam
 
 __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'FILTERS_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
