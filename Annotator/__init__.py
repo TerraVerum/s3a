@@ -3,6 +3,8 @@ import sys
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
+
+# Import here to resolve resolution order
 import Annotator.projectvars
 import Annotator.structures
 
