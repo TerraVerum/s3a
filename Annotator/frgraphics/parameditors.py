@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import pickle as pkl
 import re
 import sys
@@ -6,22 +7,20 @@ from dataclasses import dataclass
 from functools import partial
 from os.path import join
 from pathlib import Path
-from typing import Sequence, Union, Callable, Any, Optional, List, Dict, Tuple, Set
+from typing import Sequence, Union, Callable, Any, Optional, List, Dict, Tuple
 
 import numpy as np
-
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
 
-from Annotator.constants import MENU_OPTS_DIR
-from Annotator.interfaces import FRImageProcessor
 from .graphicsutils import dialogSaveToFile
 from .. import appInst
-from ..constants import (
-  SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR,
+from ..interfaces import FRImageProcessor
+from ..structures import FRIllRegisteredPropError
+from ..projectvars import (
+  MENU_OPTS_DIR, SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR,
   TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES, FR_CONSTS)
-from ..exceptions import FRIllRegisteredPropError
-from ..params import FRParam
+from ..structures import FRParam
 
 Signal = QtCore.pyqtSignal
 
@@ -424,8 +423,19 @@ class FRParamEditor(QtWidgets.QDialog):
     :return: None
     """
     # Make sure to add parameters from registered base classes, too
-    iterClasses = [cls.__qualname__]
-    for baseCls in cls.__bases__:
+    iterClasses = []
+    baseClasses = [cls]
+    nextClsPtr = 0
+    # Get all bases of bases, too
+    while nextClsPtr < len(baseClasses):
+      curCls = baseClasses[nextClsPtr]
+      curBases = curCls.__bases__
+      # Only add base classes that haven't already been added to prevent infinite recursion
+      baseClasses.extend([tmpCls for tmpCls in curBases if tmpCls not in baseClasses])
+      nextClsPtr += 1
+
+    baseClses = []
+    for baseCls in baseClasses:
       iterClasses.append(baseCls.__qualname__)
 
     for clsName in iterClasses:
@@ -616,7 +626,8 @@ class AlgPropsMgr(FRParamEditor):
     clsName = type(clsObj).__name__
     editorDir = join(MENU_OPTS_DIR, clsName, '')
     # Strip "FR" from class name before retrieving name
-    newEditor = AlgCollectionEditor(editorDir, self, name=_camelCaseToTitle(clsName[2:]))
+    settingsName = _camelCaseToTitle(clsName[2:]) + ' Processor'
+    newEditor = AlgCollectionEditor(editorDir, self, name=settingsName)
     FR_SINGLETON.editors.append(newEditor)
     FR_SINGLETON.editorNames.append(newEditor.name)
     # Wrap in property so changes propagate to the calling class

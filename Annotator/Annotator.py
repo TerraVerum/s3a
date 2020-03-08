@@ -10,14 +10,15 @@ import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
 
-from .FRGraphics.annotator_ui import FRAnnotatorUI
-from .FRGraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, \
-  addDirItemsToMenu, \
+from .interfaceimpls import *
+from .frgraphics.annotator_ui import FRAnnotatorUI
+from .frgraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc, dialogGetAuthorName
-from .FRGraphics.parameditors import FRParamEditor, FR_SINGLETON
-from .constants import FR_CONSTS, ANN_AUTH_DIR
-from .constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
-from .tablemodel import ComponentMgr as ComponentMgr, FR_ENUMS, makeCompDf
+from .frgraphics.parameditors import FRParamEditor, FR_SINGLETON
+from .projectvars.constants import FR_CONSTS, ANN_AUTH_DIR
+from .projectvars.constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
+from .projectvars.enums import FR_ENUMS
+from .tablemodel import ComponentMgr as ComponentMgr, makeCompDf
 from .tableviewproxy import CompDisplayFilter, CompSortFilter
 
 Slot = QtCore.pyqtSlot
@@ -46,7 +47,6 @@ class Annotator(FRAnnotatorUI):
     # ---------------
     self.mainImg.sigComponentCreated.connect(self._add_focusComp)
     self.mainImg.setImage(startImgFpath)
-
     # ---------------
     # FOCUSED IMAGE
     # ---------------
@@ -79,6 +79,7 @@ class Annotator(FRAnnotatorUI):
     self.resetRegionBtn.clicked.connect(self.resetRegionBtnClicked)
     self.acceptRegionBtn.clicked.connect(self.acceptRegionBtnClicked)
 
+
     # Dropdowns
     # self.addRmCombo.currentIndexChanged.connect(self.addRmComboChanged)
 
@@ -110,8 +111,10 @@ class Annotator(FRAnnotatorUI):
     # Start with docks in default position, hide error if default file doesn't exist
     self.loadLayoutActionTriggered('Default', showError=False)
 
-    #QtCore.QTimer.singleShot(0, self.showMaximized)
-    self.showMaximized()
+    # Placing in a single shot timer ensures the app has enough time to load and assess screen
+    # dimensions before resizing. Otherwise, the maximize doesn't work properly
+    QtCore.QTimer.singleShot(0, self.showMaximized)
+    # self.showMaximized()
     if authorName is None:
       authorName = self.getAuthorName()
     FR_SINGLETON.annotationAuthor = authorName
@@ -132,7 +135,6 @@ class Annotator(FRAnnotatorUI):
       ofile.write(name)
     return name
 
-  # TODO: Move these properties into the class responsible for image processing/etc.
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_EST_BOUNDS_ON_START)
   def estBoundsOnStart(self): pass
 

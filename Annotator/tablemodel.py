@@ -8,20 +8,16 @@ import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 
-from imageprocessing.annotations import ABAnnotationTable
-
-from Annotator.FRGraphics.parameditors import FR_SINGLETON
-from Annotator.constants import FR_CONSTS, FR_ENUMS
-from Annotator.exceptions import FRCsvIOError
-from Annotator.generalutils import coerceDfTypes
-from Annotator.params import FRComplexVertices
-from .constants import TEMPLATE_COMP as TC, CompParams
-from .params import FRParam
+from .frgraphics.parameditors import FR_SINGLETON
+from .generalutils import coerceDfTypes
+from .projectvars import FR_ENUMS, TEMPLATE_COMP as TC, CompParams
+from .projectvars.constants import FR_CONSTS
+from .structures import FRComplexVertices, FRParam, FRCsvIOError
 
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal
 
-def makeCompDf(numRows=1) -> ABAnnotationTable:
+def makeCompDf(numRows=1) -> df:
   """
   Creates a dataframe for the requested number of components.
   This is the recommended method for component instantiation prior to table insertion.

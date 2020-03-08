@@ -1,4 +1,4 @@
-from typing import Union, Tuple, List, Optional
+from typing import Union, Tuple, Optional
 
 import numpy as np
 import pyqtgraph as pg
@@ -6,20 +6,18 @@ from PIL import Image
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
-from Annotator.FRGraphics.regions import FRVertexDefinedImg
-from Annotator.params import FRComplexVertices
-from Annotator.processing import getVertsFromBwComps
 from .clickables import RightPanViewBox
 from .drawopts import FRDrawOpts
 from .parameditors import FR_SINGLETON
 from .regions import FRShapeCollection
 # Required to trigger property registration
 from .rois import FRExtendedROI
-from ..constants import TEMPLATE_COMP as TC, FR_CONSTS, FR_ENUMS
+from ..frgraphics.regions import FRVertexDefinedImg
 from ..generalutils import getClippedBbox, ObjUndoBuffer
-from ..params import FRParam
-from ..params import FRVertices
-from ..processing import segmentComp
+from ..processingutils import getVertsFromBwComps
+from ..processingutils import segmentComp
+from ..projectvars import TEMPLATE_COMP as TC, FR_CONSTS, FR_ENUMS
+from ..structures import FRParam, FRVertices, FRComplexVertices
 from ..tablemodel import makeCompDf
 
 Signal = QtCore.pyqtSignal
@@ -196,7 +194,8 @@ class FRMainImage(FREditableImg):
     Allows the user to change the main image either from a filepath or array data
     """
     if isinstance(imgSrc, str):
-      imgSrc = np.array(Image.open(imgSrc))
+      # TODO: Handle alpha channel images. For now, discard that data
+      imgSrc = np.array(Image.open(imgSrc))[:,:,0:3]
 
     self.imgItem.setImage(imgSrc)
     self.procCollection.image = imgSrc
