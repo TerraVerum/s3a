@@ -5,8 +5,8 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 
 # Import here to resolve resolution order
-import Annotator.projectvars
-import Annotator.structures
+import cdef.projectvars
+import cdef.structures
 
 # Makes sure that when the folder is run as a module, the app exists in the outermost
 # scope of the application
