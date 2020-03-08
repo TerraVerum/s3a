@@ -94,9 +94,9 @@ def newParam(name, val=None, valType=None, helpText=''):
   :param val: Initial value of the parameter. This is used within the program to infer
          parameter type, shape, comparison methods, etc.
   :param valType: Type of the variable if not easily inferrable from the value itself. For instance,
-  class:`ShortcutParameter<Annotator.frgraphics.parameditors.ShortcutParameter>` is indicated with string values
+  class:`ShortcutParameter<cdef.frgraphics.parameditors.ShortcutParameter>` is indicated with string values
   (e.g. 'Ctrl+D'), so the user must explicitly specify that such an :class:`FRParam` is of type 'shortcut' (as
-  defined in :class:`ShortcutParameter<Annotator.frgraphics.parameditors.ShortcutParameter>`) If the type *is* easily
+  defined in :class:`ShortcutParameter<cdef.frgraphics.parameditors.ShortcutParameter>`) If the type *is* easily
   inferrable, this may be left blank.
   :param helpText: Additional documentation for this parameter.
   :return: Field that can be inserted within the :class:`FRParamGroup` dataclass.

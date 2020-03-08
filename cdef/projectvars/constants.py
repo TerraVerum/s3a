@@ -9,18 +9,18 @@ __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'FILTERS_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
            'FR_CONSTS', 'TEMPLATE_COMP_TYPES', 'TEMPLATE_COMP', 'CompParams', 'ComponentTypes']
 BASE_DIR = Path(__file__).parent.parent.absolute()
-MENU_OPTS_DIR = os.path.join(BASE_DIR, 'MenuOpts', '')
-ICON_DIR = os.path.join(BASE_DIR, 'Icons', '')
+MENU_OPTS_DIR = os.path.join(BASE_DIR, 'menuopts', '')
+ICON_DIR = os.path.join(BASE_DIR, 'icons', '')
 ANN_AUTH_DIR = os.path.join(MENU_OPTS_DIR)
 
 # -----
 # EDITORS
 # -----
-SCHEMES_DIR = os.path.join(MENU_OPTS_DIR, 'Schemes', '')
-LAYOUTS_DIR = os.path.join(MENU_OPTS_DIR, 'Layouts', '')
-FILTERS_DIR = os.path.join(MENU_OPTS_DIR, 'Filters', '')
-GEN_PROPS_DIR = os.path.join(MENU_OPTS_DIR, 'RegionControls', '')
-SHORTCUTS_DIR = os.path.join(MENU_OPTS_DIR, 'Shortcuts', '')
+SCHEMES_DIR = os.path.join(MENU_OPTS_DIR, 'schemes', '')
+LAYOUTS_DIR = os.path.join(MENU_OPTS_DIR, 'layouts', '')
+FILTERS_DIR = os.path.join(MENU_OPTS_DIR, 'filters', '')
+GEN_PROPS_DIR = os.path.join(MENU_OPTS_DIR, 'regioncontrols', '')
+SHORTCUTS_DIR = os.path.join(MENU_OPTS_DIR, 'shortcuts', '')
 
 
 @dataclass
@@ -56,7 +56,7 @@ class _FRConsts(FRParamGroup):
   # --------------------------
   # CLASS NAMES
   # --------------------------
-  CLS_ANNOTATOR        : FRParam = newParam('Main Annotator')
+  CLS_ANNOTATOR        : FRParam = newParam('Main MainWindow')
 
   CLS_COMP_TBL         : FRParam = newParam('Component Table')
   CLS_COMP_MGR         : FRParam = newParam('Component Manager')

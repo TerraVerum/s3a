@@ -28,7 +28,7 @@ Signal = QtCore.pyqtSignal
 pg.setConfigOptions(imageAxisOrder='row-major')
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_ANNOTATOR)
-class Annotator(FRAnnotatorUI):
+class MainWindow(FRAnnotatorUI):
   """
   Top-level widget for producing component bounding boxes from an input image.
   """
@@ -295,5 +295,5 @@ class Annotator(FRAnnotatorUI):
 ## Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
   app = pg.mkQApp()
-  win = Annotator()
+  win = MainWindow()
   app.exec()

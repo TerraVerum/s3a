@@ -6,7 +6,7 @@ from skimage.morphology import closing, dilation, opening
 from skimage.morphology import disk
 from skimage.segmentation import quickshift, flood
 
-from Annotator.structures.vertices import FRVertices, FRComplexVertices
+from cdef.structures.vertices import FRVertices, FRComplexVertices
 from .generalutils import getClippedBbox
 
 

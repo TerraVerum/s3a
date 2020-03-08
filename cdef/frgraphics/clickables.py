@@ -9,7 +9,7 @@ Signal = QtCore.pyqtSignal
 import numpy as np
 
 from .parameditors import FR_SINGLETON
-from Annotator.projectvars import FR_CONSTS
+from cdef.projectvars import FR_CONSTS
 
 class ClickableImageItem(pg.ImageItem):
   sigClicked = Signal(object)

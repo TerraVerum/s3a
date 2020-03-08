@@ -1,1 +1,2 @@
-from Annotator import __main__
+#!/usr/bin/env python
+from cdef import __main__
