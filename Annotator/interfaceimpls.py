@@ -1,18 +1,19 @@
 from dataclasses import dataclass
+from typing import List
 
 import cv2 as cv
 import numpy as np
 from skimage.measure import regionprops, label
-from typing import List
+from skimage.morphology import opening, closing, disk
 
-from Annotator.generalutils import splitListAtNans, nanConcatList, largestList
-from Annotator.params import FRParamGroup, FRParam, newParam, FRComplexVertices
-from Annotator.processing import growSeedpoint, rmSmallComps
-from .FRGraphics.parameditors import FR_SINGLETON
+from .frgraphics.parameditors import FR_SINGLETON
 from .generalutils import getClippedBbox
-from Annotator.interfaces import FRImageProcessor
-from .params import FRVertices
-from .processing import getVertsFromBwComps, getBwComps
+from .generalutils import splitListAtNans
+from .interfaces import FRImageProcessor
+from .processingutils import getVertsFromBwComps, getBwComps
+from .processingutils import growSeedpoint, rmSmallComps
+from .structures import FRParam, FRParamGroup, newParam
+from .structures import FRVertices, FRComplexVertices
 
 
 @dataclass
@@ -31,6 +32,7 @@ class _FRDefaultAlgImpls(FRParamGroup):
                                            'these drawbacks.')
   PROP_ALLOW_MULT_REG : FRParam = newParam('Allow Noncontiguous Vertices', False)
   PROP_ALLOW_HOLES    : FRParam = newParam('Allow Holes in Component', False)
+  PROP_STREL_SZ       : FRParam = newParam('Open->Close Struct. El. Width', 3)
   PROP_N_A            : FRParam = newParam('No Editable Properties', None, 'none')
 
 IMPLS = _FRDefaultAlgImpls()
@@ -45,6 +47,9 @@ class FRBasicImageProcessorImpl(FRImageProcessor):
   def allowMultReg(self): pass
   @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_ALLOW_HOLES)
   def allowHoles(self): pass
+  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_STREL_SZ)
+  def strelSz(self): pass
+  
 
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices = None, bgVerts: FRVertices = None) -> \
       np.ndarray:
@@ -52,7 +57,7 @@ class FRBasicImageProcessorImpl(FRImageProcessor):
     Performs basic operations shared by all FICS-specified image processors. That is, whether they allow holes,
     regions comprised of multiple separate segments, their minimum size, and margin around specified vertices.
     """
-    if np.count_nonzero(prevCompMask) <= 1: return prevCompMask
+    if np.count_nonzero(prevCompMask) <= 1: return rmSmallComps(prevCompMask, self.minCompSz)
     if not self.allowHoles:
       # Fill in outer contours
       tmpVerts = getVertsFromBwComps(prevCompMask, externOnly=True)
@@ -72,7 +77,8 @@ class FRBasicImageProcessorImpl(FRImageProcessor):
     return rmSmallComps(prevCompMask, self.minCompSz)
 
   def globalCompEstimate(self) -> List[FRComplexVertices]:
-    pass
+    initialList = getVertsFromBwComps(getBwComps(self.image, self.minCompSz), externOnly=True)
+    return [FRComplexVertices([lst]) for lst in initialList]
 
 
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_REGION_GROW)
@@ -138,12 +144,9 @@ class RegionGrow(FRBasicImageProcessorImpl):
     rowColSlices = (slice(cropOffset[1], cropOffset[3]),
                     slice(cropOffset[0], cropOffset[2]))
     prevCompMask[rowColSlices] = bitOperation(prevCompMask[rowColSlices], newRegion)
+    openCloseStrel = disk(self.strelSz)
+    prevCompMask = opening(closing(prevCompMask))
     return super().localCompEstimate(prevCompMask)
-
-
-  def globalCompEstimate(self) -> List[FRComplexVertices]:
-    initialList = getVertsFromBwComps(getBwComps(self.image, self.minCompSz), externOnly=True)
-    return [FRComplexVertices([lst]) for lst in initialList]
 
   def getCroppedImg(self, verts: FRVertices, margin: int) -> (np.ndarray, np.ndarray):
     verts = np.vstack(verts)
@@ -155,10 +158,6 @@ class RegionGrow(FRBasicImageProcessorImpl):
 
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_SHAPES)
 class BasicShapes(FRBasicImageProcessorImpl):
-  def globalCompEstimate(self) -> List[FRComplexVertices]:
-    initialList = getVertsFromBwComps(getBwComps(self.image, self.minCompSz), externOnly=True)
-    return [FRComplexVertices(lst) for lst in initialList]
-
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices=None, bgVerts: FRVertices=None) -> \
       np.ndarray:
     # Don't modify the original version
@@ -182,11 +181,15 @@ class BasicShapes(FRBasicImageProcessorImpl):
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_SQUARES)
 class OnlySquares(BasicShapes):
   def globalCompEstimate(self) -> List[FRComplexVertices]:
-    polyVerts = getVertsFromBwComps(getBwComps(self.image, self.minCompSz), externOnly=True)
+    polyVerts = super().globalCompEstimate()
     outVerts = []
     for vertList in polyVerts:
-      squareVerts = np.vstack([vertList.min(0), vertList.max(0)]).view(FRVertices)
-      outVerts.append(FRComplexVertices(squareVerts))
+      squareCorners = np.vstack([vertList.stack().min(0), vertList.stack().max(0)])
+      # Turn square diagonals into proper vertices
+      colIdx = [0,1,0,1,0,1,0,1]
+      rowIdx = [0,0,0,1,1,1,1,0]
+      squareVerts = squareCorners[rowIdx, colIdx].reshape(-1,2)
+      outVerts.append(FRComplexVertices([squareVerts]))
     return outVerts
 
   def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices = None, bgVerts: FRVertices = None) -> \

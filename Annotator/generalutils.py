@@ -1,10 +1,9 @@
-
 from collections import deque
 from typing import Any, Optional, List
 
 import numpy as np
 
-from Annotator.params import FRParamGroup, FRVertices
+from .structures import FRVertices, FRParamGroup
 from pandas import DataFrame as df
 
 

@@ -1,12 +1,12 @@
-from typing import Tuple, Dict
+from typing import Tuple
 
-from pyqtgraph.Qt import QtWidgets, QtGui, QtCore
+from pyqtgraph.Qt import QtWidgets, QtGui
 
 from bidict import bidict
 
-from Annotator.params import FRParamGroup
-from ..constants import FR_CONSTS
-from ..params import FRParam
+from ..projectvars import FR_CONSTS
+from ..structures import FRParam, FRParamGroup
+
 
 class FRDrawOpts(QtWidgets.QWidget):
   def __init__(self, parent=None, shapes: Tuple[FRParamGroup, ...]=None, actions: Tuple[FRParamGroup, ...]=None):
