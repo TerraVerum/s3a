@@ -78,7 +78,7 @@ def dialogSaveToFile(parent, saveObj, winTitle, saveDir, saveExt, allowOverwrite
 def dialogGetAuthorName(parent: QtWidgets.QMainWindow, defaultAuthFilename: Path) -> (bool, str):
   """
   Attempts to load the username from a default file if found on the system. Otherwise,
-  requests the user name. Used before the start of the :class:`Annotator` application
+  requests the user name. Used before the start of the :class:`MainWindow` application
   :param parent:
   :param defaultAuthFilename:
   :return:

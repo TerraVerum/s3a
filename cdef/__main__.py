@@ -4,13 +4,13 @@ import sys
 from os import path
 
 from . import appInst
-from .Annotator import Annotator
-from Annotator.projectvars.constants import BASE_DIR
+from .MainWindow import MainWindow
+from cdef.projectvars.constants import BASE_DIR
 
 startImgFpath = path.join(BASE_DIR, '../Images/orig.png')
 if len(sys.argv) > 1:
   startImgFpath = path.join(BASE_DIR, sys.argv[1])
-win = Annotator(startImgFpath)
+win = MainWindow(startImgFpath)
 # p = run('profileFunc(win.estBoundsBtnClicked, 1)')
 win.showMaximized()
 sys.exit(appInst.exec())
