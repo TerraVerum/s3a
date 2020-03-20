@@ -145,7 +145,7 @@ class RegionGrow(FRBasicImageProcessorImpl):
                     slice(cropOffset[0], cropOffset[2]))
     prevCompMask[rowColSlices] = bitOperation(prevCompMask[rowColSlices], newRegion)
     openCloseStrel = disk(self.strelSz)
-    prevCompMask = opening(closing(prevCompMask))
+    prevCompMask = opening(closing(prevCompMask, openCloseStrel), openCloseStrel)
     return super().localCompEstimate(prevCompMask)
 
   def getCroppedImg(self, verts: FRVertices, margin: int) -> (np.ndarray, np.ndarray):
