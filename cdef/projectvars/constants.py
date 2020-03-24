@@ -22,6 +22,9 @@ FILTERS_DIR = os.path.join(MENU_OPTS_DIR, 'filters', '')
 GEN_PROPS_DIR = os.path.join(MENU_OPTS_DIR, 'regioncontrols', '')
 SHORTCUTS_DIR = os.path.join(MENU_OPTS_DIR, 'shortcuts', '')
 
+# Ensure menuopts and layouts directories exist
+Path(LAYOUTS_DIR).mkdir(exist_ok=True)
+
 
 @dataclass
 class ComponentTypes(FRParamGroup):
