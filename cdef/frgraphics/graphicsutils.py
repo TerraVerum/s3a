@@ -1,6 +1,7 @@
 from typing import Optional, Union
 
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
+from pyqtgraph import BusyCursor
 
 from functools import wraps
 
@@ -11,19 +12,14 @@ from pathlib import Path
 from glob import glob
 from functools import partial
 
-from .. import appInst
-
 Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
 
 def applyWaitCursor(func):
   @wraps(func)
   def wrapWithWaitCursor(*args, **kwargs):
-    try:
-      appInst.setOverrideCursor(QCursor(QtCore.Qt.WaitCursor))
-      return func(*args, **kwargs)
-    finally:
-      appInst.restoreOverrideCursor()
+    with BusyCursor():
+      func(*args, **kwargs)
   return wrapWithWaitCursor
 
 def disableAppDuringFunc(func):
@@ -53,7 +49,19 @@ def dialogSaveToFile(parent, saveObj, winTitle, saveDir, saveExt, allowOverwrite
   while failedSave:
     saveName, ok = QtWidgets.QInputDialog() \
       .getText(parent, winTitle, winTitle + ':', QtWidgets.QLineEdit.Normal)
-    if ok:
+    # TODO: Make this more robust. At the moment just very basic sanitation
+    for disallowedChar in ['/', '\\']:
+      saveName = saveName.replace(disallowedChar, '')
+    if ok and not saveName:
+      # User presses 'ok' without typing anything except disallowed characters
+      # Keep asking for a name
+      continue
+    elif not ok:
+      # User pressed 'cancel' -- Doesn't matter whether they entered a name or not
+      # Stop asking for name
+      break
+    else:
+      # User pressed 'ok' and entered a valid name
       returnVal = saveName
       # Prevent overwriting default layout
       if not allowOverwriteDefault and saveName.lower() == 'default':
@@ -63,9 +71,6 @@ def dialogSaveToFile(parent, saveObj, winTitle, saveDir, saveExt, allowOverwrite
         return None
       else:
         try:
-          # TODO: Make this more robust. At the moment just very basic sanitation
-          for disallowedChar in ['/', '\\']:
-            saveName = saveName.replace(disallowedChar, '')
           with open(f'{saveDir}{saveName}.{saveExt}', 'wb') as saveFile:
             pkl.dump(saveObj, saveFile)
           failedSave = False

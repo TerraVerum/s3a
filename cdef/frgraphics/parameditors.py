@@ -3,6 +3,7 @@ from __future__ import annotations
 import pickle as pkl
 import re
 import sys
+import weakref
 from dataclasses import dataclass
 from functools import partial
 from os.path import join
@@ -10,11 +11,11 @@ from pathlib import Path
 from typing import Sequence, Union, Callable, Any, Optional, List, Dict, Tuple
 
 import numpy as np
+import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
 
 from .graphicsutils import dialogSaveToFile
-from .. import appInst
 from ..interfaces import FRImageProcessor
 from ..structures import FRIllRegisteredPropError
 from ..projectvars import (
@@ -296,13 +297,14 @@ class FRParamEditor(QtWidgets.QDialog):
     self.sigParamStateUpdated.emit(outDict)
     return outDict
 
-  def saveAsBtnClicked(self, saveName=None):
+  def saveAsBtnClicked(self, saveName=None, paramState=None):
     """
     :return: List where each index corresponds to the tree's parameter.
     This is suitable for extending with an ID and vertex list, after which
     it can be placed into the component table.
     """
-    paramState = self.params.saveState()
+    if paramState is None:
+      paramState = self.params.saveState()
     if saveName is False or saveName is None:
       saveName = dialogSaveToFile(self, paramState, self._saveDlgName,
                                   self.saveDir, self.fileType, allowOverwriteDefault=False)
@@ -502,22 +504,22 @@ class ShortcutsEditor(FRParamEditor):
     # after the top-level widget is passed to the shortcut editor
     super().__init__(parent, [], saveDir=SHORTCUTS_DIR, saveExt='shortcut')
 
+    # If the registered class is not a graphical widget, the shortcut
+    # needs a global context
+    allWidgets = pg.mkQApp().topLevelWidgets()
+    isGlobalWidget = [isinstance(o, QtWidgets.QMainWindow) for o in allWidgets]
+    self.mainWinRef = weakref.proxy(allWidgets[np.argmax(isGlobalWidget)])
+
   def _extendedClassInit(self, clsObj: Any, clsParam: FRParam):
     clsName = type(clsObj).__qualname__
     boundParamList = self.boundFnsPerClass.get(clsName, [])
     for boundParam in boundParamList:
-      appInst.topLevelWidgets()
       seqCopy = QtGui.QKeySequence(boundParam.param.value)
-      # If the registered class is not a graphical widget, the shortcut
-      # needs a global context
-      allWidgets = appInst.topLevelWidgets()
-      isGlobalWidget = [isinstance(o, QtWidgets.QMainWindow) for o in allWidgets]
-      mainWin = allWidgets[np.argmax(isGlobalWidget)]
-
       try:
         shortcut = FREditableShortcut(seqCopy, clsObj)
       except TypeError:
-        shortcut = FREditableShortcut(seqCopy, mainWin)
+        # Occurs when the requested class is not a widget
+        shortcut = FREditableShortcut(seqCopy, self.mainWinRef)
       shortcut.paramIdx = (clsParam, boundParam.param)
       shortcut.activated.connect(partial(boundParam.func, clsObj, *boundParam.defaultFnArgs))
       shortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
@@ -561,6 +563,11 @@ class AlgCollectionEditor(FRParamEditor):
 
 
     self.build_attachParams(algMgr)
+
+  # def saveAsBtnClicked(self, saveName=None, paramState=None):
+  #   if paramState is None:
+  #     paramState = self.algMgr.params.saveState()
+  #   return super().saveAsBtnClicked(saveName, paramState)
 
   @property
   def image(self):
