@@ -14,6 +14,7 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
+from pyqtgraph.parametertree.parameterTypes import ListParameter
 
 from .graphicsutils import dialogSaveToFile
 from ..interfaces import FRImageProcessor
@@ -320,7 +321,7 @@ class FRParamEditor(QtWidgets.QDialog):
     # If no name specified
     return None
 
-  def loadState(self, newStateDict):
+  def loadState(self, newStateDict: dict):
     self.params.restoreState(newStateDict, addChildren=False)
 
   def registerProp(self, constParam: FRParam):
@@ -544,15 +545,13 @@ class AlgCollectionEditor(FRParamEditor):
       'name': 'Algorithm', 'type': 'list', 'values': [], 'value': 'N/A'
     }
     self.treeAlgOpts: Parameter = Parameter(name='Algorithm Selection', type='group', children=[algOptDict])
-    self.algOpts = self.treeAlgOpts.children()[0]
+    self.algOpts: ListParameter = self.treeAlgOpts.children()[0]
     # Since constructor forces self.params to be top level item, we need to reconstruct
     # the tree to avoid this
     self.tree.setParameters(self.algOpts)
     self.algOpts.sigValueChanged.connect(self.changeActiveAlg)
 
     Path(self.saveDir).mkdir(parents=True, exist_ok=True)
-    with open(join(self.saveDir, f'Default.{self.fileType}'), 'wb') as ofile:
-      pkl.dump(self.params.saveState(), ofile)
 
     # Allows only the current processor params to be shown in the tree
     #self.tree.addParameters(self.params, showTop=False)
@@ -599,6 +598,29 @@ class AlgCollectionEditor(FRParamEditor):
     self.tree.resizeColumnToContents(0)
 
     self.algOpts.setLimits(self.processors)
+    self.saveAsBtnClicked(f'{self.saveDir}Default.{self.fileType}')
+
+  def saveAsBtnClicked(self, saveName=None, paramState=None):
+    """
+    The algorithm editor also needs to store information about the selected algorithm, so lump
+    this in with the other parameter information before calling default save.
+    """
+    paramState = [self.algOpts.value()[0], self.params.saveState()]
+    return super().saveAsBtnClicked(saveName, paramState)
+
+  def loadState(self, selection_newStatePair: Tuple[str, dict]):
+    selectedOpt = selection_newStatePair[0]
+    # Get the impl associated with this option name
+    isLegit = selectedOpt in self.algOpts.opts['limits']
+    if not isLegit:
+      selectedImpl = self.algOpts.value()
+      msgBox = QtWidgets.QMessageBox
+      msgBox.information(self, 'Invalid Selection', f'Selection {selectedOpt} does'
+           f' not match the list of available algorithms. Defaulting to {selectedImpl}')
+    else:
+      selectedImpl = self.algOpts.opts['limits'][selectedOpt]
+    self.algOpts.setValue(selectedImpl)
+    super().loadState(selection_newStatePair[1])
 
   def changeActiveAlg(self, selectedParam: Parameter, nameProcCombo: Tuple[str, FRImageProcessor]):
     # Hide all except current selection
