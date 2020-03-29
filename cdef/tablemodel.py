@@ -2,6 +2,7 @@ import re
 import sys
 from ast import literal_eval
 from typing import Union, Any, Optional, Sequence
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -37,7 +38,7 @@ def makeCompDf(numRows=1) -> df:
   # Set the metadata for this application run
   outDf[TC.ANN_AUTHOR] = FR_SINGLETON.annotationAuthor
   outDf[TC.ANN_TIMESTAMP] = pd.datetime.utcnow()
-  outDf[TC.ANN_FILENAME] = FR_CONSTS.ANN_CUR_FILE_INDICATOR
+  outDf[TC.ANN_FILENAME] = FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
   if dropRow:
     outDf = outDf.drop(index=TC.INST_ID.value)
   return outDf
@@ -99,6 +100,9 @@ class CompTableModel(QtCore.QAbstractTableModel):
 class ComponentMgr(CompTableModel):
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.EXP_ONLY_VISIBLE)
   def exportOnlyVis(self): pass
+  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.INCLUDE_FNAME_PATH)
+  def includeFullSourceImgName(self): pass
+  
 
   _nextCompId = 0
 
@@ -188,6 +192,7 @@ class ComponentMgr(CompTableModel):
     return toEmit
 
   def csvExport(self, outFile: str,
+                mainImgFpath: str,
                 exportIds:Union[FR_ENUMS, Sequence] = FR_ENUMS.COMP_EXPORT_ALL,
                 **pdExportArgs) \
       -> bool:
@@ -195,7 +200,9 @@ class ComponentMgr(CompTableModel):
     Serializes the table data and returns the success or failure of the operation.
 
     :param outFile: Name of the output file location
-    :param exportIds: If :var:`FR_ENUMS.EXPORT_ALL`,
+    :param mainImgFpath: Name of the image being annotated. This helps associate
+           all annotations to their source file.
+    :param exportIds: If :var:`FR_ENUMS.EXPORT_ALL`
     :param pdExportArgs: Dictionary of values passed to underlying pandas export function.
            These will overwrite the default options for :func:`exportToFile
            <ComponentMgr.exportToFile>`
@@ -226,6 +233,13 @@ class ComponentMgr(CompTableModel):
       for col in exportDf:
         if hasattr(col.value, 'serialize'):
           exportDf[col] = exportDf[col].map(type(col.value).serialize)
+      # Now fill in source image information
+      if not self.includeFullSourceImgName:
+        # Only use the file name, not the whole path
+        mainImgFpath = Path(mainImgFpath).name
+      # Assign correct export name for only new components
+      overwriteIdxs = exportDf[TC.ANN_FILENAME] == FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
+      exportDf.loc[overwriteIdxs, TC.ANN_FILENAME] = mainImgFpath
       exportDf.to_csv(outFile, index=False)
       success = True
     except IOError:

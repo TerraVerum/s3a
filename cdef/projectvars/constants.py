@@ -44,7 +44,7 @@ class CompParams(FRParamGroup):
   VERTICES        : FRParam = newParam('Vertices', FRComplexVertices())
   VALIDATED       : FRParam = newParam('Validated', False)
   ANN_AUTHOR      : FRParam = newParam('Author', "")
-  ANN_FILENAME    : FRParam = newParam('Filename', "")
+  ANN_FILENAME    : FRParam = newParam('Source Image Filename', "")
   ANN_TIMESTAMP   : FRParam = newParam('Timestamp', "")
   DEV_TEXT        : FRParam = newParam('Device Text', '')
   DEV_TYPE        : FRParam = newParam('Device Type', TEMPLATE_COMP_TYPES.N_A)
@@ -129,12 +129,15 @@ class _FRConsts(FRParamGroup):
   # --------------------------
   # COMPONENT EXPORT PARAMETERS
   # --------------------------
-  EXP_ONLY_VISIBLE: FRParam = newParam('Only Export Visible Components', True)
+  EXP_ONLY_VISIBLE   : FRParam = newParam('Only Export Visible Components', True)
+  INCLUDE_FNAME_PATH : FRParam = newParam('Include full image path on export', False,
+  None, 'Whether to just export the image name with this component group or the '
+        'full absolute filepath')
 
   # --------------------------
   # COMPONENT EXPORT PARAMETERS
   # --------------------------
-  ANN_CUR_FILE_INDICATOR: FRParam = newParam('New')
+  ANN_CUR_FILE_INDICATOR: FRParam = newParam('Current image file string', 'New')
 
   # --------------------------
   # DRAWING

@@ -2,7 +2,7 @@ from typing import Union, Tuple, Optional
 
 import numpy as np
 import pyqtgraph as pg
-from PIL import Image
+from skimage.io import imread
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
@@ -195,7 +195,7 @@ class FRMainImage(FREditableImg):
     """
     if isinstance(imgSrc, str):
       # TODO: Handle alpha channel images. For now, discard that data
-      imgSrc = np.array(Image.open(imgSrc))[:,:,0:3]
+      imgSrc = imread(imgSrc)[:,:,0:3]
 
     self.imgItem.setImage(imgSrc)
     self.procCollection.image = imgSrc

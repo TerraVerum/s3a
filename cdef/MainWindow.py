@@ -36,6 +36,15 @@ class MainWindow(FRAnnotatorUI):
 
   def __init__(self, startImgFpath=None, authorName:str=None):
     super().__init__()
+    
+    # ---------------
+    # DATA ATTRIBUTES
+    # ---------------
+    self.mainImgFpath = None
+    if startImgFpath is not None:
+      # Make sure to simplify the incoming path
+      self.mainImgFpath = str(Path(startImgFpath).resolve())
+    
 
     self.statBar = QtWidgets.QStatusBar(self)
     self.setStatusBar(self.statBar)
@@ -178,6 +187,7 @@ class MainWindow(FRAnnotatorUI):
     if fname is not None:
       self.compMgr.rmComps()
       self.mainImg.setImage(fname)
+      self.mainImgFpath = fname
       self.compImg.resetImage()
       if self.estBoundsOnStart:
         self.estimateBoundaries()
@@ -210,7 +220,7 @@ class MainWindow(FRAnnotatorUI):
     fileFilter = "CSV Files (*.csv)"
     fname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilter)
     if len(fname) > 0:
-      self.compMgr.csvExport(fname, exportIds)
+      self.compMgr.csvExport(fname, self.mainImgFpath, exportIds)
 
   def loadCompsActionTriggered(self, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
     fileFilter = "CSV Files (*.csv)"
