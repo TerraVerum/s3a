@@ -8,7 +8,7 @@ from typing import Callable
 
 import pyqtgraph as pg
 from pandas import DataFrame as df
-from pyqtgraph.Qt import QtCore, QtWidgets
+from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
 from .frgraphics.annotator_ui import FRAnnotatorUI
 from .frgraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
@@ -44,7 +44,8 @@ class MainWindow(FRAnnotatorUI):
     if startImgFpath is not None:
       # Make sure to simplify the incoming path
       self.mainImgFpath = str(Path(startImgFpath).resolve())
-    
+    self.hasUnsavedChanges = False
+
 
     self.statBar = QtWidgets.QStatusBar(self)
     self.setStatusBar(self.statBar)
@@ -63,6 +64,7 @@ class MainWindow(FRAnnotatorUI):
     # COMPONENT MANAGER
     # ---------------
     self.compMgr = ComponentMgr()
+    self.compMgr.sigCompsChanged.connect(self._recordCompChange)
 
     # Allow filtering/sorting
     self.sortFilterProxy = CompSortFilter(self.compMgr, self)
@@ -146,9 +148,23 @@ class MainWindow(FRAnnotatorUI):
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_EST_BOUNDS_ON_START)
   def estBoundsOnStart(self): pass
 
-  def closeEvent(self, ev):
-    # Clean up all editor windows, which could potentially be left open
-    FR_SINGLETON.close()
+  def closeEvent(self, ev: QtGui.QCloseEvent):
+    # Confirm all components have been saved
+    shouldExit = False
+    if self.hasUnsavedChanges:
+      ev.ignore()
+      if (QtWidgets.QMessageBox.question(self, 'Confirm Exit',
+          'Component table has unsaved changes.\nAre you sure you want to exit?',
+          QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Cancel)
+        == QtWidgets.QMessageBox.Ok):
+        shouldExit = True
+    else:
+      shouldExit = True
+    if shouldExit:
+      # Clean up all editor windows, which could potentially be left open
+      ev.accept()
+      FR_SINGLETON.close()
+
 
   def createSettingsMenus(self):
     for editor, name in zip(FR_SINGLETON.editors, FR_SINGLETON.editorNames): \
@@ -165,6 +181,9 @@ class MainWindow(FRAnnotatorUI):
       populateFunc()
       self.menuSettings.addMenu(menu)
 
+  @Slot(object)
+  def _recordCompChange(self):
+    self.hasUnsavedChanges = True
 
   @Slot(object)
   def _add_focusComp(self, newComp):
@@ -221,6 +240,7 @@ class MainWindow(FRAnnotatorUI):
     fname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilter)
     if len(fname) > 0:
       self.compMgr.csvExport(fname, self.mainImgFpath, exportIds)
+      self.hasUnsavedChanges = False
 
   def loadCompsActionTriggered(self, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
     fileFilter = "CSV Files (*.csv)"
