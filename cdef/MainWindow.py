@@ -4,12 +4,14 @@ import sys
 from functools import partial
 from os.path import join
 from pathlib import Path
-from typing import Callable
+from typing import Callable, List
+from skimage import io
 
 import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
+from cdef.projectvars import CompParams
 from .frgraphics.annotator_ui import FRAnnotatorUI
 from .frgraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc, dialogGetAuthorName
@@ -107,7 +109,8 @@ class MainWindow(FRAnnotatorUI):
     self.saveLayout.triggered.connect(self.saveLayoutActionTriggered)
     self.sigLayoutSaved.connect(self.populateLoadLayoutOptions)
 
-    self.saveComps.triggered.connect(self.saveCompsActionTriggered)
+    self.exportCompList.triggered.connect(self.exportCompListActionTriggered)
+    self.exportLabelImg.triggered.connect(self.exportLabelImgActionTriggered)
     self.loadComps_merge.triggered.connect(lambda: self.loadCompsActionTriggered(FR_ENUMS.COMP_ADD_AS_MERGE))
     self.loadComps_new.triggered.connect(lambda: self.loadCompsActionTriggered(FR_ENUMS.COMP_ADD_AS_NEW))
 
@@ -229,7 +232,7 @@ class MainWindow(FRAnnotatorUI):
     self.sigLayoutSaved.emit()
 
   @Slot()
-  def saveCompsActionTriggered(self):
+  def exportCompListActionTriggered(self):
     onlyExportFiltered = self.compMgr.exportOnlyVis
     if onlyExportFiltered:
       exportIds = self.compDisplay.displayedIds
@@ -241,6 +244,21 @@ class MainWindow(FRAnnotatorUI):
     if len(fname) > 0:
       self.compMgr.csvExport(fname, self.mainImgFpath, exportIds)
       self.hasUnsavedChanges = False
+
+  @Slot()
+  def exportLabelImgActionTriggered(self):
+    """
+    # Note -- These three functions will be a single dialog with options
+    # for each requested parameter. It will look like the TableFilterEditor dialog.
+    types: List[CompParams] = getTypesFromUser()
+    outFile = getOutFileFromUser()
+    exportLegend = getExpLegendFromUser()
+    """
+    labelImg, clrs = self.compMgr.labelImgExport(self.mainImg.image.shape)
+    # io.imsave(outFile, labelImg)
+    # if exportLegend:
+    # Create a nam like outFile and pickle dump or something to also save the clrs array
+
 
   def loadCompsActionTriggered(self, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
     fileFilter = "CSV Files (*.csv)"

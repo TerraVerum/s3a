@@ -100,7 +100,9 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     self.menuLayout.addSeparator()
 
     # File / components
-    self.saveComps = create_addMenuAct(self.menuFile, 'Save Components')
+    self.menuExport = create_addMenuAct(self.menuFile, 'Export...', True)
+    self.exportCompList = create_addMenuAct(self.menuExport, 'Component List')
+    self.exportLabelImg = create_addMenuAct(self.menuExport, 'Labeled Image')
 
     self.menuLoad_Components = create_addMenuAct(self.menuFile, 'Load Components', True)
     self.loadComps_merge = create_addMenuAct(self.menuLoad_Components, 'Update as Merge')

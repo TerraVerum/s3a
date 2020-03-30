@@ -1,14 +1,17 @@
 import re
 import sys
 from ast import literal_eval
-from typing import Union, Any, Optional, Sequence
+from typing import Union, Any, Optional, Sequence, List, Tuple, Dict
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import cv2 as cv
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 
+from cdef.projectvars import TEMPLATE_COMP_TYPES
+from cdef.structures.typeoverloads import TwoDArr, NChanImg
 from .frgraphics.parameditors import FR_SINGLETON
 from .generalutils import coerceDfTypes
 from .projectvars import FR_ENUMS, TEMPLATE_COMP as TC, CompParams
@@ -190,6 +193,31 @@ class ComponentMgr(CompTableModel):
     if emitChange:
       self.sigCompsChanged.emit(toEmit)
     return toEmit
+
+  def labelImgExport(self,
+                     mainImgShape: Tuple[int],
+                     types: List[CompParams] = None,
+                     colorPerType: TwoDArr = None,
+                     ) -> Tuple[NChanImg, TwoDArr]:
+    # Set up input arguments
+    if types is None:
+      types = [param for param in TEMPLATE_COMP_TYPES]
+    if colorPerType is None:
+      colorPerType = np.arange(1, len(types) + 1, dtype=int)[:,None]
+    outShape = mainImgShape[:2]
+    if colorPerType.shape[1] > 1:
+      outShape += (colorPerType.shape[1],)
+    out = np.zeros(outShape, 'uint8')
+
+    # Create label to output mapping
+    for curType, color in zip(types, colorPerType):
+      outlines = self.compDf.loc[self.compDf[TC.DEV_TYPE] == curType, TC.VERTICES].values
+      cvFillArg = [arr[0] for arr in outlines]
+      cvClrArg = tuple([int(val) for val in color])
+      cv.fillPoly(out, cvFillArg, cvClrArg)
+
+    return out, colorPerType
+
 
   def csvExport(self, outFile: str,
                 mainImgFpath: str,
