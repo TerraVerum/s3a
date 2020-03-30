@@ -44,7 +44,8 @@ class MainWindow(FRAnnotatorUI):
     if startImgFpath is not None:
       # Make sure to simplify the incoming path
       self.mainImgFpath = str(Path(startImgFpath).resolve())
-    
+    self.hasUnsavedChanges = False
+
 
     self.statBar = QtWidgets.QStatusBar(self)
     self.setStatusBar(self.statBar)
@@ -63,6 +64,7 @@ class MainWindow(FRAnnotatorUI):
     # COMPONENT MANAGER
     # ---------------
     self.compMgr = ComponentMgr()
+    self.compMgr.sigCompsChanged.connect(self._recordCompChange)
 
     # Allow filtering/sorting
     self.sortFilterProxy = CompSortFilter(self.compMgr, self)
@@ -147,8 +149,17 @@ class MainWindow(FRAnnotatorUI):
   def estBoundsOnStart(self): pass
 
   def closeEvent(self, ev):
-    # Clean up all editor windows, which could potentially be left open
-    FR_SINGLETON.close()
+    # Confirm all components have been saved
+    if self.hasUnsavedChanges:
+      ev.ignore()
+      if (QtWidgets.QMessageBox.question(self, 'Confirm Exit',
+          'Component table has unsaved changes.\nAre you sure you want to exit?',
+          QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Cancel)
+        == QtWidgets.QMessageBox.Ok):
+        ev.accept()
+        # Clean up all editor windows, which could potentially be left open
+        FR_SINGLETON.close()
+
 
   def createSettingsMenus(self):
     for editor, name in zip(FR_SINGLETON.editors, FR_SINGLETON.editorNames): \
@@ -165,6 +176,9 @@ class MainWindow(FRAnnotatorUI):
       populateFunc()
       self.menuSettings.addMenu(menu)
 
+  @Slot(object)
+  def _recordCompChange(self):
+    self.hasUnsavedChanges = True
 
   @Slot(object)
   def _add_focusComp(self, newComp):
@@ -221,6 +235,7 @@ class MainWindow(FRAnnotatorUI):
     fname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilter)
     if len(fname) > 0:
       self.compMgr.csvExport(fname, self.mainImgFpath, exportIds)
+      self.hasUnsavedChanges = False
 
   def loadCompsActionTriggered(self, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
     fileFilter = "CSV Files (*.csv)"
