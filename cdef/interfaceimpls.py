@@ -6,6 +6,7 @@ import numpy as np
 from skimage.measure import regionprops, label
 from skimage.morphology import opening, closing, disk
 
+from cdef.structures.typeoverloads import BlackWhiteImg
 from .frgraphics.parameditors import FR_SINGLETON
 from .generalutils import getClippedBbox
 from .generalutils import splitListAtNans
@@ -51,8 +52,8 @@ class FRBasicImageProcessorImpl(FRImageProcessor):
   def strelSz(self): pass
   
 
-  def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices = None, bgVerts: FRVertices = None) -> \
-      np.ndarray:
+  def localCompEstimate(self, prevCompMask: BlackWhiteImg, fgVerts: FRVertices = None, bgVerts: FRVertices = None) -> \
+      BlackWhiteImg:
     """
     Performs basic operations shared by all FICS-specified image processors. That is, whether they allow holes,
     regions comprised of multiple separate segments, their minimum size, and margin around specified vertices.
@@ -86,8 +87,8 @@ class RegionGrow(FRBasicImageProcessorImpl):
   @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_SEED_THRESH)
   def seedThresh(self): pass
 
-  def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices = None,
-                        bgVerts: FRVertices = None) -> np.ndarray:
+  def localCompEstimate(self, prevCompMask: BlackWhiteImg, fgVerts: FRVertices = None,
+                        bgVerts: FRVertices = None) -> BlackWhiteImg:
     if prevCompMask is None:
       prevCompMask = np.zeros(self.image.shape[:2], dtype=bool)
     else:
@@ -134,7 +135,7 @@ class RegionGrow(FRBasicImageProcessorImpl):
       filledMask = cv.fillPoly(tmpImgToFill, [centeredFgVerts], 1) > 0
       centeredFgVerts = getVertsFromBwComps(filledMask,simplifyVerts=False).filledVerts().stack()
 
-    newRegion = growFunc(croppedImg, centeredFgVerts, self.seedThresh, self.minCompSz)
+    newRegion = growFunc(croppedImg, centeredFgVerts, self.seedThresh)
     if fgVerts.connected:
       # For connected vertices, zero out region locations outside the user defined area
       if filledMask is None:
@@ -158,8 +159,8 @@ class RegionGrow(FRBasicImageProcessorImpl):
 
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_SHAPES)
 class BasicShapes(FRBasicImageProcessorImpl):
-  def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices=None, bgVerts: FRVertices=None) -> \
-      np.ndarray:
+  def localCompEstimate(self, prevCompMask: BlackWhiteImg, fgVerts: FRVertices=None, bgVerts: FRVertices=None) -> \
+      BlackWhiteImg:
     # Don't modify the original version
     prevCompMask = prevCompMask.copy()
     # Convert indices into boolean index masks

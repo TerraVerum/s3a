@@ -7,6 +7,7 @@ import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtGui, QtCore
 
+from cdef.structures.typeoverloads import GrayImg
 from .clickables import ClickableScatterItem
 from .parameditors import FR_SINGLETON
 from ..frgraphics.rois import SHAPE_ROI_MAPPING, FRExtendedROI
@@ -292,7 +293,7 @@ class FRVertexDefinedImg(pg.ImageItem):
     self.setPos(*self._offset.asPoint())
     self.vertsUpToDate = True
 
-  def updateFromMask(self, newMask: np.ndarray, maskPos=(0,0)):
+  def updateFromMask(self, newMask: GrayImg, maskPos=(0,0)):
     # It is expensive to color the vertices, so only find contours if specified by the user
     newMask = newMask.astype('uint8')
     if newMask.max() < 2 or self.fillClr != self.vertClr:

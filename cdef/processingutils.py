@@ -6,18 +6,19 @@ from skimage.morphology import closing, dilation, opening
 from skimage.morphology import disk
 from skimage.segmentation import quickshift, flood
 
+from cdef.structures.typeoverloads import RgbImg, GrayImg, NChanImg, BlackWhiteImg, TwoDArr
 from cdef.structures.vertices import FRVertices, FRComplexVertices
 from .generalutils import getClippedBbox
 
 
-def getBwComps(img: np.ndarray, minSz=30):
+def getBwComps(img: RgbImg, minSz=30) -> BlackWhiteImg:
   bwOut = bwBgMask(img)
   bwOut = opening(bwOut, np.ones((10,10), dtype=bool))
   bwOut = closing(bwOut, np.ones((7,7), dtype=bool))
   return rmSmallComps(bwOut, minSz)
 
 
-def colorLabelsWithMean(labelImg, refImg) -> np.ndarray:
+def colorLabelsWithMean(labelImg: GrayImg, refImg: NChanImg) -> RgbImg:
   outImg = np.empty(refImg.shape)
   labels = np.unique(labelImg)
   for curLabel in labels:
@@ -25,7 +26,7 @@ def colorLabelsWithMean(labelImg, refImg) -> np.ndarray:
     outImg[curmask,:] = refImg[curmask,:].reshape(-1,3).mean(0)
   return outImg
 
-def bwBgMask(img: np.array) -> np.array:
+def bwBgMask(img: RgbImg) -> BlackWhiteImg:
   if img.dtype != 'uint8':
     img = img.astype('uint8')
 
@@ -38,7 +39,7 @@ def bwBgMask(img: np.array) -> np.array:
   return mask
 
 
-def getVertsFromBwComps(bwmask: np.array, simplifyVerts=True, externOnly=False) -> FRComplexVertices:
+def getVertsFromBwComps(bwmask: BlackWhiteImg, simplifyVerts=True, externOnly=False) -> FRComplexVertices:
   approxMethod = cv.CHAIN_APPROX_SIMPLE
   if not simplifyVerts:
     approxMethod = cv.CHAIN_APPROX_NONE
@@ -56,7 +57,7 @@ def getVertsFromBwComps(bwmask: np.array, simplifyVerts=True, externOnly=False) 
     hierarchy = np.ones((0,1,4), int)*-1
   return FRComplexVertices(compVertices, hierarchy[:,0,:])
 
-def segmentComp(compImg: np.array, maxDist: np.float, kernSz=10) -> np.array:
+def segmentComp(compImg: RgbImg, maxDist: np.float, kernSz=10) -> RgbImg:
   # For maxDist of 0, the input isn't changed and it takes a long time
   if maxDist < 1:
     return compImg
@@ -64,7 +65,7 @@ def segmentComp(compImg: np.array, maxDist: np.float, kernSz=10) -> np.array:
   # Color segmented image with mean values
   return colorLabelsWithMean(segImg, compImg)
 
-def rmSmallComps(bwMask: np.ndarray, minSz: int=0) -> np.ndarray:
+def rmSmallComps(bwMask: BlackWhiteImg, minSz: int=0) -> BlackWhiteImg:
   """
   Removes components smaller than :param:`minSz` from the input mask.
 
@@ -84,7 +85,7 @@ def rmSmallComps(bwMask: np.ndarray, minSz: int=0) -> np.ndarray:
       bwMask[coords[:, 0], coords[:, 1]] = False
   return bwMask
 
-def growSeedpoint(img: np.array, seeds: FRVertices, thresh: float, minSz: int=0):
+def growSeedpoint(img: NChanImg, seeds: FRVertices, thresh: float) -> BlackWhiteImg:
   shape = np.array(img.shape[0:2])
   bwOut = np.zeros(shape, dtype=bool)
   # Turn x-y vertices into row-col seeds
@@ -97,12 +98,9 @@ def growSeedpoint(img: np.array, seeds: FRVertices, thresh: float, minSz: int=0)
     for chan in range(img.shape[2]):
       curBwMask = flood(img[...,chan], tuple(seed), tolerance=thresh)
       bwOut |= curBwMask
-
-  #bwOut = closing(bwOut, np.ones((3,3), dtype=bool))
-  #bwOut = rmSmallComps(bwOut, minSz)
   return bwOut
 
-def growSeedpoint_cv_fastButErratic(img: np.array, seeds: np.array, thresh: float, minSz: int=0):
+def growSeedpoint_cv_fastButErratic(img: NChanImg, seeds: TwoDArr, thresh: float, minSz: int=0):
   if thresh > 255:
     thresh = 255
   if thresh < 0:
@@ -191,8 +189,8 @@ def growSeedpoint_custom_slowButWorks(img: np.array, seeds: np.array, thresh: fl
   # Remove components smaller than minSz
   return rmSmallComps(finalBwOut, minSz)
 
-def growBoundarySeeds(img: np.ndarray, seedThresh: float, minSz: int,
-                      segThresh: float=0., useAllBounds=False) -> np.ndarray:
+def growBoundarySeeds(img: NChanImg, seedThresh: float, minSz: int,
+                      segThresh: float=0., useAllBounds=False) -> BlackWhiteImg:
   """
   Treats all border pixels of :param:`img` as seedpoints for growing. Once these are
   grown, all regions are united, and the inverse area is returned. This has the effect
@@ -221,9 +219,10 @@ def growBoundarySeeds(img: np.ndarray, seedThresh: float, minSz: int,
   else:
     # Just use image corners
     seeds = np.array([[0,0], [0, maxCol], [maxRow, 0], [maxRow, maxCol]])
+  seeds = FRVertices(seeds)
   # Since these are background components, we don't want to remove small components until
   # after inverting the mask
-  bwBgSeedGrow = growSeedpoint(img, seeds, seedThresh, 0)
+  bwBgSeedGrow = growSeedpoint(img, seeds, seedThresh)
   bwOut = ~bwBgSeedGrow
 
   # Remove sparsely connected regions

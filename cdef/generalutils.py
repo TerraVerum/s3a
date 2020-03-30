@@ -3,6 +3,7 @@ from typing import Any, Optional, List
 
 import numpy as np
 
+from cdef.structures.typeoverloads import TwoDArr
 from .structures import FRVertices, FRParamGroup
 from pandas import DataFrame as df
 
@@ -59,7 +60,7 @@ def sliceToArray(keySlice: slice, arrToSlice: np.ndarray):
   return outArr
 
 
-def getClippedBbox(arrShape: tuple, bbox: np.ndarray, margin: int):
+def getClippedBbox(arrShape: tuple, bbox: TwoDArr, margin: int):
   """
   Given a bounding box and margin, create a clipped bounding box that does not extend
   past any dimension size from arrShape

@@ -16,6 +16,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
 from pyqtgraph.parametertree.parameterTypes import ListParameter
 
+from cdef.structures.typeoverloads import NChanImg
 from .graphicsutils import dialogSaveToFile
 from ..interfaces import FRImageProcessor
 from ..structures import FRIllRegisteredPropError
@@ -572,7 +573,7 @@ class AlgCollectionEditor(FRParamEditor):
   def image(self):
     return self._image
   @image.setter
-  def image(self, newImg: np.ndarray):
+  def image(self, newImg: NChanImg):
     self.curProcessor.image = newImg
     self._image = newImg
 

@@ -1,6 +1,7 @@
 import numpy as np
 from pyqtgraph.Qt import QtCore
 
+from cdef.structures.typeoverloads import OneDArr
 from .frgraphics import tableview
 from .frgraphics.imageareas import FRMainImage
 from .frgraphics.parameditors import FR_SINGLETON
@@ -112,7 +113,7 @@ class CompDisplayFilter(QtCore.QObject):
     self.redrawComps(self._compMgr.defaultEmitDict)
 
   @Slot(object)
-  def _reflectTableSelectionChange(self, selectedIds: np.ndarray):
+  def _reflectTableSelectionChange(self, selectedIds: OneDArr):
     self._regionPlots.selectById(selectedIds)
 
   @Slot(object)
