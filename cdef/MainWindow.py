@@ -4,14 +4,13 @@ import sys
 from functools import partial
 from os.path import join
 from pathlib import Path
-from typing import Callable, List
-from skimage import io
+from typing import Callable
 
 import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
-from cdef.projectvars import CompParams
+from cdef.generalutils import resolveAuthorName
 from .frgraphics.annotator_ui import FRAnnotatorUI
 from .frgraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc, dialogGetAuthorName
@@ -36,7 +35,7 @@ class MainWindow(FRAnnotatorUI):
   # Alerts GUI that a layout (either new or overwriting old) was saved
   sigLayoutSaved = Signal()
 
-  def __init__(self, startImgFpath=None, authorName:str=None):
+  def __init__(self, startImgFpath: str = None, startAnnFpath: str = None, authorName: str = None):
     super().__init__()
     
     # ---------------
@@ -48,10 +47,15 @@ class MainWindow(FRAnnotatorUI):
       self.mainImgFpath = str(Path(startImgFpath).resolve())
     self.hasUnsavedChanges = False
 
-
     self.statBar = QtWidgets.QStatusBar(self)
     self.setStatusBar(self.statBar)
-    #self.setWindowIcon(QtGui.QIcon(BASE_DIR + './ficsLogo.png'))
+    authorName = resolveAuthorName(authorName)
+    if authorName is None:
+      sys.exit('No author name provided and no default author exists. Exiting.\n'
+               'To start without error, provide an author name explicitly.')
+    FR_SINGLETON.annotationAuthor = authorName
+    self.statBar.showMessage(FR_SINGLETON.annotationAuthor)
+
     # Flesh out pg components
     # ---------------
     # MAIN IMAGE
@@ -91,18 +95,15 @@ class MainWindow(FRAnnotatorUI):
     self.resetRegionBtn.clicked.connect(self.resetRegionBtnClicked)
     self.acceptRegionBtn.clicked.connect(self.acceptRegionBtnClicked)
 
-
-    # Dropdowns
-    # self.addRmCombo.currentIndexChanged.connect(self.addRmComboChanged)
-
-    # Checkboxes
-    # self.allowEditsChk.stateChanged.connect(self.allowEditsChkChanged)
-
-
     # Same with estimating boundaries
-    if startImgFpath is not None \
-        and self.estBoundsOnStart:
+    if (startImgFpath is not None
+        and self.estBoundsOnStart):
       self.estimateBoundaries()
+
+    if startAnnFpath is not None:
+      self.loadCompsActionTriggered(FR_ENUMS.COMP_ADD_AS_NEW, startAnnFpath)
+
+
 
     # Menu options
     # FILE
@@ -124,30 +125,9 @@ class MainWindow(FRAnnotatorUI):
     # Start with docks in default position, hide error if default file doesn't exist
     self.loadLayoutActionTriggered('Default', showError=False)
 
-    # Placing in a single shot timer ensures the app has enough time to load and assess screen
-    # dimensions before resizing. Otherwise, the maximize doesn't work properly
-    QtCore.QTimer.singleShot(0, self.showMaximized)
-    # self.showMaximized()
-    if authorName is None:
-      authorName = self.getAuthorName()
-    FR_SINGLETON.annotationAuthor = authorName
-    self.statBar.showMessage(FR_SINGLETON.annotationAuthor)
-
   # -----------------------------
   # MainWindow CLASS FUNCTIONS
   # -----------------------------
-  def getAuthorName(self):
-    annPath = Path(ANN_AUTH_DIR)
-    annFile = annPath.joinpath('defaultAuthor.txt')
-    quitApp, name = dialogGetAuthorName(self, annFile)
-
-    if quitApp:
-      sys.exit(0)
-
-    with open(annFile, 'w') as ofile:
-      ofile.write(name)
-    return name
-
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_EST_BOUNDS_ON_START)
   def estBoundsOnStart(self): pass
 
@@ -260,9 +240,10 @@ class MainWindow(FRAnnotatorUI):
     # Create a nam like outFile and pickle dump or something to also save the clrs array
 
 
-  def loadCompsActionTriggered(self, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
-    fileFilter = "CSV Files (*.csv)"
-    fname = popupFilePicker(self, 'Select Load File', fileFilter)
+  def loadCompsActionTriggered(self, loadType=FR_ENUMS.COMP_ADD_AS_NEW, fname: str=None):
+    if fname is None:
+      fileFilter = "CSV Files (*.csv)"
+      fname = popupFilePicker(self, 'Select Load File', fileFilter)
     if fname is not None:
       # Operation may take a long time, but we don't want to start the wait cursor until
       # after dialog selection

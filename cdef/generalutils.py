@@ -1,8 +1,11 @@
 from collections import deque
+from pathlib import Path
 from typing import Any, Optional, List
 
 import numpy as np
+import sys
 
+from cdef.projectvars import ANN_AUTH_DIR
 from cdef.structures.typeoverloads import TwoDArr
 from .structures import FRVertices, FRParamGroup
 from pandas import DataFrame as df
@@ -162,3 +165,21 @@ class ObjUndoBuffer:
       self._oldestId = id(self._buffer[self._OLDEST_BUF_IDX])
       self._newestId = id(self._buffer[self._NEWEST_BUF_IDX])
       self._stepsSinceBufSave = 0
+
+
+def resolveAuthorName(providedAuthName: Optional[str]) -> Optional[str]:
+  authPath = Path(ANN_AUTH_DIR)
+  authFile = authPath.joinpath('defaultAuthor.txt')
+  if providedAuthName is not None:
+    # New default author provided
+    with open(authFile.absolute(), 'w') as ofile:
+      ofile.write(providedAuthName)
+      return providedAuthName
+  # Fetch default author
+  if not authFile.exists():
+    authFile.touch()
+  with open(str(authFile), 'r') as ifile:
+    lines = ifile.readlines()
+    if not lines:
+      return None
+  return lines[0]

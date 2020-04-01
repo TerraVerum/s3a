@@ -1,5 +1,6 @@
 from typing import Optional, Union
 
+import sys
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph import BusyCursor
 
@@ -11,6 +12,8 @@ from os.path import basename
 from pathlib import Path
 from glob import glob
 from functools import partial
+
+from cdef.projectvars import ANN_AUTH_DIR
 
 Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
@@ -80,7 +83,7 @@ def dialogSaveToFile(parent, saveObj, winTitle, saveDir, saveExt, allowOverwrite
                                               QtWidgets.QMessageBox.Ok)
   return returnVal
 
-def dialogGetAuthorName(parent: QtWidgets.QMainWindow, defaultAuthFilename: Path) -> (bool, str):
+def dialogGetAuthorName(parent: QtWidgets.QMainWindow) -> str:
   """
   Attempts to load the username from a default file if found on the system. Otherwise,
   requests the user name. Used before the start of the :class:`MainWindow` application
@@ -88,10 +91,12 @@ def dialogGetAuthorName(parent: QtWidgets.QMainWindow, defaultAuthFilename: Path
   :param defaultAuthFilename:
   :return:
   """
+  annPath = Path(ANN_AUTH_DIR)
+  annFile = annPath.joinpath('defaultAuthor.txt')
   msgDlg = QtWidgets.QMessageBox(parent)
   msgDlg.setModal(True)
-  if defaultAuthFilename.exists():
-    with open(defaultAuthFilename, 'r') as ifile:
+  if annFile.exists():
+    with open(str(annFile), 'r') as ifile:
       lines = ifile.readlines()
       if not lines:
         reply = msgDlg.No
@@ -118,7 +123,9 @@ def dialogGetAuthorName(parent: QtWidgets.QMainWindow, defaultAuthFilename: Path
       if reply == msgDlg.Yes:
         quitApp = True
         break
-  return quitApp, name
+  if quitApp:
+    sys.exit(0)
+  return name
 
 def attemptLoadSettings(fpath, openMode='rb', showErrorOnFail=True):
   """

@@ -1,3 +1,4 @@
+fire
 bidict
 tqdm
 opencv_python>=4.1.2.30
@@ -5,8 +6,8 @@ numpy
 scikit_image>=0.15.0
 # So far, PyQt5 is the only module that MUST be older than 5.14, since for some reason the
 # new release can't handle drawing NaN values from a numpy array
-pyqtgraph>=0.10.0
-pandas>=0.24
+pyqtgraph
+pandas
 Pillow==6.1.0
 
 # adding requirement to have installed our imageprocessing code via pip
