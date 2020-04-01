@@ -38,14 +38,16 @@ class ComponentTypes(FRParamGroup):
 TEMPLATE_COMP_TYPES = ComponentTypes()
 
 @dataclass
-class CompParams(FRParamGroup):
-  # These 3 params MUST exist in the component
-  INST_ID         : FRParam = newParam('Instance ID', -1)
-  VERTICES        : FRParam = newParam('Vertices', FRComplexVertices())
-  VALIDATED       : FRParam = newParam('Validated', False)
-  ANN_AUTHOR      : FRParam = newParam('Author', "")
-  ANN_FILENAME    : FRParam = newParam('Source Image Filename', "")
-  ANN_TIMESTAMP   : FRParam = newParam('Timestamp', "")
+class _ReqdCompParams(FRParamGroup):
+  INST_ID: FRParam = newParam('Instance ID', -1)
+  VERTICES: FRParam = newParam('Vertices', FRComplexVertices())
+  VALIDATED: FRParam = newParam('Validated', False)
+  ANN_AUTHOR: FRParam = newParam('Author', "")
+  ANN_FILENAME: FRParam = newParam('Source Image Filename', "")
+  ANN_TIMESTAMP: FRParam = newParam('Timestamp', "")
+
+@dataclass
+class CompParams(_ReqdCompParams):
   DEV_TEXT        : FRParam = newParam('Device Text', '')
   DEV_TYPE        : FRParam = newParam('Device Type', TEMPLATE_COMP_TYPES.N_A)
   BOARD_TEXT      : FRParam = newParam('Board Text', '')
