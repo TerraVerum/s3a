@@ -45,6 +45,7 @@ class MainWindow(FRAnnotatorUI):
     if startImgFpath is not None:
       # Make sure to simplify the incoming path
       self.mainImgFpath = str(Path(startImgFpath).resolve())
+      startImgFpath = self.mainImgFpath
     self.hasUnsavedChanges = False
 
     self.statBar = QtWidgets.QStatusBar(self)
