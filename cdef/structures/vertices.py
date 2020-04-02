@@ -42,6 +42,9 @@ class FRVertices(np.ndarray):
     raise FRIllFormedVerticesError(f'asPoint() can only be called when one vertex is in'
                               f' the vertex list. Currently has shape {self.shape}')
 
+  def asRowCol(self):
+    return np.fliplr(self)
+
   @property
   def x(self):
     # Copy to array first so dimensionality checks are no longer required

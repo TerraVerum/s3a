@@ -239,3 +239,27 @@ def growBoundarySeeds(img: NChanImg, seedThresh: float, minSz: int,
     bwOut[biggestRegion.coords[:,0], biggestRegion.coords[:,1]] = True
 
   return rmSmallComps(bwOut, minSz)
+
+def cornersToFullBoundary(cornerVerts: FRVertices, sizeLimit: float=np.inf) -> FRVertices:
+  """
+  From a list of corner vertices, returns a list with one vertex for every border pixel.
+  Example:
+  >>> cornerVerts = FRVertices([[0,0], [100,0], [100,100],[0,100]])
+  >>> cornersToFullBoundary(cornerVerts)
+  # [[0,0], [1,0], ..., [100,0], [100,1], ..., [100,100], ..., ..., [0,100]]
+  :param cornerVerts: Corners of the represented polygon
+  :param sizeLimit: The largest number of pixels from the enclosed area allowed before the full boundary is no
+  longer returned. For instance:
+    >>> cornerVerts = FRVertices([[0,0], [1000,0], [1000,1000],[0,1000]])
+    >>> cornersToFullBoundary(cornerVerts, 10e5)
+    will *NOT* return all boundary vertices, since the enclosed area (10e6) is larger than sizeLimit.
+  :return: List with one vertex for every border pixel, unless *sizeLimit* is violated.
+  """
+  fillShape = cornerVerts.asRowCol().max(0)
+  if np.prod(fillShape) > sizeLimit:
+    return cornerVerts
+
+  tmpImgToFill = np.zeros(fillShape, dtype='uint8')
+
+  filledMask = cv.fillPoly(tmpImgToFill, [cornerVerts], 1) > 0
+  return getVertsFromBwComps(filledMask, simplifyVerts=False).filledVerts().stack()

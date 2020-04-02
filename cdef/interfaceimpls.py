@@ -5,7 +5,10 @@ import cv2 as cv
 import numpy as np
 from skimage.measure import regionprops, label
 from skimage.morphology import opening, closing, disk
+from skimage.segmentation import active_contour
+from skimage.filters import gaussian
 
+from cdef.processingutils import cornersToFullBoundary
 from cdef.structures.typeoverloads import BlackWhiteImg
 from .frgraphics.parameditors import FR_SINGLETON
 from .generalutils import getClippedBbox
@@ -16,13 +19,15 @@ from .processingutils import growSeedpoint, rmSmallComps
 from .structures import FRParam, FRParamGroup, newParam
 from .structures import FRVertices, FRComplexVertices
 
-
+# For the purposes of processor impl's, a dataclass is probably not necessary. But I used it everywhere else
+# so I'll stick to the pattern
 @dataclass
 class _FRDefaultAlgImpls(FRParamGroup):
   CLS_REGION_GROW : FRParam = newParam('Region Growing')
   CLS_SHAPES      : FRParam = newParam('Basic Shapes')
   CLS_SQUARES     : FRParam = newParam('Only Squares')
   CLS_BASIC       : FRParam = newParam('Shared Impl. Functionality')
+  CLS_ACT_CONTOUR : FRParam = newParam('Active Contour -- SLOW')
 
   PROP_SEED_THRESH    : FRParam = newParam('Seedpoint Threshold', 10.)
   PROP_MIN_COMP_SZ    : FRParam = newParam('Minimum New Component Pixels', 50)
@@ -34,7 +39,14 @@ class _FRDefaultAlgImpls(FRParamGroup):
   PROP_ALLOW_MULT_REG : FRParam = newParam('Allow Noncontiguous Vertices', False)
   PROP_ALLOW_HOLES    : FRParam = newParam('Allow Holes in Component', False)
   PROP_STREL_SZ       : FRParam = newParam('Open->Close Struct. El. Width', 3)
+  # Default values below retrieved from
+  PROP_GAUS_SIGMA     : FRParam = newParam('Blurring Sigma', 3)
+  PROP_ACT_CONT_ALPHA : FRParam = newParam('Alpha', 1)
+  PROP_ACT_CONT_BETA  : FRParam = newParam('Beta', 0.1)
+  PROP_ACT_CONT_GAMMA : FRParam = newParam('Gamma', 0.1)
+  PROP_ACT_CONT_EDGE : FRParam = newParam('Edge Attraction', 5)
   PROP_N_A            : FRParam = newParam('No Editable Properties', None, 'none')
+
 
 IMPLS = _FRDefaultAlgImpls()
 
@@ -83,7 +95,7 @@ class FRBasicImageProcessorImpl(FRImageProcessor):
 
 
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_REGION_GROW)
-class RegionGrow(FRBasicImageProcessorImpl):
+class FRRegionGrow(FRBasicImageProcessorImpl):
   @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_SEED_THRESH)
   def seedThresh(self): pass
 
@@ -130,10 +142,8 @@ class RegionGrow(FRBasicImageProcessorImpl):
     tmpImgToFill = np.zeros(croppedImg.shape[0:2], dtype='uint8')
 
     # For small enough shapes, get all boundary pixels instead of just shape vertices
-    if fgVerts.connected and np.prod(croppedImg.shape[0:2]) < 50e3:
-      # Use all vertex points, not just the defined corners
-      filledMask = cv.fillPoly(tmpImgToFill, [centeredFgVerts], 1) > 0
-      centeredFgVerts = getVertsFromBwComps(filledMask,simplifyVerts=False).filledVerts().stack()
+    if centeredFgVerts.connected:
+      centeredFgVerts = cornersToFullBoundary(centeredFgVerts, 50e3)
 
     newRegion = growFunc(croppedImg, centeredFgVerts, self.seedThresh)
     if fgVerts.connected:
@@ -158,7 +168,7 @@ class RegionGrow(FRBasicImageProcessorImpl):
     return croppedImg, compCoords
 
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_SHAPES)
-class BasicShapes(FRBasicImageProcessorImpl):
+class FRBasicShapes(FRBasicImageProcessorImpl):
   def localCompEstimate(self, prevCompMask: BlackWhiteImg, fgVerts: FRVertices=None, bgVerts: FRVertices=None) -> \
       BlackWhiteImg:
     # Don't modify the original version
@@ -180,7 +190,7 @@ class BasicShapes(FRBasicImageProcessorImpl):
 
 
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_SQUARES)
-class OnlySquares(BasicShapes):
+class FROnlySquares(FRBasicShapes):
   def globalCompEstimate(self) -> List[FRComplexVertices]:
     polyVerts = super().globalCompEstimate()
     outVerts = []
@@ -200,4 +210,46 @@ class OnlySquares(BasicShapes):
     outMask = np.zeros(compMask.shape, dtype=bool)
     for region in regionprops(label(compMask)):
       outMask[region.bbox[0]:region.bbox[2],region.bbox[1]:region.bbox[3]] = True
-    return outMask
+    return outMask    
+
+@FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_ACT_CONTOUR)
+class FRActiveContour(FRBasicImageProcessorImpl):
+  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_GAUS_SIGMA)
+  def blurSigma(self): pass
+  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_ACT_CONT_ALPHA)
+  def alpha(self): pass
+  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_ACT_CONT_BETA)
+  def beta(self): pass
+  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_ACT_CONT_GAMMA)
+  def gamma(self): pass
+  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_ACT_CONT_EDGE)
+  def wEdge(self): pass
+
+  def localCompEstimate(self, prevCompMask: BlackWhiteImg, fgVerts: FRVertices = None, bgVerts: FRVertices = None) -> \
+      BlackWhiteImg:
+    blurredImg = gaussian(self.image, self.blurSigma)
+    prevCompMask = prevCompMask.copy()
+    if fgVerts is None:
+      # Snake to get area, then subtract
+      contourVertsArg = bgVerts
+      isBg = True
+    else:
+      isBg = False
+      contourVertsArg = fgVerts
+
+    # Get high precision by retrieving all boundary pixels
+    contourVertsArg = cornersToFullBoundary(contourVertsArg)
+    # 'xy' option will soon be removed, so convert to rc
+    # verts are mutated into bad shape during active_contouring processing, so cast to regular array
+    contourVertsArg = contourVertsArg.asRowCol().view(np.ndarray)
+    contouredVerts = active_contour(blurredImg, contourVertsArg, self.alpha, self.beta,
+                                    w_edge=self.wEdge, gamma=self.gamma, coordinates='rc')
+    out = np.zeros(self.image.shape[:2], dtype='uint8')
+    # Format contour verts for fillPoly
+    contouredVerts = np.fliplr(contouredVerts.astype('int'))
+    contourRegion = cv.fillPoly(out, [contouredVerts], 1).astype(bool)
+    if isBg:
+      prevCompMask = prevCompMask & ~contourRegion
+    else:
+      prevCompMask |= contourRegion
+    return super().localCompEstimate(prevCompMask, fgVerts, bgVerts)
