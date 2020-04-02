@@ -13,9 +13,9 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from cdef.generalutils import resolveAuthorName
 from .frgraphics.annotator_ui import FRAnnotatorUI
 from .frgraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
-  attemptLoadSettings, popupFilePicker, disableAppDuringFunc, dialogGetAuthorName
+  attemptLoadSettings, popupFilePicker, disableAppDuringFunc
 from .frgraphics.parameditors import FRParamEditor, FR_SINGLETON
-from .projectvars.constants import FR_CONSTS, ANN_AUTH_DIR
+from .projectvars.constants import FR_CONSTS
 from .projectvars.constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
 from .projectvars.enums import FR_ENUMS
 from .tablemodel import ComponentMgr as ComponentMgr, makeCompDf
