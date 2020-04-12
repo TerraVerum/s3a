@@ -252,7 +252,7 @@ class ComponentMgr(CompTableModel):
       #  them, since this may be useful if it can be modified
       # TODO: Add some comment to the top of the CSV or some extra text file output with additional metrics
       #  about the export, like time, who did it, what image it was from, etc.
-      if isinstance(exportIds, FR_ENUMS) and exportIds == FR_ENUMS.EXPORT_ALL:
+      if isinstance(exportIds, FR_ENUMS) and exportIds == FR_ENUMS.COMP_EXPORT_ALL:
         exportDf = self.compDf
       else:
         exportDf = self.compDf.loc[exportIds,:]

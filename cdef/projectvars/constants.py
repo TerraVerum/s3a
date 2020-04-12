@@ -131,7 +131,7 @@ class _FRConsts(FRParamGroup):
   # --------------------------
   # COMPONENT EXPORT PARAMETERS
   # --------------------------
-  EXP_ONLY_VISIBLE   : FRParam = newParam('Only Export Visible Components', True)
+  EXP_ONLY_VISIBLE   : FRParam = newParam('Only Export Visible Components', False)
   INCLUDE_FNAME_PATH : FRParam = newParam('Include full image path on export', False,
   None, 'Whether to just export the image name with this component group or the '
         'full absolute filepath')
