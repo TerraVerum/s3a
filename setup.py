@@ -13,8 +13,10 @@ def _mltGlob(curDir, *globs):
 setup(
   name='cdef',
   version='0.1.0',
-  package_dir={'cdef':'cdef/cdef'},
-  # include_package_data=True,
+  package_dir={'cdef':'cdef'},
+  packages=find_packages(),
+  data_files=[('cdef/cdef/icons', _mltGlob('cdef/icons', '*.svg', '*.png'))],
+  include_package_data=True,
   url='https://gitlab.com/ficsresearch/cdef',
   license='',
   author='Nathan Jessurun',
