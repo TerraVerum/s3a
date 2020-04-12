@@ -1,5 +1,7 @@
 from enum import Enum
-from typing import Sequence
+from typing import Sequence, List
+
+from functools import partial
 
 import numpy as np
 import pandas as pd
@@ -22,6 +24,8 @@ class PopupTableDialog(QtWidgets.QDialog):
     # Table View
     # -----------
     self.tbl = CompTableView(minimal=True)
+    # Keeps track of which columns were edited by the user
+    self.dirtyColIdxs = []
 
     # -----------
     # Warning Message
@@ -29,7 +33,7 @@ class PopupTableDialog(QtWidgets.QDialog):
     self.titles = np.array(self.tbl.mgr.colTitles)
     self.warnLbl = QtWidgets.QLabel(self)
     self.warnLbl.setStyleSheet("font-weight: bold; color:red; font-size:14")
-    self.updateWarnMsg(self.titles)
+    self.updateWarnMsg([])
 
     # -----------
     # Widget buttons
@@ -56,9 +60,18 @@ class PopupTableDialog(QtWidgets.QDialog):
     # -----------
     self.closeBtn.clicked.connect(self.close)
     self.applyBtn.clicked.connect(self.accept)
+    # TODO: Find if there's a better way to see if changes happen in a table
+    for colIdx in range(len(self.titles)):
+      deleg = self.tbl.itemDelegateForColumn(colIdx)
+      deleg.commitData.connect(partial(self.reflectDataChanged, colIdx))
 
   def updateWarnMsg(self, updatableCols: Sequence[str]):
-    warnMsg = f'Note! Only {", ".join(updatableCols)} will be updated from this view.'
+    warnMsg = 'Note! '
+    if len(updatableCols) == 0:
+      tblInfo = 'No information'
+    else:
+      tblInfo = "Only " + ", ".join(updatableCols)
+    warnMsg += f'{tblInfo} will be updated from this view.'
     self.warnLbl.setText(warnMsg)
 
   @property
@@ -66,6 +79,8 @@ class PopupTableDialog(QtWidgets.QDialog):
     return self.tbl.mgr.compDf.iloc[[0],:]
 
   def setData(self, compDf: df, colIdxs: Sequence):
+    # New selection, so reset dirty columns
+    self.dirtyColIdxs = []
     # Hide columns that weren't selected by the user since these changes
     # Won't propagate
     for ii in range(len(self.titles)):
@@ -73,10 +88,18 @@ class PopupTableDialog(QtWidgets.QDialog):
         self.tbl.hideColumn(ii)
     self.tbl.mgr.rmComps()
     self.tbl.mgr.addComps(compDf, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
-    self.updateWarnMsg(self.titles[colIdxs])
+    self.updateWarnMsg([])
+
+  def reflectDataChanged(self, editedColIdx: int):
+    """Responds to user editing the value in a cell by setting a dirty bit for that column"""
+    if editedColIdx not in self.dirtyColIdxs:
+      self.dirtyColIdxs.append(editedColIdx)
+      self.dirtyColIdxs.sort()
+      self.updateWarnMsg(self.titles[self.dirtyColIdxs])
 
   def reject(self):
-    # On dialog close be sure to unhide all columns
+    # On dialog close be sure to unhide all columns / reset dirty cols
+    self.dirtyColIdxs = []
     for ii in range(len(self.titles)):
       self.tbl.showColumn(ii)
     super().reject()
@@ -130,7 +153,7 @@ class CompTableView(QtWidgets.QTableView):
         self.setItemDelegateForColumn(ii, ComboBoxDelegate(self, comboValues=list(curval.group)))
       else:
         # Default to text box
-        pass
+        self.setItemDelegateForColumn(ii, TextDelegate(self))
 
   # When the model is changed, get a reference to the ComponentMgr
   def setModel(self, modelOrProxy: QtCore.QAbstractTableModel):
@@ -157,15 +180,15 @@ class CompTableView(QtWidgets.QTableView):
     menu = QtWidgets.QMenu(self)
     menu.setTitle('Table Actions')
 
-    remAct = QtGui.QAction("Remove", menu)
+    remAct = QtWidgets.QAction("Remove", menu)
     remAct.triggered.connect(self.removeTriggered)
     menu.addAction(remAct)
 
-    overwriteAct = QtGui.QAction("Set Same As First", menu)
+    overwriteAct = QtWidgets.QAction("Set Same As First", menu)
     overwriteAct.triggered.connect(self.overwriteTriggered)
     menu.addAction(overwriteAct)
 
-    setAsAct = QtGui.QAction("Set As...", menu)
+    setAsAct = QtWidgets.QAction("Set As...", menu)
     menu.addAction(setAsAct)
     setAsAct.triggered.connect(self.setAsTriggered)
 
@@ -214,6 +237,8 @@ class CompTableView(QtWidgets.QTableView):
     idList = []
     colIdxs = []
     for idx in selectedIdxs:
+      # 0th row contains instance ID
+      # TODO: If the user is allowed to reorder columns this needs to be revisited
       idAtIdx = idx.sibling(idx.row(), 0).data(QtCore.Qt.EditRole)
       idList.append(idAtIdx)
       colIdxs.append(idx.column())
@@ -233,6 +258,9 @@ class CompTableView(QtWidgets.QTableView):
     wasAccepted = self.popup.exec()
     if wasAccepted:
       toOverwrite = self.mgr.compDf.loc[idList].copy()
+      # Only overwrite dirty columns from popup
+
+      colIdxs = np.intersect1d(colIdxs, self.popup.dirtyColIdxs)
       # Some bug is preventing the single assignment value from broadcasting
       overwriteData = self.popup.data
       setVals = [overwriteData.iloc[0,colIdxs] for _ in range(len(idList))]
