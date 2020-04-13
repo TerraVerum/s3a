@@ -8,9 +8,11 @@ from stat import S_IRGRP
 
 import numpy as np
 import pandas as pd
+from datetime import datetime
+from pandas import DataFrame as df
+
 import cv2 as cv
 from skimage import io
-from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 
 from cdef.projectvars import TEMPLATE_COMP_CLASSES
@@ -43,7 +45,7 @@ def makeCompDf(numRows=1) -> df:
   outDf = df(df_list, columns=TC).set_index(TC.INST_ID, drop=False)
   # Set the metadata for this application run
   outDf[TC.ANN_AUTHOR] = FR_SINGLETON.annotationAuthor
-  outDf[TC.ANN_TIMESTAMP] = pd.datetime.utcnow()
+  outDf[TC.ANN_TIMESTAMP] = datetime.now()
   outDf[TC.ANN_FILENAME] = FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
   if dropRow:
     outDf = outDf.drop(index=TC.INST_ID.value)

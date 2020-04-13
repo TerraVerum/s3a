@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from datetime import datetime
 
 # Preference directories
 from ..structures import FRComplexVertices, FRParam, FRParamGroup, newParam
@@ -44,7 +45,7 @@ class _ReqdCompParams(FRParamGroup):
   VALIDATED     : FRParam = newParam('Validated', False)
   ANN_AUTHOR    : FRParam = newParam('Author', "")
   ANN_FILENAME  : FRParam = newParam('Source Image Filename', "")
-  ANN_TIMESTAMP : FRParam = newParam('Timestamp', "")
+  ANN_TIMESTAMP : FRParam = newParam('Timestamp', datetime(1900,1,1))
   COMP_CLASS     : FRParam = newParam('Class', TEMPLATE_COMP_CLASSES.N_A)
 
 @dataclass
