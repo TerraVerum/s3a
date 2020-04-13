@@ -11,6 +11,8 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
 from cdef.generalutils import resolveAuthorName
+from cdef.structures import FRCompIOError
+from cdef.tablemodel import FRComponentIO
 from .frgraphics.annotator_ui import FRAnnotatorUI
 from .frgraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc
@@ -18,7 +20,7 @@ from .frgraphics.parameditors import FRParamEditor, FR_SINGLETON
 from .projectvars.constants import FR_CONSTS
 from .projectvars.constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
 from .projectvars.enums import FR_ENUMS
-from .tablemodel import ComponentMgr as ComponentMgr, makeCompDf
+from .tablemodel import FRComponentMgr, makeCompDf
 from .tableviewproxy import CompDisplayFilter, CompSortFilter
 
 Slot = QtCore.pyqtSlot
@@ -70,7 +72,7 @@ class MainWindow(FRAnnotatorUI):
     # ---------------
     # COMPONENT MANAGER
     # ---------------
-    self.compMgr = ComponentMgr()
+    self.compMgr = FRComponentMgr()
     self.compMgr.sigCompsChanged.connect(self._recordCompChange)
 
     # Allow filtering/sorting
@@ -220,10 +222,13 @@ class MainWindow(FRAnnotatorUI):
     else:
       exportIds = FR_ENUMS.COMP_EXPORT_ALL
     fileDlg = QtWidgets.QFileDialog()
+    # TODO: Delegate this to the exporter. Make a function that makes the right file filter,
+    #   and calls the right exporter function after the filename is retrieved.
     fileFilter = "CSV Files (*.csv)"
     fname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilter)
     if len(fname) > 0:
-      self.compMgr.csvExport(fname, self.mainImgFpath, exportIds)
+      exporter = FRComponentIO(self.compMgr.compDf, self.mainImgFpath, exportIds)
+      exporter.exportCsv(fname)
       self.hasUnsavedChanges = False
 
   @Slot()
@@ -235,25 +240,43 @@ class MainWindow(FRAnnotatorUI):
     outFile = getOutFileFromUser()
     exportLegend = getExpLegendFromUser()
     """
-    labelImg, clrs = self.compMgr.labelImgExport(self.mainImg.image.shape)
-    # io.imsave(outFile, labelImg)
-    # if exportLegend:
-    # Create a nam like outFile and pickle dump or something to also save the clrs array
+    onlyExportFiltered = self.compMgr.exportOnlyVis
+    if onlyExportFiltered:
+      exportIds = self.compDisplay.displayedIds
+    else:
+      exportIds = FR_ENUMS.COMP_EXPORT_ALL
+    fileDlg = QtWidgets.QFileDialog()
+    # TODO: Delegate this to the exporter. Make a function that makes the right file filter,
+    #   and calls the right exporter function after the filename is retrieved.
+    fileFilter = "Label Mask Image (*.png; *.tif; *.jpg; *.jpeg; *.bmp; *.jfif);; All files(*.*)"
+    fname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilter)
+    if len(fname) > 0:
+      exporter = FRComponentIO(self.compMgr.compDf, self.mainImgFpath, exportIds)
+      exporter.exportLabeledImg(self.mainImg.image.shape, fname)
 
 
   def loadCompsActionTriggered(self, loadType=FR_ENUMS.COMP_ADD_AS_NEW, fname: str=None):
+    # TODO: See note about exporting comps. Delegate the filepicker activity to importer
     if fname is None:
       fileFilter = "CSV Files (*.csv)"
       fname = popupFilePicker(self, 'Select Load File', fileFilter)
-    if fname is not None:
+    if fname is None:
+      return
+    pathFname = Path(fname)
+    fType = pathFname.suffix[1:]
+    if fType == 'csv':
+      newComps, errMsg = FRComponentIO.buildFromCsv(fname, self.mainImg.image.shape)
+    elif fType == 'cdefpkl':
       # Operation may take a long time, but we don't want to start the wait cursor until
       # after dialog selection
-      err = applyWaitCursor(self.compMgr.csvImport)(fname, loadType,
-                                                    self.mainImg.image.shape)
-      if err is not None:
-        # Something went wrong. Inform the user.
-        errMsg = f'Failed to import components. {type(err)}:\n{err}'
-        QtWidgets.QMessageBox().information(self, 'Error During Import', errMsg)
+      newComps, errMsg = FRComponentIO.buildFromPkl(fname, self.mainImg.image.shape)
+    else:
+      raise FRCompIOError(f'Extension {fType} is not recognized. Must be one of: csv, cdefpkl')
+    self.compMgr.addComps(newComps, loadType)
+    if errMsg is not None:
+      # Something went wrong. Inform the user.
+      fullErrMsg = f'Failed to import components. {type(errMsg)}:\n{errMsg}'
+      QtWidgets.QMessageBox().information(self, 'Error During Import', fullErrMsg)
 
   @staticmethod
   def genericPopulateMenuOptions(objForMenu: FRParamEditor, winMenu: QtWidgets.QMenu, triggerFn: Callable):

@@ -11,7 +11,7 @@ from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from .parameditors import FR_SINGLETON
 from ..projectvars import TEMPLATE_COMP, FR_CONSTS, FR_ENUMS
 from ..structures import FRParam
-from ..tablemodel import CompTableModel, ComponentMgr
+from ..tablemodel import FRCompTableModel, FRComponentMgr
 
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal
@@ -107,7 +107,7 @@ class PopupTableDialog(QtWidgets.QDialog):
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_TBL)
 class CompTableView(QtWidgets.QTableView):
   """
-  Table for displaying :class:`ComponentMgr` data.
+  Table for displaying :class:`FRComponentMgr` data.
   """
   sigSelectionChanged = Signal(object)
 
@@ -122,7 +122,7 @@ class CompTableView(QtWidgets.QTableView):
     super().__init__(*args)
     self.setSortingEnabled(True)
 
-    self.mgr = ComponentMgr()
+    self.mgr = FRComponentMgr()
     self.setModel(self.mgr)
 
     self.minimal = minimal
@@ -155,7 +155,7 @@ class CompTableView(QtWidgets.QTableView):
         # Default to text box
         self.setItemDelegateForColumn(ii, TextDelegate(self))
 
-  # When the model is changed, get a reference to the ComponentMgr
+  # When the model is changed, get a reference to the FRComponentMgr
   def setModel(self, modelOrProxy: QtCore.QAbstractTableModel):
     super().setModel(modelOrProxy)
     try:
@@ -278,8 +278,8 @@ class TextDelegate(QtWidgets.QItemDelegate):
     editor.setPlainText(text)
 
   def setModelData(self, editor: QtWidgets.QTextEdit,
-                           model: CompTableModel,
-                           index: QtCore.QModelIndex):
+                   model: FRCompTableModel,
+                   index: QtCore.QModelIndex):
     model.setData(index, editor.toPlainText())
 
   def updateEditorGeometry(self, editor: QtWidgets.QPlainTextEdit,
@@ -307,8 +307,8 @@ class ComboBoxDelegate(QtWidgets.QStyledItemDelegate):
     editor.setCurrentIndex(self.comboNames.index(curVal))
 
   def setModelData(self, editor: QtWidgets.QComboBox,
-                   model: CompTableModel,
-                           index: QtCore.QModelIndex):
+                   model: FRCompTableModel,
+                   index: QtCore.QModelIndex):
     model.setData(index, self.comboValues[editor.currentIndex()])
 
   def updateEditorGeometry(self, editor: QtWidgets.QPlainTextEdit,

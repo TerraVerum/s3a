@@ -7,7 +7,7 @@ from ..structures import FRComplexVertices, FRParam, FRParamGroup, newParam
 
 __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'FILTERS_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
-           'FR_CONSTS', 'TEMPLATE_COMP_TYPES', 'TEMPLATE_COMP', 'CompParams', 'ComponentTypes']
+           'FR_CONSTS', 'TEMPLATE_COMP_CLASSES', 'TEMPLATE_COMP', 'CompParams', 'ComponentTypes']
 BASE_DIR = Path(__file__).parent.parent.absolute()
 MENU_OPTS_DIR = os.path.join(BASE_DIR, 'menuopts', '')
 ICON_DIR = os.path.join(BASE_DIR, 'icons', '')
@@ -35,24 +35,24 @@ class ComponentTypes(FRParamGroup):
   IC    : FRParam = newParam('IC')
   OTHER : FRParam = newParam('Other')
   N_A   : FRParam = newParam('Unassigned')
-TEMPLATE_COMP_TYPES = ComponentTypes()
+TEMPLATE_COMP_CLASSES = ComponentTypes()
 
 @dataclass
 class _ReqdCompParams(FRParamGroup):
-  INST_ID: FRParam = newParam('Instance ID', -1)
-  VERTICES: FRParam = newParam('Vertices', FRComplexVertices())
-  VALIDATED: FRParam = newParam('Validated', False)
-  ANN_AUTHOR: FRParam = newParam('Author', "")
-  ANN_FILENAME: FRParam = newParam('Source Image Filename', "")
-  ANN_TIMESTAMP: FRParam = newParam('Timestamp', "")
+  INST_ID       : FRParam = newParam('Instance ID', -1)
+  VERTICES      : FRParam = newParam('Vertices', FRComplexVertices())
+  VALIDATED     : FRParam = newParam('Validated', False)
+  ANN_AUTHOR    : FRParam = newParam('Author', "")
+  ANN_FILENAME  : FRParam = newParam('Source Image Filename', "")
+  ANN_TIMESTAMP : FRParam = newParam('Timestamp', "")
+  COMP_CLASS     : FRParam = newParam('Class', TEMPLATE_COMP_CLASSES.N_A)
 
 @dataclass
 class CompParams(_ReqdCompParams):
-  DEV_TEXT        : FRParam = newParam('Device Text', '')
-  DEV_TYPE        : FRParam = newParam('Device Type', TEMPLATE_COMP_TYPES.N_A)
-  BOARD_TEXT      : FRParam = newParam('Board Text', '')
-  LOGO            : FRParam = newParam('Logo', '')
-  NOTES           : FRParam = newParam('Notes', '')
+  DEV_TEXT   : FRParam = newParam('Device Text', '')
+  BOARD_TEXT : FRParam = newParam('Board Text', '')
+  LOGO       : FRParam = newParam('Logo', '')
+  NOTES      : FRParam = newParam('Notes', '')
 TEMPLATE_COMP = CompParams()
 
 
@@ -65,6 +65,7 @@ class _FRConsts(FRParamGroup):
 
   CLS_COMP_TBL         : FRParam = newParam('Component Table')
   CLS_COMP_MGR         : FRParam = newParam('Component Manager')
+  CLS_COMP_EXPORTER    : FRParam = newParam('Component Exporter')
 
   CLS_VERT_IMG         : FRParam = newParam('Focused Image Graphics')
   CLS_MULT_REG_PLT     : FRParam = newParam('Main Image Graphics')

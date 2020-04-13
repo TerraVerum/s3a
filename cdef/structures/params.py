@@ -19,6 +19,11 @@ class FRParam:
   def __str__(self):
     return f'{self.name}'
 
+  def __repr__(self):
+    return f'FRParam(name=\'{self.name}\', value=\'{self.value}\', ' \
+           f'valType=\'{self.valType}\', helpText=\'{self.helpText}\', ' \
+           f'group=FRParamGroup(...))'
+
   def __lt__(self, other):
     """
     Required for sorting by value in component table. Defer to alphabetic
@@ -27,6 +32,11 @@ class FRParam:
     :return: Whether `self` is less than `other`
     """
     return str(self) < str(other)
+
+  def __eq__(self, other):
+    # TODO: Highly naive implementation. Be sure to make this more robust if it needs to be
+    #   for now assume only other frparams will be passed in
+    return repr(self) == repr(other)
 
   def __hash__(self):
     # Since every param within a group will have a unique name, just the name is

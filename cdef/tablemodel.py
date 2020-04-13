@@ -1,22 +1,25 @@
+import pickle
 import re
 import sys
 from ast import literal_eval
 from typing import Union, Any, Optional, Sequence, List, Tuple, Dict
 from pathlib import Path
+from stat import S_IRGRP
 
 import numpy as np
 import pandas as pd
 import cv2 as cv
+from skimage import io
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 
-from cdef.projectvars import TEMPLATE_COMP_TYPES
+from cdef.projectvars import TEMPLATE_COMP_CLASSES
 from cdef.structures.typeoverloads import TwoDArr, NChanImg
 from .frgraphics.parameditors import FR_SINGLETON
 from .generalutils import coerceDfTypes
 from .projectvars import FR_ENUMS, TEMPLATE_COMP as TC, CompParams
 from .projectvars.constants import FR_CONSTS
-from .structures import FRComplexVertices, FRParam, FRCsvIOError
+from .structures import FRComplexVertices, FRParam, FRCompIOError
 
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal
@@ -46,7 +49,7 @@ def makeCompDf(numRows=1) -> df:
     outDf = outDf.drop(index=TC.INST_ID.value)
   return outDf
 
-class CompTableModel(QtCore.QAbstractTableModel):
+class FRCompTableModel(QtCore.QAbstractTableModel):
   colTitles = TC.paramNames()
 
   # Emits 3-element dict: Deleted comp ids, changed comp ids, added comp ids
@@ -100,7 +103,7 @@ class CompTableModel(QtCore.QAbstractTableModel):
       return QtCore.Qt.ItemIsEnabled
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_MGR)
-class ComponentMgr(CompTableModel):
+class FRComponentMgr(FRCompTableModel):
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.EXP_ONLY_VISIBLE)
   def exportOnlyVis(self): pass
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.INCLUDE_FNAME_PATH)
@@ -194,141 +197,6 @@ class ComponentMgr(CompTableModel):
       self.sigCompsChanged.emit(toEmit)
     return toEmit
 
-  def labelImgExport(self,
-                     mainImgShape: Tuple[int],
-                     types: List[CompParams] = None,
-                     colorPerType: TwoDArr = None,
-                     ) -> Tuple[NChanImg, TwoDArr]:
-    # Set up input arguments
-    if types is None:
-      types = [param for param in TEMPLATE_COMP_TYPES]
-    if colorPerType is None:
-      colorPerType = np.arange(1, len(types) + 1, dtype=int)[:,None]
-    outShape = mainImgShape[:2]
-    if colorPerType.shape[1] > 1:
-      outShape += (colorPerType.shape[1],)
-    out = np.zeros(outShape, 'uint8')
-
-    # Create label to output mapping
-    for curType, color in zip(types, colorPerType):
-      outlines = self.compDf.loc[self.compDf[TC.DEV_TYPE] == curType, TC.VERTICES].values
-      cvFillArg = [arr[0] for arr in outlines]
-      cvClrArg = tuple([int(val) for val in color])
-      cv.fillPoly(out, cvFillArg, cvClrArg)
-
-    return out, colorPerType
-
-
-  def csvExport(self, outFile: str,
-                mainImgFpath: str,
-                exportIds:Union[FR_ENUMS, Sequence] = FR_ENUMS.COMP_EXPORT_ALL,
-                **pdExportArgs) \
-      -> bool:
-    """
-    Serializes the table data and returns the success or failure of the operation.
-
-    :param outFile: Name of the output file location
-    :param mainImgFpath: Name of the image being annotated. This helps associate
-           all annotations to their source file.
-    :param exportIds: If :var:`FR_ENUMS.EXPORT_ALL`
-    :param pdExportArgs: Dictionary of values passed to underlying pandas export function.
-           These will overwrite the default options for :func:`exportToFile
-           <ComponentMgr.exportToFile>`
-    :return: Success or failure of the operation.
-    """
-    defaultExportParams = {
-      'na_rep': 'NaN',
-      'float_format': '{:0.10n}',
-      'index': False
-    }
-    defaultExportParams.update(pdExportArgs)
-    # Make sure no rows are truncated
-    pd.set_option('display.max_rows', sys.maxsize)
-    oldNpOpts=  np.get_printoptions()
-    np.set_printoptions(threshold=sys.maxsize)
-    success = False
-    try:
-      # TODO: Currently the additional options are causing errors. Find out why and fix
-      #  them, since this may be useful if it can be modified
-      # TODO: Add some comment to the top of the CSV or some extra text file output with additional metrics
-      #  about the export, like time, who did it, what image it was from, etc.
-      if isinstance(exportIds, FR_ENUMS) and exportIds == FR_ENUMS.COMP_EXPORT_ALL:
-        exportDf = self.compDf
-      else:
-        exportDf = self.compDf.loc[exportIds,:]
-      exportDf: df = exportDf.copy(deep=True)
-      # Format special columns appropriately
-      for col in exportDf:
-        if hasattr(col.value, 'serialize'):
-          exportDf[col] = exportDf[col].map(type(col.value).serialize)
-      # Now fill in source image information
-      if not self.includeFullSourceImgName:
-        # Only use the file name, not the whole path
-        mainImgFpath = Path(mainImgFpath).name
-      # Assign correct export name for only new components
-      overwriteIdxs = exportDf[TC.ANN_FILENAME] == FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
-      exportDf.loc[overwriteIdxs, TC.ANN_FILENAME] = mainImgFpath
-      exportDf.to_csv(outFile, index=False)
-      success = True
-    except IOError:
-      # success is already false
-      pass
-    finally:
-      pd.reset_option('display.max_rows')
-      # False positive checker warning for some reason
-      # noinspection PyTypeChecker
-      np.set_printoptions(**oldNpOpts)
-    return success
-
-  def csvImport(self, inFile: str, loadType=FR_ENUMS.COMP_ADD_AS_NEW,
-                imShape: Optional[tuple]=None) -> Optional[Exception]:
-    """
-    Deserializes data from a csv file to create a Component :class:`DataFrame`.
-    The input .csv should be the same format as one exported by
-    :func:`csvImport <ComponentMgr.csvImport>`.
-
-    :param imShape: If included, this ensures all imported components lie within imSize
-           boundaries. If any components do not, an error is thrown since this is
-           indicative of components that actually came from a different reference image.
-    :param inFile: Name of file to import
-    :param loadType: Whether new components should be added to the exisitng component list as new
-           or if they should be merged by ID with existing entries. Currently, all fields of the
-           existing component will be overwritten by the new values, even if they had text/values.
-    :return: Exception that occurs if the operation did not succeed. Otherwise,
-           this value will be `None`.
-    """
-    try:
-      csvDf = pd.read_csv(inFile, keep_default_na=False)
-      # Objects in the original frame are represented as strings, so try to convert these
-      # as needed
-      stringCols = csvDf.columns[csvDf.dtypes == object]
-      valToParamMap = {param.name: param.value for param in TC}
-      for col in stringCols:
-        paramVal = valToParamMap[col]
-        # No need to perform this expensive computation if the values are already strings
-        if not isinstance(paramVal, str):
-          csvDf[col] = _strSerToParamSer(csvDf[col], valToParamMap[col])
-      csvDf.columns = TC
-      csvDf = csvDf.set_index(TC.INST_ID, drop=False)
-
-      if imShape is not None:
-        # Image shape from row-col -> x-y
-        imShape = np.array(imShape[1::-1])[None,:]
-        # Remove components whose vertices go over any image edges
-        vertMaxs = [verts.stack().max(0) for verts in csvDf[TC.VERTICES] if len(verts) > 0]
-        vertMaxs = np.vstack(vertMaxs)
-        offendingIds = np.nonzero(np.any(vertMaxs >= imShape, axis=1))[0]
-        if len(offendingIds) > 0:
-          raise FRCsvIOError(f'Vertices on some components extend beyond image dimensions. '
-                           f'Perhaps this export came from a different image?\n'
-                           f'Offending IDs: {offendingIds}')
-    except Exception as ex:
-      return ex
-    # TODO: Apply this function to individual rows instead of the whole dataframe. This will allow malformed
-    #  rows to gracefully fall off the dataframe with some sort of warning message
-    self.addComps(csvDf, loadType)
-    return None
-
 def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> Any:
   paramType = type(paramVal)
   funcMap = {
@@ -342,12 +210,214 @@ def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> Any:
   funcToUse = funcMap.get(paramType, defaultFunc)
   return strSeries.apply(funcToUse)
 
-if __name__ == '__main__':
-  pass
-  #t = CompTableModel()
-  #tbl = makeCompDf(6)
-  #tbl.set_index(np.arange(len(tbl)), inplace=True)
+@FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_EXPORTER)
+class FRComponentIO:
+  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.EXP_ONLY_VISIBLE)
+  def expOnlyVisible(self): pass
+  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.INCLUDE_FNAME_PATH)
+  def includeFullSourceImgName(self): pass
 
-  #tbl2 = makeCompDf(6)
-  #tbl2.set_index(np.arange(0, 2*len(tbl), 2), inplace=True)
-  #point=1
+  def __init__(self, compDf: df, mainImgFpath: str,
+                exportIds: Union[FR_ENUMS, Sequence] = FR_ENUMS.COMP_EXPORT_ALL):
+    """
+    Exporter responsible for saving Component information to a file or object.
+    Once created, users can extract different representations of components by
+    calling exporter.exportCsv, exportPkl, etc. for those objects / files respectively.
+
+    :param compDf: The component dataframe that came from the component manager
+    :param mainImgFpath: Name of the image being annotated. This helps associate
+      all annotations to their source file.
+    :param exportIds: If :var:`FR_ENUMS.EXPORT_ALL`, exports every component in the
+      dataframe. Otherwise, just exports the requested IDs
+    """
+    if isinstance(exportIds, FR_ENUMS) and exportIds == FR_ENUMS.COMP_EXPORT_ALL:
+      exportDf = compDf
+    else:
+      exportDf = compDf.loc[exportIds, :]
+    exportDf: df = exportDf.copy(deep=True)
+    if not self.includeFullSourceImgName:
+      # Only use the file name, not the whole path
+      mainImgFpath = Path(mainImgFpath).name
+    # Assign correct export name for only new components
+    overwriteIdxs = exportDf[TC.ANN_FILENAME] == FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
+    # TODO: Maybe the current filename will match the current file indicator. What happens then?
+    exportDf.loc[overwriteIdxs, TC.ANN_FILENAME] = mainImgFpath
+
+    self.exportDf = exportDf
+
+  # -----
+  # Export options
+  # -----
+
+  def exportCsv(self, outFile: str=None, **pdExportArgs) -> (Any, str):
+    """
+
+    :param outFile: Name of the output file location. If *None*, no file is created. However,
+      the export object will still be created and returned.
+    :param pdExportArgs: Dictionary of values passed to underlying pandas export function.
+      These will overwrite the default options for :func:`exportToFile <FRComponentMgr.exportToFile>`
+    :return: (Export object, Success or failure of the operation) tuple.
+    """
+    defaultExportParams = {
+      'na_rep': 'NaN',
+      'float_format': '{:0.10n}',
+      'index': False
+    }
+    outPath = Path(outFile)
+    defaultExportParams.update(pdExportArgs)
+    # Make sure no rows are truncated
+    pd.set_option('display.max_rows', sys.maxsize)
+    oldNpOpts = np.get_printoptions()
+    np.set_printoptions(threshold=sys.maxsize)
+    errMsg = None
+    exportDf: Optional[df] = None
+    try:
+      # TODO: Currently the additional options are causing errors. Find out why and fix
+      #  them, since this may be useful if it can be modified
+      # Format special columns appropriately
+      # Since CSV export significantly modifies the df, make a copy before doing all these
+      # operations
+      exportDf = self.exportDf.copy(deep=True)
+      for col in exportDf:
+        if hasattr(col.value, 'serialize'):
+          exportDf[col] = exportDf[col].map(type(col.value).serialize)
+      if outFile is not None:
+        exportDf.to_csv(outFile, index=False)
+        outPath.chmod(S_IRGRP)
+    except Exception as ex:
+      errMsg = str(ex)
+    finally:
+      pd.reset_option('display.max_rows')
+      # False positive checker warning for some reason
+      # noinspection PyTypeChecker
+      np.set_printoptions(**oldNpOpts)
+    return exportDf, errMsg
+
+  def exportPkl(self, outFile=None) -> (Any, str):
+    """
+    See the function signature for :func:`exportCsv <FRComponentIO.exportCsv>`
+    """
+    errMsg = None
+    # Since the write-out is a single operation there isn't an intermediate form to return
+    retObj = None
+    try:
+      if outFile is not None:
+        pklDf = pickle.dumps(self.exportDf)
+
+        self.exportDf.to_pickle(outFile)
+    except Exception as ex:
+      errMsg = str(ex)
+    return retObj, errMsg
+
+  def exportLabeledImg(self,
+                        mainImgShape: Tuple[int],
+                        outFile: str = None,
+                        types: List[CompParams] = None,
+                        colorPerType: TwoDArr = None,
+                      ) -> (NChanImg, str):
+    errMsg = None
+    # Set up input arguments
+    if types is None:
+      types = [param for param in TEMPLATE_COMP_CLASSES]
+    if colorPerType is None:
+      colorPerType = np.arange(1, len(types) + 1, dtype=int)[:,None]
+    outShape = mainImgShape[:2]
+    if colorPerType.shape[1] > 1:
+      outShape += (colorPerType.shape[1],)
+    out = np.zeros(outShape, 'uint8')
+
+    # Create label to output mapping
+    for curType, color in zip(types, colorPerType):
+      outlines = self.exportDf.loc[self.exportDf[TC.COMP_CLASS] == curType, TC.VERTICES].values
+      cvFillArg = [arr[0] for arr in outlines]
+      cvClrArg = tuple([int(val) for val in color])
+      cv.fillPoly(out, cvFillArg, cvClrArg)
+
+    if outFile is not None:
+      try:
+        io.imsave(outFile, out, check_contrast=False)
+      except Exception as ex:
+        errMsg = str(ex)
+
+    return out, errMsg
+
+  # -----
+  # Import options
+  # -----
+
+  @classmethod
+  def buildFromCsv(cls, inFile: str, imShape: Optional[Tuple]) -> (df, str):
+    """
+    Deserializes data from a csv file to create a Component :class:`DataFrame`.
+    The input .csv should be the same format as one exported by
+    :func:`csvImport <FRComponentMgr.csvImport>`.
+
+    :param imShape: If included, this ensures all imported components lie within imSize
+           boundaries. If any components do not, an error is thrown since this is
+           indicative of components that actually came from a different reference image.
+    :param inFile: Name of file to import
+    :return: Tuple: DF if successful extraction + Exception message that occurs if the operation did not succeed.
+      Otherwise, this value will be `None`.
+    """
+    csvDf = None
+    errMsg = None
+    try:
+      csvDf = pd.read_csv(inFile, keep_default_na=False)
+      # Objects in the original frame are represented as strings, so try to convert these
+      # as needed
+      # Organize the fields of the incoming CSV in the order expected by the template component
+      csvDf = csvDf[[str(field) for field in TC]]
+      stringCols = csvDf.columns[csvDf.dtypes == object]
+      valToParamMap = {param.name: param.value for param in TC}
+      for col in stringCols:
+        paramVal = valToParamMap[col]
+        # No need to perform this expensive computation if the values are already strings
+        if not isinstance(paramVal, str):
+          csvDf[col] = _strSerToParamSer(csvDf[col], valToParamMap[col])
+      csvDf.columns = TC
+      csvDf = csvDf.set_index(TC.INST_ID, drop=False)
+
+      cls.checkVertBounds(csvDf[TC.VERTICES], imShape)
+    except Exception as ex:
+      errMsg = str(ex)
+    # TODO: Apply this function to individual rows instead of the whole dataframe. This will allow malformed
+    #  rows to gracefully fall off the dataframe with some sort of warning message
+    return csvDf, errMsg
+
+  @classmethod
+  def buildFromPkl(cls, inFile: str, imShape: Optional[Tuple]) -> (df, str):
+    """
+    See docstring for :func:`self.buildFromCsv`
+    """
+    errMsg = None
+    try:
+      pklDf = pd.read_pickle(inFile)
+      cls.checkVertBounds(pklDf[TC.VERTICES], imShape)
+    except Exception as ex:
+      errMsg = str(ex)
+    return pklDf, errMsg
+
+  @staticmethod
+  def checkVertBounds(vertSer: pd.Series, imShape: tuple):
+    """
+    Checks whether any vertices in the imported dataframe extend past image dimensions. This is an indicator
+    they came from the wrong import file.
+
+    :param vertSer: Vertices from incoming component dataframe
+    :param imShape: Shape of the main image these vertices are drawn on
+    :return: Raises error if offending vertices are present, since this is an indication the component file
+      was from a different image
+    """
+    if imShape is None:
+      # Nothing we can do if no shape is given
+      return
+    # Image shape from row-col -> x-y
+    imShape = np.array(imShape[1::-1])[None, :]
+    # Remove components whose vertices go over any image edges
+    vertMaxs = [verts.stack().max(0) for verts in vertSer if len(verts) > 0]
+    vertMaxs = np.vstack(vertMaxs)
+    offendingIds = np.nonzero(np.any(vertMaxs >= imShape, axis=1))[0]
+    if len(offendingIds) > 0:
+      raise FRCompIOError(f'Vertices on some components extend beyond image dimensions. '
+                          f'Perhaps this export came from a different image?\n'
+                          f'Offending IDs: {offendingIds}')

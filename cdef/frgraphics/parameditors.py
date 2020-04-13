@@ -22,7 +22,7 @@ from ..interfaces import FRImageProcessor
 from ..structures import FRIllRegisteredPropError
 from ..projectvars import (
   MENU_OPTS_DIR, SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR,
-  TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES, FR_CONSTS)
+  TEMPLATE_COMP as TC, TEMPLATE_COMP_CLASSES as COMP_CLASSES, FR_CONSTS)
 from ..structures import FRParam
 
 Signal = QtCore.pyqtSignal
@@ -354,9 +354,10 @@ class FRParamEditor(QtWidgets.QDialog):
     if fnArgs is None:
       fnArgs = []
 
-    def registerMethodDecorator(func: Callable, returnClsName=False):
+    def registerMethodDecorator(func: Callable, returnClsName=False, fnParentClass=None):
       boundFnParam = FRBoundFnParams(param=constParam, func=func, defaultFnArgs=fnArgs)
-      fnParentClass, _ = _class_fnNamesFromFnQualname(func.__qualname__)
+      if fnParentClass is None:
+        fnParentClass, _ = _class_fnNamesFromFnQualname(func.__qualname__)
 
       self._addParamToList(fnParentClass, boundFnParam)
       if returnClsName:
@@ -483,12 +484,12 @@ class TableFilterEditor(FRParamEditor):
     # Make max 'infinity'
     minMaxParam[1]['value'] = sys.maxsize
     validatedParms = _genList(['Validated', 'Not Validated'], 'bool', True)
-    devTypeParam = _genList((param.name for param in COMP_TYPES), 'bool', True)
+    devTypeParam = _genList((param.name for param in COMP_CLASSES), 'bool', True)
     xyVerts = _genList(['X Bounds', 'Y Bounds'], 'group', minMaxParam, 'children')
     _FILTER_DICT = [
         {'name': TC.INST_ID.name, 'type': 'group', 'children': minMaxParam},
         {'name': TC.VALIDATED.name, 'type': 'group', 'children': validatedParms},
-        {'name': TC.DEV_TYPE.name, 'type': 'group', 'children': devTypeParam},
+        {'name': TC.COMP_CLASS.name, 'type': 'group', 'children': devTypeParam},
         {'name': TC.LOGO.name, 'type': 'str', 'value': '.*'},
         {'name': TC.NOTES.name, 'type': 'str', 'value': '.*'},
         {'name': TC.BOARD_TEXT.name, 'type': 'str', 'value': '.*'},

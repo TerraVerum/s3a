@@ -6,16 +6,16 @@ from .frgraphics import tableview
 from .frgraphics.imageareas import FRMainImage
 from .frgraphics.parameditors import FR_SINGLETON
 from .frgraphics.regions import MultiRegionPlot
-from .projectvars import FR_CONSTS, TEMPLATE_COMP as TC, TEMPLATE_COMP_TYPES as COMP_TYPES
+from .projectvars import FR_CONSTS, TEMPLATE_COMP as TC, TEMPLATE_COMP_CLASSES as COMP_CLASSES
 from .structures import FRVertices
-from .tablemodel import ComponentMgr
+from .tablemodel import FRComponentMgr
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
 class CompSortFilter(QtCore.QSortFilterProxyModel):
   colTitles = TC.paramNames()
-  def __init__(self, compMgr: ComponentMgr, parent=None):
+  def __init__(self, compMgr: FRComponentMgr, parent=None):
     super().__init__(parent)
     self.setSourceModel(compMgr)
     # TODO: Move code for filtering into the proxy too. It will be more efficient and
@@ -44,7 +44,7 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
 class CompDisplayFilter(QtCore.QObject):
   sigCompClicked = Signal(object)
 
-  def __init__(self, compMgr: ComponentMgr, mainImg: FRMainImage,
+  def __init__(self, compMgr: FRComponentMgr, mainImg: FRMainImage,
                compTbl: tableview.CompTableView, parent=None):
     super().__init__(parent)
     filterEditor = FR_SINGLETON.filter
@@ -171,10 +171,10 @@ class CompDisplayFilter(QtCore.QObject):
     # ------
     # DEVICE TYPE FILTERING
     # ------
-    compTypes = np.array(curComps.loc[:, TC.DEV_TYPE])
-    curParam = self._filter[TC.DEV_TYPE.name][1]
+    compTypes = np.array(curComps.loc[:, TC.COMP_CLASS])
+    curParam = self._filter[TC.COMP_CLASS.name][1]
     allowedTypes = []
-    for curType in COMP_TYPES:
+    for curType in COMP_CLASSES:
       isAllowed = curParam[curType.name][0]
       if isAllowed:
         allowedTypes.append(curType)
