@@ -8,11 +8,14 @@ from ..structures import FRComplexVertices, FRParam, FRParamGroup, newParam
 
 __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'FILTERS_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
+           'DATE_FORMAT',
            'FR_CONSTS', 'TEMPLATE_COMP_CLASSES', 'TEMPLATE_COMP', 'CompParams', 'ComponentTypes']
 BASE_DIR = Path(__file__).parent.parent.absolute()
 MENU_OPTS_DIR = os.path.join(BASE_DIR, 'menuopts', '')
 ICON_DIR = os.path.join(BASE_DIR, 'icons', '')
 ANN_AUTH_DIR = os.path.join(MENU_OPTS_DIR)
+
+DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 # -----
 # EDITORS

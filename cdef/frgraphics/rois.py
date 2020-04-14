@@ -20,7 +20,7 @@ def _clearPoints(roi: pg.ROI):
 class FRROIExtension:
   connected = True
 
-  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: np.ndarray) -> (bool, Optional[FRVertices]):
+  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: FRVertices) -> (bool, Optional[FRVertices]):
     """
     Customized update for the FRROI.
 
@@ -34,20 +34,13 @@ class FRROIExtension:
     """
 
   @property
-  @abstractmethod
-  def vertices(self): pass
+  def vertices(self): return FRVertices()
 
 class FRExtendedROI(pg.ROI, FRROIExtension):
   """
   Purely for specifying the interface provided by the following classes. This is mainly
   so PyCharm knows what methds and signatures are provided by the ROIs below.
   """
-
-  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: np.ndarray) -> (bool, Optional[FRVertices]):
-    pass
-
-  @property
-  def vertices(self): return
 
 
 class FRRectROI(pg.RectROI, FRROIExtension):
@@ -136,11 +129,14 @@ class FRPolygonROI(pg.PolyLineROI, FRROIExtension):
     elif evType == QtCore.QEvent.MouseMove:
       # ROI handle will change the shape as needed, no action required
       pass
-    elif evType == QtCore.QEvent.MouseButtonRelease:
+    elif evType in [QtCore.QEvent.MouseButtonRelease, QtCore.QEvent.MouseButtonDblClick]:
       # Check if the placed point is close enough to the first vertex. If so, the shape is done
       vertsToCheck = self.vertices
-      if (len(vertsToCheck) > 2) \
-      and np.all(np.abs(vertsToCheck[0] - vertsToCheck[-1]) < 5):
+      if ((len(vertsToCheck) > 2)
+          and (evType == QtCore.QEvent.MouseButtonDblClick
+            or np.all(np.abs(vertsToCheck[0] - vertsToCheck[-1]) < 5)
+          )
+      ):
         verts = vertsToCheck
         self.constructingRoi = False
       else:

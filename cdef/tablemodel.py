@@ -9,6 +9,7 @@ from stat import S_IRGRP
 import numpy as np
 import pandas as pd
 from datetime import datetime
+import dateparser
 from pandas import DataFrame as df
 
 import cv2 as cv
@@ -16,6 +17,7 @@ from skimage import io
 from pyqtgraph.Qt import QtCore
 
 from cdef.projectvars import TEMPLATE_COMP_CLASSES
+from cdef.projectvars import DATE_FORMAT
 from cdef.structures.typeoverloads import TwoDArr, NChanImg
 from .frgraphics.parameditors import FR_SINGLETON
 from .generalutils import coerceDfTypes
@@ -199,18 +201,35 @@ class FRComponentMgr(FRCompTableModel):
       self.sigCompsChanged.emit(toEmit)
     return toEmit
 
-def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> Any:
+def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> pd.Series:
   paramType = type(paramVal)
+  # TODO: Move this to a more obvious place?
   funcMap = {
     # Format string to look like a list, use ast to convert that string INTO a list, make a numpy array from the list
-    np.ndarray        : lambda strVal: np.array(literal_eval(re.sub(r'(\d|\])\s+', '\\1,', strVal.replace('\n', '')))),
+    np.ndarray        : lambda strVal: np.array(literal_eval(strVal)),
     FRComplexVertices : FRComplexVertices.deserialize,
     bool              : lambda strVal: strVal.lower() == 'true',
-    FRParam           : lambda strVal: paramVal.group.fromString(strVal)
+    FRParam           : lambda strVal: paramVal.group.fromString(strVal),
+    datetime          : lambda strVal: datetime.strptime(strVal, DATE_FORMAT)
   }
   defaultFunc = lambda strVal: paramType(strVal)
   funcToUse = funcMap.get(paramType, defaultFunc)
   return strSeries.apply(funcToUse)
+
+def _paramSerToStrSer(paramSer: pd.Series, paramVal: Any) -> pd.Series:
+  # TODO: Move along with above function?
+  paramType = type(paramVal)
+  funcMap = {
+    # Format string to look like a list, use ast to convert that string INTO a list, make a numpy array from the list
+    np.ndarray: lambda param: str(param.tolist()),
+    FRComplexVertices: FRComplexVertices.serialize,
+    datetime: lambda param: datetime.strftime(param, DATE_FORMAT)
+  }
+  defaultFunc = lambda param: str(param)
+
+  funcToUse = funcMap.get(paramType, defaultFunc)
+  return paramSer.apply(funcToUse)
+
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_EXPORTER)
 class FRComponentIO:
@@ -273,6 +292,7 @@ class FRComponentIO:
     np.set_printoptions(threshold=sys.maxsize)
     errMsg = None
     exportDf: Optional[df] = None
+    col = None
     try:
       # TODO: Currently the additional options are causing errors. Find out why and fix
       #  them, since this may be useful if it can be modified
@@ -280,14 +300,15 @@ class FRComponentIO:
       # Since CSV export significantly modifies the df, make a copy before doing all these
       # operations
       exportDf = self.exportDf.copy(deep=True)
+      valToParamMap = {param.name: param.value for param in TC}
       for col in exportDf:
-        if hasattr(col.value, 'serialize'):
-          exportDf[col] = exportDf[col].map(type(col.value).serialize)
+        if not isinstance(col.value, str):
+          exportDf[col] = _paramSerToStrSer(exportDf[col], col.value)
       if outFile is not None:
         exportDf.to_csv(outFile, index=False)
         outPath.chmod(S_IRGRP)
     except Exception as ex:
-      errMsg = str(ex)
+      errMsg = f'Error on parsing column {col.name}:\n{ex}'
     finally:
       pd.reset_option('display.max_rows')
       # False positive checker warning for some reason
@@ -363,12 +384,11 @@ class FRComponentIO:
     """
     csvDf = None
     errMsg = None
+    col = None
     try:
       csvDf = pd.read_csv(inFile, keep_default_na=False)
       # Objects in the original frame are represented as strings, so try to convert these
       # as needed
-      # Organize the fields of the incoming CSV in the order expected by the template component
-      csvDf = csvDf[[str(field) for field in TC]]
       stringCols = csvDf.columns[csvDf.dtypes == object]
       valToParamMap = {param.name: param.value for param in TC}
       for col in stringCols:
@@ -381,7 +401,7 @@ class FRComponentIO:
 
       cls.checkVertBounds(csvDf[TC.VERTICES], imShape)
     except Exception as ex:
-      errMsg = str(ex)
+      errMsg = f'Error importing column {col}:\n{ex}'
     # TODO: Apply this function to individual rows instead of the whole dataframe. This will allow malformed
     #  rows to gracefully fall off the dataframe with some sort of warning message
     return csvDf, errMsg

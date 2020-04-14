@@ -272,11 +272,12 @@ class MainWindow(FRAnnotatorUI):
       newComps, errMsg = FRComponentIO.buildFromPkl(fname, self.mainImg.image.shape)
     else:
       raise FRCompIOError(f'Extension {fType} is not recognized. Must be one of: csv, cdefpkl')
-    self.compMgr.addComps(newComps, loadType)
     if errMsg is not None:
       # Something went wrong. Inform the user.
-      fullErrMsg = f'Failed to import components. {type(errMsg)}:\n{errMsg}'
+      fullErrMsg = f'Failed to import components:\n{errMsg}'
       QtWidgets.QMessageBox().information(self, 'Error During Import', fullErrMsg)
+    else:
+      self.compMgr.addComps(newComps, loadType)
 
   @staticmethod
   def genericPopulateMenuOptions(objForMenu: FRParamEditor, winMenu: QtWidgets.QMenu, triggerFn: Callable):

@@ -112,6 +112,13 @@ class FREditableImg(pg.PlotWidget):
 
     super().mousePressEvent(ev)
 
+  def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent):
+    if ev.buttons() == QtCore.Qt.LeftButton \
+        and self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
+      self.shapeCollection.buildRoi(self.imgItem, ev)
+
+    super().mouseDoubleClickEvent(ev)
+
   def mouseMoveEvent(self, ev: QtGui.QMouseEvent):
     """
     Mouse move behavior is contingent on which shape is currently selected,
