@@ -9,7 +9,6 @@ from stat import S_IRGRP
 import numpy as np
 import pandas as pd
 from datetime import datetime
-import dateparser
 from pandas import DataFrame as df
 
 import cv2 as cv
@@ -47,7 +46,7 @@ def makeCompDf(numRows=1) -> df:
   outDf = df(df_list, columns=TC).set_index(TC.INST_ID, drop=False)
   # Set the metadata for this application run
   outDf[TC.ANN_AUTHOR] = FR_SINGLETON.annotationAuthor
-  outDf[TC.ANN_TIMESTAMP] = datetime.now()
+  outDf[TC.ANN_TIMESTAMP] = datetime.now().strftime(DATE_FORMAT)
   outDf[TC.ANN_FILENAME] = FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
   if dropRow:
     outDf = outDf.drop(index=TC.INST_ID.value)
@@ -100,7 +99,8 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
 
   def flags(self, index: QtCore.QModelIndex) -> QtCore.Qt.ItemFlags:
     noEditColIdxs = [self.colTitles.index(col.name)for col in
-                     [TC.INST_ID, TC.VERTICES]]
+                     [TC.INST_ID, TC.VERTICES, TC.ANN_AUTHOR, TC.ANN_FILENAME,
+                      TC.ANN_TIMESTAMP]]
     if index.column() not in noEditColIdxs:
       return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable
     else:
@@ -209,8 +209,7 @@ def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> pd.Series:
     np.ndarray        : lambda strVal: np.array(literal_eval(strVal)),
     FRComplexVertices : FRComplexVertices.deserialize,
     bool              : lambda strVal: strVal.lower() == 'true',
-    FRParam           : lambda strVal: paramVal.group.fromString(strVal),
-    datetime          : lambda strVal: datetime.strptime(strVal, DATE_FORMAT)
+    FRParam           : lambda strVal: paramVal.group.fromString(strVal)
   }
   defaultFunc = lambda strVal: paramType(strVal)
   funcToUse = funcMap.get(paramType, defaultFunc)
@@ -223,7 +222,6 @@ def _paramSerToStrSer(paramSer: pd.Series, paramVal: Any) -> pd.Series:
     # Format string to look like a list, use ast to convert that string INTO a list, make a numpy array from the list
     np.ndarray: lambda param: str(param.tolist()),
     FRComplexVertices: FRComplexVertices.serialize,
-    datetime: lambda param: datetime.strftime(param, DATE_FORMAT)
   }
   defaultFunc = lambda param: str(param)
 
@@ -389,6 +387,7 @@ class FRComponentIO:
       csvDf = pd.read_csv(inFile, keep_default_na=False)
       # Objects in the original frame are represented as strings, so try to convert these
       # as needed
+      csvDf = csvDf[[field.name for field in TC]]
       stringCols = csvDf.columns[csvDf.dtypes == object]
       valToParamMap = {param.name: param.value for param in TC}
       for col in stringCols:
