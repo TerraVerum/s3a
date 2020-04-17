@@ -157,6 +157,7 @@ class FRComplexVertices(list):
     concatVerts = self.stack()
     if len(concatVerts) <= 4: return str(concatVerts)
     return f'Mean:\t{np.round(concatVerts.mean(0), 1)}\n' \
+           f'# Points:\t{len(concatVerts)}\n' \
            f'Min:\t{concatVerts.min(0)}\n' \
            f'Max:\t{concatVerts.max(0)}'
 

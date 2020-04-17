@@ -98,13 +98,13 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
     return True
 
   def flags(self, index: QtCore.QModelIndex) -> QtCore.Qt.ItemFlags:
-    noEditColIdxs = [self.colTitles.index(col.name)for col in
+    noEditColIdxs = [self.colTitles.index(col.name) for col in
                      [TC.INST_ID, TC.VERTICES, TC.ANN_AUTHOR, TC.ANN_FILENAME,
                       TC.ANN_TIMESTAMP]]
     if index.column() not in noEditColIdxs:
       return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable
     else:
-      return QtCore.Qt.ItemIsEnabled
+      return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_MGR)
 class FRComponentMgr(FRCompTableModel):
