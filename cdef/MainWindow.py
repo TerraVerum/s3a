@@ -57,7 +57,8 @@ class MainWindow(FRAnnotatorUI):
     authorName = resolveAuthorName(authorName)
     if authorName is None:
       sys.exit('No author name provided and no default author exists. Exiting.\n'
-               'To start without error, provide an author name explicitly.')
+               'To start without error, provide an author name explicitly, e.g.\n'
+               '"python -m cdef --author=<Author Name>"')
     FR_SINGLETON.annotationAuthor = authorName
     self.statBar.showMessage(FR_SINGLETON.annotationAuthor)
 
