@@ -6,6 +6,7 @@ from os.path import join
 from pathlib import Path
 from typing import Callable
 
+import pandas as pd
 import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
@@ -14,7 +15,8 @@ from cdef.generalutils import resolveAuthorName
 from cdef.structures import FRCompIOError
 from cdef.tablemodel import FRComponentIO
 from .frgraphics.annotator_ui import FRAnnotatorUI
-from .frgraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, addDirItemsToMenu, \
+from .frgraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, \
+  addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc
 from .frgraphics.parameditors import FRParamEditor, FR_SINGLETON
 from .projectvars.constants import FR_CONSTS
@@ -87,7 +89,7 @@ class MainWindow(FRAnnotatorUI):
                                          self)
 
     self.mainImg.imgItem.sigImageChanged.connect(self.clearBoundaries)
-    self.compDisplay.sigCompClicked.connect(self.updateCurComp)
+    self.compDisplay.sigCompsSelected.connect(self.updateCurComp)
 
     # ---------------
     # UI ELEMENT SIGNALS
@@ -177,7 +179,7 @@ class MainWindow(FRAnnotatorUI):
     # Make sure index matches ID before updating current component
     newComp = newComp.set_index(TC.INST_ID, drop=False)
     # Set this component as active in the focused view
-    self.updateCurComp(newComp.squeeze())
+    self.updateCurComp(newComp)
 
   # ---------------
   # MENU CALLBACKS
@@ -340,10 +342,19 @@ class MainWindow(FRAnnotatorUI):
   # ---------------
   @Slot(object)
   @applyWaitCursor
-  def updateCurComp(self, newComp: df):
+  def updateCurComp(self, newComps: df):
+    if len(newComps) == 0:
+      return
+    # TODO: More robust scenario if multiple comps are in the dataframe
+    #   For now, just use the last in the selection. This is so that if multiple
+    #   components are selected in a row, the most recently selected is always
+    #   the current displayed.
+    newComps: pd.Series = newComps.iloc[-1,:]
+    newCompId = newComps[TC.INST_ID]
+    self.compDisplay.regionPlots.focusById([newCompId])
     mainImg = self.mainImg.image
-    self.compImg.updateAll(mainImg, newComp)
-    self.curCompIdLbl.setText(f'Component ID: {newComp[TC.INST_ID]}')
+    self.compImg.updateAll(mainImg, newComps)
+    self.curCompIdLbl.setText(f'Component ID: {newCompId}')
 
 ## Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':

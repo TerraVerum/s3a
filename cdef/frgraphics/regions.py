@@ -14,7 +14,7 @@ from ..frgraphics.rois import SHAPE_ROI_MAPPING, FRExtendedROI
 from ..generalutils import coerceDfTypes, nanConcatList
 from ..processingutils import getVertsFromBwComps
 from ..projectvars import TEMPLATE_COMP as TC, FR_CONSTS
-from ..structures import FRParam, FRVertices, FRComplexVertices
+from ..structures import FRParam, FRVertices, FRComplexVertices, OneDArr
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
@@ -133,8 +133,6 @@ def _makeTxtSymbol(txt: str, fontSize: int):
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_MULT_REG_PLT)
 class MultiRegionPlot(QtCore.QObject):
-  sigIdClicked = Signal(int)
-
   @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_BOUNDARY_COLOR)
   def boundClr(self): pass
   @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_BOUNDARY_WIDTH)
@@ -148,20 +146,21 @@ class MultiRegionPlot(QtCore.QObject):
   @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_SELECTED_ID_BORDER)
   def selectedIdBorder(self): pass
 
+
   # Helper class for IDE assistance during dataframe access
   def __init__(self, parent=None):
     super().__init__(parent)
     self.boundPlt = pg.PlotDataItem(connect='finite')
     self.idPlts = ClickableScatterItem(pen=None)
-    self.idPlts.sigClicked.connect(self.scatPltClicked)
-    # Cache nan sep due to its frequent use
-    self._nanSep = np.empty((1,2)) * np.nan
     self.data = makeMultiRegionDf(0)
 
-  @Slot(object, object)
-  def scatPltClicked(self, plot, points):
-    # Only send click signal for one point in the list
-    self.sigIdClicked.emit(points[-1].data())
+    # 'pointsAt' is an expensive operation if many points are in the scatterplot. Since
+    # this will be called anyway when a selection box is made in the main image, disable
+    # mouse click listener to avoid doing all that work for nothing.
+    self.idPlts.mouseClickEvent = lambda ev: None
+    # Also disable sigClicked. This way, users who try connecting to this signal won't get
+    # code that runs but never triggers
+    self.idPlts.sigClicked = None
 
   def resetRegionList(self, newIds: Optional[Sequence]=None, newRegionDf: Optional[df]=None):
     if newIds is None:
@@ -171,12 +170,34 @@ class MultiRegionPlot(QtCore.QObject):
     self.data = makeMultiRegionDf(0)
     self[newIds,newRegionDf.columns] = newRegionDf
 
-  def selectById(self, selectedIds):
-    pens = np.empty(len(self.data), dtype=object)
-    pens.fill(None)
-    selectedIdxs = np.isin(self.data.index, selectedIds)
-    pens[selectedIdxs] = pg.mkPen(self.selectedIdBorder, width=3)
-    self.idPlts.setPen(pens)
+  def selectById(self, selectedIds: OneDArr):
+    """
+    Marks 'selectedIds' as currently selected by changing their scheme to user-specified
+    selection values.
+    """
+    selectedIdPens = np.empty(len(self.data), dtype=object)
+    selectedIdPens.fill(None)
+    selectedIdxs = self.data.index.intersection(selectedIds)
+    selectedIdPens[selectedIdxs] = pg.mkPen(self.selectedIdBorder, width=3)
+
+    self.idPlts.setPen(selectedIdPens)
+
+  def focusById(self, focusedIds: OneDArr):
+    """
+    Colors 'focusedIds' to indicate they are present in a focused view.
+    """
+    focusedIdSymbs = np.empty(len(self.data), dtype='<U4')
+    focusedIdSymbs.fill('o')
+    focusedIdSizes = np.empty(len(self.data))
+    focusedIdSizes.fill(self.idMarkerSz)
+    focusedIdxs = self.data.index.intersection(focusedIds)
+
+    # TODO: Make GUI properties for these?
+    focusedIdSymbs[focusedIdxs] = 'star'
+    focusedIdSizes[focusedIdxs] *= 3
+    self.idPlts.setSymbol(focusedIdSymbs)
+    self.idPlts.setSize(focusedIdSizes)
+
 
   def updatePlot(self):
     # -----------

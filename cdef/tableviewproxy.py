@@ -1,3 +1,5 @@
+from typing import Union
+
 import numpy as np
 from pyqtgraph.Qt import QtCore
 
@@ -42,7 +44,7 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_TBL)
 class CompDisplayFilter(QtCore.QObject):
-  sigCompClicked = Signal(object)
+  sigCompsSelected = Signal(object)
 
   def __init__(self, compMgr: FRComponentMgr, mainImg: FRMainImage,
                compTbl: tableview.CompTableView, parent=None):
@@ -53,25 +55,18 @@ class CompDisplayFilter(QtCore.QObject):
     self._compTbl = compTbl
     self._compMgr = compMgr
 
-    # Attach to main image area signals
-    mainImg.sigSelectionBoundsMade.connect(self._compPointsSelected)
-
-    # Attach to manager signals
-    compMgr.sigCompsChanged.connect(self.redrawComps)
-
-    # Retrieve filter changes
-    filterEditor.sigParamStateUpdated.connect(self._updateFilter)
-
-    # Update based on table selection
-    compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
-    #self.sigProxy = SignalProxy(self._compTbl.sigSelectionChanged, delay=0.25, slot=self._reflectTableSelectionChange)
-
-    self._regionPlots = MultiRegionPlot()
+    self.regionPlots = MultiRegionPlot()
     self.displayedIds = np.array([], dtype=int)
+    self.selectedIds = np.array([], dtype=int)
 
-    for plt in self._regionPlots.boundPlt, self._regionPlots.idPlts:
+    # Attach to UI signals
+    mainImg.sigSelectionBoundsMade.connect(self._reflectSelectionBoundsMade)
+    compMgr.sigCompsChanged.connect(self.redrawComps)
+    filterEditor.sigParamStateUpdated.connect(self._updateFilter)
+    compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
+
+    for plt in self.regionPlots.boundPlt, self.regionPlots.idPlts:
       mainImg.addItem(plt)
-    self._regionPlots.sigIdClicked.connect(self.handleCompClick)
 
   def redrawComps(self, idLists):
     # Following mix of cases are possible:
@@ -102,9 +97,11 @@ class CompDisplayFilter(QtCore.QObject):
     # Remove all IDs that aren't displayed
     # FIXME: This isn't working correctly at the moment
     # self._regionPlots.drop(np.setdiff1d(self._regionPlots.data.index, self._displayedIds))
-    self._regionPlots.resetRegionList(self.displayedIds, compDf.loc[self.displayedIds, regCols])
+    self.regionPlots.resetRegionList(self.displayedIds, compDf.loc[self.displayedIds, regCols])
+    # noinspection PyTypeChecker
+    self._reflectTableSelectionChange(np.intersect1d(self.displayedIds, self.selectedIds))
 
-    tblIdxsToShow = np.nonzero(np.in1d(compDf.index, self.displayedIds))[0]
+    tblIdxsToShow = compDf.index.intersection(self.displayedIds)
     for rowIdx in tblIdxsToShow:
       self._compTbl.showRow(rowIdx)
 
@@ -114,34 +111,45 @@ class CompDisplayFilter(QtCore.QObject):
 
   @Slot(object)
   def _reflectTableSelectionChange(self, selectedIds: OneDArr):
-    self._regionPlots.selectById(selectedIds)
+    self.selectedIds = selectedIds
+    self.regionPlots.selectById(selectedIds)
+    self.sigCompsSelected.emit(self._compMgr.compDf.loc[selectedIds, :])
 
   @Slot(object)
-  def _compPointsSelected(self, selection: FRVertices):
+  def _reflectSelectionBoundsMade(self, selection: Union[OneDArr, FRVertices]):
     """
-    :param selectionBox: bounding box of user selection: [xmin ymin xmax ymax]
+    :param selection: bounding box of user selection: [xmin ymin; xmax ymax]
     """
-    selectedIds = self._regionPlots.idPlts.idsWithin(selection)
-    self.updateCompSelection(selectedIds, scrollTo=len(selectedIds) > 0)
+    # If min and max are the same, just check for points at mouse position
+    if np.abs(selection[0] - selection[1]).sum() < 0.01:
+      qtPoint = QtCore.QPointF(*selection[0])
+      selectedSpots = self.regionPlots.idPlts.pointsAt(qtPoint)
+      selectedIds = [spot.data() for spot in selectedSpots]
+    else:
+      selectedIds = self.regionPlots.idPlts.idsWithin(selection)
 
-  # @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DESEL_ALL_BOUNDARIES, [[]])
-  def updateCompSelection(self, selectedIds, scrollTo=True):
-    self._compTbl.clearSelection()
-    mode = QtCore.QItemSelectionModel.Select | QtCore.QItemSelectionModel.Rows
+    # -----
+    # Obtain table idxs corresponding to ids so rows can be highlighted
+    # -----
+    mode = QtCore.QItemSelectionModel.ClearAndSelect | QtCore.QItemSelectionModel.Rows
     selectionModel = self._compTbl.selectionModel()
     sortModel = self._compTbl.model()
     isFirst = True
+    shouldScroll = len(selectedIds) > 0
+    selectionList = QtCore.QItemSelection()
     for curId in selectedIds:
       idRow = np.nonzero(self._compMgr.compDf.index == curId)[0][0]
       # Map this ID to its sorted position in the list
       idxForId = sortModel.mapFromSource(self._compMgr.index(idRow, 0))
-      selectionModel.select(idxForId, mode)
-      if isFirst and scrollTo:
+      selectionList.select(idxForId, idxForId)
+      if isFirst and shouldScroll:
         self._compTbl.scrollTo(idxForId, self._compTbl.PositionAtCenter)
         isFirst = False
-
+    # noinspection PyTypeChecker
+    selectionModel.select(selectionList, mode)
+    self.selectedIds = selectedIds
     self._compTbl.setFocus()
-
+    # TODO: Better management of widget focus here
 
   def _populateDisplayedIds(self):
     curComps = self._compMgr.compDf
@@ -214,10 +222,4 @@ class CompDisplayFilter(QtCore.QObject):
 
   @Slot()
   def resetCompBounds(self):
-    self._regionPlots.resetRegionList()
-
-  @Slot(int)
-  def handleCompClick(self, clickedId=None):
-    self.updateCompSelection([clickedId], scrollTo=True)
-    # noinspection PyTypeChecker
-    self.sigCompClicked.emit(self._compMgr.compDf.loc[clickedId,:])
+    self.regionPlots.resetRegionList()

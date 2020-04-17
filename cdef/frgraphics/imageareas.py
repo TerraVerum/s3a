@@ -2,9 +2,9 @@ from typing import Union, Tuple, Optional
 
 import numpy as np
 import pyqtgraph as pg
-from skimage.io import imread
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from skimage.io import imread
 
 from .clickables import RightPanViewBox
 from .drawopts import FRDrawOpts
@@ -18,6 +18,7 @@ from ..processingutils import getVertsFromBwComps
 from ..processingutils import segmentComp
 from ..projectvars import TEMPLATE_COMP as TC, FR_CONSTS, FR_ENUMS
 from ..structures import FRParam, FRVertices, FRComplexVertices
+from ..structures import NChanImg
 from ..tablemodel import makeCompDf
 
 Signal = QtCore.pyqtSignal
@@ -164,8 +165,7 @@ class FRMainImage(FREditableImg):
 
   def handleShapeFinished(self, roi: FRExtendedROI, fgVerts: FRVertices=None, bgVerts: FRVertices=None,
                           prevComp=None) -> Optional[np.ndarray]:
-    if self.drawAction == FR_CONSTS.DRAW_ACT_SELECT \
-        and roi.connected:
+    if (self.drawAction == FR_CONSTS.DRAW_ACT_SELECT) and roi.connected:
       # Selection
       self.sigSelectionBoundsMade.emit(self.shapeCollection.shapeVerts)
     elif self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
@@ -183,6 +183,15 @@ class FRMainImage(FREditableImg):
       newComp = makeCompDf(1)
       newComp[TC.VERTICES] = [newVerts.copy()]
       self.sigComponentCreated.emit(newComp)
+
+  def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
+    super().mouseReleaseEvent(ev)
+    if self.drawAction == FR_CONSTS.DRAW_ACT_PAN:
+      # Simulate a click-wide boundary selection so points can be selected in pan mode
+      pos = self.imgItem.mapFromScene(ev.pos())
+      xx, yy, = pos.x(), pos.y()
+      squareCorners = FRVertices([[xx, yy], [xx, yy]], dtype=float)
+      self.sigSelectionBoundsMade.emit(squareCorners)
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_FG, [FR_CONSTS.DRAW_ACT_ADD])
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_PAN, [FR_CONSTS.DRAW_ACT_PAN])
@@ -202,7 +211,10 @@ class FRMainImage(FREditableImg):
     """
     if isinstance(imgSrc, str):
       # TODO: Handle alpha channel images. For now, discard that data
-      imgSrc = imread(imgSrc)[:,:,0:3]
+      imgSrc = imread(imgSrc)
+      if imgSrc.ndim < 3:
+        imgSrc = imgSrc[:,:,None]
+      imgSrc = imgSrc[:,:,0:3]
 
     self.imgItem.setImage(imgSrc)
     self.procCollection.image = imgSrc
@@ -278,7 +290,7 @@ class FRFocusedImage(FREditableImg):
       self.region.updateFromMask(self.compMask)
       self.regionBuffer.update((self.compMask, (0,0)))
 
-  def updateAll(self, mainImg: Optional[np.array], newComp:Optional[df]=None):
+  def updateAll(self, mainImg: Optional[NChanImg], newComp:Optional[df]=None):
     if mainImg is None:
       mainImg = np.zeros((1,1,3))
       self.imgItem.setImage(mainImg)

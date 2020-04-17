@@ -12,6 +12,7 @@ from .parameditors import FR_SINGLETON
 from cdef.projectvars import FR_CONSTS
 
 class ClickableImageItem(pg.ImageItem):
+  """ Depracated class"""
   sigClicked = Signal(object)
 
   clickable = True
@@ -36,11 +37,12 @@ class ClickableScatterItem(pg.ScatterPlotItem):
 
     self.hoverCursor = QtCore.Qt.PointingHandCursor
 
-  def mouseMoveEvent(self, ev):
-    if self.pointsAt(ev.pos()):
-      self.setCursor(self.hoverCursor)
-    else:
-      self.unsetCursor()
+  # Not working at the moment :/
+  # def mouseMoveEvent(self, ev):
+  #   if self.pointsAt(ev.pos()):
+  #     self.setCursor(self.hoverCursor)
+  #   else:
+  #     self.unsetCursor()
 
   def idsWithin(self, selection: FRVertices):
     # TODO: Optimize for rectangular selections
@@ -53,7 +55,7 @@ class ClickableScatterItem(pg.ScatterPlotItem):
     #   & (pointLocs[1] <= bbox[3])
     tfIsInSelection = np.array([selectionPoly.containsPoint(QtCore.QPointF(*row), QtCore.Qt.WindingFill)
                                 for row in pointLocs], dtype=bool)
-    return [point.data() for point in self.points()[tfIsInSelection]]
+    return np.array([point.data() for point in self.points()[tfIsInSelection]])
 
 class ClickableTextItem(pg.TextItem):
 
