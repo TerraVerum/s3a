@@ -489,7 +489,7 @@ class UserProfileEditor(FRParamEditor):
     optsFromSingletonEditors = []
     for editor in FR_SINGLETON.editors:
       curValues = self.getSettingsFiles(editor.saveDir, editor.fileType)
-      curParam = ListParameter(name=editor.name, values=curValues, default='Default')
+      curParam = ListParameter(name=editor.name, value='Default', values=curValues)
       updateFunc = lambda newName, listParam=curParam: \
         listParam.setLimits(listParam.opts['limits'] + [newName])
       editor.sigParamStateCreated.connect(updateFunc)
@@ -499,7 +499,7 @@ class UserProfileEditor(FRParamEditor):
       {'name': 'Image', 'type': 'str'},
       {'name': 'Annotations', 'type': 'str'},
       {'name': 'Layout', 'type': 'list', 'values': self.getSettingsFiles(LAYOUTS_DIR, 'dockstate'),
-       'default': 'Default'},
+       'value': 'Default'},
     ]
     _USER_PROFILE_PARAMS.extend(optsFromSingletonEditors)
 

@@ -5,7 +5,7 @@ from collections import defaultdict
 from functools import partial
 from os.path import join
 from pathlib import Path
-from typing import Callable, Dict, Any, Union
+from typing import Callable, Dict, Any, Union, Optional
 
 import pandas as pd
 import pyqtgraph as pg
@@ -223,39 +223,43 @@ class MainWindow(FRAnnotatorUI):
                       triggerFn)
 
   @staticmethod
-  def paramEditorLoadActTriggered(objForMenu: FRParamEditor, nameToLoad: str) -> dict:
+  def paramEditorLoadActTriggered(objForMenu: FRParamEditor, nameToLoad: str) -> Optional[dict]:
     dictFilename = join(objForMenu.saveDir, f'{nameToLoad}.{objForMenu.fileType}')
     loadDict = attemptLoadSettings(dictFilename)
     if loadDict is None:
-      return
+      return None
     objForMenu.loadState(loadDict)
     objForMenu.applyBtnClicked()
     return loadDict
 
   def loadUserProfileActTriggered(self, profileSrc: Union[dict, str]):
+    # Make sure defaults exist
+    profileDict = defaultdict(type(None))
     if isinstance(profileSrc, str):
-      profileDict = self.paramEditorLoadActTriggered(self.userProfile, profileSrc)['children']
-      getFromProfile = lambda prof, val: prof[val]['value']
+      profName = profileSrc
+      profileSrc = {}
     else:
-      # Make sure defaults exist
-      profileDict = defaultdict(type(None))
-      getFromProfile = lambda prof, val: prof[val]
-      profileDict.update(profileSrc)
+      profName = profileSrc.get('Profile', None)
+    if profName is not None:
+      profileParams = self.paramEditorLoadActTriggered(self.userProfile, profName)['children']
+      # Attrs from a param tree are hidden behind 'value', so bring each to the front
+      profileDict.update({k: v['value'] for k, v in profileParams.items()})
+    profileDict.update(profileSrc)
 
-    imgFname = getFromProfile(profileDict, 'Image')
+    imgFname = profileDict['Image']
     if imgFname:
       self.openImgActionTriggered(imgFname)
 
-    annFname = getFromProfile(profileDict, 'Annotations')
+    annFname = profileDict['Annotations']
     if annFname:
       self.loadCompsActionTriggered(fname=annFname)
 
-    layoutName = getFromProfile(profileDict, 'Layout')
+    layoutName = profileDict['Layout']
     if layoutName:
       self.loadLayoutActionTriggered(layoutName)
 
     for editor in FR_SINGLETON.editors:
-      curSettings = getFromProfile(profileDict, editor.name)
+      curSettings = profileDict[editor.name]
       if curSettings is not None:
         self.paramEditorLoadActTriggered(editor, curSettings)
 
