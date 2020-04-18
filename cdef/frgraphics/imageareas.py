@@ -292,7 +292,6 @@ class FRFocusedImage(FREditableImg):
 
   def updateAll(self, mainImg: Optional[NChanImg], newComp:Optional[df]=None):
     if mainImg is None:
-      mainImg = np.zeros((1,1,3))
       self.imgItem.setImage(mainImg)
       self.region.updateFromVertices(FRComplexVertices())
       return

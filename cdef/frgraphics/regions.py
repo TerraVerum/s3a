@@ -67,7 +67,9 @@ class FRShapeCollection(QtCore.QObject):
         :param ev: Mouse event
         """
     # Unblock on mouse press
-    if ev.type() == ev.MouseButtonPress and ev.button() == QtCore.Qt.LeftButton:
+    if (imgItem.image is not None
+        and ev.type() == ev.MouseButtonPress
+        and ev.button() == QtCore.Qt.LeftButton):
       self.forceBlockRois = False
     if self.forceBlockRois: return
     posRelToImg = imgItem.mapFromScene(ev.pos())
