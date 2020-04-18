@@ -292,8 +292,9 @@ class FRFocusedImage(FREditableImg):
 
   def updateAll(self, mainImg: Optional[NChanImg], newComp:Optional[df]=None):
     if mainImg is None:
-      self.imgItem.setImage(mainImg)
+      self.imgItem.clear()
       self.region.updateFromVertices(FRComplexVertices())
+      self.shapeCollection.clearAllRois()
       return
     newVerts: FRComplexVertices = newComp[TC.VERTICES]
     # Since values INSIDE the dataframe are reset instead of modified, there is no
@@ -303,7 +304,7 @@ class FRFocusedImage(FREditableImg):
     # Reset the undo buffer
     self.regionBuffer = FRRegionVertsUndoBuffer()
 
-    # Propagate all resultant changes
+    # Propagate all resultant changesre
     self.updateBbox(mainImg.shape, newVerts)
     self.updateCompImg(mainImg)
     self.updateRegionFromVerts(newVerts)
