@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
 
 import sys
+from collections import defaultdict
 from functools import partial
 from os.path import join
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Dict, Any, Union
 
 import pandas as pd
 import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
+from cdef.frgraphics.graphicsutils import saveToFile
+from cdef.frgraphics.parameditors import UserProfileEditor
 from cdef.generalutils import resolveAuthorName
 from cdef.structures import FRCompIOError
 from cdef.tablemodel import FRComponentIO
@@ -39,18 +42,15 @@ class MainWindow(FRAnnotatorUI):
   # Alerts GUI that a layout (either new or overwriting old) was saved
   sigLayoutSaved = Signal()
 
-  def __init__(self, startImgFpath: str = None, startAnnFpath: str = None, authorName: str = None):
+  def __init__(self, authorName: str = None, userProfileArgs: Dict[str, Any]=None):
     super().__init__()
     
     # ---------------
     # DATA ATTRIBUTES
     # ---------------
     self.mainImgFpath = None
-    if startImgFpath is not None:
-      # Make sure to simplify the incoming path
-      self.mainImgFpath = str(Path(startImgFpath).resolve())
-      startImgFpath = self.mainImgFpath
     self.hasUnsavedChanges = False
+    self.userProfile = UserProfileEditor()
 
     self.statBar = QtWidgets.QStatusBar(self)
     self.setStatusBar(self.statBar)
@@ -67,10 +67,6 @@ class MainWindow(FRAnnotatorUI):
     # MAIN IMAGE
     # ---------------
     self.mainImg.sigComponentCreated.connect(self._add_focusComp)
-    self.mainImg.setImage(startImgFpath)
-    # ---------------
-    # FOCUSED IMAGE
-    # ---------------
 
     # ---------------
     # COMPONENT MANAGER
@@ -96,20 +92,10 @@ class MainWindow(FRAnnotatorUI):
     # UI ELEMENT SIGNALS
     # ---------------
     # Buttons
-    self.openImgAct.triggered.connect(self.openImgActionTriggered)
+    self.openImgAct.triggered.connect(lambda: self.openImgActionTriggered())
     self.clearRegionBtn.clicked.connect(self.clearRegionBtnClicked)
     self.resetRegionBtn.clicked.connect(self.resetRegionBtnClicked)
     self.acceptRegionBtn.clicked.connect(self.acceptRegionBtnClicked)
-
-    # Same with estimating boundaries
-    if (startImgFpath is not None
-        and self.estBoundsOnStart):
-      self.estimateBoundaries()
-
-    if startAnnFpath is not None:
-      self.loadCompsActionTriggered(FR_ENUMS.COMP_ADD_AS_NEW, startAnnFpath)
-
-
 
     # Menu options
     # FILE
@@ -122,12 +108,17 @@ class MainWindow(FRAnnotatorUI):
     self.loadComps_new.triggered.connect(lambda: self.loadCompsActionTriggered(FR_ENUMS.COMP_ADD_AS_NEW))
 
     # SETTINGS
-    self.createSettingsMenus()
+    for editor in FR_SINGLETON.editors:
+      self.createMenuOptForEditor(self.menuSettings, editor)
+    profileLoadFunc = self.loadUserProfileActTriggered
+    self.createMenuOptForEditor(self.menuFile, self.userProfile, profileLoadFunc)
+    if userProfileArgs is not None:
+      self.loadUserProfileActTriggered(userProfileArgs)
 
     # ---------------
     # LOAD LAYOUT OPTIONS
     # ---------------
-    self.populateLoadLayoutOptions()
+    self.saveLayoutActionTriggered('Default')
     # Start with docks in default position, hide error if default file doesn't exist
     self.loadLayoutActionTriggered('Default', showError=False)
 
@@ -155,20 +146,22 @@ class MainWindow(FRAnnotatorUI):
       FR_SINGLETON.close()
 
 
-  def createSettingsMenus(self):
-    for editor, name in zip(FR_SINGLETON.editors, FR_SINGLETON.editorNames): \
-        #type: FRParamEditor, str
-      menu = QtWidgets.QMenu(name, self)
-      editAct = QtWidgets.QAction('Edit ' + name, self)
-      menu.addAction(editAct)
-      menu.addSeparator()
-      editAct.triggered.connect(editor.show)
-      loadFunc = partial(self.genericLoadActionTriggered, editor)
-      populateFunc = partial(self.genericPopulateMenuOptions, editor, menu, loadFunc)
-      editor.sigParamStateCreated.connect(populateFunc)
-      # Initialize default menus
-      populateFunc()
-      self.menuSettings.addMenu(menu)
+  def createMenuOptForEditor(self, parentMenu: QtWidgets.QMenu, editor: FRParamEditor,
+                             loadFunc=None):
+    if loadFunc is None:
+      loadFunc = partial(self.paramEditorLoadActTriggered, editor)
+    name = editor.name
+    newMenu = QtWidgets.QMenu(name, self)
+    editAct = QtWidgets.QAction('Edit ' + name, self)
+    newMenu.addAction(editAct)
+    newMenu.addSeparator()
+    editAct.triggered.connect(editor.show)
+    populateFunc = partial(self.populateParamEditorMenuOpts, editor, newMenu, loadFunc)
+    editor.sigParamStateCreated.connect(populateFunc)
+    # Initialize default menus
+    populateFunc()
+    parentMenu.addMenu(newMenu)
+
 
   @Slot(object)
   def _recordCompChange(self):
@@ -186,16 +179,16 @@ class MainWindow(FRAnnotatorUI):
   # MENU CALLBACKS
   # ---------------
 
-  @Slot()
   @applyWaitCursor
-  def openImgActionTriggered(self):
-    fileFilter = "Image Files (*.png; *.tif; *.jpg; *.jpeg; *.bmp; *.jfif);; All files(*.*)"
-    fname = popupFilePicker(self, 'Select Main Image', fileFilter)
+  def openImgActionTriggered(self, fname=None):
+    if fname is None:
+      fileFilter = "Image Files (*.png; *.tif; *.jpg; *.jpeg; *.bmp; *.jfif);; All files(*.*)"
+      fname = popupFilePicker(self, 'Select Main Image', fileFilter)
 
     if fname is not None:
       self.compMgr.rmComps()
       self.mainImg.setImage(fname)
-      self.mainImgFpath = fname
+      self.mainImgFpath = str(Path(fname).resolve())
       self.compImg.resetImage()
       if self.estBoundsOnStart:
         self.estimateBoundaries()
@@ -211,11 +204,61 @@ class MainWindow(FRAnnotatorUI):
     if dockStates is not None:
       self.restoreState(dockStates)
 
-  @Slot()
-  def saveLayoutActionTriggered(self):
+  def saveLayoutActionTriggered(self, saveName: str=None):
     dockStates = self.saveState()
-    dialogSaveToFile(self, dockStates, 'Layout Name', LAYOUTS_DIR, 'dockstate')
-    self.sigLayoutSaved.emit()
+    if saveName is None:
+      outName = dialogSaveToFile(self, dockStates, 'Layout Name', LAYOUTS_DIR, 'dockstate', saveName)
+      success = outName is not None
+    else:
+      errMsg = saveToFile(dockStates, LAYOUTS_DIR, saveName, 'dockstate', True)
+      success = errMsg is None
+    if success:
+      self.sigLayoutSaved.emit()
+
+  @staticmethod
+  def populateParamEditorMenuOpts(objForMenu: FRParamEditor, winMenu: QtWidgets.QMenu,
+                                  triggerFn: Callable):
+    addDirItemsToMenu(winMenu,
+                      join(objForMenu.saveDir, f'*.{objForMenu.fileType}'),
+                      triggerFn)
+
+  @staticmethod
+  def paramEditorLoadActTriggered(objForMenu: FRParamEditor, nameToLoad: str) -> dict:
+    dictFilename = join(objForMenu.saveDir, f'{nameToLoad}.{objForMenu.fileType}')
+    loadDict = attemptLoadSettings(dictFilename)
+    if loadDict is None:
+      return
+    objForMenu.loadState(loadDict)
+    objForMenu.applyBtnClicked()
+    return loadDict
+
+  def loadUserProfileActTriggered(self, profileSrc: Union[dict, str]):
+    if isinstance(profileSrc, str):
+      profileDict = self.paramEditorLoadActTriggered(self.userProfile, profileSrc)['children']
+      getFromProfile = lambda prof, val: prof[val]['value']
+    else:
+      # Make sure defaults exist
+      profileDict = defaultdict(type(None))
+      getFromProfile = lambda prof, val: prof[val]
+      profileDict.update(profileSrc)
+
+    imgFname = getFromProfile(profileDict, 'Image')
+    if imgFname:
+      self.openImgActionTriggered(imgFname)
+
+    annFname = getFromProfile(profileDict, 'Annotations')
+    if annFname:
+      self.loadCompsActionTriggered(fname=annFname)
+
+    layoutName = getFromProfile(profileDict, 'Layout')
+    if layoutName:
+      self.loadLayoutActionTriggered(layoutName)
+
+    for editor in FR_SINGLETON.editors:
+      curSettings = getFromProfile(profileDict, editor.name)
+      if curSettings is not None:
+        self.paramEditorLoadActTriggered(editor, curSettings)
+
 
   @Slot()
   def exportCompListActionTriggered(self):
@@ -282,21 +325,6 @@ class MainWindow(FRAnnotatorUI):
     else:
       self.compMgr.addComps(newComps, loadType)
 
-  @staticmethod
-  def genericPopulateMenuOptions(objForMenu: FRParamEditor, winMenu: QtWidgets.QMenu, triggerFn: Callable):
-    addDirItemsToMenu(winMenu,
-                      join(objForMenu.saveDir, f'*.{objForMenu.fileType}'),
-                      triggerFn)
-
-  @staticmethod
-  def genericLoadActionTriggered(objForMenu: FRParamEditor, nameToLoad: str):
-    dictFilename = join(objForMenu.saveDir, f'{nameToLoad}.{objForMenu.fileType}')
-    loadDict = attemptLoadSettings(dictFilename)
-    if loadDict is None:
-      return
-    objForMenu.loadState(loadDict)
-    objForMenu.applyBtnClicked()
-
   # ---------------
   # BUTTON CALLBACKS
   # ---------------
@@ -361,4 +389,5 @@ class MainWindow(FRAnnotatorUI):
 if __name__ == '__main__':
   app = pg.mkQApp()
   win = MainWindow()
+
   app.exec()

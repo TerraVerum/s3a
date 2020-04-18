@@ -22,6 +22,7 @@ from ..interfaces import FRImageProcessor
 from ..structures import FRIllRegisteredPropError
 from ..projectvars import (
   MENU_OPTS_DIR, SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR,
+  LAYOUTS_DIR, USER_PROFILES_DIR,
   TEMPLATE_COMP as TC, TEMPLATE_COMP_CLASSES as COMP_CLASSES, FR_CONSTS)
 from ..structures import FRParam
 
@@ -136,7 +137,7 @@ class FRParamEditor(QtWidgets.QDialog):
   sigParamStateUpdated = Signal(dict)
 
   def __init__(self, parent=None, paramList: List[Dict]=None, saveDir='.',
-               saveExt='param', saveDlgName='Save As', name=None):
+               fileType='param', saveDlgName='Save As', name=None):
     # Place in list so an empty value gets unpacked into super constructor
     if paramList is None:
       paramList = []
@@ -198,7 +199,7 @@ class FRParamEditor(QtWidgets.QDialog):
     # Internal parameters for saving settings
     # -----------
     self.saveDir = saveDir
-    self.fileType = saveExt
+    self.fileType = fileType
     self._saveDlgName = saveDlgName
     self._stateBeforeEdit = self.params.saveState()
 
@@ -294,7 +295,11 @@ class FRParamEditor(QtWidgets.QDialog):
     super().reject()
 
   def applyBtnClicked(self):
-    self._stateBeforeEdit = self.params.saveState()
+    # Don't emit any signals if nothing changed
+    newState = self.params.saveState()
+    if self._stateBeforeEdit == newState:
+      return
+    self._stateBeforeEdit = newState
     outDict = self.params.getValues()
     self.sigParamStateUpdated.emit(outDict)
     return outDict
@@ -452,9 +457,10 @@ class FRParamEditor(QtWidgets.QDialog):
       paramGroup = {'name': clsParam.name, 'type': 'group',
                     'children': paramChildren}
       for boundFn in classParamList:
-        paramForTree = {'name': boundFn.param.name,
-                         'type': boundFn.param.valType,
-                         'value': boundFn.param.value}
+        paramForTree = {'name' : boundFn.param.name,
+                        'type' : boundFn.param.valType,
+                        'value': boundFn.param.value,
+                        'tip'  : boundFn.param.helpText}
         paramChildren.append(paramForTree)
       # If this group already exists, append the children to the existing group
       # instead of adding a new child
@@ -470,13 +476,42 @@ class FRParamEditor(QtWidgets.QDialog):
       else:
         self.params.addChild(paramGroup)
     # Make sure all new names are properly displayed
-    self.tree.resizeColumnToContents(0)
+    for colIdx in range(2):
+      self.tree.resizeColumnToContents(colIdx)
     self._stateBeforeEdit = self.params.saveState()
 
 class GeneralPropertiesEditor(FRParamEditor):
   def __init__(self, parent=None):
-    super().__init__(parent, paramList=[], saveDir=GEN_PROPS_DIR, saveExt='regctrl')
+    super().__init__(parent, paramList=[], saveDir=GEN_PROPS_DIR, fileType='regctrl')
 
+class UserProfileEditor(FRParamEditor):
+  def __init__(self, parent=None):
+    optsFromSingletonEditors = []
+    for editor in FR_SINGLETON.editors:
+      curValues = self.getSettingsFiles(editor.saveDir, editor.fileType)
+      curParam = ListParameter(name=editor.name, values=curValues, default='Default')
+      updateFunc = lambda newName, listParam=curParam: \
+        listParam.setLimits(listParam.opts['limits'] + [newName])
+      editor.sigParamStateCreated.connect(updateFunc)
+      optsFromSingletonEditors.append(curParam)
+
+    _USER_PROFILE_PARAMS = [
+      {'name': 'Image', 'type': 'str'},
+      {'name': 'Annotations', 'type': 'str'},
+      {'name': 'Layout', 'type': 'list', 'values': self.getSettingsFiles(LAYOUTS_DIR, 'dockstate'),
+       'default': 'Default'},
+    ]
+    _USER_PROFILE_PARAMS.extend(optsFromSingletonEditors)
+
+    super().__init__(parent, paramList=_USER_PROFILE_PARAMS,
+                     saveDir=USER_PROFILES_DIR, fileType='cdefprofile')
+    for colIdx in range(2):
+      self.tree.resizeColumnToContents(colIdx)
+
+  @staticmethod
+  def getSettingsFiles(settingsDir: str, ext: str) -> List[str]:
+    files = Path(settingsDir).glob(f'*.{ext}')
+    return [file.stem for file in files]
 
 class TableFilterEditor(FRParamEditor):
   def __init__(self, parent=None):
@@ -486,7 +521,7 @@ class TableFilterEditor(FRParamEditor):
     validatedParms = _genList(['Validated', 'Not Validated'], 'bool', True)
     devTypeParam = _genList((param.name for param in COMP_CLASSES), 'bool', True)
     xyVerts = _genList(['X Bounds', 'Y Bounds'], 'group', minMaxParam, 'children')
-    _FILTER_DICT = [
+    _FILTER_PARAMS = [
         {'name': TC.INST_ID.name, 'type': 'group', 'children': minMaxParam},
         {'name': TC.VALIDATED.name, 'type': 'group', 'children': validatedParms},
         {'name': TC.COMP_CLASS.name, 'type': 'group', 'children': devTypeParam},
@@ -496,7 +531,7 @@ class TableFilterEditor(FRParamEditor):
         {'name': TC.DEV_TEXT.name, 'type': 'str', 'value': '.*'},
         {'name': TC.VERTICES.name, 'type': 'group', 'children': xyVerts}
       ]
-    super().__init__(parent, paramList=_FILTER_DICT, saveDir=FILTERS_DIR, saveExt='filter')
+    super().__init__(parent, paramList=_FILTER_PARAMS, saveDir=FILTERS_DIR, fileType='filter')
 
 class ShortcutsEditor(FRParamEditor):
 
@@ -505,7 +540,7 @@ class ShortcutsEditor(FRParamEditor):
     self.shortcuts = []
     # Unlike other param editors, these children don't get filled in until
     # after the top-level widget is passed to the shortcut editor
-    super().__init__(parent, [], saveDir=SHORTCUTS_DIR, saveExt='shortcut')
+    super().__init__(parent, [], saveDir=SHORTCUTS_DIR, fileType='shortcut')
 
     # If the registered class is not a graphical widget, the shortcut
     # needs a global context
@@ -542,7 +577,7 @@ class ShortcutsEditor(FRParamEditor):
 class AlgCollectionEditor(FRParamEditor):
   def __init__(self, saveDir, algMgr: AlgPropsMgr, name=None, parent=None):
     self.algMgr = algMgr
-    super().__init__(parent, saveDir=saveDir, saveExt='alg', name=name)
+    super().__init__(parent, saveDir=saveDir, fileType='alg', name=name)
     algOptDict = {
       'name': 'Algorithm', 'type': 'list', 'values': [], 'value': 'N/A'
     }
@@ -597,7 +632,8 @@ class AlgCollectionEditor(FRParamEditor):
     for param in self.params.children():
       self.tree.addParameters(param)
     # Make sure all new names are properly displayed
-    self.tree.resizeColumnToContents(0)
+    for colIdx in range(2):
+      self.tree.resizeColumnToContents(colIdx)
 
     self.algOpts.setLimits(self.processors)
     self.saveAsBtnClicked(f'{self.saveDir}Default.{self.fileType}')
@@ -640,7 +676,7 @@ class AlgCollectionEditor(FRParamEditor):
 class AlgPropsMgr(FRParamEditor):
 
   def __init__(self, parent=None):
-    super().__init__(parent, saveExt='', saveDir='')
+    super().__init__(parent, fileType='', saveDir='')
     self.processorCtors : List[Callable[[Any,...], FRImageProcessor]] = []
 
   def registerClass(self, clsParam: FRParam, **opts):
@@ -660,14 +696,13 @@ class AlgPropsMgr(FRParamEditor):
     settingsName = _camelCaseToTitle(clsName[2:]) + ' Processor'
     newEditor = AlgCollectionEditor(editorDir, self, name=settingsName)
     FR_SINGLETON.editors.append(newEditor)
-    FR_SINGLETON.editorNames.append(newEditor.name)
     # Wrap in property so changes propagate to the calling class
     return newEditor
 
 
 class SchemeEditor(FRParamEditor):
   def __init__(self, parent=None):
-    super().__init__(parent, paramList=[], saveDir=SCHEMES_DIR, saveExt='scheme')
+    super().__init__(parent, paramList=[], saveDir=SCHEMES_DIR, fileType='scheme')
 
 class _FRSingleton:
   algParamMgr = AlgPropsMgr()
@@ -682,9 +717,6 @@ class _FRSingleton:
   def __init__(self):
     self.editors: List[FRParamEditor] =\
       [self.scheme, self.shortcuts, self.generalProps, self.filter]
-    self.editorNames: List[str] = []
-    for editor in self.editors:
-        self.editorNames.append(editor.name)
 
   def registerClass(self, clsParam: FRParam):
     def multiEditorClsDecorator(cls):

@@ -46,9 +46,10 @@ def popupFilePicker(parent, winTitle: str, fileFilter: str) -> Optional[str]:
     retVal = fname
   return retVal
 
-def dialogSaveToFile(parent, saveObj, winTitle, saveDir, saveExt, allowOverwriteDefault=False):
+def dialogSaveToFile(parent, saveObj, winTitle, saveDir, fileType, allowOverwriteDefault=False)\
+    -> Optional[str]:
   failedSave = True
-  returnVal = None
+  returnVal: Optional[str] = None
   while failedSave:
     saveName, ok = QtWidgets.QInputDialog() \
       .getText(parent, winTitle, winTitle + ':', QtWidgets.QLineEdit.Normal)
@@ -66,22 +67,28 @@ def dialogSaveToFile(parent, saveObj, winTitle, saveDir, saveExt, allowOverwrite
     else:
       # User pressed 'ok' and entered a valid name
       returnVal = saveName
+      errMsg = saveToFile(saveObj, saveDir, saveName, fileType, allowOverwriteDefault)
       # Prevent overwriting default layout
-      if not allowOverwriteDefault and saveName.lower() == 'default':
-        QtWidgets.QMessageBox().information(parent, f'Error During Save',
-                                            'Cannot overwrite default setting.\n\'Default\' is automatically'
-                                            ' generated, so it should not be modified.', QtWidgets.QMessageBox.Ok)
+      if errMsg is not None:
+        QtWidgets.QMessageBox().information(parent, f'Error During Save', errMsg, QtWidgets.QMessageBox.Ok)
         return None
       else:
-        try:
-          with open(f'{saveDir}{saveName}.{saveExt}', 'wb') as saveFile:
-            pkl.dump(saveObj, saveFile)
           failedSave = False
-        except FileNotFoundError as e:
-          QtWidgets.QMessageBox().information(parent, 'Invalid Name',
-                                              'Invalid save name. Please rename the parameter state.',
-                                              QtWidgets.QMessageBox.Ok)
   return returnVal
+
+def saveToFile(saveObj, saveDir, saveName, fileType, allowOverwriteDefault=False) -> str:
+  """Attempts to svae to file, and returns the err message if there was a problem"""
+  errMsg = None
+  if not allowOverwriteDefault and saveName.lower() == 'default':
+    errMsg = 'Cannot overwrite default setting.\n\'Default\' is automatically' \
+             ' generated, so it should not be modified.'
+  else:
+    try:
+      with open(f'{saveDir}{saveName}.{fileType}', 'wb') as saveFile:
+        pkl.dump(saveObj, saveFile)
+    except FileNotFoundError as e:
+      errMsg = 'Invalid save name. Please rename the parameter state.'
+  return errMsg
 
 def dialogGetAuthorName(parent: QtWidgets.QMainWindow) -> str:
   """

@@ -6,7 +6,7 @@ from datetime import datetime
 # Preference directories
 from ..structures import FRComplexVertices, FRParam, FRParamGroup, newParam
 
-__all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR',
+__all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR', 'USER_PROFILES_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'FILTERS_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
            'DATE_FORMAT',
            'FR_CONSTS', 'TEMPLATE_COMP_CLASSES', 'TEMPLATE_COMP', 'CompParams', 'ComponentTypes']
@@ -20,14 +20,16 @@ DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 # -----
 # EDITORS
 # -----
-SCHEMES_DIR = os.path.join(MENU_OPTS_DIR, 'schemes', '')
 LAYOUTS_DIR = os.path.join(MENU_OPTS_DIR, 'layouts', '')
+USER_PROFILES_DIR = os.path.join(MENU_OPTS_DIR, 'userprofiles', '')
+SCHEMES_DIR = os.path.join(MENU_OPTS_DIR, 'schemes', '')
 FILTERS_DIR = os.path.join(MENU_OPTS_DIR, 'filters', '')
 GEN_PROPS_DIR = os.path.join(MENU_OPTS_DIR, 'regioncontrols', '')
 SHORTCUTS_DIR = os.path.join(MENU_OPTS_DIR, 'shortcuts', '')
 
 # Ensure menuopts and layouts directories exist
 Path(LAYOUTS_DIR).mkdir(parents=True, exist_ok=True)
+Path(USER_PROFILES_DIR).mkdir(parents=True, exist_ok=True)
 
 
 @dataclass

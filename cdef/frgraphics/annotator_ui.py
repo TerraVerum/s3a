@@ -95,18 +95,18 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     self.openImgAct = create_addMenuAct(self.menuFile, '&Open Image')
 
     # File / layout
-    self.menuLayout = create_addMenuAct(self.menuFile, 'Layout', True)
+    self.menuLayout = create_addMenuAct(self.menuFile, '&Layout', True)
     self.saveLayout = create_addMenuAct(self.menuLayout, 'Save Layout')
     self.menuLayout.addSeparator()
 
     # File / components
-    self.menuExport = create_addMenuAct(self.menuFile, 'Export...', True)
-    self.exportCompList = create_addMenuAct(self.menuExport, 'Component List')
-    self.exportLabelImg = create_addMenuAct(self.menuExport, 'Labeled Image')
+    self.menuExport = create_addMenuAct(self.menuFile, '&Export...', True)
+    self.exportCompList = create_addMenuAct(self.menuExport, '&Component List')
+    self.exportLabelImg = create_addMenuAct(self.menuExport, '&Labeled Image')
 
     self.menuLoad_Components = create_addMenuAct(self.menuFile, 'Load Components', True)
-    self.loadComps_merge = create_addMenuAct(self.menuLoad_Components, 'Update as Merge')
-    self.loadComps_new = create_addMenuAct(self.menuLoad_Components, 'Append as New')
+    self.loadComps_merge = create_addMenuAct(self.menuLoad_Components, 'Update as &Merge')
+    self.loadComps_new = create_addMenuAct(self.menuLoad_Components, 'Append as &New')
 
     self.setMenuBar(self.menubar)
 
