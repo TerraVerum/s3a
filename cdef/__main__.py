@@ -21,6 +21,8 @@ def main(author: str = None, gui=True, **profileArgs) -> Optional[MainWindow]:
   :key Image: Optional initial image to be annotated
   :key Annotations: Optional initial annotation file loaded.
   """
+  # Parameter editors are named in title-case, so ensure this is how keys are formatted
+  profileArgs = {k.title(): v for k, v in profileArgs.items()}
   win = MainWindow(author, profileArgs)
   if gui:
     QtCore.QTimer.singleShot(0, win.showMaximized)
