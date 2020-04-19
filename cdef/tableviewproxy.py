@@ -1,7 +1,7 @@
 from typing import Union
 
 import numpy as np
-from pyqtgraph.Qt import QtCore
+from pyqtgraph.Qt import QtCore, QtGui
 
 from cdef.structures.typeoverloads import OneDArr
 from .frgraphics import tableview
@@ -131,7 +131,12 @@ class CompDisplayFilter(QtCore.QObject):
     # -----
     # Obtain table idxs corresponding to ids so rows can be highlighted
     # -----
-    mode = QtCore.QItemSelectionModel.ClearAndSelect | QtCore.QItemSelectionModel.Rows
+    # Add to current selection depending on modifiers
+    mode = QtCore.QItemSelectionModel.Rows
+    if QtGui.QGuiApplication.keyboardModifiers() == QtCore.Qt.ControlModifier:
+      mode |= QtCore.QItemSelectionModel.Select
+    else:
+      mode |= QtCore.QItemSelectionModel.ClearAndSelect
     selectionModel = self._compTbl.selectionModel()
     sortModel = self._compTbl.model()
     isFirst = True
