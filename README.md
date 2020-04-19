@@ -45,7 +45,7 @@ The app will start as expected. As long as the author remains the same, you can 
 You can specify more than just the author at startup. If you want a certain image to be opened on launch, specify the filepath with the `--image` switch:
 
 ```bash
-python -m cdef --image="./Images/circuitBoard.png"
+python -m cdef --image="./images/circuitBoard.png"
 ```
 
 When CDEF opens, the requested image will be loaded. The following command-line arguments are accepted:
