@@ -355,6 +355,7 @@ class MainWindow(FRAnnotatorUI):
     self.compImg.saveNewVerts()
     modifiedComp = self.compImg.compSer
     self.compMgr.addComps(modifiedComp.to_frame().T, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.compDisplay.regionPlots.focusById([modifiedComp[TC.INST_ID]])
 
   @disableAppDuringFunc
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_ESTIMATE_BOUNDARIES)
