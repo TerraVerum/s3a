@@ -127,7 +127,7 @@ class CompTableView(QtWidgets.QTableView):
 
     self.minimal = minimal
     if not minimal:
-      self.popup = PopupTableDialog()
+      self.popup = PopupTableDialog(*args)
       # Create context menu for changing table rows
       self.menu = self.createContextMenu()
       self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -253,7 +253,7 @@ class CompTableView(QtWidgets.QTableView):
     idList, colIdxs = self.getIds_colsFromSelection()
     if len(idList) == 0: return
 
-    dataToSet = self.mgr.compDf.iloc[[idList[0]],:].copy()
+    dataToSet = self.mgr.compDf.loc[[idList[0]],:].copy()
     self.popup.setData(dataToSet, colIdxs)
     wasAccepted = self.popup.exec()
     if wasAccepted:

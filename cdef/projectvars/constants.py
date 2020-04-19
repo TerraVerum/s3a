@@ -67,7 +67,7 @@ class _FRConsts(FRParamGroup):
   # --------------------------
   # CLASS NAMES
   # --------------------------
-  CLS_ANNOTATOR        : FRParam = newParam('Main MainWindow')
+  CLS_ANNOTATOR        : FRParam = newParam('Main Window')
 
   CLS_COMP_TBL         : FRParam = newParam('Component Table')
   CLS_COMP_MGR         : FRParam = newParam('Component Manager')
