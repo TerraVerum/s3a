@@ -9,7 +9,8 @@ from ..structures import FRComplexVertices, FRParam, FRParamGroup, newParam
 __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR', 'USER_PROFILES_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'FILTERS_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
            'DATE_FORMAT',
-           'FR_CONSTS', 'TEMPLATE_COMP_CLASSES', 'TEMPLATE_COMP', 'CompParams', 'ComponentTypes']
+           'FR_CONSTS', 'TEMPLATE_COMP_CLASSES', 'TEMPLATE_COMP', 'FRCompParams',
+           'FRComponentTypes']
 BASE_DIR = Path(__file__).parent.parent.absolute()
 MENU_OPTS_DIR = os.path.join(BASE_DIR, 'menuopts', '')
 ICON_DIR = os.path.join(BASE_DIR, 'icons', '')
@@ -33,7 +34,7 @@ Path(USER_PROFILES_DIR).mkdir(parents=True, exist_ok=True)
 
 
 @dataclass
-class ComponentTypes(FRParamGroup):
+class FRComponentTypes(FRParamGroup):
   CAP   : FRParam = newParam('Capacitor')
   RES   : FRParam = newParam('Resistor')
   IND   : FRParam = newParam('Inductor')
@@ -41,7 +42,7 @@ class ComponentTypes(FRParamGroup):
   IC    : FRParam = newParam('IC')
   OTHER : FRParam = newParam('Other')
   N_A   : FRParam = newParam('Unassigned')
-TEMPLATE_COMP_CLASSES = ComponentTypes()
+TEMPLATE_COMP_CLASSES = FRComponentTypes()
 
 @dataclass
 class _ReqdCompParams(FRParamGroup):
@@ -51,15 +52,15 @@ class _ReqdCompParams(FRParamGroup):
   ANN_AUTHOR    : FRParam = newParam('Author', "")
   ANN_FILENAME  : FRParam = newParam('Source Image Filename', "")
   ANN_TIMESTAMP : FRParam = newParam('Timestamp', "")
-  COMP_CLASS     : FRParam = newParam('Class', TEMPLATE_COMP_CLASSES.N_A)
+  COMP_CLASS    : FRParam = newParam('Class', TEMPLATE_COMP_CLASSES.N_A)
 
 @dataclass
-class CompParams(_ReqdCompParams):
+class FRCompParams(_ReqdCompParams):
   DEV_TEXT   : FRParam = newParam('Device Text', '')
   BOARD_TEXT : FRParam = newParam('Board Text', '')
   LOGO       : FRParam = newParam('Logo', '')
   NOTES      : FRParam = newParam('Notes', '')
-TEMPLATE_COMP = CompParams()
+TEMPLATE_COMP = FRCompParams()
 
 
 @dataclass

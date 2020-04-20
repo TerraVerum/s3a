@@ -4,7 +4,7 @@ Slot = QtCore.pyqtSlot
 
 from .graphicsutils import create_addMenuAct
 from .imageareas import FRMainImage, FRFocusedImage
-from .tableview import CompTableView
+from .tableview import FRCompTableView
 
 
 class FRAnnotatorUI(QtWidgets.QMainWindow):
@@ -40,10 +40,11 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     focusedImgContents = QtWidgets.QWidget(self)
     focusedLayout = QtWidgets.QVBoxLayout(focusedImgContents)
     focusedImgDock.setWidget(focusedImgContents)
+    focusedImgDock.setObjectName('Focused Image Dock')
     regionBtnLayout = QtWidgets.QHBoxLayout()
 
     # Important widgets
-    self.compImg = FRFocusedImage(focusedImgContents)
+    self.focusedImg = FRFocusedImage(focusedImgContents)
     self.curCompIdLbl = QtWidgets.QLabel(self.CUR_COMP_LBL)
     self.clearRegionBtn = QtWidgets.QPushButton('Clear', focusedImgContents)
     self.resetRegionBtn = QtWidgets.QPushButton('Reset', focusedImgContents)
@@ -55,9 +56,9 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     regionBtnLayout.addWidget(self.resetRegionBtn)
     regionBtnLayout.addWidget(self.acceptRegionBtn)
 
-    focusedLayout.addWidget(self.compImg.drawOptsWidget)
+    focusedLayout.addWidget(self.focusedImg.drawOptsWidget)
     focusedLayout.addWidget(self.curCompIdLbl, 0, QtCore.Qt.AlignHCenter)
-    focusedLayout.addWidget(self.compImg)
+    focusedLayout.addWidget(self.focusedImg)
     focusedLayout.addLayout(regionBtnLayout)
 
     self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, focusedImgDock)
@@ -67,11 +68,12 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     # -----
     # Bookkeeping widgets
     tableDock = QtWidgets.QDockWidget('Component Table', self)
+    tableDock.setObjectName('Component Table Dock')
     tableContents = QtWidgets.QWidget(tableDock)
     tableLayout = QtWidgets.QVBoxLayout(tableContents)
 
     # Important widgets
-    self.compTbl = CompTableView(tableDock)
+    self.compTbl = FRCompTableView(tableDock)
     self.compTbl.setSortingEnabled(True)
     self.compTbl.setAlternatingRowColors(True)
 

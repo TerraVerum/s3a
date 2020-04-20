@@ -16,14 +16,14 @@ from ..tablemodel import FRCompTableModel, FRComponentMgr
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal
 
-class PopupTableDialog(QtWidgets.QDialog):
+class FRPopupTableDialog(QtWidgets.QDialog):
   def __init__(self, *args):
     super().__init__(*args)
     self.setModal(True)
     # -----------
     # Table View
     # -----------
-    self.tbl = CompTableView(minimal=True)
+    self.tbl = FRCompTableView(minimal=True)
     # Keeps track of which columns were edited by the user
     self.dirtyColIdxs = []
 
@@ -105,7 +105,7 @@ class PopupTableDialog(QtWidgets.QDialog):
     super().reject()
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_TBL)
-class CompTableView(QtWidgets.QTableView):
+class FRCompTableView(QtWidgets.QTableView):
   """
   Table for displaying :class:`FRComponentMgr` data.
   """
@@ -127,7 +127,7 @@ class CompTableView(QtWidgets.QTableView):
 
     self.minimal = minimal
     if not minimal:
-      self.popup = PopupTableDialog(*args)
+      self.popup = FRPopupTableDialog(*args)
       # Create context menu for changing table rows
       self.menu = self.createContextMenu()
       self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -136,10 +136,10 @@ class CompTableView(QtWidgets.QTableView):
 
 
     # Default to text box delegate
-    self.setItemDelegate(TextDelegate(self))
+    self.setItemDelegate(FRTextDelegate(self))
 
     validOpts = [True, False]
-    boolDelegate = ComboBoxDelegate(self, comboValues=validOpts)
+    boolDelegate = FRComboBoxDelegate(self, comboValues=validOpts)
 
     self.instIdColIdx = TEMPLATE_COMP.paramNames().index(TEMPLATE_COMP.INST_ID.name)
 
@@ -148,12 +148,12 @@ class CompTableView(QtWidgets.QTableView):
       if isinstance(curval, bool):
         self.setItemDelegateForColumn(ii, boolDelegate)
       elif isinstance(curval, Enum):
-        self.setItemDelegateForColumn(ii, ComboBoxDelegate(self, comboValues=list(type(curval))))
+        self.setItemDelegateForColumn(ii, FRComboBoxDelegate(self, comboValues=list(type(curval))))
       elif isinstance(curval, FRParam):
-        self.setItemDelegateForColumn(ii, ComboBoxDelegate(self, comboValues=list(curval.group)))
+        self.setItemDelegateForColumn(ii, FRComboBoxDelegate(self, comboValues=list(curval.group)))
       else:
         # Default to text box
-        self.setItemDelegateForColumn(ii, TextDelegate(self))
+        self.setItemDelegateForColumn(ii, FRTextDelegate(self))
 
   # When the model is changed, get a reference to the FRComponentMgr
   def setModel(self, modelOrProxy: QtCore.QAbstractTableModel):
@@ -267,7 +267,7 @@ class CompTableView(QtWidgets.QTableView):
       toOverwrite.iloc[:, colIdxs] = setVals
       self.mgr.addComps(toOverwrite, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
 
-class TextDelegate(QtWidgets.QItemDelegate):
+class FRTextDelegate(QtWidgets.QItemDelegate):
   def createEditor(self, parent, option, index):
     editor = QtWidgets.QPlainTextEdit(parent)
     editor.setTabChangesFocus(True)
@@ -288,7 +288,7 @@ class TextDelegate(QtWidgets.QItemDelegate):
     editor.setGeometry(option.rect)
 
 
-class ComboBoxDelegate(QtWidgets.QStyledItemDelegate):
+class FRComboBoxDelegate(QtWidgets.QStyledItemDelegate):
   def __init__(self, parent=None, comboValues=None, comboNames=None):
     super().__init__(parent)
     if comboValues is None:

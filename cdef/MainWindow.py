@@ -14,7 +14,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph import BusyCursor
 
 from cdef.frgraphics.graphicsutils import saveToFile
-from cdef.frgraphics.parameditors import UserProfileEditor
+from cdef.frgraphics.parameditors import FRUserProfileEditor
 from cdef.generalutils import resolveAuthorName
 from cdef.structures import FRCompIOError
 from cdef.tablemodel import FRComponentIO
@@ -27,7 +27,7 @@ from .projectvars.constants import FR_CONSTS
 from .projectvars.constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
 from .projectvars.enums import FR_ENUMS
 from .tablemodel import FRComponentMgr, makeCompDf
-from .tableviewproxy import CompDisplayFilter, CompSortFilter
+from .tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
 
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal
@@ -51,7 +51,7 @@ class MainWindow(FRAnnotatorUI):
     # ---------------
     self.mainImgFpath = None
     self.hasUnsavedChanges = False
-    self.userProfile = UserProfileEditor()
+    self.userProfile = FRUserProfileEditor()
 
     self.statBar = QtWidgets.QStatusBar(self)
     self.setStatusBar(self.statBar)
@@ -76,15 +76,15 @@ class MainWindow(FRAnnotatorUI):
     self.compMgr.sigCompsChanged.connect(self._recordCompChange)
 
     # Allow filtering/sorting
-    self.sortFilterProxy = CompSortFilter(self.compMgr, self)
+    self.sortFilterProxy = FRCompSortFilter(self.compMgr, self)
 
     self.compTbl.setModel(self.sortFilterProxy)
 
     # ---------------
     # COMPONENT DISPLAY FILTER
     # ---------------
-    self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl,
-                                         self)
+    self.compDisplay = FRCompDisplayFilter(self.compMgr, self.mainImg, self.compTbl,
+                                           self)
 
     self.mainImg.imgItem.sigImageChanged.connect(self.clearBoundaries)
     self.compDisplay.sigCompsSelected.connect(self.updateCurComp)
@@ -190,7 +190,7 @@ class MainWindow(FRAnnotatorUI):
         self.compMgr.rmComps()
         self.mainImg.setImage(fname)
         self.mainImgFpath = str(Path(fname).resolve())
-        self.compImg.resetImage()
+        self.focusedImg.resetImage()
         if self.estBoundsOnStart:
           self.estimateBoundaries()
 
@@ -286,8 +286,8 @@ class MainWindow(FRAnnotatorUI):
   def exportLabelImgActionTriggered(self):
     """
     # Note -- These three functions will be a single dialog with options
-    # for each requested parameter. It will look like the TableFilterEditor dialog.
-    types: List[CompParams] = getTypesFromUser()
+    # for each requested parameter. It will look like the FRTableFilterEditor dialog.
+    types: List[FRCompParams] = getTypesFromUser()
     outFile = getOutFileFromUser()
     exportLegend = getExpLegendFromUser()
     """
@@ -338,23 +338,23 @@ class MainWindow(FRAnnotatorUI):
   def clearRegionBtnClicked(self):
     # Reset drawn comp vertices to nothing
     # Only perform action if image currently exists
-    if self.compImg.imgItem.image is None:
+    if self.focusedImg.imgItem.image is None:
       return
-    self.compImg.updateRegionFromVerts(None)
+    self.focusedImg.updateRegionFromVerts(None)
 
   @Slot()
   def resetRegionBtnClicked(self):
     # Reset drawn comp vertices to nothing
     # Only perform action if image currently exists
-    if self.compImg.imgItem.image is None:
+    if self.focusedImg.imgItem.image is None:
       return
-    self.compImg.updateRegionFromVerts(self.compImg.compSer[TC.VERTICES])
+    self.focusedImg.updateRegionFromVerts(self.focusedImg.compSer[TC.VERTICES])
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_ACCEPT_REGION)
   @Slot()
   def acceptRegionBtnClicked(self):
-    self.compImg.saveNewVerts()
-    modifiedComp = self.compImg.compSer
+    self.focusedImg.saveNewVerts()
+    modifiedComp = self.focusedImg.compSer
     self.compMgr.addComps(modifiedComp.to_frame().T, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
     self.compDisplay.regionPlots.focusById([modifiedComp[TC.INST_ID]])
 
@@ -387,7 +387,7 @@ class MainWindow(FRAnnotatorUI):
     newCompId = newComps[TC.INST_ID]
     self.compDisplay.regionPlots.focusById([newCompId])
     mainImg = self.mainImg.image
-    self.compImg.updateAll(mainImg, newComps)
+    self.focusedImg.updateAll(mainImg, newComps)
     self.curCompIdLbl.setText(f'Component ID: {newCompId}')
 
 ## Start Qt event loop unless running in interactive mode or using pyside.

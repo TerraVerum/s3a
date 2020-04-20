@@ -7,7 +7,7 @@ from cdef.structures.typeoverloads import OneDArr
 from .frgraphics import tableview
 from .frgraphics.imageareas import FRMainImage
 from .frgraphics.parameditors import FR_SINGLETON
-from .frgraphics.regions import MultiRegionPlot
+from .frgraphics.regions import FRMultiRegionPlot
 from .projectvars import FR_CONSTS, TEMPLATE_COMP as TC, TEMPLATE_COMP_CLASSES as COMP_CLASSES
 from .structures import FRVertices
 from .tablemodel import FRComponentMgr
@@ -15,13 +15,13 @@ from .tablemodel import FRComponentMgr
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
-class CompSortFilter(QtCore.QSortFilterProxyModel):
+class FRCompSortFilter(QtCore.QSortFilterProxyModel):
   colTitles = TC.paramNames()
   def __init__(self, compMgr: FRComponentMgr, parent=None):
     super().__init__(parent)
     self.setSourceModel(compMgr)
     # TODO: Move code for filtering into the proxy too. It will be more efficient and
-    #  easier to generalize than the current solution in CompDisplayFilter.
+    #  easier to generalize than the current solution in FRCompDisplayFilter.
 
 
   def sort(self, column: int, order: QtCore.Qt.SortOrder=...) -> None:
@@ -43,11 +43,11 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
       return str(leftObj) < str(rightObj)
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_TBL)
-class CompDisplayFilter(QtCore.QObject):
+class FRCompDisplayFilter(QtCore.QObject):
   sigCompsSelected = Signal(object)
 
   def __init__(self, compMgr: FRComponentMgr, mainImg: FRMainImage,
-               compTbl: tableview.CompTableView, parent=None):
+               compTbl: tableview.FRCompTableView, parent=None):
     super().__init__(parent)
     filterEditor = FR_SINGLETON.filter
     self._mainImgArea = mainImg
@@ -55,7 +55,7 @@ class CompDisplayFilter(QtCore.QObject):
     self._compTbl = compTbl
     self._compMgr = compMgr
 
-    self.regionPlots = MultiRegionPlot()
+    self.regionPlots = FRMultiRegionPlot()
     self.displayedIds = np.array([], dtype=int)
     self.selectedIds = np.array([], dtype=int)
 
@@ -65,7 +65,7 @@ class CompDisplayFilter(QtCore.QObject):
     filterEditor.sigParamStateUpdated.connect(self._updateFilter)
     compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
 
-    for plt in self.regionPlots.boundPlt, self.regionPlots.idPlts:
+    for plt in self.regionPlots.boundPlt, self.regionPlots.centroidPlts:
       mainImg.addItem(plt)
 
   def redrawComps(self, idLists):
@@ -123,10 +123,10 @@ class CompDisplayFilter(QtCore.QObject):
     # If min and max are the same, just check for points at mouse position
     if np.abs(selection[0] - selection[1]).sum() < 0.01:
       qtPoint = QtCore.QPointF(*selection[0])
-      selectedSpots = self.regionPlots.idPlts.pointsAt(qtPoint)
+      selectedSpots = self.regionPlots.centroidPlts.pointsAt(qtPoint)
       selectedIds = [spot.data() for spot in selectedSpots]
     else:
-      selectedIds = self.regionPlots.idPlts.idsWithin(selection)
+      selectedIds = self.regionPlots.centroidPlts.centroidsWithin(selection)
 
     # -----
     # Obtain table idxs corresponding to ids so rows can be highlighted

@@ -20,7 +20,7 @@ from cdef.projectvars import DATE_FORMAT
 from cdef.structures.typeoverloads import TwoDArr, NChanImg
 from .frgraphics.parameditors import FR_SINGLETON
 from .generalutils import coerceDfTypes
-from .projectvars import FR_ENUMS, TEMPLATE_COMP as TC, CompParams
+from .projectvars import FR_ENUMS, TEMPLATE_COMP as TC, FRCompParams
 from .projectvars.constants import FR_CONSTS
 from .structures import FRComplexVertices, FRParam, FRCompIOError
 
@@ -42,7 +42,7 @@ def makeCompDf(numRows=1) -> df:
   for _ in range(numRows):
     # Make sure to construct a separate component instance for
     # each row no objects have the same reference
-    df_list.append([field.value for field in CompParams()])
+    df_list.append([field.value for field in FRCompParams()])
   outDf = df(df_list, columns=TC).set_index(TC.INST_ID, drop=False)
   # Set the metadata for this application run
   outDf[TC.ANN_AUTHOR] = FR_SINGLETON.annotationAuthor
@@ -331,11 +331,11 @@ class FRComponentIO:
     return retObj, errMsg
 
   def exportLabeledImg(self,
-                        mainImgShape: Tuple[int],
-                        outFile: str = None,
-                        types: List[CompParams] = None,
-                        colorPerType: TwoDArr = None,
-                      ) -> (NChanImg, str):
+                       mainImgShape: Tuple[int],
+                       outFile: str = None,
+                       types: List[FRCompParams] = None,
+                       colorPerType: TwoDArr = None,
+                       ) -> (NChanImg, str):
     errMsg = None
     # Set up input arguments
     if types is None:

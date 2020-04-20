@@ -7,14 +7,14 @@ from pyqtgraph import BusyCursor
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from skimage.io import imread
 
-from .clickables import RightPanViewBox
+from .clickables import FRRightPanViewBox
 from .drawopts import FRDrawOpts
 from .parameditors import FR_SINGLETON
 from .regions import FRShapeCollection
 # Required to trigger property registration
 from .rois import FRExtendedROI
 from ..frgraphics.regions import FRVertexDefinedImg
-from ..generalutils import getClippedBbox, ObjUndoBuffer
+from ..generalutils import getClippedBbox, FRObjUndoBuffer
 from ..processingutils import getVertsFromBwComps
 from ..processingutils import segmentComp
 from ..projectvars import TEMPLATE_COMP as TC, FR_CONSTS, FR_ENUMS
@@ -27,7 +27,7 @@ Slot = QtCore.pyqtSlot
 QCursor = QtGui.QCursor
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_REGION_BUF)
-class FRRegionVertsUndoBuffer(ObjUndoBuffer):
+class FRRegionVertsUndoBuffer(FRObjUndoBuffer):
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_UNDO_BUF_SZ)
   def maxBufferLen(self): pass
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_STEPS_BW_SAVE)
@@ -42,7 +42,7 @@ class FRRegionVertsUndoBuffer(ObjUndoBuffer):
 class FREditableImg(pg.PlotWidget):
   def __init__(self, parent=None, allowableShapes: Tuple[FRParam,...]=None,
                allowableActions: Tuple[FRParam,...]=None, **kargs):
-    super().__init__(parent, viewBox=RightPanViewBox(), **kargs)
+    super().__init__(parent, viewBox=FRRightPanViewBox(), **kargs)
     self.setAspectLocked(True)
     self.getViewBox().invertY()
     self.setMouseEnabled(True)

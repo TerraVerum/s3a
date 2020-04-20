@@ -8,7 +8,7 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtGui, QtCore
 
 from cdef.structures.typeoverloads import GrayImg
-from .clickables import ClickableScatterItem
+from .clickables import FRCentroidScatterItem
 from .parameditors import FR_SINGLETON
 from ..frgraphics.rois import SHAPE_ROI_MAPPING, FRExtendedROI
 from ..generalutils import coerceDfTypes, nanConcatList
@@ -134,7 +134,7 @@ def _makeTxtSymbol(txt: str, fontSize: int):
   return outSymbol
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_MULT_REG_PLT)
-class MultiRegionPlot(QtCore.QObject):
+class FRMultiRegionPlot(QtCore.QObject):
   @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_BOUNDARY_COLOR)
   def boundClr(self): pass
   @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_BOUNDARY_WIDTH)
@@ -153,16 +153,16 @@ class MultiRegionPlot(QtCore.QObject):
   def __init__(self, parent=None):
     super().__init__(parent)
     self.boundPlt = pg.PlotDataItem(connect='finite')
-    self.idPlts = ClickableScatterItem(pen=None)
+    self.centroidPlts = FRCentroidScatterItem(pen=None)
     self.data = makeMultiRegionDf(0)
 
     # 'pointsAt' is an expensive operation if many points are in the scatterplot. Since
     # this will be called anyway when a selection box is made in the main image, disable
     # mouse click listener to avoid doing all that work for nothing.
-    self.idPlts.mouseClickEvent = lambda ev: None
+    self.centroidPlts.mouseClickEvent = lambda ev: None
     # Also disable sigClicked. This way, users who try connecting to this signal won't get
     # code that runs but never triggers
-    self.idPlts.sigClicked = None
+    self.centroidPlts.sigClicked = None
 
   def resetRegionList(self, newIds: Optional[Sequence]=None, newRegionDf: Optional[df]=None):
     if newIds is None:
@@ -182,7 +182,7 @@ class MultiRegionPlot(QtCore.QObject):
     selectedIdxs = np.in1d(self.data.index, selectedIds)
     selectedIdPens[selectedIdxs] = pg.mkPen(self.selectedIdBorder, width=3)
 
-    self.idPlts.setPen(selectedIdPens)
+    self.centroidPlts.setPen(selectedIdPens)
 
   def focusById(self, focusedIds: OneDArr):
     """
@@ -197,8 +197,8 @@ class MultiRegionPlot(QtCore.QObject):
     # TODO: Make GUI properties for these?
     focusedIdSymbs[focusedIdxs] = 'star'
     focusedIdSizes[focusedIdxs] *= 3
-    self.idPlts.setSymbol(focusedIdSymbs)
-    self.idPlts.setSize(focusedIdSizes)
+    self.centroidPlts.setSymbol(focusedIdSymbs)
+    self.centroidPlts.setSize(focusedIdSizes)
 
 
   def updatePlot(self):
@@ -226,8 +226,8 @@ class MultiRegionPlot(QtCore.QObject):
     brushes.fill(pg.mkBrush(self.nonvalidIdClr))
     brushes[self.data.loc[:, TC.VALIDATED]] = pg.mkBrush(self.validIdClr)
 
-    self.idPlts.setData(x=idLocs[:,0], y=idLocs[:,1], size=self.idMarkerSz, brush=brushes,
-                        data=self.data.index, symbol=scatSymbols)
+    self.centroidPlts.setData(x=idLocs[:, 0], y=idLocs[:, 1], size=self.idMarkerSz, brush=brushes,
+                              data=self.data.index, symbol=scatSymbols)
     plotRegions = np.vstack(plotRegions)
     boundPen = pg.mkPen(color=self.boundClr, width=self.boundWidth)
     self.boundPlt.setData(plotRegions[:,0], plotRegions[:,1], pen=boundPen)

@@ -33,17 +33,18 @@ def _genList(nameIter, paramType, defaultVal, defaultParam='value'):
   return [{'name': name, 'type': paramType, defaultParam: defaultVal} for name in nameIter]
 
 
-def _camelCaseToTitle(name: str) -> str:
+def _frPascalCaseToTitle(name: str) -> str:
   """
-  Helper utility to turn a CamelCase name to a 'Title Case' title
+  Helper utility to turn a FRPascaleCase name to a 'Title Case' title
   :param name: camel-cased name
   :return: Space-separated, properly capitalized version of :param:`Name`
   """
   if not name:
     return name
-  else:
-    name = re.sub(r'(\w)([A-Z])', r'\1 \2', name)
-    return name.title()
+  if name.startswith('FR'):
+    name = name[2:]
+  name = re.sub(r'(\w)([A-Z])', r'\1 \2', name)
+  return name.title()
 
 def _class_fnNamesFromFnQualname(qualname: str) -> (str, str):
   """
@@ -74,7 +75,7 @@ class FRShortcutCtorGroup:
 class FREditableShortcut(QtWidgets.QShortcut):
   paramIdx: QtGui.QKeySequence
 
-class ShortcutParameterItem(parameterTypes.WidgetParameterItem):
+class FRShortcutParameterItem(parameterTypes.WidgetParameterItem):
   """
   Class for creating custom shortcuts. Must be made here since pyqtgraph doesn't
   provide an implementation.
@@ -104,8 +105,8 @@ class ShortcutParameterItem(parameterTypes.WidgetParameterItem):
   #   menu.addAction(delAct)
   #   menu.exec(ev.globalPos())
 
-class ShortcutParameter(Parameter):
-  itemClass = ShortcutParameterItem
+class FRShortcutParameter(Parameter):
+  itemClass = FRShortcutParameterItem
 
   def __init__(self, **opts):
     # Before initializing super, turn the string keystroke into a key sequence
@@ -115,7 +116,7 @@ class ShortcutParameter(Parameter):
     super().__init__(**opts)
 
 
-class NoneParameter(parameterTypes.SimpleParameter):
+class FRNoneParameter(parameterTypes.SimpleParameter):
 
   def __init__(self, **opts):
     opts['type'] = 'str'
@@ -123,8 +124,8 @@ class NoneParameter(parameterTypes.SimpleParameter):
     self.setWritable(False)
 
 
-parameterTypes.registerParameterType('none', NoneParameter)
-parameterTypes.registerParameterType('shortcut', ShortcutParameter)
+parameterTypes.registerParameterType('none', FRNoneParameter)
+parameterTypes.registerParameterType('shortcut', FRShortcutParameter)
 
 @dataclass
 class FRBoundFnParams:
@@ -146,7 +147,7 @@ class FRParamEditor(QtWidgets.QDialog):
       try:
         propClsName = type(self).__name__
         name = propClsName[:propClsName.index('Editor')]
-        name = _camelCaseToTitle(name)
+        name = _frPascalCaseToTitle(name)
       except ValueError:
         name = "Parameter Editor"
 
@@ -166,7 +167,7 @@ class FRParamEditor(QtWidgets.QDialog):
     self.classInstToEditorMapping: Dict[Any, FRParamEditor] = {}
     """
     For editors that register parameters for *other* editors (like
-    :class:`AlgPropsMgr`), this allows parameters to be updated from the
+    :class:`FRAlgPropsMgr`), this allows parameters to be updated from the
     correct editor
     """
 
@@ -239,7 +240,7 @@ class FRParamEditor(QtWidgets.QDialog):
 
         * The first element of the tuple must correspond to the base name within the
           parameter grouping in order to properly extract the corresponding children.
-          For instance, to extract MARGIN from :class:`GeneralPropertiesEditor`,
+          For instance, to extract MARGIN from :class:`FRGeneralPropertiesEditor`,
               you must first specify the group parent for that parameter:
               >>> margin = FR_SINGLETON.generalProps[FR_CONSTS.CLS_FOCUSED_IMG_AREA,
               >>>   FR_CONSTS.MARGIN]
@@ -353,7 +354,7 @@ class FRParamEditor(QtWidgets.QDialog):
   def registerMethod(self, constParam: FRParam, fnArgs=None):
     """
     Designed for use as a function decorator. Registers the decorated function into a list
-    of methods known to the :class:`ShortcutsEditor`. These functions are then accessable from
+    of methods known to the :class:`FRShortcutsEditor`. These functions are then accessable from
     customizeable shortcuts.
     """
     if fnArgs is None:
@@ -428,7 +429,7 @@ class FRParamEditor(QtWidgets.QDialog):
     :param cls: Current class
 
     :param clsParam: :class:`FRParam` value encapsulating the human readable class name.
-           This is how the class will be displayed in the :class:`ShortcutsEditor`.
+           This is how the class will be displayed in the :class:`FRShortcutsEditor`.
 
     :return: None
     """
@@ -480,11 +481,11 @@ class FRParamEditor(QtWidgets.QDialog):
       self.tree.resizeColumnToContents(colIdx)
     self._stateBeforeEdit = self.params.saveState()
 
-class GeneralPropertiesEditor(FRParamEditor):
+class FRGeneralPropertiesEditor(FRParamEditor):
   def __init__(self, parent=None):
     super().__init__(parent, paramList=[], saveDir=GEN_PROPS_DIR, fileType='regctrl')
 
-class UserProfileEditor(FRParamEditor):
+class FRUserProfileEditor(FRParamEditor):
   def __init__(self, parent=None):
     optsFromSingletonEditors = []
     for editor in FR_SINGLETON.editors:
@@ -513,7 +514,7 @@ class UserProfileEditor(FRParamEditor):
     files = Path(settingsDir).glob(f'*.{ext}')
     return [file.stem for file in files]
 
-class TableFilterEditor(FRParamEditor):
+class FRTableFilterEditor(FRParamEditor):
   def __init__(self, parent=None):
     minMaxParam = _genList(['min', 'max'], 'int', 0)
     # Make max 'infinity'
@@ -533,7 +534,7 @@ class TableFilterEditor(FRParamEditor):
       ]
     super().__init__(parent, paramList=_FILTER_PARAMS, saveDir=FILTERS_DIR, fileType='filter')
 
-class ShortcutsEditor(FRParamEditor):
+class FRShortcutsEditor(FRParamEditor):
 
   def __init__(self, parent=None):
 
@@ -574,8 +575,8 @@ class ShortcutsEditor(FRParamEditor):
       shortcut.setKey(self[shortcut.paramIdx])
     super().applyBtnClicked()
 
-class AlgCollectionEditor(FRParamEditor):
-  def __init__(self, saveDir, algMgr: AlgPropsMgr, name=None, parent=None):
+class FRAlgCollectionEditor(FRParamEditor):
+  def __init__(self, saveDir, algMgr: FRAlgPropsMgr, name=None, parent=None):
     self.algMgr = algMgr
     super().__init__(parent, saveDir=saveDir, fileType='alg', name=name)
     algOptDict = {
@@ -613,7 +614,7 @@ class AlgCollectionEditor(FRParamEditor):
     self.curProcessor.image = newImg
     self._image = newImg
 
-  def build_attachParams(self, algMgr: AlgPropsMgr):
+  def build_attachParams(self, algMgr: FRAlgPropsMgr):
     # Step 1: Instantiate all processor algorithms
     for processorCtor in algMgr.processorCtors:
       processor = processorCtor()
@@ -673,7 +674,7 @@ class AlgCollectionEditor(FRParamEditor):
     self.curProcessor = nameProcCombo[1]
     self.curProcessor.image = self.image
 
-class AlgPropsMgr(FRParamEditor):
+class FRAlgPropsMgr(FRParamEditor):
 
   def __init__(self, parent=None):
     super().__init__(parent, fileType='', saveDir='')
@@ -689,28 +690,28 @@ class AlgPropsMgr(FRParamEditor):
       procCtor = partial(cls, *ctorArgs)
       self.processorCtors.append(procCtor)
 
-  def createProcessorForClass(self, clsObj) -> AlgCollectionEditor:
+  def createProcessorForClass(self, clsObj) -> FRAlgCollectionEditor:
     clsName = type(clsObj).__name__
     editorDir = join(MENU_OPTS_DIR, clsName, '')
     # Strip "FR" from class name before retrieving name
-    settingsName = _camelCaseToTitle(clsName[2:]) + ' Processor'
-    newEditor = AlgCollectionEditor(editorDir, self, name=settingsName)
+    settingsName = _frPascalCaseToTitle(clsName[2:]) + ' Processor'
+    newEditor = FRAlgCollectionEditor(editorDir, self, name=settingsName)
     FR_SINGLETON.editors.append(newEditor)
     # Wrap in property so changes propagate to the calling class
     return newEditor
 
 
-class SchemeEditor(FRParamEditor):
+class FRColorSchemeEditor(FRParamEditor):
   def __init__(self, parent=None):
     super().__init__(parent, paramList=[], saveDir=SCHEMES_DIR, fileType='scheme')
 
 class _FRSingleton:
-  algParamMgr = AlgPropsMgr()
+  algParamMgr = FRAlgPropsMgr()
 
-  shortcuts = ShortcutsEditor()
-  scheme = SchemeEditor()
-  generalProps = GeneralPropertiesEditor()
-  filter = TableFilterEditor()
+  shortcuts = FRShortcutsEditor()
+  scheme = FRColorSchemeEditor()
+  generalProps = FRGeneralPropertiesEditor()
+  filter = FRTableFilterEditor()
 
   annotationAuthor = None
 

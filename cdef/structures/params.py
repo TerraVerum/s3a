@@ -77,7 +77,7 @@ class FRParamGroup:
     for param in self:
       if param.name.lower() == paramName:
         return param
-    # If we reach here the value didn't match any ComponentTypes values. Throw an error
+    # If we reach here the value didn't match any FRComponentTypes values. Throw an error
     defaultParam = self.getDefault()
     baseWarnMsg = f'String representation "{paramName}" was not recognized. '
     if defaultParam is None:
@@ -104,9 +104,9 @@ def newParam(name, val=None, valType=None, helpText=''):
   :param val: Initial value of the parameter. This is used within the program to infer
          parameter type, shape, comparison methods, etc.
   :param valType: Type of the variable if not easily inferrable from the value itself. For instance,
-  class:`ShortcutParameter<cdef.frgraphics.parameditors.ShortcutParameter>` is indicated with string values
+  class:`FRShortcutParameter<cdef.frgraphics.parameditors.FRShortcutParameter>` is indicated with string values
   (e.g. 'Ctrl+D'), so the user must explicitly specify that such an :class:`FRParam` is of type 'shortcut' (as
-  defined in :class:`ShortcutParameter<cdef.frgraphics.parameditors.ShortcutParameter>`) If the type *is* easily
+  defined in :class:`FRShortcutParameter<cdef.frgraphics.parameditors.FRShortcutParameter>`) If the type *is* easily
   inferrable, this may be left blank.
   :param helpText: Additional documentation for this parameter.
   :return: Field that can be inserted within the :class:`FRParamGroup` dataclass.

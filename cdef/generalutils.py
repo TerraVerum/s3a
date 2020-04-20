@@ -106,7 +106,7 @@ def largestList(verts: List[FRVertices]) -> FRVertices:
   return FRVertices(maxLenList)
 
 
-class ObjUndoBuffer:
+class FRObjUndoBuffer:
   _maxBufferLen:Optional[int] = None
   # Used to reduce the memory requirements for the undo buffer. More steps between
   # saves means fewer required buffer entries
