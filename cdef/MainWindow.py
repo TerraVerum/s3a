@@ -11,6 +11,7 @@ import pandas as pd
 import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
+from pyqtgraph import BusyCursor
 
 from cdef.frgraphics.graphicsutils import saveToFile
 from cdef.frgraphics.parameditors import UserProfileEditor
@@ -18,7 +19,7 @@ from cdef.generalutils import resolveAuthorName
 from cdef.structures import FRCompIOError
 from cdef.tablemodel import FRComponentIO
 from .frgraphics.annotator_ui import FRAnnotatorUI
-from .frgraphics.graphicsutils import applyWaitCursor, dialogSaveToFile, \
+from .frgraphics.graphicsutils import dialogSaveToFile, \
   addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc
 from .frgraphics.parameditors import FRParamEditor, FR_SINGLETON
@@ -179,19 +180,19 @@ class MainWindow(FRAnnotatorUI):
   # MENU CALLBACKS
   # ---------------
 
-  @applyWaitCursor
   def openImgActionTriggered(self, fname=None):
     if fname is None:
       fileFilter = "Image Files (*.png; *.tif; *.jpg; *.jpeg; *.bmp; *.jfif);; All files(*.*)"
       fname = popupFilePicker(self, 'Select Main Image', fileFilter)
 
     if fname is not None:
-      self.compMgr.rmComps()
-      self.mainImg.setImage(fname)
-      self.mainImgFpath = str(Path(fname).resolve())
-      self.compImg.resetImage()
-      if self.estBoundsOnStart:
-        self.estimateBoundaries()
+      with BusyCursor():
+        self.compMgr.rmComps()
+        self.mainImg.setImage(fname)
+        self.mainImgFpath = str(Path(fname).resolve())
+        self.compImg.resetImage()
+        if self.estBoundsOnStart:
+          self.estimateBoundaries()
 
   def populateLoadLayoutOptions(self):
     layoutGlob = join(LAYOUTS_DIR, '*.dockstate')
@@ -360,13 +361,13 @@ class MainWindow(FRAnnotatorUI):
   @disableAppDuringFunc
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_ESTIMATE_BOUNDARIES)
   def estimateBoundaries(self):
-    compVertices = self.mainImg.procCollection.curProcessor.globalCompEstimate()
-    components = makeCompDf(len(compVertices))
-    components[TC.VERTICES] = compVertices
-    self.compMgr.addComps(components)
+    with BusyCursor():
+      compVertices = self.mainImg.procCollection.curProcessor.globalCompEstimate()
+      components = makeCompDf(len(compVertices))
+      components[TC.VERTICES] = compVertices
+      self.compMgr.addComps(components)
 
   @Slot()
-  @applyWaitCursor
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_CLEAR_BOUNDARIES)
   def clearBoundaries(self):
     self.compMgr.rmComps()
@@ -375,7 +376,6 @@ class MainWindow(FRAnnotatorUI):
   # CUSTOM UI ELEMENT CALLBACKS
   # ---------------
   @Slot(object)
-  @applyWaitCursor
   def updateCurComp(self, newComps: df):
     if len(newComps) == 0:
       return

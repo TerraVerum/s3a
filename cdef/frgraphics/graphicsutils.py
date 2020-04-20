@@ -18,13 +18,6 @@ from cdef.projectvars import ANN_AUTH_DIR
 Signal = QtCore.pyqtSignal
 QCursor = QtGui.QCursor
 
-def applyWaitCursor(func):
-  @wraps(func)
-  def wrapWithWaitCursor(*args, **kwargs):
-    with BusyCursor():
-      func(*args, **kwargs)
-  return wrapWithWaitCursor
-
 def disableAppDuringFunc(func):
   @wraps(func)
   def disableApp(*args, **kwargs):
