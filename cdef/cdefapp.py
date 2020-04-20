@@ -100,7 +100,7 @@ class FRCdefApp(FRAnnotatorUI):
 
     # Menu options
     # FILE
-    self.saveLayout.triggered.connect(self.saveLayoutActionTriggered)
+    self.saveLayout.triggered.connect(lambda: self.saveLayoutActionTriggered())
     self.sigLayoutSaved.connect(self.populateLoadLayoutOptions)
 
     self.exportCompList.triggered.connect(self.exportCompListActionTriggered)
