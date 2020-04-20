@@ -86,9 +86,8 @@ def saveToFile(saveObj, saveDir, saveName, fileType, allowOverwriteDefault=False
 def dialogGetAuthorName(parent: QtWidgets.QMainWindow) -> str:
   """
   Attempts to load the username from a default file if found on the system. Otherwise,
-  requests the user name. Used before the start of the :class:`MainWindow` application
+  requests the user name.
   :param parent:
-  :param defaultAuthFilename:
   :return:
   """
   annPath = Path(ANN_AUTH_DIR)
@@ -106,7 +105,7 @@ def dialogGetAuthorName(parent: QtWidgets.QMainWindow) -> str:
                   f'The default author for this application is\n{name}.\n'
                      f'Is this you?', msgDlg.Yes, msgDlg.No)
       if reply == msgDlg.Yes:
-        return False, name
+        return name
 
   dlg = QtWidgets.QInputDialog(parent)
   dlg.setCancelButtonText('Quit')

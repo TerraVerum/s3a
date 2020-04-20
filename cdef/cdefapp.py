@@ -36,7 +36,7 @@ Signal = QtCore.pyqtSignal
 pg.setConfigOptions(imageAxisOrder='row-major')
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_ANNOTATOR)
-class MainWindow(FRAnnotatorUI):
+class FRCdefApp(FRAnnotatorUI):
   """
   Top-level widget for producing component bounding boxes from an input image.
   """
@@ -124,7 +124,7 @@ class MainWindow(FRAnnotatorUI):
     self.loadLayoutActionTriggered('Default', showError=False)
 
   # -----------------------------
-  # MainWindow CLASS FUNCTIONS
+  # FRCdefApp CLASS FUNCTIONS
   # -----------------------------
   @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_EST_BOUNDS_ON_START)
   def estBoundsOnStart(self): pass
@@ -389,10 +389,3 @@ class MainWindow(FRAnnotatorUI):
     mainImg = self.mainImg.image
     self.focusedImg.updateAll(mainImg, newComps)
     self.curCompIdLbl.setText(f'Component ID: {newCompId}')
-
-## Start Qt event loop unless running in interactive mode or using pyside.
-if __name__ == '__main__':
-  app = pg.mkQApp()
-  win = MainWindow()
-
-  app.exec()
