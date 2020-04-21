@@ -45,7 +45,7 @@ class FRCdefApp(FRAnnotatorUI):
 
   def __init__(self, authorName: str = None, userProfileArgs: Dict[str, Any]=None):
     super().__init__()
-    
+
     # ---------------
     # DATA ATTRIBUTES
     # ---------------
@@ -153,7 +153,7 @@ class FRCdefApp(FRAnnotatorUI):
       loadFunc = partial(self.paramEditorLoadActTriggered, editor)
     name = editor.name
     newMenu = QtWidgets.QMenu(name, self)
-    editAct = QtWidgets.QAction('Edit ' + name, self)
+    editAct = QtWidgets.QAction ('Edit ' + name, self)
     newMenu.addAction(editAct)
     newMenu.addSeparator()
     editAct.triggered.connect(editor.show)

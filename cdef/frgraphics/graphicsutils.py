@@ -161,14 +161,15 @@ def addDirItemsToMenu(parentMenu, dirRegex, triggerFunc, removeExistingChildren=
     curAction = parentMenu.addAction(name)
     curAction.triggered.connect(partial(triggerFunc, name))
 
-def create_addMenuAct(parent: QtWidgets.QMenu, title: str, asMenu=False) -> Union[QtWidgets.QMenu, QtWidgets.QAction]:
+def create_addMenuAct(mainWin: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, title: str, asMenu=False) \
+    -> Union[QtWidgets.QMenu, QtWidgets.QAction]:
   menu = None
   if asMenu:
-    menu = QtWidgets.QMenu(title)
+    menu = QtWidgets.QMenu(title, mainWin)
     act = menu.menuAction()
   else:
     act = QtWidgets.QAction(title)
-  parent.addAction(act)
+  parentMenu.addAction(act)
   if asMenu:
     return menu
   else:
