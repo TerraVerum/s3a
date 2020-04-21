@@ -163,6 +163,10 @@ class FRCdefApp(FRAnnotatorUI):
     populateFunc()
     parentMenu.addMenu(newMenu)
 
+  def setStyleSheet(self, styleSheet: str):
+    super().setStyleSheet(styleSheet)
+    for editor in FR_SINGLETON.editors:
+      editor.setStyleSheet(styleSheet)
 
   @Slot(object)
   def _recordCompChange(self):
