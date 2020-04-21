@@ -1,13 +1,13 @@
-from abc import abstractmethod
 from typing import Optional, Callable, Dict
 
+import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-import numpy as np
 
 from ..projectvars import FR_CONSTS
-from ..structures import FRVertices
 from ..structures import FRParam
+from ..structures import FRVertices
+
 
 def _clearPoints(roi: pg.ROI):
   while roi.handles:

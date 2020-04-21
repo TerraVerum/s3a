@@ -1,7 +1,6 @@
 from enum import Enum
-from typing import Sequence, List
-
 from functools import partial
+from typing import Sequence
 
 import numpy as np
 import pandas as pd

@@ -1,22 +1,20 @@
 import pickle
-import re
 import sys
 from ast import literal_eval
-from typing import Union, Any, Optional, Sequence, List, Tuple, Dict
+from datetime import datetime
 from pathlib import Path
 from stat import S_IRGRP
-
-import numpy as np
-import pandas as pd
-from datetime import datetime
-from pandas import DataFrame as df
+from typing import Union, Any, Optional, Sequence, List, Tuple
 
 import cv2 as cv
-from skimage import io
+import numpy as np
+import pandas as pd
+from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
+from skimage import io
 
-from cdef.projectvars import TEMPLATE_COMP_CLASSES
 from cdef.projectvars import DATE_FORMAT
+from cdef.projectvars import TEMPLATE_COMP_CLASSES
 from cdef.structures.typeoverloads import TwoDArr, NChanImg
 from .frgraphics.parameditors import FR_SINGLETON
 from .generalutils import coerceDfTypes

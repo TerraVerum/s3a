@@ -1,8 +1,8 @@
 from typing import Union, Tuple, Optional
 
 import numpy as np
-from pandas import DataFrame as df
 import pyqtgraph as pg
+from pandas import DataFrame as df
 from pyqtgraph import BusyCursor
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from skimage.io import imread

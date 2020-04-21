@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
+from typing import List
 
 import numpy as np
-from typing import List
 
 from cdef.structures.typeoverloads import NChanImg, BlackWhiteImg
 from .structures.vertices import FRVertices, FRComplexVertices

@@ -8,8 +8,6 @@ Signal = QtCore.pyqtSignal
 
 import numpy as np
 
-from .parameditors import FR_SINGLETON
-from cdef.projectvars import FR_CONSTS
 
 # class FRClickableImageItem(pg.ImageItem):
 #   """ Depracated class"""

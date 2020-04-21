@@ -10,8 +10,8 @@ from typing import Callable, Dict, Any, Union, Optional
 import pandas as pd
 import pyqtgraph as pg
 from pandas import DataFrame as df
-from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph import BusyCursor
+from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
 from cdef.frgraphics.graphicsutils import saveToFile
 from cdef.frgraphics.parameditors import FRUserProfileEditor

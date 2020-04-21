@@ -1,17 +1,13 @@
-from typing import Optional, Union
-
-import sys
-from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-from pyqtgraph import BusyCursor
-
-from functools import wraps
-
 import pickle as pkl
-
+import sys
+from functools import partial
+from functools import wraps
+from glob import glob
 from os.path import basename
 from pathlib import Path
-from glob import glob
-from functools import partial
+from typing import Optional, Union
+
+from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
 from cdef.projectvars import ANN_AUTH_DIR
 
