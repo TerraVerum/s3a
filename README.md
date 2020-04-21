@@ -1,5 +1,7 @@
+![](./docs/img/readme/cdefLogo.svg)
 
 # Component Detection and Evaluation Framework (CDEF)
+
 A highly adaptable tool for both visualizing and generating semantic annotations for generic images.
 
 Most software solutions for semantic (pixel-level) labeling are designed for low-resolution (<10MB) images with fewer than 10 components of interest. Violating either constraint (e.g. using a high-res image or annotating $\approx$ 1000 components) incur detrimental performance impacts. CDEF is designed to combat both these deficiencies. With images up to 150 MB and 2000 components, the tool remains interactive. However, since the use case is tailored to multiple small regions of interest within an image, performance lags when editing individual components of larger than $\approx$ 1000x1000 pixels.
