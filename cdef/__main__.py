@@ -1,9 +1,8 @@
-from pyqtgraph.Qt import QtCore
-
 import sys
 from typing import Optional
 
 import fire
+from pyqtgraph.Qt import QtCore
 
 from . import appInst
 from .cdefapp import FRCdefApp

@@ -1,22 +1,20 @@
 import pickle
-import re
 import sys
 from ast import literal_eval
-from typing import Union, Any, Optional, Sequence, List, Tuple, Dict
+from datetime import datetime
 from pathlib import Path
 from stat import S_IRGRP
-
-import numpy as np
-import pandas as pd
-from datetime import datetime
-from pandas import DataFrame as df
+from typing import Union, Any, Optional, Sequence, List, Tuple
 
 import cv2 as cv
-from skimage import io
+import numpy as np
+import pandas as pd
+from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
+from skimage import io
 
-from cdef.projectvars import TEMPLATE_COMP_CLASSES
 from cdef.projectvars import DATE_FORMAT
+from cdef.projectvars import TEMPLATE_COMP_CLASSES
 from cdef.structures.typeoverloads import TwoDArr, NChanImg
 from .frgraphics.parameditors import FR_SINGLETON
 from .generalutils import coerceDfTypes
@@ -68,6 +66,10 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
     # ensure datatypes are correct
     self.compDf = makeCompDf(0)
 
+    self.noEditColIdxs = [self.colTitles.index(col.name) for col in
+                     [TC.INST_ID, TC.VERTICES, TC.ANN_AUTHOR, TC.ANN_FILENAME,
+                      TC.ANN_TIMESTAMP]]
+
   # ------
   # Functions required to implement table model
   # ------
@@ -81,6 +83,7 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
     if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
       return self.colTitles[section]
 
+  # noinspection PyMethodOverriding
   def data(self, index: QtCore.QModelIndex, role: int) -> Any:
     outData = self.compDf.iloc[index.row(), index.column()]
     if role == QtCore.Qt.DisplayRole:
@@ -98,10 +101,7 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
     return True
 
   def flags(self, index: QtCore.QModelIndex) -> QtCore.Qt.ItemFlags:
-    noEditColIdxs = [self.colTitles.index(col.name) for col in
-                     [TC.INST_ID, TC.VERTICES, TC.ANN_AUTHOR, TC.ANN_FILENAME,
-                      TC.ANN_TIMESTAMP]]
-    if index.column() not in noEditColIdxs:
+    if index.column() not in self.noEditColIdxs:
       return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable
     else:
       return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable

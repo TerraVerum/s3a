@@ -10,8 +10,8 @@ from typing import Callable, Dict, Any, Union, Optional
 import pandas as pd
 import pyqtgraph as pg
 from pandas import DataFrame as df
-from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph import BusyCursor
+from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
 from cdef.frgraphics.graphicsutils import saveToFile
 from cdef.frgraphics.parameditors import FRUserProfileEditor
@@ -45,7 +45,7 @@ class FRCdefApp(FRAnnotatorUI):
 
   def __init__(self, authorName: str = None, userProfileArgs: Dict[str, Any]=None):
     super().__init__()
-    
+
     # ---------------
     # DATA ATTRIBUTES
     # ---------------
@@ -100,7 +100,7 @@ class FRCdefApp(FRAnnotatorUI):
 
     # Menu options
     # FILE
-    self.saveLayout.triggered.connect(self.saveLayoutActionTriggered)
+    self.saveLayout.triggered.connect(lambda: self.saveLayoutActionTriggered())
     self.sigLayoutSaved.connect(self.populateLoadLayoutOptions)
 
     self.exportCompList.triggered.connect(self.exportCompListActionTriggered)
@@ -153,7 +153,7 @@ class FRCdefApp(FRAnnotatorUI):
       loadFunc = partial(self.paramEditorLoadActTriggered, editor)
     name = editor.name
     newMenu = QtWidgets.QMenu(name, self)
-    editAct = QtWidgets.QAction('Edit ' + name, self)
+    editAct = QtWidgets.QAction ('Edit ' + name, self)
     newMenu.addAction(editAct)
     newMenu.addSeparator()
     editAct.triggered.connect(editor.show)
@@ -163,6 +163,10 @@ class FRCdefApp(FRAnnotatorUI):
     populateFunc()
     parentMenu.addMenu(newMenu)
 
+  def setStyleSheet(self, styleSheet: str):
+    super().setStyleSheet(styleSheet)
+    for editor in FR_SINGLETON.editors:
+      editor.setStyleSheet(styleSheet)
 
   @Slot(object)
   def _recordCompChange(self):

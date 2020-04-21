@@ -1,8 +1,7 @@
 from typing import Tuple
 
-from pyqtgraph.Qt import QtWidgets, QtGui
-
 from bidict import bidict
+from pyqtgraph.Qt import QtWidgets, QtGui
 
 from ..projectvars import FR_CONSTS
 from ..structures import FRParam, FRParamGroup

@@ -1,17 +1,13 @@
-from typing import Optional, Union
-
-import sys
-from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-from pyqtgraph import BusyCursor
-
-from functools import wraps
-
 import pickle as pkl
-
+import sys
+from functools import partial
+from functools import wraps
+from glob import glob
 from os.path import basename
 from pathlib import Path
-from glob import glob
-from functools import partial
+from typing import Optional, Union
+
+from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
 from cdef.projectvars import ANN_AUTH_DIR
 
@@ -165,14 +161,15 @@ def addDirItemsToMenu(parentMenu, dirRegex, triggerFunc, removeExistingChildren=
     curAction = parentMenu.addAction(name)
     curAction.triggered.connect(partial(triggerFunc, name))
 
-def create_addMenuAct(parent: QtWidgets.QMenu, title: str, asMenu=False) -> Union[QtWidgets.QMenu, QtWidgets.QAction]:
+def create_addMenuAct(mainWin: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, title: str, asMenu=False) \
+    -> Union[QtWidgets.QMenu, QtWidgets.QAction]:
   menu = None
   if asMenu:
-    menu = QtWidgets.QMenu(title)
+    menu = QtWidgets.QMenu(title, mainWin)
     act = menu.menuAction()
   else:
     act = QtWidgets.QAction(title)
-  parent.addAction(act)
+  parentMenu.addAction(act)
   if asMenu:
     return menu
   else:

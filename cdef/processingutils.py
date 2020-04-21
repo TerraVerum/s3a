@@ -1,14 +1,13 @@
 import cv2 as cv
 import numpy as np
-from skimage.filters import gaussian
 from skimage.measure import regionprops, label
 from skimage.morphology import closing, dilation, opening
 from skimage.morphology import disk
 from skimage.segmentation import quickshift, flood
 
-from cdef.structures.typeoverloads import RgbImg, GrayImg, NChanImg, BlackWhiteImg, TwoDArr
+from cdef.structures.typeoverloads import RgbImg, GrayImg, NChanImg, BlackWhiteImg, \
+  TwoDArr
 from cdef.structures.vertices import FRVertices, FRComplexVertices
-from .generalutils import getClippedBbox
 
 
 def getBwComps(img: RgbImg, minSz=30) -> BlackWhiteImg:

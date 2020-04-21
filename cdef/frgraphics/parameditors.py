@@ -19,11 +19,11 @@ from pyqtgraph.parametertree.parameterTypes import ListParameter
 from cdef.structures.typeoverloads import NChanImg
 from .graphicsutils import dialogSaveToFile
 from ..interfaces import FRImageProcessor
-from ..structures import FRIllRegisteredPropError
 from ..projectvars import (
   MENU_OPTS_DIR, SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR,
   LAYOUTS_DIR, USER_PROFILES_DIR,
   TEMPLATE_COMP as TC, TEMPLATE_COMP_CLASSES as COMP_CLASSES, FR_CONSTS)
+from ..structures import FRIllRegisteredPropError
 from ..structures import FRParam
 
 Signal = QtCore.pyqtSignal

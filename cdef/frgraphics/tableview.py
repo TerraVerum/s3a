@@ -1,7 +1,6 @@
 from enum import Enum
-from typing import Sequence, List
-
 from functools import partial
+from typing import Sequence
 
 import numpy as np
 import pandas as pd
@@ -155,6 +154,8 @@ class FRCompTableView(QtWidgets.QTableView):
         # Default to text box
         self.setItemDelegateForColumn(ii, FRTextDelegate(self))
 
+    self.horizontalHeader().setSectionsMovable(True)
+
   # When the model is changed, get a reference to the FRComponentMgr
   def setModel(self, modelOrProxy: QtCore.QAbstractTableModel):
     super().setModel(modelOrProxy)
@@ -251,7 +252,12 @@ class FRCompTableView(QtWidgets.QTableView):
     if self.minimal: return
 
     idList, colIdxs = self.getIds_colsFromSelection()
-    if len(idList) == 0: return
+    colIdxs = np.setdiff1d(colIdxs, self.model().sourceModel().noEditColIdxs)
+    if len(idList) == 0 or len(colIdxs) == 0:
+      QtWidgets.QMessageBox.information(self, 'No Editable Data',
+                                        'No editable columns selected. Nothing to do.',
+                                        QtWidgets.QMessageBox.Ok)
+      return
 
     dataToSet = self.mgr.compDf.loc[[idList[0]],:].copy()
     self.popup.setData(dataToSet, colIdxs)

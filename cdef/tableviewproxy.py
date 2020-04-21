@@ -8,7 +8,8 @@ from .frgraphics import tableview
 from .frgraphics.imageareas import FRMainImage
 from .frgraphics.parameditors import FR_SINGLETON
 from .frgraphics.regions import FRMultiRegionPlot
-from .projectvars import FR_CONSTS, TEMPLATE_COMP as TC, TEMPLATE_COMP_CLASSES as COMP_CLASSES
+from .projectvars import FR_CONSTS, TEMPLATE_COMP as TC, \
+  TEMPLATE_COMP_CLASSES as COMP_CLASSES
 from .structures import FRVertices
 from .tablemodel import FRComponentMgr
 

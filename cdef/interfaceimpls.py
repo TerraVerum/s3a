@@ -3,10 +3,10 @@ from typing import List
 
 import cv2 as cv
 import numpy as np
+from skimage.filters import gaussian
 from skimage.measure import regionprops, label
 from skimage.morphology import opening, closing, disk
 from skimage.segmentation import active_contour
-from skimage.filters import gaussian
 
 from cdef.processingutils import cornersToFullBoundary
 from cdef.structures.typeoverloads import BlackWhiteImg
@@ -18,6 +18,7 @@ from .processingutils import getVertsFromBwComps, getBwComps
 from .processingutils import growSeedpoint, rmSmallComps
 from .structures import FRParam, FRParamGroup, newParam
 from .structures import FRVertices, FRComplexVertices
+
 
 # For the purposes of processor impl's, a dataclass is probably not necessary. But I used it everywhere else
 # so I'll stick to the pattern

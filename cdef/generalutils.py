@@ -3,12 +3,11 @@ from pathlib import Path
 from typing import Any, Optional, List
 
 import numpy as np
-import sys
+from pandas import DataFrame as df
 
 from cdef.projectvars import ANN_AUTH_DIR
 from cdef.structures.typeoverloads import TwoDArr
 from .structures import FRVertices, FRParamGroup
-from pandas import DataFrame as df
 
 
 def nanConcatList(vertList) -> FRVertices:
