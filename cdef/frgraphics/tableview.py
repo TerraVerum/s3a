@@ -253,7 +253,11 @@ class FRCompTableView(QtWidgets.QTableView):
 
     idList, colIdxs = self.getIds_colsFromSelection()
     colIdxs = np.setdiff1d(colIdxs, self.model().sourceModel().noEditColIdxs)
-    if len(idList) == 0: return
+    if len(idList) == 0 or len(colIdxs) == 0:
+      QtWidgets.QMessageBox.information(self, 'No Editable Data',
+                                        'No editable columns selected. Nothing to do.',
+                                        QtWidgets.QMessageBox.Ok)
+      return
 
     dataToSet = self.mgr.compDf.loc[[idList[0]],:].copy()
     self.popup.setData(dataToSet, colIdxs)
