@@ -68,6 +68,10 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
     # ensure datatypes are correct
     self.compDf = makeCompDf(0)
 
+    self.noEditColIdxs = [self.colTitles.index(col.name) for col in
+                     [TC.INST_ID, TC.VERTICES, TC.ANN_AUTHOR, TC.ANN_FILENAME,
+                      TC.ANN_TIMESTAMP]]
+
   # ------
   # Functions required to implement table model
   # ------
@@ -81,6 +85,7 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
     if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
       return self.colTitles[section]
 
+  # noinspection PyMethodOverriding
   def data(self, index: QtCore.QModelIndex, role: int) -> Any:
     outData = self.compDf.iloc[index.row(), index.column()]
     if role == QtCore.Qt.DisplayRole:
@@ -98,10 +103,7 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
     return True
 
   def flags(self, index: QtCore.QModelIndex) -> QtCore.Qt.ItemFlags:
-    noEditColIdxs = [self.colTitles.index(col.name) for col in
-                     [TC.INST_ID, TC.VERTICES, TC.ANN_AUTHOR, TC.ANN_FILENAME,
-                      TC.ANN_TIMESTAMP]]
-    if index.column() not in noEditColIdxs:
+    if index.column() not in self.noEditColIdxs:
       return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable
     else:
       return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable

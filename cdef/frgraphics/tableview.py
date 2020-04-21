@@ -155,6 +155,8 @@ class FRCompTableView(QtWidgets.QTableView):
         # Default to text box
         self.setItemDelegateForColumn(ii, FRTextDelegate(self))
 
+    self.horizontalHeader().setSectionsMovable(True)
+
   # When the model is changed, get a reference to the FRComponentMgr
   def setModel(self, modelOrProxy: QtCore.QAbstractTableModel):
     super().setModel(modelOrProxy)
@@ -251,6 +253,7 @@ class FRCompTableView(QtWidgets.QTableView):
     if self.minimal: return
 
     idList, colIdxs = self.getIds_colsFromSelection()
+    colIdxs = np.setdiff1d(colIdxs, self.model().sourceModel().noEditColIdxs)
     if len(idList) == 0: return
 
     dataToSet = self.mgr.compDf.loc[[idList[0]],:].copy()
