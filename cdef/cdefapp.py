@@ -43,9 +43,14 @@ class FRCdefApp(FRAnnotatorUI):
   # Alerts GUI that a layout (either new or overwriting old) was saved
   sigLayoutSaved = Signal()
 
+  def __new__(cls, *args, **kwargs):
+    inst = super().__new__(cls, *args, **kwargs)
+    cls.estBoundsOnStart = FR_SINGLETON.generalProps.registerProp(inst,
+        FR_CONSTS.PROP_EST_BOUNDS_ON_START)
+    return inst
+
   def __init__(self, authorName: str = None, userProfileArgs: Dict[str, Any]=None):
     super().__init__()
-
     # ---------------
     # DATA ATTRIBUTES
     # ---------------
@@ -126,9 +131,6 @@ class FRCdefApp(FRAnnotatorUI):
   # -----------------------------
   # FRCdefApp CLASS FUNCTIONS
   # -----------------------------
-  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_EST_BOUNDS_ON_START)
-  def estBoundsOnStart(self): pass
-
   def closeEvent(self, ev: QtGui.QCloseEvent):
     # Confirm all components have been saved
     shouldExit = False

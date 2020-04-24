@@ -184,6 +184,7 @@ class FRParamEditor(QtWidgets.QDialog):
     # Construct parameter tree
     # -----------
     self.params = Parameter(name='Parameters', type='group', children=paramList)
+    self.params.sigStateChanged.connect(self._paramTreeChanged)
     self.tree = ParameterTree()
     self.tree.setParameters(self.params, showTop=False)
 
@@ -229,6 +230,11 @@ class FRParamEditor(QtWidgets.QDialog):
     self.saveAsBtn.clicked.connect(self.saveAsBtnClicked)
     self.closeBtn.clicked.connect(self.close)
     self.applyBtn.clicked.connect(self.applyBtnClicked)
+
+  def _paramTreeChanged(self, param, child, idx):
+    self._stateBeforeEdit = self.params.saveState()
+    for colIdx in range(2):
+      self.tree.resizeColumnToContents(colIdx)
 
   # Helper method for accessing simple parameter values
   def __getitem__(self, keys: Union[tuple, FRParam, Sequence[FRParam]]):
@@ -331,25 +337,43 @@ class FRParamEditor(QtWidgets.QDialog):
   def loadState(self, newStateDict: dict):
     self.params.restoreState(newStateDict, addChildren=False)
 
-  def registerProp(self, constParam: FRParam):
-    # First add registered property to self list
-    def funcWrapper(func):
-      func, clsName = self.registerMethod(constParam)(func, True)
+  def registerProps(self, clsObj, constParams: List[FRParam]):
+    outProps = []
+    for param in constParams:
+      outProps.append(self.registerProp(clsObj, param))
+    return outProps
 
-      @property
-      def paramAccessor(*args, **kwargs):
-        # Use function wrapper instead of directly returning so no errors are thrown when class isn't fully instantiated
-        # Retrieve class name from the class instance, since this function call may have resulted from an inhereted class
-        trueCls = type(args[0]).__qualname__
-        xpondingEditor = self.classInstToEditorMapping[args[0]]
-        return xpondingEditor[self.classNameToParamMapping[trueCls], constParam]
-      @paramAccessor.setter
-      def paramAccessor(clsObj, newVal):
-        xpondingEditor = self.classInstToEditorMapping[clsObj]
-        param = xpondingEditor[self.classNameToParamMapping[clsName], constParam, True]
-        param.setValue(newVal)
-      return paramAccessor
-    return funcWrapper
+  def registerProp(self, clsObj, constParam: FRParam):
+    paramForEditor = Parameter.create(name=constParam.name, type=constParam.valType,
+                               value=constParam.value, tip=constParam.helpText)
+    cls = type(clsObj)
+    clsName = cls.__qualname__
+    paramName = self.classNameToParamMapping[clsName].name
+    if paramName in self.params.names:
+      paramForCls = self.params.child(paramName)
+    else:
+      paramForCls = Parameter.create(name=paramName, type='group')
+      paramForCls.sigStateChanged.connect(self._paramTreeChanged)
+      self.params.addChild(paramForCls)
+
+    if constParam.name not in paramForCls.names:
+      paramForCls.addChild(paramForEditor)
+
+    @property
+    def paramAccessor(*args, **kwargs):
+      # Use function wrapper instfead of directly returning so no errors are thrown when class isn't fully instantiated
+      # Retrieve class name from the class instance, since this function call may have resulted from an inhereted class
+      trueCls = type(args[0]).__qualname__
+      xpondingEditor = self.classInstToEditorMapping[args[0]]
+      return xpondingEditor[self.classNameToParamMapping[trueCls], constParam]
+
+    @paramAccessor.setter
+    def paramAccessor(newVal):
+      xpondingEditor = self.classInstToEditorMapping[clsObj]
+      param = xpondingEditor[self.classNameToParamMapping[clsName], constParam, True]
+      param.setValue(newVal)
+
+    return paramAccessor
 
   def registerMethod(self, constParam: FRParam, fnArgs=None):
     """
@@ -386,19 +410,18 @@ class FRParamEditor(QtWidgets.QDialog):
       clsName = cls.__qualname__
       oldClsInit = cls.__init__
       self._extendedClassDecorator(cls, clsParam, **opts)
+      # Don't add class parameters again if two of the same class instances were added
+      if cls not in self.instantiatedClassTypes:
+        self.instantiatedClassTypes.add(cls)
+        self.addParamsFromClass(cls, clsParam)
+        # Now that class params are registered, save off default file
+        if opts.get('saveDefault', True):
+          Path(self.saveDir).mkdir(parents=True, exist_ok=True)
+          with open(join(self.saveDir, f'Default.{self.fileType}'), 'wb') as ofile:
+            pkl.dump(self.params.saveState(), ofile)
+        self.classNameToParamMapping[clsName] = clsParam
       def newClassInit(clsObj, *args, **kwargs):
         self.classInstToEditorMapping[clsObj] = self
-        # Don't add class parameters again if two of the same class instances were added
-        if cls not in self.instantiatedClassTypes:
-          self.instantiatedClassTypes.add(cls)
-          self.addParamsFromClass(cls, clsParam)
-          # Now that class params are registered, save off default file
-          if opts.get('saveDefault', True):
-            Path(self.saveDir).mkdir(parents=True, exist_ok=True)
-            with open(join(self.saveDir, f'Default.{self.fileType}'), 'wb') as ofile:
-              pkl.dump(self.params.saveState(), ofile)
-          self.classNameToParamMapping[clsName] = clsParam
-
         retVal = oldClsInit(clsObj, *args, **kwargs)
         self._extendedClassInit(clsObj, clsParam)
         return retVal
@@ -445,7 +468,6 @@ class FRParamEditor(QtWidgets.QDialog):
       baseClasses.extend([tmpCls for tmpCls in curBases if tmpCls not in baseClasses])
       nextClsPtr += 1
 
-    baseClses = []
     for baseCls in baseClasses:
       iterClasses.append(baseCls.__qualname__)
 
@@ -465,21 +487,10 @@ class FRParamEditor(QtWidgets.QDialog):
         paramChildren.append(paramForTree)
       # If this group already exists, append the children to the existing group
       # instead of adding a new child
-      paramExists = False
-      existingParamIdx = None
-      for ii, param in enumerate(self.params.childs):
-        if param.name() == clsParam.name:
-          paramExists = True
-          existingParamIdx = ii
-          break
-      if paramExists:
-        self.params.childs[existingParamIdx].addChildren(paramChildren)
+      if clsParam.name in self.params.names:
+        self.params.child(clsParam.name).addChildren(paramChildren)
       else:
         self.params.addChild(paramGroup)
-    # Make sure all new names are properly displayed
-    for colIdx in range(2):
-      self.tree.resizeColumnToContents(colIdx)
-    self._stateBeforeEdit = self.params.saveState()
 
 class FRGeneralPropertiesEditor(FRParamEditor):
   def __init__(self, parent=None):

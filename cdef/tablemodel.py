@@ -108,12 +108,6 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_MGR)
 class FRComponentMgr(FRCompTableModel):
-  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.EXP_ONLY_VISIBLE)
-  def exportOnlyVis(self): pass
-  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.INCLUDE_FNAME_PATH)
-  def includeFullSourceImgName(self): pass
-  
-
   _nextCompId = 0
 
   def __init__(self):
@@ -231,10 +225,12 @@ def _paramSerToStrSer(paramSer: pd.Series, paramVal: Any) -> pd.Series:
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_EXPORTER)
 class FRComponentIO:
-  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.EXP_ONLY_VISIBLE)
-  def expOnlyVisible(self): pass
-  @FR_SINGLETON.generalProps.registerProp(FR_CONSTS.INCLUDE_FNAME_PATH)
-  def includeFullSourceImgName(self): pass
+  def __new__(cls, *args, **kwargs):
+    inst = super().__new__(cls, *args, **kwargs)
+    cls.exportOnlyVis, cls.includeFullSourceImgName = FR_SINGLETON.generalProps.registerProps(
+      [FR_CONSTS.EXP_ONLY_VISIBLE, FR_CONSTS.INCLUDE_FNAME_PATH]
+    )
+    return inst
 
   def __init__(self, compDf: df, mainImgFpath: str,
                 exportIds: Union[FR_ENUMS, Sequence] = FR_ENUMS.COMP_EXPORT_ALL):

@@ -135,18 +135,15 @@ def _makeTxtSymbol(txt: str, fontSize: int):
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_MULT_REG_PLT)
 class FRMultiRegionPlot(QtCore.QObject):
-  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_BOUNDARY_COLOR)
-  def boundClr(self): pass
-  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_BOUNDARY_WIDTH)
-  def boundWidth(self): pass
-  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_VALID_ID_COLOR)
-  def validIdClr(self): pass
-  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_NONVALID_ID_COLOR)
-  def nonvalidIdClr(self): pass
-  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_ID_MARKER_SZ)
-  def idMarkerSz(self): pass
-  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_SELECTED_ID_BORDER)
-  def selectedIdBorder(self): pass
+  def __new__(cls, *args, **kwargs):
+    inst = super().__new__(cls, *args, **kwargs)
+    (cls.nonvalidIdClr, cls.validIdClr, cls.boundClr,cls.boundWidth,
+    cls.idMarkerSz, cls.selectedIdBorder) = FR_SINGLETON.scheme.registerProps(inst,
+      [FR_CONSTS.SCHEME_NONVALID_ID_COLOR, FR_CONSTS.SCHEME_VALID_ID_COLOR,
+       FR_CONSTS.SCHEME_BOUNDARY_COLOR, FR_CONSTS.SCHEME_BOUNDARY_WIDTH,
+       FR_CONSTS.SCHEME_ID_MARKER_SZ, FR_CONSTS.SCHEME_SELECTED_ID_BORDER]
+    )
+    return inst
 
 
   # Helper class for IDE assistance during dataframe access
@@ -274,10 +271,11 @@ class FRMultiRegionPlot(QtCore.QObject):
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_VERT_IMG)
 class FRVertexDefinedImg(pg.ImageItem):
-  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_REG_FILL_COLOR)
-  def fillClr(self):pass
-  @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_REG_VERT_COLOR)
-  def vertClr(self): pass
+  def __new__(cls, *args, **kwargs):
+    inst = super().__new__(cls, *args, **kwargs)
+    cls.fillClr, cls.vertClr = FR_SINGLETON.scheme.registerProps(
+      inst, [FR_CONSTS.SCHEME_REG_FILL_COLOR, FR_CONSTS.SCHEME_REG_VERT_COLOR])
+    return inst
 
   def __init__(self):
     super().__init__()

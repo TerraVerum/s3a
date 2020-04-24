@@ -53,16 +53,14 @@ IMPLS = _FRDefaultAlgImpls()
 
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_BASIC, addToList=False)
 class FRBasicImageProcessorImpl(FRImageProcessor):
-  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_MIN_COMP_SZ)
-  def minCompSz(self): pass
-  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_MARGIN)
-  def margin(self): pass
-  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_ALLOW_MULT_REG)
-  def allowMultReg(self): pass
-  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_ALLOW_HOLES)
-  def allowHoles(self): pass
-  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_STREL_SZ)
-  def strelSz(self): pass
+
+  def __new__(cls, *args, **kwargs):
+    inst = super().__new__(cls, *args, **kwargs)
+    (cls.minCompSz, cls.margin, cls.allowMultReg,
+     cls.allowHoles, cls.strelSz) = FR_SINGLETON.algParamMgr.registerProps(inst,
+        [IMPLS.PROP_MIN_COMP_SZ, IMPLS.PROP_MARGIN, IMPLS.PROP_ALLOW_MULT_REG,
+         IMPLS.PROP_ALLOW_HOLES, IMPLS.PROP_STREL_SZ])
+    return inst
   
 
   def localCompEstimate(self, prevCompMask: BlackWhiteImg, fgVerts: FRVertices = None, bgVerts: FRVertices = None) -> \
@@ -97,8 +95,10 @@ class FRBasicImageProcessorImpl(FRImageProcessor):
 
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_REGION_GROW)
 class FRRegionGrow(FRBasicImageProcessorImpl):
-  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_SEED_THRESH)
-  def seedThresh(self): pass
+  def __new__(cls, *args, **kwargs):
+    inst = super().__new__(cls, *args, **kwargs)
+    cls.seedThresh = FR_SINGLETON.algParamMgr.registerProp(inst, IMPLS.PROP_SEED_THRESH)
+    return inst
 
   def localCompEstimate(self, prevCompMask: BlackWhiteImg, fgVerts: FRVertices = None,
                         bgVerts: FRVertices = None) -> BlackWhiteImg:
@@ -215,16 +215,13 @@ class FROnlySquares(FRBasicShapes):
 
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_ACT_CONTOUR)
 class FRActiveContour(FRBasicImageProcessorImpl):
-  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_GAUS_SIGMA)
-  def blurSigma(self): pass
-  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_ACT_CONT_ALPHA)
-  def alpha(self): pass
-  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_ACT_CONT_BETA)
-  def beta(self): pass
-  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_ACT_CONT_GAMMA)
-  def gamma(self): pass
-  @FR_SINGLETON.algParamMgr.registerProp(IMPLS.PROP_ACT_CONT_EDGE)
-  def wEdge(self): pass
+  def __new__(cls, *args, **kwargs):
+    inst = super().__new__(cls, *args, **kwargs)
+    (cls.blurSigma, cls.alpha, cls.beta, cls.gamma, cls.wEdge)\
+      = FR_SINGLETON.algParamMgr.registerProps(inst, [IMPLS.PROP_GAUS_SIGMA,
+          IMPLS.PROP_ACT_CONT_ALPHA, IMPLS.PROP_ACT_CONT_BETA, IMPLS.PROP_ACT_CONT_GAMMA,
+          IMPLS.PROP_ACT_CONT_EDGE])
+    return inst
 
   def localCompEstimate(self, prevCompMask: BlackWhiteImg, fgVerts: FRVertices = None, bgVerts: FRVertices = None) -> \
       BlackWhiteImg:
