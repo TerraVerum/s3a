@@ -77,6 +77,7 @@ class FRCdefApp(FRAnnotatorUI):
     # ---------------
     # COMPONENT MANAGER
     # ---------------
+    self.compExporter = FRComponentIO()
     self.compMgr = FRComponentMgr()
     self.compMgr.sigCompsChanged.connect(self._recordCompChange)
 
@@ -273,19 +274,15 @@ class FRCdefApp(FRAnnotatorUI):
 
   @Slot()
   def exportCompListActionTriggered(self):
-    onlyExportFiltered = self.compMgr.exportOnlyVis
-    if onlyExportFiltered:
-      exportIds = self.compDisplay.displayedIds
-    else:
-      exportIds = FR_ENUMS.COMP_EXPORT_ALL
     fileDlg = QtWidgets.QFileDialog()
     # TODO: Delegate this to the exporter. Make a function that makes the right file filter,
     #   and calls the right exporter function after the filename is retrieved.
     fileFilter = "CSV Files (*.csv)"
     fname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilter)
     if len(fname) > 0:
-      exporter = FRComponentIO(self.compMgr.compDf, self.mainImgFpath, exportIds)
-      exporter.exportCsv(fname)
+      self.compExporter.prepareDf(self.compMgr.compDf, self.mainImgFpath,
+                                  self.compDisplay.displayedIds)
+      self.compExporter.exportCsv(fname)
       self.hasUnsavedChanges = False
 
   @Slot()
@@ -297,19 +294,15 @@ class FRCdefApp(FRAnnotatorUI):
     outFile = getOutFileFromUser()
     exportLegend = getExpLegendFromUser()
     """
-    onlyExportFiltered = self.compMgr.exportOnlyVis
-    if onlyExportFiltered:
-      exportIds = self.compDisplay.displayedIds
-    else:
-      exportIds = FR_ENUMS.COMP_EXPORT_ALL
     fileDlg = QtWidgets.QFileDialog()
     # TODO: Delegate this to the exporter. Make a function that makes the right file filter,
     #   and calls the right exporter function after the filename is retrieved.
     fileFilter = "Label Mask Image (*.png; *.tif; *.jpg; *.jpeg; *.bmp; *.jfif);; All files(*.*)"
     fname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilter)
     if len(fname) > 0:
-      exporter = FRComponentIO(self.compMgr.compDf, self.mainImgFpath, exportIds)
-      exporter.exportLabeledImg(self.mainImg.image.shape, fname)
+      self.compExporter.prepareDf(self.compMgr.compDf, self.mainImgFpath,
+                                  self.compDisplay.displayedIds)
+      self.compExporter.exportLabeledImg(self.mainImg.image.shape, fname)
 
 
   def loadCompsActionTriggered(self, loadType=FR_ENUMS.COMP_ADD_AS_NEW, fname: str=None):

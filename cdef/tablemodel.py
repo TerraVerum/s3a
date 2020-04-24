@@ -15,6 +15,7 @@ from skimage import io
 
 from cdef.projectvars import DATE_FORMAT
 from cdef.projectvars import TEMPLATE_COMP_CLASSES
+from cdef.structures import OneDArr
 from cdef.structures.typeoverloads import TwoDArr, NChanImg
 from .frgraphics.parameditors import FR_SINGLETON
 from .generalutils import coerceDfTypes
@@ -225,31 +226,33 @@ def _paramSerToStrSer(paramSer: pd.Series, paramVal: Any) -> pd.Series:
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_EXPORTER)
 class FRComponentIO:
+  """
+  Exporter responsible for saving Component information to a file or object.
+  Once created, users can extract different representations of components by
+  calling exporter.exportCsv, exportPkl, etc. for those objects / files respectively.
+  """
   def __new__(cls, *args, **kwargs):
     inst = super().__new__(cls, *args, **kwargs)
-    cls.exportOnlyVis, cls.includeFullSourceImgName = FR_SINGLETON.generalProps.registerProps(
+    cls.exportOnlyVis, cls.includeFullSourceImgName = FR_SINGLETON.generalProps.registerProps(inst,
       [FR_CONSTS.EXP_ONLY_VISIBLE, FR_CONSTS.INCLUDE_FNAME_PATH]
     )
     return inst
 
-  def __init__(self, compDf: df, mainImgFpath: str,
-                exportIds: Union[FR_ENUMS, Sequence] = FR_ENUMS.COMP_EXPORT_ALL):
-    """
-    Exporter responsible for saving Component information to a file or object.
-    Once created, users can extract different representations of components by
-    calling exporter.exportCsv, exportPkl, etc. for those objects / files respectively.
+  def __init__(self):
+    self.compDf: Optional[df] = None
 
-    :param compDf: The component dataframe that came from the component manager
+  def prepareDf(self, compDf: df, mainImgFpath: str, displayIds: OneDArr):
+    """:param compDf: The component dataframe that came from the component manager
     :param mainImgFpath: Name of the image being annotated. This helps associate
       all annotations to their source file.
-    :param exportIds: If :var:`FR_ENUMS.EXPORT_ALL`, exports every component in the
+    :param displayIds: If not self.exportOnlyVis, exports every component in the
       dataframe. Otherwise, just exports the requested IDs
     """
-    if isinstance(exportIds, FR_ENUMS) and exportIds == FR_ENUMS.COMP_EXPORT_ALL:
-      exportDf = compDf
+    if self.exportOnlyVis:
+      exportIds = displayIds
     else:
-      exportDf = compDf.loc[exportIds, :]
-    exportDf: df = exportDf.copy(deep=True)
+      exportIds = self.compDf.index
+    exportDf = compDf.loc[exportIds,:].copy()
     if not self.includeFullSourceImgName:
       # Only use the file name, not the whole path
       mainImgFpath = Path(mainImgFpath).name
@@ -257,13 +260,11 @@ class FRComponentIO:
     overwriteIdxs = exportDf[TC.ANN_FILENAME] == FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
     # TODO: Maybe the current filename will match the current file indicator. What happens then?
     exportDf.loc[overwriteIdxs, TC.ANN_FILENAME] = mainImgFpath
-
-    self.exportDf = exportDf
+    self.compDf = exportDf
 
   # -----
   # Export options
   # -----
-
   def exportCsv(self, outFile: str=None, **pdExportArgs) -> (Any, str):
     """
 
@@ -293,7 +294,7 @@ class FRComponentIO:
       # Format special columns appropriately
       # Since CSV export significantly modifies the df, make a copy before doing all these
       # operations
-      exportDf = self.exportDf.copy(deep=True)
+      exportDf = self.compDf.copy(deep=True)
       valToParamMap = {param.name: param.value for param in TC}
       for col in exportDf:
         if not isinstance(col.value, str):
@@ -319,9 +320,9 @@ class FRComponentIO:
     retObj = None
     try:
       if outFile is not None:
-        pklDf = pickle.dumps(self.exportDf)
+        pklDf = pickle.dumps(self.compDf)
 
-        self.exportDf.to_pickle(outFile)
+        self.compDf.to_pickle(outFile)
     except Exception as ex:
       errMsg = str(ex)
     return retObj, errMsg
@@ -345,7 +346,7 @@ class FRComponentIO:
 
     # Create label to output mapping
     for curType, color in zip(types, colorPerType):
-      outlines = self.exportDf.loc[self.exportDf[TC.COMP_CLASS] == curType, TC.VERTICES].values
+      outlines = self.compDf.loc[self.compDf[TC.COMP_CLASS] == curType, TC.VERTICES].values
       cvFillArg = [arr[0] for arr in outlines]
       cvClrArg = tuple([int(val) for val in color])
       cv.fillPoly(out, cvFillArg, cvClrArg)
