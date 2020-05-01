@@ -43,51 +43,9 @@ Since every annotation has an associated author, this field must be populated --
 `python -m cdef --author="username"`
 
 The app will start as expected. As long as the author remains the same, you can start the app in the future without providing an `--author` flag.
-## Command-Line Arguments
-You can specify more than just the author at startup. If you want a certain image to be opened on launch, specify the filepath with the `--image` switch:
+## Detailed Feature List
 
-```bash
-python -m cdef --image="./images/circuitBoard.png"
-```
-
-When CDEF opens, the requested image will be loaded. The following command-line arguments are accepted:
-- `--author`: Username of the person currently making annotations. This will appear next to each component created during the session.
-- `--image`: Filename of the starting image
-- `--annotations`: Annotation file to load in on startup
-- `--profile`: Name of a saved profile. If additional flags are provided, they will override settings from this profile.
-- `--layout`: Name of a saved Layout
-- `--"<Editor Name>"`: Name of the saved parameter editor state. For a list of allowed editors, see the user guide.
-
-## Usage
-Simply run CDEF as a module (as explained in [Command-Line Arguments](#Command-Line Arguments)) and the main window should appear:
-
-![](./docs/img/readme/startup.png)
-
-From here, you can add components by creating polygons in the main window. The newly created component will be enlarged in the focused editor, where you can edit the resulting boundary.
-
-![](./docs/img/readme/compCreation.gif)
-
-The color scheme can also be changed as needed:
-
-![](./docs/img/readme/changeColorScheme.gif)
-
-Just like the color scheme, various application settings can be changed through similar menus:
-
-![](./docs/img/readme/propEditors.png)
-
-CDEF also supports batch component editing through either the component table or main image. To my knowledge, this is a unique feature compared to other annotation tools:
-
-![](./docs/img/readme/batchEdit.gif)
-
-You can also filter which components you want to show on the main image:
-
-![](./docs/img/readme/tableFilter.gif)
-
-Most importantly, you can create your own algorithms for generating segmentation boundaries. These will be available within the GUI, along with any parameters you specify as editable within the parameter window:
-
-![](./docs/img/readme/algEditor.png)
-
-![](./docs/img/readme/liveAlgEdit.gif)
+More information about the capabilities of this tool are outlined in the [project wiki](https://gitlab.com/ficsresearch/cdef/-/wikis/home)..
 
 
 ## License
