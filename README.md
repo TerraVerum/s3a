@@ -45,7 +45,7 @@ Since every annotation has an associated author, this field must be populated --
 The app will start as expected. As long as the author remains the same, you can start the app in the future without providing an `--author` flag.
 ## Detailed Feature List
 
-More information about the capabilities of this tool are outlined in the [project wiki](https://gitlab.com/ficsresearch/cdef/-/wikis/home)..
+More information about the capabilities of this tool are outlined in the [project wiki](https://gitlab.com/ficsresearch/cdef/-/wikis/home).
 
 
 ## License
