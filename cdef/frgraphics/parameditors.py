@@ -375,32 +375,6 @@ class FRParamEditor(QtWidgets.QDialog):
 
     return paramAccessor
 
-  def registerMethod(self, constParam: FRParam, fnArgs=None):
-    """
-    Designed for use as a function decorator. Registers the decorated function into a list
-    of methods known to the :class:`FRShortcutsEditor`. These functions are then accessable from
-    customizeable shortcuts.
-    """
-    if fnArgs is None:
-      fnArgs = []
-
-    def registerMethodDecorator(func: Callable, returnClsName=False, fnParentClass=None):
-      boundFnParam = FRBoundFnParams(param=constParam, func=func, defaultFnArgs=fnArgs)
-      if fnParentClass is None:
-        fnParentClass, _ = _class_fnNamesFromFnQualname(func.__qualname__)
-
-      self._addParamToList(fnParentClass, boundFnParam)
-      if returnClsName:
-        return func, fnParentClass
-      else:
-        return func
-    return registerMethodDecorator
-
-  def _addParamToList(self, clsName: str, param: Union[FRParam, FRBoundFnParams]):
-    clsParams = self.boundFnsPerClass.get(clsName, [])
-    clsParams.append(param)
-    self.boundFnsPerClass[clsName] = clsParams
-
   def registerClass(self, clsParam: FRParam, **opts):
     """
     Intended for use as a class decorator. Registers a class as able to hold
@@ -413,7 +387,6 @@ class FRParamEditor(QtWidgets.QDialog):
       # Don't add class parameters again if two of the same class instances were added
       if cls not in self.instantiatedClassTypes:
         self.instantiatedClassTypes.add(cls)
-        self.addParamsFromClass(cls, clsParam)
         # Now that class params are registered, save off default file
         if opts.get('saveDefault', True):
           Path(self.saveDir).mkdir(parents=True, exist_ok=True)
@@ -442,55 +415,6 @@ class FRParamEditor(QtWidgets.QDialog):
     """
     Editors needing additional class decorator boilerplates will place it in this overloaded function
     """
-
-  def addParamsFromClass(self, cls: Any, clsParam: FRParam):
-    """
-    For a given class, adds the registered parameters from that class to the respective
-    editor. This is how the dropdown menus in the editors are populated with the
-    user-specified variables.
-
-    :param cls: Current class
-
-    :param clsParam: :class:`FRParam` value encapsulating the human readable class name.
-           This is how the class will be displayed in the :class:`FRShortcutsEditor`.
-
-    :return: None
-    """
-    # Make sure to add parameters from registered base classes, too
-    iterClasses = []
-    baseClasses = [cls]
-    nextClsPtr = 0
-    # Get all bases of bases, too
-    while nextClsPtr < len(baseClasses):
-      curCls = baseClasses[nextClsPtr]
-      curBases = curCls.__bases__
-      # Only add base classes that haven't already been added to prevent infinite recursion
-      baseClasses.extend([tmpCls for tmpCls in curBases if tmpCls not in baseClasses])
-      nextClsPtr += 1
-
-    for baseCls in baseClasses:
-      iterClasses.append(baseCls.__qualname__)
-
-    for clsName in iterClasses:
-      classParamList = self.boundFnsPerClass.get(clsName, [])
-      # Don't add a category unless at least one list element is present
-      if len(classParamList) == 0: continue
-      # If a human-readable name was given, replace class name with human name
-      paramChildren = []
-      paramGroup = {'name': clsParam.name, 'type': 'group',
-                    'children': paramChildren}
-      for boundFn in classParamList:
-        paramForTree = {'name' : boundFn.param.name,
-                        'type' : boundFn.param.valType,
-                        'value': boundFn.param.value,
-                        'tip'  : boundFn.param.helpText}
-        paramChildren.append(paramForTree)
-      # If this group already exists, append the children to the existing group
-      # instead of adding a new child
-      if clsParam.name in self.params.names:
-        self.params.child(clsParam.name).addChildren(paramChildren)
-      else:
-        self.params.addChild(paramGroup)
 
 class FRGeneralPropertiesEditor(FRParamEditor):
   def __init__(self, parent=None):
@@ -560,6 +484,37 @@ class FRShortcutsEditor(FRParamEditor):
     isGlobalWidget = [isinstance(o, QtWidgets.QMainWindow) for o in allWidgets]
     self.mainWinRef = weakref.proxy(allWidgets[np.argmax(isGlobalWidget)])
 
+  def registerMethod(self, constParam: FRParam, fnArgs=None):
+    """
+    Designed for use as a function decorator. Registers the decorated function into a list
+    of methods known to the :class:`FRShortcutsEditor`. These functions are then accessable from
+    customizeable shortcuts.
+    """
+    if fnArgs is None:
+      fnArgs = []
+
+    def registerMethodDecorator(func: Callable, returnClsName=False, fnParentClass=None):
+      boundFnParam = FRBoundFnParams(param=constParam, func=func, defaultFnArgs=fnArgs)
+      if fnParentClass is None:
+        fnParentClass, _ = _class_fnNamesFromFnQualname(func.__qualname__)
+
+      self._addParamToList(fnParentClass, boundFnParam)
+      if returnClsName:
+        return func, fnParentClass
+      else:
+        return func
+    return registerMethodDecorator
+
+  def _addParamToList(self, clsName: str, param: Union[FRParam, FRBoundFnParams]):
+    clsParams = self.boundFnsPerClass.get(clsName, [])
+    clsParams.append(param)
+    self.boundFnsPerClass[clsName] = clsParams
+
+  def _extendedClassDecorator(self, cls: Any, clsParam: FRParam, **opts):
+    if cls not in self.instantiatedClassTypes:
+      self.addRegisteredFuncsFromClass(cls, clsParam)
+    super()._extendedClassDecorator(cls, clsParam, **opts)
+
   def _extendedClassInit(self, clsObj: Any, clsParam: FRParam):
     clsName = type(clsObj).__qualname__
     boundParamList = self.boundFnsPerClass.get(clsName, [])
@@ -575,7 +530,58 @@ class FRShortcutsEditor(FRParamEditor):
       shortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
       self.shortcuts.append(shortcut)
 
-  def registerProp(self, constParam: FRParam):
+  def addRegisteredFuncsFromClass(self, cls: Any, clsParam: FRParam):
+    """
+    For a given class, adds the registered parameters from that class to the respective
+    editor. This is how the dropdown menus in the editors are populated with the
+    user-specified variables.
+
+    :param cls: Current class
+
+    :param clsParam: :class:`FRParam` value encapsulating the human readable class name.
+           This is how the class will be displayed in the :class:`FRShortcutsEditor`.
+
+    :return: None
+    """
+    # Make sure to add parameters from registered base classes, too
+    iterClasses = []
+    baseClasses = [cls]
+    nextClsPtr = 0
+    # Get all bases of bases, too
+    while nextClsPtr < len(baseClasses):
+      curCls = baseClasses[nextClsPtr]
+      curBases = curCls.__bases__
+      # Only add base classes that haven't already been added to prevent infinite recursion
+      baseClasses.extend([tmpCls for tmpCls in curBases if tmpCls not in baseClasses])
+      nextClsPtr += 1
+
+    for baseCls in baseClasses:
+      iterClasses.append(baseCls.__qualname__)
+
+    for clsName in iterClasses:
+      classParamList = self.boundFnsPerClass.get(clsName, [])
+      # Don't add a category unless at least one list element is present
+      if len(classParamList) == 0: continue
+      # If a human-readable name was given, replace class name with human name
+      paramChildren = []
+      paramGroup = {'name': clsParam.name, 'type': 'group',
+                    'children': paramChildren}
+      for boundFn in classParamList:
+        paramForTree = {'name' : boundFn.param.name,
+                        'type' : boundFn.param.valType,
+                        'value': boundFn.param.value,
+                        'tip'  : boundFn.param.helpText}
+        paramChildren.append(paramForTree)
+      # If this group already exists, append the children to the existing group
+      # instead of adding a new child
+      if clsParam.name in self.params.names:
+        self.params.child(clsParam.name).addChildren(paramChildren)
+      else:
+        self.params.addChild(paramGroup)
+
+
+
+  def registerProp(self, clsObj, constParam: FRParam):
     """
     Properties should never be registered as shortcuts, so make sure this is disallowed
     """
