@@ -85,6 +85,7 @@ class _FRConsts(FRParamGroup):
   # --------------------------
   # SCHEME PARAMETERS
   # --------------------------
+  SCHEME_USE_DARK_THEME     : FRParam = newParam('Use dark theme', False)
   SCHEME_VALID_ID_COLOR     : FRParam = newParam('Validated ID Color', '0f0', 'color')
   SCHEME_NONVALID_ID_COLOR  : FRParam = newParam('Non-Validated ID Color', 'f00', 'color')
   SCHEME_BOUNDARY_COLOR     : FRParam = newParam('Component Boundary Color', 'ff0', 'color')

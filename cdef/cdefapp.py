@@ -12,6 +12,7 @@ import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph import BusyCursor
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
+import qdarkstyle
 
 from cdef.frgraphics.graphicsutils import saveToFile
 from cdef.frgraphics.parameditors import FRUserProfileEditor
@@ -47,6 +48,7 @@ class FRCdefApp(FRAnnotatorUI):
   def initShared_(cls):
     cls.estBoundsOnStart = FR_SINGLETON.generalProps.registerProp(cls,
         FR_CONSTS.PROP_EST_BOUNDS_ON_START)
+    cls.useDarkTheme = FR_SINGLETON.scheme.registerProp(cls, FR_CONSTS.SCHEME_USE_DARK_THEME)
 
   def __init__(self, authorName: str = None, userProfileArgs: Dict[str, Any]=None):
     super().__init__()
@@ -103,6 +105,8 @@ class FRCdefApp(FRAnnotatorUI):
     self.resetRegionBtn.clicked.connect(self.resetRegionBtnClicked)
     self.acceptRegionBtn.clicked.connect(self.acceptRegionBtnClicked)
 
+    FR_SINGLETON.scheme.sigParamStateUpdated.connect(self.updateTheme)
+
     # Menu options
     # FILE
     self.saveLayout.triggered.connect(lambda: self.saveLayoutActionTriggered())
@@ -131,6 +135,15 @@ class FRCdefApp(FRAnnotatorUI):
   # -----------------------------
   # FRCdefApp CLASS FUNCTIONS
   # -----------------------------
+  def updateTheme(self, newScheme):
+    style = ''
+    if self.useDarkTheme:
+      style = qdarkstyle.load_stylesheet()
+    self.setStyleSheet(style)
+    for editor in FR_SINGLETON.editors:
+      editor.setStyleSheet(style)
+
+
   def closeEvent(self, ev: QtGui.QCloseEvent):
     # Confirm all components have been saved
     shouldExit = False
