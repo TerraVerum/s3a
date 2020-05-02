@@ -231,12 +231,12 @@ class FRComponentIO:
   Once created, users can extract different representations of components by
   calling exporter.exportCsv, exportPkl, etc. for those objects / files respectively.
   """
-  def __new__(cls, *args, **kwargs):
-    inst = super().__new__(cls, *args, **kwargs)
-    cls.exportOnlyVis, cls.includeFullSourceImgName = FR_SINGLETON.generalProps.registerProps(inst,
+  @classmethod
+  def initShared_(cls):
+    cls.exportOnlyVis, cls.includeFullSourceImgName = \
+      FR_SINGLETON.generalProps.registerProps(cls,
       [FR_CONSTS.EXP_ONLY_VISIBLE, FR_CONSTS.INCLUDE_FNAME_PATH]
     )
-    return inst
 
   def __init__(self):
     self.compDf: Optional[df] = None

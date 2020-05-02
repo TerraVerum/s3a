@@ -43,11 +43,10 @@ class FRCdefApp(FRAnnotatorUI):
   # Alerts GUI that a layout (either new or overwriting old) was saved
   sigLayoutSaved = Signal()
 
-  def __new__(cls, *args, **kwargs):
-    inst = super().__new__(cls, *args, **kwargs)
-    cls.estBoundsOnStart = FR_SINGLETON.generalProps.registerProp(inst,
+  @classmethod
+  def initShared_(cls):
+    cls.estBoundsOnStart = FR_SINGLETON.generalProps.registerProp(cls,
         FR_CONSTS.PROP_EST_BOUNDS_ON_START)
-    return inst
 
   def __init__(self, authorName: str = None, userProfileArgs: Dict[str, Any]=None):
     super().__init__()

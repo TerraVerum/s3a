@@ -28,11 +28,11 @@ QCursor = QtGui.QCursor
 
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_REGION_BUF)
 class FRRegionVertsUndoBuffer(FRObjUndoBuffer):
-  def __new__(cls, *args, **kwargs):
-    inst = super().__new__(cls, *args, **kwargs)
-    cls.maxBufferLen, cls.stepsBetweenBufSave = FR_SINGLETON.generalProps.registerProps(inst,
+
+  @classmethod
+  def initShared_(cls):
+    cls.maxBufferLen, cls.stepsBetweenBufSave = FR_SINGLETON.generalProps.registerProps(cls,
         [FR_CONSTS.PROP_UNDO_BUF_SZ, FR_CONSTS.PROP_STEPS_BW_SAVE])
-    return inst
 
   def __init__(self):
     """
@@ -229,12 +229,11 @@ class FRMainImage(FREditableImg):
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_FOCUSED_IMG_AREA)
 class FRFocusedImage(FREditableImg):
 
-  def __new__(cls, *args, **kwargs):
-    inst = super().__new__(cls, *args, **kwargs)
-    (cls.compCropMargin, cls.segThresh)\
-      = FR_SINGLETON.generalProps.registerProps(inst, [FR_CONSTS.PROP_MARGIN,
+  @classmethod
+  def initShared_(cls):
+    cls.compCropMargin, cls.segThresh\
+      = FR_SINGLETON.generalProps.registerProps(cls, [FR_CONSTS.PROP_MARGIN,
           FR_CONSTS.PROP_SEG_THRESH])
-    return inst
 
   def __init__(self, parent=None, **kargs):
     allowableShapes = (

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from functools import partial
 from os.path import join
 from pathlib import Path
-from typing import Sequence, Union, Callable, Any, Optional, List, Dict, Tuple
+from typing import Sequence, Union, Callable, Any, Optional, List, Dict, Tuple, Set, Type
 
 import numpy as np
 import pyqtgraph as pg
@@ -16,7 +16,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
 from pyqtgraph.parametertree.parameterTypes import ListParameter
 
-from cdef.structures.typeoverloads import NChanImg
+from cdef.structures import NChanImg, ContainsSharedProps
 from .graphicsutils import dialogSaveToFile
 from ..interfaces import FRImageProcessor
 from ..projectvars import (
@@ -65,6 +65,17 @@ def _class_fnNamesFromFnQualname(qualname: str) -> (str, str):
     fnName = qualname[lastDotIdx:]
   return fnParentClass, fnName
 
+def _getAllBases(cls):
+  baseClasses = [cls]
+  nextClsPtr = 0
+  # Get all bases of bases, too
+  while nextClsPtr < len(baseClasses):
+    curCls = baseClasses[nextClsPtr]
+    curBases = curCls.__bases__
+    # Only add base classes that haven't already been added to prevent infinite recursion
+    baseClasses.extend([tmpCls for tmpCls in curBases if tmpCls not in baseClasses])
+    nextClsPtr += 1
+  return baseClasses
 
 @dataclass
 class FRShortcutCtorGroup:
@@ -319,13 +330,14 @@ class FRParamEditor(QtWidgets.QDialog):
     """
     if paramState is None:
       paramState = self.params.saveState()
-    if saveName is False or saveName is None:
-      saveName = dialogSaveToFile(self, paramState, self._saveDlgName,
-                                  self.saveDir, self.fileType, allowOverwriteDefault=False)
+    if not saveName:
+      saveName = dialogSaveToFile(self, paramState, self._saveDlgName, self.saveDir,
+                                  self.fileType)
     else:
+      Path(self.saveDir).mkdir(parents=True, exist_ok=True)
       with open(saveName, 'wb') as saveFile:
         pkl.dump(paramState, saveFile)
-    if saveName is not None:
+    if saveName:
       # Accept new param state after saving
       self.applyBtnClicked()
       outDict = self.params.getValues()
@@ -343,10 +355,9 @@ class FRParamEditor(QtWidgets.QDialog):
       outProps.append(self.registerProp(clsObj, param))
     return outProps
 
-  def registerProp(self, clsObj, constParam: FRParam):
+  def registerProp(self, cls, constParam: FRParam):
     paramForEditor = Parameter.create(name=constParam.name, type=constParam.valType,
                                value=constParam.value, tip=constParam.helpText)
-    cls = type(clsObj)
     clsName = cls.__qualname__
     paramName = self.classNameToParamMapping[clsName].name
     if paramName in self.params.names:
@@ -360,15 +371,15 @@ class FRParamEditor(QtWidgets.QDialog):
       paramForCls.addChild(paramForEditor)
 
     @property
-    def paramAccessor(*args, **kwargs):
+    def paramAccessor(clsObj):
       # Use function wrapper instfead of directly returning so no errors are thrown when class isn't fully instantiated
       # Retrieve class name from the class instance, since this function call may have resulted from an inhereted class
-      trueCls = type(args[0]).__qualname__
-      xpondingEditor = self.classInstToEditorMapping[args[0]]
+      trueCls = type(clsObj).__qualname__
+      xpondingEditor = self.classInstToEditorMapping[clsObj]
       return xpondingEditor[self.classNameToParamMapping[trueCls], constParam]
 
     @paramAccessor.setter
-    def paramAccessor(newVal):
+    def paramAccessor(clsObj, newVal):
       xpondingEditor = self.classInstToEditorMapping[clsObj]
       param = xpondingEditor[self.classNameToParamMapping[clsName], constParam, True]
       param.setValue(newVal)
@@ -384,16 +395,19 @@ class FRParamEditor(QtWidgets.QDialog):
       clsName = cls.__qualname__
       oldClsInit = cls.__init__
       self._extendedClassDecorator(cls, clsParam, **opts)
-      # Don't add class parameters again if two of the same class instances were added
-      if cls not in self.instantiatedClassTypes:
-        self.instantiatedClassTypes.add(cls)
-        # Now that class params are registered, save off default file
-        if opts.get('saveDefault', True):
-          Path(self.saveDir).mkdir(parents=True, exist_ok=True)
-          with open(join(self.saveDir, f'Default.{self.fileType}'), 'wb') as ofile:
-            pkl.dump(self.params.saveState(), ofile)
-        self.classNameToParamMapping[clsName] = clsParam
+      if opts.get('saveDefault', True):
+        defaultName = str(Path(self.saveDir)/f'Default.{self.fileType}')
+        self.saveAsBtnClicked(defaultName)
+
+      self.classNameToParamMapping[clsName] = clsParam
       def newClassInit(clsObj, *args, **kwargs):
+        if (cls not in _INITIALIZED_CLASSES
+            and issubclass(cls, ContainsSharedProps)):
+          _INITIALIZED_CLASSES.add(cls)
+          cls.initShared_()
+          superObj = super(cls, clsObj)
+          if isinstance(superObj, ContainsSharedProps):
+           superObj.initShared_()
         self.classInstToEditorMapping[clsObj] = self
         retVal = oldClsInit(clsObj, *args, **kwargs)
         self._extendedClassInit(clsObj, clsParam)
@@ -511,8 +525,7 @@ class FRShortcutsEditor(FRParamEditor):
     self.boundFnsPerClass[clsName] = clsParams
 
   def _extendedClassDecorator(self, cls: Any, clsParam: FRParam, **opts):
-    if cls not in self.instantiatedClassTypes:
-      self.addRegisteredFuncsFromClass(cls, clsParam)
+    self.addRegisteredFuncsFromClass(cls, clsParam)
     super()._extendedClassDecorator(cls, clsParam, **opts)
 
   def _extendedClassInit(self, clsObj: Any, clsParam: FRParam):
@@ -545,15 +558,7 @@ class FRShortcutsEditor(FRParamEditor):
     """
     # Make sure to add parameters from registered base classes, too
     iterClasses = []
-    baseClasses = [cls]
-    nextClsPtr = 0
-    # Get all bases of bases, too
-    while nextClsPtr < len(baseClasses):
-      curCls = baseClasses[nextClsPtr]
-      curBases = curCls.__bases__
-      # Only add base classes that haven't already been added to prevent infinite recursion
-      baseClasses.extend([tmpCls for tmpCls in curBases if tmpCls not in baseClasses])
-      nextClsPtr += 1
+    baseClasses = _getAllBases(cls)
 
     for baseCls in baseClasses:
       iterClasses.append(baseCls.__qualname__)
@@ -722,6 +727,8 @@ class FRColorSchemeEditor(FRParamEditor):
   def __init__(self, parent=None):
     super().__init__(parent, paramList=[], saveDir=SCHEMES_DIR, fileType='scheme')
 
+
+_INITIALIZED_CLASSES: Set[Type[ContainsSharedProps]] = set()
 class _FRSingleton:
   algParamMgr = FRAlgPropsMgr()
 

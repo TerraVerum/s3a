@@ -3,9 +3,16 @@ import re
 import weakref
 from dataclasses import dataclass, fields, field
 from typing import Any, Optional
+from typing_extensions import Protocol, runtime_checkable
 from warnings import warn
 
 from .exceptions import FRParamParseError
+
+@runtime_checkable
+class ContainsSharedProps(Protocol):
+  @classmethod
+  def initShared_(cls):
+    return
 
 
 @dataclass
