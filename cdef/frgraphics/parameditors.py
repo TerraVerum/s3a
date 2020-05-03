@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from functools import partial
 from os.path import join
 from pathlib import Path
-from typing import Sequence, Union, Callable, Any, Optional, List, Dict, Tuple, Set, Type
+from typing import Collection, Union, Callable, Any, Optional, List, Dict, Tuple, Set, Type
 
 import numpy as np
 import pyqtgraph as pg
@@ -135,7 +135,7 @@ class FRNoneParameter(parameterTypes.SimpleParameter):
     self.setWritable(False)
 
 
-parameterTypes.registerParameterType('none', FRNoneParameter)
+parameterTypes.registerParameterType('NoneType', FRNoneParameter)
 parameterTypes.registerParameterType('shortcut', FRShortcutParameter)
 
 @dataclass
@@ -248,7 +248,7 @@ class FRParamEditor(QtWidgets.QDialog):
       self.tree.resizeColumnToContents(colIdx)
 
   # Helper method for accessing simple parameter values
-  def __getitem__(self, keys: Union[tuple, FRParam, Sequence[FRParam]]):
+  def __getitem__(self, keys: Union[tuple, FRParam, Collection[FRParam]]):
     """
     Convenience function for accessing child parameters within a parameter editor.
       - If :param:`keys` is a single :class:`FRParam`, the value at that parameter is
@@ -355,10 +355,41 @@ class FRParamEditor(QtWidgets.QDialog):
       outProps.append(self.registerProp(clsObj, param))
     return outProps
 
-  def registerProp(self, cls, constParam: FRParam):
-    paramForEditor = Parameter.create(name=constParam.name, type=constParam.valType,
-                               value=constParam.value, tip=constParam.helpText)
-    clsName = cls.__qualname__
+  def registerProp(self, groupingName: Union[type, str], constParam: FRParam,
+                   parentParamPath:Collection[str]=None, asProperty=True, **etxraOpts):
+    """
+    Registers a property defined by *constParam* that will appear in the respective
+    parameter editor.
+
+    :param groupingName: If *type* it must be a class. In this case, this parameter will
+      be listed under the registered class of the same exact name.
+      If *str*, *groupingName* must match the exact same string name passed in during
+      :func:`registerClass <FRParamEditor.registerClass>`. Otherwise, an error will
+      occur.
+    :param constParam: Object holding parameter attributes such as name, type,
+      help text, etc.
+    :param parentParamPath: If None, defaults to the top level of the parameters for the
+      current class (or paramHolder). *parentParamPath* represents the parent group
+      to whom the newly registered parameter should be added
+    :param asProperty: If True, creates a property object bound to getter and setter
+      for the new param. Otherwise, returns the param itself. If asProperty is false,
+      the returned parameter must be evaluated to obtain a value, e.g.
+      x = registerProp(..., asProperty=False); myVal = x.value()
+    :param etxraOpts: Extra options passed directly to the created pyqtgraph.Parameter
+    :return: Property bound to this value in the parameter editor
+    """
+    paramOpts = dict(name=constParam.name, type=constParam.valType, tip=constParam.helpText)
+    if constParam.valType == 'group':
+      paramOpts.update(children=constParam.value)
+    else:
+      paramOpts.update(value=constParam.value)
+    paramOpts.update(etxraOpts)
+    paramForEditor = Parameter.create(**paramOpts)
+
+    if isinstance(groupingName, type):
+      clsName = groupingName.__qualname__
+    else:
+      clsName = groupingName
     paramName = self.classNameToParamMapping[clsName].name
     if paramName in self.params.names:
       paramForCls = self.params.child(paramName)
@@ -367,21 +398,38 @@ class FRParamEditor(QtWidgets.QDialog):
       paramForCls.sigStateChanged.connect(self._paramTreeChanged)
       self.params.addChild(paramForCls)
 
+    if parentParamPath is not None:
+      paramForCls = paramForCls.param(*parentParamPath)
     if constParam.name not in paramForCls.names:
       paramForCls.addChild(paramForEditor)
 
+    if not asProperty:
+      return paramForEditor
+
+    def _paramAccessHelper(clsObj):
+      # when class isn't fully instantiated
+      # Retrieve class name from the class instance, since this function call may
+      # have resulted from an inhereted class. This only matters if the class name was
+      # used instead of a generic string parameter value
+      nonlocal clsName
+      if not isinstance(groupingName, str):
+        clsName = type(clsObj).__qualname__
+      if clsObj in self.classInstToEditorMapping:
+        xpondingEditor = self.classInstToEditorMapping[clsObj]
+      else:
+        xpondingEditor = self
+      return clsName, xpondingEditor
+
+    # Else, create a property and return that instead
     @property
     def paramAccessor(clsObj):
-      # Use function wrapper instfead of directly returning so no errors are thrown when class isn't fully instantiated
-      # Retrieve class name from the class instance, since this function call may have resulted from an inhereted class
-      trueCls = type(clsObj).__qualname__
-      xpondingEditor = self.classInstToEditorMapping[clsObj]
-      return xpondingEditor[self.classNameToParamMapping[trueCls], constParam]
+      trueClsName, xpondingEditor = _paramAccessHelper(clsObj)
+      return xpondingEditor[self.classNameToParamMapping[clsName], trueClsName]
 
     @paramAccessor.setter
     def paramAccessor(clsObj, newVal):
-      xpondingEditor = self.classInstToEditorMapping[clsObj]
-      param = xpondingEditor[self.classNameToParamMapping[clsName], constParam, True]
+      trueClsName, xpondingEditor = _paramAccessHelper(clsObj)
+      param = xpondingEditor[self.classNameToParamMapping[trueClsName], constParam, True]
       param.setValue(newVal)
 
     return paramAccessor
@@ -390,9 +438,27 @@ class FRParamEditor(QtWidgets.QDialog):
     """
     Intended for use as a class decorator. Registers a class as able to hold
     customizable shortcuts.
+
+    :param clsParam: Parameter holding the name of this class as it should appear
+      in this parameter editor. As such, it should be human readable.
+    :param opts: Additional registration options. Accepted values:
+      - overrideName: This is available so objects without a dedicated class can
+      also be registered. In that case, this is the unique identifier for the
+      spoof class instead of '[decorated class].__qualname__`.
+    :return: Undecorated class, but with a new __init__ method which initializes
+      all shared properties contained in the '__initEditorParams__' method, if it exists
+      in the class.
     """
-    def classDecorator(cls):
-      clsName = cls.__qualname__
+    def classDecorator(cls: Union[Type, Any]=None):
+      if cls is None:
+        # In this case overrideName must be provided. Use a dummy class for the
+        # rest of the proceedings
+        cls = type('DummyClass', (), {})
+        opts['overrideName'] = opts.get('overrideName', clsParam.name)
+      if not isinstance(cls, type):
+        # Instance was passed, not class
+        cls = type(cls)
+      clsName = opts.get('overrideName', cls.__qualname__)
       oldClsInit = cls.__init__
       self._extendedClassDecorator(cls, clsParam, **opts)
 
@@ -585,9 +651,7 @@ class FRShortcutsEditor(FRParamEditor):
       else:
         self.params.addChild(paramGroup)
 
-
-
-  def registerProp(self, clsObj, constParam: FRParam):
+  def registerProp(self, *args, **etxraOpts):
     """
     Properties should never be registered as shortcuts, so make sure this is disallowed
     """
@@ -723,6 +787,32 @@ class FRAlgPropsMgr(FRParamEditor):
     # Wrap in property so changes propagate to the calling class
     return newEditor
 
+class FRAlgPropsMgr_new(FRParamEditor):
+
+  def __init__(self, parent=None):
+    super().__init__(parent, fileType='', saveDir='')
+    self.processorCtors : List[Callable[[Any,...], FRImageProcessor]] = []
+
+  def registerClass(self, clsParam: FRParam, **opts):
+    # Don't save a default file for this class
+    return super().registerClass(clsParam, saveDefault=False, **opts)
+
+  def _extendedClassDecorator(self, cls: Any, clsParam: FRParam, **opts):
+    if opts.get('addToList', True):
+      ctorArgs = opts.get('args', [])
+      procCtor = partial(cls, *ctorArgs)
+      self.processorCtors.append(procCtor)
+
+  def createProcessorForClass(self, clsObj) -> FRAlgCollectionEditor:
+    clsName = type(clsObj).__name__
+    editorDir = join(MENU_OPTS_DIR, clsName, '')
+    # Strip "FR" from class name before retrieving name
+    settingsName = _frPascalCaseToTitle(clsName[2:]) + ' Processor'
+    newEditor = FRAlgCollectionEditor(editorDir, self, name=settingsName)
+    FR_SINGLETON.editors.append(newEditor)
+    # Wrap in property so changes propagate to the calling class
+    return newEditor
+
 
 class FRColorSchemeEditor(FRParamEditor):
   def __init__(self, parent=None):
@@ -731,7 +821,7 @@ class FRColorSchemeEditor(FRParamEditor):
 
 _INITIALIZED_CLASSES: Set[Type[ContainsSharedProps]] = set()
 class _FRSingleton:
-  algParamMgr = FRAlgPropsMgr()
+  algParamMgr = FRAlgPropsMgr_new()
 
   shortcuts = FRShortcutsEditor()
   scheme = FRColorSchemeEditor()
@@ -744,11 +834,11 @@ class _FRSingleton:
     self.editors: List[FRParamEditor] =\
       [self.scheme, self.shortcuts, self.generalProps, self.filter]
 
-  def registerClass(self, clsParam: FRParam):
+  def registerClass(self, clsParam: FRParam, **opts):
     def multiEditorClsDecorator(cls):
       # Since all legwork is done inside the editors themselves, simply call each decorator from here as needed
       for editor in self.editors:
-        cls = editor.registerClass(clsParam)(cls)
+        cls = editor.registerClass(clsParam, **opts)(cls)
       return cls
     return multiEditorClsDecorator
 

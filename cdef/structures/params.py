@@ -11,17 +11,40 @@ from .exceptions import FRParamParseError
 @runtime_checkable
 class ContainsSharedProps(Protocol):
   @classmethod
-  def initShared_(cls):
+  def __initEditorParams__(cls):
     return
 
 
 @dataclass
 class FRParam:
   name: str
-  value: Any
-  valType: Optional[Any] = None
+  """Display name of the parameter"""
+  value: Any = None
+  """
+  Initial value of the parameter.
+    This is used within the program to infer parameter type, shape, comparison methods, etc.
+  """
+  valType: Optional[str] = None
+  """
+  Type of the variable if not easily inferrable from the value itself. 
+    For instance, class:`FRShortcutParameter<cdef.frgraphics.parameditors.FRShortcutParameter>`
+    is indicated with string values (e.g. 'Ctrl+D'), so the user must explicitly specify 
+    that such an :class:`FRParam` is of type 'shortcut' (as defined in 
+    :class:`FRShortcutParameter<cdef.frgraphics.parameditors.FRShortcutParameter>`)
+    If the type *is* easily inferrable, this may be left blank.
+  """
   helpText: str = ''
+  """Additional documentation for this parameter."""
   group: Optional[FRParamGroup] = None
+  """FRParamGroup to which this parameter belongs, if this parameter is part of
+    a group. This is set by the FRParamGroup, not manually
+  """
+
+  def __post_init__(self):
+    if self.valType is None:
+      # Infer from value
+      valType = type(self.value).__name__
+      self.valType = valType
 
   def __str__(self):
     return f'{self.name}'
@@ -107,21 +130,8 @@ def newParam(name, val=None, valType=None, helpText=''):
   """
   Factory for creating new parameters within a :class:`FRParamGroup`.
 
-  :param name: Display name of the parameter
-  :param val: Initial value of the parameter. This is used within the program to infer
-         parameter type, shape, comparison methods, etc.
-  :param valType: Type of the variable if not easily inferrable from the value itself. For instance,
-  class:`FRShortcutParameter<cdef.frgraphics.parameditors.FRShortcutParameter>` is indicated with string values
-  (e.g. 'Ctrl+D'), so the user must explicitly specify that such an :class:`FRParam` is of type 'shortcut' (as
-  defined in :class:`FRShortcutParameter<cdef.frgraphics.parameditors.FRShortcutParameter>`) If the type *is* easily
-  inferrable, this may be left blank.
-  :param helpText: Additional documentation for this parameter.
+  See parameter documentation from :class:FRParam for arguments.
+
   :return: Field that can be inserted within the :class:`FRParamGroup` dataclass.
   """
-  if valType is None:
-    # Infer from value
-    # TODO: Is there an easier way?
-    # The string representation of val 'type' is: <class 'type'>
-    # Parse for '' occurrences and grab in between the quotes
-    valType = re.search('\'.*\'', str(type(val))).group()[1:-1]
   return field(default_factory=lambda: FRParam(name, val, valType, helpText))
