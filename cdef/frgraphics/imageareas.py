@@ -30,7 +30,7 @@ QCursor = QtGui.QCursor
 class FRRegionVertsUndoBuffer(FRObjUndoBuffer):
 
   @classmethod
-  def initShared_(cls):
+  def __initEditorParams__(cls):
     cls.maxBufferLen, cls.stepsBetweenBufSave = FR_SINGLETON.generalProps.registerProps(cls,
         [FR_CONSTS.PROP_UNDO_BUF_SZ, FR_CONSTS.PROP_STEPS_BW_SAVE])
 
@@ -230,7 +230,7 @@ class FRMainImage(FREditableImg):
 class FRFocusedImage(FREditableImg):
 
   @classmethod
-  def initShared_(cls):
+  def __initEditorParams__(cls):
     cls.compCropMargin, cls.segThresh\
       = FR_SINGLETON.generalProps.registerProps(cls, [FR_CONSTS.PROP_MARGIN,
           FR_CONSTS.PROP_SEG_THRESH])

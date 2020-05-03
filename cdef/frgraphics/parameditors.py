@@ -395,19 +395,20 @@ class FRParamEditor(QtWidgets.QDialog):
       clsName = cls.__qualname__
       oldClsInit = cls.__init__
       self._extendedClassDecorator(cls, clsParam, **opts)
-      if opts.get('saveDefault', True):
-        defaultName = str(Path(self.saveDir)/f'Default.{self.fileType}')
-        self.saveAsBtnClicked(defaultName)
 
       self.classNameToParamMapping[clsName] = clsParam
       def newClassInit(clsObj, *args, **kwargs):
         if (cls not in _INITIALIZED_CLASSES
             and issubclass(cls, ContainsSharedProps)):
           _INITIALIZED_CLASSES.add(cls)
-          cls.initShared_()
+          cls.__initEditorParams__()
           superObj = super(cls, clsObj)
           if isinstance(superObj, ContainsSharedProps):
-           superObj.initShared_()
+           superObj.__initEditorParams__()
+
+        if opts.get('saveDefault', True):
+          defaultName = str(Path(self.saveDir)/f'Default.{self.fileType}')
+          self.saveAsBtnClicked(defaultName)
         self.classInstToEditorMapping[clsObj] = self
         retVal = oldClsInit(clsObj, *args, **kwargs)
         self._extendedClassInit(clsObj, clsParam)

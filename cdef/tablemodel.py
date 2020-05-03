@@ -232,7 +232,7 @@ class FRComponentIO:
   calling exporter.exportCsv, exportPkl, etc. for those objects / files respectively.
   """
   @classmethod
-  def initShared_(cls):
+  def __initEditorParams__(cls):
     cls.exportOnlyVis, cls.includeFullSourceImgName = \
       FR_SINGLETON.generalProps.registerProps(cls,
       [FR_CONSTS.EXP_ONLY_VISIBLE, FR_CONSTS.INCLUDE_FNAME_PATH]

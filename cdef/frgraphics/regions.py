@@ -136,7 +136,7 @@ def _makeTxtSymbol(txt: str, fontSize: int):
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_MULT_REG_PLT)
 class FRMultiRegionPlot(QtCore.QObject):
   @classmethod
-  def initShared_(cls):
+  def __initEditorParams__(cls):
     (cls.nonvalidIdClr, cls.validIdClr, cls.boundClr,cls.boundWidth,
     cls.idMarkerSz, cls.selectedIdBorder) = FR_SINGLETON.scheme.registerProps(cls,
       [FR_CONSTS.SCHEME_NONVALID_ID_COLOR, FR_CONSTS.SCHEME_VALID_ID_COLOR,
@@ -271,7 +271,7 @@ class FRMultiRegionPlot(QtCore.QObject):
 @FR_SINGLETON.registerClass(FR_CONSTS.CLS_VERT_IMG)
 class FRVertexDefinedImg(pg.ImageItem):
   @classmethod
-  def initShared_(cls):
+  def __initEditorParams__(cls):
     cls.fillClr, cls.vertClr = FR_SINGLETON.scheme.registerProps(
       cls, [FR_CONSTS.SCHEME_REG_FILL_COLOR, FR_CONSTS.SCHEME_REG_VERT_COLOR])
 

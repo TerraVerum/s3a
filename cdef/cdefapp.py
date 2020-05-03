@@ -45,7 +45,7 @@ class FRCdefApp(FRAnnotatorUI):
   sigLayoutSaved = Signal()
 
   @classmethod
-  def initShared_(cls):
+  def __initEditorParams__(cls):
     cls.estBoundsOnStart = FR_SINGLETON.generalProps.registerProp(cls,
         FR_CONSTS.PROP_EST_BOUNDS_ON_START)
     cls.useDarkTheme = FR_SINGLETON.scheme.registerProp(cls, FR_CONSTS.SCHEME_USE_DARK_THEME)

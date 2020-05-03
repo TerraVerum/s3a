@@ -55,7 +55,7 @@ IMPLS = _FRDefaultAlgImpls()
 class FRBasicImageProcessorImpl(FRImageProcessor):
 
   @classmethod
-  def initShared_(cls):
+  def __initEditorParams__(cls):
     (cls.minCompSz, cls.margin, cls.allowMultReg,
      cls.allowHoles, cls.strelSz) = FR_SINGLETON.algParamMgr.registerProps(cls,
         [IMPLS.PROP_MIN_COMP_SZ, IMPLS.PROP_MARGIN, IMPLS.PROP_ALLOW_MULT_REG,
@@ -91,11 +91,10 @@ class FRBasicImageProcessorImpl(FRImageProcessor):
     initialList = getVertsFromBwComps(getBwComps(self.image, self.minCompSz), externOnly=True)
     return [FRComplexVertices([lst]) for lst in initialList]
 
-
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_REGION_GROW)
 class FRRegionGrow(FRBasicImageProcessorImpl):
   @classmethod
-  def initShared_(cls):
+  def __initEditorParams__(cls):
     cls.seedThresh = FR_SINGLETON.algParamMgr.registerProp(cls, IMPLS.PROP_SEED_THRESH)
 
   def localCompEstimate(self, prevCompMask: BlackWhiteImg, fgVerts: FRVertices = None,
@@ -187,7 +186,6 @@ class FRBasicShapes(FRBasicImageProcessorImpl):
     prevCompMask &= (~subRegion)
     return super().localCompEstimate(prevCompMask)
 
-
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_SQUARES)
 class FROnlySquares(FRBasicShapes):
   def globalCompEstimate(self) -> List[FRComplexVertices]:
@@ -214,7 +212,7 @@ class FROnlySquares(FRBasicShapes):
 @FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_ACT_CONTOUR)
 class FRActiveContour(FRBasicImageProcessorImpl):
   @classmethod
-  def initShared_(cls):
+  def __initEditorParams__(cls):
     (cls.blurSigma, cls.alpha, cls.beta, cls.gamma, cls.wEdge)\
       = FR_SINGLETON.algParamMgr.registerProps(cls, [IMPLS.PROP_GAUS_SIGMA,
           IMPLS.PROP_ACT_CONT_ALPHA, IMPLS.PROP_ACT_CONT_BETA, IMPLS.PROP_ACT_CONT_GAMMA,
