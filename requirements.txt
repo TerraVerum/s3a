@@ -10,3 +10,4 @@ pyqtgraph
 pandas
 Pillow
 qdarkstyle
+typing_extensions
