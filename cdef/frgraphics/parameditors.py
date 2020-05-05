@@ -322,29 +322,33 @@ class FRParamEditor(QtWidgets.QDialog):
     self.sigParamStateUpdated.emit(outDict)
     return outDict
 
-  def saveAsBtnClicked(self, saveName=None, paramState=None):
+  def saveAsBtnClicked(self):
+    paramState = self.params.saveState()
+    saveName = dialogSaveToFile(self, paramState, self._saveDlgName, self.saveDir,
+                                  self.fileType, performSave=False)
+    self.saveAs(saveName, paramState)
+
+  def saveAs(self, saveName: str=None, paramState: dict=None,
+             allowOverwriteDefault=False):
     """
-    :return: List where each index corresponds to the tree's parameter.
-    This is suitable for extending with an ID and vertex list, after which
-    it can be placed into the component table.
+    * Returns dict on successful parameter save and emits sigParamStateCreated.
+    * Returns string representing error if the file name was invalid.
+    * Returns None if no save name was given
     """
+    if saveName is None:
+      return None
     if paramState is None:
       paramState = self.params.saveState()
-    if not saveName:
-      saveName = dialogSaveToFile(self, paramState, self._saveDlgName, self.saveDir,
-                                  self.fileType)
-    else:
-      Path(self.saveDir).mkdir(parents=True, exist_ok=True)
-      with open(saveName, 'wb') as saveFile:
-        pkl.dump(paramState, saveFile)
-    if saveName:
-      # Accept new param state after saving
+    Path(self.saveDir).mkdir(parents=True, exist_ok=True)
+    errMsg = saveToFile(paramState, self.saveDir, saveName, self.fileType,
+                        allowOverwriteDefault=allowOverwriteDefault)
+    if errMsg is None:
       self.applyBtnClicked()
-      outDict = self.params.getValues()
+      outDict: dict = self.params.getValues()
       self.sigParamStateCreated.emit(saveName)
       return outDict
-    # If no name specified
-    return None
+    else:
+      return errMsg
 
   def loadState(self, newStateDict: dict):
     self.params.restoreState(newStateDict, addChildren=False)
@@ -398,7 +402,7 @@ class FRParamEditor(QtWidgets.QDialog):
       paramForCls.sigStateChanged.connect(self._paramTreeChanged)
       self.params.addChild(paramForCls)
 
-    if parentParamPath is not None:
+    if parentParamPath is not None and len(parentParamPath) > 0:
       paramForCls = paramForCls.param(*parentParamPath)
     if constParam.name not in paramForCls.names:
       paramForCls.addChild(paramForEditor)
@@ -473,8 +477,7 @@ class FRParamEditor(QtWidgets.QDialog):
            superObj.__initEditorParams__()
 
         if opts.get('saveDefault', True):
-          defaultName = str(Path(self.saveDir)/f'Default.{self.fileType}')
-          self.saveAsBtnClicked(defaultName)
+          self.saveAs(saveName='Default', allowOverwriteDefault=True)
         self.classInstToEditorMapping[clsObj] = self
         retVal = oldClsInit(clsObj, *args, **kwargs)
         self._extendedClassInit(clsObj, clsParam)
@@ -724,15 +727,16 @@ class FRAlgCollectionEditor(FRParamEditor):
       self.tree.resizeColumnToContents(colIdx)
 
     self.algOpts.setLimits(self.processors)
-    self.saveAsBtnClicked(f'{self.saveDir}Default.{self.fileType}')
+    self.saveAs('Default', allowOverwriteDefault=True)
 
-  def saveAsBtnClicked(self, saveName=None, paramState=None):
+  def saveAs(self, saveName: str=None, paramState: dict=None,
+             allowOverwriteDefault=False):
     """
     The algorithm editor also needs to store information about the selected algorithm, so lump
     this in with the other parameter information before calling default save.
     """
     paramState = [self.algOpts.value()[0], self.params.saveState()]
-    return super().saveAsBtnClicked(saveName, paramState)
+    return super().saveAs(saveName, paramState, allowOverwriteDefault)
 
   def loadState(self, selection_newStatePair: Tuple[str, dict]):
     selectedOpt = selection_newStatePair[0]

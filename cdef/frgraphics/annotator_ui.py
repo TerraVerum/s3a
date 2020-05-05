@@ -98,17 +98,17 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
 
     # File / layout
     self.menuLayout = create_addMenuAct(self, self.menuFile, '&Layout', True)
-    self.saveLayout = create_addMenuAct(self, self.menuLayout, 'Save Layout')
+    self.saveLayoutAct = create_addMenuAct(self, self.menuLayout, 'Save Layout')
     self.menuLayout.addSeparator()
 
     # File / components
     self.menuExport = create_addMenuAct(self, self.menuFile, '&Export...', True)
-    self.exportCompList = create_addMenuAct(self, self.menuExport, '&Component List')
-    self.exportLabelImg = create_addMenuAct(self, self.menuExport, '&Labeled Image')
+    self.exportCompListAct = create_addMenuAct(self, self.menuExport, '&Component List')
+    self.exportLabelImgAct = create_addMenuAct(self, self.menuExport, '&Labeled Image')
 
     self.menuLoad_Components = create_addMenuAct(self, self.menuFile, 'Load Components', True)
-    self.loadComps_merge = create_addMenuAct(self, self.menuLoad_Components, 'Update as &Merge')
-    self.loadComps_new = create_addMenuAct(self, self.menuLoad_Components, 'Append as &New')
+    self.loadCompsAct_merge = create_addMenuAct(self, self.menuLoad_Components, 'Update as &Merge')
+    self.loadCompsAct_new = create_addMenuAct(self, self.menuLoad_Components, 'Append as &New')
 
     self.setMenuBar(self.menubar)
 

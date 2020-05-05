@@ -21,6 +21,7 @@ Slot = QtCore.pyqtSlot
 
 
 class FRShapeCollection(QtCore.QObject):
+  # Signal(FRExtendedROI)
   sigShapeFinished = Signal(object)
   def __init__(self, allowableShapes: Tuple[FRParam,...]=None, parent: pg.GraphicsView=None):
     super().__init__(parent)

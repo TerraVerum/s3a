@@ -251,7 +251,7 @@ class FRComponentIO:
     if self.exportOnlyVis:
       exportIds = displayIds
     else:
-      exportIds = self.compDf.index
+      exportIds = compDf.index
     exportDf = compDf.loc[exportIds,:].copy()
     if not self.includeFullSourceImgName:
       # Only use the file name, not the whole path
