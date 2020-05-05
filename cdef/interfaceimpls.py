@@ -1,117 +1,97 @@
-from dataclasses import dataclass
-from typing import List
-
 import cv2 as cv
 import numpy as np
-from skimage.filters import gaussian
+import pandas as pd
+from scipy.ndimage import binary_fill_holes
+from skimage import morphology
 from skimage.measure import regionprops, label
-from skimage.morphology import opening, closing, disk
-from skimage.segmentation import active_contour
+from scipy.ndimage import binary_opening, binary_closing
 
-from cdef.processingutils import cornersToFullBoundary
-from cdef.structures.typeoverloads import BlackWhiteImg
-from .frgraphics.parameditors import FR_SINGLETON
-from .generalutils import getClippedBbox
-from .generalutils import splitListAtNans
-from .interfaces import FRImageProcessor
-from .processingutils import getVertsFromBwComps, getBwComps
-from .processingutils import growSeedpoint, rmSmallComps
-from .structures import FRParam, FRParamGroup, newParam
-from .structures import FRVertices, FRComplexVertices
+from cdef.generalutils import splitListAtNans
+from cdef.processingutils import growSeedpoint, cornersToFullBoundary, _getCroppedImg, \
+  _area_coord_regionTbl
+from cdef.structures import BlackWhiteImg, FRVertices
+from imageprocessing.common import Image
+from imageprocessing.processing import ImageIO
 
+def fillHoles():
+  io = ImageIO.createFrom(fillHoles, locals())
+  proc = io.initProcess('Fill Holes')
 
-# For the purposes of processor impl's, a dataclass is probably not necessary. But I used it everywhere else
-# so I'll stick to the pattern
-@dataclass
-class _FRDefaultAlgImpls(FRParamGroup):
-  CLS_REGION_GROW : FRParam = newParam('Region Growing')
-  CLS_SHAPES      : FRParam = newParam('Basic Shapes')
-  CLS_SQUARES     : FRParam = newParam('Only Squares')
-  CLS_BASIC       : FRParam = newParam('Shared Impl. Functionality')
-  CLS_ACT_CONTOUR : FRParam = newParam('Active Contour -- SLOW')
+  def op(_image: Image):
+    return ImageIO(image=binary_fill_holes(_image.data))
+  proc.addFunction(op)
+  return proc
 
-  PROP_SEED_THRESH    : FRParam = newParam('Seedpoint Threshold', 10.)
-  PROP_MIN_COMP_SZ    : FRParam = newParam('Minimum New Component Pixels', 50)
-  PROP_MARGIN         : FRParam = newParam('Max Seedpoint Side Length', 30, None,
-                                           'During seedpoint growth, the resulting '
-                                           'component can grow very large if not restricted. '
-                                           'Enforcing a larest size requirement limits '
-                                           'these drawbacks.')
-  PROP_ALLOW_MULT_REG : FRParam = newParam('Allow Noncontiguous Vertices', False)
-  PROP_ALLOW_HOLES    : FRParam = newParam('Allow Holes in Component', False)
-  PROP_STREL_SZ       : FRParam = newParam('Open->Close Struct. El. Width', 3)
-  # Default values below retrieved from
-  PROP_GAUS_SIGMA     : FRParam = newParam('Blurring Sigma', 3)
-  PROP_ACT_CONT_ALPHA : FRParam = newParam('Alpha', 1)
-  PROP_ACT_CONT_BETA  : FRParam = newParam('Beta', 0.1)
-  PROP_ACT_CONT_GAMMA : FRParam = newParam('Gamma', 0.1)
-  PROP_ACT_CONT_EDGE : FRParam = newParam('Edge Attraction', 5)
-  PROP_N_A            : FRParam = newParam('No Editable Properties', None, 'none')
+def closeOpen(diskRadius=3):
+  io = ImageIO.createFrom(closeOpen, locals())
+  proc = io.initProcess('Close -> Open Component')
 
+  def close_open(_image: Image, _diskRadius):
+    strel = morphology.disk(_diskRadius)
+    return ImageIO(image=binary_opening(binary_closing(_image.data, strel), strel))
+  proc.addFunction(close_open)
+  return proc
 
-IMPLS = _FRDefaultAlgImpls()
+def keepLargestConnComp():
+  io = ImageIO.createFrom(keepLargestConnComp, locals())
+  proc = io.initProcess('Keep Largest Connected Components')
 
-@FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_BASIC, addToList=False)
-class FRBasicImageProcessorImpl(FRImageProcessor):
+  def keep_largest_comp(_image: Image, _regionPropTbl: pd.DataFrame):
+      if _regionPropTbl is None:
+        _regionPropTbl = _area_coord_regionTbl(_image)
+      out = np.zeros(_image.data.shape, bool)
+      coords = _regionPropTbl.coords[_regionPropTbl.area.argmax()]
+      if coords.size == 0:
+        return ImageIO(image=out, regionPropTbl=_regionPropTbl)
+      out[coords[:,0], coords[:,1]] = True
+      return ImageIO(image=out, regionPropTbl=_regionPropTbl)
+  proc.addFunction(keep_largest_comp)
+  return proc
 
-  @classmethod
-  def __initEditorParams__(cls):
-    (cls.minCompSz, cls.margin, cls.allowMultReg,
-     cls.allowHoles, cls.strelSz) = FR_SINGLETON.algParamMgr.registerProps(cls,
-        [IMPLS.PROP_MIN_COMP_SZ, IMPLS.PROP_MARGIN, IMPLS.PROP_ALLOW_MULT_REG,
-         IMPLS.PROP_ALLOW_HOLES, IMPLS.PROP_STREL_SZ])
+def removeSmallConnComps(minSzThreshold=30):
+  io = ImageIO.createFrom(removeSmallConnComps, locals())
+  proc = io.initProcess('Remove Conn. Comp. Smaller Than...')
+  def rm_small_comp(_image: Image, _regionPropTbl: pd.DataFrame, _minSzThreshold):
+    if _regionPropTbl is None:
+      _regionPropTbl = _area_coord_regionTbl(_image)
+    validCoords = _regionPropTbl.coords[_regionPropTbl.area >= _minSzThreshold]
+    out = np.zeros(_image.shape, bool)
+    if len(validCoords) == 0:
+      return ImageIO(image=out, regionPropTbl=_regionPropTbl)
+    coords = np.vstack(validCoords)
+    out[coords[:,0], coords[:,1]] = True
+    return ImageIO(image=out, regionPropTbl=_regionPropTbl)
+  proc.addFunction(rm_small_comp)
+  return proc
 
+def basicOpsCombo():
+  io = ImageIO.createFrom(basicOpsCombo, locals())
+  proc = io.initProcess('Basic Region Operations')
+  proc.addProcess(fillHoles())
+  proc.addProcess(closeOpen())
+  proc.addProcess(keepLargestConnComp())
+  proc.addProcess(removeSmallConnComps())
+  return proc
 
-  def localCompEstimate(self, prevCompMask: BlackWhiteImg, fgVerts: FRVertices = None, bgVerts: FRVertices = None) -> \
-      BlackWhiteImg:
-    """
-    Performs basic operations shared by all FICS-specified image processors. That is, whether they allow holes,
-    regions comprised of multiple separate segments, their minimum size, and margin around specified vertices.
-    """
-    if np.count_nonzero(prevCompMask) <= 1: return rmSmallComps(prevCompMask, self.minCompSz)
-    if not self.allowHoles:
-      # Fill in outer contours
-      tmpVerts = getVertsFromBwComps(prevCompMask, externOnly=True)
-      tmpMask = prevCompMask.astype('uint8')
-      prevCompMask = cv.fillPoly(tmpMask, tmpVerts, 1) > 0
-    if not self.allowMultReg:
-      # Take out all except the largest region
-      regions = regionprops(label(prevCompMask))
-      if len(regions) == 0: return prevCompMask
-      maxRegion = regions[0]
-      for region in regions:
-        if region.area > maxRegion.area:
-          maxRegion = region
-      prevCompMask[:] = False
-      prevCompMask[maxRegion.coords[:,0], maxRegion.coords[:,1]] = True
-    # Remember to account for the vertex offset
-    return rmSmallComps(prevCompMask, self.minCompSz)
-
-  def globalCompEstimate(self) -> List[FRComplexVertices]:
-    initialList = getVertsFromBwComps(getBwComps(self.image, self.minCompSz), externOnly=True)
-    return [FRComplexVertices([lst]) for lst in initialList]
-
-@FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_REGION_GROW)
-class FRRegionGrow(FRBasicImageProcessorImpl):
-  @classmethod
-  def __initEditorParams__(cls):
-    cls.seedThresh = FR_SINGLETON.algParamMgr.registerProp(cls, IMPLS.PROP_SEED_THRESH)
-
-  def localCompEstimate(self, prevCompMask: BlackWhiteImg, fgVerts: FRVertices = None,
-                        bgVerts: FRVertices = None) -> BlackWhiteImg:
-    if prevCompMask is None:
-      prevCompMask = np.zeros(self.image.shape[:2], dtype=bool)
+def regionGrowProcessor(margin=5, seedThresh=10, strelSz=3):
+  curLocals = locals()
+  io = ImageIO.createFrom(regionGrowProcessor, locals())
+  proc = io.initProcess('Region Growing')
+  def region_grow(_image: Image, _prevCompMask: BlackWhiteImg, _fgVerts: FRVertices,
+                  _bgVerts: FRVertices, _seedThresh=seedThresh, _margin=margin, _strelSz=strelSz):
+    if _prevCompMask is None:
+      _prevCompMask = np.zeros(_image.shape[:2], dtype=bool)
     else:
       # Don't modify the original version
-      prevCompMask = prevCompMask.copy()
+      _prevCompMask = _prevCompMask.copy()
     # TODO: Make this code more robust
     # -----
     # DETERMINE BITWISE RELATIONSHIP B/W OLD AND NEW MASKS
     # -----
-    if fgVerts is None:
+    if _fgVerts is None:
       # Add to background
       bitOperation = lambda curRegion, other: curRegion & (~other)
-      fgVerts = bgVerts
+      _fgVerts = _bgVerts
     else:
       # Add to foreground
       bitOperation = np.bitwise_or
@@ -119,22 +99,22 @@ class FRRegionGrow(FRBasicImageProcessorImpl):
     # -----
     # DETERMINE INWARD/OUTWARD GROWTH BASED ON VERTEX SHAPE
     # -----
-    if np.all(fgVerts == fgVerts[0,:]):
+    if np.all(_fgVerts == _fgVerts[0,:]):
       # Remove unnecessary redundant seedpoints
-      fgVerts = fgVerts[[0],:]
-    if fgVerts.shape[0] == 1:
+      _fgVerts = _fgVerts[[0],:]
+    if _fgVerts.shape[0] == 1:
       # Grow outward
       growFunc = growSeedpoint
-      compMargin = self.margin
-      fgVerts.connected = False
+      compMargin = _margin
+      _fgVerts.connected = False
     else:
       # Grow inward
       growFunc = lambda *args: ~growSeedpoint(*args)
       compMargin = 0
-    croppedImg, cropOffset = self.getCroppedImg(fgVerts, compMargin)
+    croppedImg, cropOffset = _getCroppedImg(_image.data, _fgVerts, compMargin)
     if croppedImg.size == 0:
-      return prevCompMask
-    centeredFgVerts = fgVerts - cropOffset[0:2]
+      return _prevCompMask
+    centeredFgVerts = _fgVerts - cropOffset[0:2]
 
     filledMask = None
     tmpImgToFill = np.zeros(croppedImg.shape[0:2], dtype='uint8')
@@ -143,8 +123,8 @@ class FRRegionGrow(FRBasicImageProcessorImpl):
     if centeredFgVerts.connected:
       centeredFgVerts = cornersToFullBoundary(centeredFgVerts, 50e3)
 
-    newRegion = growFunc(croppedImg, centeredFgVerts, self.seedThresh)
-    if fgVerts.connected:
+    newRegion = growFunc(croppedImg, centeredFgVerts, _seedThresh)
+    if _fgVerts.connected:
       # For connected vertices, zero out region locations outside the user defined area
       if filledMask is None:
         filledMask = cv.fillPoly(tmpImgToFill, [centeredFgVerts], 1) > 0
@@ -152,29 +132,26 @@ class FRRegionGrow(FRBasicImageProcessorImpl):
 
     rowColSlices = (slice(cropOffset[1], cropOffset[3]),
                     slice(cropOffset[0], cropOffset[2]))
-    prevCompMask[rowColSlices] = bitOperation(prevCompMask[rowColSlices], newRegion)
-    openCloseStrel = disk(self.strelSz)
-    prevCompMask = opening(closing(prevCompMask, openCloseStrel), openCloseStrel)
-    return super().localCompEstimate(prevCompMask)
+    _prevCompMask[rowColSlices] = bitOperation(_prevCompMask[rowColSlices], newRegion)
+    openCloseStrel = morphology.disk(_strelSz)
+    _prevCompMask = morphology.opening(morphology.closing(_prevCompMask, openCloseStrel), openCloseStrel)
+    return ImageIO(image=_prevCompMask)
+  proc.addFunction(region_grow)
+  proc.addProcess(basicOpsCombo())
+  return proc
 
-  def getCroppedImg(self, verts: FRVertices, margin: int) -> (np.ndarray, np.ndarray):
-    verts = np.vstack(verts)
-    img_np = self.image
-    compCoords = np.vstack([verts.min(0), verts.max(0)])
-    compCoords = getClippedBbox(img_np.shape, compCoords, margin).flatten()
-    croppedImg = self.image[compCoords[1]:compCoords[3], compCoords[0]:compCoords[2], :]
-    return croppedImg, compCoords
+def basicShapesProcessor():
+  io = ImageIO.createFrom(basicShapesProcessor, locals())
+  proc = io.initProcess('Basic Shapes')
 
-@FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_SHAPES)
-class FRBasicShapes(FRBasicImageProcessorImpl):
-  def localCompEstimate(self, prevCompMask: BlackWhiteImg, fgVerts: FRVertices=None, bgVerts: FRVertices=None) -> \
-      BlackWhiteImg:
+  def get_basic_shapes(_image: Image, _prevCompMask: BlackWhiteImg,
+                       _fgVerts: FRVertices=None, _bgVerts: FRVertices=None):
     # Don't modify the original version
-    prevCompMask = prevCompMask.copy()
+    prevCompMask = _prevCompMask.copy()
     # Convert indices into boolean index masks
     masks = []
-    for ii, verts in enumerate((fgVerts, bgVerts)):
-      curMask = np.zeros(self.image.shape[0:2], dtype='uint8')
+    for ii, verts in enumerate((_fgVerts, _bgVerts)):
+      curMask = np.zeros(_image.shape[0:2], dtype='uint8')
       if verts is not None:
         fillPolyArg = splitListAtNans(verts)
         curMask = cv.fillPoly(curMask, fillPolyArg, 1)
@@ -184,65 +161,20 @@ class FRBasicShapes(FRBasicImageProcessorImpl):
     subRegion = ~masks[0] & masks[1]
     prevCompMask |= addRegion
     prevCompMask &= (~subRegion)
-    return super().localCompEstimate(prevCompMask)
+    return ImageIO(image=prevCompMask)
+  proc.addFunction(get_basic_shapes)
+  proc.addProcess(basicOpsCombo())
+  return proc
 
-@FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_SQUARES)
-class FROnlySquares(FRBasicShapes):
-  def globalCompEstimate(self) -> List[FRComplexVertices]:
-    polyVerts = super().globalCompEstimate()
-    outVerts = []
-    for vertList in polyVerts:
-      squareCorners = np.vstack([vertList.stack().min(0), vertList.stack().max(0)])
-      # Turn square diagonals into proper vertices
-      colIdx = [0,1,0,1,0,1,0,1]
-      rowIdx = [0,0,0,1,1,1,1,0]
-      squareVerts = squareCorners[rowIdx, colIdx].reshape(-1,2)
-      outVerts.append(FRComplexVertices([squareVerts]))
-    return outVerts
+def onlySquaresProcessor():
+  io = ImageIO.createFrom(basicShapesProcessor, locals())
+  proc = io.initProcess('Only Squares')
 
-  def localCompEstimate(self, prevCompMask: np.ndarray, fgVerts: FRVertices = None, bgVerts: FRVertices = None) -> \
-      np.ndarray:
-    # Convert indices into boolean index masks
-    compMask = super().localCompEstimate(prevCompMask, fgVerts, bgVerts)
-    outMask = np.zeros(compMask.shape, dtype=bool)
-    for region in regionprops(label(compMask)):
+  proc.addProcess(basicShapesProcessor())
+  def convert_to_squares(_image: Image):
+    outMask = np.zeros(_image.shape, dtype=bool)
+    for region in regionprops(label(_image.data)):
       outMask[region.bbox[0]:region.bbox[2],region.bbox[1]:region.bbox[3]] = True
-    return outMask    
-
-@FR_SINGLETON.algParamMgr.registerClass(IMPLS.CLS_ACT_CONTOUR)
-class FRActiveContour(FRBasicImageProcessorImpl):
-  @classmethod
-  def __initEditorParams__(cls):
-    (cls.blurSigma, cls.alpha, cls.beta, cls.gamma, cls.wEdge)\
-      = FR_SINGLETON.algParamMgr.registerProps(cls, [IMPLS.PROP_GAUS_SIGMA,
-          IMPLS.PROP_ACT_CONT_ALPHA, IMPLS.PROP_ACT_CONT_BETA, IMPLS.PROP_ACT_CONT_GAMMA,
-          IMPLS.PROP_ACT_CONT_EDGE])
-
-  def localCompEstimate(self, prevCompMask: BlackWhiteImg, fgVerts: FRVertices = None, bgVerts: FRVertices = None) -> \
-      BlackWhiteImg:
-    blurredImg = gaussian(self.image, self.blurSigma)
-    prevCompMask = prevCompMask.copy()
-    if fgVerts is None:
-      # Snake to get area, then subtract
-      contourVertsArg = bgVerts
-      isBg = True
-    else:
-      isBg = False
-      contourVertsArg = fgVerts
-
-    # Get high precision by retrieving all boundary pixels
-    contourVertsArg = cornersToFullBoundary(contourVertsArg)
-    # 'xy' option will soon be removed, so convert to rc
-    # verts are mutated into bad shape during active_contouring processing, so cast to regular array
-    contourVertsArg = contourVertsArg.asRowCol().view(np.ndarray)
-    contouredVerts = active_contour(blurredImg, contourVertsArg, self.alpha, self.beta,
-                                    w_edge=self.wEdge, gamma=self.gamma, coordinates='rc')
-    out = np.zeros(self.image.shape[:2], dtype='uint8')
-    # Format contour verts for fillPoly
-    contouredVerts = np.fliplr(contouredVerts.astype('int'))
-    contourRegion = cv.fillPoly(out, [contouredVerts], 1).astype(bool)
-    if isBg:
-      prevCompMask = prevCompMask & ~contourRegion
-    else:
-      prevCompMask |= contourRegion
-    return super().localCompEstimate(prevCompMask, fgVerts, bgVerts)
+    return ImageIO(image=outMask)
+  proc.addFunction(convert_to_squares)
+  return proc

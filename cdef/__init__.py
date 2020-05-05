@@ -19,7 +19,10 @@ pg.mkQApp()
 import cdef.projectvars
 import cdef.structures
 
-import cdef.frgraphics.parameditors
-import cdef.interfaceimpls
+from cdef.frgraphics.parameditors import FR_SINGLETON
+import cdef.interfaceimpls as impls
+for key, val in vars(impls).items():
+  if 'Processor' in key:
+    FR_SINGLETON.algParamMgr.addProcessCtor(val)
 
 from cdef.cdefapp import FRCdefApp
