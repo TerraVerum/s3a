@@ -16,9 +16,12 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
 from pyqtgraph.parametertree.parameterTypes import ListParameter
 
+from imageprocessing.processing import Process, ImageProcess
+
 from cdef.structures import NChanImg, ContainsSharedProps
-from .graphicsutils import dialogSaveToFile
-from ..interfaces import FRImageProcessor
+from .graphicsutils import dialogSaveToFile, saveToFile
+from .. import appInst
+from ..procwrapper import FRAlgWrapper
 from ..projectvars import (
   MENU_OPTS_DIR, SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR,
   LAYOUTS_DIR, USER_PROFILES_DIR,
@@ -198,10 +201,7 @@ class FRParamEditor(QtWidgets.QDialog):
     self.params.sigStateChanged.connect(self._paramTreeChanged)
     self.tree = ParameterTree()
     self.tree.setParameters(self.params, showTop=False)
-
-    # Allow the user to change column widths
-    for colIdx in range(2):
-      self.tree.header().setSectionResizeMode(colIdx, QtWidgets.QHeaderView.Interactive)
+    self.tree.header().setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
 
     # -----------
     # Human readable name (for settings menu)
@@ -244,8 +244,12 @@ class FRParamEditor(QtWidgets.QDialog):
 
   def _paramTreeChanged(self, param, child, idx):
     self._stateBeforeEdit = self.params.saveState()
+
+  def _expandCols(self):
     for colIdx in range(2):
       self.tree.resizeColumnToContents(colIdx)
+    appInst.processEvents()
+    self.adjustSize()
 
   # Helper method for accessing simple parameter values
   def __getitem__(self, keys: Union[tuple, FRParam, Collection[FRParam]]):
@@ -407,6 +411,8 @@ class FRParamEditor(QtWidgets.QDialog):
     if constParam.name not in paramForCls.names:
       paramForCls.addChild(paramForEditor)
 
+    self._expandCols()
+
     if not asProperty:
       return paramForEditor
 
@@ -428,11 +434,12 @@ class FRParamEditor(QtWidgets.QDialog):
     @property
     def paramAccessor(clsObj):
       trueClsName, xpondingEditor = _paramAccessHelper(clsObj)
-      return xpondingEditor[self.classNameToParamMapping[clsName], trueClsName]
+      return xpondingEditor[self.classNameToParamMapping[trueClsName], constParam]
 
     @paramAccessor.setter
     def paramAccessor(clsObj, newVal):
       trueClsName, xpondingEditor = _paramAccessHelper(clsObj)
+
       param = xpondingEditor[self.classNameToParamMapping[trueClsName], constParam, True]
       param.setValue(newVal)
 
@@ -525,8 +532,6 @@ class FRUserProfileEditor(FRParamEditor):
 
     super().__init__(parent, paramList=_USER_PROFILE_PARAMS,
                      saveDir=USER_PROFILES_DIR, fileType='cdefprofile')
-    for colIdx in range(2):
-      self.tree.resizeColumnToContents(colIdx)
 
   @staticmethod
   def getSettingsFiles(settingsDir: str, ext: str) -> List[str]:
@@ -684,47 +689,36 @@ class FRAlgCollectionEditor(FRParamEditor):
     # Allows only the current processor params to be shown in the tree
     #self.tree.addParameters(self.params, showTop=False)
 
-    self.curProcessor: Optional[FRImageProcessor] = None
-    self.processors: Dict[str, Tuple[str, FRImageProcessor]] = {}
+    self.curProcessor: Optional[FRAlgWrapper] = None
+    self.processors: Dict[str, Tuple[str, FRAlgWrapper]] = {}
     self._image = np.zeros((1,1), dtype='uint8')
 
 
     self.build_attachParams(algMgr)
-
-  # def saveAsBtnClicked(self, saveName=None, paramState=None):
-  #   if paramState is None:
-  #     paramState = self.algMgr.params.saveState()
-  #   return super().saveAsBtnClicked(saveName, paramState)
 
   @property
   def image(self):
     return self._image
   @image.setter
   def image(self, newImg: NChanImg):
-    self.curProcessor.image = newImg
+    if self.curProcessor is not None:
+      self.curProcessor.image = newImg
     self._image = newImg
 
   def build_attachParams(self, algMgr: FRAlgPropsMgr):
     # Step 1: Instantiate all processor algorithms
     for processorCtor in algMgr.processorCtors:
-      processor = processorCtor()
-      # Step 2: For each instantiated process, hook up accessor functions to self's
-      # parameter tree
-      algMgr.classInstToEditorMapping[processor] = self
+      processor = FRAlgWrapper(processorCtor(), self)
 
-      clsName = type(processor).__qualname__
-      procParam = algMgr.classNameToParamMapping[clsName]
+      procParam = processor.algParam
       self.processors.update({procParam.name: (procParam.name, processor)})
 
     # Step 3: Construct parameter tree
-    mgrParams = algMgr.params.saveState()
-    self.params.clearChildren()
-    self.params.addChildren(mgrParams['children'])
+    # mgrParams = algMgr.params.saveState()
+    # self.params.clearChildren()
+    # self.params.addChildren(mgrParams['children'])
     for param in self.params.children():
       self.tree.addParameters(param)
-    # Make sure all new names are properly displayed
-    for colIdx in range(2):
-      self.tree.resizeColumnToContents(colIdx)
 
     self.algOpts.setLimits(self.processors)
     self.saveAs('Default', allowOverwriteDefault=True)
@@ -752,7 +746,7 @@ class FRAlgCollectionEditor(FRParamEditor):
     self.algOpts.setValue(selectedImpl)
     super().loadState(selection_newStatePair[1])
 
-  def changeActiveAlg(self, selectedParam: Parameter, nameProcCombo: Tuple[str, FRImageProcessor]):
+  def changeActiveAlg(self, selectedParam: Parameter, nameProcCombo: Tuple[str, FRAlgWrapper]):
     # Hide all except current selection
     # TODO: Find out why hide() isn't working. Documentation indicates it should
     # Instead, use the parentChanged utility as a hacky workaround
@@ -769,17 +763,11 @@ class FRAlgPropsMgr(FRParamEditor):
 
   def __init__(self, parent=None):
     super().__init__(parent, fileType='', saveDir='')
-    self.processorCtors : List[Callable[[Any,...], FRImageProcessor]] = []
+    self.processorCtors : List[Callable[[], ImageProcess]] = []
 
   def registerClass(self, clsParam: FRParam, **opts):
     # Don't save a default file for this class
     return super().registerClass(clsParam, saveDefault=False, **opts)
-
-  def _extendedClassDecorator(self, cls: Any, clsParam: FRParam, **opts):
-    if opts.get('addToList', True):
-      ctorArgs = opts.get('args', [])
-      procCtor = partial(cls, *ctorArgs)
-      self.processorCtors.append(procCtor)
 
   def createProcessorForClass(self, clsObj) -> FRAlgCollectionEditor:
     clsName = type(clsObj).__name__
@@ -791,31 +779,9 @@ class FRAlgPropsMgr(FRParamEditor):
     # Wrap in property so changes propagate to the calling class
     return newEditor
 
-class FRAlgPropsMgr_new(FRParamEditor):
+  def addProcessCtor(self, procCtor: Callable[[], ImageProcess]):
+    self.processorCtors.append(procCtor)
 
-  def __init__(self, parent=None):
-    super().__init__(parent, fileType='', saveDir='')
-    self.processorCtors : List[Callable[[Any,...], FRImageProcessor]] = []
-
-  def registerClass(self, clsParam: FRParam, **opts):
-    # Don't save a default file for this class
-    return super().registerClass(clsParam, saveDefault=False, **opts)
-
-  def _extendedClassDecorator(self, cls: Any, clsParam: FRParam, **opts):
-    if opts.get('addToList', True):
-      ctorArgs = opts.get('args', [])
-      procCtor = partial(cls, *ctorArgs)
-      self.processorCtors.append(procCtor)
-
-  def createProcessorForClass(self, clsObj) -> FRAlgCollectionEditor:
-    clsName = type(clsObj).__name__
-    editorDir = join(MENU_OPTS_DIR, clsName, '')
-    # Strip "FR" from class name before retrieving name
-    settingsName = _frPascalCaseToTitle(clsName[2:]) + ' Processor'
-    newEditor = FRAlgCollectionEditor(editorDir, self, name=settingsName)
-    FR_SINGLETON.editors.append(newEditor)
-    # Wrap in property so changes propagate to the calling class
-    return newEditor
 
 
 class FRColorSchemeEditor(FRParamEditor):
@@ -825,7 +791,7 @@ class FRColorSchemeEditor(FRParamEditor):
 
 _INITIALIZED_CLASSES: Set[Type[ContainsSharedProps]] = set()
 class _FRSingleton:
-  algParamMgr = FRAlgPropsMgr_new()
+  algParamMgr = FRAlgPropsMgr()
 
   shortcuts = FRShortcutsEditor()
   scheme = FRColorSchemeEditor()

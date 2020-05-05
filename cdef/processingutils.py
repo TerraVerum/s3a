@@ -1,13 +1,18 @@
 import cv2 as cv
 import numpy as np
-from skimage.measure import regionprops, label
+import pandas as pd
+from skimage.measure import regionprops, label, regionprops_table
 from skimage.morphology import closing, dilation, opening
 from skimage.morphology import disk
 from skimage.segmentation import quickshift, flood
 
+from cdef.generalutils import getClippedBbox
+from cdef.structures import NChanImg, FRVertices
+
 from cdef.structures.typeoverloads import RgbImg, GrayImg, NChanImg, BlackWhiteImg, \
   TwoDArr
 from cdef.structures.vertices import FRVertices, FRComplexVertices
+from imageprocessing.common import Image
 
 
 def getBwComps(img: RgbImg, minSz=30) -> BlackWhiteImg:
@@ -262,3 +267,20 @@ def cornersToFullBoundary(cornerVerts: FRVertices, sizeLimit: float=np.inf) -> F
 
   filledMask = cv.fillPoly(tmpImgToFill, [cornerVerts], 1) > 0
   return getVertsFromBwComps(filledMask, simplifyVerts=False).filledVerts().stack()
+
+
+def _getCroppedImg(image: NChanImg, verts: FRVertices, margin: int) -> (np.ndarray, np.ndarray):
+  verts = np.vstack(verts)
+  img_np = image
+  compCoords = np.vstack([verts.min(0), verts.max(0)])
+  compCoords = getClippedBbox(img_np.shape, compCoords, margin).flatten()
+  croppedImg = image[compCoords[1]:compCoords[3], compCoords[0]:compCoords[2], :]
+  return croppedImg, compCoords
+
+
+def _area_coord_regionTbl(_image: Image):
+  if not np.any(_image.data):
+    return pd.DataFrame({'coords': [np.array([[]])], 'area': [0]})
+  regionDict = regionprops_table(label(_image.data), properties=('coords', 'area'))
+  _regionPropTbl = pd.DataFrame(regionDict)
+  return _regionPropTbl

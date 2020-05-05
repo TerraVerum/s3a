@@ -178,7 +178,7 @@ class FRMainImage(FREditableImg):
       verts = self.shapeCollection.shapeVerts.astype(int)
 
       with BusyCursor():
-        newCompMask = self.procCollection.curProcessor.localCompEstimate(prevComp, verts, None)
+        newCompMask = self.procCollection.curProcessor.run(prevCompMask=prevComp, fgVerts=verts)
       newVerts = getVertsFromBwComps(newCompMask)
       if len(newVerts.stack()) == 0:
         return
@@ -281,15 +281,14 @@ class FRFocusedImage(FREditableImg):
     # For now assume a single point indicates foreground where multiple indicate
     # background selection
     verts = self.shapeCollection.shapeVerts.astype(int)
-    fgBgVerts = [None, None]
+    vertsDict = {'fgVerts': None, 'bgVerts': None}
     if self.drawAction == FR_CONSTS.DRAW_ACT_ADD:
-      fgBgVerts[0] = verts
+      vertsDict['fgVerts'] = verts
     elif self.drawAction == FR_CONSTS.DRAW_ACT_REM:
-      fgBgVerts[1] = verts
+      vertsDict['bgVerts'] = verts
     # Check for flood fill
 
-    newMask = self.procCollection.curProcessor.localCompEstimate(
-      self.compMask, *fgBgVerts)
+    newMask = self.procCollection.curProcessor.run(prevCompMask=self.compMask, **vertsDict)
     if not np.all(newMask == self.compMask):
       self.compMask = newMask
       self.region.updateFromMask(self.compMask)
