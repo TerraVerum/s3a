@@ -696,6 +696,9 @@ class FRAlgCollectionEditor(FRParamEditor):
 
     self.build_attachParams(algMgr)
 
+  def run(self, **kwargs):
+    return self.curProcessor.run(**kwargs)
+
   @property
   def image(self):
     return self._image

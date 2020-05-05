@@ -178,7 +178,7 @@ class FRMainImage(FREditableImg):
       verts = self.shapeCollection.shapeVerts.astype(int)
 
       with BusyCursor():
-        newCompMask = self.procCollection.curProcessor.run(prevCompMask=prevComp, fgVerts=verts)
+        newCompMask = self.procCollection.run(prevCompMask=prevComp, fgVerts=verts)
       newVerts = getVertsFromBwComps(newCompMask)
       if len(newVerts.stack()) == 0:
         return
@@ -288,7 +288,7 @@ class FRFocusedImage(FREditableImg):
       vertsDict['bgVerts'] = verts
     # Check for flood fill
 
-    newMask = self.procCollection.curProcessor.run(prevCompMask=self.compMask, **vertsDict)
+    newMask = self.procCollection.run(prevCompMask=self.compMask, **vertsDict)
     if not np.all(newMask == self.compMask):
       self.compMask = newMask
       self.region.updateFromMask(self.compMask)
