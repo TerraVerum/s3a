@@ -42,9 +42,9 @@ def keepLargestConnComp():
       out = np.zeros(_image.data.shape, bool)
       coords = _regionPropTbl.coords[_regionPropTbl.area.argmax()]
       if coords.size == 0:
-        return ImageIO(image=out, regionPropTbl=_regionPropTbl)
+        return ImageIO(image=out)
       out[coords[:,0], coords[:,1]] = True
-      return ImageIO(image=out, regionPropTbl=_regionPropTbl)
+      return ImageIO(image=out)
   proc.addFunction(keep_largest_comp)
   return proc
 
@@ -57,10 +57,10 @@ def removeSmallConnComps(minSzThreshold=30):
     validCoords = _regionPropTbl.coords[_regionPropTbl.area >= _minSzThreshold]
     out = np.zeros(_image.shape, bool)
     if len(validCoords) == 0:
-      return ImageIO(image=out, regionPropTbl=_regionPropTbl)
+      return ImageIO(image=out)
     coords = np.vstack(validCoords)
     out[coords[:,0], coords[:,1]] = True
-    return ImageIO(image=out, regionPropTbl=_regionPropTbl)
+    return ImageIO(image=out)
   proc.addFunction(rm_small_comp)
   return proc
 
