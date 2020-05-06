@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pickle as pkl
 import re
 import sys
 import weakref
@@ -16,9 +15,8 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
 from pyqtgraph.parametertree.parameterTypes import ListParameter
 
-from imageprocessing.processing import Process, ImageProcess
-
 from cdef.structures import NChanImg, ContainsSharedProps
+from imageprocessing.processing import ImageProcess
 from .graphicsutils import dialogSaveToFile, saveToFile
 from .. import appInst
 from ..procwrapper import FRAlgWrapper
@@ -167,7 +165,6 @@ class FRParamEditor(QtWidgets.QDialog):
 
     super().__init__(parent)
     self.setWindowTitle(name)
-    self.resize(500, 400)
 
     self.boundFnsPerClass: Dict[str, List[FRBoundFnParams]] = {}
     """Holds the parameters associated with this registered class"""
@@ -235,6 +232,7 @@ class FRParamEditor(QtWidgets.QDialog):
     centralLayout.addWidget(self.tree)
     centralLayout.addLayout(btnLayout)
     self.setLayout(centralLayout)
+    self.tree.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
     # -----------
     # UI Element Signals
     # -----------
@@ -250,6 +248,7 @@ class FRParamEditor(QtWidgets.QDialog):
       self.tree.resizeColumnToContents(colIdx)
     appInst.processEvents()
     self.adjustSize()
+    self.resize(self.width() + self.tree.width(), self.height() + self.tree.height())
 
   # Helper method for accessing simple parameter values
   def __getitem__(self, keys: Union[tuple, FRParam, Collection[FRParam]]):
@@ -512,9 +511,11 @@ class FRGeneralPropertiesEditor(FRParamEditor):
     super().__init__(parent, paramList=[], saveDir=GEN_PROPS_DIR, fileType='regctrl')
 
 class FRUserProfileEditor(FRParamEditor):
-  def __init__(self, parent=None):
+  def __init__(self, parent=None, singletonObj: _FRSingleton=None):
+    super().__init__(parent, paramList=[],
+                     saveDir=USER_PROFILES_DIR, fileType='cdefprofile')
     optsFromSingletonEditors = []
-    for editor in FR_SINGLETON.editors:
+    for editor in singletonObj.editors:
       curValues = self.getSettingsFiles(editor.saveDir, editor.fileType)
       curParam = ListParameter(name=editor.name, value='Default', values=curValues)
       updateFunc = lambda newName, listParam=curParam: \
@@ -529,9 +530,7 @@ class FRUserProfileEditor(FRParamEditor):
        'value': 'Default'},
     ]
     _USER_PROFILE_PARAMS.extend(optsFromSingletonEditors)
-
-    super().__init__(parent, paramList=_USER_PROFILE_PARAMS,
-                     saveDir=USER_PROFILES_DIR, fileType='cdefprofile')
+    self.params.addChildren(_USER_PROFILE_PARAMS)
 
   @staticmethod
   def getSettingsFiles(settingsDir: str, ext: str) -> List[str]:
@@ -804,8 +803,9 @@ class _FRSingleton:
   annotationAuthor = None
 
   def __init__(self):
-    self.editors: List[FRParamEditor] =\
+    self.editors: List[FRParamEditor] = \
       [self.scheme, self.shortcuts, self.generalProps, self.filter]
+    self.userProfile = FRUserProfileEditor(singletonObj=self)
 
   def registerClass(self, clsParam: FRParam, **opts):
     def multiEditorClsDecorator(cls):

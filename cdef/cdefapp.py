@@ -57,7 +57,7 @@ class FRCdefApp(FRAnnotatorUI):
     # ---------------
     self.mainImgFpath = None
     self.hasUnsavedChanges = False
-    self.userProfile = FRUserProfileEditor()
+    self.userProfile = FR_SINGLETON.userProfile
 
     self.statBar = QtWidgets.QStatusBar(self)
     self.setStatusBar(self.statBar)
