@@ -127,6 +127,28 @@ class FRShortcutParameter(Parameter):
     opts['value'] = keySeqVal
     super().__init__(**opts)
 
+class FRProcGroupParameter(parameterTypes.GroupParameter):
+  def __init__(self, **opts):
+    super().__init__(**opts)
+    disableFont = QtGui.QFont()
+    disableFont.setStrikeOut(True)
+    self.enabledFontMap = {True: None, False: disableFont}
+
+  def makeTreeItem(self, depth):
+    item = super().makeTreeItem(depth)
+    item.contextMenuEvent = lambda ev: item.contextMenu.popup(ev.globalPos())
+    act = item.contextMenu.addAction('Toggle Enable')
+    self.enabledFontMap[True] = QtGui.QFont(item.font(0))
+    def setter():
+      # Toggle 'enable' on click
+      disabled = self.opts['enabled']
+      enabled = not disabled
+      item.setFont(0, self.enabledFontMap[enabled])
+      for ii in range(item.childCount()):
+        item.child(ii).setDisabled(disabled)
+      self.opts['enabled'] = enabled
+    act.triggered.connect(setter)
+    return item
 
 class FRNoneParameter(parameterTypes.SimpleParameter):
 
@@ -138,6 +160,7 @@ class FRNoneParameter(parameterTypes.SimpleParameter):
 
 parameterTypes.registerParameterType('NoneType', FRNoneParameter)
 parameterTypes.registerParameterType('shortcut', FRShortcutParameter)
+parameterTypes.registerParameterType('procgroup', FRProcGroupParameter)
 
 @dataclass
 class FRBoundFnParams:
@@ -249,6 +272,7 @@ class FRParamEditor(QtWidgets.QDialog):
     appInst.processEvents()
     self.adjustSize()
     self.resize(self.width() + self.tree.width(), self.height() + self.tree.height())
+    self.tree.setColumnWidth(0, self.width()//2)
 
   # Helper method for accessing simple parameter values
   def __getitem__(self, keys: Union[tuple, FRParam, Collection[FRParam]]):
@@ -362,6 +386,12 @@ class FRParamEditor(QtWidgets.QDialog):
       outProps.append(self.registerProp(clsObj, param))
     return outProps
 
+  def _addParamGroup(self, groupName: str):
+    paramForCls = Parameter.create(name=groupName, type='group')
+    paramForCls.sigStateChanged.connect(self._paramTreeChanged)
+    self.params.addChild(paramForCls)
+    return paramForCls
+
   def registerProp(self, groupingName: Union[type, str], constParam: FRParam,
                    parentParamPath:Collection[str]=None, asProperty=True, **etxraOpts):
     """
@@ -401,9 +431,7 @@ class FRParamEditor(QtWidgets.QDialog):
     if paramName in self.params.names:
       paramForCls = self.params.child(paramName)
     else:
-      paramForCls = Parameter.create(name=paramName, type='group')
-      paramForCls.sigStateChanged.connect(self._paramTreeChanged)
-      self.params.addChild(paramForCls)
+      paramForCls = self._addParamGroup(paramName)
 
     if parentParamPath is not None and len(parentParamPath) > 0:
       paramForCls = paramForCls.param(*parentParamPath)
@@ -455,6 +483,10 @@ class FRParamEditor(QtWidgets.QDialog):
       - overrideName: This is available so objects without a dedicated class can
       also be registered. In that case, this is the unique identifier for the
       spoof class instead of '[decorated class].__qualname__`.
+      - forceCreate: Normally, the class is not registered until at least one property
+      (or method) is registered to it. That way, classes registered for other editors
+      don't erroneously appear. *forceCreate* will override this rule, creating this
+      parameter immediately.
     :return: Undecorated class, but with a new __init__ method which initializes
       all shared properties contained in the '__initEditorParams__' method, if it exists
       in the class.
@@ -471,6 +503,9 @@ class FRParamEditor(QtWidgets.QDialog):
       clsName = opts.get('overrideName', cls.__qualname__)
       oldClsInit = cls.__init__
       self._extendedClassDecorator(cls, clsParam, **opts)
+
+      if opts.get('forceCreate', False):
+        self._addParamGroup(clsName)
 
       self.classNameToParamMapping[clsName] = clsParam
       def newClassInit(clsObj, *args, **kwargs):

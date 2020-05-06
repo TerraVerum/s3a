@@ -1,5 +1,7 @@
 from __future__ import annotations
-from typing import Tuple, List
+
+from functools import wraps
+from typing import Tuple, List, Callable
 
 import numpy as np
 from pyqtgraph.parametertree import Parameter
@@ -10,19 +12,22 @@ from .frgraphics import parameditors
 from .processingutils import getVertsFromBwComps
 from .structures import FRParam, NChanImg, FRComplexVertices, FRVertices
 
+def atomicRunWrapper(proc: AtomicFunction, names: List[str], params: List[Parameter]):
+  oldRun = proc.run
+  @wraps(oldRun)
+  def newRun(io: ProcessIO = None, force=False, disable=False) -> ProcessIO:
+    newIo = {name: param.value() for name, param in zip(names, params)}
+    proc.updateParams(**newIo)
+    return oldRun(io, force, disable)
+  return newRun
 
-class FRRunWrapper:
-  def __init__(self, proc: ProcessStage, names: List[str], params: List[Parameter]):
-    self.oldRun = proc.run
-    self.params = params
-    self.names = names
-
-  def __call__(self, io: ProcessIO = None, force=False) -> ProcessIO:
-    for name, param in zip(self.names, self.params):
-      if name not in io:
-        io[name] = param.value()
-    return self.oldRun(io, force)
-
+def procRunWrapper(proc: Process, groupParam: Parameter):
+  oldRun = proc.run
+  @wraps(oldRun)
+  def newRun(io: ProcessIO = None, force=False, disable=False):
+    proc.disabled = not groupParam.opts['enabled']
+    return oldRun(io, force, disable)
+  return newRun
 
 class FRAlgWrapper:
   def __init__(self, processor: ImageProcess, editor: parameditors.FRParamEditor):
@@ -33,27 +38,33 @@ class FRAlgWrapper:
     self.output = np.zeros((0,0), bool)
 
     self.editor = editor
-    editor.registerClass(self.algParam, overrideName=self.algName)()
+    editor.registerClass(self.algParam, overrideName=self.algName, forceCreate=True)()
     self.unpackStages(self.processor)
 
   def unpackStages(self, stage: ProcessStage, paramParent: Tuple[str,...]=()):
     if isinstance(stage, AtomicFunction):
+      procInpt = stage.input
+      params: List[Parameter] = []
+      for inptKey in stage.hyperParamKeys:
+        val = procInpt[inptKey]
+        curParam = FRParam(name=inptKey, value=val)
+        pgParam = self.editor.registerProp(self.algName, curParam, paramParent, asProperty=False)
+        params.append(pgParam)
+      stage.run = atomicRunWrapper(stage, stage.hyperParamKeys, params)
       return
     # else: # Process
     stage: Process
-    procInpt = stage.input
-    params: List[Parameter] = []
-    for inptKey in stage.requiredInputs:
-      val = procInpt[inptKey]
-      curParam = FRParam(name=inptKey, value=val)
-      pgParam = self.editor.registerProp(self.algName, curParam, paramParent, asProperty=False)
-      params.append(pgParam)
-    stage.run = FRRunWrapper(stage, stage.requiredInputs, params)
+    curGroup = self.editor.params.child(self.algName, *paramParent)
+    stage.run = procRunWrapper(stage, curGroup)
     # Special case of a process comprised of just one atomic function
     if len(stage.stages) == 1 and isinstance(stage.stages[0], AtomicFunction):
+      self.unpackStages(stage.stages[0], paramParent=paramParent)
       return
     for childStage in stage.stages:
-      curGroup = FRParam(name=childStage.name, valType='group', value=[])
+      valType = 'group'
+      if isinstance(childStage, Process):
+        valType = 'procgroup'
+      curGroup = FRParam(name=childStage.name, valType=valType, value=[])
       self.editor.registerProp(self.algName, curGroup, paramParent)
       self.unpackStages(childStage, paramParent=paramParent + (childStage.name,))
 

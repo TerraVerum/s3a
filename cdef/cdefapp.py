@@ -173,7 +173,7 @@ class FRCdefApp(FRAnnotatorUI):
 
   def setStyleSheet(self, styleSheet: str):
     super().setStyleSheet(styleSheet)
-    for editor in FR_SINGLETON.editors:
+    for editor in FR_SINGLETON.editors + [FR_SINGLETON.userProfile]:
       editor.setStyleSheet(styleSheet)
 
   @staticmethod

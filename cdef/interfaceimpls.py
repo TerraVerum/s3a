@@ -39,9 +39,8 @@ def keepLargestConnComp():
   io = ImageIO.createFrom(keepLargestConnComp, locals())
   proc = io.initProcess('Keep Largest Connected Components')
 
-  def keep_largest_comp(_image: Image, _regionPropTbl: pd.DataFrame):
-      if _regionPropTbl is None:
-        _regionPropTbl = _area_coord_regionTbl(_image)
+  def keep_largest_comp(_image: Image):
+      _regionPropTbl = _area_coord_regionTbl(_image)
       out = np.zeros(_image.data.shape, bool)
       coords = _regionPropTbl.coords[_regionPropTbl.area.argmax()]
       if coords.size == 0:
@@ -54,9 +53,8 @@ def keepLargestConnComp():
 def removeSmallConnComps(minSzThreshold=30):
   io = ImageIO.createFrom(removeSmallConnComps, locals())
   proc = io.initProcess('Remove Conn. Comp. Smaller Than...')
-  def rm_small_comp(_image: Image, _regionPropTbl: pd.DataFrame, _minSzThreshold):
-    if _regionPropTbl is None:
-      _regionPropTbl = _area_coord_regionTbl(_image)
+  def rm_small_comp(_image: Image, _minSzThreshold=minSzThreshold):
+    _regionPropTbl = _area_coord_regionTbl(_image)
     validCoords = _regionPropTbl.coords[_regionPropTbl.area >= _minSzThreshold]
     out = np.zeros(_image.shape, bool)
     if len(validCoords) == 0:
@@ -76,12 +74,12 @@ def basicOpsCombo():
   proc.addProcess(removeSmallConnComps())
   return proc
 
-def regionGrowProcessor(margin=5, seedThresh=10, strelSz=3):
+def regionGrowProcessor(margin=5, seedThresh=10):
   curLocals = locals()
   io = ImageIO.createFrom(regionGrowProcessor, locals())
   proc = io.initProcess('Region Growing')
   def region_grow(_image: Image, _prevCompMask: BlackWhiteImg, _fgVerts: FRVertices,
-                  _bgVerts: FRVertices, _seedThresh=seedThresh, _margin=margin, _strelSz=strelSz):
+                  _bgVerts: FRVertices, _seedThresh=seedThresh, _margin=margin):
     if _prevCompMask is None:
       _prevCompMask = np.zeros(_image.shape[:2], dtype=bool)
     else:
@@ -136,8 +134,6 @@ def regionGrowProcessor(margin=5, seedThresh=10, strelSz=3):
     rowColSlices = (slice(cropOffset[1], cropOffset[3]),
                     slice(cropOffset[0], cropOffset[2]))
     _prevCompMask[rowColSlices] = bitOperation(_prevCompMask[rowColSlices], newRegion)
-    openCloseStrel = morphology.disk(_strelSz)
-    _prevCompMask = morphology.opening(morphology.closing(_prevCompMask, openCloseStrel), openCloseStrel)
     return ImageIO(image=_prevCompMask)
   proc.addFunction(region_grow)
   proc.addProcess(basicOpsCombo())
@@ -148,7 +144,7 @@ def basicShapesProcessor():
   proc = io.initProcess('Basic Shapes')
 
   def get_basic_shapes(_image: Image, _prevCompMask: BlackWhiteImg,
-                       _fgVerts: FRVertices=None, _bgVerts: FRVertices=None):
+                       _fgVerts: FRVertices, _bgVerts: FRVertices):
     # Don't modify the original version
     prevCompMask = _prevCompMask.copy()
     # Convert indices into boolean index masks
