@@ -1,3 +1,5 @@
+from functools import wraps
+
 import cv2 as cv
 import numpy as np
 import pandas as pd
@@ -10,6 +12,7 @@ from cdef.generalutils import splitListAtNans
 from cdef.processingutils import growSeedpoint, cornersToFullBoundary, _getCroppedImg, \
   _area_coord_regionTbl
 from cdef.structures import BlackWhiteImg, FRVertices
+from imageprocessing import algorithms
 from imageprocessing.common import Image
 from imageprocessing.processing import ImageIO
 
@@ -17,19 +20,19 @@ def fillHoles():
   io = ImageIO.createFrom(fillHoles, locals())
   proc = io.initProcess('Fill Holes')
 
-  def op(_image: Image):
+  def fill_holes(_image: Image):
     return ImageIO(image=binary_fill_holes(_image.data))
-  proc.addFunction(op)
+  proc.addFunction(fill_holes)
   return proc
 
-def closeOpen(diskRadius=3):
+def closeOpen():
   io = ImageIO.createFrom(closeOpen, locals())
-  proc = io.initProcess('Close -> Open Component')
-
-  def close_open(_image: Image, _diskRadius):
-    strel = morphology.disk(_diskRadius)
-    return ImageIO(image=binary_opening(binary_closing(_image.data, strel), strel))
-  proc.addFunction(close_open)
+  proc = io.initProcess('Close -> Open Compondent')
+  def cvt_to_uint(_image: Image):
+    return ImageIO(image = _image.data.astype('uint8'))
+  proc.addFunction(cvt_to_uint)
+  proc.addProcess(algorithms.morphologyExProcess(cv.MORPH_CLOSE))
+  proc.addProcess(algorithms.morphologyExProcess(cv.MORPH_OPEN))
   return proc
 
 def keepLargestConnComp():
@@ -113,7 +116,7 @@ def regionGrowProcessor(margin=5, seedThresh=10, strelSz=3):
       compMargin = 0
     croppedImg, cropOffset = _getCroppedImg(_image.data, _fgVerts, compMargin)
     if croppedImg.size == 0:
-      return _prevCompMask
+      return ImageIO(image=_prevCompMask)
     centeredFgVerts = _fgVerts - cropOffset[0:2]
 
     filledMask = None
