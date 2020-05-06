@@ -178,7 +178,7 @@ class FRMainImage(FREditableImg):
       verts = self.shapeCollection.shapeVerts.astype(int)
 
       with BusyCursor():
-        newCompMask = self.procCollection.run(prevCompMask=prevComp, fgVerts=verts)
+        newCompMask = self.procCollection.run(prevCompMask=prevComp, fgVerts=verts, bgVerts=None)
       newVerts = getVertsFromBwComps(newCompMask)
       if len(newVerts.stack()) == 0:
         return
@@ -342,13 +342,15 @@ class FRFocusedImage(FREditableImg):
     # 0-center new vertices relative to FRFocusedImage image
     # Make a copy of each list first so we aren't modifying the
     # original data
+    lstLens = lambda lst: np.array([len(el) for el in lst])
     centeredVerts = newVerts.copy()
     for vertList in centeredVerts:
       vertList -= offset
-    shouldUpdate = not self.region.vertsUpToDate \
-                   or len(self.region.verts) != len(centeredVerts) \
-                   or not np.all(np.vstack([selfLst == newLst for selfLst, newLst
-                                  in zip(self.region.verts, centeredVerts)]))
+    shouldUpdate = (not self.region.vertsUpToDate
+                    or len(self.region.verts) != len(centeredVerts)
+                    or np.any(lstLens(self.region.verts) != lstLens(centeredVerts))
+                    or np.any(np.vstack([selfLst != newLst for selfLst, newLst
+                                  in zip(self.region.verts, centeredVerts)])))
     if shouldUpdate:
       self.region.updateFromVertices(centeredVerts)
       regionPos = self.region.pos().x(), self.region.pos().y()
