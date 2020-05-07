@@ -259,7 +259,7 @@ def cornersToFullBoundary(cornerVerts: FRVertices, sizeLimit: float=np.inf) -> F
     will *NOT* return all boundary vertices, since the enclosed area (10e6) is larger than sizeLimit.
   :return: List with one vertex for every border pixel, unless *sizeLimit* is violated.
   """
-  fillShape = cornerVerts.asRowCol().max(0)
+  fillShape = cornerVerts.asRowCol().max(0)+1
   if np.prod(fillShape) > sizeLimit:
     return cornerVerts
 
