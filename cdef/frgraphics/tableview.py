@@ -224,7 +224,7 @@ class FRCompTableView(QtWidgets.QTableView):
     if confirm != dlg.Yes:
       return
     idList, colIdxs = self.getIds_colsFromSelection()
-    if len(idList) <= 1:
+    if idList is None:
       return
     toOverwrite = self.mgr.compDf.loc[idList].copy()
     # Some bug is preventing the single assignment value from broadcasting
@@ -245,6 +245,12 @@ class FRCompTableView(QtWidgets.QTableView):
       colIdxs.append(idx.column())
     idList = pd.unique(idList)
     colIdxs = pd.unique(colIdxs)
+    colIdxs = np.setdiff1d(colIdxs, self.model().sourceModel().noEditColIdxs)
+    if len(idList) == 0 or len(colIdxs) == 0:
+      QtWidgets.QMessageBox.information(self, 'No Editable Data',
+                                        'No editable columns selected. Nothing to do.',
+                                        QtWidgets.QMessageBox.Ok)
+      return None, None
     return idList, colIdxs
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_TBL_SET_AS)
@@ -252,11 +258,7 @@ class FRCompTableView(QtWidgets.QTableView):
     if self.minimal: return
 
     idList, colIdxs = self.getIds_colsFromSelection()
-    colIdxs = np.setdiff1d(colIdxs, self.model().sourceModel().noEditColIdxs)
-    if len(idList) == 0 or len(colIdxs) == 0:
-      QtWidgets.QMessageBox.information(self, 'No Editable Data',
-                                        'No editable columns selected. Nothing to do.',
-                                        QtWidgets.QMessageBox.Ok)
+    if idList is None:
       return
 
     dataToSet = self.mgr.compDf.loc[[idList[0]],:].copy()
