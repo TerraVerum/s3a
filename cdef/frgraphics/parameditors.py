@@ -733,6 +733,9 @@ class FRAlgCollectionEditor(FRParamEditor):
   def run(self, **kwargs):
     return self.curProcessor.run(**kwargs)
 
+  def resultAsVerts(self, localEstimate=True):
+    return self.curProcessor.resultAsVerts(localEstimate=localEstimate)
+
   @property
   def image(self):
     return self._image

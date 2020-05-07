@@ -69,6 +69,8 @@ class FRAlgWrapper:
       self.unpackStages(childStage, paramParent=paramParent + (childStage.name,))
 
   def run(self, **kwargs):
+    if kwargs.get('prevCompMask', None) is None:
+      kwargs['prevCompMask'] = np.zeros(self.image.shape[:2], bool)
     if kwargs.get('fgVerts') is None and kwargs.get('bgVerts') is None:
       # Assume global estimate
       shape = self.image.shape[:2][::-1]
