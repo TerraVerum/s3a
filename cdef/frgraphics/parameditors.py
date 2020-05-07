@@ -17,7 +17,7 @@ from pyqtgraph.parametertree.parameterTypes import ListParameter
 
 from cdef.structures import NChanImg, ContainsSharedProps
 from imageprocessing.processing import ImageProcess
-from .graphicsutils import dialogSaveToFile, saveToFile
+from .graphicsutils import dialogGetSaveFileName, saveToFile
 from .. import appInst
 from ..procwrapper import FRAlgWrapper
 from ..projectvars import (
@@ -351,9 +351,11 @@ class FRParamEditor(QtWidgets.QDialog):
 
   def saveAsBtnClicked(self):
     paramState = self.params.saveState()
-    saveName = dialogSaveToFile(self, paramState, self._saveDlgName, self.saveDir,
-                                  self.fileType, performSave=False)
-    self.saveAs(saveName, paramState)
+    saveName = dialogGetSaveFileName(self, self._saveDlgName)
+    errMsg = self.saveAs(saveName, paramState)
+    if errMsg is not None:
+      QtWidgets.QMessageBox().information(self, 'Error During Import', errMsg)
+
 
   def saveAs(self, saveName: str=None, paramState: dict=None,
              allowOverwriteDefault=False):

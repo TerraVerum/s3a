@@ -35,8 +35,7 @@ def popupFilePicker(parent, winTitle: str, fileFilter: str) -> Optional[str]:
     retVal = fname
   return retVal
 
-def dialogSaveToFile(parent, saveObj, winTitle, saveDir, fileType,
-                     allowOverwriteDefault=False, performSave=True)\
+def dialogGetSaveFileName(parent, winTitle)\
     -> Optional[str]:
   failedSave = True
   returnVal: Optional[str] = None
@@ -56,15 +55,7 @@ def dialogSaveToFile(parent, saveObj, winTitle, saveDir, fileType,
       break
     else:
       # User pressed 'ok' and entered a valid name
-      returnVal = saveName
-      if performSave:
-        errMsg = saveToFile(saveObj, saveDir, saveName, fileType, allowOverwriteDefault)
-        # Prevent overwriting default layout
-        if errMsg is not None:
-          QtWidgets.QMessageBox().information(parent, f'Error During Save', errMsg, QtWidgets.QMessageBox.Ok)
-          return None
-        else:
-            failedSave = False
+      return saveName
   return returnVal
 
 def saveToFile(saveObj, saveDir, saveName, fileType, allowOverwriteDefault=False) -> str:

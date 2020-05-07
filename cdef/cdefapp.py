@@ -20,7 +20,7 @@ from cdef.generalutils import resolveAuthorName
 from cdef.structures import FRCompIOError, NChanImg
 from cdef.tablemodel import FRComponentIO
 from .frgraphics.annotator_ui import FRAnnotatorUI
-from .frgraphics.graphicsutils import dialogSaveToFile, \
+from .frgraphics.graphicsutils import dialogGetSaveFileName, \
   addDirItemsToMenu, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc
 from .frgraphics.parameditors import FRParamEditor, FR_SINGLETON
@@ -267,6 +267,7 @@ class FRCdefApp(FRAnnotatorUI):
     success = errMsg is None
     if success:
       self.sigLayoutSaved.emit()
+    return errMsg
 
   def loadUserProfile(self, profileSrc: Union[dict, str]):
     # Make sure defaults exist
@@ -364,9 +365,10 @@ class FRCdefApp(FRAnnotatorUI):
 
   @Slot()
   def saveLayoutActionTriggered(self):
-    outName = dialogSaveToFile(self, None, 'Layout Name', LAYOUTS_DIR, 'dockstate',
-                               performSave=False)
-    self.saveLayout(outName)
+    outName = dialogGetSaveFileName(self, 'Layout Name')
+    errMsg = self.saveLayout(outName)
+    if errMsg is not None:
+      QtWidgets.QMessageBox().information(self, 'Error During Import', errMsg)
 
   @staticmethod
   def paramEditorLoadActTriggered(objForMenu: FRParamEditor, nameToLoad: str) -> Optional[dict]:
