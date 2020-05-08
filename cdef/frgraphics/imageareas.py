@@ -229,7 +229,7 @@ class FRFocusedImage(FREditableImg):
   @classmethod
   def __initEditorParams__(cls):
     cls.compCropMargin, cls.segThresh\
-      = FR_SINGLETON.generalProps.registerProps(cls, [FR_CONSTS.PROP_MARGIN,
+      = FR_SINGLETON.generalProps.registerProps(cls, [FR_CONSTS.PROP_CROP_MARGIN_PCT,
           FR_CONSTS.PROP_SEG_THRESH])
 
   def __init__(self, parent=None, **kargs):
@@ -317,7 +317,8 @@ class FRFocusedImage(FREditableImg):
     bbox = np.vstack([concatVerts.min(0),
                       concatVerts.max(0)])
     # Account for margins
-    self.bbox = getClippedBbox(mainImgShape, bbox, self.compCropMargin)
+    padding = max((bbox[1,:] - bbox[0,:])/self.compCropMargin/2)
+    self.bbox = getClippedBbox(mainImgShape, bbox, int(padding))
 
   def updateCompImg(self, mainImg, bbox=None):
     if bbox is None:

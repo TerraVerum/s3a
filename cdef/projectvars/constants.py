@@ -102,7 +102,7 @@ class _FRConsts(FRParamGroup):
   PROP_MIN_COMP_SZ          : FRParam = newParam('Minimum New Component Size (px)', 50)
   PROP_NEW_COMP_SZ          : FRParam = newParam('New Component Side Length (px)', 30)
   PROP_EST_BOUNDS_ON_START  : FRParam = newParam('Estimate Boundaries on Image Load', False)
-  PROP_MARGIN               : FRParam = newParam('Margin', 5)
+  PROP_CROP_MARGIN_PCT      : FRParam = newParam('Crop Padding (% of image size)', 5)
   PROP_SEG_THRESH           : FRParam = newParam('Segmentation Threshold', 0.)
   PROP_FOCUSED_SEED_THRESH  : FRParam = newParam('Seedpoint Threshold in Focused Image', 7.)
   PROP_UNDO_BUF_SZ          : FRParam = newParam('Size of Region Undo Buffer', 30)
