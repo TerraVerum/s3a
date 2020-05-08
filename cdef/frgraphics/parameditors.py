@@ -16,10 +16,10 @@ from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
 from pyqtgraph.parametertree.parameterTypes import ListParameter
 
 from cdef.structures import NChanImg, ContainsSharedProps
-from imageprocessing.processing import ImageProcess
+from imageprocessing.processing import ImageProcess, Process
 from .graphicsutils import dialogGetSaveFileName, saveToFile
 from .. import appInst
-from ..procwrapper import FRAlgWrapper
+from ..procwrapper import FRImgProcWrapper
 from ..projectvars import (
   MENU_OPTS_DIR, SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR,
   LAYOUTS_DIR, USER_PROFILES_DIR,
@@ -725,12 +725,14 @@ class FRAlgCollectionEditor(FRParamEditor):
     # Allows only the current processor params to be shown in the tree
     #self.tree.addParameters(self.params, showTop=False)
 
-    self.curProcessor: Optional[FRAlgWrapper] = None
-    self.processors: Dict[str, Tuple[str, FRAlgWrapper]] = {}
+    self.curProcessor: Optional[FRImgProcWrapper] = None
+    self.nameToProcMapping: Dict[str, FRImgProcWrapper] = {}
     self._image = np.zeros((1,1), dtype='uint8')
 
-
-    self.build_attachParams(algMgr)
+    for processorCtor in algMgr.processorCtors:
+      self.addImageProcessor(processorCtor())
+    self.saveAs('Default', allowOverwriteDefault=True)
+    self.algOpts.sigLimitsChanged.connect(lambda *args: print(*args))
 
   def run(self, **kwargs):
     return self.curProcessor.run(**kwargs)
@@ -747,23 +749,12 @@ class FRAlgCollectionEditor(FRParamEditor):
       self.curProcessor.image = newImg
     self._image = newImg
 
-  def build_attachParams(self, algMgr: FRAlgPropsMgr):
-    # Step 1: Instantiate all processor algorithms
-    for processorCtor in algMgr.processorCtors:
-      processor = FRAlgWrapper(processorCtor(), self)
+  def addImageProcessor(self, newProc: ImageProcess):
+    processor = FRImgProcWrapper(newProc, self)
+    self.tree.addParameters(self.params.child(processor.algName))
 
-      procParam = processor.algParam
-      self.processors.update({procParam.name: (procParam.name, processor)})
-
-    # Step 3: Construct parameter tree
-    # mgrParams = algMgr.params.saveState()
-    # self.params.clearChildren()
-    # self.params.addChildren(mgrParams['children'])
-    for param in self.params.children():
-      self.tree.addParameters(param)
-
-    self.algOpts.setLimits(self.processors)
-    self.saveAs('Default', allowOverwriteDefault=True)
+    self.nameToProcMapping.update({processor.algName: processor})
+    self.algOpts.setLimits(self.nameToProcMapping.copy())
 
   def saveAs(self, saveName: str=None, paramState: dict=None,
              allowOverwriteDefault=False):
@@ -771,7 +762,7 @@ class FRAlgCollectionEditor(FRParamEditor):
     The algorithm editor also needs to store information about the selected algorithm, so lump
     this in with the other parameter information before calling default save.
     """
-    paramState = [self.algOpts.value()[0], self.params.saveState()]
+    paramState = [self.algOpts.value().algName, self.params.saveState()]
     return super().saveAs(saveName, paramState, allowOverwriteDefault)
 
   def loadState(self, selection_newStatePair: Tuple[str, dict]):
@@ -788,17 +779,17 @@ class FRAlgCollectionEditor(FRParamEditor):
     self.algOpts.setValue(selectedImpl)
     super().loadState(selection_newStatePair[1])
 
-  def changeActiveAlg(self, selectedParam: Parameter, nameProcCombo: Tuple[str, FRAlgWrapper]):
+  def changeActiveAlg(self, selectedParam: Parameter, proc: FRImgProcWrapper):
     # Hide all except current selection
     # TODO: Find out why hide() isn't working. Documentation indicates it should
     # Instead, use the parentChanged utility as a hacky workaround
-    curParamSet = self.params.child(nameProcCombo[0])
+    curParamSet = self.params.child(proc.algName)
     for ii, child in enumerate(self.params.children()):
       shouldHide = child is not curParamSet
       # Offset by 1 to account for self.algOpts
       self.tree.setRowHidden(1 + ii, QtCore.QModelIndex(), shouldHide)
     # selectedParam.show()
-    self.curProcessor = nameProcCombo[1]
+    self.curProcessor = proc
     self.curProcessor.image = self.image
 
 class FRAlgPropsMgr(FRParamEditor):
@@ -806,6 +797,7 @@ class FRAlgPropsMgr(FRParamEditor):
   def __init__(self, parent=None):
     super().__init__(parent, fileType='', saveDir='')
     self.processorCtors : List[Callable[[], ImageProcess]] = []
+    self.spawnedCollections : List[FRAlgCollectionEditor] = []
 
   def registerClass(self, clsParam: FRParam, **opts):
     # Don't save a default file for this class
@@ -818,12 +810,14 @@ class FRAlgPropsMgr(FRParamEditor):
     settingsName = _frPascalCaseToTitle(clsName[2:]) + ' Processor'
     newEditor = FRAlgCollectionEditor(editorDir, self, name=settingsName)
     FR_SINGLETON.editors.append(newEditor)
+    self.spawnedCollections.append(weakref.proxy(newEditor))
     # Wrap in property so changes propagate to the calling class
     return newEditor
 
   def addProcessCtor(self, procCtor: Callable[[], ImageProcess]):
     self.processorCtors.append(procCtor)
-
+    for algCollection in self.spawnedCollections:
+      algCollection.addImageProcessor(procCtor())
 
 
 class FRColorSchemeEditor(FRParamEditor):

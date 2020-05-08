@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC
 from functools import wraps
 from typing import Tuple, List, Callable
 
@@ -29,12 +30,11 @@ def procRunWrapper(proc: Process, groupParam: Parameter):
     return oldRun(io, force, disable)
   return newRun
 
-class FRAlgWrapper:
+class FRGeneralProcWrapper(ABC):
   def __init__(self, processor: ImageProcess, editor: parameditors.FRParamEditor):
     self.processor = processor
     self.algName = processor.name
     self.algParam = FRParam(self.algName)
-    self.image: NChanImg = np.zeros((0,0), bool)
     self.output = np.zeros((0,0), bool)
 
     self.editor = editor
@@ -69,6 +69,14 @@ class FRAlgWrapper:
       self.unpackStages(childStage, paramParent=paramParent + (childStage.name,))
 
   def run(self, **kwargs):
+    raise NotImplementedError
+
+class FRImgProcWrapper(FRGeneralProcWrapper):
+  def __init__(self, processor: ImageProcess, editor: parameditors.FRParamEditor):
+    super().__init__(processor, editor)
+    self.image: NChanImg = np.zeros((0,0), bool)
+
+  def run(self, **kwargs):
     if kwargs.get('prevCompMask', None) is None:
       kwargs['prevCompMask'] = np.zeros(self.image.shape[:2], bool)
     if kwargs.get('fgVerts') is None and kwargs.get('bgVerts') is None:
@@ -78,7 +86,7 @@ class FRAlgWrapper:
                                       [shape[0], shape[1]], [shape[0], 0]])
     newIo = ImageIO(image=self.image, **kwargs)
     result = self.processor.run(newIo, force=True)
-    outImg = result['image'].data
+    outImg = result['image']
     if outImg.ndim > 2:
       outImg = np.bitwise_or.reduce(outImg, 2)
     self.output = outImg
@@ -92,4 +100,3 @@ class FRAlgWrapper:
     # else, all vertices belong to the same component
     else:
       return FRComplexVertices(initialList)
-

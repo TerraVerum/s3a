@@ -269,16 +269,21 @@ def cornersToFullBoundary(cornerVerts: FRVertices, sizeLimit: float=np.inf) -> F
   return getVertsFromBwComps(filledMask, simplifyVerts=False).filledVerts().stack()
 
 
-def _getCroppedImg(image: NChanImg, verts: FRVertices, margin: int) -> (np.ndarray, np.ndarray):
+def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int, otherBbox: np.ndarray=None) -> (np.ndarray, np.ndarray):
   verts = np.vstack(verts)
   img_np = image
   compCoords = np.vstack([verts.min(0), verts.max(0)])
-  compCoords = getClippedBbox(img_np.shape, compCoords, margin).flatten()
-  croppedImg = image[compCoords[1]:compCoords[3], compCoords[0]:compCoords[2], :]
+  if otherBbox is not None:
+    for dim in range(2):
+      for ii, cmp in zip(range(2), [min, max]):
+        compCoords[ii,dim] = cmp(compCoords[ii,dim], otherBbox[ii,dim])
+  compCoords = getClippedBbox(img_np.shape, compCoords, margin)
+  # Verts are x-y, index into image with row-col
+  croppedImg = image[compCoords[0,1]:compCoords[1,1], compCoords[0,0]:compCoords[1,0], :]
   return croppedImg, compCoords
 
 
-def _area_coord_regionTbl(_image: Image):
+def area_coord_regionTbl(_image: Image):
   if not np.any(_image.data):
     return pd.DataFrame({'coords': [np.array([[]])], 'area': [0]})
   regionDict = regionprops_table(label(_image.data), properties=('coords', 'area'))

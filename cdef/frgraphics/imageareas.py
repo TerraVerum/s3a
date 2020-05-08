@@ -109,27 +109,25 @@ class FREditableImg(pg.PlotWidget):
       self.shapeCollection.curShape = self.drawOptsWidget.shapeBtnParamMap[btn]
 
   def mousePressEvent(self, ev: QtGui.QMouseEvent):
+    super().mousePressEvent(ev)
     if ev.buttons() == QtCore.Qt.LeftButton \
         and self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
       self.shapeCollection.buildRoi(self.imgItem, ev)
-
-    super().mousePressEvent(ev)
 
   def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent):
+    super().mouseDoubleClickEvent(ev)
     if ev.buttons() == QtCore.Qt.LeftButton \
         and self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
       self.shapeCollection.buildRoi(self.imgItem, ev)
-
-    super().mouseDoubleClickEvent(ev)
 
   def mouseMoveEvent(self, ev: QtGui.QMouseEvent):
     """
     Mouse move behavior is contingent on which shape is currently selected,
     unless we are panning
     """
+    super().mouseMoveEvent(ev)
     if self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
       self.shapeCollection.buildRoi(self.imgItem, ev)
-    super().mouseMoveEvent(ev)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
     """
@@ -137,11 +135,10 @@ class FREditableImg(pg.PlotWidget):
 
     :return: Whether the mouse release completes the current ROI
     """
+    super().mouseReleaseEvent(ev)
     # if ev.buttons() == QtCore.Qt.LeftButton:
     if self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
       self.shapeCollection.buildRoi(self.imgItem, ev)
-
-    super().mouseReleaseEvent(ev)
 
   def clearCurDrawShape(self):
     self.shapeCollection.clearAllRois()

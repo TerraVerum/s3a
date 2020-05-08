@@ -125,12 +125,16 @@ class FRCdefApp(FRAnnotatorUI):
     if userProfileArgs is not None:
       self.loadUserProfile(userProfileArgs)
 
-    # ---------------
-    # LOAD LAYOUT OPTIONS
-    # ---------------
+    # ANALYTICS
+    self.newCompAnalyticsAct.triggered.connect(self.showNewCompAnalytics)
+    self.modCompAnalyticsAct.triggered.connect(self.showModCompAnalytics)
+
+    # Load layout options
     self.saveLayout('Default')
     # Start with docks in default position, hide error if default file doesn't exist
     self.loadLayout('Default', showError=False)
+
+
 
   # -----------------------------
   # FRCdefApp CLASS FUNCTIONS
@@ -251,6 +255,7 @@ class FRCdefApp(FRAnnotatorUI):
       else:
         self.mainImgFpath = str(Path(fileName).resolve())
       self.focusedImg.resetImage()
+      self.mainImg.plotItem.vb.autoRange()
       if self.estBoundsOnStart:
         self.estimateBoundaries()
 
@@ -289,7 +294,7 @@ class FRCdefApp(FRAnnotatorUI):
 
     annFname = profileDict['Annotations']
     if annFname:
-      self.loadCompList(fname=annFname)
+      self.loadCompList(annFname)
 
     layoutName = profileDict['Layout']
     if layoutName:
@@ -311,7 +316,7 @@ class FRCdefApp(FRAnnotatorUI):
                                 self.compDisplay.displayedIds)
     self.compExporter.exportLabeledImg(self.mainImg.image.shape, outFname)
 
-  def loadCompList(self, inFname: str, loadType: FR_ENUMS.COMP_ADD_AS_NEW):
+  def loadCompList(self, inFname: str, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
     pathFname = Path(inFname)
     fType = pathFname.suffix[1:]
     if fType == 'csv':
@@ -328,6 +333,12 @@ class FRCdefApp(FRAnnotatorUI):
       QtWidgets.QMessageBox().information(self, 'Error During Import', fullErrMsg)
     else:
       self.compMgr.addComps(newComps, loadType)
+
+  def showNewCompAnalytics(self):
+    self.mainImg.procCollection.curProcessor.processor.plotStages()
+
+  def showModCompAnalytics(self):
+    self.focusedImg.procCollection.curProcessor.processor.plotStages()
 
   # ---------------
   # MISC CALLBACKS
@@ -415,6 +426,9 @@ class FRCdefApp(FRAnnotatorUI):
     if fname is None:
       return
     self.loadCompList(fname, loadType)
+
+  def newCompAnalyticsActTriggered(self):
+    self.showNewCompAnalytics()
 
   # ---------------
   # BUTTON CALLBACKS

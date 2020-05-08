@@ -90,8 +90,11 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     self.menubar = QtWidgets.QMenuBar(self)
     self.menuFile = QtWidgets.QMenu('&File', self.menubar)
     self.menuSettings = QtWidgets.QMenu('&Settings', self.menubar)
+    # self.menuEdit = QtWidgets.QMenu('&Edit', self.menubar)
+    self.menuAnalytics = QtWidgets.QMenu('&Analytics', self.menubar)
     self.menubar.addMenu(self.menuFile)
     self.menubar.addMenu(self.menuSettings)
+    self.menubar.addMenu(self.menuAnalytics)
 
     # File / Image
     self.openImgAct = create_addMenuAct(self, self.menuFile, '&Open Image')
@@ -110,7 +113,13 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     self.loadCompsAct_merge = create_addMenuAct(self, self.menuLoad_Components, 'Update as &Merge')
     self.loadCompsAct_new = create_addMenuAct(self, self.menuLoad_Components, 'Append as &New')
 
+    # Analytics
+    self.newCompAnalyticsAct = create_addMenuAct(self, self.menuAnalytics, 'Newest Added Component')
+    self.modCompAnalyticsAct = create_addMenuAct(self, self.menuAnalytics, 'Modified Component')
+
+
     self.setMenuBar(self.menubar)
+
 
 
 
