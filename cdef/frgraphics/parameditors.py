@@ -168,7 +168,7 @@ class FRBoundFnParams:
   func: Callable
   defaultFnArgs: list
 
-class FRParamEditor(QtWidgets.QDialog):
+class FRParamEditor(QtWidgets.QDockWidget):
   sigParamStateCreated = Signal(str)
   sigParamStateUpdated = Signal(dict)
 
@@ -187,7 +187,9 @@ class FRParamEditor(QtWidgets.QDialog):
         name = "Parameter Editor"
 
     super().__init__(parent)
+    self.hide()
     self.setWindowTitle(name)
+    self.setObjectName(name)
 
     self.boundFnsPerClass: Dict[str, List[FRBoundFnParams]] = {}
     """Holds the parameters associated with this registered class"""
@@ -200,9 +202,8 @@ class FRParamEditor(QtWidgets.QDialog):
 
     self.classInstToEditorMapping: Dict[Any, FRParamEditor] = {}
     """
-    For editors that register parameters for *other* editors (like
-    :class:`FRAlgPropsMgr`), this allows parameters to be updated from the
-    correct editor
+    For editors that register parameters for *other* editors,
+     this allows parameters to be updated from the correct editor
     """
 
     self.instantiatedClassTypes = set()
@@ -211,8 +212,6 @@ class FRParamEditor(QtWidgets.QDialog):
     base classes with registered parameters but no instances will not appear in the
     parameter editor.
     """
-
-
 
     # -----------
     # Construct parameter tree
@@ -246,15 +245,17 @@ class FRParamEditor(QtWidgets.QDialog):
     # -----------
     # Widget layout
     # -----------
+    dockContents = QtWidgets.QWidget(parent)
+    self.setWidget(dockContents)
     btnLayout = QtWidgets.QHBoxLayout()
     btnLayout.addWidget(self.saveAsBtn)
     btnLayout.addWidget(self.applyBtn)
     btnLayout.addWidget(self.closeBtn)
 
-    centralLayout = QtWidgets.QVBoxLayout()
+    centralLayout = QtWidgets.QVBoxLayout(dockContents)
     centralLayout.addWidget(self.tree)
     centralLayout.addLayout(btnLayout)
-    self.setLayout(centralLayout)
+    # self.setLayout(centralLayout)
     self.tree.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
     # -----------
     # UI Element Signals
@@ -336,7 +337,7 @@ class FRParamEditor(QtWidgets.QDialog):
     """
     If window is closed apart from pressing 'accept', restore pre-edit state
     """
-    self.params.restoreState(self._stateBeforeEdit)
+    self.params.restoreState(self._stateBeforeEdit, removeChildren=False)
     super().reject()
 
   def applyBtnClicked(self):
@@ -350,10 +351,10 @@ class FRParamEditor(QtWidgets.QDialog):
     return outDict
 
   def saveAsBtnClicked(self):
-    paramState = self.params.saveState()
+    paramState = self.params.saveState(filter='user')
     saveName = dialogGetSaveFileName(self, self._saveDlgName)
     errMsg = self.saveAs(saveName, paramState)
-    if errMsg is not None:
+    if isinstance(errMsg, str):
       QtWidgets.QMessageBox().information(self, 'Error During Import', errMsg)
 
 
@@ -718,7 +719,7 @@ class FRAlgCollectionEditor(FRParamEditor):
     # Since constructor forces self.params to be top level item, we need to reconstruct
     # the tree to avoid this
     self.tree.setParameters(self.algOpts)
-    self.algOpts.sigValueChanged.connect(self.changeActiveAlg)
+    self.algOpts.sigValueChanged.connect(lambda param, proc: self.changeActiveAlg(proc))
 
     Path(self.saveDir).mkdir(parents=True, exist_ok=True)
 
@@ -730,9 +731,11 @@ class FRAlgCollectionEditor(FRParamEditor):
     self._image = np.zeros((1,1), dtype='uint8')
 
     for processorCtor in algMgr.processorCtors:
-      self.addImageProcessor(processorCtor())
+      # Retrieve proc so default can be set after
+      wrapped = self.addImageProcessor(processorCtor())
+    self.algOpts.setDefault(wrapped)
+    self.changeActiveAlg(proc=wrapped)
     self.saveAs('Default', allowOverwriteDefault=True)
-    self.algOpts.sigLimitsChanged.connect(lambda *args: print(*args))
 
   def run(self, **kwargs):
     return self.curProcessor.run(**kwargs)
@@ -755,6 +758,7 @@ class FRAlgCollectionEditor(FRParamEditor):
 
     self.nameToProcMapping.update({processor.algName: processor})
     self.algOpts.setLimits(self.nameToProcMapping.copy())
+    return processor
 
   def saveAs(self, saveName: str=None, paramState: dict=None,
              allowOverwriteDefault=False):
@@ -779,13 +783,13 @@ class FRAlgCollectionEditor(FRParamEditor):
     self.algOpts.setValue(selectedImpl)
     super().loadState(selection_newStatePair[1])
 
-  def changeActiveAlg(self, selectedParam: Parameter, proc: FRImgProcWrapper):
+  def changeActiveAlg(self, proc: FRImgProcWrapper):
     # Hide all except current selection
     # TODO: Find out why hide() isn't working. Documentation indicates it should
     # Instead, use the parentChanged utility as a hacky workaround
-    curParamSet = self.params.child(proc.algName)
+    selectedParam = self.params.child(proc.algName)
     for ii, child in enumerate(self.params.children()):
-      shouldHide = child is not curParamSet
+      shouldHide = child is not selectedParam
       # Offset by 1 to account for self.algOpts
       self.tree.setRowHidden(1 + ii, QtCore.QModelIndex(), shouldHide)
     # selectedParam.show()
@@ -812,6 +816,11 @@ class FRAlgPropsMgr(FRParamEditor):
     FR_SINGLETON.editors.append(newEditor)
     self.spawnedCollections.append(weakref.proxy(newEditor))
     # Wrap in property so changes propagate to the calling class
+    lims = newEditor.algOpts.opts['limits']
+    defaultKey = next(iter(lims))
+    defaultAlg = lims[defaultKey]
+    newEditor.algOpts.setDefault(defaultAlg)
+    newEditor.changeActiveAlg(proc=defaultAlg)
     return newEditor
 
   def addProcessCtor(self, procCtor: Callable[[], ImageProcess]):

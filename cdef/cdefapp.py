@@ -52,6 +52,7 @@ class FRCdefApp(FRAnnotatorUI):
 
   def __init__(self, **userProfileArgs: Dict[str, Any]):
     super().__init__()
+    self.addEditorDocks()
     # ---------------
     # DATA ATTRIBUTES
     # ---------------
@@ -159,6 +160,12 @@ class FRCdefApp(FRAnnotatorUI):
       ev.accept()
       FR_SINGLETON.close()
 
+  def addEditorDocks(self):
+    editorList = FR_SINGLETON.editors + [FR_SINGLETON.userProfile]
+    for editor in editorList:
+      editor.setParent(self)
+      self.addDockWidget(QtCore.Qt.RightDockWidgetArea, editor)
+
   def createMenuOptForEditor(self, parentMenu: QtWidgets.QMenu, editor: FRParamEditor,
                              loadFunc=None):
     if loadFunc is None:
@@ -174,11 +181,6 @@ class FRCdefApp(FRAnnotatorUI):
     # Initialize default menus
     populateFunc()
     parentMenu.addMenu(newMenu)
-
-  def setStyleSheet(self, styleSheet: str):
-    super().setStyleSheet(styleSheet)
-    for editor in FR_SINGLETON.editors + [FR_SINGLETON.userProfile]:
-      editor.setStyleSheet(styleSheet)
 
   @staticmethod
   def populateParamEditorMenuOpts(objForMenu: FRParamEditor, winMenu: QtWidgets.QMenu,

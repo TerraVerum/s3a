@@ -16,6 +16,7 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     self.setWindowTitle(self.APP_TITLE)
 
     self.setDockNestingEnabled(True)
+    self.setTabPosition(QtCore.Qt.AllDockWidgetAreas, QtWidgets.QTabWidget.North)
 
 
     # -----
@@ -36,7 +37,7 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     # FOCUSED IMAGE
     # -----
     # Bookkeeping widgets
-    focusedImgDock = QtWidgets.QDockWidget('Focused Component', self)
+    focusedImgDock = QtWidgets.QDockWidget('Focused Component', self, flags=QtCore.Qt.Window)
     focusedImgContents = QtWidgets.QWidget(self)
     focusedLayout = QtWidgets.QVBoxLayout(focusedImgContents)
     focusedImgDock.setWidget(focusedImgContents)
@@ -67,7 +68,7 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     # COMPONENT TABLE
     # -----
     # Bookkeeping widgets
-    tableDock = QtWidgets.QDockWidget('Component Table', self)
+    tableDock = QtWidgets.QDockWidget('Component Table', self, flags=QtCore.Qt.Window)
     tableDock.setObjectName('Component Table Dock')
     tableContents = QtWidgets.QWidget(tableDock)
     tableLayout = QtWidgets.QVBoxLayout(tableContents)
