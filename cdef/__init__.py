@@ -24,9 +24,7 @@ import cdef.structures
 
 from cdef.frgraphics.parameditors import FR_SINGLETON
 from cdef.interfaceimpls import FRTopLevelProcessors
-## TODO: A little sad to set default function this way
-# Reverse sort so 'region grow' is first
-for name, func in reversed(inspect.getmembers(FRTopLevelProcessors, inspect.isfunction)):
+for name, func in inspect.getmembers(FRTopLevelProcessors, inspect.isfunction):
   FR_SINGLETON.algParamMgr.addProcessCtor(func)
 
 from cdef.cdefapp import FRCdefApp

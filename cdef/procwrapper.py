@@ -10,6 +10,7 @@ from pyqtgraph.parametertree import Parameter
 from imageprocessing.processing import ImageIO, ProcessStage, AtomicFunction, Process, \
   ImageProcess, ProcessIO
 from .frgraphics import parameditors
+from .interfaceimpls import cropImgToROI, updateCroppedArea, basicOpsCombo
 from .processingutils import getVertsFromBwComps
 from .structures import FRParam, NChanImg, FRComplexVertices, FRVertices
 
@@ -73,17 +74,16 @@ class FRGeneralProcWrapper(ABC):
 
 class FRImgProcWrapper(FRGeneralProcWrapper):
   def __init__(self, processor: ImageProcess, editor: parameditors.FRParamEditor):
+    # Each processor is encapsulated in processes that crop the image to the region of
+    # interest specified by the user, and re-expand the area after processing
+    processor.stages = [cropImgToROI()] + processor.stages + [updateCroppedArea(),
+                                                              basicOpsCombo()]
     super().__init__(processor, editor)
     self.image: NChanImg = np.zeros((0,0), bool)
 
   def run(self, **kwargs):
     if kwargs.get('prevCompMask', None) is None:
       kwargs['prevCompMask'] = np.zeros(self.image.shape[:2], bool)
-    if kwargs.get('fgVerts') is None and kwargs.get('bgVerts') is None:
-      # Assume global estimate
-      shape = self.image.shape[:2][::-1]
-      kwargs['fgVerts'] = FRVertices([[0,0], [0, shape[1]],
-                                      [shape[0], shape[1]], [shape[0], 0]])
     newIo = ImageIO(image=self.image, **kwargs)
     result = self.processor.run(newIo, force=True)
     outImg = result['image']
