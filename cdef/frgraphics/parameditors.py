@@ -15,7 +15,8 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
 from pyqtgraph.parametertree.parameterTypes import ListParameter
 
-from cdef.structures import NChanImg, ContainsSharedProps
+from cdef.structures import NChanImg, ContainsSharedProps, FRComplexVertices, FRVertices, \
+  BlackWhiteImg
 from imageprocessing.processing import ImageProcess, Process
 from .graphicsutils import dialogGetSaveFileName, saveToFile
 from .. import appInst
@@ -85,7 +86,7 @@ class FRShortcutCtorGroup:
   args: list
 
 class FREditableShortcut(QtWidgets.QShortcut):
-  paramIdx: QtGui.QKeySequence
+  paramIdx: Tuple[FRParam, FRParam]
 
 class FRShortcutParameterItem(parameterTypes.WidgetParameterItem):
   """
@@ -140,6 +141,8 @@ class FRProcGroupParameter(parameterTypes.GroupParameter):
     act = item.contextMenu.addAction('Toggle Enable')
     self.enabledFontMap[True] = QtGui.QFont(item.font(0))
     def setter():
+      if not self.opts['allowDisable']:
+        return
       # Toggle 'enable' on click
       disabled = self.opts['enabled']
       enabled = not disabled
@@ -730,6 +733,12 @@ class FRAlgCollectionEditor(FRParamEditor):
     self.nameToProcMapping: Dict[str, FRImgProcWrapper] = {}
     self._image = np.zeros((1,1), dtype='uint8')
 
+    self.VERT_LST_NAMES = ['fgVerts', 'bgVerts']
+    self.vertBuffers: Dict[str, FRComplexVertices] = {
+      vType: FRComplexVertices() for vType in self.VERT_LST_NAMES
+    }
+
+    wrapped : Optional[FRImgProcWrapper] = None
     for processorCtor in algMgr.processorCtors:
       # Retrieve proc so default can be set after
       wrapped = self.addImageProcessor(processorCtor())
@@ -738,7 +747,19 @@ class FRAlgCollectionEditor(FRParamEditor):
     self.saveAs('Default', allowOverwriteDefault=True)
 
   def run(self, **kwargs):
-    return self.curProcessor.run(**kwargs)
+    # for vertsName in self.VERT_LST_NAMES:
+    #   curVerts = kwargs[vertsName]
+    #   if curVerts is not None:
+    #     self.vertBuffers[vertsName].append(curVerts)
+    # for vertsName in self.VERT_LST_NAMES:
+    #   arg = self.vertBuffers[vertsName].stack()
+    #   kwargs[vertsName] = arg
+    for name in 'fgVerts', 'bgVerts':
+      if kwargs[name] is None:
+        kwargs[name] = FRVertices()
+    retVal = self.curProcessor.run(**kwargs)
+    # self.vertBuffers = {name: FRComplexVertices() for name in self.VERT_LST_NAMES}
+    return retVal
 
   def resultAsVerts(self, localEstimate=True):
     return self.curProcessor.resultAsVerts(localEstimate=localEstimate)

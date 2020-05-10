@@ -16,7 +16,7 @@ from imageprocessing.common import Image, ColorSpace
 from imageprocessing.processing import ImageIO, ImageProcess
 
 def cropImgToROI(margin=10):
-  io = ImageIO.createFrom(cropImgToROI, locals())
+  io = ImageIO.createFrom(cropImgToROI)
   proc = io.initProcess('Crop to Vertices')
   def crop_to_verts(_image: Image, _fgVerts: FRVertices, _bgVerts: FRVertices,
                     _prevCompMask: BlackWhiteImg, _margin=margin):
@@ -29,32 +29,29 @@ def cropImgToROI(margin=10):
 
     asForeground = True
     allVerts = []
-    if _fgVerts is None and _bgVerts is None:
+    if _fgVerts.empty and _bgVerts.empty:
       # Give whole image as input
       shape = _image.shape[:2][::-1]
       _fgVerts = FRVertices([[0,0], [0, shape[1]],
                              [shape[0], shape[1]], [shape[0], 0]
                             ])
-    if _fgVerts is None:
+    if _fgVerts.empty:
       asForeground = False
       _fgVerts = _bgVerts
-      allVerts.append(_fgVerts)
-      _bgVerts = None
-    else:
-      allVerts.append(_fgVerts)
-    if _bgVerts is not None:
-      allVerts.append(_bgVerts)
+      _bgVerts = FRVertices()
 
+    allVerts.append(_fgVerts)
+    allVerts.append(_bgVerts)
     allVerts = np.vstack(allVerts)
     cropped, bounds = getCroppedImg(_image, allVerts, _margin, maskBbox)
     vertOffset = bounds.min(0)
     for vertList in _fgVerts, _bgVerts:
-      if vertList is not None:
         vertList -= vertOffset
     boundSlices = slice(*bounds[:,1]), slice(*bounds[:,0])
     _prevCompMask = _prevCompMask[boundSlices]
     return ImageIO(image=cropped, fgVerts=_fgVerts, bgVerts=_bgVerts, prevCompMask=_prevCompMask,
-                   boundSlices=boundSlices, origImg=_image, asForeground=asForeground)
+                   boundSlices=boundSlices, origImg=_image, asForeground=asForeground,
+                   allVerts=allVerts)
   proc.addFunction(crop_to_verts)
   return proc
 
@@ -79,7 +76,7 @@ def updateCroppedArea():
 
 
 def fillHoles():
-  io = ImageIO.createFrom(fillHoles, locals())
+  io = ImageIO.createFrom(fillHoles)
   proc = io.initProcess('Fill Holes')
 
   def fill_holes(_image: Image):
@@ -88,7 +85,7 @@ def fillHoles():
   return proc
 
 def openClose():
-  io = ImageIO.createFrom(openClose, locals())
+  io = ImageIO.createFrom(openClose)
   proc = io.initProcess('Open -> Close')
   def cvt_to_uint(_image: Image):
     return ImageIO(image = _image.astype('uint8'))
@@ -98,7 +95,7 @@ def openClose():
   return proc
 
 def keepLargestConnComp():
-  io = ImageIO.createFrom(keepLargestConnComp, locals())
+  io = ImageIO.createFrom(keepLargestConnComp)
   proc = io.initProcess('Keep Largest Connected Components')
 
   def keep_largest_comp(_image: Image):
@@ -113,7 +110,7 @@ def keepLargestConnComp():
   return proc
 
 def removeSmallConnComps(minSzThreshold=30):
-  io = ImageIO.createFrom(removeSmallConnComps, locals())
+  io = ImageIO.createFrom(removeSmallConnComps)
   proc = io.initProcess('Remove Conn. Comp. Smaller Than...')
   def rm_small_comp(_image: Image, _minSzThreshold=minSzThreshold):
     _regionPropTbl = area_coord_regionTbl(_image)
@@ -128,7 +125,7 @@ def removeSmallConnComps(minSzThreshold=30):
   return proc
 
 def basicOpsCombo():
-  io = ImageIO.createFrom(basicOpsCombo, locals())
+  io = ImageIO.createFrom(basicOpsCombo)
   proc = io.initProcess('Basic Region Operations')
   proc.addProcess(fillHoles())
   proc.addProcess(openClose())
@@ -139,8 +136,7 @@ def basicOpsCombo():
 class FRTopLevelProcessors:
   @staticmethod
   def b_regionGrowProcessor(seedThresh=10):
-    curLocals = locals()
-    io = ImageIO.createFrom(FRTopLevelProcessors.b_regionGrowProcessor, locals())
+    io = ImageIO.createFrom(FRTopLevelProcessors.b_regionGrowProcessor)
     proc = io.initProcess('Region Growing')
     def region_grow(_image: Image, _prevCompMask: BlackWhiteImg, _fgVerts: FRVertices,
                     _asForeground: bool, _seedThresh=seedThresh):
@@ -177,9 +173,9 @@ class FRTopLevelProcessors:
     proc.addFunction(region_grow)
     return proc
 
-  @staticmethod
-  def c_watershedProcessor():
-    return watershedProcess()
+  # @staticmethod
+  # def c_watershedProcessor():
+  #   return watershedProcess()
 
   @staticmethod
   def d_graphCutProcessor():
@@ -187,19 +183,39 @@ class FRTopLevelProcessors:
 
   @staticmethod
   def a_grabCutProcessor(iters=5):
-    io = ImageIO.createFrom(FRTopLevelProcessors.a_grabCutProcessor, locals())
+    io = ImageIO.createFrom(FRTopLevelProcessors.a_grabCutProcessor)
     proc = io.initProcess('Primitive Grab Cut')
     def cv_grabcut(_image: Image, _fgVerts: FRVertices, _bgVerts: FRVertices,
                    _prevCompMask: BlackWhiteImg, _asForeground: bool, _iters=iters):
-      cvRect = np.array([_fgVerts.min(0), _fgVerts.max(0) - _fgVerts.min(0)]).flatten()
-      if cvRect[2] + cvRect[3] == 0:
-        return ImageIO(image=np.zeros_like(_prevCompMask))
       img = cv.cvtColor(_image, cv.COLOR_RGB2BGR)
       # Turn foreground into x-y-width-height
-      mask = _prevCompMask.astype('uint8')
       bgdModel = np.zeros((1,65),np.float64)
       fgdModel = np.zeros((1,65),np.float64)
-      cv.grabCut(img, mask, cvRect, bgdModel, fgdModel, _iters, mode=cv.GC_INIT_WITH_RECT)
+      if not _asForeground:
+        fgdClr = cv.GC_PR_BGD
+        bgdClr = cv.GC_PR_FGD
+      else:
+        fgdClr = cv.GC_PR_FGD
+        bgdClr = cv.GC_PR_BGD
+      mask = np.zeros(_prevCompMask.shape, dtype='uint8')
+      mask[_prevCompMask == 1] = fgdClr
+      mask[_prevCompMask == 0] = bgdClr
+
+      allverts = np.vstack([_fgVerts, _bgVerts])
+      cvRect = np.array([allverts.min(0), allverts.max(0) - allverts.min(0)]).flatten()
+
+      if np.any(_prevCompMask):
+        mode = cv.GC_INIT_WITH_MASK
+        for verts, fillClr in zip([_fgVerts, _bgVerts], [1,0]):
+          if verts.connected and len(verts) > 0:
+            cv.fillPoly(mask, [verts], fillClr)
+          else:
+            mask[verts.rows, verts.cols] = fillClr
+      else:
+        if cvRect[2] + cvRect[3] == 0:
+          return ImageIO(image=np.zeros_like(_prevCompMask))
+        mode = cv.GC_INIT_WITH_RECT
+      cv.grabCut(img, mask, cvRect, bgdModel, fgdModel, _iters, mode=mode)
       outMask = np.where((mask==2)|(mask==0), False, True)
       return ImageIO(image=outMask)
     proc.addFunction(cv_grabcut)
@@ -207,7 +223,7 @@ class FRTopLevelProcessors:
 
   @staticmethod
   def w_basicShapesProcessor():
-    io = ImageIO.createFrom(FRTopLevelProcessors.w_basicShapesProcessor, locals())
+    io = ImageIO.createFrom(FRTopLevelProcessors.w_basicShapesProcessor)
     proc = io.initProcess('Basic Shapes')
 
     def get_basic_shapes(_image: Image, _prevCompMask: BlackWhiteImg,
@@ -223,7 +239,7 @@ class FRTopLevelProcessors:
 
   @staticmethod
   def z_onlySquaresProcessor():
-    io = ImageIO.createFrom(FRTopLevelProcessors.w_basicShapesProcessor, locals())
+    io = ImageIO.createFrom(FRTopLevelProcessors.w_basicShapesProcessor)
     proc = io.initProcess('Only Squares')
 
     proc.addProcess(FRTopLevelProcessors.w_basicShapesProcessor())
@@ -235,6 +251,6 @@ class FRTopLevelProcessors:
     proc.addFunction(convert_to_squares)
     return proc
 
-  # @staticmethod
-  # def c_watershedProcessor():
-  #   return watershedProcess()
+  @staticmethod
+  def c_watershedProcessor():
+    return watershedProcess()

@@ -1,9 +1,12 @@
 from __future__ import annotations
 from ast import literal_eval
-from typing import Union, List
+from typing import Union, List, Sequence
+from warnings import warn
 
 import numpy as np
+import cv2 as cv
 
+from .typeoverloads import BlackWhiteImg
 from .exceptions import FRIllFormedVerticesError
 from ..projectvars.enums import FR_ENUMS
 
@@ -33,6 +36,10 @@ class FRVertices(np.ndarray):
       raise FRIllFormedVerticesError(f'Vertex list must be Nx2. Received shape {shape}.')
     if obj is None: return
     self.connected = getattr(obj, 'connected', True)
+
+  @property
+  def empty(self):
+      return len(self) == 0
 
   def asPoint(self):
     if self.size == 2:
@@ -96,6 +103,10 @@ class FRComplexVertices(list):
       hierarchy = np.ones((numInpts, 4), dtype=int)*-1
     self.hierarchy = hierarchy
 
+  def append(self, verts:FRVertices=None) -> None:
+    if verts is not None:
+      self.append(verts)
+
   @property
   def x_flat(self):
     return self.stack().x
@@ -148,6 +159,36 @@ class FRComplexVertices(list):
     """
     idxs = np.nonzero(self.hierarchy[:,3] != -1)[0]
     return FRComplexVertices([self[ii] for ii in idxs])
+
+  def toBwMask(self, maskShape: Sequence, warnIfTooSmall=True):
+    vertMax = self.stack().max(0)
+    if warnIfTooSmall and vertMax > np.array(maskShape[:2]):
+      warn('Vertices don\'t fit in the provided mask size.\n'
+           f'Vertex shape: {vertMax}, mask shape: {maskShape}')
+    out = np.zeros(maskShape, bool)
+    nChans = 1 if out.ndim < 3 else out.shape[2]
+    fillClr = tuple([1 for _ in range(nChans)])
+    cv.fillPoly(out, self, fillClr)
+    return out
+
+  @staticmethod
+  def fromBwMask(bwMask: BlackWhiteImg, simplifyVerts=True, externOnly=False) -> FRComplexVertices:
+    approxMethod = cv.CHAIN_APPROX_SIMPLE
+    if not simplifyVerts:
+      approxMethod = cv.CHAIN_APPROX_NONE
+    retrMethod = cv.RETR_CCOMP
+    if externOnly:
+      retrMethod = cv.RETR_EXTERNAL
+    # Contours are on the inside of components, so dilate first to make sure they are on the
+    # outside
+    #bwmask = dilation(bwmask, np.ones((3,3), dtype=bool))
+    contours, hierarchy = cv.findContours(bwMask.astype('uint8'), retrMethod, approxMethod)
+    compVertices = []
+    for contour in contours:
+      compVertices.append(FRVertices(contour[:,0,:]))
+    if hierarchy is None:
+      hierarchy = np.ones((0,1,4), int)*-1
+    return FRComplexVertices(compVertices, hierarchy[:,0,:])
 
   def __str__(self) -> str:
     """

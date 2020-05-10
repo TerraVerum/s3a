@@ -76,8 +76,7 @@ class FREditableImg(pg.PlotWidget):
     self.drawOptsWidget.selectOpt(self.drawAction)
     self.drawOptsWidget.selectOpt(self.shapeCollection.curShape)
 
-  def handleShapeFinished(self, roi: FRExtendedROI, fgVerts: FRVertices=None, bgVerts: FRVertices=None, prevComp=None) \
-      -> Optional[np.ndarray]:
+  def handleShapeFinished(self, roi: FRExtendedROI) -> Optional[np.ndarray]:
     """
     Overloaded in child classes to process new regions
     """
@@ -162,8 +161,7 @@ class FRMainImage(FREditableImg):
 
     self.switchBtnMode(FR_CONSTS.DRAW_ACT_ADD)
 
-  def handleShapeFinished(self, roi: FRExtendedROI, fgVerts: FRVertices=None, bgVerts: FRVertices=None,
-                          prevComp=None) -> Optional[np.ndarray]:
+  def handleShapeFinished(self, roi: FRExtendedROI) -> Optional[np.ndarray]:
     if (self.drawAction == FR_CONSTS.DRAW_ACT_SELECT) and roi.connected:
       # Selection
       self.sigSelectionBoundsMade.emit(self.shapeCollection.shapeVerts)
@@ -176,7 +174,7 @@ class FRMainImage(FREditableImg):
 
       with BusyCursor():
         newCompMask = self.procCollection.run(prevCompMask=prevComp, fgVerts=verts, bgVerts=None)
-      newVerts = getVertsFromBwComps(newCompMask)
+      newVerts = FRComplexVertices.fromBwMask(newCompMask)
       if len(newVerts.stack()) == 0:
         return
       # TODO: Determine more robust solution for separated vertices. For now use largest component
@@ -269,8 +267,7 @@ class FRFocusedImage(FREditableImg):
   def resetImage(self):
     self.updateAll(None)
 
-  def handleShapeFinished(self, roi: FRExtendedROI, fgVerts: FRVertices=None, bgVerts: FRVertices=None,
-                          prevComp=None) -> Optional[np.ndarray]:
+  def handleShapeFinished(self, roi: FRExtendedROI) -> Optional[np.ndarray]:
     if self.drawAction == FR_CONSTS.DRAW_ACT_PAN:
       return
 

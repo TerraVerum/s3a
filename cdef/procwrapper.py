@@ -66,7 +66,8 @@ class FRGeneralProcWrapper(ABC):
       if isinstance(childStage, Process):
         valType = 'procgroup'
       curGroup = FRParam(name=childStage.name, valType=valType, value=[])
-      self.editor.registerProp(self.algName, curGroup, paramParent)
+      param = self.editor.registerProp(self.algName, curGroup, paramParent, asProperty=False)
+      param.opts['allowDisable'] = stage.allowDisable
       self.unpackStages(childStage, paramParent=paramParent + (childStage.name,))
 
   def run(self, **kwargs):
@@ -76,8 +77,11 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
   def __init__(self, processor: ImageProcess, editor: parameditors.FRParamEditor):
     # Each processor is encapsulated in processes that crop the image to the region of
     # interest specified by the user, and re-expand the area after processing
-    processor.stages = [cropImgToROI()] + processor.stages + [updateCroppedArea(),
-                                                              basicOpsCombo()]
+    cropStage = cropImgToROI()
+    cropStage.allowDisable = False
+    updateStage = updateCroppedArea()
+    updateStage.allowDisable = False
+    processor.stages = [cropStage] + processor.stages + [updateStage, basicOpsCombo()]
     super().__init__(processor, editor)
     self.image: NChanImg = np.zeros((0,0), bool)
 
@@ -86,7 +90,7 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
       kwargs['prevCompMask'] = np.zeros(self.image.shape[:2], bool)
     newIo = ImageIO(image=self.image, **kwargs)
     result = self.processor.run(newIo, force=True)
-    outImg = result['image']
+    outImg = result['image'].astype(bool)
     if outImg.ndim > 2:
       outImg = np.bitwise_or.reduce(outImg, 2)
     self.output = outImg
