@@ -86,7 +86,6 @@ def keep_largest_comp(_image: Image):
   out[coords[:,0], coords[:,1]] = True
   return ImageIO(image=out)
 
-
 def rm_small_comp(_image: Image, _minSzThreshold=30):
   _regionPropTbl = area_coord_regionTbl(_image)
   validCoords = _regionPropTbl.coords[_regionPropTbl.area >= _minSzThreshold]
@@ -125,6 +124,8 @@ def basicOpsCombo():
 
 def cv_grabcut(_image: Image, _fgVerts: FRVertices, _bgVerts: FRVertices,
                _prevCompMask: BlackWhiteImg, _asForeground: bool, _iters=5):
+  if _image.size == 0:
+    return np.zeros_like(_prevCompMask)
   img = cv.cvtColor(_image, cv.COLOR_RGB2BGR)
   # Turn foreground into x-y-width-height
   bgdModel = np.zeros((1,65),np.float64)
@@ -189,7 +190,6 @@ def region_grow(_image: Image, _prevCompMask: BlackWhiteImg, _fgVerts: FRVertice
     newRegion[~filledMask] = False
 
   return ImageIO(image=newRegion)
-
 
 class FRTopLevelProcessors:
   @staticmethod

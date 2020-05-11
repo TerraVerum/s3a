@@ -119,7 +119,7 @@ class FRCdefApp(FRAnnotatorUI):
     self.loadCompsAct_new.triggered.connect(lambda: self.loadCompsActionTriggered(FR_ENUMS.COMP_ADD_AS_NEW))
 
     # SETTINGS
-    for editor in FR_SINGLETON.editors:
+    for editor in FR_SINGLETON.registerableEditors:
       self.createMenuOptForEditor(self.menuSettings, editor)
     profileLoadFunc = self.loadUserProfile
     self.createMenuOptForEditor(self.menuFile, self.userProfile, profileLoadFunc)
@@ -131,9 +131,7 @@ class FRCdefApp(FRAnnotatorUI):
     self.modCompAnalyticsAct.triggered.connect(self.showModCompAnalytics)
 
     # Load layout options
-    self.saveLayout('Default')
-    # Start with docks in default position, hide error if default file doesn't exist
-    self.loadLayout('Default', showError=False)
+    self.saveLayout('Default', allowOverwriteDefault=True)
 
 
 
@@ -161,10 +159,13 @@ class FRCdefApp(FRAnnotatorUI):
       FR_SINGLETON.close()
 
   def addEditorDocks(self):
-    editorList = FR_SINGLETON.editors + [FR_SINGLETON.userProfile]
-    for editor in editorList:
+    # Define out here to retain scope
+    editor = None
+    for editor in FR_SINGLETON.allEditors:
       editor.setParent(self)
       self.addDockWidget(QtCore.Qt.RightDockWidgetArea, editor)
+    for nextEditor in FR_SINGLETON.allEditors[:-1]:
+      self.tabifyDockWidget(editor, nextEditor)
 
   def createMenuOptForEditor(self, parentMenu: QtWidgets.QMenu, editor: FRParamEditor,
                              loadFunc=None):
@@ -197,8 +198,6 @@ class FRCdefApp(FRAnnotatorUI):
     if self.useDarkTheme:
       style = qdarkstyle.load_stylesheet()
     self.setStyleSheet(style)
-    for editor in FR_SINGLETON.editors:
-      editor.setStyleSheet(style)
 
   def clearFocusedRegion(self):
     # Reset drawn comp vertices to nothing
@@ -302,7 +301,7 @@ class FRCdefApp(FRAnnotatorUI):
     if layoutName:
       self.loadLayoutActionTriggered(layoutName)
 
-    for editor in FR_SINGLETON.editors:
+    for editor in FR_SINGLETON.registerableEditors:
       curSettings = profileDict[editor.name]
       if curSettings is not None:
         self.paramEditorLoadActTriggered(editor, curSettings)
@@ -350,12 +349,12 @@ class FRCdefApp(FRAnnotatorUI):
     self.hasUnsavedChanges = True
 
   @Slot(object)
-  def add_focusComp(self, newComp):
-    self.compMgr.addComps(newComp)
+  def add_focusComp(self, newComps: df):
+    self.compMgr.addComps(newComps)
     # Make sure index matches ID before updating current component
-    newComp = newComp.set_index(TC.INST_ID, drop=False)
+    newComps = newComps.set_index(TC.INST_ID, drop=False)
     # Set this component as active in the focused view
-    self.updateCurComp(newComp)
+    self.updateCurComp(newComps)
 
   # ---------------
   # MENU CALLBACKS
@@ -379,6 +378,8 @@ class FRCdefApp(FRAnnotatorUI):
   @Slot()
   def saveLayoutActionTriggered(self):
     outName = dialogGetSaveFileName(self, 'Layout Name')
+    if outName is None or outName == '':
+      return
     errMsg = self.saveLayout(outName)
     if errMsg is not None:
       QtWidgets.QMessageBox().information(self, 'Error During Import', errMsg)

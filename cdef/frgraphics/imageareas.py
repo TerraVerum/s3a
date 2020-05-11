@@ -148,6 +148,11 @@ class FRMainImage(FREditableImg):
   # Hooked up during __init__
   sigSelectionBoundsMade = Signal(object)
 
+  @classmethod
+  def __initEditorParams__(cls):
+    cls.multCompsOnCreate = FR_SINGLETON.generalProps.registerProp(cls,
+                              FR_CONSTS.PROP_MK_MULT_COMPS_ON_ADD)
+
   def __init__(self, parent=None, imgSrc=None, **kargs):
     allowedShapes = (FR_CONSTS.DRAW_SHAPE_RECT, FR_CONSTS.DRAW_SHAPE_POLY)
     allowedActions = (FR_CONSTS.DRAW_ACT_SELECT,FR_CONSTS.DRAW_ACT_ADD)
@@ -173,14 +178,16 @@ class FRMainImage(FREditableImg):
       verts = self.shapeCollection.shapeVerts.astype(int)
 
       with BusyCursor():
-        newCompMask = self.procCollection.run(prevCompMask=prevComp, fgVerts=verts, bgVerts=None)
-      newVerts = FRComplexVertices.fromBwMask(newCompMask)
-      if len(newVerts.stack()) == 0:
+        self.procCollection.run(prevCompMask=prevComp, fgVerts=verts, bgVerts=None)
+      newVerts = self.procCollection.resultAsVerts(not self.multCompsOnCreate)
+      if not self.multCompsOnCreate:
+        newVerts = [newVerts]
+      if len(newVerts) == 0:
         return
       # TODO: Determine more robust solution for separated vertices. For now use largest component
-      newComp = makeCompDf(1)
-      newComp[TC.VERTICES] = [newVerts.copy()]
-      self.sigComponentCreated.emit(newComp)
+      newComps = makeCompDf(len(newVerts))
+      newComps[TC.VERTICES] = newVerts
+      self.sigComponentCreated.emit(newComps)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
     super().mouseReleaseEvent(ev)

@@ -37,7 +37,7 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     # FOCUSED IMAGE
     # -----
     # Bookkeeping widgets
-    focusedImgDock = QtWidgets.QDockWidget('Focused Component', self, flags=QtCore.Qt.Window)
+    focusedImgDock = QtWidgets.QDockWidget('Focused Image', self)
     focusedImgContents = QtWidgets.QWidget(self)
     focusedLayout = QtWidgets.QVBoxLayout(focusedImgContents)
     focusedImgDock.setWidget(focusedImgContents)
@@ -68,7 +68,7 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     # COMPONENT TABLE
     # -----
     # Bookkeeping widgets
-    tableDock = QtWidgets.QDockWidget('Component Table', self, flags=QtCore.Qt.Window)
+    tableDock = QtWidgets.QDockWidget('Component Table', self)
     tableDock.setObjectName('Component Table Dock')
     tableContents = QtWidgets.QWidget(tableDock)
     tableLayout = QtWidgets.QVBoxLayout(tableContents)

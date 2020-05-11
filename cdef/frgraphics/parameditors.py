@@ -268,7 +268,6 @@ class FRParamEditor(QtWidgets.QDockWidget):
     centralLayout.addLayout(btnLayout)
     # self.setLayout(centralLayout)
     self.tree.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-    self.tree.setSizeAdjustPolicy(QtWidgets.QScrollArea.AdjustToContents)
     # -----------
     # UI Element Signals
     # -----------
@@ -280,16 +279,18 @@ class FRParamEditor(QtWidgets.QDockWidget):
     self._stateBeforeEdit = self.params.saveState()
 
   def _expandCols(self):
-    # self.resize(self.tree.width(), self.height())
-    self.tree.setColumnWidth(0, self.width()//2)
     # totWidth = 0
-    # for colIdx in range(2):
-    #   self.tree.resizeColumnToContents(colIdx)
+    for colIdx in range(2):
+      self.tree.resizeColumnToContents(colIdx)
     #   totWidth += self.tree.columnWidth(colIdx) + self.tree.margin
     # appInst.processEvents()
     # self.dockContentsWidget.setMinimumWidth(totWidth)
+    self.tree.setColumnWidth(0, self.width()//2)
+    self.resize(self.tree.width(), self.height())
+    self.tree.setMinimumWidth(self.tree.width())
 
-  # Helper method for accessing simple parameter values
+
+# Helper method for accessing simple parameter values
   def __getitem__(self, keys: Union[tuple, FRParam, Collection[FRParam]]):
     """
     Convenience function for accessing child parameters within a parameter editor.
@@ -572,7 +573,7 @@ class FRUserProfileEditor(FRParamEditor):
     super().__init__(parent, paramList=[],
                      saveDir=USER_PROFILES_DIR, fileType='cdefprofile')
     optsFromSingletonEditors = []
-    for editor in singletonObj.editors:
+    for editor in singletonObj.registerableEditors:
       curValues = self.getSettingsFiles(editor.saveDir, editor.fileType)
       curParam = ListParameter(name=editor.name, value='Default', values=curValues)
       updateFunc = lambda newName, listParam=curParam: \
@@ -850,7 +851,7 @@ class FRAlgPropsMgr(FRParamEditor):
     # Strip "FR" from class name before retrieving name
     settingsName = _frPascalCaseToTitle(clsName[2:]) + ' Processor'
     newEditor = FRAlgCollectionEditor(editorDir, self, name=settingsName)
-    FR_SINGLETON.editors.append(newEditor)
+    FR_SINGLETON.registerableEditors.append(newEditor)
     self.spawnedCollections.append(weakref.proxy(newEditor))
     # Wrap in property so changes propagate to the calling class
     lims = newEditor.algOpts.opts['limits']
@@ -883,20 +884,24 @@ class _FRSingleton:
   annotationAuthor = None
 
   def __init__(self):
-    self.editors: List[FRParamEditor] = \
+    self.registerableEditors: List[FRParamEditor] = \
       [self.scheme, self.shortcuts, self.generalProps, self.filter]
     self.userProfile = FRUserProfileEditor(singletonObj=self)
+
+  @property
+  def allEditors(self):
+      return self.registerableEditors + [self.userProfile]
 
   def registerGroup(self, clsParam: FRParam, **opts):
     def multiEditorClsDecorator(cls):
       # Since all legwork is done inside the editors themselves, simply call each decorator from here as needed
-      for editor in self.editors:
+      for editor in self.registerableEditors:
         cls = editor.registerGroup(clsParam, **opts)(cls)
       return cls
     return multiEditorClsDecorator
 
   def close(self):
-    for editor in self.editors:
+    for editor in self.registerableEditors:
       editor.close()
 # Encapsulate scheme within class so that changes to the scheme propagate to all GUI elements
 FR_SINGLETON = _FRSingleton()
