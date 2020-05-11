@@ -49,7 +49,7 @@ class FRGeneralProcWrapper(ABC):
         curParam = FRParam(name=key, value=val)
         pgParam = self.editor.registerProp(self.algName, curParam, paramParent, asProperty=False)
         params.append(pgParam)
-      stage.run = atomicRunWrapper(stage, stage.hyperParamKeys, params)
+      stage.run = atomicRunWrapper(stage, stage.input.hyperParamKeys, params)
       return
     # else: # Process
     stage: Process
