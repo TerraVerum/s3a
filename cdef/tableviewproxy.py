@@ -43,7 +43,7 @@ class FRCompSortFilter(QtCore.QSortFilterProxyModel):
       # If that doesn't work, default to stringified comparison
       return str(leftObj) < str(rightObj)
 
-@FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_TBL)
+@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_TBL)
 class FRCompDisplayFilter(QtCore.QObject):
   sigCompsSelected = Signal(object)
 

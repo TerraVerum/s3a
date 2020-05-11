@@ -107,7 +107,7 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
     else:
       return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
 
-@FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_MGR)
+@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_MGR)
 class FRComponentMgr(FRCompTableModel):
   _nextCompId = 0
 
@@ -224,7 +224,7 @@ def _paramSerToStrSer(paramSer: pd.Series, paramVal: Any) -> pd.Series:
   return paramSer.apply(funcToUse)
 
 
-@FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_EXPORTER)
+@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_EXPORTER)
 class FRComponentIO:
   """
   Exporter responsible for saving Component information to a file or object.

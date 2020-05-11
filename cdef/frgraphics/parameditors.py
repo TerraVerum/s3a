@@ -141,8 +141,6 @@ class FRProcGroupParameter(parameterTypes.GroupParameter):
     act = item.contextMenu.addAction('Toggle Enable')
     self.enabledFontMap[True] = QtGui.QFont(item.font(0))
     def setter():
-      if not self.opts['allowDisable']:
-        return
       # Toggle 'enable' on click
       disabled = self.opts['enabled']
       enabled = not disabled
@@ -152,6 +150,15 @@ class FRProcGroupParameter(parameterTypes.GroupParameter):
       self.opts['enabled'] = enabled
     act.triggered.connect(setter)
     return item
+
+class FRAtomicGroupParameter(parameterTypes.GroupParameter):
+  def makeTreeItem(self, depth):
+    item = super().makeTreeItem(depth)
+    font = QtGui.QFont()
+    font.setBold(False)
+    item.setFont(0, font)
+    return item
+
 
 class FRNoneParameter(parameterTypes.SimpleParameter):
 
@@ -164,6 +171,7 @@ class FRNoneParameter(parameterTypes.SimpleParameter):
 parameterTypes.registerParameterType('NoneType', FRNoneParameter)
 parameterTypes.registerParameterType('shortcut', FRShortcutParameter)
 parameterTypes.registerParameterType('procgroup', FRProcGroupParameter)
+parameterTypes.registerParameterType('atomicgroup', FRAtomicGroupParameter)
 
 @dataclass
 class FRBoundFnParams:
@@ -248,18 +256,19 @@ class FRParamEditor(QtWidgets.QDockWidget):
     # -----------
     # Widget layout
     # -----------
-    dockContents = QtWidgets.QWidget(parent)
-    self.setWidget(dockContents)
+    self.dockContentsWidget = QtWidgets.QWidget(parent)
+    self.setWidget(self.dockContentsWidget)
     btnLayout = QtWidgets.QHBoxLayout()
     btnLayout.addWidget(self.saveAsBtn)
     btnLayout.addWidget(self.applyBtn)
     btnLayout.addWidget(self.closeBtn)
 
-    centralLayout = QtWidgets.QVBoxLayout(dockContents)
+    centralLayout = QtWidgets.QVBoxLayout(self.dockContentsWidget)
     centralLayout.addWidget(self.tree)
     centralLayout.addLayout(btnLayout)
     # self.setLayout(centralLayout)
     self.tree.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+    self.tree.setSizeAdjustPolicy(QtWidgets.QScrollArea.AdjustToContents)
     # -----------
     # UI Element Signals
     # -----------
@@ -271,12 +280,14 @@ class FRParamEditor(QtWidgets.QDockWidget):
     self._stateBeforeEdit = self.params.saveState()
 
   def _expandCols(self):
-    for colIdx in range(2):
-      self.tree.resizeColumnToContents(colIdx)
-    appInst.processEvents()
-    self.adjustSize()
-    self.resize(self.width() + self.tree.width(), self.height() + self.tree.height())
+    # self.resize(self.tree.width(), self.height())
     self.tree.setColumnWidth(0, self.width()//2)
+    # totWidth = 0
+    # for colIdx in range(2):
+    #   self.tree.resizeColumnToContents(colIdx)
+    #   totWidth += self.tree.columnWidth(colIdx) + self.tree.margin
+    # appInst.processEvents()
+    # self.dockContentsWidget.setMinimumWidth(totWidth)
 
   # Helper method for accessing simple parameter values
   def __getitem__(self, keys: Union[tuple, FRParam, Collection[FRParam]]):
@@ -407,7 +418,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
     :param groupingName: If *type* it must be a class. In this case, this parameter will
       be listed under the registered class of the same exact name.
       If *str*, *groupingName* must match the exact same string name passed in during
-      :func:`registerClass <FRParamEditor.registerClass>`. Otherwise, an error will
+      :func:`registerGroup <FRParamEditor.registerGroup>`. Otherwise, an error will
       occur.
     :param constParam: Object holding parameter attributes such as name, type,
       help text, etc.
@@ -478,17 +489,17 @@ class FRParamEditor(QtWidgets.QDockWidget):
 
     return paramAccessor
 
-  def registerClass(self, clsParam: FRParam, **opts):
+  def registerGroup(self, groupParam: FRParam, **opts):
     """
     Intended for use as a class decorator. Registers a class as able to hold
     customizable shortcuts.
 
-    :param clsParam: Parameter holding the name of this class as it should appear
+    :param groupParam: Parameter holding the name of this class as it should appear
       in this parameter editor. As such, it should be human readable.
     :param opts: Additional registration options. Accepted values:
-      - overrideName: This is available so objects without a dedicated class can
-      also be registered. In that case, this is the unique identifier for the
-      spoof class instead of '[decorated class].__qualname__`.
+      - nameFromParam: This is available so objects without a dedicated class can
+      also be registered. In that case, a spoof class is registered under the name
+      'clsParam.name' instead of '[decorated class].__qualname__'.
       - forceCreate: Normally, the class is not registered until at least one property
       (or method) is registered to it. That way, classes registered for other editors
       don't erroneously appear. *forceCreate* will override this rule, creating this
@@ -497,23 +508,26 @@ class FRParamEditor(QtWidgets.QDockWidget):
       all shared properties contained in the '__initEditorParams__' method, if it exists
       in the class.
     """
+    opts['nameFromParam'] = opts.get('nameFromParam', False)
     def classDecorator(cls: Union[Type, Any]=None):
       if cls is None:
-        # In this case overrideName must be provided. Use a dummy class for the
+        # In this case nameFromParam must be provided. Use a dummy class for the
         # rest of the proceedings
         cls = type('DummyClass', (), {})
-        opts['overrideName'] = opts.get('overrideName', clsParam.name)
       if not isinstance(cls, type):
         # Instance was passed, not class
         cls = type(cls)
-      clsName = opts.get('overrideName', cls.__qualname__)
+      if opts['nameFromParam']:
+        clsName = groupParam.name
+      else:
+        clsName = cls.__qualname__
       oldClsInit = cls.__init__
-      self._extendedClassDecorator(cls, clsParam, **opts)
+      self._extendedClassDecorator(cls, groupParam, **opts)
 
       if opts.get('forceCreate', False):
         self._addParamGroup(clsName)
 
-      self.classNameToParamMapping[clsName] = clsParam
+      self.classNameToParamMapping[clsName] = groupParam
       def newClassInit(clsObj, *args, **kwargs):
         if (cls not in _INITIALIZED_CLASSES
             and issubclass(cls, ContainsSharedProps)):
@@ -527,10 +541,12 @@ class FRParamEditor(QtWidgets.QDockWidget):
           self.saveAs(saveName='Default', allowOverwriteDefault=True)
         self.classInstToEditorMapping[clsObj] = self
         retVal = oldClsInit(clsObj, *args, **kwargs)
-        self._extendedClassInit(clsObj, clsParam)
+        self._extendedClassInit(clsObj, groupParam)
         return retVal
       cls.__init__ = newClassInit
       return cls
+    if opts['nameFromParam']:
+      classDecorator()
     return classDecorator
 
   def _extendedClassInit(self, clsObj: Any, clsParam: FRParam):
@@ -824,9 +840,9 @@ class FRAlgPropsMgr(FRParamEditor):
     self.processorCtors : List[Callable[[], ImageProcess]] = []
     self.spawnedCollections : List[FRAlgCollectionEditor] = []
 
-  def registerClass(self, clsParam: FRParam, **opts):
+  def registerGroup(self, groupParam: FRParam, **opts):
     # Don't save a default file for this class
-    return super().registerClass(clsParam, saveDefault=False, **opts)
+    return super().registerGroup(groupParam, saveDefault=False, **opts)
 
   def createProcessorForClass(self, clsObj) -> FRAlgCollectionEditor:
     clsName = type(clsObj).__name__
@@ -871,11 +887,11 @@ class _FRSingleton:
       [self.scheme, self.shortcuts, self.generalProps, self.filter]
     self.userProfile = FRUserProfileEditor(singletonObj=self)
 
-  def registerClass(self, clsParam: FRParam, **opts):
+  def registerGroup(self, clsParam: FRParam, **opts):
     def multiEditorClsDecorator(cls):
       # Since all legwork is done inside the editors themselves, simply call each decorator from here as needed
       for editor in self.editors:
-        cls = editor.registerClass(clsParam, **opts)(cls)
+        cls = editor.registerGroup(clsParam, **opts)(cls)
       return cls
     return multiEditorClsDecorator
 

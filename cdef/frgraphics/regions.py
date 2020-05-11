@@ -134,7 +134,7 @@ def _makeTxtSymbol(txt: str, fontSize: int):
   outSymbol = tr.map(outSymbol)
   return outSymbol
 
-@FR_SINGLETON.registerClass(FR_CONSTS.CLS_MULT_REG_PLT)
+@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MULT_REG_PLT)
 class FRMultiRegionPlot(QtCore.QObject):
   @classmethod
   def __initEditorParams__(cls):
@@ -269,7 +269,7 @@ class FRMultiRegionPlot(QtCore.QObject):
   def drop(self, ids):
     self.data.drop(index=ids, inplace=True)
 
-@FR_SINGLETON.registerClass(FR_CONSTS.CLS_VERT_IMG)
+@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_VERT_IMG)
 class FRVertexDefinedImg(pg.ImageItem):
   @classmethod
   def __initEditorParams__(cls):

@@ -26,7 +26,7 @@ Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 QCursor = QtGui.QCursor
 
-@FR_SINGLETON.registerClass(FR_CONSTS.CLS_REGION_BUF)
+@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_REGION_BUF)
 class FRRegionVertsUndoBuffer(FRObjUndoBuffer):
 
   @classmethod
@@ -142,7 +142,7 @@ class FREditableImg(pg.PlotWidget):
   def clearCurDrawShape(self):
     self.shapeCollection.clearAllRois()
 
-@FR_SINGLETON.registerClass(FR_CONSTS.CLS_MAIN_IMG_AREA)
+@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MAIN_IMG_AREA)
 class FRMainImage(FREditableImg):
   sigComponentCreated = Signal(object)
   # Hooked up during __init__
@@ -221,7 +221,7 @@ class FRMainImage(FREditableImg):
   def clearCurDrawShape(self):
     super().clearCurDrawShape()
 
-@FR_SINGLETON.registerClass(FR_CONSTS.CLS_FOCUSED_IMG_AREA)
+@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_FOCUSED_IMG_AREA)
 class FRFocusedImage(FREditableImg):
 
   @classmethod

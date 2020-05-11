@@ -7,14 +7,14 @@ from typing import Tuple, List, Callable
 import numpy as np
 from pyqtgraph.parametertree import Parameter
 
-from imageprocessing.processing import ImageIO, ProcessStage, AtomicFunction, Process, \
+from imageprocessing.processing import ImageIO, ProcessStage, AtomicProcess, Process, \
   ImageProcess, ProcessIO
 from .frgraphics import parameditors
-from .interfaceimpls import cropImgToROI, updateCroppedArea, basicOpsCombo
+from .interfaceimpls import crop_to_verts, update_area, basicOpsCombo
 from .processingutils import getVertsFromBwComps
 from .structures import FRParam, NChanImg, FRComplexVertices, FRVertices
 
-def atomicRunWrapper(proc: AtomicFunction, names: List[str], params: List[Parameter]):
+def atomicRunWrapper(proc: AtomicProcess, names: List[str], params: List[Parameter]):
   oldRun = proc.run
   @wraps(oldRun)
   def newRun(io: ProcessIO = None, force=False, disable=False) -> ProcessIO:
@@ -39,16 +39,14 @@ class FRGeneralProcWrapper(ABC):
     self.output = np.zeros((0,0), bool)
 
     self.editor = editor
-    editor.registerClass(self.algParam, overrideName=self.algName, forceCreate=True)()
+    editor.registerGroup(self.algParam, nameFromParam=True, forceCreate=True)
     self.unpackStages(self.processor)
 
   def unpackStages(self, stage: ProcessStage, paramParent: Tuple[str,...]=()):
-    if isinstance(stage, AtomicFunction):
-      procInpt = stage.input
+    if isinstance(stage, AtomicProcess):
       params: List[Parameter] = []
-      for inptKey in stage.hyperParamKeys:
-        val = procInpt[inptKey]
-        curParam = FRParam(name=inptKey, value=val)
+      for key, val in stage.input.hyperParams.items():
+        curParam = FRParam(name=key, value=val)
         pgParam = self.editor.registerProp(self.algName, curParam, paramParent, asProperty=False)
         params.append(pgParam)
       stage.run = atomicRunWrapper(stage, stage.hyperParamKeys, params)
@@ -58,16 +56,15 @@ class FRGeneralProcWrapper(ABC):
     curGroup = self.editor.params.child(self.algName, *paramParent)
     stage.run = procRunWrapper(stage, curGroup)
     # Special case of a process comprised of just one atomic function
-    if len(stage.stages) == 1 and isinstance(stage.stages[0], AtomicFunction):
+    if len(stage.stages) == 1 and isinstance(stage.stages[0], AtomicProcess):
       self.unpackStages(stage.stages[0], paramParent=paramParent)
       return
     for childStage in stage.stages:
-      valType = 'group'
+      valType = 'atomicgroup'
       if isinstance(childStage, Process):
         valType = 'procgroup'
       curGroup = FRParam(name=childStage.name, valType=valType, value=[])
-      param = self.editor.registerProp(self.algName, curGroup, paramParent, asProperty=False)
-      param.opts['allowDisable'] = stage.allowDisable
+      self.editor.registerProp(self.algName, curGroup, paramParent, asProperty=False)
       self.unpackStages(childStage, paramParent=paramParent + (childStage.name,))
 
   def run(self, **kwargs):
@@ -77,9 +74,9 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
   def __init__(self, processor: ImageProcess, editor: parameditors.FRParamEditor):
     # Each processor is encapsulated in processes that crop the image to the region of
     # interest specified by the user, and re-expand the area after processing
-    cropStage = cropImgToROI()
+    cropStage = ImageProcess.fromFunction(crop_to_verts, name='Crop to Vertices')
     cropStage.allowDisable = False
-    updateStage = updateCroppedArea()
+    updateStage = ImageProcess.fromFunction(update_area, 'Update Cropped Area')
     updateStage.allowDisable = False
     processor.stages = [cropStage] + processor.stages + [updateStage, basicOpsCombo()]
     super().__init__(processor, editor)

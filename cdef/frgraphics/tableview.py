@@ -103,7 +103,7 @@ class FRPopupTableDialog(QtWidgets.QDialog):
       self.tbl.showColumn(ii)
     super().reject()
 
-@FR_SINGLETON.registerClass(FR_CONSTS.CLS_COMP_TBL)
+@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_TBL)
 class FRCompTableView(QtWidgets.QTableView):
   """
   Table for displaying :class:`FRComponentMgr` data.

@@ -36,7 +36,7 @@ Signal = QtCore.pyqtSignal
 # Configure pg to correctly read image dimensions
 pg.setConfigOptions(imageAxisOrder='row-major')
 
-@FR_SINGLETON.registerClass(FR_CONSTS.CLS_ANNOTATOR)
+@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_ANNOTATOR)
 class FRCdefApp(FRAnnotatorUI):
   """
   Top-level widget for producing component bounding boxes from an input image.
