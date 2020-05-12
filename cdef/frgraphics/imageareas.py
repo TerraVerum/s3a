@@ -180,8 +180,6 @@ class FRMainImage(FREditableImg):
       with BusyCursor():
         self.procCollection.run(prevCompMask=prevComp, fgVerts=verts, bgVerts=None)
       newVerts = self.procCollection.resultAsVerts(not self.multCompsOnCreate)
-      if not self.multCompsOnCreate:
-        newVerts = [newVerts]
       if len(newVerts) == 0:
         return
       # TODO: Determine more robust solution for separated vertices. For now use largest component

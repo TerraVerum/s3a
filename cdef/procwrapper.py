@@ -100,4 +100,4 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
       return [FRComplexVertices([lst]) for lst in initialList]
     # else, all vertices belong to the same component
     else:
-      return FRComplexVertices(initialList)
+      return [FRComplexVertices(initialList)]
