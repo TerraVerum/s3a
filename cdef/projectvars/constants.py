@@ -106,7 +106,7 @@ class _FRConsts(FRParamGroup):
                                                  helpText='When creating a new component in the main image, '
                                                  'separate boundaries will not be assigned to one single component. '
                                                  'Rather, a new compnent will be created for each closed boundary.')
-  PROP_CROP_MARGIN_PCT      : FRParam = newParam('Crop Padding (% of image size)', 5)
+  PROP_CROP_MARGIN_PCT      : FRParam = newParam('Crop Padding (% of image size)', 15)
   PROP_SEG_THRESH           : FRParam = newParam('Segmentation Threshold', 0.)
   PROP_FOCUSED_SEED_THRESH  : FRParam = newParam('Seedpoint Threshold in Focused Image', 7.)
   PROP_UNDO_BUF_SZ          : FRParam = newParam('Size of Region Undo Buffer', 30)
