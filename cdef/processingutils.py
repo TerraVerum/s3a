@@ -275,8 +275,8 @@ def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int, otherBbox: np
   compCoords = np.vstack([verts.min(0), verts.max(0)])
   if otherBbox is not None:
     for dim in range(2):
-      for ii, cmp in zip(range(2), [min, max]):
-        compCoords[ii,dim] = cmp(compCoords[ii,dim], otherBbox[ii,dim])
+      for ii, cmpFunc in zip(range(2), [min, max]):
+        compCoords[ii,dim] = cmpFunc(compCoords[ii,dim], otherBbox[ii,dim])
   compCoords = getClippedBbox(img_np.shape, compCoords, margin)
   # Verts are x-y, index into image with row-col
   croppedImg = image[compCoords[0,1]:compCoords[1,1], compCoords[0,0]:compCoords[1,0], :]

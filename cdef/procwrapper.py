@@ -86,8 +86,11 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
 
   def run(self, **kwargs):
     if kwargs.get('prevCompMask', None) is None:
+      noPrevMask = True
       kwargs['prevCompMask'] = np.zeros(self.image.shape[:2], bool)
-    newIo = ImageIO(image=self.image, **kwargs)
+    else:
+      noPrevMask = False
+    newIo = ImageIO(image=self.image, **kwargs, noPrevMask=noPrevMask)
     result = self.processor.run(newIo, force=True)
     outImg = result['image'].astype(bool)
     if outImg.ndim > 2:

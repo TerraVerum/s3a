@@ -172,13 +172,12 @@ class FRMainImage(FREditableImg):
       self.sigSelectionBoundsMade.emit(self.shapeCollection.shapeVerts)
     elif self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
       # Component modification subject to processor
-      prevComp = np.zeros(self.image.shape[0:2], dtype=bool)
       # For now assume a single point indicates foreground where multiple indicate
       # background selection
       verts = self.shapeCollection.shapeVerts.astype(int)
 
       with BusyCursor():
-        self.procCollection.run(prevCompMask=prevComp, fgVerts=verts, bgVerts=None)
+        self.procCollection.run(fgVerts=verts, bgVerts=None)
       newComps = self.procCollection.resultAsCompDf(not self.multCompsOnCreate)
       if len(newComps) == 0:
         return

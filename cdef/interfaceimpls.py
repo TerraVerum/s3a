@@ -17,6 +17,7 @@ from imageprocessing.processing import ImageIO, ImageProcess
 
 def crop_to_verts(_image: Image, _fgVerts: FRVertices, _bgVerts: FRVertices,
                   _prevCompMask: BlackWhiteImg, _margin=10):
+
   maskLocs = np.nonzero(_prevCompMask)
   maskCoords = np.hstack([m[:,None] for m in reversed(maskLocs)])
   if maskCoords.size > 0:
@@ -42,11 +43,14 @@ def crop_to_verts(_image: Image, _fgVerts: FRVertices, _bgVerts: FRVertices,
   allVerts = np.vstack(allVerts)
   cropped, bounds = getCroppedImg(_image, allVerts, _margin, maskBbox)
   vertOffset = bounds.min(0)
+  fgbg = []
   for vertList in _fgVerts, _bgVerts:
-      vertList -= vertOffset
+    vertList -= vertOffset
+    vertList = np.clip(vertList, a_min=[0,0], a_max=bounds[1,:]-1)
+    fgbg.append(vertList)
   boundSlices = slice(*bounds[:,1]), slice(*bounds[:,0])
   _prevCompMask = _prevCompMask[boundSlices]
-  return ImageIO(image=cropped, fgVerts=_fgVerts, bgVerts=_bgVerts, prevCompMask=_prevCompMask,
+  return ImageIO(image=cropped, fgVerts=fgbg[0], bgVerts=fgbg[1], prevCompMask=_prevCompMask,
                  boundSlices=boundSlices, origImg=_image, asForeground=asForeground,
                  allVerts=allVerts)
 
@@ -123,7 +127,8 @@ def basicOpsCombo():
   return proc
 
 def cv_grabcut(_image: Image, _fgVerts: FRVertices, _bgVerts: FRVertices,
-               _prevCompMask: BlackWhiteImg, _asForeground: bool, _iters=5):
+               _prevCompMask: BlackWhiteImg, _asForeground: bool, _noPrevMask: bool,
+               _iters=5):
   if _image.size == 0:
     return ImageIO(image=np.zeros_like(_prevCompMask))
   img = cv.cvtColor(_image, cv.COLOR_RGB2BGR)
@@ -143,17 +148,20 @@ def cv_grabcut(_image: Image, _fgVerts: FRVertices, _bgVerts: FRVertices,
   allverts = np.vstack([_fgVerts, _bgVerts])
   cvRect = np.array([allverts.min(0), allverts.max(0) - allverts.min(0)]).flatten()
 
-  if np.any(_prevCompMask):
+  if _noPrevMask:
+    if cvRect[2] == 0 or cvRect[3] == 0:
+      return ImageIO(image=np.zeros_like(_prevCompMask))
+    mode = cv.GC_INIT_WITH_RECT
+  else:
     mode = cv.GC_INIT_WITH_MASK
     for verts, fillClr in zip([_fgVerts, _bgVerts], [1,0]):
+      # Grabcut throws errors when the mask is totally full or empty. To prevent this,
+      # clip vertices to allow at least a 1-pixel boundary on all image sides
+      verts = np.clip(verts, a_min=1, a_max=np.array(mask.shape[::-1])-2).view(FRVertices)
       if verts.connected and len(verts) > 0:
         cv.fillPoly(mask, [verts], fillClr)
       else:
         mask[verts.rows, verts.cols] = fillClr
-  else:
-    if cvRect[2] == 0 or cvRect[3] == 0:
-      return ImageIO(image=np.zeros_like(_prevCompMask))
-    mode = cv.GC_INIT_WITH_RECT
   cv.grabCut(img, mask, cvRect, bgdModel, fgdModel, _iters, mode=mode)
   outMask = np.where((mask==2)|(mask==0), False, True)
   return ImageIO(image=outMask)
