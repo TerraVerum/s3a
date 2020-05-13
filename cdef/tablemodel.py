@@ -118,6 +118,9 @@ class FRComponentMgr(FRCompTableModel):
     toEmit = self.defaultEmitDict.copy()
     existingIds = self.compDf.index
 
+    if len(newCompsDf) == 0:
+      return toEmit
+
     # Delete entries with no vertices, since they make work within the app difficult.
     # TODO: Is this the appropriate response?
     verts = newCompsDf[TC.VERTICES]

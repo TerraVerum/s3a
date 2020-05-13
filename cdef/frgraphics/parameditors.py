@@ -4,7 +4,7 @@ import re
 import sys
 import weakref
 from dataclasses import dataclass
-from functools import partial
+from functools import partial, wraps
 from os.path import join
 from pathlib import Path
 from typing import Collection, Union, Callable, Any, Optional, List, Dict, Tuple, Set, \
@@ -44,8 +44,12 @@ def filterForParam(param: FRParam):
     retVal[1]['value'] = sys.maxsize
     children.extend(retVal)
     return paramWithChildren
-  elif valType == 'FRParam':
-    children.extend(genList((param.name for param in param.value.group), 'bool', True))
+  elif valType in ['FRParam', 'Enum']:
+    if valType == 'FRParam':
+      iterGroup = [param.name for param in param.value.group]
+    else:
+      iterGroup = [param for param in param.value]
+    children.extend(genList(iterGroup, 'bool', True))
     return paramWithChildren
   elif valType == 'FRComplexVertices':
     minMax = filterForParam(FRParam('', 5))['children']
@@ -556,6 +560,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
         self._addParamGroup(clsName)
 
       self.classNameToParamMapping[clsName] = groupParam
+      @wraps(oldClsInit)
       def newClassInit(clsObj, *args, **kwargs):
         if (cls not in _INITIALIZED_CLASSES
             and issubclass(cls, ContainsSharedProps)):
