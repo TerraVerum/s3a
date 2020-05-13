@@ -222,9 +222,7 @@ class FRCdefApp(FRAnnotatorUI):
   def estimateBoundaries(self):
     with BusyCursor():
       self.mainImg.procCollection.run(prevCompMask=None, fgVerts=None, bgVerts=None)
-      compVertices = self.mainImg.procCollection.resultAsVerts(localEstimate=False)
-      components = makeCompDf(len(compVertices))
-      components[TC.VERTICES] = compVertices
+      components = self.mainImg.procCollection.resultAsCompDf(localEstimate=False)
       self.compMgr.addComps(components)
 
   def clearBoundaries(self):

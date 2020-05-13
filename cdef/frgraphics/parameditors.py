@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from functools import partial
 from os.path import join
 from pathlib import Path
-from typing import Collection, Union, Callable, Any, Optional, List, Dict, Tuple, Set, Type
+from typing import Collection, Union, Callable, Any, Optional, List, Dict, Tuple, Set, \
+  Type
 
 import numpy as np
 import pyqtgraph as pg
@@ -15,11 +16,9 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import (Parameter, ParameterTree, parameterTypes)
 from pyqtgraph.parametertree.parameterTypes import ListParameter
 
-from cdef.structures import NChanImg, ContainsSharedProps, FRComplexVertices, FRVertices, \
-  BlackWhiteImg
-from imageprocessing.processing import ImageProcess, Process
+from cdef.structures import NChanImg, ContainsSharedProps, FRComplexVertices, FRVertices
+from imageprocessing.processing import ImageProcess
 from .graphicsutils import dialogGetSaveFileName, saveToFile
-from .. import appInst
 from ..procwrapper import FRImgProcWrapper
 from ..projectvars import (
   MENU_OPTS_DIR, SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR,
@@ -780,6 +779,9 @@ class FRAlgCollectionEditor(FRParamEditor):
 
   def resultAsVerts(self, localEstimate=True):
     return self.curProcessor.resultAsVerts(localEstimate=localEstimate)
+
+  def resultAsCompDf(self, localEstimate=True):
+    return self.curProcessor.resultAsCompDf(localEstimate=localEstimate)
 
   @property
   def image(self):

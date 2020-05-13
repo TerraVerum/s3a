@@ -7,12 +7,14 @@ from typing import Tuple, List, Callable
 import numpy as np
 from pyqtgraph.parametertree import Parameter
 
+import cdef
 from imageprocessing.processing import ImageIO, ProcessStage, AtomicProcess, Process, \
   ImageProcess, ProcessIO
 from .frgraphics import parameditors
 from .interfaceimpls import crop_to_verts, update_area, basicOpsCombo
 from .processingutils import getVertsFromBwComps
 from .structures import FRParam, NChanImg, FRComplexVertices, FRVertices
+from .projectvars import TEMPLATE_COMP as TC
 
 def atomicRunWrapper(proc: AtomicProcess, names: List[str], params: List[Parameter]):
   oldRun = proc.run
@@ -101,3 +103,9 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     # else, all vertices belong to the same component
     else:
       return [FRComplexVertices(initialList)]
+
+  def resultAsCompDf(self, localEstimate=True):
+    compVertices = self.resultAsVerts(localEstimate=localEstimate)
+    components = cdef.makeCompDf(len(compVertices))
+    components[TC.VERTICES] = compVertices
+    return components
