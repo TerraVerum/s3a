@@ -125,7 +125,7 @@ def basicOpsCombo():
 def cv_grabcut(_image: Image, _fgVerts: FRVertices, _bgVerts: FRVertices,
                _prevCompMask: BlackWhiteImg, _asForeground: bool, _iters=5):
   if _image.size == 0:
-    return np.zeros_like(_prevCompMask)
+    return ImageIO(image=np.zeros_like(_prevCompMask))
   img = cv.cvtColor(_image, cv.COLOR_RGB2BGR)
   # Turn foreground into x-y-width-height
   bgdModel = np.zeros((1,65),np.float64)
