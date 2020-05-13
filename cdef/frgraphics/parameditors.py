@@ -321,7 +321,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
     self.tree.setMinimumWidth(self.tree.width())
 
 
-# Helper method for accessing simple parameter values
+  # Helper method for accessing simple parameter values
   def __getitem__(self, keys: Union[tuple, FRParam, Collection[FRParam]]):
     """
     Convenience function for accessing child parameters within a parameter editor.
