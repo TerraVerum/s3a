@@ -316,7 +316,7 @@ class FRFocusedImage(FREditableImg):
     bbox = np.vstack([concatVerts.min(0),
                       concatVerts.max(0)])
     # Account for margins
-    padding = max((bbox[1,:] - bbox[0,:])/self.compCropMargin/2)
+    padding = max((bbox[1,:] - bbox[0,:])*self.compCropMargin/2/100)
     self.bbox = getClippedBbox(mainImgShape, bbox, int(padding))
 
   def updateCompImg(self, mainImg, bbox=None):
