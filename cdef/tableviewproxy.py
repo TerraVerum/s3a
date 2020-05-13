@@ -1,6 +1,7 @@
 from typing import Union
 
 import numpy as np
+from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui
 
 from cdef.structures.typeoverloads import OneDArr
@@ -10,7 +11,8 @@ from .frgraphics.parameditors import FR_SINGLETON
 from .frgraphics.regions import FRMultiRegionPlot
 from .projectvars import FR_CONSTS, TEMPLATE_COMP as TC, \
   TEMPLATE_COMP_CLASSES as COMP_CLASSES
-from .structures import FRVertices
+
+from .structures import FRVertices, FRParam
 from .tablemodel import FRComponentMgr
 
 Signal = QtCore.pyqtSignal
@@ -158,73 +160,64 @@ class FRCompDisplayFilter(QtCore.QObject):
     # TODO: Better management of widget focus here
 
   def _populateDisplayedIds(self):
-    curComps = self._compMgr.compDf
-
-    # idx 0 = value, 1 = children
-    # ------
-    # ID FILTERING
-    # ------
-    curParam = self._filter[TC.INST_ID.name][1]
-    curmin, curmax = [curParam[name][0] for name in ['min', 'max']]
-
-    idList = curComps.index
-    curComps = curComps.loc[(idList >= curmin) & (idList <= curmax),:]
-
-    # ------
-    # VALIDATED FILTERING
-    # ------
-    curParam = self._filter[TC.VALIDATED.name][1]
-    allowValid, allowInvalid = [curParam[name][0] for name in ['Validated', 'Not Validated']]
-
-    validList = np.array(curComps.loc[:, TC.VALIDATED], dtype=bool)
-    if not allowValid:
-      curComps = curComps.loc[~validList, :]
-    if not allowInvalid:
-      curComps = curComps.loc[validList, :]
-
-    # ------
-    # DEVICE TYPE FILTERING
-    # ------
-    compTypes = np.array(curComps.loc[:, TC.COMP_CLASS])
-    curParam = self._filter[TC.COMP_CLASS.name][1]
-    allowedTypes = []
-    for curType in COMP_CLASSES:
-      isAllowed = curParam[curType.name][0]
-      if isAllowed:
-        allowedTypes.append(curType)
-    curComps = curComps.loc[np.isin(compTypes, allowedTypes),:]
-
-    # ------
-    # LOGO, NOTES, BOARD, DEVICE TEXT FILTERING
-    # ------
-    nextParamNames = [TC.LOGO, TC.NOTES, TC.BOARD_TEXT, TC.DEV_TEXT]
-    for param in nextParamNames:
-      compParamVals = curComps.loc[:, param]
-      allowedRegex = self._filter[param.name][0]
-      isCompAllowed = compParamVals.str.contains(allowedRegex, regex=True, case=False)
-      curComps = curComps.loc[isCompAllowed,:]
-
-    # ------
-    # VERTEX FILTERING
-    # ------
-    compVerts = curComps.loc[:, TC.VERTICES]
-    vertsAllowed = np.ones(len(compVerts), dtype=bool)
-
-    vertParam = self._filter[TC.VERTICES.name][1]
-    xParam = vertParam['X Bounds'][1]
-    yParam = vertParam['Y Bounds'][1]
-    xmin, xmax, ymin, ymax = [param[val][0] for param in (xParam, yParam) for val in ['min', 'max']]
-
-    for vertIdx, verts in enumerate(compVerts):
-      xVerts = verts.x_flat
-      yVerts = verts.y_flat
-      isAllowed = np.all((xVerts >= xmin) & (xVerts <= xmax)) & \
-                  np.all((yVerts >= ymin) & (yVerts <= ymax))
-      vertsAllowed[vertIdx] = isAllowed
-    curComps = curComps.loc[vertsAllowed,:]
+    curComps = self._compMgr.compDf.copy()
+    for param in curComps.columns:
+      curComps = self.filterByParamType(curComps, param)
 
     # Give self the id list of surviving comps
-    self.displayedIds = curComps.index
+    self.displayedIds = curComps[TC.INST_ID]
+
+  def filterByParamType(self, compDf: df, param: FRParam):
+    valType = param.valType
+    # idx 0 = value, 1 = children
+    curFilterParam = self._filter[param.name][1]
+    dfAtParam = compDf.loc[:, param]
+
+    if valType in ['int', 'float']:
+      curmin, curmax = [curFilterParam[name][0] for name in ['min', 'max']]
+
+      compDf = compDf.loc[(dfAtParam >= curmin) & (dfAtParam <= curmax),:]
+      return compDf
+    elif valType == 'bool':
+      allowTrue, allowFalse = [curFilterParam[name][0] for name in
+                               [f'{param.name}', f'Not {param.name}']]
+
+      validList = np.array(dfAtParam, dtype=bool)
+      if not allowTrue:
+        compDf = compDf.loc[~validList, :]
+      if not allowFalse:
+        compDf = compDf.loc[validList, :]
+      return compDf
+    elif valType == 'FRParam':
+      existingParams = np.array(dfAtParam)
+      allowedParams = []
+      for groupSubParam in param.value.group:
+        isAllowed = curFilterParam[groupSubParam.name][0]
+        if isAllowed:
+          allowedParams.append(groupSubParam)
+      compDf = compDf.loc[np.isin(existingParams, allowedParams),:]
+      return compDf
+    elif valType == 'str':
+      allowedRegex = self._filter[param.name][0]
+      isCompAllowed = dfAtParam.str.contains(allowedRegex, regex=True, case=False)
+      compDf = compDf.loc[isCompAllowed,:]
+      return compDf
+    elif valType == 'FRComplexVertices':
+      vertsAllowed = np.ones(len(dfAtParam), dtype=bool)
+
+      xParam = curFilterParam['X Bounds'][1]
+      yParam = curFilterParam['Y Bounds'][1]
+      xmin, xmax, ymin, ymax = [param[val][0] for param in (xParam, yParam) for val in ['min', 'max']]
+
+      for vertIdx, verts in enumerate(dfAtParam):
+        xVerts = verts.x_flat
+        yVerts = verts.y_flat
+        isAllowed = np.all((xVerts >= xmin) & (xVerts <= xmax)) & \
+                    np.all((yVerts >= ymin) & (yVerts <= ymax))
+        vertsAllowed[vertIdx] = isAllowed
+      compDf = compDf.loc[vertsAllowed,:]
+      return compDf
+
 
   @Slot()
   def resetCompBounds(self):

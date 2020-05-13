@@ -29,9 +29,37 @@ from ..structures import FRParam
 
 Signal = QtCore.pyqtSignal
 
-def _genList(nameIter, paramType, defaultVal, defaultParam='value'):
+def genList(nameIter, paramType, defaultVal, defaultParam='value'):
   """Helper for generating children elements"""
   return [{'name': name, 'type': paramType, defaultParam: defaultVal} for name in nameIter]
+
+def filterForParam(param: FRParam):
+  """Constructs a filter for the parameter based on its type"""
+  children = []
+  valType = param.valType
+  paramWithChildren = {'name': param.name, 'type': 'group', 'children': children}
+  paramWithoutChild = {'name': param.name, 'type': valType, 'value': None}
+  if valType in ['int', 'float']:
+    retVal = genList(['min', 'max'], valType, 0)
+    retVal[1]['value'] = sys.maxsize
+    children.extend(retVal)
+    return paramWithChildren
+  elif valType == 'FRParam':
+    children.extend(genList((param.name for param in param.value.group), 'bool', True))
+    return paramWithChildren
+  elif valType == 'FRComplexVertices':
+    minMax = filterForParam(FRParam('', 5))['children']
+    xyVerts = genList(['X Bounds', 'Y Bounds'], 'group', minMax, 'children')
+    children.extend(xyVerts)
+    return paramWithChildren
+  elif valType == 'bool':
+    children.extend(genList([f'{param.name}', f'Not {param.name}'], valType, True))
+    return paramWithChildren
+  else:
+    # Assumes string
+    paramWithoutChild['value'] = ''
+    return paramWithoutChild
+
 
 
 def _frPascalCaseToTitle(name: str) -> str:
@@ -596,21 +624,8 @@ class FRUserProfileEditor(FRParamEditor):
 
 class FRTableFilterEditor(FRParamEditor):
   def __init__(self, parent=None):
-    minMaxParam = _genList(['min', 'max'], 'int', 0)
-    # Make max 'infinity'
-    minMaxParam[1]['value'] = sys.maxsize
-    validatedParms = _genList(['Validated', 'Not Validated'], 'bool', True)
-    devTypeParam = _genList((param.name for param in COMP_CLASSES), 'bool', True)
-    xyVerts = _genList(['X Bounds', 'Y Bounds'], 'group', minMaxParam, 'children')
     _FILTER_PARAMS = [
-        {'name': TC.INST_ID.name, 'type': 'group', 'children': minMaxParam},
-        {'name': TC.VALIDATED.name, 'type': 'group', 'children': validatedParms},
-        {'name': TC.COMP_CLASS.name, 'type': 'group', 'children': devTypeParam},
-        {'name': TC.LOGO.name, 'type': 'str', 'value': '.*'},
-        {'name': TC.NOTES.name, 'type': 'str', 'value': '.*'},
-        {'name': TC.BOARD_TEXT.name, 'type': 'str', 'value': '.*'},
-        {'name': TC.DEV_TEXT.name, 'type': 'str', 'value': '.*'},
-        {'name': TC.VERTICES.name, 'type': 'group', 'children': xyVerts}
+        filterForParam(param) for param in TC
       ]
     super().__init__(parent, paramList=_FILTER_PARAMS, saveDir=FILTERS_DIR, fileType='filter')
 
