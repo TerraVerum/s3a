@@ -91,7 +91,13 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     else:
       noPrevMask = False
     newIo = ImageIO(image=self.image, **kwargs, noPrevMask=noPrevMask)
-    result = self.processor.run(newIo, force=True)
+
+    try:
+      result = self.processor.run(newIo, force=True)
+    except Exception as ex:
+      print(f'Exception during processor run:\n{ex}')
+      result = ImageIO(image=kwargs['prevCompMask'])
+
     outImg = result['image'].astype(bool)
     if outImg.ndim > 2:
       outImg = np.bitwise_or.reduce(outImg, 2)
