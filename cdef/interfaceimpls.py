@@ -1,5 +1,4 @@
-from functools import partial
-from typing import Tuple, Optional, Callable, List
+from typing import Tuple, List
 
 import cv2 as cv
 import numpy as np
@@ -12,8 +11,9 @@ from cdef.processingutils import growSeedpoint, cornersToFullBoundary, getCroppe
 from cdef.structures import BlackWhiteImg, FRVertices
 from imageprocessing import algorithms
 from imageprocessing.algorithms import watershedProcess, graphCutSegmentation
-from imageprocessing.common import Image, ColorSpace
+from imageprocessing.common import Image
 from imageprocessing.processing import ImageIO, ImageProcess
+
 
 def crop_to_verts(_image: Image, _fgVerts: FRVertices, _bgVerts: FRVertices,
                   _prevCompMask: BlackWhiteImg, _margin=10):
@@ -218,7 +218,10 @@ class FRTopLevelProcessors:
 
   @staticmethod
   def z_onlySquaresProcessor():
-    return ImageProcess.fromFunction(convert_to_squares, name='Only Squares')
+    proc = FRTopLevelProcessors.w_basicShapesProcessor()
+    proc.name = 'Only Squares'
+    proc.addProcess(ImageProcess.fromFunction(convert_to_squares, name=convert_to_squares.__name__))
+    return proc
 
   @staticmethod
   def c_watershedProcessor():
