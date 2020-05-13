@@ -19,18 +19,18 @@ from .projectvars import TEMPLATE_COMP as TC
 def atomicRunWrapper(proc: AtomicProcess, names: List[str], params: List[Parameter]):
   oldRun = proc.run
   @wraps(oldRun)
-  def newRun(io: ProcessIO = None, force=False, disable=False) -> ProcessIO:
+  def newRun(io: ProcessIO = None, force=False, disable=False, verbose=False) -> ProcessIO:
     newIo = {name: param.value() for name, param in zip(names, params)}
     proc.updateParams(**newIo)
-    return oldRun(io, force, disable)
+    return oldRun(io, force, disable, verbose)
   return newRun
 
 def procRunWrapper(proc: Process, groupParam: Parameter):
   oldRun = proc.run
   @wraps(oldRun)
-  def newRun(io: ProcessIO = None, force=False, disable=False):
+  def newRun(io: ProcessIO = None, force=False, disable=False, verbose=False):
     proc.disabled = not groupParam.opts['enabled']
-    return oldRun(io, force, disable)
+    return oldRun(io, force=force, disable=disable, verbose=verbose)
   return newRun
 
 class FRGeneralProcWrapper(ABC):
