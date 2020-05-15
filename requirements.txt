@@ -6,8 +6,10 @@ numpy
 scikit_image>=0.15.0
 # So far, PyQt5 is the only module that MUST be older than 5.14, since for some reason the
 # new release can't handle drawing NaN values from a numpy array
+PyQt5<=5.13.0
 pyqtgraph
 pandas
 Pillow
 qdarkstyle
 typing_extensions
+imageprocessing
