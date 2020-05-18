@@ -110,7 +110,7 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     self.exportCompListAct = create_addMenuAct(self, self.menuExport, '&Component List')
     self.exportLabelImgAct = create_addMenuAct(self, self.menuExport, '&Labeled Image')
 
-    self.menuLoad_Components = create_addMenuAct(self, self.menuFile, 'Load Components', True)
+    self.menuLoad_Components = create_addMenuAct(self, self.menuFile, '&Import', True)
     self.loadCompsAct_merge = create_addMenuAct(self, self.menuLoad_Components, 'Update as &Merge')
     self.loadCompsAct_new = create_addMenuAct(self, self.menuLoad_Components, 'Append as &New')
 

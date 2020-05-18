@@ -1,4 +1,3 @@
-import pickle as pkl
 import sys
 from functools import partial
 from functools import wraps
@@ -7,6 +6,8 @@ from os.path import basename
 from pathlib import Path
 from typing import Optional, Union
 
+from ruamel.yaml import YAML
+yaml = YAML()
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
 from cdef.projectvars import ANN_AUTH_DIR
@@ -66,8 +67,8 @@ def saveToFile(saveObj, saveDir, saveName, fileType, allowOverwriteDefault=False
              ' generated, so it should not be modified.'
   else:
     try:
-      with open(f'{saveDir}{saveName}.{fileType}', 'wb') as saveFile:
-        pkl.dump(saveObj, saveFile)
+      with open(f'{saveDir}{saveName}.{fileType}', 'w') as saveFile:
+        yaml.dump(saveObj, saveFile)
     except FileNotFoundError as e:
       errMsg = 'Invalid save name. Please rename the parameter state.'
   return errMsg
@@ -120,17 +121,17 @@ def attemptLoadSettings(fpath, openMode='rb', showErrorOnFail=True):
   I/O helper function that, when given a file path, either returns the pickle object
   associated with that file or displays an error message and returns nothing.
   """
-  pklObj = None
+  loadObj = None
   try:
     curFile = open(fpath, openMode)
-    pklObj = pkl.load(curFile)
+    loadObj = yaml.load(curFile)
     curFile.close()
   except IOError as err:
     if showErrorOnFail:
       QtWidgets.QErrorMessage().showMessage(f'Settings could not be loaded.\n'
                                       f'Error: {err}')
   finally:
-    return pklObj
+    return loadObj
 
 def addDirItemsToMenu(parentMenu, dirRegex, triggerFunc, removeExistingChildren=True):
   """Helper function for populating menu from directory contents"""

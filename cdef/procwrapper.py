@@ -11,10 +11,9 @@ import cdef
 from imageprocessing.processing import ImageIO, ProcessStage, AtomicProcess, Process, \
   ImageProcess, ProcessIO
 from .frgraphics import parameditors
-from .interfaceimpls import crop_to_verts, update_area, basicOpsCombo
+from .interfaceimpls import crop_to_verts, update_area, basicOpsCombo, return_to_full_size
 from .processingutils import getVertsFromBwComps
 from .structures import FRParam, NChanImg, FRComplexVertices, FRVertices
-from .projectvars import TEMPLATE_COMP as TC
 
 def atomicRunWrapper(proc: AtomicProcess, names: List[str], params: List[Parameter]):
   oldRun = proc.run
@@ -63,7 +62,7 @@ class FRGeneralProcWrapper(ABC):
       return
     for childStage in stage.stages:
       valType = 'atomicgroup'
-      if isinstance(childStage, Process):
+      if isinstance(childStage, Process) and childStage.allowDisable:
         valType = 'procgroup'
       curGroup = FRParam(name=childStage.name, valType=valType, value=[])
       self.editor.registerProp(self.algName, curGroup, paramParent, asProperty=False)
@@ -80,7 +79,9 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     cropStage.allowDisable = False
     updateStage = ImageProcess.fromFunction(update_area, 'Update Cropped Area')
     updateStage.allowDisable = False
-    processor.stages = [cropStage] + processor.stages + [updateStage, basicOpsCombo()]
+    resizeStage = ImageProcess.fromFunction(return_to_full_size, 'Return to Full Size')
+    resizeStage.allowDisable = False
+    processor.stages = [cropStage] + processor.stages + [updateStage, basicOpsCombo(), resizeStage]
     super().__init__(processor, editor)
     self.image: NChanImg = np.zeros((0,0), bool)
 
@@ -112,9 +113,3 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     # else, all vertices belong to the same component
     else:
       return [FRComplexVertices(initialList)]
-
-  def resultAsCompDf(self, localEstimate=True):
-    compVertices = self.resultAsVerts(localEstimate=localEstimate)
-    components = cdef.makeCompDf(len(compVertices))
-    components[TC.VERTICES] = compVertices
-    return components

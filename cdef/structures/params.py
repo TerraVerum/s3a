@@ -2,7 +2,7 @@ from __future__ import annotations
 import re
 import weakref
 from dataclasses import dataclass, fields, field
-from typing import Any, Optional
+from typing import Any, Optional, Collection
 from typing_extensions import Protocol, runtime_checkable
 from warnings import warn
 
@@ -35,7 +35,7 @@ class FRParam:
   """
   helpText: str = ''
   """Additional documentation for this parameter."""
-  group: Optional[FRParamGroup] = None
+  group: Collection[FRParam] = None
   """FRParamGroup to which this parameter belongs, if this parameter is part of
     a group. This is set by the FRParamGroup, not manually
   """
@@ -109,7 +109,7 @@ class FRParamGroup:
         return param
     # If we reach here the value didn't match any FRComponentTypes values. Throw an error
     defaultParam = self.getDefault()
-    baseWarnMsg = f'String representation "{paramName}" was not recognized. '
+    baseWarnMsg = f'String representation "{paramName}" was not recognized.\n'
     if defaultParam is None:
       # No default specified, so we have to raise Exception
       raise FRParamParseError(baseWarnMsg + 'No class default is specified.')

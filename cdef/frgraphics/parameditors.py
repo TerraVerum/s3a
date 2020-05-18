@@ -23,9 +23,10 @@ from ..procwrapper import FRImgProcWrapper
 from ..projectvars import (
   MENU_OPTS_DIR, SCHEMES_DIR, GEN_PROPS_DIR, FILTERS_DIR, SHORTCUTS_DIR,
   LAYOUTS_DIR, USER_PROFILES_DIR,
-  TEMPLATE_COMP as TC, TEMPLATE_COMP_CLASSES as COMP_CLASSES, FR_CONSTS)
+  REQD_TBL_FIELDS, FR_CONSTS, BASE_DIR)
 from ..structures import FRIllRegisteredPropError
 from ..structures import FRParam
+from ..structures.tabledata import FRTableData
 
 Signal = QtCore.pyqtSignal
 
@@ -133,7 +134,7 @@ class FRShortcutParameterItem(parameterTypes.WidgetParameterItem):
     item = QtWidgets.QKeySequenceEdit()
 
     item.sigChanged = item.editingFinished
-    item.value = item.keySequence
+    item.value = lambda: item.keySequence().fromString()
     item.setValue = item.setKeySequence
     self.item = item
     return self.item
@@ -155,8 +156,6 @@ class FRShortcutParameter(Parameter):
   def __init__(self, **opts):
     # Before initializing super, turn the string keystroke into a key sequence
     value = opts.get('value', '')
-    keySeqVal = QtGui.QKeySequence(value)
-    opts['value'] = keySeqVal
     super().__init__(**opts)
 
 class FRProcGroupParameter(parameterTypes.GroupParameter):
@@ -215,7 +214,8 @@ class FRParamEditor(QtWidgets.QDockWidget):
   sigParamStateUpdated = Signal(dict)
 
   def __init__(self, parent=None, paramList: List[Dict]=None, saveDir='.',
-               fileType='param', saveDlgName='Save As', name=None):
+               fileType='param', saveDlgName='Save As', name=None,
+               childForOverride: Parameter=None):
     # Place in list so an empty value gets unpacked into super constructor
     if paramList is None:
       paramList = []
@@ -258,10 +258,13 @@ class FRParamEditor(QtWidgets.QDockWidget):
     # -----------
     # Construct parameter tree
     # -----------
-    self.params = Parameter(name='Parameters', type='group', children=paramList)
+    self.params = Parameter.create(name='Parameters', type='group', children=paramList)
     self.params.sigStateChanged.connect(self._paramTreeChanged)
     self.tree = ParameterTree()
-    self.tree.setParameters(self.params, showTop=False)
+    topParam = self.params
+    if childForOverride is not None:
+      topParam = childForOverride
+    self.tree.setParameters(topParam, showTop=False)
     self.tree.header().setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
 
     # -----------
@@ -414,7 +417,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
     if saveName is None:
       return None
     if paramState is None:
-      paramState = self.params.saveState()
+      paramState = self.params.saveState(filter='user')
     Path(self.saveDir).mkdir(parents=True, exist_ok=True)
     errMsg = saveToFile(paramState, self.saveDir, saveName, self.fileType,
                         allowOverwriteDefault=allowOverwriteDefault)
@@ -453,7 +456,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
       :func:`registerGroup <FRParamEditor.registerGroup>`. Otherwise, an error will
       occur.
     :param constParam: Object holding parameter attributes such as name, type,
-      help text, etc.
+      help text, eREQD_TBL_FIELDS.
     :param parentParamPath: If None, defaults to the top level of the parameters for the
       current class (or paramHolder). *parentParamPath* represents the parent group
       to whom the newly registered parameter should be added
@@ -601,11 +604,11 @@ class FRGeneralPropertiesEditor(FRParamEditor):
     super().__init__(parent, paramList=[], saveDir=GEN_PROPS_DIR, fileType='regctrl')
 
 class FRUserProfileEditor(FRParamEditor):
-  def __init__(self, parent=None, singletonObj: _FRSingleton=None):
+  def __init__(self, parent=None, singleton: _FRSingleton=None):
     super().__init__(parent, paramList=[],
                      saveDir=USER_PROFILES_DIR, fileType='cdefprofile')
     optsFromSingletonEditors = []
-    for editor in singletonObj.registerableEditors:
+    for editor in singleton.registerableEditors:
       curValues = self.getSettingsFiles(editor.saveDir, editor.fileType)
       curParam = ListParameter(name=editor.name, value='Default', values=curValues)
       updateFunc = lambda newName, listParam=curParam: \
@@ -628,11 +631,20 @@ class FRUserProfileEditor(FRParamEditor):
     return [file.stem for file in files]
 
 class FRTableFilterEditor(FRParamEditor):
-  def __init__(self, parent=None):
+  def __init__(self, paramList: List[FRParam]=None, parent=None):
+    if paramList is None:
+      paramList = []
     _FILTER_PARAMS = [
-        filterForParam(param) for param in TC
-      ]
+        filterForParam(param) for param in paramList
+    ]
     super().__init__(parent, paramList=_FILTER_PARAMS, saveDir=FILTERS_DIR, fileType='filter')
+
+  def updateParamList(self, paramList: List[FRParam]):
+    newParams = [
+      filterForParam(param) for param in paramList
+    ]
+    self.params.clearChildren()
+    self.params.addChildren(newParams)
 
 class FRShortcutsEditor(FRParamEditor):
 
@@ -749,21 +761,17 @@ class FRShortcutsEditor(FRParamEditor):
 class FRAlgCollectionEditor(FRParamEditor):
   def __init__(self, saveDir, algMgr: FRAlgPropsMgr, name=None, parent=None):
     self.algMgr = algMgr
-    super().__init__(parent, saveDir=saveDir, fileType='alg', name=name)
+    self.makeCompDf = algMgr.singleton.tableData.makeCompDf
     algOptDict = {
       'name': 'Algorithm', 'type': 'list', 'values': [], 'value': 'N/A'
     }
     self.treeAlgOpts: Parameter = Parameter(name='Algorithm Selection', type='group', children=[algOptDict])
     self.algOpts: ListParameter = self.treeAlgOpts.children()[0]
-    # Since constructor forces self.params to be top level item, we need to reconstruct
-    # the tree to avoid this
-    self.tree.setParameters(self.algOpts)
     self.algOpts.sigValueChanged.connect(lambda param, proc: self.changeActiveAlg(proc))
+    super().__init__(parent, saveDir=saveDir, fileType='alg', name=name,
+                     childForOverride=self.algOpts)
 
     Path(self.saveDir).mkdir(parents=True, exist_ok=True)
-
-    # Allows only the current processor params to be shown in the tree
-    #self.tree.addParameters(self.params, showTop=False)
 
     self.curProcessor: Optional[FRImgProcWrapper] = None
     self.nameToProcMapping: Dict[str, FRImgProcWrapper] = {}
@@ -801,7 +809,10 @@ class FRAlgCollectionEditor(FRParamEditor):
     return self.curProcessor.resultAsVerts(localEstimate=localEstimate)
 
   def resultAsCompDf(self, localEstimate=True):
-    return self.curProcessor.resultAsCompDf(localEstimate=localEstimate)
+    compVertices = self.resultAsVerts(localEstimate=localEstimate)
+    components = self.makeCompDf(len(compVertices))
+    components[REQD_TBL_FIELDS.VERTICES] = compVertices
+    return components
 
   @property
   def image(self):
@@ -826,11 +837,12 @@ class FRAlgCollectionEditor(FRParamEditor):
     The algorithm editor also needs to store information about the selected algorithm, so lump
     this in with the other parameter information before calling default save.
     """
-    paramState = [self.algOpts.value().algName, self.params.saveState()]
+    paramState = {'Selected Algorithm': self.algOpts.value().algName,
+                  'Parameters': self.params.saveState(filter='user')}
     return super().saveAs(saveName, paramState, allowOverwriteDefault)
 
-  def loadState(self, selection_newStatePair: Tuple[str, dict]):
-    selectedOpt = selection_newStatePair[0]
+  def loadState(self, newState: Dict[str, Any]):
+    selectedOpt = newState['Selected Algorithm']
     # Get the impl associated with this option name
     isLegit = selectedOpt in self.algOpts.opts['limits']
     if not isLegit:
@@ -841,7 +853,7 @@ class FRAlgCollectionEditor(FRParamEditor):
     else:
       selectedImpl = self.algOpts.opts['limits'][selectedOpt]
     self.algOpts.setValue(selectedImpl)
-    super().loadState(selection_newStatePair[1])
+    super().loadState(newState['Parameters'])
 
   def changeActiveAlg(self, proc: FRImgProcWrapper):
     # Hide all except current selection
@@ -858,8 +870,9 @@ class FRAlgCollectionEditor(FRParamEditor):
 
 class FRAlgPropsMgr(FRParamEditor):
 
-  def __init__(self, parent=None):
+  def __init__(self, singleton: _FRSingleton, parent=None):
     super().__init__(parent, fileType='', saveDir='')
+    self.singleton = singleton
     self.processorCtors : List[Callable[[], ImageProcess]] = []
     self.spawnedCollections : List[FRAlgCollectionEditor] = []
 
@@ -873,7 +886,7 @@ class FRAlgPropsMgr(FRParamEditor):
     # Strip "FR" from class name before retrieving name
     settingsName = _frPascalCaseToTitle(clsName[2:]) + ' Processor'
     newEditor = FRAlgCollectionEditor(editorDir, self, name=settingsName)
-    FR_SINGLETON.registerableEditors.append(newEditor)
+    self.singleton.registerableEditors.append(newEditor)
     self.spawnedCollections.append(weakref.proxy(newEditor))
     # Wrap in property so changes propagate to the calling class
     lims = newEditor.algOpts.opts['limits']
@@ -896,20 +909,21 @@ class FRColorSchemeEditor(FRParamEditor):
 
 _INITIALIZED_CLASSES: Set[Type[ContainsSharedProps]] = set()
 class _FRSingleton:
-  algParamMgr = FRAlgPropsMgr()
-
-  shortcuts = FRShortcutsEditor()
-  scheme = FRColorSchemeEditor()
-  generalProps = FRGeneralPropertiesEditor()
-  filter = FRTableFilterEditor()
-
-  annotationAuthor = None
 
   def __init__(self):
+    self.tableData = FRTableData()
+    self.tableData.loadCfg(BASE_DIR.parent/'tablecfg.yml')
+    self.filter = self.tableData.filter
+
+    self.algParamMgr = FRAlgPropsMgr(self)
+
+    self.shortcuts = FRShortcutsEditor()
+    self.scheme = FRColorSchemeEditor()
+    self.generalProps = FRGeneralPropertiesEditor()
+
     self.registerableEditors: List[FRParamEditor] = \
       [self.scheme, self.shortcuts, self.generalProps, self.filter]
-    self.userProfile = FRUserProfileEditor(singletonObj=self)
-
+    self.userProfile = FRUserProfileEditor(singleton=self)
   @property
   def allEditors(self):
       return self.registerableEditors + [self.userProfile]

@@ -1,10 +1,9 @@
 import pickle
 import sys
 from ast import literal_eval
-from datetime import datetime
 from pathlib import Path
 from stat import S_IRGRP
-from typing import Union, Any, Optional, Sequence, List, Tuple
+from typing import Union, Any, Optional, List, Tuple
 
 import cv2 as cv
 import numpy as np
@@ -13,47 +12,21 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 from skimage import io
 
-from cdef.projectvars import DATE_FORMAT
 from cdef.projectvars import TEMPLATE_COMP_CLASSES
 from cdef.structures import OneDArr
 from cdef.structures.typeoverloads import TwoDArr, NChanImg
 from .frgraphics.parameditors import FR_SINGLETON
 from .generalutils import coerceDfTypes
-from .projectvars import FR_ENUMS, TEMPLATE_COMP as TC, FRCompParams
+from .projectvars import FR_ENUMS, REQD_TBL_FIELDS, FRCompParams
 from .projectvars.constants import FR_CONSTS
 from .structures import FRComplexVertices, FRParam, FRCompIOError
 
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal
 
-def makeCompDf(numRows=1) -> df:
-  """
-  Creates a dataframe for the requested number of components.
-  This is the recommended method for component instantiation prior to table insertion.
-  """
-  df_list = []
-  dropRow = False
-  if numRows <= 0:
-    # Create one row and drop it, which ensures data types are correct in the empty
-    # dataframe
-    numRows = 1
-    dropRow = True
-  for _ in range(numRows):
-    # Make sure to construct a separate component instance for
-    # each row no objects have the same reference
-    df_list.append([field.value for field in FRCompParams()])
-  outDf = df(df_list, columns=TC).set_index(TC.INST_ID, drop=False)
-  # Set the metadata for this application run
-  outDf[TC.ANN_AUTHOR] = FR_SINGLETON.annotationAuthor
-  outDf[TC.ANN_TIMESTAMP] = datetime.now().strftime(DATE_FORMAT)
-  outDf[TC.ANN_FILENAME] = FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
-  if dropRow:
-    outDf = outDf.drop(index=TC.INST_ID.value)
-  return outDf
+TBL_FIELDS = FR_SINGLETON.tableData.allFields
 
 class FRCompTableModel(QtCore.QAbstractTableModel):
-  colTitles = TC.paramNames()
-
   # Emits 3-element dict: Deleted comp ids, changed comp ids, added comp ids
   defaultEmitDict = {'deleted': np.array([]), 'changed': np.array([]), 'added': np.array([])}
   sigCompsChanged = Signal(dict)
@@ -65,11 +38,13 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
     super().__init__()
     # Create component dataframe and remove created row. This is to
     # ensure datatypes are correct
-    self.compDf = makeCompDf(0)
+    self.colTitles =   colTitles = [f.name for f in TBL_FIELDS]
 
-    self.noEditColIdxs = [self.colTitles.index(col.name) for col in
-                     [TC.INST_ID, TC.VERTICES, TC.ANN_AUTHOR, TC.ANN_FILENAME,
-                      TC.ANN_TIMESTAMP]]
+    self.compDf = FR_SINGLETON.tableData.makeCompDf(0)
+
+    noEditParams = set(REQD_TBL_FIELDS) - {REQD_TBL_FIELDS.COMP_CLASS,
+                                           REQD_TBL_FIELDS.VALIDATED}
+    self.noEditColIdxs = {self.colTitles.index(col.name) for col in noEditParams}
 
   # ------
   # Functions required to implement table model
@@ -123,7 +98,7 @@ class FRComponentMgr(FRCompTableModel):
 
     # Delete entries with no vertices, since they make work within the app difficult.
     # TODO: Is this the appropriate response?
-    verts = newCompsDf[TC.VERTICES]
+    verts = newCompsDf[REQD_TBL_FIELDS.VERTICES]
     dropIds = newCompsDf.index[verts.map(lambda complexVerts: len(complexVerts.stack()) == 0)]
     newCompsDf.drop(index=dropIds, inplace=True)
     # Inform graphics elements of deletion if this ID is already in our dataframe
@@ -132,7 +107,7 @@ class FRComponentMgr(FRCompTableModel):
     if addtype == FR_ENUMS.COMP_ADD_AS_NEW:
       # Treat all comps as new -> set their IDs to guaranteed new values
       newIds = np.arange(self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int)
-      newCompsDf.loc[:,TC.INST_ID] = newIds
+      newCompsDf.loc[:,REQD_TBL_FIELDS.INST_ID] = newIds
       newCompsDf = newCompsDf.set_index(newIds)
     # Now, merge existing IDs and add new ones
     # TODO: Add some metric for merging other than a total override. Currently, even if the existing
@@ -152,7 +127,7 @@ class FRComponentMgr(FRCompTableModel):
     compsToAdd = newCompsDf.iloc[~newChangedIdxs, :]
     self.compDf = pd.concat((self.compDf, compsToAdd), sort=False)
     # Retain type information
-    coerceDfTypes(self.compDf, TC)
+    coerceDfTypes(self.compDf, TBL_FIELDS)
 
     toEmit['added'] = newIds[~newChangedIdxs]
     self.layoutChanged.emit()
@@ -186,7 +161,7 @@ class FRComponentMgr(FRCompTableModel):
     self.layoutChanged.emit()
 
     # Preserve type information after change
-    coerceDfTypes(self.compDf, TC)
+    coerceDfTypes(self.compDf, TBL_FIELDS)
 
     # Determine next ID for new components
     self._nextCompId = 0
@@ -244,25 +219,25 @@ class FRComponentIO:
   def __init__(self):
     self.compDf: Optional[df] = None
 
-  def prepareDf(self, compDf: df, mainImgFpath: str, displayIds: OneDArr):
-    """:param compDf: The component dataframe that came from the component manager
-    :param mainImgFpath: Name of the image being annotated. This helps associate
-      all annotations to their source file.
+  def prepareDf(self, compDf: df, displayIds: OneDArr=None):
+    """
+    :param compDf: The component dataframe that came from the component manager
     :param displayIds: If not self.exportOnlyVis, exports every component in the
       dataframe. Otherwise, just exports the requested IDs
     """
-    if self.exportOnlyVis:
+    if self.exportOnlyVis and displayIds is not None:
       exportIds = displayIds
     else:
       exportIds = compDf.index
-    exportDf = compDf.loc[exportIds,:].copy()
+    exportDf: df = compDf.loc[exportIds,:].copy()
+    mainImgFpath = FR_SINGLETON.tableData.annFile
     if not self.includeFullSourceImgName:
       # Only use the file name, not the whole path
       mainImgFpath = Path(mainImgFpath).name
     # Assign correct export name for only new components
-    overwriteIdxs = exportDf[TC.ANN_FILENAME] == FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
+    overwriteIdxs = exportDf[REQD_TBL_FIELDS.ANN_FILENAME] == FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
     # TODO: Maybe the current filename will match the current file indicator. What happens then?
-    exportDf.loc[overwriteIdxs, TC.ANN_FILENAME] = mainImgFpath
+    exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.ANN_FILENAME] = mainImgFpath
     self.compDf = exportDf
 
   # -----
@@ -283,6 +258,7 @@ class FRComponentIO:
       'index': False
     }
     outPath = Path(outFile)
+    outPath.parent.mkdir(exist_ok=True)
     defaultExportParams.update(pdExportArgs)
     # Make sure no rows are truncated
     pd.set_option('display.max_rows', sys.maxsize)
@@ -298,7 +274,6 @@ class FRComponentIO:
       # Since CSV export significantly modifies the df, make a copy before doing all these
       # operations
       exportDf = self.compDf.copy(deep=True)
-      valToParamMap = {param.name: param.value for param in TC}
       for col in exportDf:
         if not isinstance(col.value, str):
           exportDf[col] = _paramSerToStrSer(exportDf[col], col.value)
@@ -349,7 +324,7 @@ class FRComponentIO:
 
     # Create label to output mapping
     for curType, color in zip(types, colorPerType):
-      outlines = self.compDf.loc[self.compDf[TC.COMP_CLASS] == curType, TC.VERTICES].values
+      outlines = self.compDf.loc[self.compDf[REQD_TBL_FIELDS.COMP_CLASS] == curType, REQD_TBL_FIELDS.VERTICES].values
       cvFillArg = [arr[0] for arr in outlines]
       cvClrArg = tuple([int(val) for val in color])
       cv.fillPoly(out, cvFillArg, cvClrArg)
@@ -387,18 +362,18 @@ class FRComponentIO:
       csvDf = pd.read_csv(inFile, keep_default_na=False)
       # Objects in the original frame are represented as strings, so try to convert these
       # as needed
-      csvDf = csvDf[[field.name for field in TC]]
+      csvDf = csvDf[[field.name for field in TBL_FIELDS]]
       stringCols = csvDf.columns[csvDf.dtypes == object]
-      valToParamMap = {param.name: param.value for param in TC}
+      valToParamMap = {param.name: param.value for param in TBL_FIELDS}
       for col in stringCols:
         paramVal = valToParamMap[col]
         # No need to perform this expensive computation if the values are already strings
         if not isinstance(paramVal, str):
           csvDf[col] = _strSerToParamSer(csvDf[col], valToParamMap[col])
-      csvDf.columns = TC
-      csvDf = csvDf.set_index(TC.INST_ID, drop=False)
+      csvDf.columns = TBL_FIELDS
+      csvDf = csvDf.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
 
-      cls.checkVertBounds(csvDf[TC.VERTICES], imShape)
+      cls.checkVertBounds(csvDf[REQD_TBL_FIELDS.VERTICES], imShape)
     except Exception as ex:
       errMsg = f'Error importing column {col}:\n{ex}'
     # TODO: Apply this function to individual rows instead of the whole dataframe. This will allow malformed
@@ -411,9 +386,10 @@ class FRComponentIO:
     See docstring for :func:`self.buildFromCsv`
     """
     errMsg = None
+    pklDf = None
     try:
       pklDf = pd.read_pickle(inFile)
-      cls.checkVertBounds(pklDf[TC.VERTICES], imShape)
+      cls.checkVertBounds(pklDf[REQD_TBL_FIELDS.VERTICES], imShape)
     except Exception as ex:
       errMsg = str(ex)
     return pklDf, errMsg

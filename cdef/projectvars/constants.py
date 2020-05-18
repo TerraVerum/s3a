@@ -8,7 +8,7 @@ from ..structures import FRComplexVertices, FRParam, FRParamGroup, newParam
 
 __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR', 'USER_PROFILES_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'FILTERS_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
-           'DATE_FORMAT',
+           'DATE_FORMAT', 'REQD_TBL_FIELDS', 'COMP_CLASS_NA',
            'FR_CONSTS', 'TEMPLATE_COMP_CLASSES', 'TEMPLATE_COMP', 'FRCompParams',
            'FRComponentTypes']
 BASE_DIR = Path(__file__).parent.parent.absolute()
@@ -45,7 +45,7 @@ class FRComponentTypes(FRParamGroup):
 TEMPLATE_COMP_CLASSES = FRComponentTypes()
 
 @dataclass
-class _ReqdCompParams(FRParamGroup):
+class _ReqdTableFields(FRParamGroup):
   INST_ID       : FRParam = newParam('Instance ID', -1)
   VERTICES      : FRParam = newParam('Vertices', FRComplexVertices())
   VALIDATED     : FRParam = newParam('Validated', False)
@@ -53,9 +53,13 @@ class _ReqdCompParams(FRParamGroup):
   ANN_FILENAME  : FRParam = newParam('Source Image Filename', "")
   ANN_TIMESTAMP : FRParam = newParam('Timestamp', "")
   COMP_CLASS    : FRParam = newParam('Class', TEMPLATE_COMP_CLASSES.N_A)
+REQD_TBL_FIELDS = _ReqdTableFields()
+
+COMP_CLASS_NA = FRParam('Unassigned')
+
 
 @dataclass
-class FRCompParams(_ReqdCompParams):
+class FRCompParams(_ReqdTableFields):
   DEV_TEXT   : FRParam = newParam('Device Text', '')
   BOARD_TEXT : FRParam = newParam('Board Text', '')
   LOGO       : FRParam = newParam('Logo', '')
@@ -152,7 +156,7 @@ class _FRConsts(FRParamGroup):
   # --------------------------
   # COMPONENT EXPORT PARAMETERS
   # --------------------------
-  ANN_CUR_FILE_INDICATOR: FRParam = newParam('Current image file string', 'New')
+  ANN_CUR_FILE_INDICATOR: FRParam = newParam('Current image file string', 'Newly Added')
 
   # --------------------------
   # DRAWING
@@ -169,3 +173,12 @@ class _FRConsts(FRParamGroup):
   DRAW_ACT_SELECT : FRParam = newParam('Select', f'{ICON_DIR}select.svg', 'icon')
   DRAW_ACT_PAN    : FRParam = newParam('Pan', f'{ICON_DIR}pan.svg', 'icon')
 FR_CONSTS = _FRConsts()
+
+# from ruamel.yaml import YAML
+# yaml = YAML()
+# for cls in FRParam, FRParamGroup, _FRConsts:
+#   yaml.register_class(cls)
+# for p in FR_CONSTS:
+#   p.group = []
+# p = Path('./consts.yml')
+# yaml.dump(FR_CONSTS, p)

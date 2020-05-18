@@ -9,8 +9,7 @@ from .frgraphics import tableview
 from .frgraphics.imageareas import FRMainImage
 from .frgraphics.parameditors import FR_SINGLETON
 from .frgraphics.regions import FRMultiRegionPlot
-from .projectvars import FR_CONSTS, TEMPLATE_COMP as TC, \
-  TEMPLATE_COMP_CLASSES as COMP_CLASSES
+from .projectvars import FR_CONSTS, REQD_TBL_FIELDS
 
 from .structures import FRVertices, FRParam
 from .tablemodel import FRComponentMgr
@@ -18,8 +17,10 @@ from .tablemodel import FRComponentMgr
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
+TBL_FIELDS = FR_SINGLETON.tableData.allFields
+
 class FRCompSortFilter(QtCore.QSortFilterProxyModel):
-  colTitles = TC.paramNames()
+  colTitles = [f.name for f in TBL_FIELDS]
   def __init__(self, compMgr: FRComponentMgr, parent=None):
     super().__init__(parent)
     self.setSourceModel(compMgr)
@@ -30,7 +31,7 @@ class FRCompSortFilter(QtCore.QSortFilterProxyModel):
   def sort(self, column: int, order: QtCore.Qt.SortOrder=...) -> None:
     # Do nothing if the user is trying to sort by vertices, since the intention of
     # sorting numpy arrays is somewhat ambiguous
-    if column == self.colTitles.index(TC.VERTICES.name):
+    if column == self.colTitles.index(REQD_TBL_FIELDS.VERTICES.name):
       return
     else:
       super().sort(column, order)
@@ -83,7 +84,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     # Update and add changed/new components
     # TODO: Find out why this isn't working. For now, just reset the whole comp list
     #  each time components are changed, since the overhead isn't too terrible.
-    regCols = (TC.VERTICES, TC.VALIDATED)
+    regCols = (REQD_TBL_FIELDS.VERTICES, REQD_TBL_FIELDS.VALIDATED)
     # changedIds = np.concatenate((idLists['added'], idLists['changed']))
     # self._regionPlots[changedIds, regCols] = compDf.loc[changedIds, compCols]
 
@@ -165,7 +166,7 @@ class FRCompDisplayFilter(QtCore.QObject):
       curComps = self.filterByParamType(curComps, param)
 
     # Give self the id list of surviving comps
-    self.displayedIds = curComps[TC.INST_ID]
+    self.displayedIds = curComps[REQD_TBL_FIELDS.INST_ID]
 
   def filterByParamType(self, compDf: df, param: FRParam):
     valType = param.valType

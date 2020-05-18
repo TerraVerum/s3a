@@ -17,10 +17,9 @@ from ..frgraphics.regions import FRVertexDefinedImg
 from ..generalutils import getClippedBbox, FRObjUndoBuffer
 from ..processingutils import getVertsFromBwComps
 from ..processingutils import segmentComp
-from ..projectvars import TEMPLATE_COMP as TC, FR_CONSTS, FR_ENUMS
+from ..projectvars import REQD_TBL_FIELDS, FR_CONSTS, FR_ENUMS
 from ..structures import FRParam, FRVertices, FRComplexVertices
 from ..structures import NChanImg
-from ..tablemodel import makeCompDf
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
@@ -243,7 +242,7 @@ class FRFocusedImage(FREditableImg):
     self.region = FRVertexDefinedImg()
     self.addItem(self.region)
 
-    self.compSer = makeCompDf().squeeze()
+    self.compSer = FR_SINGLETON.tableData.makeCompDf().squeeze()
     # Image representation of component boundaries
     self.compMask = np.zeros((1,1), bool)
 
@@ -296,7 +295,7 @@ class FRFocusedImage(FREditableImg):
       self.region.updateFromVertices(FRComplexVertices())
       self.shapeCollection.clearAllRois()
       return
-    newVerts: FRComplexVertices = newComp[TC.VERTICES]
+    newVerts: FRComplexVertices = newComp[REQD_TBL_FIELDS.VERTICES]
     # Since values INSIDE the dataframe are reset instead of modified, there is no
     # need to go through the trouble of deep copying
     self.compSer = newComp.copy(deep=False)
@@ -380,4 +379,4 @@ class FRFocusedImage(FREditableImg):
       newVerts = self.region.verts.copy()
     for vertList in newVerts:
       vertList += self.bbox[0,:]
-    self.compSer.loc[TC.VERTICES] = newVerts
+    self.compSer.loc[REQD_TBL_FIELDS.VERTICES] = newVerts

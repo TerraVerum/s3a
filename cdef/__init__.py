@@ -8,7 +8,7 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 
-__all__ = ['appInst', 'FRCdefApp', 'makeCompDf']
+__all__ = ['appInst', 'FRCdefApp', 'FR_SINGLETON']
 
 # Makes sure that when the folder is run as a module, the app exists in the outermost
 # scope of the application
@@ -24,7 +24,6 @@ import cdef.structures
 
 from cdef.frgraphics.parameditors import FR_SINGLETON
 from cdef.interfaceimpls import FRTopLevelProcessors
-from cdef.tablemodel import makeCompDf
 for name, func in inspect.getmembers(FRTopLevelProcessors, inspect.isfunction):
   FR_SINGLETON.algParamMgr.addProcessCtor(func)
 

@@ -5,15 +5,18 @@ from typing import Sequence
 import numpy as np
 import pandas as pd
 from pandas import DataFrame as df
+import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
 from .parameditors import FR_SINGLETON
-from ..projectvars import TEMPLATE_COMP, FR_CONSTS, FR_ENUMS
+from ..projectvars import FR_CONSTS, FR_ENUMS, REQD_TBL_FIELDS
 from ..structures import FRParam
 from ..tablemodel import FRCompTableModel, FRComponentMgr
 
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal
+
+TBL_FIELDS = FR_SINGLETON.tableData.allFields
 
 class FRPopupTableDialog(QtWidgets.QDialog):
   def __init__(self, *args):
@@ -135,23 +138,25 @@ class FRCompTableView(QtWidgets.QTableView):
 
 
     # Default to text box delegate
-    self.setItemDelegate(FRTextDelegate(self))
+    # self.setItemDelegate(FRTextDelegate(self))
 
     validOpts = [True, False]
     boolDelegate = FRComboBoxDelegate(self, comboValues=validOpts)
 
-    self.instIdColIdx = TEMPLATE_COMP.paramNames().index(TEMPLATE_COMP.INST_ID.name)
+    self.instIdColIdx = TBL_FIELDS.index(REQD_TBL_FIELDS.INST_ID)
 
-    for ii, field in enumerate(TEMPLATE_COMP):
+    for ii, field in enumerate(TBL_FIELDS):
+      curType = field.valType
       curval = field.value
-      if isinstance(curval, bool):
+      if curType == 'bool':
         self.setItemDelegateForColumn(ii, boolDelegate)
-      elif isinstance(curval, Enum):
+      elif curType == 'Enum':
         self.setItemDelegateForColumn(ii, FRComboBoxDelegate(self, comboValues=list(type(curval))))
-      elif isinstance(curval, FRParam):
+      elif curType == 'FRParam':
         self.setItemDelegateForColumn(ii, FRComboBoxDelegate(self, comboValues=list(curval.group)))
+      elif curType in ['int', 'float']:
+        self.setItemDelegateForColumn(ii, FRSpinBoxDelegate(self, spinType=curType))
       else:
-        # Default to text box
         self.setItemDelegateForColumn(ii, FRTextDelegate(self))
 
     self.horizontalHeader().setSectionsMovable(True)
@@ -310,7 +315,7 @@ class FRComboBoxDelegate(QtWidgets.QStyledItemDelegate):
     editor.addItems(self.comboNames)
     return editor
 
-  def setEditorData(self, editor: QtWidgets.QComboBox, index):
+  def setEditorData(self, editor: QtWidgets.QComboBox, index: QtCore.QModelIndex):
     curVal = index.data(QtCore.Qt.DisplayRole)
     editor.setCurrentIndex(self.comboNames.index(curVal))
 
@@ -318,6 +323,41 @@ class FRComboBoxDelegate(QtWidgets.QStyledItemDelegate):
                    model: FRCompTableModel,
                    index: QtCore.QModelIndex):
     model.setData(index, self.comboValues[editor.currentIndex()])
+
+  def updateEditorGeometry(self, editor: QtWidgets.QPlainTextEdit,
+                           option: QtWidgets.QStyleOptionViewItem,
+                           index: QtCore.QModelIndex):
+    editor.setGeometry(option.rect)
+
+class FRSpinBoxDelegate(QtWidgets.QStyledItemDelegate):
+  def __init__(self, parent=None, spinType = 'int'):
+    super().__init__(parent)
+    self.defs = {
+      'value': 0, 'min': None, 'max': None,
+      'step': 1.0,
+      'siPrefix': False, 'suffix': '', 'decimals': 3,
+    }
+    if spinType == 'int':
+      self.defs['minStep'] = 1.0
+    else:
+      self.defs['step'] = 0.1
+    self.defs['dec'] = spinType != 'int'
+    self.defs['int'] = spinType == 'int'
+
+
+  def createEditor(self, parent, option, index: QtCore.QModelIndex):
+    editor = pg.SpinBox(parent, **self.defs)
+    editor.setMaximumHeight(editor.maximumWidth())
+    return editor
+
+  def setEditorData(self, editor: pg.SpinBox, index: QtCore.QModelIndex):
+    curVal = index.data(QtCore.Qt.DisplayRole)
+    editor.setValue(curVal)
+
+  def setModelData(self, editor: pg.SpinBox,
+                   model: FRCompTableModel,
+                   index: QtCore.QModelIndex):
+    model.setData(index, editor.value())
 
   def updateEditorGeometry(self, editor: QtWidgets.QPlainTextEdit,
                            option: QtWidgets.QStyleOptionViewItem,

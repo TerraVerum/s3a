@@ -15,7 +15,6 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 import qdarkstyle
 
 from cdef.frgraphics.graphicsutils import saveToFile
-from cdef.frgraphics.parameditors import FRUserProfileEditor
 from cdef.generalutils import resolveAuthorName
 from cdef.structures import FRCompIOError, NChanImg
 from cdef.tablemodel import FRComponentIO
@@ -25,9 +24,9 @@ from .frgraphics.graphicsutils import dialogGetSaveFileName, \
   attemptLoadSettings, popupFilePicker, disableAppDuringFunc
 from .frgraphics.parameditors import FRParamEditor, FR_SINGLETON
 from .projectvars.constants import FR_CONSTS
-from .projectvars.constants import LAYOUTS_DIR, TEMPLATE_COMP as TC
+from .projectvars.constants import LAYOUTS_DIR, REQD_TBL_FIELDS
 from .projectvars.enums import FR_ENUMS, _FREnums
-from .tablemodel import FRComponentMgr, makeCompDf
+from .tablemodel import FRComponentMgr
 from .tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
 
 Slot = QtCore.pyqtSlot
@@ -50,13 +49,12 @@ class FRCdefApp(FRAnnotatorUI):
         FR_CONSTS.PROP_EST_BOUNDS_ON_START)
     cls.useDarkTheme = FR_SINGLETON.scheme.registerProp(cls, FR_CONSTS.SCHEME_USE_DARK_THEME)
 
-  def __init__(self, **userProfileArgs: Dict[str, Any]):
+  def __init__(self, **userProfileArgs):
     super().__init__()
     self.addEditorDocks()
     # ---------------
     # DATA ATTRIBUTES
     # ---------------
-    self.mainImgFpath = None
     self.hasUnsavedChanges = False
     self.userProfile = FR_SINGLETON.userProfile
 
@@ -67,8 +65,8 @@ class FRCdefApp(FRAnnotatorUI):
       sys.exit('No author name provided and no default author exists. Exiting.\n'
                'To start without error, provide an author name explicitly, e.g.\n'
                '"python -m cdef --author=<Author Name>"')
-    FR_SINGLETON.annotationAuthor = authorName
-    self.statBar.showMessage(FR_SINGLETON.annotationAuthor)
+    FR_SINGLETON.tableData.annAuthor = authorName
+    self.statBar.showMessage(authorName)
 
     # Flesh out pg components
     # ---------------
@@ -193,7 +191,7 @@ class FRCdefApp(FRAnnotatorUI):
   # -----
   # App functionality
   # -----
-  def updateTheme(self, newScheme):
+  def updateTheme(self, _newScheme: Dict[str, Any]):
     style = ''
     if self.useDarkTheme:
       style = qdarkstyle.load_stylesheet()
@@ -211,13 +209,13 @@ class FRCdefApp(FRAnnotatorUI):
     # Only perform action if image currently exists
     if self.focusedImg.imgItem.image is None:
       return
-    self.focusedImg.updateRegionFromVerts(self.focusedImg.compSer[TC.VERTICES])
+    self.focusedImg.updateRegionFromVerts(self.focusedImg.compSer[REQD_TBL_FIELDS.VERTICES])
 
   def acceptFocusedRegion(self):
     self.focusedImg.saveNewVerts()
     modifiedComp = self.focusedImg.compSer
     self.compMgr.addComps(modifiedComp.to_frame().T, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
-    self.compDisplay.regionPlots.focusById([modifiedComp[TC.INST_ID]])
+    self.compDisplay.regionPlots.focusById([modifiedComp[REQD_TBL_FIELDS.INST_ID]])
 
   def estimateBoundaries(self):
     with BusyCursor():
@@ -242,6 +240,8 @@ class FRCdefApp(FRAnnotatorUI):
     :param clearExistingComps: If True, erases all existing components on image load.
       Else, they are retained.
     """
+    if fileName is not None:
+      fileName = str(Path(fileName).resolve())
     with BusyCursor():
       if clearExistingComps:
         self.compMgr.rmComps()
@@ -249,10 +249,7 @@ class FRCdefApp(FRAnnotatorUI):
         self.mainImg.setImage(imgData)
       else:
         self.mainImg.setImage(fileName)
-      if fileName is None:
-        self.mainImgFpath = None
-      else:
-        self.mainImgFpath = str(Path(fileName).resolve())
+      FR_SINGLETON.tableData.annFile = fileName
       self.focusedImg.resetImage()
       self.mainImg.plotItem.vb.autoRange()
       if self.estBoundsOnStart:
@@ -265,7 +262,7 @@ class FRCdefApp(FRAnnotatorUI):
       self.restoreState(dockStates)
 
   def saveLayout(self, layoutName: str=None, allowOverwriteDefault=False):
-    dockStates = self.saveState()
+    dockStates = self.saveState().data()
     errMsg = saveToFile(dockStates, LAYOUTS_DIR, layoutName, 'dockstate',
                         allowOverwriteDefault=allowOverwriteDefault)
     success = errMsg is None
@@ -288,15 +285,15 @@ class FRCdefApp(FRAnnotatorUI):
     profileDict.update(profileSrc)
 
     imgFname = profileDict['Image']
-    if imgFname:
+    if imgFname is not None:
       self.resetMainImg(imgFname)
 
     annFname = profileDict['Annotations']
-    if annFname:
+    if annFname is not None:
       self.loadCompList(annFname)
 
     layoutName = profileDict['Layout']
-    if layoutName:
+    if layoutName is not None:
       self.loadLayoutActionTriggered(layoutName)
 
     for editor in FR_SINGLETON.registerableEditors:
@@ -305,8 +302,7 @@ class FRCdefApp(FRAnnotatorUI):
         self.paramEditorLoadActTriggered(editor, curSettings)
 
   def exportCompList(self, outFname: str):
-    self.compExporter.prepareDf(self.compMgr.compDf, self.mainImgFpath,
-                                self.compDisplay.displayedIds)
+    self.compExporter.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds)
     self.compExporter.exportCsv(outFname)
     self.hasUnsavedChanges = False
 
@@ -350,7 +346,7 @@ class FRCdefApp(FRAnnotatorUI):
   def add_focusComp(self, newComps: df):
     self.compMgr.addComps(newComps)
     # Make sure index matches ID before updating current component
-    newComps = newComps.set_index(TC.INST_ID, drop=False)
+    newComps = newComps.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
     # Set this component as active in the focused view
     self.updateCurComp(newComps)
 
@@ -468,9 +464,9 @@ class FRCdefApp(FRAnnotatorUI):
     #   For now, just use the last in the selection. This is so that if multiple
     #   components are selected in a row, the most recently selected is always
     #   the current displayed.
-    newComps: pd.Series = newComps.iloc[-1,:]
-    newCompId = newComps[TC.INST_ID]
+    newComp: pd.Series = newComps.iloc[-1,:]
+    newCompId = newComp[REQD_TBL_FIELDS.INST_ID]
     self.compDisplay.regionPlots.focusById([newCompId])
     mainImg = self.mainImg.image
-    self.focusedImg.updateAll(mainImg, newComps)
+    self.focusedImg.updateAll(mainImg, newComp)
     self.curCompIdLbl.setText(f'Component ID: {newCompId}')

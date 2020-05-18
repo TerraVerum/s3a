@@ -13,7 +13,7 @@ from .parameditors import FR_SINGLETON
 from ..frgraphics.rois import SHAPE_ROI_MAPPING, FRExtendedROI
 from ..generalutils import coerceDfTypes, nanConcatList
 from ..processingutils import getVertsFromBwComps
-from ..projectvars import TEMPLATE_COMP as TC, FR_CONSTS
+from ..projectvars import REQD_TBL_FIELDS, FR_CONSTS
 from ..structures import FRParam, FRVertices, FRComplexVertices, OneDArr
 
 Signal = QtCore.pyqtSignal
@@ -106,7 +106,7 @@ class FRShapeCollection(QtCore.QObject):
 def makeMultiRegionDf(numRows=1, whichCols=None, idList=None) -> df:
   df_list = []
   if whichCols is None:
-    whichCols = (TC.INST_ID, TC.VERTICES, TC.VALIDATED)
+    whichCols = (REQD_TBL_FIELDS.INST_ID, REQD_TBL_FIELDS.VERTICES, REQD_TBL_FIELDS.VALIDATED)
   elif isinstance(whichCols, FRParam):
     whichCols = [whichCols]
   for _ in range(numRows):
@@ -205,7 +205,7 @@ class FRMultiRegionPlot(QtCore.QObject):
     plotRegions = [np.ones((0,2))]
     idLocs = [np.ones((0,2))]
 
-    for region in self.data.loc[:, TC.VERTICES]:
+    for region in self.data.loc[:, REQD_TBL_FIELDS.VERTICES]:
       concatRegion = nanConcatList(region)
       idLoc = np.nanmean(concatRegion, 0)
       idLocs.append(idLoc)
@@ -221,7 +221,7 @@ class FRMultiRegionPlot(QtCore.QObject):
 
     brushes = np.empty(len(self.data), dtype=object)
     brushes.fill(pg.mkBrush(self.nonvalidIdClr))
-    brushes[self.data.loc[:, TC.VALIDATED]] = pg.mkBrush(self.validIdClr)
+    brushes[self.data.loc[:, REQD_TBL_FIELDS.VALIDATED]] = pg.mkBrush(self.validIdClr)
 
     self.centroidPlts.setData(x=idLocs[:, 0], y=idLocs[:, 1], size=self.idMarkerSz, brush=brushes,
                               data=self.data.index, symbol=scatSymbols)
