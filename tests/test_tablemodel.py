@@ -1,50 +1,27 @@
-from cdef import appInst, FRCdefApp, makeCompDf
-from cdef.structures import FRComplexVertices, FRVertices
-from cdef.projectvars import TEMPLATE_COMP as TC, TEMPLATE_COMP_CLASSES as COMP_CLASSES
-from cdef.projectvars import FR_ENUMS
-
 import numpy as np
-import pandas as pd
-import cv2 as cv
-from pandas import DataFrame as df
-from PIL import Image
-import random
-from random import randint
 
-
-from skimage import io
-from skimage import morphology as morph
-import skimage
-
-NUM_COMPS = 5
+from cdef import FRCdefApp, FR_SINGLETON
+from cdef.projectvars import FR_ENUMS
+from cdef.projectvars import REQD_TBL_FIELDS
+from appsetup import (CompDfTester, makeCompDf, NUM_COMPS, SAMPLE_IMG,
+                       TESTS_DIR, SAMPLE_IMG_DIR)
 
 from unittest import TestCase
-class ModelTester(TestCase):
+
+class TableModelTestCases(TestCase):
   def setUp(self):
-    random.seed(42)
-    np.random.seed(42)
-    self.app = FRCdefApp()
+    super().setUp()
+    self.app = FRCdefApp(Image=SAMPLE_IMG_DIR)
     self.mgr = self.app.compMgr
 
-    self.img: np.ndarray = io.imread('../images/circuitBoard.png')
-    mask = np.zeros(self.img.shape[:2], 'uint8')
+    dfTester = CompDfTester(NUM_COMPS)
+    dfTester.fillRandomVerts(imShape=SAMPLE_IMG.shape)
+    dfTester.fillRandomClasses()
 
-    sampleComps = makeCompDf(NUM_COMPS)
-    sampleComps.set_index(np.arange(NUM_COMPS, dtype=int), inplace=True)
-
-    for ii in range(NUM_COMPS):
-      radius = randint(0, 100)
-      o_x = randint(0, self.img.shape[1])
-      o_y = randint(0, self.img.shape[0])
-      sampleComps.loc[ii, TC.VERTICES] = [FRComplexVertices.fromBwMask(
-        cv.circle(mask, (o_x, o_y), radius, 1)
-      )]
-      mask.fill(0)
-    self.sampleComps = sampleComps
-
+    self.sampleComps = dfTester.compDf
     self.emptyArr = np.array([], int)
 
-
+class CompMgrTester(TableModelTestCases):
   def test_add_comps(self):
     # Standard add
     oldIds = np.arange(NUM_COMPS, dtype=int)
@@ -63,8 +40,6 @@ class ModelTester(TestCase):
     # Should be new IDs during 'add as new'
     changeList = self.mgr.addComps(comps)
     self.cmpChangeList(changeList, added=oldIds + NUM_COMPS)
-
-
   def test_rm_comps(self):
     comps = self.sampleComps.copy(deep=True)
     ids = np.arange(NUM_COMPS, dtype=int)
@@ -81,7 +56,7 @@ class ModelTester(TestCase):
     # Remove all
     for _ in range(10):
       self.mgr.addComps(comps)
-    oldIds = self.mgr.compDf[TC.INST_ID].values
+    oldIds = self.mgr.compDf[REQD_TBL_FIELDS.INST_ID].values
     changeList = self.mgr.rmComps('all')
     self.cmpChangeList(changeList,deleted=oldIds)
 
@@ -97,3 +72,42 @@ class ModelTester(TestCase):
       else:
         arrCmp = arrs[name]
       np.testing.assert_equal(changeList[name], arrCmp)
+
+class CompIOTester(TableModelTestCases):
+  def test_normal_export(self):
+    io = self.app.compExporter
+    io.exportOnlyVis = False
+    curPath = TESTS_DIR/'files'/'normalExport - All IDs.csv'
+    io.prepareDf(self.sampleComps)
+    outDf, errMsg = io.exportCsv(str(curPath))
+    self.assertTrue(curPath.exists(), 'Normal export with all IDs not successful.\n'
+                                      'Error message from save:\n'
+                                      f'{errMsg}')
+
+  def test_filter_export(self):
+    io = self.app.compExporter
+
+    curPath = TESTS_DIR/'files'/'normalExport - Filtered IDs.csv'
+    filterIds = np.array([0,3,2])
+    io.exportOnlyVis = False
+    io.prepareDf(self.sampleComps, filterIds)
+    np.testing.assert_array_equal(io.compDf.index, self.sampleComps.index,
+                                  'Export DF should not use only filtered IDs'
+                                  ' when not exporting only visible, but'
+                                  ' ID lists don\'t match.')
+    # With export only visible false, should still export whole frame
+    outDf, errMsg = io.exportCsv(str(curPath))
+    self.assertTrue(curPath.exists(), 'Normal export with filter ids passed not successful.\n'
+                                      'Error message from save:\n'
+                                      f'{errMsg}')
+
+    io.exportOnlyVis = True
+    io.prepareDf(self.sampleComps, filterIds)
+    np.testing.assert_array_equal(io.compDf.index, filterIds,
+                                  'Export DF should use only filtered IDswhen exporting only '
+                                  ' visible, but ID lists don\'t match.')
+    # With export only visible false, should still export whole frame
+    outDf, errMsg = io.exportCsv(str(curPath))
+    self.assertTrue(curPath.exists(), 'Filtered IDs export not successful.\n'
+                                      'Error message from save:\n'
+                                      f'{errMsg}')
