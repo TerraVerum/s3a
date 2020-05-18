@@ -13,3 +13,4 @@ Pillow
 qdarkstyle
 typing_extensions
 imageprocessing
+ruamel.yaml
