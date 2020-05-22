@@ -14,18 +14,18 @@ ___
 
 ## Installation
 
-Clone / cd this repository:
+Clone and install the dependent `imageprocessing` repository:
+
+```bash
+git clone https://gitlab.com/ficsresearch/imageprocessing
+pip install -e ./imageprocessing
+```
+
+Next, clone and install `cdef`:
+
 ```bash
 git clone https://gitlab.com/ficsresearch/cdef
-cd cdef
-```
-Install requirements:
-```bash
-pip install -r requirements.txt
-```
-Optionally, the repository can be installed as a pip module:
-```bash
-pip install .
+pip install -e ./cdef
 ```
 
 ## Running the App
