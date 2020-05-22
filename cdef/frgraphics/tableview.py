@@ -1,17 +1,15 @@
-from enum import Enum
 from functools import partial
 from typing import Sequence
 
 import numpy as np
 import pandas as pd
-from pandas import DataFrame as df
 import pyqtgraph as pg
+from pandas import DataFrame as df
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
-from .parameditors import FR_SINGLETON
-from ..projectvars import FR_CONSTS, FR_ENUMS, REQD_TBL_FIELDS
-from ..structures import FRParam
-from ..tablemodel import FRCompTableModel, FRComponentMgr
+from cdef import FR_SINGLETON
+from cdef.projectvars import FR_CONSTS, FR_ENUMS, REQD_TBL_FIELDS
+from cdef.tablemodel import FRCompTableModel, FRComponentMgr
 
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal

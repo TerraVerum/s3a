@@ -9,23 +9,24 @@ from typing import Callable, Dict, Any, Union, Optional
 
 import pandas as pd
 import pyqtgraph as pg
+import qdarkstyle
 from pandas import DataFrame as df
 from pyqtgraph import BusyCursor
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-import qdarkstyle
 
-from cdef.frgraphics.graphicsutils import saveToFile
-from cdef.generalutils import resolveAuthorName
-from cdef.structures import FRCompIOError, NChanImg
-from cdef.tablemodel import FRComponentIO
+from . import FR_SINGLETON
 from .frgraphics.annotator_ui import FRAnnotatorUI
-from .frgraphics.graphicsutils import dialogGetSaveFileName, \
-  addDirItemsToMenu, \
-  attemptLoadSettings, popupFilePicker, disableAppDuringFunc
-from .frgraphics.parameditors import FRParamEditor, FR_SINGLETON
+from .frgraphics.graphicsutils import (dialogGetSaveFileName, addDirItemsToMenu,
+                                       attemptLoadSettings, popupFilePicker,
+                                       disableAppDuringFunc)
+from .frgraphics.graphicsutils import saveToFile
+from .frgraphics.parameditors import FRParamEditor
+from .generalutils import resolveAuthorName
 from .projectvars.constants import FR_CONSTS
 from .projectvars.constants import LAYOUTS_DIR, REQD_TBL_FIELDS
 from .projectvars.enums import FR_ENUMS, _FREnums
+from .structures import FRCompIOError, NChanImg
+from .tablemodel import FRComponentIO
 from .tablemodel import FRComponentMgr
 from .tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
 
@@ -118,11 +119,11 @@ class FRCdefApp(FRAnnotatorUI):
 
     # SETTINGS
     for editor in FR_SINGLETON.registerableEditors:
-      self.createMenuOptForEditor(self.menuSettings, editor)
+      self.createMenuOptForEditor(self.paramTools, editor)
     profileLoadFunc = self.loadUserProfile
     self.createMenuOptForEditor(self.menuFile, self.userProfile, profileLoadFunc)
     if userProfileArgs is not None:
-      self.loadUserProfile(userProfileArgs)
+      profileLoadFunc(userProfileArgs)
 
     # ANALYTICS
     self.newCompAnalyticsAct.triggered.connect(self.showNewCompAnalytics)
@@ -130,6 +131,7 @@ class FRCdefApp(FRAnnotatorUI):
 
     # Load layout options
     self.saveLayout('Default', allowOverwriteDefault=True)
+    self.userProfile.show()
 
 
 
@@ -174,7 +176,12 @@ class FRCdefApp(FRAnnotatorUI):
     editAct = QtWidgets.QAction ('Edit ' + name, self)
     newMenu.addAction(editAct)
     newMenu.addSeparator()
-    editAct.triggered.connect(editor.show)
+    def showFunc(_editor=editor):
+      editor.show()
+      # "Show" twice forces 1) window to exist and 2) it is currently raised and focused
+      # These guarantees are not met if "show" is only called once
+      editor.show()
+    editAct.triggered.connect(showFunc)
     populateFunc = partial(self.populateParamEditorMenuOpts, editor, newMenu, loadFunc)
     editor.sigParamStateCreated.connect(populateFunc)
     # Initialize default menus
@@ -220,7 +227,9 @@ class FRCdefApp(FRAnnotatorUI):
   def estimateBoundaries(self):
     with BusyCursor():
       self.mainImg.procCollection.run(prevCompMask=None, fgVerts=None, bgVerts=None)
-      components = self.mainImg.procCollection.resultAsCompDf(localEstimate=False)
+      verts = self.mainImg.procCollection.resultAsVerts(localEstimate=False)
+      components = FR_SINGLETON.tableData.makeCompDf(len(verts))
+      components[REQD_TBL_FIELDS.VERTICES] = verts
       self.compMgr.addComps(components)
 
   def clearBoundaries(self):
@@ -306,14 +315,14 @@ class FRCdefApp(FRAnnotatorUI):
     self.compExporter.exportCsv(outFname)
     self.hasUnsavedChanges = False
 
-  def exportLabeledImg(self, outFname: str):
-    self.compExporter.prepareDf(self.compMgr.compDf, self.mainImgFpath,
-                                self.compDisplay.displayedIds)
-    self.compExporter.exportLabeledImg(self.mainImg.image.shape, outFname)
+  def exportLabeledImg(self, outFname: str=None):
+    self.compExporter.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds)
+    return self.compExporter.exportLabeledImg(self.mainImg.image.shape, outFname)
 
   def loadCompList(self, inFname: str, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
     pathFname = Path(inFname)
     fType = pathFname.suffix[1:]
+    fullErrMsg = None
     if fType == 'csv':
       newComps, errMsg = FRComponentIO.buildFromCsv(inFname, self.mainImg.image.shape)
     elif fType == 'cdefpkl':
@@ -325,9 +334,9 @@ class FRCdefApp(FRAnnotatorUI):
     if errMsg is not None:
       # Something went wrong. Inform the user.
       fullErrMsg = f'Failed to import components:\n{errMsg}'
-      QtWidgets.QMessageBox().information(self, 'Error During Import', fullErrMsg)
     else:
       self.compMgr.addComps(newComps, loadType)
+    return fullErrMsg
 
   def showNewCompAnalytics(self):
     self.mainImg.procCollection.curProcessor.processor.plotStages()
@@ -380,13 +389,7 @@ class FRCdefApp(FRAnnotatorUI):
 
   @staticmethod
   def paramEditorLoadActTriggered(objForMenu: FRParamEditor, nameToLoad: str) -> Optional[dict]:
-    dictFilename = join(objForMenu.saveDir, f'{nameToLoad}.{objForMenu.fileType}')
-    loadDict = attemptLoadSettings(dictFilename)
-    if loadDict is None:
-      return None
-    objForMenu.loadState(loadDict)
-    objForMenu.applyBtnClicked()
-    return loadDict
+    return objForMenu.loadSettings(nameToLoad)
 
   @Slot()
   def exportCompListActionTriggered(self):
@@ -422,7 +425,10 @@ class FRCdefApp(FRAnnotatorUI):
     fname = popupFilePicker(self, 'Select Load File', fileFilter)
     if fname is None:
       return
-    self.loadCompList(fname, loadType)
+    errMsg = self.loadCompList(fname, loadType)
+    if errMsg is not None:
+      QtWidgets.QMessageBox.information(self, 'Error During Import', errMsg,
+                                        QtWidgets.QMessageBox.Ok)
 
   def newCompAnalyticsActTriggered(self):
     self.showNewCompAnalytics()

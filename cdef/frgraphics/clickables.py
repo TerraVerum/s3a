@@ -2,7 +2,7 @@ import pyqtgraph as pg
 from pyqtgraph.GraphicsScene.mouseEvents import MouseDragEvent
 from pyqtgraph.Qt import QtCore, QtGui
 
-from ..structures import FRVertices
+from cdef.structures import FRVertices
 
 Signal = QtCore.pyqtSignal
 

@@ -2,18 +2,19 @@ from __future__ import annotations
 
 from abc import ABC
 from functools import wraps
-from typing import Tuple, List, Callable
+from typing import Tuple, List
 
 import numpy as np
 from pyqtgraph.parametertree import Parameter
 
 import cdef
+import cdef.frgraphics.parameditors.genericeditor
 from imageprocessing.processing import ImageIO, ProcessStage, AtomicProcess, Process, \
   ImageProcess, ProcessIO
-from .frgraphics import parameditors
 from .interfaceimpls import crop_to_verts, update_area, basicOpsCombo, return_to_full_size
 from .processingutils import getVertsFromBwComps
-from .structures import FRParam, NChanImg, FRComplexVertices, FRVertices
+from .structures import FRParam, NChanImg, FRComplexVertices
+
 
 def atomicRunWrapper(proc: AtomicProcess, names: List[str], params: List[Parameter]):
   oldRun = proc.run
@@ -33,7 +34,7 @@ def procRunWrapper(proc: Process, groupParam: Parameter):
   return newRun
 
 class FRGeneralProcWrapper(ABC):
-  def __init__(self, processor: ImageProcess, editor: parameditors.FRParamEditor):
+  def __init__(self, processor: ImageProcess, editor: cdef.frgraphics.parameditors.genericeditor.FRParamEditor):
     self.processor = processor
     self.algName = processor.name
     self.algParam = FRParam(self.algName)
@@ -72,7 +73,7 @@ class FRGeneralProcWrapper(ABC):
     raise NotImplementedError
 
 class FRImgProcWrapper(FRGeneralProcWrapper):
-  def __init__(self, processor: ImageProcess, editor: parameditors.FRParamEditor):
+  def __init__(self, processor: ImageProcess, editor: cdef.frgraphics.parameditors.genericeditor.FRParamEditor):
     # Each processor is encapsulated in processes that crop the image to the region of
     # interest specified by the user, and re-expand the area after processing
     cropStage = ImageProcess.fromFunction(crop_to_verts, name='Crop to Vertices')

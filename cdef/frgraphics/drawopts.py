@@ -3,8 +3,8 @@ from typing import Tuple
 from bidict import bidict
 from pyqtgraph.Qt import QtWidgets, QtGui
 
-from ..projectvars import FR_CONSTS
-from ..structures import FRParam, FRParamGroup
+from cdef.projectvars import FR_CONSTS
+from cdef.structures import FRParam, FRParamGroup
 
 
 class FRDrawOpts(QtWidgets.QWidget):

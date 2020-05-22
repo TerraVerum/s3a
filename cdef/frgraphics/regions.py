@@ -7,14 +7,14 @@ import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtGui, QtCore
 
+from cdef import FR_SINGLETON
+from cdef.generalutils import coerceDfTypes, nanConcatList
+from cdef.processingutils import getVertsFromBwComps
+from cdef.projectvars import REQD_TBL_FIELDS, FR_CONSTS
+from cdef.structures import FRParam, FRVertices, FRComplexVertices, OneDArr
 from cdef.structures.typeoverloads import GrayImg
 from .clickables import FRCentroidScatterItem
-from .parameditors import FR_SINGLETON
-from ..frgraphics.rois import SHAPE_ROI_MAPPING, FRExtendedROI
-from ..generalutils import coerceDfTypes, nanConcatList
-from ..processingutils import getVertsFromBwComps
-from ..projectvars import REQD_TBL_FIELDS, FR_CONSTS
-from ..structures import FRParam, FRVertices, FRComplexVertices, OneDArr
+from .rois import SHAPE_ROI_MAPPING, FRExtendedROI
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot

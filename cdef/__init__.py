@@ -3,8 +3,6 @@ from __future__ import annotations
 import inspect
 import sys
 
-import numpy as np
-
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 

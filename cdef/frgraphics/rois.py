@@ -4,9 +4,9 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
-from ..projectvars import FR_CONSTS
-from ..structures import FRParam
-from ..structures import FRVertices
+from cdef.projectvars import FR_CONSTS
+from cdef.structures import FRParam
+from cdef.structures import FRVertices
 
 
 def _clearPoints(roi: pg.ROI):

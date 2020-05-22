@@ -4,13 +4,12 @@ import numpy as np
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui
 
+from cdef.frgraphics import tableview
 from cdef.structures.typeoverloads import OneDArr
-from .frgraphics import tableview
+from . import FR_SINGLETON
 from .frgraphics.imageareas import FRMainImage
-from .frgraphics.parameditors import FR_SINGLETON
 from .frgraphics.regions import FRMultiRegionPlot
 from .projectvars import FR_CONSTS, REQD_TBL_FIELDS
-
 from .structures import FRVertices, FRParam
 from .tablemodel import FRComponentMgr
 

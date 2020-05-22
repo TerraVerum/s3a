@@ -8,7 +8,7 @@ import cv2 as cv
 
 from .typeoverloads import BlackWhiteImg
 from .exceptions import FRIllFormedVerticesError
-from ..projectvars.enums import FR_ENUMS
+from cdef.projectvars.enums import FR_ENUMS
 
 
 class FRVertices(np.ndarray):

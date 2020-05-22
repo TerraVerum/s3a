@@ -12,12 +12,11 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 from skimage import io
 
-from cdef.projectvars import TEMPLATE_COMP_CLASSES
-from cdef.structures import OneDArr
+from cdef.structures import OneDArr, FRParamGroup
 from cdef.structures.typeoverloads import TwoDArr, NChanImg
-from .frgraphics.parameditors import FR_SINGLETON
+from . import FR_SINGLETON
 from .generalutils import coerceDfTypes
-from .projectvars import FR_ENUMS, REQD_TBL_FIELDS, FRCompParams
+from .projectvars import FR_ENUMS, REQD_TBL_FIELDS
 from .projectvars.constants import FR_CONSTS
 from .structures import FRComplexVertices, FRParam, FRCompIOError
 
@@ -182,7 +181,7 @@ def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> pd.Series:
     np.ndarray        : lambda strVal: np.array(literal_eval(strVal)),
     FRComplexVertices : FRComplexVertices.deserialize,
     bool              : lambda strVal: strVal.lower() == 'true',
-    FRParam           : lambda strVal: paramVal.group.fromString(strVal)
+    FRParam           : lambda strVal: FRParamGroup.fromString(paramVal.group, strVal)
   }
   defaultFunc = lambda strVal: paramType(strVal)
   funcToUse = funcMap.get(paramType, defaultFunc)
@@ -308,13 +307,13 @@ class FRComponentIO:
   def exportLabeledImg(self,
                        mainImgShape: Tuple[int],
                        outFile: str = None,
-                       types: List[FRCompParams] = None,
+                       types: List[FRParam] = None,
                        colorPerType: TwoDArr = None,
                        ) -> (NChanImg, str):
     errMsg = None
     # Set up input arguments
     if types is None:
-      types = [param for param in TEMPLATE_COMP_CLASSES]
+      types = [param for param in FR_SINGLETON.tableData.compClasses]
     if colorPerType is None:
       colorPerType = np.arange(1, len(types) + 1, dtype=int)[:,None]
     outShape = mainImgShape[:2]
@@ -342,7 +341,7 @@ class FRComponentIO:
   # -----
 
   @classmethod
-  def buildFromCsv(cls, inFile: str, imShape: Optional[Tuple]) -> (df, str):
+  def buildFromCsv(cls, inFile: str, imShape: Tuple=None) -> (df, str):
     """
     Deserializes data from a csv file to create a Component :class:`DataFrame`.
     The input .csv should be the same format as one exported by
@@ -381,7 +380,7 @@ class FRComponentIO:
     return csvDf, errMsg
 
   @classmethod
-  def buildFromPkl(cls, inFile: str, imShape: Optional[Tuple]) -> (df, str):
+  def buildFromPkl(cls, inFile: str, imShape: Tuple=None) -> (df, str):
     """
     See docstring for :func:`self.buildFromCsv`
     """

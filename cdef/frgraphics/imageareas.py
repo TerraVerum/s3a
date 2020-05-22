@@ -7,19 +7,17 @@ from pyqtgraph import BusyCursor
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from skimage.io import imread
 
+from cdef import FR_SINGLETON
+from cdef.generalutils import getClippedBbox, FRObjUndoBuffer
+from cdef.processingutils import getVertsFromBwComps, segmentComp
+from cdef.projectvars import REQD_TBL_FIELDS, FR_CONSTS, FR_ENUMS
+from cdef.structures import FRParam, FRVertices, FRComplexVertices
+from cdef.structures import NChanImg
 from .clickables import FRRightPanViewBox
 from .drawopts import FRDrawOpts
-from .parameditors import FR_SINGLETON
-from .regions import FRShapeCollection
+from .regions import FRShapeCollection, FRVertexDefinedImg
 # Required to trigger property registration
 from .rois import FRExtendedROI
-from ..frgraphics.regions import FRVertexDefinedImg
-from ..generalutils import getClippedBbox, FRObjUndoBuffer
-from ..processingutils import getVertsFromBwComps
-from ..processingutils import segmentComp
-from ..projectvars import REQD_TBL_FIELDS, FR_CONSTS, FR_ENUMS
-from ..structures import FRParam, FRVertices, FRComplexVertices
-from ..structures import NChanImg
 
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
