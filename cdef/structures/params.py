@@ -2,7 +2,7 @@ from __future__ import annotations
 import re
 import weakref
 from dataclasses import dataclass, fields, field
-from typing import Any, Optional, Collection
+from typing import Any, Optional, Collection, Union
 from typing_extensions import Protocol, runtime_checkable
 from warnings import warn
 
@@ -99,16 +99,19 @@ class FRParamGroup:
     for param in self:
       param.group = weakref.proxy(self)
 
-  def fromString(self, paramName: str):
+  @staticmethod
+  def fromString(group: Union[Collection[FRParam], FRParamGroup], paramName: str):
     """
     Allows user to create a :class:`FRParam` object from its string value
     """
     paramName = paramName.lower()
-    for param in self:
+    for param in group:
       if param.name.lower() == paramName:
         return param
     # If we reach here the value didn't match any FRComponentTypes values. Throw an error
-    defaultParam = self.getDefault()
+    defaultParam = None
+    if hasattr(group, 'getDefault'):
+      defaultParam = group.getDefault()
     baseWarnMsg = f'String representation "{paramName}" was not recognized.\n'
     if defaultParam is None:
       # No default specified, so we have to raise Exception

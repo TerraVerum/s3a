@@ -175,7 +175,9 @@ class FRMainImage(FREditableImg):
 
       with BusyCursor():
         self.procCollection.run(fgVerts=verts, bgVerts=None)
-      newComps = self.procCollection.resultAsCompDf(not self.multCompsOnCreate)
+      newVerts = self.procCollection.resultAsVerts(not self.multCompsOnCreate)
+      newComps = FR_SINGLETON.tableData.makeCompDf(len(newVerts))
+      newComps[REQD_TBL_FIELDS.VERTICES] = newVerts
       if len(newComps) == 0:
         return
       # TODO: Determine more robust solution for separated vertices. For now use largest component

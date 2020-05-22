@@ -89,6 +89,10 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     # -----
     # Top Level
     self.menubar = QtWidgets.QMenuBar(self)
+    toolbar = self.addToolBar('Parameter Editors')
+    toolbar.setObjectName('Parameter Edtor Toolbar')
+    self.paramTools = QtWidgets.QMenuBar()
+    toolbar.addWidget(self.paramTools)
     self.menuFile = QtWidgets.QMenu('&File', self.menubar)
     self.menuSettings = QtWidgets.QMenu('&Settings', self.menubar)
     # self.menuEdit = QtWidgets.QMenu('&Edit', self.menubar)
