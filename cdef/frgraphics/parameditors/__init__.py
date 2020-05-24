@@ -24,7 +24,7 @@ class _FRSingleton:
 
   def __init__(self):
     self.tableData = FRTableData()
-    self.tableData.loadCfg(BASE_DIR.parent/'tablecfg.yml')
+    self.tableData.loadCfg(BASE_DIR/'tablecfg.yml')
     self.filter = self.tableData.filter
 
     self.shortcuts = FRShortcutsEditor()

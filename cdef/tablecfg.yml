@@ -1,0 +1,13 @@
+opt-tbl-fields:
+  Device Text : ''
+  Board Text : ''
+  Logo : ''
+  Notes : ''
+
+classes:
+  - Resistor
+  - Capacitor
+  - Inductor
+  - Transistor
+  - IC
+  - Other
