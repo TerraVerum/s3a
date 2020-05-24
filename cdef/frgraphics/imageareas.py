@@ -215,7 +215,10 @@ class FRMainImage(FREditableImg):
         imgSrc = imgSrc[:,:,None]
       imgSrc = imgSrc[:,:,0:3]
 
-    self.imgItem.setImage(imgSrc)
+    if imgSrc is None:
+      self.imgItem.clear()
+    else:
+      self.imgItem.setImage(imgSrc)
     self.procCollection.image = imgSrc
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_CLEAR_SHAPE_MAIN)
@@ -300,8 +303,9 @@ class FRFocusedImage(FREditableImg):
     # need to go through the trouble of deep copying
     self.compSer = newComp.copy(deep=False)
 
-    # Reset the undo buffer
-    self.regionBuffer = FRRegionVertsUndoBuffer()
+    # Reset the undo buffer size
+    self.regionBuffer.clear()
+    self.regionBuffer.resize(self.regionBuffer.maxBufferLen)
 
     # Propagate all resultant changesre
     self.updateBbox(mainImg.shape, newVerts)

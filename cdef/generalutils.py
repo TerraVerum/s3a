@@ -165,6 +165,14 @@ class FRObjUndoBuffer:
       self._newestId = id(self._buffer[self._NEWEST_BUF_IDX])
       self._stepsSinceBufSave = 0
 
+  def resize(self, newMaxSize: int):
+    newBuffer = deque(maxlen=newMaxSize)
+    for obj in self._buffer:
+      newBuffer.append(obj)
+    self._buffer = newBuffer
+
+  def clear(self):
+    self._buffer.clear()
 
 def resolveAuthorName(providedAuthName: Optional[str]) -> Optional[str]:
   authPath = Path(ANN_AUTH_DIR)
@@ -182,3 +190,9 @@ def resolveAuthorName(providedAuthName: Optional[str]) -> Optional[str]:
     if not lines:
       return None
   return lines[0]
+
+def augmentException(ex: Exception, prependedMsg: str):
+  if len(ex.args) >= 1:
+    ex.args = (prependedMsg + ex.args[0],) + ex.args[1:]
+  else:
+    ex.args = (prependedMsg,)
