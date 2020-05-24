@@ -30,11 +30,13 @@ class FREditorListModel(QtCore.QAbstractListModel):
       for settingName in self.getSettingsFiles(editor.saveDir, editor.fileType):
         self.settingsList.append(settingName)
         self.editorList.append(editor)
-      # editor.sigParamStateCreated.connect(lambda name, e=editor:
-      #                                     self.updateEditorOpts(e))
+      editor.sigParamStateCreated.connect(lambda name, e=editor:
+                                          self.addOptForEditor(e, name))
     self.layoutChanged.emit()
 
   def addOptForEditor(self, editor: FRParamEditor, name: str):
+    if self.displayFormat.format(editor=editor, setting=name) in self.displayedData:
+      return
     self.layoutAboutToBeChanged.emit()
     self.settingsList.append(name)
     self.editorList.append(editor)

@@ -132,10 +132,6 @@ class FRCdefApp(FRAnnotatorUI):
 
     # Load layout options
     self.saveLayout('Default', allowOverwriteDefault=True)
-    FR_SINGLETON.quickLoader.show()
-    self.resetMainImg()
-
-
 
   # -----------------------------
   # FRCdefApp CLASS FUNCTIONS
