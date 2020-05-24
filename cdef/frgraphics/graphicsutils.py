@@ -4,9 +4,13 @@ from functools import wraps
 from glob import glob
 from os.path import basename
 from pathlib import Path
-from typing import Optional, Union
+from traceback import format_exception_only
+from typing import Optional, Union, TextIO
 
 from ruamel.yaml import YAML
+
+from cdef.structures import FRAppIOError
+
 yaml = YAML()
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
@@ -59,19 +63,14 @@ def dialogGetSaveFileName(parent, winTitle)\
       return saveName
   return returnVal
 
-def saveToFile(saveObj, saveDir, saveName, fileType, allowOverwriteDefault=False) -> str:
-  """Attempts to svae to file, and returns the err message if there was a problem"""
-  errMsg = None
+def saveToFile(saveObj, saveDir, saveName, fileType, allowOverwriteDefault=False):
   if not allowOverwriteDefault and saveName.lower() == 'default':
     errMsg = 'Cannot overwrite default setting.\n\'Default\' is automatically' \
              ' generated, so it should not be modified.'
+    raise FRAppIOError(errMsg)
   else:
-    try:
-      with open(f'{saveDir}{saveName}.{fileType}', 'w') as saveFile:
-        yaml.dump(saveObj, saveFile)
-    except FileNotFoundError as e:
-      errMsg = 'Invalid save name. Please rename the parameter state.'
-  return errMsg
+    with open(f'{saveDir}{saveName}.{fileType}', 'w') as saveFile:
+      yaml.dump(saveObj, saveFile)
 
 def dialogGetAuthorName(parent: QtWidgets.QMainWindow) -> str:
   """
@@ -116,22 +115,10 @@ def dialogGetAuthorName(parent: QtWidgets.QMainWindow) -> str:
     sys.exit(0)
   return name
 
-def attemptLoadSettings(fpath, openMode='rb', showErrorOnFail=True):
-  """
-  I/O helper function that, when given a file path, either returns the pickle object
-  associated with that file or displays an error message and returns nothing.
-  """
-  loadObj = None
-  try:
-    curFile = open(fpath, openMode)
-    loadObj = yaml.load(curFile)
-    curFile.close()
-  except IOError as err:
-    if showErrorOnFail:
-      QtWidgets.QErrorMessage().showMessage(f'Settings could not be loaded.\n'
-                                      f'Error: {err}')
-  finally:
-    return loadObj
+def attemptLoadSettings(fpath, openMode='rb') -> dict:
+  with open(fpath, openMode) as ifile:
+    loadObj = yaml.load(ifile)
+  return loadObj
 
 def addDirItemsToMenu(parentMenu, dirRegex, triggerFunc, removeExistingChildren=True):
   """Helper function for populating menu from directory contents"""

@@ -1,12 +1,21 @@
+from pathlib import Path
+import stat
+
 import numpy as np
 
 from cdef import FRCdefApp, FR_SINGLETON
+from cdef.generalutils import augmentException
 from cdef.projectvars import FR_ENUMS
 from cdef.projectvars import REQD_TBL_FIELDS
 from appsetup import (CompDfTester, makeCompDf, NUM_COMPS, SAMPLE_IMG,
                        TESTS_DIR, SAMPLE_IMG_DIR)
 
 from unittest import TestCase
+
+from cdef.tablemodel import FRComponentIO
+
+EXPORT_DIR = TESTS_DIR/'files'
+
 
 class TableModelTestCases(TestCase):
   def setUp(self):
@@ -74,20 +83,24 @@ class CompMgrTester(TableModelTestCases):
       np.testing.assert_equal(changeList[name], arrCmp)
 
 class CompIOTester(TableModelTestCases):
+  def setUp(self):
+    super().setUp()
+    # Clear exports from previous runs
+    for file in EXPORT_DIR.glob('*.csv'):
+      file.chmod(stat.S_IWRITE)
+      file.unlink()
+
   def test_normal_export(self):
     io = self.app.compExporter
     io.exportOnlyVis = False
-    curPath = TESTS_DIR/'files'/'normalExport - All IDs.csv'
+    curPath = EXPORT_DIR/'normalExport - All IDs.csv'
     io.prepareDf(self.sampleComps)
-    outDf, errMsg = io.exportCsv(str(curPath))
-    self.assertTrue(curPath.exists(), 'Normal export with all IDs not successful.\n'
-                                      'Error message from save:\n'
-                                      f'{errMsg}')
+    self.doAndAssertExport(curPath, io, 'Normal export with all IDs not successful.')
 
   def test_filter_export(self):
     io = self.app.compExporter
 
-    curPath = TESTS_DIR/'files'/'normalExport - Filtered IDs.csv'
+    curPath = EXPORT_DIR/'normalExport - Filtered IDs export all.csv'
     filterIds = np.array([0,3,2])
     io.exportOnlyVis = False
     io.prepareDf(self.sampleComps, filterIds)
@@ -96,18 +109,21 @@ class CompIOTester(TableModelTestCases):
                                   ' when not exporting only visible, but'
                                   ' ID lists don\'t match.')
     # With export only visible false, should still export whole frame
-    outDf, errMsg = io.exportCsv(str(curPath))
-    self.assertTrue(curPath.exists(), 'Normal export with filter ids passed not successful.\n'
-                                      'Error message from save:\n'
-                                      f'{errMsg}')
+    self.doAndAssertExport(curPath, io, 'Normal export with filter ids passed not successful.')
 
+    curPath = EXPORT_DIR/'normalExport - Filtered IDs export filtered.csv'
     io.exportOnlyVis = True
     io.prepareDf(self.sampleComps, filterIds)
     np.testing.assert_array_equal(io.compDf.index, filterIds,
-                                  'Export DF should use only filtered IDswhen exporting only '
-                                  ' visible, but ID lists don\'t match.')
+                                  'Export DF should use only filtered IDs when exporting only '
+                                  'visible, but ID lists don\'t match.')
     # With export only visible false, should still export whole frame
-    outDf, errMsg = io.exportCsv(str(curPath))
-    self.assertTrue(curPath.exists(), 'Filtered IDs export not successful.\n'
-                                      'Error message from save:\n'
-                                      f'{errMsg}')
+    self.doAndAssertExport(curPath, io, 'Export with filtered ids not successful.')
+
+  def doAndAssertExport(self, fpath: Path, io: FRComponentIO, failMsg: str):
+    try:
+      io.exportCsv(str(fpath))
+    except Exception as ex:
+      augmentException(ex, f'{failMsg}\n')
+      raise
+    self.assertTrue(fpath.exists(), 'Csv file doesn\'t exist despite export')

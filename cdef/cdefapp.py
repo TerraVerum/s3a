@@ -18,14 +18,14 @@ from . import FR_SINGLETON
 from .frgraphics.annotator_ui import FRAnnotatorUI
 from .frgraphics.graphicsutils import (dialogGetSaveFileName, addDirItemsToMenu,
                                        attemptLoadSettings, popupFilePicker,
-                                       disableAppDuringFunc)
+                                       disableAppDuringFunc, makeExceptionsShowDialogs)
 from .frgraphics.graphicsutils import saveToFile
 from .frgraphics.parameditors import FRParamEditor
 from .generalutils import resolveAuthorName
 from .projectvars.constants import FR_CONSTS
 from .projectvars.constants import LAYOUTS_DIR, REQD_TBL_FIELDS
 from .projectvars.enums import FR_ENUMS, _FREnums
-from .structures import FRCompIOError, NChanImg
+from .structures import FRAppIOError, NChanImg
 from .tablemodel import FRComponentIO
 from .tablemodel import FRComponentMgr
 from .tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
@@ -50,8 +50,10 @@ class FRCdefApp(FRAnnotatorUI):
         FR_CONSTS.PROP_EST_BOUNDS_ON_START)
     cls.useDarkTheme = FR_SINGLETON.scheme.registerProp(cls, FR_CONSTS.SCHEME_USE_DARK_THEME)
 
-  def __init__(self, **userProfileArgs):
+  def __init__(self, **quickLoaderArgs):
     super().__init__()
+    makeExceptionsShowDialogs(self)
+
     self.addEditorDocks()
     # ---------------
     # DATA ATTRIBUTES
@@ -264,20 +266,15 @@ class FRCdefApp(FRAnnotatorUI):
       if self.estBoundsOnStart:
         self.estimateBoundaries()
 
-  def loadLayout(self, layoutName: str, showError=True):
+  def loadLayout(self, layoutName: str):
     layoutFilename = join(LAYOUTS_DIR, f'{layoutName}.dockstate')
-    dockStates = attemptLoadSettings(layoutFilename, showErrorOnFail=showError)
-    if dockStates is not None:
-      self.restoreState(dockStates)
+    self.restoreState(attemptLoadSettings(layoutFilename))
 
   def saveLayout(self, layoutName: str=None, allowOverwriteDefault=False):
     dockStates = self.saveState().data()
-    errMsg = saveToFile(dockStates, LAYOUTS_DIR, layoutName, 'dockstate',
-                        allowOverwriteDefault=allowOverwriteDefault)
-    success = errMsg is None
-    if success:
-      self.sigLayoutSaved.emit()
-    return errMsg
+    saveToFile(dockStates, LAYOUTS_DIR, layoutName, 'dockstate',
+               allowOverwriteDefault=allowOverwriteDefault)
+    self.sigLayoutSaved.emit()
 
   def importQuickLoaderProfile(self, profileSrc: Union[dict, str]):
     # Make sure defaults exist
@@ -322,22 +319,18 @@ class FRCdefApp(FRAnnotatorUI):
 
   def loadCompList(self, inFname: str, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
     pathFname = Path(inFname)
+    if self.mainImg.image is None:
+      raise FRAppIOError('Cannot load components when no main image is set.')
     fType = pathFname.suffix[1:]
-    fullErrMsg = None
     if fType == 'csv':
-      newComps, errMsg = FRComponentIO.buildFromCsv(inFname, self.mainImg.image.shape)
+      newComps = FRComponentIO.buildFromCsv(inFname, self.mainImg.image.shape)
     elif fType == 'cdefpkl':
       # Operation may take a long time, but we don't want to start the wait cursor until
       # after dialog selection
-      newComps, errMsg = FRComponentIO.buildFromPkl(inFname, self.mainImg.image.shape)
+      newComps = FRComponentIO.buildFromPkl(inFname, self.mainImg.image.shape)
     else:
-      raise FRCompIOError(f'Extension {fType} is not recognized. Must be one of: csv, cdefpkl')
-    if errMsg is not None:
-      # Something went wrong. Inform the user.
-      fullErrMsg = f'Failed to import components:\n{errMsg}'
-    else:
-      self.compMgr.addComps(newComps, loadType)
-    return fullErrMsg
+      raise FRAppIOError(f'Extension {fType} is not recognized. Must be one of: csv, cdefpkl')
+    self.compMgr.addComps(newComps, loadType)
 
   def showNewCompAnalytics(self):
     self.mainImg.procCollection.curProcessor.processor.plotStages()
@@ -384,9 +377,7 @@ class FRCdefApp(FRAnnotatorUI):
     outName = dialogGetSaveFileName(self, 'Layout Name')
     if outName is None or outName == '':
       return
-    errMsg = self.saveLayout(outName)
-    if errMsg is not None:
-      QtWidgets.QMessageBox().information(self, 'Error During Import', errMsg)
+    self.saveLayout(outName)
 
   @staticmethod
   def paramEditorLoadActTriggered(objForMenu: FRParamEditor, nameToLoad: str) -> Optional[dict]:
@@ -426,10 +417,7 @@ class FRCdefApp(FRAnnotatorUI):
     fname = popupFilePicker(self, 'Select Load File', fileFilter)
     if fname is None:
       return
-    errMsg = self.loadCompList(fname, loadType)
-    if errMsg is not None:
-      QtWidgets.QMessageBox.information(self, 'Error During Import', errMsg,
-                                        QtWidgets.QMessageBox.Ok)
+    self.loadCompList(fname, loadType)
 
   def newCompAnalyticsActTriggered(self):
     self.showNewCompAnalytics()

@@ -201,16 +201,12 @@ class FRParamEditor(QtWidgets.QDockWidget):
   def saveAsBtnClicked(self):
     paramState = self.params.saveState(filter='user')
     saveName = dialogGetSaveFileName(self, self._saveDlgName)
-    errMsg = self.saveAs(saveName, paramState)
-    if isinstance(errMsg, str):
-      QtWidgets.QMessageBox().information(self, 'Error During Import', errMsg)
-
+    self.saveAs(saveName, paramState)
 
   def saveAs(self, saveName: str=None, paramState: dict=None,
              allowOverwriteDefault=False):
     """
     * Returns dict on successful parameter save and emits sigParamStateCreated.
-    * Returns string representing error if the file name was invalid.
     * Returns None if no save name was given
     """
     if saveName is None:
@@ -218,15 +214,12 @@ class FRParamEditor(QtWidgets.QDockWidget):
     if paramState is None:
       paramState = self.params.saveState(filter='user')
     Path(self.saveDir).mkdir(parents=True, exist_ok=True)
-    errMsg = saveToFile(paramState, self.saveDir, saveName, self.fileType,
+    saveToFile(paramState, self.saveDir, saveName, self.fileType,
                         allowOverwriteDefault=allowOverwriteDefault)
-    if errMsg is None:
-      self.applyBtnClicked()
-      outDict: dict = self.params.getValues()
-      self.sigParamStateCreated.emit(saveName)
-      return outDict
-    else:
-      return errMsg
+    self.applyBtnClicked()
+    outDict: dict = self.params.getValues()
+    self.sigParamStateCreated.emit(saveName)
+    return outDict
 
   def loadState(self, newStateDict: dict):
     self.params.restoreState(newStateDict, addChildren=False)

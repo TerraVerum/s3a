@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import sys
 from abc import ABC
 from functools import wraps
 from typing import Tuple, List
+from warnings import warn
 
 import numpy as np
 from pyqtgraph.parametertree import Parameter
@@ -97,7 +99,7 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     try:
       result = self.processor.run(newIo, force=True)
     except Exception as ex:
-      print(f'Exception during processor run:\n{ex}')
+      warn(f'Exception during processor run:\n{ex}')
       result = ImageIO(image=kwargs['prevCompMask'])
 
     outImg = result['image'].astype(bool)

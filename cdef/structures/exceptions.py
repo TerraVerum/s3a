@@ -1,9 +1,10 @@
 # --------------
 # Errors used within the application
 # --------------
-class FRCompIOError(Exception): pass
-class FRInvalidDrawModeError(Exception): pass
-class FRIllRegisteredPropError(Exception): pass
-class FRParamParseError(Exception): pass
-class FRInvalidROIEvType(Exception): pass
-class FRIllFormedVerticesError(Exception): pass
+class FRCdefException(Exception): pass
+class FRAppIOError(IOError, FRCdefException): pass
+class FRInvalidDrawModeError(FRCdefException): pass
+class FRIllRegisteredPropError(FRCdefException): pass
+class FRParamParseError(FRCdefException): pass
+class FRInvalidROIEvType(FRCdefException): pass
+class FRIllFormedVerticesError(FRCdefException): pass

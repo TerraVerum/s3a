@@ -15,10 +15,10 @@ from skimage import io
 from cdef.structures import OneDArr, FRParamGroup
 from cdef.structures.typeoverloads import TwoDArr, NChanImg
 from . import FR_SINGLETON
-from .generalutils import coerceDfTypes
+from .generalutils import coerceDfTypes, augmentException
 from .projectvars import FR_ENUMS, REQD_TBL_FIELDS
 from .projectvars.constants import FR_CONSTS
-from .structures import FRComplexVertices, FRParam, FRCompIOError
+from .structures import FRComplexVertices, FRParam, FRAppIOError
 
 Slot = QtCore.pyqtSlot
 Signal = QtCore.pyqtSignal
@@ -263,8 +263,6 @@ class FRComponentIO:
     pd.set_option('display.max_rows', sys.maxsize)
     oldNpOpts = np.get_printoptions()
     np.set_printoptions(threshold=sys.maxsize)
-    errMsg = None
-    exportDf: Optional[df] = None
     col = None
     try:
       # TODO: Currently the additional options are causing errors. Find out why and fix
@@ -280,29 +278,26 @@ class FRComponentIO:
         exportDf.to_csv(outFile, index=False)
         outPath.chmod(S_IRGRP)
     except Exception as ex:
-      errMsg = f'Error on parsing column {col.name}:\n{ex}'
+      errMsg = f'Error on parsing column "{col.name}"\n'
+      augmentException(ex, errMsg)
+      raise
     finally:
       pd.reset_option('display.max_rows')
       # False positive checker warning for some reason
       # noinspection PyTypeChecker
       np.set_printoptions(**oldNpOpts)
-    return exportDf, errMsg
+    return exportDf
 
   def exportPkl(self, outFile=None) -> (Any, str):
     """
     See the function signature for :func:`exportCsv <FRComponentIO.exportCsv>`
     """
-    errMsg = None
     # Since the write-out is a single operation there isn't an intermediate form to return
-    retObj = None
-    try:
-      if outFile is not None:
-        pklDf = pickle.dumps(self.compDf)
-
-        self.compDf.to_pickle(outFile)
-    except Exception as ex:
-      errMsg = str(ex)
-    return retObj, errMsg
+    pklDf = None
+    if outFile is not None:
+      pklDf = pickle.dumps(self.compDf)
+      self.compDf.to_pickle(outFile)
+    return pklDf
 
   def exportLabeledImg(self,
                        mainImgShape: Tuple[int],
@@ -310,7 +305,6 @@ class FRComponentIO:
                        types: List[FRParam] = None,
                        colorPerType: TwoDArr = None,
                        ) -> (NChanImg, str):
-    errMsg = None
     # Set up input arguments
     if types is None:
       types = [param for param in FR_SINGLETON.tableData.compClasses]
@@ -329,19 +323,16 @@ class FRComponentIO:
       cv.fillPoly(out, cvFillArg, cvClrArg)
 
     if outFile is not None:
-      try:
-        io.imsave(outFile, out, check_contrast=False)
-      except Exception as ex:
-        errMsg = str(ex)
+      io.imsave(outFile, out, check_contrast=False)
 
-    return out, errMsg
+    return out
 
   # -----
   # Import options
   # -----
 
   @classmethod
-  def buildFromCsv(cls, inFile: str, imShape: Tuple=None) -> (df, str):
+  def buildFromCsv(cls, inFile: str, imShape: Tuple=None) -> df:
     """
     Deserializes data from a csv file to create a Component :class:`DataFrame`.
     The input .csv should be the same format as one exported by
@@ -351,11 +342,8 @@ class FRComponentIO:
            boundaries. If any components do not, an error is thrown since this is
            indicative of components that actually came from a different reference image.
     :param inFile: Name of file to import
-    :return: Tuple: DF if successful extraction + Exception message that occurs if the operation did not succeed.
-      Otherwise, this value will be `None`.
+    :return: Tuple: DF that will be exported if successful extraction
     """
-    csvDf = None
-    errMsg = None
     col = None
     try:
       csvDf = pd.read_csv(inFile, keep_default_na=False)
@@ -374,24 +362,24 @@ class FRComponentIO:
 
       cls.checkVertBounds(csvDf[REQD_TBL_FIELDS.VERTICES], imShape)
     except Exception as ex:
-      errMsg = f'Error importing column {col}:\n{ex}'
+      # Rethrow exception with insight about column number
+      # Procedure copied from https://stackoverflow.com/a/6062677/9463643
+      errMsg = f'Error importing column "{col}":\n'
+      augmentException(ex, errMsg)
+      raise
     # TODO: Apply this function to individual rows instead of the whole dataframe. This will allow malformed
     #  rows to gracefully fall off the dataframe with some sort of warning message
-    return csvDf, errMsg
+    return csvDf
 
   @classmethod
-  def buildFromPkl(cls, inFile: str, imShape: Tuple=None) -> (df, str):
+  def buildFromPkl(cls, inFile: str, imShape: Tuple=None) -> df:
     """
     See docstring for :func:`self.buildFromCsv`
     """
-    errMsg = None
     pklDf = None
-    try:
-      pklDf = pd.read_pickle(inFile)
-      cls.checkVertBounds(pklDf[REQD_TBL_FIELDS.VERTICES], imShape)
-    except Exception as ex:
-      errMsg = str(ex)
-    return pklDf, errMsg
+    pklDf = pd.read_pickle(inFile)
+    cls.checkVertBounds(pklDf[REQD_TBL_FIELDS.VERTICES], imShape)
+    return pklDf
 
   @staticmethod
   def checkVertBounds(vertSer: pd.Series, imShape: tuple):
@@ -414,6 +402,6 @@ class FRComponentIO:
     vertMaxs = np.vstack(vertMaxs)
     offendingIds = np.nonzero(np.any(vertMaxs >= imShape, axis=1))[0]
     if len(offendingIds) > 0:
-      raise FRCompIOError(f'Vertices on some components extend beyond image dimensions. '
+      raise FRAppIOError(f'Vertices on some components extend beyond image dimensions. '
                           f'Perhaps this export came from a different image?\n'
                           f'Offending IDs: {offendingIds}')

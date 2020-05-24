@@ -15,6 +15,8 @@ if appInst is None:
   appInst = QtWidgets.QApplication(sys.argv)
 # Now that the app was created with sys args, populate pg instance
 pg.mkQApp()
+# Allow selectable text in message boxes
+appInst.setStyleSheet("QMessageBox { messagebox-text-interaction-flags: 5; }")
 
 # Import here to resolve resolution order
 import cdef.projectvars
