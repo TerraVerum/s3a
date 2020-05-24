@@ -168,3 +168,68 @@ def create_addMenuAct(mainWin: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, t
     return menu
   else:
     return act
+
+
+class FRPopupLineEditor(QtWidgets.QLineEdit):
+  def __init__(self, parent: QtWidgets.QWidget=None, model: QtCore.QAbstractListModel=None):
+    super().__init__(parent)
+
+    if model is not None:
+      self.setModel(model)
+
+  def setModel(self, model: QtCore.QAbstractListModel):
+    completer = QtWidgets.QCompleter(model, self)
+    completer.setCaseSensitivity(QtCore.Qt.CaseInsensitive)
+    completer.setCompletionRole(QtCore.Qt.DisplayRole)
+    completer.setFilterMode(QtCore.Qt.MatchContains)
+    completer.activated.connect(lambda: QtCore.QTimer.singleShot(0, self.clear))
+    self.textChanged.connect(self.resetCompleterPrefix)
+
+    self.setCompleter(completer)
+
+  def focusOutEvent(self, ev: QtGui.QFocusEvent):
+    reason = ev.reason()
+    if reason == QtCore.Qt.TabFocusReason or reason == QtCore.Qt.BacktabFocusReason:
+      # Simulate tabbing through completer options instead of losing focus
+      self.setFocus()
+      completer = self.completer()
+      if completer is None:
+        return
+      popup = completer.popup()
+      if popup.isVisible() and popup.currentIndex().isValid():
+        incAmt = 1 if reason == QtCore.Qt.TabFocusReason else -1
+        nextIdx = (completer.currentRow()+incAmt)%completer.completionCount()
+        completer.setCurrentRow(nextIdx)
+      else:
+        completer.complete()
+      popup.show()
+      popup.setCurrentIndex(completer.currentIndex())
+      popup.setFocus()
+      return
+    else:
+      super().focusOutEvent(ev)
+
+  def clear(self):
+    super().clear()
+
+  def resetCompleterPrefix(self):
+    if self.text() == '':
+      self.completer().setCompletionPrefix('')
+
+def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
+  """
+  When a qt application encounters an error, it will generally crash the entire
+  application even if this is undesirable behavior. This will make qt applications
+  show a dialog rather than crashing.
+  Use with caution! Maybe the application *should* crash on an error, but this will
+  prevent that from happening.
+  """
+  # Procedure taken from https://stackoverflow.com/a/40674244/9463643
+  def new_except_hook(etype, evalue, tb):
+    QtWidgets.QMessageBox.critical(win, 'Error',
+                                   ''.join(format_exception_only(etype, evalue)),
+                                   QtWidgets.QMessageBox.Ok)
+  def patch_excepthook():
+    sys.excepthook = new_except_hook
+
+  QtCore.QTimer.singleShot(0, patch_excepthook)

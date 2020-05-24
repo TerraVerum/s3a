@@ -2,7 +2,7 @@ from pyqtgraph.Qt import  QtCore, QtWidgets
 
 Slot = QtCore.pyqtSlot
 
-from .graphicsutils import create_addMenuAct
+from .graphicsutils import create_addMenuAct, FRPopupLineEditor
 from .imageareas import FRMainImage, FRFocusedImage
 from .tableview import FRCompTableView
 
@@ -89,16 +89,16 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     # -----
     # Top Level
     self.menubar = QtWidgets.QMenuBar(self)
+    self.menuFile = QtWidgets.QMenu('&File', self.menubar)
+    # self.menuEdit = QtWidgets.QMenu('&Edit', self.menubar)
+    self.menuAnalytics = QtWidgets.QMenu('&Analytics', self.menubar)
+
     toolbar = self.addToolBar('Parameter Editors')
     toolbar.setObjectName('Parameter Edtor Toolbar')
     self.paramTools = QtWidgets.QMenuBar()
     toolbar.addWidget(self.paramTools)
-    self.menuFile = QtWidgets.QMenu('&File', self.menubar)
-    self.menuSettings = QtWidgets.QMenu('&Settings', self.menubar)
-    # self.menuEdit = QtWidgets.QMenu('&Edit', self.menubar)
-    self.menuAnalytics = QtWidgets.QMenu('&Analytics', self.menubar)
+
     self.menubar.addMenu(self.menuFile)
-    self.menubar.addMenu(self.menuSettings)
     self.menubar.addMenu(self.menuAnalytics)
 
     # File / Image

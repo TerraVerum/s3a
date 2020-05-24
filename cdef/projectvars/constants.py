@@ -20,7 +20,7 @@ DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 # EDITORS
 # -----
 LAYOUTS_DIR = os.path.join(MENU_OPTS_DIR, 'layouts', '')
-USER_PROFILES_DIR = os.path.join(MENU_OPTS_DIR, 'userprofiles', '')
+USER_PROFILES_DIR = os.path.join(MENU_OPTS_DIR, 'quickLoaders', '')
 SCHEMES_DIR = os.path.join(MENU_OPTS_DIR, 'schemes', '')
 FILTERS_DIR = os.path.join(MENU_OPTS_DIR, 'filters', '')
 GEN_PROPS_DIR = os.path.join(MENU_OPTS_DIR, 'regioncontrols', '')

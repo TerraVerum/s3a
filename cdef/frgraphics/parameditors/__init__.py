@@ -3,7 +3,7 @@ from typing import List
 from .genericeditor import FRParamEditor
 from .processor import FRAlgPropsMgr
 from .shortcut import FRShortcutsEditor
-from .userprofile import FRUserProfileEditor
+from .quickloader import FRQuickLoaderEditor
 from .table import FRTableFilterEditor, FRTableData
 from . import pgregistered
 from cdef.projectvars import GEN_PROPS_DIR, SCHEMES_DIR, BASE_DIR
@@ -35,12 +35,12 @@ class _FRSingleton:
       [self.scheme, self.shortcuts, self.generalProps, self.filter]
 
     self.algParamMgr = FRAlgPropsMgr()
-    self.userProfile = FRUserProfileEditor(editorList=self.registerableEditors)
+    self.quickLoader = FRQuickLoaderEditor(editorList=self.registerableEditors)
     self.algParamMgr.sigProcessorCreated.connect(lambda editor:
-                                                 self.userProfile.listModel.addEditors([editor]))
+                                                 self.quickLoader.listModel.addEditors([editor]))
   @property
   def allEditors(self):
-    return self.registerableEditors + [self.userProfile]
+    return self.registerableEditors + [self.quickLoader]
 
   @property
   def registerableEditors(self):

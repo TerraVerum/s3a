@@ -57,11 +57,10 @@ class FRCdefApp(FRAnnotatorUI):
     # DATA ATTRIBUTES
     # ---------------
     self.hasUnsavedChanges = False
-    self.userProfile = FR_SINGLETON.userProfile
 
     self.statBar = QtWidgets.QStatusBar(self)
     self.setStatusBar(self.statBar)
-    authorName = resolveAuthorName(userProfileArgs.get('Author', None))
+    authorName = resolveAuthorName(quickLoaderArgs.get('Author', None))
     if authorName is None:
       sys.exit('No author name provided and no default author exists. Exiting.\n'
                'To start without error, provide an author name explicitly, e.g.\n'
@@ -120,10 +119,10 @@ class FRCdefApp(FRAnnotatorUI):
     # SETTINGS
     for editor in FR_SINGLETON.registerableEditors:
       self.createMenuOptForEditor(self.paramTools, editor)
-    profileLoadFunc = self.loadUserProfile
-    self.createMenuOptForEditor(self.menuFile, self.userProfile, profileLoadFunc)
-    if userProfileArgs is not None:
-      profileLoadFunc(userProfileArgs)
+    profileLoadFunc = self.importQuickLoaderProfile
+    self.createMenuOptForEditor(self.menuFile, FR_SINGLETON.quickLoader, profileLoadFunc)
+    if quickLoaderArgs is not None:
+      profileLoadFunc(quickLoaderArgs)
 
     # ANALYTICS
     self.newCompAnalyticsAct.triggered.connect(self.showNewCompAnalytics)
@@ -131,7 +130,8 @@ class FRCdefApp(FRAnnotatorUI):
 
     # Load layout options
     self.saveLayout('Default', allowOverwriteDefault=True)
-    self.userProfile.show()
+    FR_SINGLETON.quickLoader.show()
+    self.resetMainImg()
 
 
 
@@ -279,7 +279,7 @@ class FRCdefApp(FRAnnotatorUI):
       self.sigLayoutSaved.emit()
     return errMsg
 
-  def loadUserProfile(self, profileSrc: Union[dict, str]):
+  def importQuickLoaderProfile(self, profileSrc: Union[dict, str]):
     # Make sure defaults exist
     profileDict = defaultdict(type(None))
     if isinstance(profileSrc, str):
@@ -288,7 +288,8 @@ class FRCdefApp(FRAnnotatorUI):
     else:
       profName = profileSrc.get('Profile', None)
     if profName is not None:
-      profileParams = self.paramEditorLoadActTriggered(self.userProfile, profName)['children']
+      profileParams = self.paramEditorLoadActTriggered(
+        FR_SINGLETON.quickLoader, profName)['children']
       # Attrs from a param tree are hidden behind 'value', so bring each to the front
       profileDict.update({k: v['value'] for k, v in profileParams.items()})
     profileDict.update(profileSrc)
