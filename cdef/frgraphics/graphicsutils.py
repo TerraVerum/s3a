@@ -115,7 +115,7 @@ def dialogGetAuthorName(parent: QtWidgets.QMainWindow) -> str:
     sys.exit(0)
   return name
 
-def attemptLoadSettings(fpath, openMode='rb') -> dict:
+def attemptLoadSettings(fpath, openMode='r') -> dict:
   with open(fpath, openMode) as ifile:
     loadObj = yaml.load(ifile)
   return loadObj
