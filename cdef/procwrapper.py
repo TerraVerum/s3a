@@ -113,9 +113,10 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
 
   def resultAsVerts(self, localEstimate=True):
     initialList = getVertsFromBwComps(self.output)
-
+    if len(initialList) == 0:
+      return initialList
     if not localEstimate:
       return [FRComplexVertices([lst]) for lst in initialList]
     # else, all vertices belong to the same component
     else:
-      return [FRComplexVertices(initialList)]
+      return [initialList]

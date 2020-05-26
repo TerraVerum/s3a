@@ -89,8 +89,8 @@ class FRComplexVertices(list):
                hierarchy: Union[np.ndarray, FR_ENUMS]=None):
     if hierarchy is None:
       hierarchy = FR_ENUMS.HIER_ALL_FILLED
-    if inputArr is None or len(inputArr) == 0:
-      inputArr = [FRVertices()]
+    if inputArr is None:
+      inputArr = []
     super().__init__(inputArr)
     # No hierarchy required unless list is longer than length 1
     numInpts = len(inputArr)
