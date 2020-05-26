@@ -40,13 +40,12 @@ def popupFilePicker(parent, winTitle: str, fileFilter: str) -> Optional[str]:
     retVal = fname
   return retVal
 
-def dialogGetSaveFileName(parent, winTitle)\
-    -> Optional[str]:
+def dialogGetSaveFileName(parent, winTitle, defaultTxt: str=None)-> Optional[str]:
   failedSave = True
   returnVal: Optional[str] = None
   while failedSave:
-    saveName, ok = QtWidgets.QInputDialog() \
-      .getText(parent, winTitle, winTitle + ':', QtWidgets.QLineEdit.Normal)
+    saveName, ok = QtWidgets.QInputDialog().getText(
+      parent, winTitle, winTitle + ':', QtWidgets.QLineEdit.Normal, defaultTxt)
     # TODO: Make this more robust. At the moment just very basic sanitation
     for disallowedChar in ['/', '\\']:
       saveName = saveName.replace(disallowedChar, '')

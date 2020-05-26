@@ -78,6 +78,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
     self.fileType = fileType
     self._saveDlgName = saveDlgName
     self._stateBeforeEdit = self.params.saveState()
+    self.lastAppliedName = None
 
     # -----------
     # Additional widget buttons
@@ -200,7 +201,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
 
   def saveAsBtnClicked(self):
     paramState = self.params.saveState(filter='user')
-    saveName = dialogGetSaveFileName(self, self._saveDlgName)
+    saveName = dialogGetSaveFileName(self, self._saveDlgName, self.lastAppliedName)
     self.saveAs(saveName, paramState)
 
   def saveAs(self, saveName: str=None, paramState: dict=None,
@@ -218,6 +219,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
                         allowOverwriteDefault=allowOverwriteDefault)
     self.applyBtnClicked()
     outDict: dict = self.params.getValues()
+    self.lastAppliedName = saveName
     self.sigParamStateCreated.emit(saveName)
     return outDict
 
@@ -231,6 +233,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
       return None
     self.loadState(loadDict)
     self.applyBtnClicked()
+    self.lastAppliedName = settingName
     return loadDict
 
   def registerProps(self, clsObj, constParams: List[FRParam]):

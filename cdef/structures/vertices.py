@@ -202,6 +202,16 @@ class FRComplexVertices(list):
            f'Min:\t{concatVerts.min(0)}\n' \
            f'Max:\t{concatVerts.max(0)}'
 
+  def __eq__(self, other: FRComplexVertices):
+    lstLens = lambda lst: np.array([len(el) for el in lst])
+    return (len(self) == len(other)
+      and np.all(lstLens(self) == lstLens(other))
+      and np.all(np.vstack([selfLst == newLst for selfLst, newLst
+                         in zip(self, other)])))
+
+  def __ne__(self, other):
+    return not self == other
+
   def copy(self) -> FRComplexVertices:
     return FRComplexVertices([lst.copy() for lst in self], self.hierarchy)
 

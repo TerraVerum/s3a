@@ -176,6 +176,7 @@ class FRMainImage(FREditableImg):
       with BusyCursor():
         self.procCollection.run(fgVerts=verts, bgVerts=None)
       newVerts = self.procCollection.resultAsVerts(not self.multCompsOnCreate)
+      # Discard entries with no real vertices
       newComps = FR_SINGLETON.tableData.makeCompDf(len(newVerts))
       newComps[REQD_TBL_FIELDS.VERTICES] = newVerts
       if len(newComps) == 0:
@@ -346,11 +347,13 @@ class FRFocusedImage(FREditableImg):
     centeredVerts = newVerts.copy()
     for vertList in centeredVerts:
       vertList -= offset
+    # shouldUpdate = (not self.region.vertsUpToDate
+    #                 or len(self.region.verts) != len(centeredVerts)
+    #                 or np.any(lstLens(self.region.verts) != lstLens(centeredVerts))
+    #                 or np.any(np.vstack([selfLst != newLst for selfLst, newLst
+    #                               in zip(self.region.verts, centeredVerts)])))
     shouldUpdate = (not self.region.vertsUpToDate
-                    or len(self.region.verts) != len(centeredVerts)
-                    or np.any(lstLens(self.region.verts) != lstLens(centeredVerts))
-                    or np.any(np.vstack([selfLst != newLst for selfLst, newLst
-                                  in zip(self.region.verts, centeredVerts)])))
+                    or self.region.verts != centeredVerts)
     if shouldUpdate:
       self.region.updateFromVertices(centeredVerts)
       regionPos = self.region.pos().x(), self.region.pos().y()

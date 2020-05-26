@@ -9,6 +9,7 @@ class _FREnums(Enum):
   COMP_ADD_AS_MERGE = 'Add as Merge'
   COMP_ADD_AS_NEW   = 'Add as New'
   COMP_EXPORT_ALL   = 'Export All Components'
+  COMP_RM_ALL       = "Remove All"
 
   # --------------------------
   # REGION CREATION

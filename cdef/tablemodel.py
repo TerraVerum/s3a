@@ -99,7 +99,7 @@ class FRComponentMgr(FRCompTableModel):
     # TODO: Is this the appropriate response?
     verts = newCompsDf[REQD_TBL_FIELDS.VERTICES]
     dropIds = newCompsDf.index[verts.map(lambda complexVerts: len(complexVerts.stack()) == 0)]
-    newCompsDf.drop(index=dropIds, inplace=True)
+    newCompsDf = newCompsDf.drop(index=dropIds)
     # Inform graphics elements of deletion if this ID is already in our dataframe
     toEmit.update(self.rmComps(dropIds, emitChange=False))
 
@@ -134,13 +134,15 @@ class FRComponentMgr(FRCompTableModel):
 
     self._nextCompId = np.max(self.compDf.index.to_numpy(), initial=int(-1)) + 1
     self.sigCompsChanged.emit(toEmit)
+    self.rmComps(FR_ENUMS.COMP_ADD_AS_MERGE)
     return toEmit
 
-  def rmComps(self, idsToRemove: Union[np.array, str] = 'all', emitChange=True) -> dict:
+  def rmComps(self, idsToRemove: Union[np.ndarray, type(FR_ENUMS)] = FR_ENUMS.COMP_RM_ALL,
+              emitChange=True) -> dict:
     toEmit = self.defaultEmitDict.copy()
     # Generate ID list
     existingCompIds = self.compDf.index
-    if idsToRemove is 'all':
+    if idsToRemove is FR_ENUMS.COMP_RM_ALL:
       idsToRemove = existingCompIds
     elif not hasattr(idsToRemove, '__iter__'):
       # single number passed in

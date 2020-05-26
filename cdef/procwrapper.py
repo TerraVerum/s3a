@@ -15,7 +15,8 @@ from imageprocessing.processing import ImageIO, ProcessStage, AtomicProcess, Pro
   ImageProcess, ProcessIO
 from .interfaceimpls import crop_to_verts, update_area, basicOpsCombo, return_to_full_size
 from .processingutils import getVertsFromBwComps
-from .structures import FRParam, NChanImg, FRComplexVertices
+from .structures import FRParam, NChanImg, FRComplexVertices, FRCdefException, \
+  FRAlgProcessorError
 
 
 def atomicRunWrapper(proc: AtomicProcess, names: List[str], params: List[Parameter]):
@@ -89,6 +90,8 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     self.image: NChanImg = np.zeros((0,0), bool)
 
   def run(self, **kwargs):
+    if self.image is None:
+      raise FRAlgProcessorError('Cannot run processor without an image')
     if kwargs.get('prevCompMask', None) is None:
       noPrevMask = True
       kwargs['prevCompMask'] = np.zeros(self.image.shape[:2], bool)

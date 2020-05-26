@@ -66,6 +66,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     mainImg.sigSelectionBoundsMade.connect(self._reflectSelectionBoundsMade)
     compMgr.sigCompsChanged.connect(self.redrawComps)
     filterEditor.sigParamStateUpdated.connect(self._updateFilter)
+    FR_SINGLETON.scheme.sigParamStateUpdated.connect(lambda: self._updateFilter(self._filter))
     compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
 
     for plt in self.regionPlots.boundPlt, self.regionPlots.centroidPlts:
