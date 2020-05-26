@@ -3,72 +3,104 @@ import stat
 
 import numpy as np
 
-from cdef import FRCdefApp, FR_SINGLETON
+from cdef import FRCdefApp
 from cdef.generalutils import augmentException
 from cdef.projectvars import FR_ENUMS
 from cdef.projectvars import REQD_TBL_FIELDS
 from appsetup import (CompDfTester, makeCompDf, NUM_COMPS, SAMPLE_IMG,
-                       TESTS_DIR, SAMPLE_IMG_DIR)
+                      SAMPLE_IMG_DIR, EXPORT_DIR, clearTmpFiles, RND)
 
 from unittest import TestCase
 
+from cdef.structures import FRComplexVertices
 from cdef.tablemodel import FRComponentIO
 
-EXPORT_DIR = TESTS_DIR/'files'
+# Construct app outside setUp to drastically reduce loading times
+app = FRCdefApp(Image=SAMPLE_IMG_DIR)
+mgr = app.compMgr
 
+dfTester = CompDfTester(NUM_COMPS)
+dfTester.fillRandomVerts(imShape=SAMPLE_IMG.shape)
+dfTester.fillRandomClasses()
 
 class TableModelTestCases(TestCase):
   def setUp(self):
     super().setUp()
-    self.app = FRCdefApp(Image=SAMPLE_IMG_DIR)
-    self.mgr = self.app.compMgr
 
-    dfTester = CompDfTester(NUM_COMPS)
-    dfTester.fillRandomVerts(imShape=SAMPLE_IMG.shape)
-    dfTester.fillRandomClasses()
-
-    self.sampleComps = dfTester.compDf
-    self.emptyArr = np.array([], int)
+    self.sampleComps = dfTester.compDf.copy(deep=True)
+    mgr.rmComps()
 
 class CompMgrTester(TableModelTestCases):
-  def test_add_comps(self):
-    # Standard add
+  def setUp(self):
+    super().setUp()
+    self.oldIds = np.arange(NUM_COMPS, dtype=int)
+
+  def test_normal_add(self):
     oldIds = np.arange(NUM_COMPS, dtype=int)
-    comps = self.sampleComps.copy(deep=True)
-    changeList = self.mgr.addComps(comps)
+    changeList = mgr.addComps(self.sampleComps)
     self.cmpChangeList(changeList, oldIds)
 
-    # Empty add
-    changeList = self.mgr.addComps(makeCompDf(0))
+  def test_empty_add(self):
+    changeList = mgr.addComps(makeCompDf(0))
     self.cmpChangeList(changeList)
 
-    # Add existing should change during merge
-    changeList = self.mgr.addComps(comps, FR_ENUMS.COMP_ADD_AS_MERGE)
-    self.cmpChangeList(changeList, changed=oldIds)
+  def test_rm_by_empty_vert_add(self):
+    numDeletions = NUM_COMPS//3
+    perm = RND.permutation(NUM_COMPS)
+    deleteIdxs = np.sort(perm[:numDeletions])
+    changeIdxs = np.sort(perm[numDeletions:])
+    mgr.addComps(self.sampleComps)
+
+    # List assignment behaves poorly for list-inherited objs (like frcomplexverts) so
+    # use individual assignment
+    for idx in deleteIdxs:
+      self.sampleComps.at[idx, REQD_TBL_FIELDS.VERTICES] = FRComplexVertices()
+    changeList = mgr.addComps(self.sampleComps, FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.cmpChangeList(changeList, deleted=deleteIdxs, changed=changeIdxs)
+
+
+  def test_double_add(self):
+    changeList = mgr.addComps(self.sampleComps, FR_ENUMS.COMP_ADD_AS_NEW)
+    self.cmpChangeList(changeList, added=self.oldIds)
 
     # Should be new IDs during 'add as new'
-    changeList = self.mgr.addComps(comps)
-    self.cmpChangeList(changeList, added=oldIds + NUM_COMPS)
+    changeList = mgr.addComps(self.sampleComps, FR_ENUMS.COMP_ADD_AS_NEW)
+    self.cmpChangeList(changeList, added=self.oldIds + NUM_COMPS)
+
+  def test_change_comps(self):
+    changeList = mgr.addComps(self.sampleComps, FR_ENUMS.COMP_ADD_AS_NEW)
+    self.cmpChangeList(changeList, added=self.oldIds)
+
+    newValids = dfTester.fillRandomValids(self.sampleComps)
+    newClasses = dfTester.fillRandomClasses(self.sampleComps)
+    changeList = mgr.addComps(self.sampleComps, FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.cmpChangeList(changeList, changed=self.oldIds)
+    np.testing.assert_array_equal(mgr.compDf[REQD_TBL_FIELDS.VALIDATED].values,
+                                  newValids, '"Validated" list doesn\'t match during'
+                                             ' test_change_comps')
+    np.testing.assert_array_equal(newClasses,
+                                  mgr.compDf[REQD_TBL_FIELDS.COMP_CLASS].values,
+                                  '"Class" list doesn\'t match during test_change_comps')
+
   def test_rm_comps(self):
     comps = self.sampleComps.copy(deep=True)
     ids = np.arange(NUM_COMPS, dtype=int)
 
     # Standard remove
-    self.mgr.addComps(comps)
-    changeList = self.mgr.rmComps(ids)
+    mgr.addComps(comps)
+    changeList = mgr.rmComps(ids)
     self.cmpChangeList(changeList, deleted=ids)
 
     # Remove when ids don't exist
-    changeList = self.mgr.rmComps(ids)
+    changeList = mgr.rmComps(ids)
     self.cmpChangeList(changeList)
 
     # Remove all
     for _ in range(10):
-      self.mgr.addComps(comps)
-    oldIds = self.mgr.compDf[REQD_TBL_FIELDS.INST_ID].values
-    changeList = self.mgr.rmComps('all')
+      mgr.addComps(comps)
+    oldIds = mgr.compDf[REQD_TBL_FIELDS.INST_ID].values
+    changeList = mgr.rmComps(FR_ENUMS.COMP_RM_ALL)
     self.cmpChangeList(changeList,deleted=oldIds)
-
 
   @staticmethod
   def cmpChangeList(changeList: dict, added: np.ndarray=None, deleted: np.ndarray=None,
@@ -80,27 +112,26 @@ class CompMgrTester(TableModelTestCases):
         arrCmp = emptyArr
       else:
         arrCmp = arrs[name]
-      np.testing.assert_equal(changeList[name], arrCmp)
+      np.testing.assert_equal(changeList[name], arrCmp, f'Mismatch in "{name}"'
+                                                        f' of change list')
 
 class CompIOTester(TableModelTestCases):
   def setUp(self):
     super().setUp()
     # Clear exports from previous runs
-    for file in EXPORT_DIR.glob('*.csv'):
-      file.chmod(stat.S_IWRITE)
-      file.unlink()
+    clearTmpFiles()
 
   def test_normal_export(self):
-    io = self.app.compExporter
+    io = app.compExporter
     io.exportOnlyVis = False
-    curPath = EXPORT_DIR/'normalExport - All IDs.csv'
+    curPath = EXPORT_DIR / 'normalExport - All IDs.csv'
     io.prepareDf(self.sampleComps)
     self.doAndAssertExport(curPath, io, 'Normal export with all IDs not successful.')
 
   def test_filter_export(self):
-    io = self.app.compExporter
+    io = app.compExporter
 
-    curPath = EXPORT_DIR/'normalExport - Filtered IDs export all.csv'
+    curPath = EXPORT_DIR / 'normalExport - Filtered IDs export all.csv'
     filterIds = np.array([0,3,2])
     io.exportOnlyVis = False
     io.prepareDf(self.sampleComps, filterIds)
@@ -111,7 +142,7 @@ class CompIOTester(TableModelTestCases):
     # With export only visible false, should still export whole frame
     self.doAndAssertExport(curPath, io, 'Normal export with filter ids passed not successful.')
 
-    curPath = EXPORT_DIR/'normalExport - Filtered IDs export filtered.csv'
+    curPath = EXPORT_DIR / 'normalExport - Filtered IDs export filtered.csv'
     io.exportOnlyVis = True
     io.prepareDf(self.sampleComps, filterIds)
     np.testing.assert_array_equal(io.compDf.index, filterIds,

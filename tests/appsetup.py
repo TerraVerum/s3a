@@ -1,11 +1,10 @@
-from skimage import io
-
-from cdef.structures import FRComplexVertices
 import random
-from random import randint
+import stat
+from typing import List
 
 import cv2 as cv
 import numpy as np
+from skimage import io
 from pandas import DataFrame as df
 
 from cdef import FR_SINGLETON
@@ -16,12 +15,13 @@ makeCompDf = FR_SINGLETON.tableData.makeCompDf
 
 TESTS_DIR = BASE_DIR.parent/'tests'
 IMG_DIR = BASE_DIR.parent/'images'
+EXPORT_DIR = TESTS_DIR/'files'
+
 NUM_COMPS = 15
 SAMPLE_IMG_DIR = IMG_DIR/'circuitBoard.png'
 SAMPLE_IMG = io.imread(SAMPLE_IMG_DIR)
 
-random.seed(42)
-np.random.seed(42)
+RND = np.random.default_rng(seed=42)
 
 class CompDfTester:
   def __init__(self, numComps):
@@ -29,21 +29,45 @@ class CompDfTester:
     self.compDf.set_index(np.arange(numComps, dtype=int), inplace=True)
     self.numComps = numComps
 
-  def fillRandomVerts(self, imShape=(2000, 2000)):
+  def fillRandomVerts(self, imShape=(2000, 2000), compDf: df=None):
+    if compDf is None:
+      compDf = self.compDf
     mask = np.zeros(imShape[:2], 'uint8')
 
+    retVal = []
     for ii in range(self.numComps):
-      radius = randint(0, max(imShape)//5)
-      o_x = randint(0, imShape[1])
-      o_y = randint(0, imShape[0])
+      radius = RND.integers(0, max(imShape)//5)
+      o_x = RND.integers(0, imShape[1])
+      o_y = RND.integers(0, imShape[0])
       verts = FRComplexVertices.fromBwMask(cv.circle(mask, (o_x, o_y), radius, 1))
-      self.compDf.at[ii, REQD_TBL_FIELDS.VERTICES] = verts
+      compDf.at[ii, REQD_TBL_FIELDS.VERTICES] = verts
+      retVal.append(verts)
       mask.fill(0)
+    return retVal
 
-  def fillRandomClasses(self):
+  def fillRandomClasses(self, compDf: df=None):
+    if compDf is None:
+      compDf = self.compDf
     # Encapsulate in np array for random indexing
     npClasses = np.array(FR_SINGLETON.tableData.compClasses)
-    randomIdxs = np.random.randint(0, len(npClasses), size=self.numComps)
+    randomIdxs = RND.integers(0, len(npClasses), size=self.numComps)
 
     newClasses = npClasses[randomIdxs]
-    self.compDf.loc[:, REQD_TBL_FIELDS.COMP_CLASS] = newClasses
+    compDf.loc[:, REQD_TBL_FIELDS.COMP_CLASS] = newClasses
+    return newClasses
+
+  def fillRandomValids(self, compDf: df=None):
+    if compDf is None:
+      compDf = self.compDf
+    newValids = RND.integers(0, 2, NUM_COMPS, bool)
+    compDf[REQD_TBL_FIELDS.VALIDATED] = newValids
+    return newValids
+
+def clearTmpFiles(exceptFiles: List[str] =None):
+  if exceptFiles is None:
+    exceptFiles: List[str] = []
+  for fileExt in 'csv', 'png':
+    for file in EXPORT_DIR.glob(f'*.{fileExt}'):
+      if str(file) not in exceptFiles:
+        file.chmod(stat.S_IWRITE)
+        file.unlink()
