@@ -14,6 +14,7 @@ Signal = QtCore.pyqtSignal
 class FRParamEditor(QtWidgets.QDockWidget):
   sigParamStateCreated = Signal(str)
   sigParamStateUpdated = Signal(dict)
+  sigParamStateDeleted = Signal(str)
 
   def __init__(self, parent=None, paramList: List[Dict]=None, saveDir='.',
                fileType='param', saveDlgName='Save As', name=None,
@@ -235,6 +236,13 @@ class FRParamEditor(QtWidgets.QDockWidget):
     self.applyBtnClicked()
     self.lastAppliedName = settingName
     return loadDict
+
+  def deleteSettings(self, settingName: str):
+    filename = Path(self.saveDir)/f'{settingName}.{self.fileType}'
+    if not filename.exists():
+      return
+    filename.unlink()
+    self.sigParamStateDeleted.emit(settingName)
 
   def registerProps(self, clsObj, constParams: List[FRParam]):
     outProps = []
