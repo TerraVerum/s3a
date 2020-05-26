@@ -11,7 +11,8 @@ from pyqtgraph.parametertree.parameterTypes import ListParameter
 
 from cdef.procwrapper import FRImgProcWrapper
 from cdef.projectvars import REQD_TBL_FIELDS, MENU_OPTS_DIR
-from cdef.structures import FRComplexVertices, FRVertices, NChanImg, FRParam
+from cdef.structures import FRComplexVertices, FRVertices, NChanImg, FRParam, \
+  FRAlgProcessorError
 from imageprocessing.processing import ImageProcess
 from .genericeditor import FRParamEditor, _frPascalCaseToTitle
 from .table import FRTableData
@@ -33,8 +34,8 @@ class FRAlgPropsMgr(FRParamEditor):
     clsName = type(clsObj).__name__
     editorDir = join(MENU_OPTS_DIR, clsName, '')
     # Strip "FR" from class name before retrieving name
-    settingsName = _frPascalCaseToTitle(clsName[2:]) + ' Processor'
-    newEditor = FRAlgCollectionEditor(editorDir, self.processorCtors, name=settingsName)
+    editorName = _frPascalCaseToTitle(clsName[2:]) + ' Processor'
+    newEditor = FRAlgCollectionEditor(editorDir, self.processorCtors, name=editorName)
     self.spawnedCollections.append(newEditor)
     # Wrap in property so changes propagate to the calling class
     lims = newEditor.algOpts.opts['limits']
@@ -79,7 +80,7 @@ class FRAlgCollectionEditor(FRParamEditor):
       wrapped = self.addImageProcessor(processorCtor())
     self.algOpts.setDefault(wrapped)
     self.changeActiveAlg(proc=wrapped)
-    self.saveAs('Default', allowOverwriteDefault=True)
+    self.saveParamState('Default', allowOverwriteDefault=True)
 
   def run(self, **kwargs):
     # for vertsName in self.VERT_LST_NAMES:
@@ -116,29 +117,29 @@ class FRAlgCollectionEditor(FRParamEditor):
     self.algOpts.setLimits(self.nameToProcMapping.copy())
     return processor
 
-  def saveAs(self, saveName: str=None, paramState: dict=None,
-             allowOverwriteDefault=False):
+  def saveParamState(self, saveName: str=None, paramState: dict=None,
+                     allowOverwriteDefault=False):
     """
     The algorithm editor also needs to store information about the selected algorithm, so lump
     this in with the other parameter information before calling default save.
     """
     paramState = {'Selected Algorithm': self.algOpts.value().algName,
                   'Parameters': self.params.saveState(filter='user')}
-    return super().saveAs(saveName, paramState, allowOverwriteDefault)
+    return super().saveParamState(saveName, paramState, allowOverwriteDefault)
 
-  def loadState(self, newState: Dict[str, Any]):
-    selectedOpt = newState['Selected Algorithm']
+  def loadParamState(self, stateName: str, stateDict: dict=None):
+    stateDict = self._parseStateDict(stateName, stateDict)
+    selectedOpt = stateDict.get('Selected Algorithm', None)
     # Get the impl associated with this option name
-    isLegit = selectedOpt in self.algOpts.opts['limits']
-    if not isLegit:
+    isLegitSelection = selectedOpt in self.algOpts.opts['limits']
+    if not isLegitSelection:
       selectedImpl = self.algOpts.value()
-      msgBox = QtWidgets.QMessageBox
-      msgBox.information(self, 'Invalid Selection', f'Selection {selectedOpt} does'
-                                                    f' not match the list of available algorithms. Defaulting to {selectedImpl}')
+      raise FRAlgProcessorError(f'Selection {selectedOpt} does'
+                                f' not match the list of available algorithms. Defaulting to {selectedImpl}')
     else:
       selectedImpl = self.algOpts.opts['limits'][selectedOpt]
     self.algOpts.setValue(selectedImpl)
-    super().loadState(newState['Parameters'])
+    super().loadParamState(self.lastAppliedName, stateDict['Parameters'])
 
   def changeActiveAlg(self, proc: FRImgProcWrapper):
     # Hide all except current selection

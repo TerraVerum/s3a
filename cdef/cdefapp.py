@@ -17,7 +17,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from . import FR_SINGLETON
 from .frgraphics.annotator_ui import FRAnnotatorUI
 from .frgraphics.graphicsutils import (dialogGetSaveFileName, addDirItemsToMenu,
-                                       attemptLoadSettings, popupFilePicker,
+                                       attemptFileLoad, popupFilePicker,
                                        disableAppDuringFunc, makeExceptionsShowDialogs)
 from .frgraphics.graphicsutils import saveToFile
 from .frgraphics.parameditors import FRParamEditor
@@ -264,7 +264,7 @@ class FRCdefApp(FRAnnotatorUI):
 
   def loadLayout(self, layoutName: str):
     layoutFilename = join(LAYOUTS_DIR, f'{layoutName}.dockstate')
-    self.restoreState(attemptLoadSettings(layoutFilename))
+    self.restoreState(attemptFileLoad(layoutFilename))
 
   def saveLayout(self, layoutName: str=None, allowOverwriteDefault=False):
     dockStates = self.saveState().data()
@@ -300,9 +300,9 @@ class FRCdefApp(FRAnnotatorUI):
       self.loadLayoutActionTriggered(layoutName)
 
     for editor in FR_SINGLETON.registerableEditors:
-      curSettings = profileDict[editor.name]
-      if curSettings is not None:
-        self.paramEditorLoadActTriggered(editor, curSettings)
+      curParanState = profileDict[editor.name]
+      if curParanState is not None:
+        self.paramEditorLoadActTriggered(editor, curParanState)
 
   def exportCompList(self, outFname: str):
     self.compExporter.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds)
@@ -377,7 +377,7 @@ class FRCdefApp(FRAnnotatorUI):
 
   @staticmethod
   def paramEditorLoadActTriggered(objForMenu: FRParamEditor, nameToLoad: str) -> Optional[dict]:
-    return objForMenu.loadSettings(nameToLoad)
+    return objForMenu.loadParamState(nameToLoad)
 
   @Slot()
   def exportCompListActionTriggered(self):

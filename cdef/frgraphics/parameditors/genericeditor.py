@@ -7,7 +7,7 @@ from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter, ParameterTree
 
 from cdef.frgraphics.graphicsutils import dialogGetSaveFileName, saveToFile, \
-  attemptLoadSettings
+  attemptFileLoad
 from cdef.structures import FRParam, ContainsSharedProps
 
 Signal = QtCore.pyqtSignal
@@ -203,10 +203,10 @@ class FRParamEditor(QtWidgets.QDockWidget):
   def saveAsBtnClicked(self):
     paramState = self.params.saveState(filter='user')
     saveName = dialogGetSaveFileName(self, self._saveDlgName, self.lastAppliedName)
-    self.saveAs(saveName, paramState)
+    self.saveParamState(saveName, paramState)
 
-  def saveAs(self, saveName: str=None, paramState: dict=None,
-             allowOverwriteDefault=False):
+  def saveParamState(self, saveName: str=None, paramState: dict=None,
+                     allowOverwriteDefault=False):
     """
     * Returns dict on successful parameter save and emits sigParamStateCreated.
     * Returns None if no save name was given
@@ -224,25 +224,25 @@ class FRParamEditor(QtWidgets.QDockWidget):
     self.sigParamStateCreated.emit(saveName)
     return outDict
 
-  def loadState(self, newStateDict: dict):
-    self.params.restoreState(newStateDict, addChildren=False)
-
-  def loadSettings(self, settingName: str):
-    dictFilename = Path(self.saveDir)/f'{settingName}.{self.fileType}'
-    loadDict = attemptLoadSettings(dictFilename)
-    if loadDict is None:
-      return None
-    self.loadState(loadDict)
+  def loadParamState(self, stateName: str, stateDict: dict=None):
+    loadDict = self._parseStateDict(stateName, stateDict)
+    self.params.restoreState(loadDict, addChildren=False, removeChildren=False)
     self.applyBtnClicked()
-    self.lastAppliedName = settingName
+    self.lastAppliedName = stateName
     return loadDict
 
-  def deleteSettings(self, settingName: str):
-    filename = Path(self.saveDir)/f'{settingName}.{self.fileType}'
+  def _parseStateDict(self, stateName: str, stateDict: dict):
+    if stateDict is None:
+      dictFilename = Path(self.saveDir)/f'{stateName}.{self.fileType}'
+      stateDict = attemptFileLoad(dictFilename)
+    return stateDict
+
+  def deleteParamState(self, stateName: str):
+    filename = Path(self.saveDir)/f'{stateName}.{self.fileType}'
     if not filename.exists():
       return
     filename.unlink()
-    self.sigParamStateDeleted.emit(settingName)
+    self.sigParamStateDeleted.emit(stateName)
 
   def registerProps(self, clsObj, constParams: List[FRParam]):
     outProps = []
@@ -386,7 +386,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
            superObj.__initEditorParams__()
 
         if opts.get('saveDefault', True):
-          self.saveAs(saveName='Default', allowOverwriteDefault=True)
+          self.saveParamState(saveName='Default', allowOverwriteDefault=True)
         self.classInstToEditorMapping[clsObj] = self
         retVal = oldClsInit(clsObj, *args, **kwargs)
         self._extendedClassInit(clsObj, groupParam)
