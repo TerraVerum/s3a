@@ -4,8 +4,8 @@ from functools import wraps
 from glob import glob
 from os.path import basename
 from pathlib import Path
-from traceback import format_exception_only
-from typing import Optional, Union, TextIO
+from traceback import format_exception
+from typing import Optional, Union
 
 from ruamel.yaml import YAML
 
@@ -212,10 +212,44 @@ def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
   """
   # Procedure taken from https://stackoverflow.com/a/40674244/9463643
   def new_except_hook(etype, evalue, tb):
-    QtWidgets.QMessageBox.critical(win, 'Error',
-                                   ''.join(format_exception_only(etype, evalue)),
-                                   QtWidgets.QMessageBox.Ok)
+    errMsg = ''.join(format_exception(etype, evalue, tb))
+    dlg = FRScrollableErrorDialog(win, errMsg)
+    dlg.show()
+    dlg.exec()
   def patch_excepthook():
     sys.excepthook = new_except_hook
 
   QtCore.QTimer.singleShot(0, patch_excepthook)
+
+
+class FRScrollableErrorDialog(QtWidgets.QDialog):
+  def __init__(self, parent: QtWidgets.QWidget=None, errMsg=''):
+    super().__init__(parent)
+    style = self.style()
+    icon = style.standardIcon(style.SP_MessageBoxCritical)
+
+    self.setWindowTitle('Error')
+    self.setWindowIcon(icon)
+    verticalLayout = QtWidgets.QVBoxLayout(self)
+
+    scrollArea = QtWidgets.QScrollArea(self)
+    scrollArea.setWidgetResizable(True)
+    scrollAreaWidgetContents = QtWidgets.QWidget()
+    scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 400, 400))
+    scrollLayout = QtWidgets.QVBoxLayout(scrollAreaWidgetContents)
+
+    scrollMsg = QtWidgets.QLabel(errMsg, scrollAreaWidgetContents)
+    scrollLayout.addWidget(scrollMsg, 0, QtCore.Qt.AlignHCenter|QtCore.Qt.AlignTop)
+    scrollArea.setWidget(scrollAreaWidgetContents)
+    verticalLayout.addWidget(scrollArea)
+
+    okBtnLayout = QtWidgets.QHBoxLayout()
+    ok = QtWidgets.QPushButton('Ok', self)
+    okBtnLayout.addWidget(ok)
+    spacerItem = QtWidgets.QSpacerItem(ok.width(), ok.height(),
+                                       QtWidgets.QSizePolicy.Expanding,
+                                       QtWidgets.QSizePolicy.Minimum)
+    ok.clicked.connect(self.close)
+
+    okBtnLayout.addItem(spacerItem)
+    verticalLayout.addLayout(okBtnLayout)
