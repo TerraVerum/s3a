@@ -88,7 +88,7 @@ class FRComponentMgr(FRCompTableModel):
   def __init__(self):
     super().__init__()
 
-  def addComps(self, newCompsDf: df, addtype: FR_ENUMS = FR_ENUMS.COMP_ADD_AS_NEW):
+  def addComps(self, newCompsDf: df, addtype: FR_ENUMS = FR_ENUMS.COMP_ADD_AS_NEW, emitChange=True):
     toEmit = self.defaultEmitDict.copy()
     existingIds = self.compDf.index
 
@@ -99,7 +99,7 @@ class FRComponentMgr(FRCompTableModel):
     # TODO: Is this the appropriate response?
     verts = newCompsDf[REQD_TBL_FIELDS.VERTICES]
     dropIds = newCompsDf.index[verts.map(lambda complexVerts: len(complexVerts.stack()) == 0)]
-    newCompsDf = newCompsDf.drop(index=dropIds)
+    newCompsDf.drop(index=dropIds, inplace=True)
     # Inform graphics elements of deletion if this ID is already in our dataframe
     toEmit.update(self.rmComps(dropIds, emitChange=False))
 
@@ -107,7 +107,7 @@ class FRComponentMgr(FRCompTableModel):
       # Treat all comps as new -> set their IDs to guaranteed new values
       newIds = np.arange(self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int)
       newCompsDf.loc[:,REQD_TBL_FIELDS.INST_ID] = newIds
-      newCompsDf = newCompsDf.set_index(newIds)
+      newCompsDf.set_index(newIds, inplace=True)
     # Now, merge existing IDs and add new ones
     # TODO: Add some metric for merging other than a total override. Currently, even if the existing
     #  component has a value in e.g. vertices while the new component does not, the new, empty value
