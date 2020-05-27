@@ -1,13 +1,13 @@
 from collections import deque
 from pathlib import Path
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Collection
 
 import numpy as np
 from pandas import DataFrame as df
 
 from cdef.projectvars import ANN_AUTH_DIR
 from cdef.structures.typeoverloads import TwoDArr
-from .structures import FRVertices, FRParamGroup
+from .structures import FRVertices, FRParam
 
 
 def nanConcatList(vertList) -> FRVertices:
@@ -84,11 +84,13 @@ def getClippedBbox(arrShape: tuple, bbox: TwoDArr, margin: int):
     bbox[1,ii] = min(arrShape[1-ii], max(0, bbox[1,ii]+margin+1))
   return bbox.astype(int)
 
-def coerceDfTypes(dataframe: df, constParams: FRParamGroup):
+def coerceDfTypes(dataframe: df, constParams: Collection[FRParam]=None):
   """
   Pandas currently has a bug where datatypes are not preserved after update operations.
   Current workaround is to coerce all types to their original values after each operation
   """
+  if constParams is None:
+    constParams = dataframe.columns
   for field in constParams:
     try:
       dataframe[field] = dataframe[field].astype(type(field.value))

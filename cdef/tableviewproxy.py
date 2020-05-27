@@ -105,7 +105,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     # noinspection PyTypeChecker
     self._reflectTableSelectionChange(np.intersect1d(self.displayedIds, self.selectedIds))
 
-    tblIdxsToShow = np.in1d(compDf.index, self.displayedIds).nonzero()[0]
+    tblIdxsToShow = np.isin(compDf.index, self.displayedIds).nonzero()[0]
     for rowIdx in tblIdxsToShow:
       self._compTbl.showRow(rowIdx)
 

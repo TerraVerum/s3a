@@ -176,7 +176,7 @@ class FRMultiRegionPlot(QtCore.QObject):
     """
     selectedIdPens = np.empty(len(self.data), dtype=object)
     selectedIdPens.fill(None)
-    selectedIdxs = np.in1d(self.data.index, selectedIds)
+    selectedIdxs = np.isin(self.data.index, selectedIds)
     selectedIdPens[selectedIdxs] = pg.mkPen(self.selectedIdBorder, width=3)
 
     self.centroidPlts.setPen(selectedIdPens)
@@ -189,7 +189,7 @@ class FRMultiRegionPlot(QtCore.QObject):
     focusedIdSymbs.fill('o')
     focusedIdSizes = np.empty(len(self.data))
     focusedIdSizes.fill(self.idMarkerSz)
-    focusedIdxs = np.in1d(self.data.index, focusedIds)
+    focusedIdxs = np.isin(self.data.index, focusedIds)
 
     # TODO: Make GUI properties for these?
     focusedIdSymbs[focusedIdxs] = 'star'

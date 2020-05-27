@@ -107,6 +107,9 @@ class FRComplexVertices(list):
     if verts is not None:
       self.append(verts)
 
+  def isEmpty(self):
+    return len(self.stack()) == 0
+
   @property
   def x_flat(self):
     return self.stack().x
