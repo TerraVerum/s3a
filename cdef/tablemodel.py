@@ -88,39 +88,45 @@ class FRComponentMgr(FRCompTableModel):
   def __init__(self):
     super().__init__()
 
+  @FR_SINGLETON.undoStack.undoable('Add Components')
   def addComps(self, newCompsDf: df, addtype: FR_ENUMS = FR_ENUMS.COMP_ADD_AS_NEW, emitChange=True):
     toEmit = self.defaultEmitDict.copy()
     existingIds = self.compDf.index
 
     if len(newCompsDf) == 0:
-      return toEmit
+      yield toEmit
+      # Noting to undo
+      raise StopIteration
 
-    # Delete entries with no vertices, since they make work within the app difficult.
+  # Delete entries with no vertices, since they make work within the app difficult.
     # TODO: Is this the appropriate response?
     verts = newCompsDf[REQD_TBL_FIELDS.VERTICES]
     dropIds = newCompsDf.index[verts.map(FRComplexVertices.isEmpty)]
     newCompsDf.drop(index=dropIds, inplace=True)
-    # Inform graphics elements of deletion if this ID is already in our dataframe
-    toEmit.update(self.rmComps(dropIds, emitChange=False))
+
 
     if addtype == FR_ENUMS.COMP_ADD_AS_NEW:
       # Treat all comps as new -> set their IDs to guaranteed new values
       newIds = np.arange(self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int)
       newCompsDf.loc[:,REQD_TBL_FIELDS.INST_ID] = newIds
       newCompsDf.set_index(newIds, inplace=True)
+      dropIds = np.array([], dtype=int)
+
+    # Track dropped data for undo
+    alteredDataDf = self.compDf.loc[self.compDf.index.intersection(newCompsDf.index)]
+
+    # Delete entries that were updated to have no vertices
+    toEmit.update(self.rmComps(dropIds, emitChange=False))
     # Now, merge existing IDs and add new ones
-    # TODO: Add some metric for merging other than a total override. Currently, even if the existing
-    #  component has a value in e.g. vertices while the new component does not, the new, empty value
-    #  will override the older. This might often be desirable, but it would still be good to let the
-    #  user have the final say on what happens
     newIds = newCompsDf.index
     newChangedIdxs = np.isin(newIds, existingIds, assume_unique=True)
+    changedIds = newIds[newChangedIdxs]
 
     # Signal to table that rows should change
     self.layoutAboutToBeChanged.emit()
     # Ensure indices overlap with the components these are replacing
     self.compDf.update(newCompsDf)
-    toEmit['changed'] = newIds[newChangedIdxs]
+    toEmit['changed'] = changedIds
 
     # Finally, add new comps
     compsToAdd = newCompsDf.iloc[~newChangedIdxs, :]
@@ -137,9 +143,13 @@ class FRComponentMgr(FRCompTableModel):
     if emitChange:
       self.sigCompsChanged.emit(toEmit)
 
-    return toEmit
-    return toEmit
+    yield toEmit
 
+    # Undo add by deleting new components and un-updating existing ones
+    self.addComps(alteredDataDf)
+    self.rmComps(toEmit['added'])
+
+  @FR_SINGLETON.undoStack.undoable('Remove Components')
   def rmComps(self, idsToRemove: Union[np.ndarray, type(FR_ENUMS)] = FR_ENUMS.COMP_RM_ALL,
               emitChange=True) -> dict:
     toEmit = self.defaultEmitDict.copy()
@@ -156,6 +166,9 @@ class FRComponentMgr(FRCompTableModel):
     # Do nothing for IDs not actually in the existing list
     idsActuallyRemoved = np.isin(idsToRemove, existingCompIds, assume_unique=True)
     idsToRemove = idsToRemove[idsActuallyRemoved]
+
+    # Track for undo purposes
+    removedData = self.compDf.loc[idsToRemove]
 
     tfKeepIdx = np.isin(existingCompIds, idsToRemove, assume_unique=True, invert=True)
 
@@ -176,7 +189,10 @@ class FRComponentMgr(FRCompTableModel):
     toEmit['deleted'] = idsToRemove
     if emitChange:
       self.sigCompsChanged.emit(toEmit)
-    return toEmit
+    yield toEmit
+
+    # Undo code
+    self.addComps(removedData, FR_ENUMS.COMP_ADD_AS_MERGE)
 
 def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> pd.Series:
   paramType = type(paramVal)

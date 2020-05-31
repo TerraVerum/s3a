@@ -120,11 +120,16 @@ class FRCdefApp(FRAnnotatorUI):
 
     # SETTINGS
     for editor in FR_SINGLETON.registerableEditors:
-      self.createMenuOptForEditor(self.paramTools, editor)
+        self.createMenuOptForEditor(self.paramTools, editor)
     profileLoadFunc = self.importQuickLoaderProfile
     self.createMenuOptForEditor(self.menuFile, FR_SINGLETON.quickLoader, profileLoadFunc)
     if quickLoaderArgs is not None:
       profileLoadFunc(quickLoaderArgs)
+
+    # EDIT
+    self.undoAct.triggered.connect(lambda: FR_SINGLETON.undoStack.undo())
+    self.redoAct.triggered.connect(lambda: FR_SINGLETON.undoStack.redo())
+
 
     # ANALYTICS
     self.newCompAnalyticsAct.triggered.connect(self.showNewCompAnalytics)
@@ -167,6 +172,8 @@ class FRCdefApp(FRAnnotatorUI):
 
   def createMenuOptForEditor(self, parentMenu: QtWidgets.QMenu, editor: FRParamEditor,
                              loadFunc=None):
+    if editor.hasMenuOption:
+      return
     if loadFunc is None:
       loadFunc = partial(self.paramEditorLoadActTriggered, editor)
     name = editor.name
@@ -185,6 +192,7 @@ class FRCdefApp(FRAnnotatorUI):
     # Initialize default menus
     populateFunc()
     parentMenu.addMenu(newMenu)
+    editor.hasMenuOption = True
 
   @staticmethod
   def populateParamEditorMenuOpts(objForMenu: FRParamEditor, winMenu: QtWidgets.QMenu,

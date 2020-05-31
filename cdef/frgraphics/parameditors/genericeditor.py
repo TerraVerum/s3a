@@ -81,6 +81,10 @@ class FRParamEditor(QtWidgets.QDockWidget):
     self._stateBeforeEdit = self.params.saveState()
     self.lastAppliedName = None
 
+    # This will be set to 'True' when an action for this editor is added to
+    # the main window menu
+    self.hasMenuOption = False
+
     # -----------
     # Additional widget buttons
     # -----------
