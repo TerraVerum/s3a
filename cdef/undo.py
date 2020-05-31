@@ -128,13 +128,10 @@ class FRActionStack:
   True
   """
 
-  def __init__(self, maxlen:int=None):
-    self.undos: Deque[_FRAction] = deque(maxlen=maxlen)
-    self._redos: Deque[_FRAction] = deque(maxlen=maxlen)
+  def __init__(self, maxlen:int=50):
     if maxlen is not None:
       maxlen *= 2
     self.actions: Deque[_FRAction] = deque(maxlen=maxlen)
-    self._receiver = self.undos
     self._savepoint: Union[EmptyType, _FRAction] = EMPTY
     self.undoCallback = lambda: None
     self.doCallback = lambda: None
@@ -244,8 +241,6 @@ class FRActionStack:
 
   def clear(self):
     """ Clear the undo list. """
-    self.undos.clear()
-    self._redos.clear()
     self._savepoint = EMPTY
     self.actions.clear()
 
@@ -270,18 +265,10 @@ class FRActionStack:
       finally:
         self.key = None
 
-  def append(self, action):
-    """ Add a undoable to the stack, using ``receiver.append()``. """
-    if self._receiver is not None:
-      self._receiver.append(action)
-    if self._receiver is self.undos:
-      self._redos.clear()
-      self.doCallback()
-
   def setSavepoint(self):
     """ Set the savepoint. """
     if self.canUndo:
-      self._savepoint = self.undos[-1]
+      self._savepoint = self.actions[-1]
     else:
       self._savepoint = EMPTY
 
@@ -292,7 +279,7 @@ class FRActionStack:
     This will always return *True* if the savepoint has not been set.
     """
     if self.canUndo:
-      cmpAction = self.undos[-1]
+      cmpAction = self.actions[-1]
     else:
       cmpAction = EMPTY
     return self._savepoint is not cmpAction
