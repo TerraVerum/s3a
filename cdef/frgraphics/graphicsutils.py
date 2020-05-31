@@ -4,12 +4,12 @@ from functools import wraps
 from glob import glob
 from os.path import basename
 from pathlib import Path
-from traceback import format_exception
+from traceback import format_exception, format_exception_only
 from typing import Optional, Union
 
 from ruamel.yaml import YAML
 
-from cdef.structures import FRAppIOError
+from cdef.structures import FRAppIOError, FRCdefException
 
 yaml = YAML()
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
@@ -212,8 +212,10 @@ def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
   """
   # Procedure taken from https://stackoverflow.com/a/40674244/9463643
   def new_except_hook(etype, evalue, tb):
-    errMsg = ''.join(format_exception(etype, evalue, tb))
-    dlg = FRScrollableErrorDialog(win, errMsg)
+    msgWithTrace = ''.join(format_exception(etype, evalue, tb))
+    msgWithoutTrace = ''.join(format_exception_only(etype, evalue))
+    dlg = FRScrollableErrorDialog(win, notCritical=issubclass(etype, FRCdefException),
+                                  msgWithTrace=msgWithTrace, msgWithoutTrace=msgWithoutTrace)
     dlg.show()
     dlg.exec()
   def patch_excepthook():
@@ -223,14 +225,21 @@ def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
 
 
 class FRScrollableErrorDialog(QtWidgets.QDialog):
-  def __init__(self, parent: QtWidgets.QWidget=None, errMsg=''):
+  def __init__(self, parent: QtWidgets.QWidget=None, notCritical=False,
+               msgWithTrace='', msgWithoutTrace=''):
     super().__init__(parent)
     style = self.style()
-    icon = style.standardIcon(style.SP_MessageBoxCritical)
 
-    self.setWindowTitle('Error')
+    if notCritical:
+      icon = style.standardIcon(style.SP_MessageBoxInformation)
+      self.setWindowTitle('Information')
+    else:
+      icon = style.standardIcon(style.SP_MessageBoxCritical)
+      self.setWindowTitle('Error')
+
     self.setWindowIcon(icon)
     verticalLayout = QtWidgets.QVBoxLayout(self)
+
 
     scrollArea = QtWidgets.QScrollArea(self)
     scrollArea.setWidgetResizable(True)
@@ -238,18 +247,33 @@ class FRScrollableErrorDialog(QtWidgets.QDialog):
     scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 400, 400))
     scrollLayout = QtWidgets.QVBoxLayout(scrollAreaWidgetContents)
 
-    scrollMsg = QtWidgets.QLabel(errMsg, scrollAreaWidgetContents)
-    scrollLayout.addWidget(scrollMsg, 0, QtCore.Qt.AlignHCenter|QtCore.Qt.AlignTop)
+    scrollMsg = QtWidgets.QLabel(msgWithoutTrace, scrollAreaWidgetContents)
+    scrollMsg.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse
+                                      | QtCore.Qt.TextSelectableByKeyboard)
+    scrollLayout.addWidget(scrollMsg, 0, QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
     scrollArea.setWidget(scrollAreaWidgetContents)
     verticalLayout.addWidget(scrollArea)
 
-    okBtnLayout = QtWidgets.QHBoxLayout()
+    btnLayout = QtWidgets.QHBoxLayout()
     ok = QtWidgets.QPushButton('Ok', self)
-    okBtnLayout.addWidget(ok)
+    toggleTrace = QtWidgets.QPushButton('Toggle Stack Trace', self)
+    btnLayout.addWidget(ok)
+    btnLayout.addWidget(toggleTrace)
     spacerItem = QtWidgets.QSpacerItem(ok.width(), ok.height(),
                                        QtWidgets.QSizePolicy.Expanding,
                                        QtWidgets.QSizePolicy.Minimum)
     ok.clicked.connect(self.close)
+    usingTrace = False
+    def updateTxt():
+      nonlocal usingTrace
+      if usingTrace:
+        newText = msgWithoutTrace
+      else:
+        newText = msgWithTrace
+      usingTrace = not usingTrace
+      scrollMsg.setText(newText)
 
-    okBtnLayout.addItem(spacerItem)
-    verticalLayout.addLayout(okBtnLayout)
+    toggleTrace.clicked.connect(updateTxt)
+
+    btnLayout.addItem(spacerItem)
+    verticalLayout.addLayout(btnLayout)
