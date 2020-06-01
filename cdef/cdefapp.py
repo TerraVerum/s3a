@@ -387,7 +387,8 @@ class FRCdefApp(FRAnnotatorUI):
 
   @staticmethod
   def paramEditorLoadActTriggered(objForMenu: FRParamEditor, nameToLoad: str) -> Optional[dict]:
-    return objForMenu.loadParamState(nameToLoad)
+    with BusyCursor():
+      return objForMenu.loadParamState(nameToLoad)
 
   @Slot()
   def exportCompListActionTriggered(self):

@@ -44,15 +44,17 @@ class FRShortcutParameter(Parameter):
     value = opts.get('value', '')
     super().__init__(**opts)
 
-class FRDisablableGroupParameter(parameterTypes.GroupParameter):
+class FRCustomMenuParameter(parameterTypes.GroupParameter):
   def __init__(self, menuActions: List[str]=None, **opts):
     if menuActions is None:
       menuActions: List[str] = []
     self.menuActions = menuActions
+    self.item = None
     super().__init__(**opts)
 
   def makeTreeItem(self, depth):
     item = super().makeTreeItem(depth)
+    self.item = item
     item.contextMenuEvent = lambda ev: item.contextMenu.popup(ev.globalPos())
     for actName in self.menuActions:
       act = item.contextMenu.addAction(actName)
@@ -63,16 +65,21 @@ class FRDisablableGroupParameter(parameterTypes.GroupParameter):
     # Toggle 'enable' on click
     return
 
-class FRProcGroupParameter(FRDisablableGroupParameter):
+  def setOpts(self, **opts):
+    super().setOpts()
+
+class FRProcGroupParameter(FRCustomMenuParameter):
   def __init__(self, **opts):
     super().__init__(menuActions=['Toggle Enable'], **opts)
     disableFont = QtGui.QFont()
     disableFont.setStrikeOut(True)
     self.enabledFontMap = {True: None, False: disableFont}
+    self.item = None
 
   def makeTreeItem(self, depth):
     item = super().makeTreeItem(depth)
     self.enabledFontMap[True] = QtGui.QFont(item.font(0))
+    self.item = item
     return item
 
   def menuActTriggered(self, item: parameterTypes.ParameterItem, act: str):
@@ -83,6 +90,12 @@ class FRProcGroupParameter(FRDisablableGroupParameter):
     for ii in range(item.childCount()):
       item.child(ii).setDisabled(disabled)
     self.opts['enabled'] = enabled
+
+  def setOpts(self, **opts):
+    enabled = opts.get('enabled', None)
+    if enabled is not None and enabled != self.opts['enabled']:
+      self.menuActTriggered(self.item, 'Toggle Enable')
+    super().setOpts(**opts)
 
 
 class FRAtomicGroupParameter(parameterTypes.GroupParameter):

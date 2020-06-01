@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional, Dict, List, Callable
 
 import numpy as np
+from pyqtgraph import BusyCursor
 from pyqtgraph.Qt import QtCore
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.parameterTypes import ListParameter
@@ -15,6 +16,7 @@ from cdef.structures import FRComplexVertices, FRVertices, NChanImg, FRParam, \
   FRAlgProcessorError
 from imageprocessing.processing import ImageProcess
 from .genericeditor import FRParamEditor, _frPascalCaseToTitle
+from .pgregistered import FRProcGroupParameter
 
 Signal = QtCore.pyqtSignal
 
@@ -122,8 +124,16 @@ class FRAlgCollectionEditor(FRParamEditor):
     The algorithm editor also needs to store information about the selected algorithm, so lump
     this in with the other parameter information before calling default save.
     """
+    tmpParamState = self.params.saveState(filter='user')
+    def addEnabledOpt(dictRoot, paramRoot: Parameter, prevRoot=None):
+      for pChild in paramRoot:
+        dChild = dictRoot['children'][pChild.name()]
+        addEnabledOpt(dChild, pChild)
+      if isinstance(paramRoot, FRProcGroupParameter):
+        dictRoot['enabled'] = paramRoot.opts['enabled']
+    addEnabledOpt(tmpParamState, self.params)
     paramState = {'Selected Algorithm': self.algOpts.value().algName,
-                  'Parameters': self.params.saveState(filter='user')}
+                  'Parameters': tmpParamState}
     return super().saveParamState(saveName, paramState, allowOverwriteDefault)
 
   def loadParamState(self, stateName: str, stateDict: dict=None):
@@ -138,7 +148,7 @@ class FRAlgCollectionEditor(FRParamEditor):
     else:
       selectedImpl = self.algOpts.opts['limits'][selectedOpt]
     self.algOpts.setValue(selectedImpl)
-    super().loadParamState(self.lastAppliedName, stateDict['Parameters'])
+    super().loadParamState(stateName, stateDict['Parameters'])
 
   def changeActiveAlg(self, proc: FRImgProcWrapper):
     # Hide all except current selection

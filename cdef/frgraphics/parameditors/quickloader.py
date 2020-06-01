@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List
 
 from pyqtgraph.Qt import QtCore, QtWidgets
-from pyqtgraph.parametertree.parameterTypes import ActionParameter
+from pyqtgraph.parametertree.parameterTypes import ActionParameter, GroupParameter
 
 from cdef.projectvars import USER_PROFILES_DIR
 from .genericeditor import FRParamEditor
@@ -89,6 +89,13 @@ class FRQuickLoaderEditor(FRParamEditor):
 
     self.onlyOneStatePerEditor = onlyOneStatePerEditor
 
+  def applyBtnClicked(self):
+    super().applyBtnClicked()
+    for grp in self.params: # type: GroupParameter
+      if grp.hasChildren():
+        act: ActionParameter = next(iter(grp))
+        act.sigActivated.emit(act)
+
   @Slot()
   def addFromLineEdit(self):
     completer = self.addNewParamState.completer()
@@ -107,4 +114,4 @@ class FRQuickLoaderEditor(FRParamEditor):
       curGroup.clearChildren()
     newChild = ActionParameter(name=paramState, removable=True)
     curGroup.addChild(newChild)
-    newChild.sigActivated.connect(lambda: editor.loadParamState(paramState))
+    newChild.sigActivated.connect(lambda act: editor.loadParamState(paramState))
