@@ -43,7 +43,7 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
 
     noEditParams = set(REQD_TBL_FIELDS) - {REQD_TBL_FIELDS.COMP_CLASS,
                                            REQD_TBL_FIELDS.VALIDATED}
-    self.noEditColIdxs = {self.colTitles.index(col.name) for col in noEditParams}
+    self.noEditColIdxs = [self.colTitles.index(col.name) for col in noEditParams]
 
   # ------
   # Functions required to implement table model
