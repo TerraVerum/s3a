@@ -287,7 +287,7 @@ class FRVertexDefinedImg(pg.ImageItem):
     outImg[idxs] = self.image
     return outImg
 
-  # @FR_SINGLETON.undoStack.undoable('Modify Focused Region')
+  @FR_SINGLETON.undoStack.undoable('Modify Focused Region')
   def updateFromVertices(self, newVerts: FRComplexVertices, srcImg: GrayImg=None):
     oldImg = self.image
     oldVerts = self.verts
@@ -307,10 +307,9 @@ class FRVertexDefinedImg(pg.ImageItem):
 
 
     self.setImage(regionData, levels=[0, 2], lut=self.getLUTFromScheme())
-    return
+    yield
     self.updateFromVertices(oldVerts, oldImg)
 
-  # @FR_SINGLETON.undoStack.undoable('Modify Focused Region')
   def updateFromMask(self, newMask: BlackWhiteImg):
     # It is expensive to color the vertices, so only find contours if specified by the user
     oldImg = self.image
@@ -324,8 +323,6 @@ class FRVertexDefinedImg(pg.ImageItem):
     newMask[verts.y_flat, verts.x_flat] = 2
     self.updateFromVertices(verts)
     return
-    self.updateFromVertices(oldVerts, oldImg)
-
 
   def getLUTFromScheme(self):
     lut = [(0, 0, 0, 0)]
