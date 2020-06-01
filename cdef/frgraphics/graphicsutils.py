@@ -9,6 +9,7 @@ from typing import Optional, Union
 
 from ruamel.yaml import YAML
 
+from cdef import appInst
 from cdef.structures import FRAppIOError, FRCdefException
 
 yaml = YAML()
@@ -213,7 +214,7 @@ def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
   # Procedure taken from https://stackoverflow.com/a/40674244/9463643
   def new_except_hook(etype, evalue, tb):
     msgWithTrace = ''.join(format_exception(etype, evalue, tb))
-    msgWithoutTrace = ''.join(format_exception_only(etype, evalue))
+    msgWithoutTrace = str(evalue)
     dlg = FRScrollableErrorDialog(win, notCritical=issubclass(etype, FRCdefException),
                                   msgWithTrace=msgWithTrace, msgWithoutTrace=msgWithoutTrace)
     dlg.show()
@@ -244,10 +245,11 @@ class FRScrollableErrorDialog(QtWidgets.QDialog):
     scrollArea = QtWidgets.QScrollArea(self)
     scrollArea.setWidgetResizable(True)
     scrollAreaWidgetContents = QtWidgets.QWidget()
-    scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 400, 400))
+
     scrollLayout = QtWidgets.QVBoxLayout(scrollAreaWidgetContents)
 
-    scrollMsg = QtWidgets.QLabel(msgWithoutTrace, scrollAreaWidgetContents)
+    # Set to message with trace first so sizing is correct
+    scrollMsg = QtWidgets.QLabel(msgWithTrace, scrollAreaWidgetContents)
     scrollMsg.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse
                                       | QtCore.Qt.TextSelectableByKeyboard)
     scrollLayout.addWidget(scrollMsg, 0, QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
@@ -262,18 +264,23 @@ class FRScrollableErrorDialog(QtWidgets.QDialog):
     spacerItem = QtWidgets.QSpacerItem(ok.width(), ok.height(),
                                        QtWidgets.QSizePolicy.Expanding,
                                        QtWidgets.QSizePolicy.Minimum)
+
     ok.clicked.connect(self.close)
-    usingTrace = False
+    self.resize(self.sizeHint())
+
+    showTrace = False
     def updateTxt():
-      nonlocal usingTrace
-      if usingTrace:
-        newText = msgWithoutTrace
-      else:
+      nonlocal showTrace
+      if showTrace:
         newText = msgWithTrace
-      usingTrace = not usingTrace
+      else:
+        newText = msgWithoutTrace
+      showTrace = not showTrace
       scrollMsg.setText(newText)
 
-    toggleTrace.clicked.connect(updateTxt)
+    toggleTrace.clicked.connect(lambda: updateTxt())
 
     btnLayout.addItem(spacerItem)
     verticalLayout.addLayout(btnLayout)
+    ok.setFocus()
+    updateTxt()

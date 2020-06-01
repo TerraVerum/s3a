@@ -2,20 +2,19 @@ from __future__ import annotations
 
 from os.path import join
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Callable
+from typing import Optional, Dict, List, Callable
 
 import numpy as np
-from pyqtgraph.Qt import QtWidgets, QtCore
+from pyqtgraph.Qt import QtCore
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.parameterTypes import ListParameter
 
 from cdef.procwrapper import FRImgProcWrapper
-from cdef.projectvars import REQD_TBL_FIELDS, MENU_OPTS_DIR
+from cdef.projectvars import MENU_OPTS_DIR
 from cdef.structures import FRComplexVertices, FRVertices, NChanImg, FRParam, \
   FRAlgProcessorError
 from imageprocessing.processing import ImageProcess
 from .genericeditor import FRParamEditor, _frPascalCaseToTitle
-from .table import FRTableData
 
 Signal = QtCore.pyqtSignal
 

@@ -14,7 +14,7 @@ from cdef.projectvars.enums import FR_ENUMS
 class FRVertices(np.ndarray):
   connected = True
 
-  def __new__(cls, inputArr: Union[list, np.ndarray]=None, connected=True, **kwargs):
+  def __new__(cls, inputArr: Union[list, np.ndarray, tuple]=None, connected=True, **kwargs):
     # See numpy docs on subclassing ndarray
     if inputArr is None:
       inputArr = np.zeros((0,2))
