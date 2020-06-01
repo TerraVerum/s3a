@@ -180,7 +180,7 @@ class FRComponentMgr(FRCompTableModel):
 
     # Reset manager's component list
     self.layoutAboutToBeChanged.emit()
-    self.compDf = self.compDf.iloc[tfKeepIdx,:]
+    self.compDf: df = self.compDf.iloc[tfKeepIdx,:]
     self.layoutChanged.emit()
 
     # Preserve type information after change

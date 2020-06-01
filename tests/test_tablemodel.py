@@ -3,7 +3,7 @@ import stat
 
 import numpy as np
 
-from cdef import FRCdefApp
+from cdef import FRCdefApp, FR_SINGLETON
 from cdef.generalutils import augmentException
 from cdef.projectvars import FR_ENUMS
 from cdef.projectvars import REQD_TBL_FIELDS
@@ -39,6 +39,12 @@ class CompMgrTester(TableModelTestCases):
     oldIds = np.arange(NUM_COMPS, dtype=int)
     changeList = mgr.addComps(self.sampleComps)
     self.cmpChangeList(changeList, oldIds)
+
+  def test_undo_add(self):
+    oldIds = np.arange(NUM_COMPS, dtype=int)
+    mgr.addComps(self.sampleComps)
+    FR_SINGLETON.undoStack.undo()
+    self.assertTrue(len(mgr.compDf) == 0)
 
   def test_empty_add(self):
     changeList = mgr.addComps(makeCompDf(0))
@@ -101,6 +107,17 @@ class CompMgrTester(TableModelTestCases):
     oldIds = mgr.compDf[REQD_TBL_FIELDS.INST_ID].values
     changeList = mgr.rmComps(FR_ENUMS.COMP_RM_ALL)
     self.cmpChangeList(changeList,deleted=oldIds)
+
+  def test_rm_undo(self):
+    comps = self.sampleComps.copy(deep=True)
+    ids = np.arange(NUM_COMPS, dtype=int)
+
+    # Standard remove
+    mgr.addComps(comps)
+    mgr.rmComps(ids)
+    FR_SINGLETON.undoStack.undo()
+    self.assertTrue(mgr.compDf.equals(comps))
+
 
   @staticmethod
   def cmpChangeList(changeList: dict, added: np.ndarray=None, deleted: np.ndarray=None,
