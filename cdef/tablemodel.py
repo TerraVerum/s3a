@@ -68,12 +68,15 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
     else:
       return None
 
+  @FR_SINGLETON.undoStack.undoable('Alter Component Data')
   def setData(self, index, value, role=QtCore.Qt.EditRole) -> bool:
+    oldVal = self.compDf.iloc[index.row(), index.column()]
     self.compDf.iloc[index.row(), index.column()] = value
     toEmit = self.defaultEmitDict.copy()
     toEmit['changed'] = np.array([self.compDf.index[index.row()]])
     self.sigCompsChanged.emit(toEmit)
-    return True
+    yield True
+    self.setData(index, oldVal, role)
 
   def flags(self, index: QtCore.QModelIndex) -> QtCore.Qt.ItemFlags:
     if index.column() not in self.noEditColIdxs:
@@ -94,9 +97,8 @@ class FRComponentMgr(FRCompTableModel):
     existingIds = self.compDf.index
 
     if len(newCompsDf) == 0:
-      yield toEmit
-      # Noting to undo
-      raise StopIteration
+      # Nothing to undo
+      return toEmit
 
   # Delete entries with no vertices, since they make work within the app difficult.
     # TODO: Is this the appropriate response?
@@ -146,8 +148,10 @@ class FRComponentMgr(FRCompTableModel):
     yield toEmit
 
     # Undo add by deleting new components and un-updating existing ones
-    self.addComps(alteredDataDf)
-    self.rmComps(toEmit['added'])
+    self.addComps(alteredDataDf, FR_ENUMS.COMP_ADD_AS_MERGE)
+    addedCompIdxs = toEmit['added']
+    if len(addedCompIdxs) > 0:
+      self.rmComps(toEmit['added'])
 
   @FR_SINGLETON.undoStack.undoable('Remove Components')
   def rmComps(self, idsToRemove: Union[np.ndarray, type(FR_ENUMS)] = FR_ENUMS.COMP_RM_ALL,
@@ -165,6 +169,8 @@ class FRComponentMgr(FRCompTableModel):
 
     # Do nothing for IDs not actually in the existing list
     idsActuallyRemoved = np.isin(idsToRemove, existingCompIds, assume_unique=True)
+    if len(idsActuallyRemoved) == 0:
+      return toEmit
     idsToRemove = idsToRemove[idsActuallyRemoved]
 
     # Track for undo purposes
@@ -189,7 +195,11 @@ class FRComponentMgr(FRCompTableModel):
     toEmit['deleted'] = idsToRemove
     if emitChange:
       self.sigCompsChanged.emit(toEmit)
-    yield toEmit
+    if len(idsToRemove) > 0:
+      yield toEmit
+    else:
+      # Nothing to undo
+      return toEmit
 
     # Undo code
     self.addComps(removedData, FR_ENUMS.COMP_ADD_AS_MERGE)

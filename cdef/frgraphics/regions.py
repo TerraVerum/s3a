@@ -11,7 +11,7 @@ from cdef import FR_SINGLETON
 from cdef.generalutils import coerceDfTypes, nanConcatList
 from cdef.processingutils import getVertsFromBwComps
 from cdef.projectvars import REQD_TBL_FIELDS, FR_CONSTS
-from cdef.structures import FRParam, FRVertices, FRComplexVertices, OneDArr
+from cdef.structures import FRParam, FRVertices, FRComplexVertices, OneDArr, BlackWhiteImg
 from cdef.structures.typeoverloads import GrayImg
 from .clickables import FRCentroidScatterItem
 from .rois import SHAPE_ROI_MAPPING, FRExtendedROI
@@ -271,6 +271,7 @@ class FRMultiRegionPlot(QtCore.QObject):
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_VERT_IMG)
 class FRVertexDefinedImg(pg.ImageItem):
+  sigRegionReverted = Signal(object) # new GrayImg
   @classmethod
   def __initEditorParams__(cls):
     cls.fillClr, cls.vertClr = FR_SINGLETON.scheme.registerProps(
@@ -278,50 +279,53 @@ class FRVertexDefinedImg(pg.ImageItem):
 
   def __init__(self):
     super().__init__()
-    self.vertsUpToDate = True
-    self._offset = FRVertices([[0,0]])
     self.verts = FRComplexVertices()
 
   def embedMaskInImg(self, toEmbedShape: Tuple[int, int]):
     outImg = np.zeros(toEmbedShape, dtype=bool)
-    selfShape = self.image.shape
-    offset_pt = self._offset.asPoint()
-    # Offset is x-y, shape is row-col. So, swap order of offset relative to current axis
-    embedSlices = [slice(offset_pt[1 - ii], selfShape[ii] + offset_pt[1 - ii]) for ii in range(2)]
-    outImg[embedSlices[0], embedSlices[1]] = self.image
+    idxs = [slice(0, self.image.shape[ii]) for ii in range(2)]
+    outImg[idxs] = self.image
     return outImg
 
-  def updateFromVertices(self, newVerts: FRComplexVertices, offset: FRVertices=None):
+  # @FR_SINGLETON.undoStack.undoable('Modify Focused Region')
+  def updateFromVertices(self, newVerts: FRComplexVertices, srcImg: GrayImg=None):
+    oldImg = self.image
+    oldVerts = self.verts
+
     self.verts = newVerts.copy()
     if len(newVerts.x_flat) == 0:
-      regionData = np.zeros((1, 1), dtype='bool')
+      regionData = np.zeros((1, 1), dtype=bool)
     else:
-      if offset is not None:
-        self._offset = offset.astype(int).view(FRVertices)
-
-      for vertList in newVerts:
-        vertList -= self._offset
-
-      newImgShape = newVerts.stack().max(0)[::-1] + 1
-      regionData = np.zeros(newImgShape, dtype='uint8')
-      cv.fillPoly(regionData, newVerts, 1)
-      # Make vertices full brightness
-      regionData[newVerts.y_flat, newVerts.x_flat] = 2
+      if srcImg is None:
+        newImgShape = newVerts.stack().max(0)[::-1] + 1
+        regionData = np.zeros(newImgShape, dtype='uint8')
+        cv.fillPoly(regionData, newVerts, 1)
+        # Make vertices full brightness
+        regionData[newVerts.y_flat, newVerts.x_flat] = 2
+      else:
+        regionData = srcImg.copy()
 
 
     self.setImage(regionData, levels=[0, 2], lut=self.getLUTFromScheme())
-    self.setPos(*self._offset.asPoint())
-    self.vertsUpToDate = True
+    return
+    self.updateFromVertices(oldVerts, oldImg)
 
-  def updateFromMask(self, newMask: GrayImg, maskPos=(0,0)):
+  # @FR_SINGLETON.undoStack.undoable('Modify Focused Region')
+  def updateFromMask(self, newMask: BlackWhiteImg):
     # It is expensive to color the vertices, so only find contours if specified by the user
+    oldImg = self.image
+    oldVerts = self.verts
+
     newMask = newMask.astype('uint8')
-    if newMask.max() < 2 or self.fillClr != self.vertClr:
-      verts = getVertsFromBwComps(newMask)
-      newMask[verts.y_flat, verts.x_flat] = 2
-    self.setImage(newMask, levels=[0,2], lut=self.getLUTFromScheme())
-    self.setPos(*maskPos)
-    self.vertsUpToDate = False
+    if np.array_equal(oldImg>0, newMask):
+      # Nothing to do
+      return
+    verts = getVertsFromBwComps(newMask)
+    newMask[verts.y_flat, verts.x_flat] = 2
+    self.updateFromVertices(verts)
+    return
+    self.updateFromVertices(oldVerts, oldImg)
+
 
   def getLUTFromScheme(self):
     lut = [(0, 0, 0, 0)]

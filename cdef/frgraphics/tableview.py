@@ -265,9 +265,10 @@ class FRCompTableView(QtWidgets.QTableView):
       return
 
     dataToSet = self.mgr.compDf.loc[[idList[0]],:].copy()
-    self.popup.setData(dataToSet, colIdxs)
-    wasAccepted = self.popup.exec()
-    if wasAccepted:
+    with FR_SINGLETON.undoStack.ignoreActions():
+      self.popup.setData(dataToSet, colIdxs)
+      wasAccepted = self.popup.exec()
+    if wasAccepted and len(self.popup.dirtyColIdxs) > 0:
       toOverwrite = self.mgr.compDf.loc[idList].copy()
       # Only overwrite dirty columns from popup
 

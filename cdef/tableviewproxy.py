@@ -103,7 +103,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     # self._regionPlots.drop(np.setdiff1d(self._regionPlots.data.index, self._displayedIds))
     self.regionPlots.resetRegionList(self.displayedIds, compDf.loc[self.displayedIds, regCols])
     # noinspection PyTypeChecker
-    self._reflectTableSelectionChange(np.intersect1d(self.displayedIds, self.selectedIds))
+    # self._reflectTableSelectionChange(np.intersect1d(self.displayedIds, self.selectedIds))
 
     tblIdxsToShow = np.isin(compDf.index, self.displayedIds).nonzero()[0]
     for rowIdx in tblIdxsToShow:

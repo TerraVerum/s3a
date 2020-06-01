@@ -13,7 +13,7 @@ from typing import Callable, Generator, Deque, Union, Type, Any
 
 from typing_extensions import Protocol
 
-from cdef.structures import FRUndoStackError
+from cdef.structures import FRUndoStackError, FRCdefException
 
 
 class _FRAction:
@@ -44,26 +44,24 @@ class _FRAction:
 
   def do(self):
     if self.treatAsUndo:
-      return self.backward()
+      ret = self.backward()
     else:
-      return self.forward()
+      ret = self.forward()
+    self.treatAsUndo = not self.treatAsUndo
+    return ret
 
   def forward(self):
     """Do or redo the action"""
     self._runner = self._generator(*self.args, **self.kwargs)
     # Forward use is expired, so treat as backward now
-    self.treatAsUndo = True
     return next(self._runner)
 
   def backward(self):
     """Undo the action"""
-    self.treatAsUndo = False
     ret = None
     try:
       ret = next(self._runner)
     except StopIteration:
-      # raise FRUndoError(f'Attempted to undo action {self.descr} which didn\'t define'
-      #                   f' an undo block.')
       pass
     # Delete it so that its not accidentally called again
     del self._runner
@@ -78,18 +76,36 @@ class Appendable(Protocol):
   def append(self):
     raise NotImplementedError
 
+class _FRBufferOverride:
+  def __init__(self, stack: FRActionStack, newActQueue: deque=None):
+    if newActQueue is None:
+      newActQueue = deque()
+    self.newActQueue = newActQueue
+    self.stack = stack
+
+    self.oldStackActions = None
+
+  def __enter__(self):
+    stack = self.stack
+    self.oldStackActions = stack.actions
+    stack.actions = self.newActQueue
+    return self
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    self.stack.actions = self.oldStackActions
+
 class FRActionStack:
-  """ The main undo stack. 
-      
-  The two key features are the :func:`redo` and :func:`undo` methods. If an 
+  """ The main undo stack.
+
+  The two key features are the :func:`redo` and :func:`undo` methods. If an
   exception occurs during doing or undoing a undoable, the undoable
-  aborts and the stack is cleared to avoid any further data corruption. 
-  
-  The stack provides two properties for tracking actions: *docallback* 
+  aborts and the stack is cleared to avoid any further data corruption.
+
+  The stack provides two properties for tracking actions: *docallback*
   and *undocallback*. Each of these allow a callback function to be set
-  which is called when an action is done or undone repectively. By default, 
+  which is called when an action is done or undone repectively. By default,
   they do nothing.
-  
+
   >>> stack = FRActionStack()
   >>> def done():
   ...     print('Can now undo: {}'.format(stack.undotext))
@@ -106,20 +122,20 @@ class FRActionStack:
   Can now redo: Redo An action
   >>> stack.redo()
   Can now undo: Undo An action
-  
+
   Setting them back to ``lambda: None`` will stop any further actions.
-  
+
   >>> stack.doCallback = stack.undoCallback = lambda: None
   >>> action()
   >>> stack.undo()
-  
+
   It is possible to mark a point in the undo history when the document
-  handled is saved. This allows the undo system to report whether a 
+  handled is saved. This allows the undo system to report whether a
   document has changed. The point is marked using :func:`savepoint` and
   :func:`haschanged` returns whether or not the state has changed (either
   by doing or undoing an action). Only one savepoint can be tracked,
   marking a new one removes the old one.
-  
+
   >>> stack.setSavepoint()
   >>> stack.hasChanged
   False
@@ -136,24 +152,24 @@ class FRActionStack:
     self.undoCallback = lambda: None
     self.doCallback = lambda: None
 
-    self.key = None
-
   @contextlib.contextmanager
-  def group(self, desc, newActBuffer: Appendable=None):
+  def group(self, descr: str=None):
     """ Return a context manager for grouping undoable actions.
 
     All actions which occur within the group will be undone by a single call
     of `stack.undo`."""
-    if newActBuffer is None:
-      newActBuffer: Deque[_FRAction] = deque()
-    with self.overrideBuffer(self, newActBuffer):
+    groupStack = FRActionStack()
+    newActBuffer = groupStack.actions
+    with _FRBufferOverride(self, newActBuffer):
       yield
+    actIter = range(len(newActBuffer))
     def grpAct():
-      for _ in range(2):
-        for act in newActBuffer:
-          act.do()
+        for _ in actIter:
+          groupStack.undo()
         yield
-    self.actions.append(_FRAction(grpAct, treatAsUndo=True))
+        for _ in actIter:
+          groupStack.redo()
+    self.actions.append(_FRAction(grpAct, descr=descr, treatAsUndo=True))
 
   def undoable(self, descr=None):
     """ Decorator which creates a new undoable action type.
@@ -175,6 +191,7 @@ class FRActionStack:
         action = _FRAction(generatorFn, args, kwargs, descr)
         self.actions.appendleft(action)
         ret = self.redo()
+
         self.flushUnusedRedos()
         return ret
       return inner
@@ -204,17 +221,27 @@ class FRActionStack:
   def redo(self):
     """
     Redo the last undone action.
-    
-    This is only possible if no other actions have occurred since the 
+
+    This is only possible if no other actions have occurred since the
     last undo call.
     """
-    if self.canRedo:
-      self.actions.rotate(-1)
+    ret = None
+    if not self.canRedo:
+      raise FRUndoStackError('Nothing to redo')
+
+    self.actions.rotate(-1)
+    try:
       ret = self.processAct()
       self.doCallback()
-      return ret
-    else:
-      raise FRUndoStackError('Nothing to redo')
+    except StopIteration as ex:
+      # Nothing to undo when this happens, remove the action from the stack.
+      ret = ex.value
+      self.actions.popleft()
+    except FRCdefException:
+      # These are intentionally thrown, recoverable exceptions. Don't clear
+      # the stack when they happen
+      pass
+    return ret
 
   def undo(self):
     """
@@ -231,7 +258,7 @@ class FRActionStack:
   def processAct(self):
     """ Undo the last action. """
     act = self.actions[-1]
-    with self.overrideBuffer(act):
+    with self.ignoreActions():
       try:
         return act.do()
       except Exception as ex:
@@ -243,27 +270,6 @@ class FRActionStack:
     """ Clear the undo list. """
     self._savepoint = EMPTY
     self.actions.clear()
-
-  @contextlib.contextmanager
-  def overrideBuffer(self, key: Any, newActQueue: deque=None):
-    """ Return a contect manager which temporarily pauses the receiver. """
-    if newActQueue is None:
-      newActQueue = deque()
-
-    if self.key is None:
-      oldActions = self.actions
-      self.actions = newActQueue
-      self.key = key
-    yield
-
-    if key is self.key:
-      try:
-        self.actions = oldActions
-      except NameError:
-        raise FRUndoStackError('Correct key was given, but restore point was never'
-                          ' created in the first place.')
-      finally:
-        self.key = None
 
   def setSavepoint(self):
     """ Set the savepoint. """
@@ -283,3 +289,6 @@ class FRActionStack:
     else:
       cmpAction = EMPTY
     return self._savepoint is not cmpAction
+
+  def ignoreActions(self):
+    return _FRBufferOverride(self)

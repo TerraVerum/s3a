@@ -121,7 +121,9 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
 
     # Edit
     self.undoAct = create_addMenuAct(self, self.menuEdit, '&Undo')
+    self.undoAct.setShortcut('Ctrl+Z')
     self.redoAct = create_addMenuAct(self, self.menuEdit, '&Redo')
+    self.redoAct.setShortcut('Ctrl+Y')
 
     # Analytics
     self.newCompAnalyticsAct = create_addMenuAct(self, self.menuAnalytics, 'Newest Added Component')

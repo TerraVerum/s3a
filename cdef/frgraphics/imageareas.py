@@ -3,12 +3,13 @@ from typing import Union, Tuple, Optional
 import numpy as np
 import pyqtgraph as pg
 from pandas import DataFrame as df
+import pandas as pd
 from pyqtgraph import BusyCursor
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from skimage.io import imread
 
 from cdef import FR_SINGLETON
-from cdef.generalutils import getClippedBbox, FRObjUndoBuffer
+from cdef.generalutils import getClippedBbox
 from cdef.processingutils import getVertsFromBwComps, segmentComp
 from cdef.projectvars import REQD_TBL_FIELDS, FR_CONSTS, FR_ENUMS
 from cdef.structures import FRParam, FRVertices, FRComplexVertices
@@ -22,20 +23,6 @@ from .rois import FRExtendedROI
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 QCursor = QtGui.QCursor
-
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_REGION_BUF)
-class FRRegionVertsUndoBuffer(FRObjUndoBuffer):
-
-  @classmethod
-  def __initEditorParams__(cls):
-    cls.maxBufferLen, cls.stepsBetweenBufSave = FR_SINGLETON.generalProps.registerProps(cls,
-        [FR_CONSTS.PROP_UNDO_BUF_SZ, FR_CONSTS.PROP_STEPS_BW_SAVE])
-
-  def __init__(self):
-    """
-    Save buffer for region modification.
-    """
-    super().__init__(self.maxBufferLen, self.stepsBetweenBufSave)
 
 class FREditableImg(pg.PlotWidget):
   def __init__(self, parent=None, allowableShapes: Tuple[FRParam,...]=None,
@@ -246,12 +233,11 @@ class FRFocusedImage(FREditableImg):
     self.region = FRVertexDefinedImg()
     self.addItem(self.region)
 
-    self.compSer = FR_SINGLETON.tableData.makeCompDf().squeeze()
+    self.compSer: pd.Series = FR_SINGLETON.tableData.makeCompDf().squeeze()
     # Image representation of component boundaries
     self.compMask = np.zeros((1,1), bool)
 
     self.bbox = np.zeros((2, 2), dtype='int32')
-    self.regionBuffer = FRRegionVertsUndoBuffer()
 
     self.switchBtnMode(FR_CONSTS.DRAW_ACT_ADD)
     self.switchBtnMode(FR_CONSTS.DRAW_SHAPE_PAINT)
@@ -287,13 +273,17 @@ class FRFocusedImage(FREditableImg):
       vertsDict['bgVerts'] = verts
     # Check for flood fill
 
-    newMask = self.procCollection.run(prevCompMask=self.compMask, **vertsDict)
-    if not np.all(newMask == self.compMask):
-      self.compMask = newMask
-      self.region.updateFromMask(self.compMask)
-      self.regionBuffer.update((self.compMask, (0,0)))
+    compMask = self.region.embedMaskInImg(self.imgItem.image.shape[:2])
+    newMask = self.procCollection.run(prevCompMask=compMask, **vertsDict)
+    if not np.array_equal(newMask,compMask):
+      self.region.updateFromMask(newMask)
 
-  def updateAll(self, mainImg: Optional[NChanImg], newComp:Optional[df]=None):
+  @FR_SINGLETON.undoStack.undoable('Modify Focused Component')
+  def updateAll(self, mainImg: Optional[NChanImg], newComp:Optional[pd.Series]=None,
+                isAlreadyTrimmed=False):
+    oldImg = self.imgItem.image
+    oldComp = self.compSer
+
     if mainImg is None:
       self.imgItem.clear()
       self.region.updateFromVertices(FRComplexVertices())
@@ -304,15 +294,17 @@ class FRFocusedImage(FREditableImg):
     # need to go through the trouble of deep copying
     self.compSer = newComp.copy(deep=False)
 
-    # Reset the undo buffer size
-    self.regionBuffer.clear()
-    self.regionBuffer.resize(self.regionBuffer.maxBufferLen)
-
-    # Propagate all resultant changesre
-    self.updateBbox(mainImg.shape, newVerts)
-    self.updateCompImg(mainImg)
-    self.updateRegionFromVerts(newVerts)
+    # Propagate all resultant changes
+    if not isAlreadyTrimmed:
+      self.updateBbox(mainImg.shape, newVerts)
+      bboxToUse = self.bbox
+    else:
+      bboxToUse = FRVertices([[0,0], mainImg.shape[:2]])
+    self.updateCompImg(mainImg, bboxToUse)
+    self.updateRegionFromVerts(newVerts, bboxToUse[0,:])
     self.autoRange()
+    yield
+    self.updateAll(oldImg, oldComp, True)
 
   def updateBbox(self, mainImgShape, newVerts: FRComplexVertices):
     concatVerts = newVerts.stack()
@@ -323,7 +315,7 @@ class FRFocusedImage(FREditableImg):
     padding = max((bbox[1,:] - bbox[0,:])*self.compCropMargin/2/100)
     self.bbox = getClippedBbox(mainImgShape, bbox, int(padding))
 
-  def updateCompImg(self, mainImg, bbox=None):
+  def updateCompImg(self, mainImg, bbox: FRVertices=None):
     if bbox is None:
       bbox = self.bbox
     # Account for nan entries
@@ -334,8 +326,12 @@ class FRFocusedImage(FREditableImg):
     self.imgItem.setImage(segImg)
     self.procCollection.image = segImg
 
-  def updateRegionFromVerts(self, newVerts: FRComplexVertices, offset=None):
+  @FR_SINGLETON.undoStack.undoable('Modify Focused Component')
+  def updateRegionFromVerts(self, newVerts: FRComplexVertices, offset: FRVertices=None):
     # Component vertices are nan-separated regions
+    oldVerts = self.region.verts
+    oldImg = self.region.image
+
     if offset is None:
       offset = self.bbox[0,:]
     if newVerts is None:
@@ -343,47 +339,19 @@ class FRFocusedImage(FREditableImg):
     # 0-center new vertices relative to FRFocusedImage image
     # Make a copy of each list first so we aren't modifying the
     # original data
-    lstLens = lambda lst: np.array([len(el) for el in lst])
     centeredVerts = newVerts.copy()
     for vertList in centeredVerts:
       vertList -= offset
-    # shouldUpdate = (not self.region.vertsUpToDate
-    #                 or len(self.region.verts) != len(centeredVerts)
-    #                 or np.any(lstLens(self.region.verts) != lstLens(centeredVerts))
-    #                 or np.any(np.vstack([selfLst != newLst for selfLst, newLst
-    #                               in zip(self.region.verts, centeredVerts)])))
-    shouldUpdate = (not self.region.vertsUpToDate
-                    or self.region.verts != centeredVerts)
-    if shouldUpdate:
+    if self.region.verts != centeredVerts:
       self.region.updateFromVertices(centeredVerts)
-      regionPos = self.region.pos().x(), self.region.pos().y()
-      self.regionBuffer.update((self.region.image, regionPos))
-      self.compMask = self.region.embedMaskInImg(self.imgItem.image.shape[:2])
-
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_UNDO_MOD_REGION, [FR_ENUMS.BUFFER_UNDO])
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_REDO_MOD_REGION, [FR_ENUMS.BUFFER_REDO])
-  def undoRedoRegionChange(self, undoOrRedo: str):
-    # Ignore requests when no region present
-    if self.imgItem.image is None:
+      yield
+    else:
       return
-    if undoOrRedo == FR_ENUMS.BUFFER_UNDO:
-      newMask, offset = self.regionBuffer.undo_getObj()
-    elif undoOrRedo == FR_ENUMS.BUFFER_REDO:
-      newMask, offset = self.regionBuffer.redo_getObj()
-    self.region.updateFromMask(newMask, offset)
-    self.compMask = self.region.embedMaskInImg(self.compMask.shape)
-
-  def clearCurDrawShape(self):
-    super().clearCurDrawShape()
+    self.region.updateFromVertices(oldVerts, oldImg)
 
   def saveNewVerts(self):
     # Add in offset from main image to FRVertexRegion vertices
-    if not self.region.vertsUpToDate:
-      newVerts = getVertsFromBwComps(self.region.image)
-      self.region.verts = newVerts.copy()
-      self.region.vertsUpToDate = True
-    else:
-      newVerts = self.region.verts.copy()
+    newVerts = self.region.verts.copy()
     for vertList in newVerts:
       vertList += self.bbox[0,:]
     self.compSer.loc[REQD_TBL_FIELDS.VERTICES] = newVerts

@@ -8,6 +8,11 @@ from cdef.structures import FRUndoStackError
 
 COUNT = 10
 
+def op(lst):
+  lst.append(len(lst))
+  yield
+  del lst[-1]
+
 def test_group():
   stack = undo.FRActionStack()
   mylst = []
@@ -62,7 +67,7 @@ def test_recursive():
       lst[0] = lst[1]
       lst[1] = tmp
       yield lst
-      raise StopIteration
+      return
     lst[:sz//2] = swapHalves(lst[:sz//2])
     lst[sz//2::] = swapHalves(lst[sz//2:])
     yield lst
@@ -129,3 +134,14 @@ def test_invalidate_redos():
   assert mylst == cmplst
   stack.redo()
   assert mylst == cmplst + [1]
+
+def test_ignore_acts():
+  stack = undo.FRActionStack()
+  curop = stack.undoable('test ignore')(op)
+  mylst = []
+  with stack.ignoreActions():
+    for _ in range(COUNT):
+      curop(mylst)
+  assert len(stack.actions) == 0
+  with pytest.raises(FRUndoStackError):
+    stack.undo()
