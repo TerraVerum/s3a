@@ -11,6 +11,14 @@ from cdef.frgraphics.graphicsutils import dialogGetSaveFileName, saveToFile, \
 from cdef.structures import FRParam, ContainsSharedProps
 
 Signal = QtCore.pyqtSignal
+
+def clearUnwantedParamVals(paramState: dict):
+  for k, child in paramState.get('children', {}).items():
+    clearUnwantedParamVals(child)
+  if paramState.get('value', True) is None:
+    paramState.pop('value')
+
+
 class FRParamEditor(QtWidgets.QDockWidget):
   sigParamStateCreated = Signal(str)
   sigParamStateUpdated = Signal(dict)
@@ -197,11 +205,10 @@ class FRParamEditor(QtWidgets.QDockWidget):
   def applyBtnClicked(self):
     # Don't emit any signals if nothing changed
     newState = self.params.saveState(filter='user')
-    if self._stateBeforeEdit == newState:
-      return
-    self._stateBeforeEdit = newState
     outDict = self.params.getValues()
-    self.sigParamStateUpdated.emit(outDict)
+    if self._stateBeforeEdit != newState:
+      self._stateBeforeEdit = newState
+      self.sigParamStateUpdated.emit(outDict)
     return outDict
 
   def saveAsBtnClicked(self):
@@ -219,6 +226,8 @@ class FRParamEditor(QtWidgets.QDockWidget):
       return None
     if paramState is None:
       paramState = self.params.saveState(filter='user')
+    # Remove non-useful values
+    clearUnwantedParamVals(paramState)
     Path(self.saveDir).mkdir(parents=True, exist_ok=True)
     saveToFile(paramState, self.saveDir, saveName, self.fileType,
                         allowOverwriteDefault=allowOverwriteDefault)
@@ -228,14 +237,39 @@ class FRParamEditor(QtWidgets.QDockWidget):
     self.sigParamStateCreated.emit(saveName)
     return outDict
 
-  def loadParamState(self, stateName: str, stateDict: dict=None):
+  def paramDictWithOpts(self, addList: List[str]=None, addTo: List[type(Parameter)]=None,
+                        removeList: List[str]=None, paramDict: Dict[str, Any]=None):
+    if addList is None:
+      addList = []
+    if addTo is None:
+      addTo = []
+    if removeList is None:
+      removeList = []
+    def addCustomOpts(dictRoot, paramRoot: Parameter):
+      for pChild in paramRoot:
+        dChild = dictRoot['children'][pChild.name()]
+        addCustomOpts(dChild, pChild)
+      if type(paramRoot) in addTo:
+        for opt in addList:
+          dictRoot[opt] = paramRoot.opts[opt]
+      for opt in removeList:
+        if dictRoot.get(opt, True) is None:
+          dictRoot.pop(opt)
+    if paramDict is None:
+      paramDict = self.params.saveState('user')
+    addCustomOpts(paramDict, self.params)
+    return paramDict
+
+
+  def loadParamState(self, stateName: str, stateDict: dict=None,
+                     addChildren=False, removeChildren=False):
     loadDict = self._parseStateDict(stateName, stateDict)
-    self.params.restoreState(loadDict, addChildren=False, removeChildren=False)
+    self.params.restoreState(loadDict, addChildren=addChildren, removeChildren=removeChildren)
     self.applyBtnClicked()
     self.lastAppliedName = stateName
     return loadDict
 
-  def _parseStateDict(self, stateName: str, stateDict: dict):
+  def _parseStateDict(self, stateName: str, stateDict: dict=None):
     if stateDict is None:
       dictFilename = Path(self.saveDir)/f'{stateName}.{self.fileType}'
       stateDict = attemptFileLoad(dictFilename)

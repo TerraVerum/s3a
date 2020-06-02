@@ -280,37 +280,22 @@ class FRCdefApp(FRAnnotatorUI):
                allowOverwriteDefault=allowOverwriteDefault)
     self.sigLayoutSaved.emit()
 
-  def importQuickLoaderProfile(self, profileSrc: Union[dict, str]):
-    # Make sure defaults exist
-    profileDict = defaultdict(type(None))
-    if isinstance(profileSrc, str):
-      profName = profileSrc
-      profileSrc = {}
-    else:
-      profName = profileSrc.get('Profile', None)
-    if profName is not None:
-      profileParams = self.paramEditorLoadActTriggered(
-        FR_SINGLETON.quickLoader, profName)['children']
-      # Attrs from a param tree are hidden behind 'value', so bring each to the front
-      profileDict.update({k: v['value'] for k, v in profileParams.items()})
-    profileDict.update(profileSrc)
-
-    imgFname = profileDict['Image']
+  def importQuickLoaderProfile(self, profileSrc: dict):
+    imgFname = profileSrc.pop('Image', None)
     if imgFname is not None:
       self.resetMainImg(imgFname)
 
-    annFname = profileDict['Annotations']
+    annFname = profileSrc.pop('Annotations', None)
     if annFname is not None:
       self.loadCompList(annFname)
 
-    layoutName = profileDict['Layout']
+    layoutName = profileSrc.pop('Layout', None)
     if layoutName is not None:
       self.loadLayoutActionTriggered(layoutName)
 
-    for editor in FR_SINGLETON.registerableEditors:
-      curParanState = profileDict[editor.name]
-      if curParanState is not None:
-        self.paramEditorLoadActTriggered(editor, curParanState)
+    if profileSrc:
+      # Unclaimed arguments
+      FR_SINGLETON.quickLoader.buildFromUserProfile(profileSrc)
 
   def exportCompList(self, outFname: str):
     self.compExporter.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds)

@@ -124,19 +124,19 @@ class FRAlgCollectionEditor(FRParamEditor):
     The algorithm editor also needs to store information about the selected algorithm, so lump
     this in with the other parameter information before calling default save.
     """
-    tmpParamState = self.params.saveState(filter='user')
+    paramDict = self.paramDictWithOpts(addList=['enabled'], addTo=[FRProcGroupParameter],
+                                       removeList=['value'])
     def addEnabledOpt(dictRoot, paramRoot: Parameter, prevRoot=None):
       for pChild in paramRoot:
         dChild = dictRoot['children'][pChild.name()]
         addEnabledOpt(dChild, pChild)
       if isinstance(paramRoot, FRProcGroupParameter):
         dictRoot['enabled'] = paramRoot.opts['enabled']
-    addEnabledOpt(tmpParamState, self.params)
     paramState = {'Selected Algorithm': self.algOpts.value().algName,
-                  'Parameters': tmpParamState}
+                  'Parameters': paramDict}
     return super().saveParamState(saveName, paramState, allowOverwriteDefault)
 
-  def loadParamState(self, stateName: str, stateDict: dict=None):
+  def loadParamState(self, stateName: str, stateDict: dict=None, addChildren=False, removeChildren=False):
     stateDict = self._parseStateDict(stateName, stateDict)
     selectedOpt = stateDict.get('Selected Algorithm', None)
     # Get the impl associated with this option name

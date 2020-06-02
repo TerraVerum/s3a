@@ -115,7 +115,12 @@ def dialogGetAuthorName(parent: QtWidgets.QMainWindow) -> str:
     sys.exit(0)
   return name
 
-def attemptFileLoad(fpath, openMode='r') -> dict:
+def raiseErrorLater(err: Exception):
+  def _raise():
+    raise err
+  QtCore.QTimer.singleShot(0, _raise)
+
+def attemptFileLoad(fpath, openMode='r') -> Union[dict, bytes]:
   with open(fpath, openMode) as ifile:
     loadObj = yaml.load(ifile)
   return loadObj
@@ -170,6 +175,7 @@ class FRPopupLineEditor(QtWidgets.QLineEdit):
     completer.setCompletionRole(QtCore.Qt.DisplayRole)
     completer.setFilterMode(QtCore.Qt.MatchContains)
     completer.activated.connect(lambda: QtCore.QTimer.singleShot(0, self.clear))
+
     self.textChanged.connect(self.resetCompleterPrefix)
 
     self.setCompleter(completer)
