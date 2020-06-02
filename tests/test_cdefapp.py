@@ -31,7 +31,7 @@ class CdefAppTestCases(TestCase):
 
   def test_change_img(self):
     im2 = RND.integers(0, 255, SAMPLE_IMG.shape, 'uint8')
-    name = 'testfile'
+    name = str(Path('./testfile').absolute())
     app.resetMainImg(name, im2)
     self.assertSequenceEqual(name, FR_SINGLETON.tableData.annFile,
                              'Annotation source not set after loading image on start')
