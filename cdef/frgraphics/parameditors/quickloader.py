@@ -5,7 +5,7 @@ from typing import List
 from pyqtgraph.Qt import QtCore, QtWidgets
 from pyqtgraph.parametertree.parameterTypes import ActionParameter, GroupParameter
 
-from cdef.projectvars import USER_PROFILES_DIR
+from cdef.projectvars import QUICK_LOAD_DIR
 from .genericeditor import FRParamEditor
 from ..graphicsutils import FRPopupLineEditor
 
@@ -76,7 +76,7 @@ class FREditorListModel(QtCore.QAbstractListModel):
 class FRQuickLoaderEditor(FRParamEditor):
   def __init__(self, parent=None, editorList: List[FRParamEditor]=None, onlyOneStatePerEditor=False):
     super().__init__(parent, paramList=[],
-                     saveDir=USER_PROFILES_DIR, fileType='cdefprofile')
+                     saveDir=QUICK_LOAD_DIR, fileType='loader')
     if editorList is None:
       editorList = []
     self.listModel = FREditorListModel(editorList, self)

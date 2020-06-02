@@ -68,7 +68,7 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
     else:
       return None
 
-  @FR_SINGLETON.undoStack.undoable('Alter Component Data')
+  @FR_SINGLETON.actionStack.undoable('Alter Component Data')
   def setData(self, index, value, role=QtCore.Qt.EditRole) -> bool:
     oldVal = self.compDf.iloc[index.row(), index.column()]
     self.compDf.iloc[index.row(), index.column()] = value
@@ -91,7 +91,7 @@ class FRComponentMgr(FRCompTableModel):
   def __init__(self):
     super().__init__()
 
-  @FR_SINGLETON.undoStack.undoable('Add Components')
+  @FR_SINGLETON.actionStack.undoable('Add Components')
   def addComps(self, newCompsDf: df, addtype: FR_ENUMS = FR_ENUMS.COMP_ADD_AS_NEW, emitChange=True):
     toEmit = self.defaultEmitDict.copy()
     existingIds = self.compDf.index
@@ -153,7 +153,7 @@ class FRComponentMgr(FRCompTableModel):
     if len(addedCompIdxs) > 0:
       self.rmComps(toEmit['added'])
 
-  @FR_SINGLETON.undoStack.undoable('Remove Components')
+  @FR_SINGLETON.actionStack.undoable('Remove Components')
   def rmComps(self, idsToRemove: Union[np.ndarray, type(FR_ENUMS)] = FR_ENUMS.COMP_RM_ALL,
               emitChange=True) -> dict:
     toEmit = self.defaultEmitDict.copy()

@@ -43,7 +43,7 @@ class CompMgrTester(TableModelTestCases):
   def test_undo_add(self):
     oldIds = np.arange(NUM_COMPS, dtype=int)
     mgr.addComps(self.sampleComps)
-    FR_SINGLETON.undoStack.undo()
+    FR_SINGLETON.actionStack.undo()
     self.assertTrue(len(mgr.compDf) == 0)
 
   def test_empty_add(self):
@@ -115,7 +115,7 @@ class CompMgrTester(TableModelTestCases):
     # Standard remove
     mgr.addComps(comps)
     mgr.rmComps(ids)
-    FR_SINGLETON.undoStack.undo()
+    FR_SINGLETON.actionStack.undo()
     self.assertTrue(mgr.compDf.equals(comps))
 
 

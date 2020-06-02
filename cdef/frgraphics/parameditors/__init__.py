@@ -8,7 +8,7 @@ from .table import FRTableFilterEditor, FRTableData
 from . import pgregistered
 from cdef.projectvars import GEN_PROPS_DIR, SCHEMES_DIR, BASE_DIR
 from cdef.structures import FRParam
-from cdef.undo import FRActionStack
+from cdef.actionstack import FRActionStack
 
 
 class FRGeneralPropertiesEditor(FRParamEditor):
@@ -40,7 +40,7 @@ class _FRSingleton:
     self.algParamMgr.sigProcessorCreated.connect(lambda editor:
                                                  self.quickLoader.listModel.addEditors([editor]))
 
-    self.undoStack = FRActionStack()
+    self.actionStack = FRActionStack()
   @property
   def allEditors(self):
     return self.registerableEditors + [self.quickLoader]

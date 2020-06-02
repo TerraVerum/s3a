@@ -127,8 +127,8 @@ class FRCdefApp(FRAnnotatorUI):
       profileLoadFunc(quickLoaderArgs)
 
     # EDIT
-    self.undoAct.triggered.connect(lambda: FR_SINGLETON.undoStack.undo())
-    self.redoAct.triggered.connect(lambda: FR_SINGLETON.undoStack.redo())
+    self.undoAct.triggered.connect(lambda: FR_SINGLETON.actionStack.undo())
+    self.redoAct.triggered.connect(lambda: FR_SINGLETON.actionStack.redo())
 
 
     # ANALYTICS
@@ -351,7 +351,7 @@ class FRCdefApp(FRAnnotatorUI):
 
   @Slot(object)
   def add_focusComp(self, newComps: df):
-    with FR_SINGLETON.undoStack.group('Create New Comp'):
+    with FR_SINGLETON.actionStack.group('Create New Comp'):
       self.compMgr.addComps(newComps)
       # Make sure index matches ID before updating current component
       newComps = newComps.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
@@ -458,8 +458,8 @@ class FRCdefApp(FRAnnotatorUI):
   # ---------------
   # CUSTOM UI ELEMENT CALLBACKS
   # ---------------
+  @FR_SINGLETON.actionStack.undoable('Change Current Component')
   @Slot(object)
-  @FR_SINGLETON.undoStack.undoable('Change Current Component')
   def updateCurComp(self, newComps: df):
     oldSer = self.focusedImg.compSer
     if len(newComps) == 0:

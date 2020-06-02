@@ -1,6 +1,6 @@
 from typing import List, Any
 
-from cdef import undo
+from cdef import actionstack
 import numpy as np
 import pytest
 
@@ -14,7 +14,7 @@ def op(lst):
   del lst[-1]
 
 def test_group():
-  stack = undo.FRActionStack()
+  stack = actionstack.FRActionStack()
   mylst = []
   @stack.undoable('op')
   def op(lst):
@@ -33,7 +33,7 @@ def test_group():
   assert mylst == []
 
 def test_nested_doable():
-  stack = undo.FRActionStack()
+  stack = actionstack.FRActionStack()
 
   mylst = []
   @stack.undoable('outer op')
@@ -55,7 +55,7 @@ def test_nested_doable():
   assert mylst == []
 
 def test_recursive():
-  stack = undo.FRActionStack()
+  stack = actionstack.FRActionStack()
 
   nextPow2 = int(np.power(2, np.ceil(np.log2(COUNT))))
   mylst = list(range(nextPow2))
@@ -83,7 +83,7 @@ def test_recursive():
   assert mylst == swapped
 
 def test_bad_undo():
-  stack = undo.FRActionStack()
+  stack = actionstack.FRActionStack()
 
   @stack.undoable('trivial')
   def op(lst):
@@ -100,12 +100,12 @@ def test_bad_undo():
     stack.undo()
 
 def test_bad_redo():
-  stack = undo.FRActionStack()
+  stack = actionstack.FRActionStack()
   with pytest.raises(FRUndoStackError):
     stack.redo()
 
 def test_invalidate_redos():
-  stack = undo.FRActionStack()
+  stack = actionstack.FRActionStack()
 
   @stack.undoable()
   def op(lst, el):
@@ -136,7 +136,7 @@ def test_invalidate_redos():
   assert mylst == cmplst + [1]
 
 def test_ignore_acts():
-  stack = undo.FRActionStack()
+  stack = actionstack.FRActionStack()
   curop = stack.undoable('test ignore')(op)
   mylst = []
   with stack.ignoreActions():

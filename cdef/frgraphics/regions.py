@@ -287,7 +287,7 @@ class FRVertexDefinedImg(pg.ImageItem):
     outImg[idxs] = self.image
     return outImg
 
-  @FR_SINGLETON.undoStack.undoable('Modify Focused Region')
+  @FR_SINGLETON.actionStack.undoable('Modify Focused Region')
   def updateFromVertices(self, newVerts: FRComplexVertices, srcImg: GrayImg=None):
     oldImg = self.image
     oldVerts = self.verts

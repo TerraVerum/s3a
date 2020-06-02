@@ -6,7 +6,7 @@ from datetime import datetime
 # Preference directories
 from cdef.structures import FRComplexVertices, FRParam, FRParamGroup, newParam
 
-__all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR', 'USER_PROFILES_DIR',
+__all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR', 'QUICK_LOAD_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'FILTERS_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
            'DATE_FORMAT', 'REQD_TBL_FIELDS', 'COMP_CLASS_NA', 'FR_CONSTS']
 BASE_DIR = Path(__file__).parent.parent.absolute()
@@ -20,7 +20,7 @@ DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 # EDITORS
 # -----
 LAYOUTS_DIR = os.path.join(MENU_OPTS_DIR, 'layouts', '')
-USER_PROFILES_DIR = os.path.join(MENU_OPTS_DIR, 'quickLoaders', '')
+QUICK_LOAD_DIR = os.path.join(MENU_OPTS_DIR, 'quickloaders', '')
 SCHEMES_DIR = os.path.join(MENU_OPTS_DIR, 'schemes', '')
 FILTERS_DIR = os.path.join(MENU_OPTS_DIR, 'filters', '')
 GEN_PROPS_DIR = os.path.join(MENU_OPTS_DIR, 'regioncontrols', '')
@@ -28,7 +28,7 @@ SHORTCUTS_DIR = os.path.join(MENU_OPTS_DIR, 'shortcuts', '')
 
 # Ensure menuopts and layouts directories exist
 Path(LAYOUTS_DIR).mkdir(parents=True, exist_ok=True)
-Path(USER_PROFILES_DIR).mkdir(parents=True, exist_ok=True)
+Path(QUICK_LOAD_DIR).mkdir(parents=True, exist_ok=True)
 
 COMP_CLASS_NA = FRParam('Unassigned')
 

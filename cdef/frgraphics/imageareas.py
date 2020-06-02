@@ -278,7 +278,7 @@ class FRFocusedImage(FREditableImg):
     if not np.array_equal(newMask,compMask):
       self.region.updateFromMask(newMask)
 
-  @FR_SINGLETON.undoStack.undoable('Modify Focused Component')
+  @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
   def updateAll(self, mainImg: Optional[NChanImg], newComp:Optional[pd.Series]=None,
                 isAlreadyTrimmed=False):
     oldImg = self.imgItem.image
@@ -326,7 +326,7 @@ class FRFocusedImage(FREditableImg):
     self.imgItem.setImage(segImg)
     self.procCollection.image = segImg
 
-  @FR_SINGLETON.undoStack.undoable('Modify Focused Component')
+  @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
   def updateRegionFromVerts(self, newVerts: FRComplexVertices, offset: FRVertices=None):
     # Component vertices are nan-separated regions
     oldVerts = self.region.verts

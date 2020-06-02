@@ -265,7 +265,7 @@ class FRCompTableView(QtWidgets.QTableView):
       return
 
     dataToSet = self.mgr.compDf.loc[[idList[0]],:].copy()
-    with FR_SINGLETON.undoStack.ignoreActions():
+    with FR_SINGLETON.actionStack.ignoreActions():
       self.popup.setData(dataToSet, colIdxs)
       wasAccepted = self.popup.exec()
     if wasAccepted and len(self.popup.dirtyColIdxs) > 0:

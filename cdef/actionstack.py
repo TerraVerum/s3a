@@ -105,43 +105,6 @@ class FRActionStack:
   and *undocallback*. Each of these allow a callback function to be set
   which is called when an action is done or undone repectively. By default,
   they do nothing.
-
-  >>> stack = FRActionStack()
-  >>> def done():
-  ...     print('Can now undo: {}'.format(stack.undotext))
-  >>> def undone():
-  ...     print('Can now redo: {}'.format(stack.redotext))
-  >>> stack.doCallback = done
-  >>> stack.undoCallback = undone
-  >>> @undoable('An action')
-  ... def action():
-  ...     yield
-  >>> action()
-  Can now undo: Undo An action
-  >>> stack.undo()
-  Can now redo: Redo An action
-  >>> stack.redo()
-  Can now undo: Undo An action
-
-  Setting them back to ``lambda: None`` will stop any further actions.
-
-  >>> stack.doCallback = stack.undoCallback = lambda: None
-  >>> action()
-  >>> stack.undo()
-
-  It is possible to mark a point in the undo history when the document
-  handled is saved. This allows the undo system to report whether a
-  document has changed. The point is marked using :func:`savepoint` and
-  :func:`haschanged` returns whether or not the state has changed (either
-  by doing or undoing an action). Only one savepoint can be tracked,
-  marking a new one removes the old one.
-
-  >>> stack.setSavepoint()
-  >>> stack.hasChanged
-  False
-  >>> action()
-  >>> stack.hasChanged
-  True
   """
 
   def __init__(self, maxlen:int=50):
