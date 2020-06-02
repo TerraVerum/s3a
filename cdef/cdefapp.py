@@ -336,7 +336,7 @@ class FRCdefApp(FRAnnotatorUI):
 
   @Slot(object)
   def add_focusComp(self, newComps: df):
-    with FR_SINGLETON.actionStack.group('Create New Comp'):
+    with FR_SINGLETON.actionStack.group('Create New Comp', flushRedos=True):
       self.compMgr.addComps(newComps)
       # Make sure index matches ID before updating current component
       newComps = newComps.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)

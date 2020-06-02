@@ -116,7 +116,7 @@ class FRActionStack:
     self.doCallback = lambda: None
 
   @contextlib.contextmanager
-  def group(self, descr: str=None):
+  def group(self, descr: str=None, flushRedos=False):
     """ Return a context manager for grouping undoable actions.
 
     All actions which occur within the group will be undone by a single call
@@ -133,6 +133,8 @@ class FRActionStack:
         for _ in actIter:
           groupStack.redo()
     self.actions.append(_FRAction(grpAct, descr=descr, treatAsUndo=True))
+    if flushRedos:
+      self.flushUnusedRedos()
 
   def undoable(self, descr=None):
     """ Decorator which creates a new undoable action type.
@@ -180,6 +182,10 @@ class FRActionStack:
     while (len(self.actions) > 0
            and not self.actions[0].treatAsUndo):
       self.actions.popleft()
+
+  def flushUntilSavepoint(self):
+    while self.actions[-1] is not self._savepoint:
+      self.actions.pop()
 
   def redo(self):
     """
