@@ -283,7 +283,7 @@ class FRVertexDefinedImg(pg.ImageItem):
 
   def embedMaskInImg(self, toEmbedShape: Tuple[int, int]):
     outImg = np.zeros(toEmbedShape, dtype=bool)
-    idxs = [slice(0, self.image.shape[ii]) for ii in range(2)]
+    idxs = tuple(slice(0, self.image.shape[ii]) for ii in range(2))
     outImg[idxs] = self.image
     return outImg
 

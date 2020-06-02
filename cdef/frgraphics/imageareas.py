@@ -282,6 +282,8 @@ class FRFocusedImage(FREditableImg):
   def updateAll(self, mainImg: Optional[NChanImg], newComp:Optional[pd.Series]=None,
                 isAlreadyTrimmed=False):
     oldImg = self.imgItem.image
+    if oldImg is not None:
+      oldImg = oldImg.copy()
     oldComp = self.compSer
 
     if mainImg is None:
@@ -300,6 +302,7 @@ class FRFocusedImage(FREditableImg):
       bboxToUse = self.bbox
     else:
       bboxToUse = FRVertices([[0,0], mainImg.shape[:2]])
+      self.bbox = bboxToUse
     self.updateCompImg(mainImg, bboxToUse)
     self.updateRegionFromVerts(newVerts, bboxToUse[0,:])
     self.autoRange()
