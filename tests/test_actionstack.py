@@ -1,64 +1,61 @@
-from typing import List, Any
+from typing import List, Any, Callable
 
-from cdef import actionstack
+from cdef.actionstack import FRActionStack
 import numpy as np
 import pytest
 
-from cdef.structures import FRUndoStackError
+from cdef.structures import FRActionStackError
 
 COUNT = 10
 
-def op(lst):
-  lst.append(len(lst))
-  yield
-  del lst[-1]
+class StackForTesting(FRActionStack):
+  def __init__(self):
+    super().__init__()
+    def op(num=None):
+      if num is None:
+        num = len(lst)
+      lst.append(num)
+      yield
+      lst.pop()
+    lst = []
+    op = self.undoable()(op)
+
+    self.op = op
+    self.lst = lst
 
 def test_group():
-  stack = actionstack.FRActionStack()
-  mylst = []
-  @stack.undoable('op')
-  def op(lst):
-    lst.append(len(lst))
-    yield
-    lst.pop()
+  stack = StackForTesting()
   with stack.group('multi op'):
     for ii in range(COUNT):
-      op(mylst)
-      assert mylst[-1] == ii
-  op(mylst)
-  assert mylst == list(range(COUNT+1))
+      stack.op()
+      assert stack.lst[-1] == ii
+  stack.op()
+  assert stack.lst == list(range(COUNT+1))
   stack.undo()
-  assert mylst == list(range(COUNT))
+  assert stack.lst == list(range(COUNT))
   stack.undo()
-  assert mylst == []
+  assert stack.lst == []
 
 def test_nested_doable():
-  stack = actionstack.FRActionStack()
+  stack = StackForTesting()
 
-  mylst = []
   @stack.undoable('outer op')
-  def outer(lst):
-    lst.append(str(len(lst)))
-    inner(lst)
+  def outer():
+    stack.lst.append(str(len(stack.lst)))
+    stack.op()
     yield
-    lst.pop();lst.pop()
+    stack.lst.pop();stack.lst.pop()
 
-  @stack.undoable('inner  op')
-  def inner(lst):
-    lst.append(len(lst))
-    yield
-    lst.pop()
-
-  outer(mylst)
-  assert mylst == ['0', 1]
+  outer()
+  assert stack.lst == ['0', 1]
   stack.undo()
-  assert mylst == []
+  assert stack.lst == []
 
 def test_recursive():
-  stack = actionstack.FRActionStack()
+  stack = StackForTesting()
 
   nextPow2 = int(np.power(2, np.ceil(np.log2(COUNT))))
-  mylst = list(range(nextPow2))
+  stack.lst = list(range(nextPow2))
   @stack.undoable('recursive op')
   def swapHalves(lst):
     sz = len(lst)
@@ -74,50 +71,41 @@ def test_recursive():
 
     swapHalves(lst)
 
-  origLst = mylst.copy()
-  swapHalves(mylst)
-  swapped = mylst.copy()
+  origLst = stack.lst.copy()
+  swapHalves(stack.lst)
+  swapped = stack.lst.copy()
   stack.undo()
-  assert mylst == origLst
+  assert stack.lst == origLst
   stack.redo()
-  assert mylst == swapped
+  assert stack.lst == swapped
 
 def test_bad_undo():
-  stack = actionstack.FRActionStack()
+  stack = StackForTesting()
 
-  @stack.undoable('trivial')
-  def op(lst):
-    lst.append([lst]*2)
-    yield
-    del lst[-1]
-
-  mylst = [1,2,3]
   for _ii in range(4):
-    op(mylst)
+    stack.op()
   for _ii in range(4):
     stack.undo()
-  with pytest.raises(FRUndoStackError):
+  with pytest.raises(FRActionStackError):
     stack.undo()
 
 def test_bad_redo():
-  stack = actionstack.FRActionStack()
-  with pytest.raises(FRUndoStackError):
+  stack = StackForTesting()
+  with pytest.raises(FRActionStackError):
+    stack.redo()
+  stack.op()
+  with pytest.raises(FRActionStackError):
+    stack.undo()
+    stack.redo()
     stack.redo()
 
 def test_invalidate_redos():
-  stack = actionstack.FRActionStack()
+  stack = StackForTesting()
 
-  @stack.undoable()
-  def op(lst, el):
-    lst.append(el)
-    yield
-    del lst[-1]
-
-  mylst = []
   for ii in range(COUNT):
-    op(mylst, ii)
+    stack.op()
 
-  assert mylst == list(range(COUNT))
+  assert stack.lst == list(range(COUNT))
   numEntriesToRemomve = COUNT//3
   for ii in range(numEntriesToRemomve):
     stack.undo()
@@ -125,23 +113,22 @@ def test_invalidate_redos():
   numRemainingEntries = COUNT-numEntriesToRemomve
   assert np.sum([a.treatAsUndo for a in stack.actions]) == numRemainingEntries
 
-  op(mylst, 1)
-  with pytest.raises(FRUndoStackError):
+  stack.op(1)
+  # New action should flush old ones
+  with pytest.raises(FRActionStackError):
     stack.redo()
   stack.undo()
   assert len(stack.actions) == numRemainingEntries+1
   cmplst = list(range(numRemainingEntries))
-  assert mylst == cmplst
+  assert stack.lst == cmplst
   stack.redo()
-  assert mylst == cmplst + [1]
+  assert stack.lst == cmplst + [1]
 
 def test_ignore_acts():
-  stack = actionstack.FRActionStack()
-  curop = stack.undoable('test ignore')(op)
-  mylst = []
+  stack = StackForTesting()
   with stack.ignoreActions():
     for _ in range(COUNT):
-      curop(mylst)
+      stack.op()
   assert len(stack.actions) == 0
-  with pytest.raises(FRUndoStackError):
+  with pytest.raises(FRActionStackError):
     stack.undo()

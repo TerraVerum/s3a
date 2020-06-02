@@ -13,7 +13,7 @@ from typing import Callable, Generator, Deque, Union, Type, Any, List
 
 from typing_extensions import Protocol
 
-from cdef.structures import FRUndoStackError, FRCdefException
+from cdef.structures import FRActionStackError, FRCdefException
 
 
 class _FRAction:
@@ -199,7 +199,7 @@ class FRActionStack:
     """
     ret = None
     if not self.canRedo:
-      raise FRUndoStackError('Nothing to redo')
+      raise FRActionStackError('Nothing to redo')
 
     self._curReceiver.rotate(-1)
     try:
@@ -222,7 +222,7 @@ class FRActionStack:
     Undo the last action.
     """
     if not self.canUndo:
-      raise FRUndoStackError('Nothing to undo')
+      raise FRActionStackError('Nothing to undo')
 
     ret = self.processAct()
     self._curReceiver.rotate(1)
