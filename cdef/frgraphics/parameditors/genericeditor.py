@@ -8,7 +8,7 @@ from pyqtgraph.parametertree import Parameter, ParameterTree
 
 from cdef.frgraphics.graphicsutils import dialogGetSaveFileName, saveToFile, \
   attemptFileLoad
-from cdef.structures import FRParam, ContainsSharedProps
+from cdef.structures import FRParam, ContainsSharedProps, FilePath
 
 Signal = QtCore.pyqtSignal
 
@@ -24,7 +24,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
   sigParamStateUpdated = Signal(dict)
   sigParamStateDeleted = Signal(str)
 
-  def __init__(self, parent=None, paramList: List[Dict]=None, saveDir='.',
+  def __init__(self, parent=None, paramList: List[Dict]=None, saveDir: FilePath='.',
                fileType='param', saveDlgName='Save As', name=None,
                childForOverride: Parameter=None):
     # Place in list so an empty value gets unpacked into super constructor
@@ -83,7 +83,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
     # -----------
     # Internal parameters for saving settings
     # -----------
-    self.saveDir = saveDir
+    self.saveDir = Path(saveDir)
     self.fileType = fileType
     self._saveDlgName = saveDlgName
     self._stateBeforeEdit = self.params.saveState()
@@ -228,8 +228,8 @@ class FRParamEditor(QtWidgets.QDockWidget):
       paramState = self.params.saveState(filter='user')
     # Remove non-useful values
     clearUnwantedParamVals(paramState)
-    Path(self.saveDir).mkdir(parents=True, exist_ok=True)
-    saveToFile(paramState, self.saveDir, saveName, self.fileType,
+    self.saveDir.mkdir(parents=True, exist_ok=True)
+    saveToFile(paramState, self.formatFileName(saveName),
                         allowOverwriteDefault=allowOverwriteDefault)
     self.applyBtnClicked()
     outDict: dict = self.params.getValues()
@@ -269,14 +269,20 @@ class FRParamEditor(QtWidgets.QDockWidget):
     self.lastAppliedName = stateName
     return loadDict
 
+  def formatFileName(self, stateName: str=None):
+    if stateName is None:
+      stateName = self.lastAppliedName
+    return self.saveDir/f'{stateName}.{self.fileType}'
+
   def _parseStateDict(self, stateName: str, stateDict: dict=None):
-    if stateDict is None:
-      dictFilename = Path(self.saveDir)/f'{stateName}.{self.fileType}'
-      stateDict = attemptFileLoad(dictFilename)
+    if stateDict is not None:
+      return stateDict
+    dictFilename = self.formatFileName(stateName)
+    stateDict = attemptFileLoad(dictFilename)
     return stateDict
 
   def deleteParamState(self, stateName: str):
-    filename = Path(self.saveDir)/f'{stateName}.{self.fileType}'
+    filename = self.formatFileName(stateName)
     if not filename.exists():
       return
     filename.unlink()

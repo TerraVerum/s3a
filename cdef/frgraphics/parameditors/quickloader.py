@@ -74,8 +74,8 @@ class FREditorListModel(QtCore.QAbstractListModel):
     return 'Parameter State List'
 
   @staticmethod
-  def getParamStateFiles(stateDir: str, fileExt: str) -> List[str]:
-    files = Path(stateDir).glob(f'*.{fileExt}')
+  def getParamStateFiles(stateDir: Path, fileExt: str) -> List[str]:
+    files = stateDir.glob(f'*.{fileExt}')
     return [file.stem for file in files]
 
 

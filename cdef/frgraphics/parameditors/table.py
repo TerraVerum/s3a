@@ -1,9 +1,7 @@
 import copy
 import sys
 from datetime import datetime
-from os import PathLike
-from pathlib import Path
-from typing import List, Union
+from typing import List
 
 from pandas import DataFrame as df
 from ruamel.yaml import YAML
@@ -12,7 +10,7 @@ import cdef.frgraphics
 from cdef.frgraphics.parameditors import FRParamEditor
 from cdef.projectvars import FILTERS_DIR, REQD_TBL_FIELDS, COMP_CLASS_NA, DATE_FORMAT, \
   FR_CONSTS
-from cdef.structures import FRParam
+from cdef.structures import FRParam, FilePath
 
 yaml = YAML()
 
@@ -105,7 +103,7 @@ class FRTableData:
       outDf = outDf.drop(index=REQD_TBL_FIELDS.INST_ID.value)
     return outDf
 
-  def loadCfg(self, cfgFname: Union[str, Path, PathLike]):
+  def loadCfg(self, cfgFname: FilePath):
     with open(cfgFname, 'r') as ifile:
       cfg: dict = yaml.load(ifile)
     self.resetLists()

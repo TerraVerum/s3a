@@ -25,7 +25,7 @@ from .generalutils import resolveAuthorName
 from .projectvars.constants import FR_CONSTS
 from .projectvars.constants import LAYOUTS_DIR, REQD_TBL_FIELDS
 from .projectvars.enums import FR_ENUMS, _FREnums
-from .structures import FRAppIOError, NChanImg
+from .structures import FRAppIOError, NChanImg, FilePath
 from .tablemodel import FRComponentIO
 from .tablemodel import FRComponentMgr
 from .tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
@@ -198,7 +198,7 @@ class FRCdefApp(FRAnnotatorUI):
   def populateParamEditorMenuOpts(objForMenu: FRParamEditor, winMenu: QtWidgets.QMenu,
                                   triggerFn: Callable):
     addDirItemsToMenu(winMenu,
-                      join(objForMenu.saveDir, f'*.{objForMenu.fileType}'),
+                      objForMenu.saveDir.glob(f'*.{objForMenu.fileType}'),
                       triggerFn)
 
   # -----
@@ -241,7 +241,7 @@ class FRCdefApp(FRAnnotatorUI):
   def clearBoundaries(self):
     self.compMgr.rmComps()
 
-  def resetMainImg(self, fileName: str=None, imgData: NChanImg=None,
+  def resetMainImg(self, fileName: FilePath=None, imgData: NChanImg=None,
                    clearExistingComps=True):
     """
     * If fileName is None, the main and focused images are blacked out.
@@ -256,7 +256,7 @@ class FRCdefApp(FRAnnotatorUI):
       Else, they are retained.
     """
     if fileName is not None:
-      fileName = str(Path(fileName).resolve())
+      fileName = Path(fileName).resolve()
     with BusyCursor():
       if clearExistingComps:
         self.compMgr.rmComps()
@@ -271,12 +271,12 @@ class FRCdefApp(FRAnnotatorUI):
         self.estimateBoundaries()
 
   def loadLayout(self, layoutName: str):
-    layoutFilename = join(LAYOUTS_DIR, f'{layoutName}.dockstate')
+    layoutFilename = LAYOUTS_DIR/f'{layoutName}.dockstate'
     self.restoreState(attemptFileLoad(layoutFilename))
 
   def saveLayout(self, layoutName: str=None, allowOverwriteDefault=False):
     dockStates = self.saveState().data()
-    saveToFile(dockStates, LAYOUTS_DIR, layoutName, 'dockstate',
+    saveToFile(dockStates, LAYOUTS_DIR/f'{layoutName}.dockstate',
                allowOverwriteDefault=allowOverwriteDefault)
     self.sigLayoutSaved.emit()
 

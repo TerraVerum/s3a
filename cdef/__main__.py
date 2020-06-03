@@ -1,8 +1,6 @@
 import sys
-from os import PathLike
-from pathlib import Path
 from typing import Optional, Union
-
+from cdef.structures import FilePath
 
 import fire
 from pyqtgraph.Qt import QtCore
@@ -10,7 +8,7 @@ from pyqtgraph.Qt import QtCore
 from . import appInst, FRCdefApp, FR_SINGLETON
 
 
-def main(gui=True, tableCfg: Union[str, Path, PathLike]=None, **profileArgs) -> Optional[FRCdefApp]:
+def main(gui=True, tableCfg: FilePath=None, **profileArgs) -> Optional[FRCdefApp]:
   """
   Calling code for the CDEF application.
 

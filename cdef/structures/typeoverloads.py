@@ -1,6 +1,9 @@
 import typing
+from typing import Union
 
 from numpy import ndarray
+from os import PathLike
+from pathlib import Path
 
 """
 Functions that just return a `np.ndarray` are often hard to interpret. Is the output a simple array, image, 
@@ -17,4 +20,6 @@ NChanImg = ndarray
 OneDArr = ndarray
 TwoDArr = ndarray
 ThreeDArr = ndarray
+
+FilePath = Union[PathLike, str, Path]
 

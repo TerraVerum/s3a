@@ -64,7 +64,7 @@ class FRAlgCollectionEditor(FRParamEditor):
     super().__init__(parent, saveDir=saveDir, fileType='alg', name=name,
                      childForOverride=self.algOpts)
 
-    Path(self.saveDir).mkdir(parents=True, exist_ok=True)
+    self.saveDir.mkdir(parents=True, exist_ok=True)
 
     self.curProcessor: Optional[FRImgProcWrapper] = None
     self.nameToProcMapping: Dict[str, FRImgProcWrapper] = {}

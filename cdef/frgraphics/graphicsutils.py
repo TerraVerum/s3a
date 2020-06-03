@@ -5,12 +5,12 @@ from glob import glob
 from os.path import basename
 from pathlib import Path
 from traceback import format_exception, format_exception_only
-from typing import Optional, Union
+from typing import Optional, Union, Callable, Generator
 
 from ruamel.yaml import YAML
 
 from cdef import appInst
-from cdef.structures import FRAppIOError, FRCdefException
+from cdef.structures import FRAppIOError, FRCdefException, FilePath
 
 yaml = YAML()
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
@@ -63,13 +63,15 @@ def dialogGetSaveFileName(parent, winTitle, defaultTxt: str=None)-> Optional[str
       return saveName
   return returnVal
 
-def saveToFile(saveObj, saveDir, saveName, fileType, allowOverwriteDefault=False):
-  if not allowOverwriteDefault and saveName.lower() == 'default':
+def saveToFile(saveObj, savePath: Path, allowOverwriteDefault=False):
+  if not allowOverwriteDefault and savePath.stem.lower() == 'default':
     errMsg = 'Cannot overwrite default setting.\n\'Default\' is automatically' \
              ' generated, so it should not be modified.'
     raise FRAppIOError(errMsg)
   else:
-    with open(f'{saveDir}{saveName}.{fileType}', 'w') as saveFile:
+    # Known pycharm bug
+    # noinspection PyTypeChecker
+    with open(savePath, 'w') as saveFile:
       yaml.dump(saveObj, saveFile)
 
 def dialogGetAuthorName(parent: QtWidgets.QMainWindow) -> str:
@@ -120,12 +122,13 @@ def raiseErrorLater(err: Exception):
     raise err
   QtCore.QTimer.singleShot(0, _raise)
 
-def attemptFileLoad(fpath, openMode='r') -> Union[dict, bytes]:
+def attemptFileLoad(fpath: FilePath , openMode='r') -> Union[dict, bytes]:
   with open(fpath, openMode) as ifile:
     loadObj = yaml.load(ifile)
   return loadObj
 
-def addDirItemsToMenu(parentMenu, dirRegex, triggerFunc, removeExistingChildren=True):
+def addDirItemsToMenu(parentMenu: QtWidgets.QMenu, dirGlob: Generator,
+                      triggerFunc: Callable, removeExistingChildren=True):
   """Helper function for populating menu from directory contents"""
   # We don't want all menu children to be removed, since this would also remove the 'edit' and
   # separator options. So, do this step manually. Remove all actions after the separator
@@ -138,8 +141,7 @@ def addDirItemsToMenu(parentMenu, dirRegex, triggerFunc, removeExistingChildren=
         encounteredSep = True
   # TODO: At the moment param files that start with '.' aren't getting included in the
   #  glob
-  itemNames = glob(dirRegex)
-  for name in itemNames:
+  for name in dirGlob:
     # glob returns entire filepath, so keep only filename as layout name
     name = basename(name)
     # Also strip file extension

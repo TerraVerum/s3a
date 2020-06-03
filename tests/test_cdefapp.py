@@ -31,9 +31,9 @@ class CdefAppTestCases(TestCase):
 
   def test_change_img(self):
     im2 = RND.integers(0, 255, SAMPLE_IMG.shape, 'uint8')
-    name = str(Path('./testfile').absolute())
+    name = Path('./testfile')
     app.resetMainImg(name, im2)
-    self.assertSequenceEqual(name, FR_SINGLETON.tableData.annFile,
+    self.assertEqual(name, FR_SINGLETON.tableData.annFile,
                              'Annotation source not set after loading image on start')
 
     np.testing.assert_array_equal(app.mainImg.image, im2,

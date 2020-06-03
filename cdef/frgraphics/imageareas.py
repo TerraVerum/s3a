@@ -12,7 +12,7 @@ from cdef import FR_SINGLETON
 from cdef.generalutils import getClippedBbox
 from cdef.processingutils import getVertsFromBwComps, segmentComp
 from cdef.projectvars import REQD_TBL_FIELDS, FR_CONSTS, FR_ENUMS
-from cdef.structures import FRParam, FRVertices, FRComplexVertices
+from cdef.structures import FRParam, FRVertices, FRComplexVertices, FilePath
 from cdef.structures import NChanImg
 from .clickables import FRRightPanViewBox
 from .drawopts import FRDrawOpts
@@ -192,11 +192,11 @@ class FRMainImage(FREditableImg):
   def image(self):
     return self.imgItem.image
 
-  def setImage(self, imgSrc: Union[str, np.ndarray]=None):
+  def setImage(self, imgSrc: Union[FilePath, np.ndarray]=None):
     """
     Allows the user to change the main image either from a filepath or array data
     """
-    if isinstance(imgSrc, str):
+    if isinstance(imgSrc, FilePath.__args__):
       # TODO: Handle alpha channel images. For now, discard that data
       imgSrc = imread(imgSrc)
       if imgSrc.ndim < 3:

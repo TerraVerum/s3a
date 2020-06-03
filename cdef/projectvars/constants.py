@@ -9,26 +9,25 @@ from cdef.structures import FRComplexVertices, FRParam, FRParamGroup, newParam
 __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR', 'QUICK_LOAD_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'FILTERS_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
            'DATE_FORMAT', 'REQD_TBL_FIELDS', 'COMP_CLASS_NA', 'FR_CONSTS']
-BASE_DIR = Path(__file__).parent.parent.absolute()
-MENU_OPTS_DIR = os.path.join(BASE_DIR, 'menuopts', '')
-ICON_DIR = os.path.join(BASE_DIR, 'icons', '')
-ANN_AUTH_DIR = os.path.join(MENU_OPTS_DIR)
+BASE_DIR = Path(__file__).parent.parent
+MENU_OPTS_DIR = BASE_DIR/'menuopts'
+ICON_DIR = BASE_DIR/'icons'
+ANN_AUTH_DIR = Path(MENU_OPTS_DIR)
 
 DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 # -----
 # EDITORS
 # -----
-LAYOUTS_DIR = os.path.join(MENU_OPTS_DIR, 'layouts', '')
-QUICK_LOAD_DIR = os.path.join(MENU_OPTS_DIR, 'quickloaders', '')
-SCHEMES_DIR = os.path.join(MENU_OPTS_DIR, 'schemes', '')
-FILTERS_DIR = os.path.join(MENU_OPTS_DIR, 'filters', '')
-GEN_PROPS_DIR = os.path.join(MENU_OPTS_DIR, 'regioncontrols', '')
-SHORTCUTS_DIR = os.path.join(MENU_OPTS_DIR, 'shortcuts', '')
+LAYOUTS_DIR = MENU_OPTS_DIR/'layouts'
+QUICK_LOAD_DIR = MENU_OPTS_DIR/'quickloaders'
+SCHEMES_DIR = MENU_OPTS_DIR/'schemes'
+FILTERS_DIR = MENU_OPTS_DIR/'filters'
+GEN_PROPS_DIR = MENU_OPTS_DIR/'regioncontrols'
+SHORTCUTS_DIR = MENU_OPTS_DIR/'shortcuts'
 
 # Ensure menuopts and layouts directories exist
-Path(LAYOUTS_DIR).mkdir(parents=True, exist_ok=True)
-Path(QUICK_LOAD_DIR).mkdir(parents=True, exist_ok=True)
+LAYOUTS_DIR.mkdir(parents=True, exist_ok=True)
 
 COMP_CLASS_NA = FRParam('Unassigned')
 
@@ -140,16 +139,16 @@ class _FRConsts(FRParamGroup):
   # DRAWING
   # -------------------
   # Shapes
-  DRAW_SHAPE_RECT : FRParam = newParam('Rectangle', f'{ICON_DIR}rectangle.svg', 'icon')
-  DRAW_SHAPE_POLY : FRParam = newParam('Polygon', f'{ICON_DIR}polygon.svg', 'icon')
+  DRAW_SHAPE_RECT : FRParam = newParam('Rectangle', str(ICON_DIR/'rectangle.svg'), 'icon')
+  DRAW_SHAPE_POLY : FRParam = newParam('Polygon', str(ICON_DIR/'polygon.svg'), 'icon')
   DRAW_SHAPE_FREE : FRParam = newParam('Freehand')
-  DRAW_SHAPE_PAINT: FRParam = newParam('Paint', f'{ICON_DIR}paint.svg', 'icon')
+  DRAW_SHAPE_PAINT: FRParam = newParam('Paint', str(ICON_DIR/'paint.svg'), 'icon')
   DRAW_SHAPE_NONE : FRParam = newParam('None')
   # Actions
-  DRAW_ACT_ADD    : FRParam = newParam('Add to Foreground', f'{ICON_DIR}foreground.png', 'icon')
-  DRAW_ACT_REM    : FRParam = newParam('Add to Background', f'{ICON_DIR}background.png', 'icon')
-  DRAW_ACT_SELECT : FRParam = newParam('Select', f'{ICON_DIR}select.svg', 'icon')
-  DRAW_ACT_PAN    : FRParam = newParam('Pan', f'{ICON_DIR}pan.svg', 'icon')
+  DRAW_ACT_ADD    : FRParam = newParam('Add to Foreground', str(ICON_DIR/'foreground.png'), 'icon')
+  DRAW_ACT_REM    : FRParam = newParam('Add to Background', str(ICON_DIR/'background.png'), 'icon')
+  DRAW_ACT_SELECT : FRParam = newParam('Select', str(ICON_DIR/'select.svg'), 'icon')
+  DRAW_ACT_PAN    : FRParam = newParam('Pan', str(ICON_DIR/'pan.svg'), 'icon')
 FR_CONSTS = _FRConsts()
 
 # from ruamel.yaml import YAML
