@@ -13,6 +13,7 @@ from typing import Callable, Generator, Deque, Union, Type, Any, List
 
 from typing_extensions import Protocol
 
+from cdef.frgraphics.graphicsutils import raiseErrorLater
 from cdef.structures import FRActionStackError, FRCdefException
 
 
@@ -36,35 +37,24 @@ class _FRAction:
 
     self.treatAsUndo = treatAsUndo
     if treatAsUndo:
-      # Need to swap how methods are treated
-      tmp = self.forward
-      self.forward = self.backward
-      self.backward = tmp
-
-
-  def do(self):
-    if self.treatAsUndo:
-      ret = self.backward()
-    else:
-      ret = self.forward()
-    self.treatAsUndo = not self.treatAsUndo
-    return ret
+      # Need to init runner for when backward is called
+      self._runner = self._generator(*args, **kwargs)
 
   def forward(self):
     """Do or redo the action"""
     self._runner = self._generator(*self.args, **self.kwargs)
     # Forward use is expired, so treat as backward now
+    self.treatAsUndo = True
     return next(self._runner)
 
   def backward(self):
     """Undo the action"""
-    ret = None
-    try:
-      ret = next(self._runner)
-    except StopIteration:
-      pass
+    # It's OK if this raises StopIteration, since we don't need anything after
+    # calling it. Therefore call graceful next.
+    ret = gracefulNext(self._runner)
     # Delete it so that its not accidentally called again
     del self._runner
+    self.treatAsUndo = False
     return ret
 
 class EMPTY: pass
@@ -78,8 +68,6 @@ class Appendable(Protocol):
 
 class _FRBufferOverride:
   def __init__(self, stack: FRActionStack, newActQueue: deque=None):
-    if newActQueue is None:
-      newActQueue = deque()
     self.newActQueue = newActQueue
     self.stack = stack
 
@@ -96,6 +84,12 @@ class _FRBufferOverride:
   def __exit__(self, exc_type, exc_val, exc_tb):
     self.stack._curReceiver = self.oldStackActions
 
+def gracefulNext(generator: Generator):
+  try:
+    return next(generator)
+  except StopIteration as ex:
+    return ex.value
+
 class FRActionStack:
   """ The main undo stack.
 
@@ -110,8 +104,6 @@ class FRActionStack:
   """
 
   def __init__(self, maxlen:int=50):
-    if maxlen is not None:
-      maxlen *= 2
     self.actions: Deque[_FRAction] = deque(maxlen=maxlen)
     self._curReceiver = self.actions
     self._savepoint: Union[EmptyType, _FRAction] = EMPTY
@@ -119,32 +111,32 @@ class FRActionStack:
     self.doCallbacks: List[Callable] = []
 
   @contextlib.contextmanager
-  def group(self, descr: str=None, flushRedos=False):
+  def group(self, descr: str=None, flushUnusedRedos=False):
     """ Return a context manager for grouping undoable actions.
 
     All actions which occur within the group will be undone by a single call
     of `stack.undo`."""
-    groupStack = FRActionStack()
-    newActBuffer = groupStack._curReceiver
+    newActBuffer: deque[_FRAction] = deque()
     with _FRBufferOverride(self, newActBuffer):
       yield
-    actIter = range(len(newActBuffer))
     def grpAct():
-        for _ in actIter:
-          groupStack.undo()
+      for _ in range(2):
+        for act in newActBuffer:
+          if act.treatAsUndo:
+            act.backward()
+          else:
+            act.forward()
         yield
-        for _ in actIter:
-          groupStack.redo()
-    self._curReceiver.append(_FRAction(grpAct, descr=descr, treatAsUndo=True))
-    if flushRedos:
+    if self._curReceiver is not None:
+      self._curReceiver.append(_FRAction(grpAct, descr=descr, treatAsUndo=True))
+    if flushUnusedRedos:
       self.flushUnusedRedos()
 
   def undoable(self, descr=None):
     """ Decorator which creates a new undoable action type.
 
     This decorator should be used on a generator of the following format::
-
-      @undoable
+      @undoable(descr)
       def operation(*args):
         do_operation_code
         yield returnval
@@ -156,11 +148,20 @@ class FRActionStack:
         descr = generatorFn.__name__
       @wraps(generatorFn)
       def inner(*args, **kwargs):
+        shouldAppend = True
         action = _FRAction(generatorFn, args, kwargs, descr)
-        self._curReceiver.appendleft(action)
-        ret = self.redo()
-
-        self.flushUnusedRedos()
+        try:
+          with self.ignoreActions():
+            ret = action.forward()
+        except StopIteration as ex:
+          ret = ex.value
+          shouldAppend = False
+        if self._curReceiver is not None and shouldAppend:
+          self._curReceiver.append(action)
+        if self._curReceiver is self.actions:
+          # State change of application means old redos are invalid
+          self.flushUnusedRedos()
+        # Else: doesn't get added to the queue
         return ret
       return inner
     return decorator
@@ -168,27 +169,30 @@ class FRActionStack:
   @property
   def canUndo(self):
     """ Return *True* if undos are available """
-    try:
-      return self._curReceiver[-1].treatAsUndo
-    except IndexError:
-      return False
+    return len(self.actions) > 0 and self.actions[-1].treatAsUndo
 
   @property
   def canRedo(self):
     """ Return *True* if redos are available """
-    try:
-      return not self._curReceiver[0].treatAsUndo
-    except IndexError:
-      return False
+    return len(self.actions) > 0 and not self.actions[0].treatAsUndo
 
   def flushUnusedRedos(self):
-    while (len(self._curReceiver) > 0
-           and not self._curReceiver[0].treatAsUndo):
-      self._curReceiver.popleft()
+    while self.canRedo:
+      if self.actions[0] is self._savepoint:
+        self._savepoint = EMPTY
+      self.actions.popleft()
 
-  def flushUntilSavepoint(self):
-    while self._curReceiver[-1] is not self._savepoint:
-      self._curReceiver.pop()
+  def revertToSavepoint(self):
+    if self._savepoint is EMPTY:
+      raise FRActionStackError('Attempted to revert to empty savepoint. Perhaps you'
+                               ' performed several \'undo\' operations, then performed'
+                               ' a forward operation that flushed your savepoint?')
+    if self._savepoint.treatAsUndo:
+      actFn = self.undo
+    else:
+      actFn = self.redo
+    while self.changedSinceLastSave:
+      actFn()
 
   def redo(self):
     """
@@ -197,22 +201,13 @@ class FRActionStack:
     This is only possible if no other actions have occurred since the
     last undo call.
     """
-    ret = None
     if not self.canRedo:
       raise FRActionStackError('Nothing to redo')
 
-    self._curReceiver.rotate(-1)
-    try:
-      ret = self.processAct()
-    except StopIteration as ex:
-      # Nothing to undo when this happens, remove the action from the stack.
-      ret = ex.value
-      self._curReceiver.popleft()
-    except FRCdefException:
-      # These are intentionally thrown, recoverable exceptions. Don't clear
-      # the stack when they happen
-      pass
-    if self._curReceiver is self.actions:
+    self.actions.rotate(-1)
+    with self.ignoreActions():
+      ret = self.actions[-1].forward()
+    if self.actions is self.actions:
       for callback in self.doCallbacks:
         callback()
     return ret
@@ -224,46 +219,37 @@ class FRActionStack:
     if not self.canUndo:
       raise FRActionStackError('Nothing to undo')
 
-    ret = self.processAct()
-    self._curReceiver.rotate(1)
-    if self._curReceiver is self.actions:
+    with self.ignoreActions():
+      ret = self.actions[-1].backward()
+    self.actions.rotate(1)
+    if self.actions is self.actions:
       for callback in self.undoCallbacks:
         callback()
     return ret
 
-  def processAct(self):
-    """ Undo the last action. """
-    act = self._curReceiver[-1]
-    with self.ignoreActions():
-      try:
-        return act.do()
-      except Exception as ex:
-        # In general exceptions are recoverable, so don't obliterate the undo stack
-        # self.clear()
-        raise
-
   def clear(self):
     """ Clear the undo list. """
     self._savepoint = EMPTY
-    self._curReceiver.clear()
+    self.actions.clear()
 
   def setSavepoint(self):
     """ Set the savepoint. """
     if self.canUndo:
-      self._savepoint = self._curReceiver[-1]
+      self._savepoint = self.actions[-1]
     else:
       self._savepoint = EMPTY
 
   @property
-  def hasChanged(self):
+  def changedSinceLastSave(self):
     """ Return *True* if the state has changed since the savepoint. 
     
     This will always return *True* if the savepoint has not been set.
     """
-    if self.canUndo:
-      cmpAction = self._curReceiver[-1]
+    if self._savepoint is EMPTY: return False
+    elif self._savepoint.treatAsUndo:
+      cmpAction = self.actions[-1]
     else:
-      cmpAction = EMPTY
+      cmpAction = self.actions[0]
     return self._savepoint is not cmpAction
 
   def ignoreActions(self):

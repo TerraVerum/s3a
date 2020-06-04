@@ -1,23 +1,18 @@
 from pathlib import Path
-import stat
+from unittest import TestCase
 
 import numpy as np
 
-from cdef import FRCdefApp, FR_SINGLETON
-from cdef.generalutils import augmentException
-from cdef.projectvars import FR_ENUMS
-from cdef.projectvars import REQD_TBL_FIELDS
-from appsetup import (CompDfTester, makeCompDf, NUM_COMPS, SAMPLE_IMG,
+from appsetup import (CompDfTester, NUM_COMPS, SAMPLE_IMG,
                       TESTS_DIR, SAMPLE_IMG_DIR, clearTmpFiles, RND)
-
-from unittest import TestCase
-
-from cdef.structures import FRComplexVertices, FRAlgProcessorError
-from cdef.tablemodel import FRComponentIO
+from cdef import FRCdefApp, FR_SINGLETON
+from cdef.projectvars import REQD_TBL_FIELDS
+from cdef.structures import FRAlgProcessorError
 
 EXPORT_DIR = TESTS_DIR/'files'
 
 app = FRCdefApp(Image=SAMPLE_IMG_DIR)
+mgr = app.compMgr
 
 dfTester = CompDfTester(NUM_COMPS)
 dfTester.fillRandomVerts(imShape=SAMPLE_IMG.shape)
@@ -28,6 +23,7 @@ class CdefAppTestCases(TestCase):
     clearTmpFiles()
     app.clearBoundaries()
     app.resetMainImg(SAMPLE_IMG_DIR, SAMPLE_IMG)
+    FR_SINGLETON.actionStack.clear()
 
   def test_change_img(self):
     im2 = RND.integers(0, 255, SAMPLE_IMG.shape, 'uint8')
@@ -82,3 +78,13 @@ class CdefAppTestCases(TestCase):
     dfCmp = app.compMgr.compDf[equalCols].values == dfTester.compDf[equalCols].values
     self.assertTrue(np.all(dfCmp), 'Loaded dataframe doesn\'t match daved dataframe')
 
+  def test_change_comp(self):
+    stack = FR_SINGLETON.actionStack
+    fImg = app.focusedImg
+    mgr.addComps(dfTester.compDf.copy())
+    comp = mgr.compDf.loc[[RND.integers(NUM_COMPS)]]
+    app.updateCurComp(comp)
+    assert app.focusedImg.compSer.equals(comp.squeeze())
+    assert fImg.imgItem.image is not None
+    stack.undo()
+    assert fImg.imgItem.image is None

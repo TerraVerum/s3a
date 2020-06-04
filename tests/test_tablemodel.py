@@ -3,6 +3,8 @@ import stat
 
 import numpy as np
 
+from pyqtgraph.Qt import QtCore, QtWidgets
+
 from cdef import FRCdefApp, FR_SINGLETON
 from cdef.generalutils import augmentException
 from cdef.projectvars import FR_ENUMS
@@ -12,12 +14,13 @@ from appsetup import (CompDfTester, makeCompDf, NUM_COMPS, SAMPLE_IMG,
 
 from unittest import TestCase
 
-from cdef.structures import FRComplexVertices
+from cdef.structures import FRComplexVertices, FRVertices
 from cdef.tablemodel import FRComponentIO
 
 # Construct app outside setUp to drastically reduce loading times
 app = FRCdefApp(Image=SAMPLE_IMG_DIR)
 mgr = app.compMgr
+stack = FR_SINGLETON.actionStack
 
 dfTester = CompDfTester(NUM_COMPS)
 dfTester.fillRandomVerts(imShape=SAMPLE_IMG.shape)
@@ -43,8 +46,10 @@ class CompMgrTester(TableModelTestCases):
   def test_undo_add(self):
     oldIds = np.arange(NUM_COMPS, dtype=int)
     mgr.addComps(self.sampleComps)
-    FR_SINGLETON.actionStack.undo()
+    stack.undo()
     self.assertTrue(len(mgr.compDf) == 0)
+    stack.redo()
+    self.assertTrue(mgr.compDf.equals(self.sampleComps))
 
   def test_empty_add(self):
     changeList = mgr.addComps(makeCompDf(0))
@@ -117,6 +122,31 @@ class CompMgrTester(TableModelTestCases):
     mgr.rmComps(ids)
     FR_SINGLETON.actionStack.undo()
     self.assertTrue(mgr.compDf.equals(comps))
+
+
+  # def test_table_setdata(self):
+  #   comps = self.sampleComps.copy()
+  #   mgr.addComps(comps)
+  #
+  #   _ = REQD_TBL_FIELDS
+  #   colVals = {
+  #     _.VERTICES: [FRComplexVertices(FRVertices([[1,2], [3,4]]))],
+  #     _.COMP_CLASS: FR_SINGLETON.tableData.compClasses[4],
+  #     _.VALIDATED: True,
+  #     _.ANN_AUTHOR: 'Hi There',
+  #     _.ANN_FILENAME: 'newfilename'
+  #   }
+  #   intColMapping = {FR_SINGLETON.tableData.allFields.index(k):v
+  #                    for k, v in colVals.items()}
+  #
+  #   for col, newVal in intColMapping.items():
+  #     row = RND.integers(NUM_COMPS)
+  #     idx = app.compTbl.model().index(row, col)
+  #     oldVal = mgr.data(idx, QtCore.Qt.EditRole)
+  #     mgr.setData(idx, newVal)
+  #     assert mgr.compDf.iloc[row, col] == newVal
+  #     stack.undo()
+  #     assert mgr.compDf.iloc[row, col] == oldVal
 
 
   @staticmethod

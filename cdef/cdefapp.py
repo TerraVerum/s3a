@@ -336,7 +336,7 @@ class FRCdefApp(FRAnnotatorUI):
 
   @Slot(object)
   def add_focusComp(self, newComps: df):
-    with FR_SINGLETON.actionStack.group('Create New Comp', flushRedos=True):
+    with FR_SINGLETON.actionStack.group('Create New Comp', flushUnusedRedos=True):
       self.compMgr.addComps(newComps)
       # Make sure index matches ID before updating current component
       newComps = newComps.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
@@ -443,10 +443,11 @@ class FRCdefApp(FRAnnotatorUI):
   # ---------------
   # CUSTOM UI ELEMENT CALLBACKS
   # ---------------
-  @FR_SINGLETON.actionStack.undoable('Change Current Component')
   @Slot(object)
+  @FR_SINGLETON.actionStack.undoable('Change Current Component')
   def updateCurComp(self, newComps: df):
-    oldSer = self.focusedImg.compSer
+    oldSer = self.focusedImg.compSer.copy()
+    oldImg = self.focusedImg.imgItem.image
     if len(newComps) == 0:
       return
     # TODO: More robust scenario if multiple comps are in the dataframe
@@ -460,7 +461,7 @@ class FRCdefApp(FRAnnotatorUI):
     self.focusedImg.updateAll(mainImg, newComp)
     self.curCompIdLbl.setText(f'Component ID: {newCompId}')
     yield
-    if len(oldSer.loc[REQD_TBL_FIELDS.VERTICES]) > 0:
+    if oldImg is not None and len(oldSer.loc[REQD_TBL_FIELDS.VERTICES]) > 0:
       self.updateCurComp(oldSer.to_frame().T)
     else:
       self.focusedImg.resetImage()

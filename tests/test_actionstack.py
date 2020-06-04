@@ -11,24 +11,45 @@ COUNT = 10
 class StackForTesting(FRActionStack):
   def __init__(self):
     super().__init__()
+
+    @self.undoable()
     def op(num=None):
       if num is None:
-        num = len(lst)
-      lst.append(num)
+        num = len(self.lst)
+      self.lst.append(num)
       yield
-      lst.pop()
-    lst = []
-    op = self.undoable()(op)
+      self.lst.pop()
 
+    @self.undoable('recurse')
+    def recursiveOp_swapEveryTwo(lst=None):
+      if lst is None:
+        lst = self.lst
+      sz = len(lst)
+      if sz < 2: pass
+      elif sz < 4:
+        tmp = lst[0]
+        lst[0] = lst[1]
+        lst[1] = tmp
+      else:
+        for rng in slice(sz//2), slice(sz//2, sz):
+          lst[rng] = recursiveOp_swapEveryTwo(lst[rng])
+      yield lst
+      recursiveOp_swapEveryTwo(lst)
+
+    def grpOp():
+      with self.group('grouping'):
+        for _ in range(COUNT):
+          self.op()
+
+    self.recursive = recursiveOp_swapEveryTwo
+    self.grpOp = grpOp
     self.op = op
-    self.lst = lst
+
+    self.lst = []
 
 def test_group():
   stack = StackForTesting()
-  with stack.group('multi op'):
-    for ii in range(COUNT):
-      stack.op()
-      assert stack.lst[-1] == ii
+  stack.grpOp()
   stack.op()
   assert stack.lst == list(range(COUNT+1))
   stack.undo()
@@ -56,28 +77,17 @@ def test_recursive():
 
   nextPow2 = int(np.power(2, np.ceil(np.log2(COUNT))))
   stack.lst = list(range(nextPow2))
-  @stack.undoable('recursive op')
-  def swapHalves(lst):
-    sz = len(lst)
-    if sz == 2:
-      tmp = lst[0]
-      lst[0] = lst[1]
-      lst[1] = tmp
-      yield lst
-      return
-    lst[:sz//2] = swapHalves(lst[:sz//2])
-    lst[sz//2::] = swapHalves(lst[sz//2:])
-    yield lst
-
-    swapHalves(lst)
-
   origLst = stack.lst.copy()
-  swapHalves(stack.lst)
+
+  stack.recursive()
   swapped = stack.lst.copy()
+
   stack.undo()
   assert stack.lst == origLst
+
   stack.redo()
   assert stack.lst == swapped
+  assert len(stack.actions) == 1
 
 def test_bad_undo():
   stack = StackForTesting()
@@ -132,3 +142,49 @@ def test_ignore_acts():
   assert len(stack.actions) == 0
   with pytest.raises(FRActionStackError):
     stack.undo()
+
+def test_max_len():
+  stack = StackForTesting()
+  cnt = stack.actions.maxlen + 20
+  for ii in range(cnt):
+    stack.op()
+
+  with pytest.raises(FRActionStackError):
+    for ii in range(cnt):
+      stack.undo()
+
+def test_grp_composite():
+  stack = StackForTesting()
+  with stack.group('outer grp', flushUnusedRedos=True):
+    with stack.group('inner grp'):
+      stack.grpOp()
+      stack.recursive()
+    stack.op()
+    stack.grpOp()
+    stack.op()
+  assert len(stack.actions) == 1
+
+  postOpLst = stack.lst.copy()
+  stack.undo()
+  assert len(stack.lst) == 0
+  stack.redo()
+  assert postOpLst == stack.lst
+
+def test_savepoint():
+  stack = StackForTesting()
+
+  for _ in range(COUNT):
+    stack.op()
+  stack.setSavepoint()
+
+  stack.op()
+  assert stack.changedSinceLastSave
+
+  stack.revertToSavepoint()
+  assert not stack.changedSinceLastSave
+
+  stack.op()
+  stack.op()
+
+  stack.revertToSavepoint()
+  assert stack.lst == list(range(COUNT))
