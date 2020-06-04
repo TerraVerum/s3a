@@ -41,7 +41,7 @@ class FREditableImg(pg.PlotWidget):
 
 
     self.procCollection = FR_SINGLETON.algParamMgr.createProcessorForClass(self)
-    self.procCollection.image = self.imgItem.image
+    self.procCollection.image = self.image
 
     # -----
     # DRAWING OPTIONS
@@ -59,6 +59,10 @@ class FREditableImg(pg.PlotWidget):
       group.buttonToggled.connect(self._handleBtnToggle)
     self.drawOptsWidget.selectOpt(self.drawAction)
     self.drawOptsWidget.selectOpt(self.shapeCollection.curShape)
+
+  @property
+  def image(self) -> Optional[NChanImg]:
+    return self.imgItem.image
 
   def handleShapeFinished(self, roi: FRExtendedROI) -> Optional[np.ndarray]:
     """
@@ -188,10 +192,6 @@ class FRMainImage(FREditableImg):
   def switchBtnMode(self, newMode: FRParam):
     super().switchBtnMode(newMode)
 
-  @property
-  def image(self):
-    return self.imgItem.image
-
   def setImage(self, imgSrc: Union[FilePath, np.ndarray]=None):
     """
     Allows the user to change the main image either from a filepath or array data
@@ -273,7 +273,7 @@ class FRFocusedImage(FREditableImg):
       vertsDict['bgVerts'] = verts
     # Check for flood fill
 
-    compMask = self.region.embedMaskInImg(self.imgItem.image.shape[:2])
+    compMask = self.region.embedMaskInImg(self.image.shape[:2])
     newMask = self.procCollection.run(prevCompMask=compMask, **vertsDict)
     if not np.array_equal(newMask,compMask):
       self.region.updateFromMask(newMask)
@@ -281,7 +281,7 @@ class FRFocusedImage(FREditableImg):
   @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
   def updateAll(self, mainImg: Optional[NChanImg], newComp:Optional[pd.Series]=None,
                 isAlreadyTrimmed=False):
-    oldImg = self.imgItem.image
+    oldImg = self.image
     if oldImg is not None:
       oldImg = oldImg.copy()
     oldComp = self.compSer

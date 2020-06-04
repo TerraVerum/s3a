@@ -85,6 +85,6 @@ class CdefAppTestCases(TestCase):
     comp = mgr.compDf.loc[[RND.integers(NUM_COMPS)]]
     app.updateCurComp(comp)
     assert app.focusedImg.compSer.equals(comp.squeeze())
-    assert fImg.imgItem.image is not None
+    assert fImg.image is not None
     stack.undo()
-    assert fImg.imgItem.image is None
+    assert fImg.image is None

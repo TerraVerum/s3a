@@ -12,7 +12,7 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 from skimage import io
 
-from cdef.structures import OneDArr, FRParamGroup
+from cdef.structures import OneDArr, FRParamGroup, FilePath
 from cdef.structures.typeoverloads import TwoDArr, NChanImg
 from . import FR_SINGLETON
 from .generalutils import coerceDfTypes, augmentException
@@ -266,7 +266,7 @@ class FRComponentIO:
     mainImgFpath = FR_SINGLETON.tableData.annFile
     if not self.includeFullSourceImgName:
       # Only use the file name, not the whole path
-      mainImgFpath = Path(mainImgFpath).name
+      mainImgFpath = mainImgFpath.name
     # Assign correct export name for only new components
     overwriteIdxs = exportDf[REQD_TBL_FIELDS.ANN_FILENAME] == FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
     # TODO: Maybe the current filename will match the current file indicator. What happens then?
@@ -366,7 +366,7 @@ class FRComponentIO:
   # -----
 
   @classmethod
-  def buildFromCsv(cls, inFile: str, imShape: Tuple=None) -> df:
+  def buildFromCsv(cls, inFile: FilePath, imShape: Tuple=None) -> df:
     """
     Deserializes data from a csv file to create a Component :class:`DataFrame`.
     The input .csv should be the same format as one exported by
@@ -406,7 +406,7 @@ class FRComponentIO:
     return csvDf
 
   @classmethod
-  def buildFromPkl(cls, inFile: str, imShape: Tuple=None) -> df:
+  def buildFromPkl(cls, inFile: FilePath, imShape: Tuple=None) -> df:
     """
     See docstring for :func:`self.buildFromCsv`
     """

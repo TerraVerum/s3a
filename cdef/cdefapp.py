@@ -213,14 +213,14 @@ class FRCdefApp(FRAnnotatorUI):
   def clearFocusedRegion(self):
     # Reset drawn comp vertices to nothing
     # Only perform action if image currently exists
-    if self.focusedImg.imgItem.image is None:
+    if self.focusedImg.image is None:
       return
     self.focusedImg.updateRegionFromVerts(None)
 
   def resetFocusedRegion(self):
     # Reset drawn comp vertices to nothing
     # Only perform action if image currently exists
-    if self.focusedImg.imgItem.image is None:
+    if self.focusedImg.image is None:
       return
     self.focusedImg.updateRegionFromVerts(self.focusedImg.compSer[REQD_TBL_FIELDS.VERTICES])
 
@@ -447,7 +447,7 @@ class FRCdefApp(FRAnnotatorUI):
   @FR_SINGLETON.actionStack.undoable('Change Current Component')
   def updateCurComp(self, newComps: df):
     oldSer = self.focusedImg.compSer.copy()
-    oldImg = self.focusedImg.imgItem.image
+    oldImg = self.focusedImg.image
     if len(newComps) == 0:
       return
     # TODO: More robust scenario if multiple comps are in the dataframe

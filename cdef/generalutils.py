@@ -125,7 +125,4 @@ def resolveAuthorName(providedAuthName: Optional[str]) -> Optional[str]:
   return lines[0]
 
 def augmentException(ex: Exception, prependedMsg: str):
-  if len(ex.args) >= 1:
-    ex.args = (prependedMsg + ex.args[0],) + ex.args[1:]
-  else:
-    ex.args = (prependedMsg,)
+  ex.args = (prependedMsg, *ex.args)
