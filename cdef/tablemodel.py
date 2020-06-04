@@ -71,12 +71,15 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
   @FR_SINGLETON.actionStack.undoable('Alter Component Data')
   def setData(self, index, value, role=QtCore.Qt.EditRole) -> bool:
     oldVal = self.compDf.iloc[index.row(), index.column()]
+    if oldVal is value:
+      return True
     self.compDf.iloc[index.row(), index.column()] = value
     toEmit = self.defaultEmitDict.copy()
     toEmit['changed'] = np.array([self.compDf.index[index.row()]])
     self.sigCompsChanged.emit(toEmit)
     yield True
     self.setData(index, oldVal, role)
+    return True
 
   def flags(self, index: QtCore.QModelIndex) -> QtCore.Qt.ItemFlags:
     if index.column() not in self.noEditColIdxs:

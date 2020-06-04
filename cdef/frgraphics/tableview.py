@@ -120,6 +120,7 @@ class FRCompTableView(QtWidgets.QTableView):
        Otherwise, only contains minimal features.
     """
     super().__init__(*args)
+    self._prevSelRows = np.array([])
     self.setSortingEnabled(True)
 
     self.mgr = FRComponentMgr()
@@ -133,10 +134,6 @@ class FRCompTableView(QtWidgets.QTableView):
       self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
       cursor = QtGui.QCursor()
       self.customContextMenuRequested.connect(lambda: self.menu.exec_(cursor.pos()))
-
-
-    # Default to text box delegate
-    # self.setItemDelegate(FRTextDelegate(self))
 
     validOpts = [True, False]
     boolDelegate = FRComboBoxDelegate(self, comboValues=validOpts)
@@ -178,6 +175,10 @@ class FRCompTableView(QtWidgets.QTableView):
     selection = self.selectionModel().selectedIndexes()
     for item in selection:
       selectedIds.append(item.sibling(item.row(),self.instIdColIdx).data(QtCore.Qt.EditRole))
+    newRows = pd.unique(selectedIds)
+    if np.array_equal(newRows, self._prevSelRows):
+      return
+    self._prevSelRows = newRows
     self.sigSelectionChanged.emit(pd.unique(selectedIds))
 
   def createContextMenu(self):
