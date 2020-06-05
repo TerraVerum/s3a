@@ -1,17 +1,16 @@
 from typing import Union, Tuple, Optional
 
 import numpy as np
-import pyqtgraph as pg
-from pandas import DataFrame as df
 import pandas as pd
+import pyqtgraph as pg
 from pyqtgraph import BusyCursor
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from skimage.io import imread
 
 from cdef import FR_SINGLETON
 from cdef.generalutils import getClippedBbox
-from cdef.processingutils import getVertsFromBwComps, segmentComp
-from cdef.projectvars import REQD_TBL_FIELDS, FR_CONSTS, FR_ENUMS
+from ..processingimpls import segmentComp
+from cdef.projectvars import REQD_TBL_FIELDS, FR_CONSTS
 from cdef.structures import FRParam, FRVertices, FRComplexVertices, FilePath
 from cdef.structures import NChanImg
 from .clickables import FRRightPanViewBox
@@ -218,9 +217,7 @@ class FRFocusedImage(FREditableImg):
 
   @classmethod
   def __initEditorParams__(cls):
-    cls.compCropMargin, cls.segThresh\
-      = FR_SINGLETON.generalProps.registerProps(cls, [FR_CONSTS.PROP_CROP_MARGIN_PCT,
-          FR_CONSTS.PROP_SEG_THRESH])
+    cls.compCropMargin = FR_SINGLETON.generalProps.registerProp(cls, FR_CONSTS.PROP_CROP_MARGIN_PCT)
 
   def __init__(self, parent=None, **kargs):
     allowableShapes = (
@@ -325,9 +322,8 @@ class FRFocusedImage(FREditableImg):
     newCompImg = mainImg[bbox[0,1]:bbox[1,1],
                          bbox[0,0]:bbox[1,0],
                          :]
-    segImg = segmentComp(newCompImg, self.segThresh)
-    self.imgItem.setImage(segImg)
-    self.procCollection.image = segImg
+    self.imgItem.setImage(newCompImg)
+    self.procCollection.image = newCompImg
 
   @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
   def updateRegionFromVerts(self, newVerts: FRComplexVertices, offset: FRVertices=None):

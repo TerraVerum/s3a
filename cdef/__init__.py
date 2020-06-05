@@ -23,7 +23,7 @@ import cdef.projectvars
 import cdef.structures
 
 from cdef.frgraphics.parameditors import FR_SINGLETON
-from cdef.interfaceimpls import FRTopLevelProcessors
+from cdef.processingimpls import FRTopLevelProcessors
 for name, func in inspect.getmembers(FRTopLevelProcessors, inspect.isfunction):
   FR_SINGLETON.algParamMgr.addProcessCtor(func)
 

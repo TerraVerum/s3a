@@ -2,18 +2,137 @@ from typing import Tuple, List
 
 import cv2 as cv
 import numpy as np
+import pandas as pd
 from scipy.ndimage import binary_fill_holes
-from skimage.measure import regionprops, label
+from skimage.measure import regionprops, label, regionprops_table
+from skimage.morphology import flood
+from skimage.segmentation import quickshift
 
-from cdef.generalutils import splitListAtNans
-from cdef.processingutils import growSeedpoint, cornersToFullBoundary, getCroppedImg, \
-  area_coord_regionTbl
-from cdef.structures import BlackWhiteImg, FRVertices
+from cdef.generalutils import splitListAtNans, getClippedBbox
+from cdef.structures import BlackWhiteImg, FRVertices, NChanImg, FRComplexVertices, \
+  GrayImg, RgbImg
 from imageprocessing import algorithms
 from imageprocessing.algorithms import watershedProcess, graphCutSegmentation
 from imageprocessing.common import Image
 from imageprocessing.processing import ImageIO, ImageProcess
 
+def rmSmallComps(bwMask: BlackWhiteImg, minSz: int=0) -> BlackWhiteImg:
+  """
+  Removes components smaller than :param:`minSz` from the input mask.
+
+  :param bwMask: Input mask
+  :param minSz: Minimum individual component size allowed. That is, regions smaller
+        than :param:`minSz` connected pixels will be removed from the output.
+  :return: output mask without small components
+  """
+  # make sure we don't modify the input data
+  bwMask = bwMask.copy()
+  if minSz < 1:
+    return bwMask
+  regions = regionprops(label(bwMask))
+  for region in regions:
+    if region.area < minSz:
+      coords = region.coords
+      bwMask[coords[:, 0], coords[:, 1]] = False
+  return bwMask
+
+def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int, otherBbox: np.ndarray=None) -> (np.ndarray, np.ndarray):
+  verts = np.vstack(verts)
+  img_np = image
+  compCoords = np.vstack([verts.min(0), verts.max(0)])
+  if otherBbox is not None:
+    for dim in range(2):
+      for ii, cmpFunc in zip(range(2), [min, max]):
+        compCoords[ii,dim] = cmpFunc(compCoords[ii,dim], otherBbox[ii,dim])
+  compCoords = getClippedBbox(img_np.shape, compCoords, margin)
+  # Verts are x-y, index into image with row-col
+  croppedImg = image[compCoords[0,1]:compCoords[1,1], compCoords[0,0]:compCoords[1,0], :]
+  return croppedImg, compCoords
+
+def growSeedpoint(img: NChanImg, seeds: FRVertices, thresh: float) -> BlackWhiteImg:
+  shape = np.array(img.shape[0:2])
+  bwOut = np.zeros(shape, dtype=bool)
+  # Turn x-y vertices into row-col seeds
+  seeds = seeds[:, ::-1]
+  # Remove seeds that don't fit in the image
+  seeds = seeds[np.all(seeds >= 0, 1)]
+  seeds = seeds[np.all(seeds < shape, 1)]
+
+  for seed in seeds:
+    for chan in range(img.shape[2]):
+      curBwMask = flood(img[...,chan], tuple(seed), tolerance=thresh)
+      bwOut |= curBwMask
+  return bwOut
+
+def cornersToFullBoundary(cornerVerts: FRVertices, sizeLimit: float=np.inf) -> FRVertices:
+  """
+  From a list of corner vertices, returns a list with one vertex for every border pixel.
+  Example:
+  >>> cornerVerts = FRVertices([[0,0], [100,0], [100,100],[0,100]])
+  >>> cornersToFullBoundary(cornerVerts)
+  # [[0,0], [1,0], ..., [100,0], [100,1], ..., [100,100], ..., ..., [0,100]]
+  :param cornerVerts: Corners of the represented polygon
+  :param sizeLimit: The largest number of pixels from the enclosed area allowed before the full boundary is no
+  longer returned. For instance:
+    >>> cornerVerts = FRVertices([[0,0], [1000,0], [1000,1000],[0,1000]])
+    >>> cornersToFullBoundary(cornerVerts, 10e5)
+    will *NOT* return all boundary vertices, since the enclosed area (10e6) is larger than sizeLimit.
+  :return: List with one vertex for every border pixel, unless *sizeLimit* is violated.
+  """
+  fillShape = cornerVerts.asRowCol().max(0)+1
+  if np.prod(fillShape) > sizeLimit:
+    return cornerVerts
+
+  tmpImgToFill = np.zeros(fillShape, dtype='uint8')
+
+  filledMask = cv.fillPoly(tmpImgToFill, [cornerVerts], 1) > 0
+  return FRComplexVertices.fromBwMask(filledMask, simplifyVerts=False).filledVerts().stack()
+
+def colorLabelsWithMean(labelImg: GrayImg, refImg: NChanImg) -> RgbImg:
+  outImg = np.empty(refImg.shape)
+  labels = np.unique(labelImg)
+  for curLabel in labels:
+    curmask = labelImg == curLabel
+    outImg[curmask,:] = refImg[curmask,:].reshape(-1,3).mean(0)
+  return outImg
+
+def segmentComp(compImg: RgbImg, maxDist: np.float, kernSz=10) -> RgbImg:
+  # For maxDist of 0, the input isn't changed and it takes a long time
+  if maxDist < 1:
+    return compImg
+  segImg = quickshift(compImg, kernel_size=kernSz, max_dist=maxDist)
+  # Color segmented image with mean values
+  return colorLabelsWithMean(segImg, compImg)
+
+def growSeedpoint_cv_fastButErratic(img: NChanImg, seeds: FRVertices, thresh: float):
+  if len(seeds) == 0:
+    return np.zeros(img.shape[:2], bool)
+  if img.ndim > 2:
+    nChans = img.shape[2]
+  else:
+    nChans = 1
+  thresh = int(np.clip(thresh, 0, 255))
+  imRCShape = np.array(img.shape[:2])
+  bwOut = np.zeros(imRCShape+2, 'uint8')
+  # Throw away seeds outside image boundaries
+  seeds = seeds[np.all(seeds < imRCShape, axis=1)]
+  seeds = np.fliplr(seeds)
+  mask = np.zeros(imRCShape+2, 'uint8')
+  for seed in seeds:
+    mask.fill(0)
+    flooded = img.copy()
+    seed = tuple(seed.flatten())
+    _, _, curOut, _ = cv.floodFill(flooded, mask, seed, 255, (thresh,)*nChans, (thresh,)*nChans,8)
+    bwOut |= curOut
+  bwOut = bwOut[1:-1,1:-1]
+  return bwOut.astype(bool)
+
+def area_coord_regionTbl(_image: Image):
+  if not np.any(_image.data):
+    return pd.DataFrame({'coords': [np.array([[]])], 'area': [0]})
+  regionDict = regionprops_table(label(_image.data), properties=('coords', 'area'))
+  _regionPropTbl = pd.DataFrame(regionDict)
+  return _regionPropTbl
 
 def crop_to_verts(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
                   prevCompMask: BlackWhiteImg, margin=10):
@@ -171,11 +290,6 @@ def region_grow(image: Image, prevCompMask: BlackWhiteImg, fgVerts: FRVertices,
                 seedThresh=10):
   if image.size == 0:
     return ImageIO(image=prevCompMask)
-  if prevCompMask is None:
-    prevCompMask = np.zeros(image.shape[:2], dtype=bool)
-  # -----
-  # DETERMINE BITWISE RELATIONSHIP B/W OLD AND NEW MASKS
-  # -----
   if np.all(fgVerts == fgVerts[0, :]):
     # Remove unnecessary redundant seedpoints
     fgVerts = fgVerts[[0], :]
@@ -185,7 +299,7 @@ def region_grow(image: Image, prevCompMask: BlackWhiteImg, fgVerts: FRVertices,
     fgVerts.connected = False
   else:
     # Grow inward
-    growFunc = lambda *args: ~growSeedpoint(*args)
+    growFunc = lambda *args: ~growSeedpoint_cv_fastButErratic(*args)
 
   tmpImgToFill = np.zeros(image.shape[0:2], dtype='uint8')
   # For small enough shapes, get all boundary pixels instead of just shape vertices
@@ -215,7 +329,9 @@ class FRTopLevelProcessors:
 
   @staticmethod
   def w_basicShapesProcessor():
-    return ImageProcess.fromFunction(get_basic_shapes, name='Basic Shapes')
+    proc = ImageProcess.fromFunction(get_basic_shapes, name='Basic Shapes')
+    proc.disabledStages = ['Open -> Close']
+    return proc
 
   @staticmethod
   def z_onlySquaresProcessor():

@@ -9,7 +9,6 @@ from pyqtgraph.Qt import QtGui, QtCore
 
 from cdef import FR_SINGLETON
 from cdef.generalutils import coerceDfTypes, nanConcatList
-from cdef.processingutils import getVertsFromBwComps
 from cdef.projectvars import REQD_TBL_FIELDS, FR_CONSTS
 from cdef.structures import FRParam, FRVertices, FRComplexVertices, OneDArr, BlackWhiteImg
 from cdef.structures.typeoverloads import GrayImg
@@ -319,7 +318,7 @@ class FRVertexDefinedImg(pg.ImageItem):
     if np.array_equal(oldImg>0, newMask):
       # Nothing to do
       return
-    verts = getVertsFromBwComps(newMask)
+    verts = FRComplexVertices.fromBwMask(newMask)
     newMask[verts.y_flat, verts.x_flat] = 2
     self.updateFromVertices(verts)
     return

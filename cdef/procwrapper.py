@@ -13,8 +13,7 @@ import cdef
 import cdef.frgraphics.parameditors.genericeditor
 from imageprocessing.processing import ImageIO, ProcessStage, AtomicProcess, Process, \
   ImageProcess, ProcessIO
-from .interfaceimpls import crop_to_verts, update_area, basicOpsCombo, return_to_full_size
-from .processingutils import getVertsFromBwComps
+from .processingimpls import crop_to_verts, update_area, basicOpsCombo, return_to_full_size
 from .structures import FRParam, NChanImg, FRComplexVertices, FRCdefException, \
   FRAlgProcessorError
 
@@ -112,7 +111,7 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     return outImg
 
   def resultAsVerts(self, localEstimate=True):
-    initialList = getVertsFromBwComps(self.output)
+    initialList = FRComplexVertices.fromBwMask(self.output)
     if len(initialList) == 0:
       return initialList
     if not localEstimate:
