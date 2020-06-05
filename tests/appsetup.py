@@ -7,7 +7,7 @@ import numpy as np
 from skimage import io
 from pandas import DataFrame as df
 
-from cdef import FR_SINGLETON
+from cdef import FR_SINGLETON, FRCdefApp
 from cdef.projectvars import REQD_TBL_FIELDS, BASE_DIR
 from cdef.structures import FRComplexVertices
 
@@ -71,3 +71,10 @@ def clearTmpFiles(exceptFiles: List[str] =None):
       if str(file) not in exceptFiles:
         file.chmod(stat.S_IWRITE)
         file.unlink()
+
+def defaultApp_tester():
+  app = FRCdefApp(Image=SAMPLE_IMG_DIR)
+  dfTester = CompDfTester(NUM_COMPS)
+  dfTester.fillRandomVerts(imShape=SAMPLE_IMG.shape)
+  dfTester.fillRandomClasses()
+  return app, dfTester
