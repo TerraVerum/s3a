@@ -230,8 +230,9 @@ class FRCdefApp(FRAnnotatorUI):
 
   def estimateBoundaries(self):
     with BusyCursor():
-      self.mainImg.procCollection.run(prevCompMask=None, fgVerts=None, bgVerts=None)
-      verts = self.mainImg.procCollection.resultAsVerts(localEstimate=False)
+      self.mainImg.curProcessor.run(image=self.mainImg.image,
+                                    prevCompMask=None, fgVerts=None, bgVerts=None)
+      verts = self.mainImg.curProcessor.resultAsVerts(localEstimate=False)
       components = FR_SINGLETON.tableData.makeCompDf(len(verts))
       components[REQD_TBL_FIELDS.VERTICES] = verts
       self.compMgr.addComps(components)
@@ -323,10 +324,10 @@ class FRCdefApp(FRAnnotatorUI):
     self.compMgr.addComps(newComps, loadType)
 
   def showNewCompAnalytics(self):
-    self.mainImg.procCollection.curProcessor.processor.plotStages()
+    self.mainImg.curProcessor.processor.plotStages()
 
   def showModCompAnalytics(self):
-    self.focusedImg.procCollection.curProcessor.processor.plotStages()
+    self.focusedImg.curProcessor.processor.plotStages()
 
   # ---------------
   # MISC CALLBACKS

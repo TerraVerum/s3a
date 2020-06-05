@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from os.path import join
 from pathlib import Path
-from typing import Optional, Dict, List, Callable
+from typing import Optional, Dict, List, Callable, Union
 
 import numpy as np
 from pyqtgraph import BusyCursor
@@ -43,7 +43,7 @@ class FRAlgPropsMgr(FRParamEditor):
     defaultKey = next(iter(lims))
     defaultAlg = lims[defaultKey]
     newEditor.algOpts.setDefault(defaultAlg)
-    newEditor.changeActiveAlg(proc=defaultAlg)
+    newEditor.switchActiveProcessor(proc=defaultAlg)
     self.sigProcessorCreated.emit(newEditor)
     return newEditor
 
@@ -60,7 +60,7 @@ class FRAlgCollectionEditor(FRParamEditor):
     }
     self.treeAlgOpts: Parameter = Parameter(name='Algorithm Selection', type='group', children=[algOptDict])
     self.algOpts: ListParameter = self.treeAlgOpts.children()[0]
-    self.algOpts.sigValueChanged.connect(lambda param, proc: self.changeActiveAlg(proc))
+    self.algOpts.sigValueChanged.connect(lambda param, proc: self.switchActiveProcessor(proc))
     super().__init__(parent, saveDir=saveDir, fileType='alg', name=name,
                      childForOverride=self.algOpts)
 
@@ -68,7 +68,6 @@ class FRAlgCollectionEditor(FRParamEditor):
 
     self.curProcessor: Optional[FRImgProcWrapper] = None
     self.nameToProcMapping: Dict[str, FRImgProcWrapper] = {}
-    self._image = np.zeros((1,1), dtype='uint8')
 
     self.VERT_LST_NAMES = ['fgVerts', 'bgVerts']
     self.vertBuffers: Dict[str, FRComplexVertices] = {
@@ -80,35 +79,8 @@ class FRAlgCollectionEditor(FRParamEditor):
       # Retrieve proc so default can be set after
       wrapped = self.addImageProcessor(processorCtor())
     self.algOpts.setDefault(wrapped)
-    self.changeActiveAlg(proc=wrapped)
+    self.switchActiveProcessor(proc=wrapped)
     self.saveParamState('Default', allowOverwriteDefault=True)
-
-  def run(self, **kwargs):
-    # for vertsName in self.VERT_LST_NAMES:
-    #   curVerts = kwargs[vertsName]
-    #   if curVerts is not None:
-    #     self.vertBuffers[vertsName].append(curVerts)
-    # for vertsName in self.VERT_LST_NAMES:
-    #   arg = self.vertBuffers[vertsName].stack()
-    #   kwargs[vertsName] = arg
-    for name in 'fgVerts', 'bgVerts':
-      if kwargs[name] is None:
-        kwargs[name] = FRVertices()
-    retVal = self.curProcessor.run(**kwargs)
-    # self.vertBuffers = {name: FRComplexVertices() for name in self.VERT_LST_NAMES}
-    return retVal
-
-  def resultAsVerts(self, localEstimate=True):
-    return self.curProcessor.resultAsVerts(localEstimate=localEstimate)
-
-  @property
-  def image(self):
-    return self._image
-  @image.setter
-  def image(self, newImg: NChanImg):
-    if self.curProcessor is not None:
-      self.curProcessor.image = newImg
-    self._image = newImg
 
   def addImageProcessor(self, newProc: ImageProcess):
     processor = FRImgProcWrapper(newProc, self)
@@ -150,7 +122,13 @@ class FRAlgCollectionEditor(FRParamEditor):
     self.algOpts.setValue(selectedImpl)
     super().loadParamState(stateName, stateDict['Parameters'])
 
-  def changeActiveAlg(self, proc: FRImgProcWrapper):
+  def switchActiveProcessor(self, proc: Union[str, FRImgProcWrapper]):
+    """
+    Changes which processor is active. if FRImgProcWrapper, uses that as the processor.
+    If str, looks for that name in current processors and uses that
+    """
+    if isinstance(proc, str):
+      proc = self.nameToProcMapping[proc]
     # Hide all except current selection
     # TODO: Find out why hide() isn't working. Documentation indicates it should
     # Instead, use the parentChanged utility as a hacky workaround
@@ -161,4 +139,3 @@ class FRAlgCollectionEditor(FRParamEditor):
       self.tree.setRowHidden(1 + ii, QtCore.QModelIndex(), shouldHide)
     # selectedParam.show()
     self.curProcessor = proc
-    self.curProcessor.image = self.image

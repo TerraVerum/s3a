@@ -1,21 +1,21 @@
 from __future__ import annotations
 
-import sys
 from abc import ABC
 from functools import wraps
-from typing import Tuple, List
+from typing import Tuple, List, Sequence
 from warnings import warn
 
 import numpy as np
 from pyqtgraph.parametertree import Parameter
 
 import cdef
-import cdef.frgraphics.parameditors.genericeditor
 from imageprocessing.processing import ImageIO, ProcessStage, AtomicProcess, Process, \
   ImageProcess, ProcessIO
-from .processingimpls import crop_to_verts, update_area, basicOpsCombo, return_to_full_size
-from .structures import FRParam, NChanImg, FRComplexVertices, FRCdefException, \
-  FRAlgProcessorError
+from .frgraphics.parameditors import genericeditor
+from .frgraphics.parameditors.pgregistered import FRCustomMenuParameter
+from .processingimpls import crop_to_verts, update_area, basicOpsCombo, \
+  return_to_full_size
+from .structures import FRParam, FRComplexVertices, FRAlgProcessorError, FRVertices
 
 
 def atomicRunWrapper(proc: AtomicProcess, names: List[str], params: List[Parameter]):
@@ -86,17 +86,20 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     resizeStage.allowDisable = False
     processor.stages = [cropStage] + processor.stages + [updateStage, basicOpsCombo(), resizeStage]
     super().__init__(processor, editor)
-    self.image: NChanImg = np.zeros((0,0), bool)
 
   def run(self, **kwargs):
-    if self.image is None:
+    if kwargs.get('image', None) is None:
       raise FRAlgProcessorError('Cannot run processor without an image')
+    image = kwargs['image']
+    for name in 'fgVerts', 'bgVerts':
+      if kwargs.get(name, None) is None:
+        kwargs[name] = FRVertices()
     if kwargs.get('prevCompMask', None) is None:
       noPrevMask = True
-      kwargs['prevCompMask'] = np.zeros(self.image.shape[:2], bool)
+      kwargs['prevCompMask'] = np.zeros(image.shape[:2], bool)
     else:
       noPrevMask = False
-    newIo = ImageIO(image=self.image, **kwargs, noPrevMask=noPrevMask)
+    newIo = ImageIO(**kwargs, noPrevMask=noPrevMask)
 
     try:
       result = self.processor.run(newIo, force=True)
@@ -119,3 +122,9 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     # else, all vertices belong to the same component
     else:
       return [initialList]
+
+  def setStageEnabled(self, stageIdx: Sequence[str], enabled: bool):
+    paramForStage: FRCustomMenuParameter = self.editor.params.child(self.algName, *stageIdx)
+    prevEnabled = paramForStage.opts['enabled']
+    if prevEnabled != enabled:
+      paramForStage.menuActTriggered('Toggle Enable')

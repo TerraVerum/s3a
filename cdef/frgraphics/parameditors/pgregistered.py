@@ -58,10 +58,10 @@ class FRCustomMenuParameter(parameterTypes.GroupParameter):
     item.contextMenuEvent = lambda ev: item.contextMenu.popup(ev.globalPos())
     for actName in self.menuActions:
       act = item.contextMenu.addAction(actName)
-      act.triggered.connect(partial(self.menuActTriggered, item, actName))
+      act.triggered.connect(partial(self.menuActTriggered, actName))
     return item
 
-  def menuActTriggered(self, item: parameterTypes.ParameterItem, actName: str):
+  def menuActTriggered(self, actName: str):
     # Toggle 'enable' on click
     return
 
@@ -82,7 +82,8 @@ class FRProcGroupParameter(FRCustomMenuParameter):
     self.item = item
     return item
 
-  def menuActTriggered(self, item: parameterTypes.ParameterItem, act: str):
+  def menuActTriggered(self, act: str):
+    item = self.item
     # Toggle 'enable' on click
     disabled = self.opts['enabled']
     enabled = not disabled
@@ -94,7 +95,7 @@ class FRProcGroupParameter(FRCustomMenuParameter):
   def setOpts(self, **opts):
     enabled = opts.get('enabled', None)
     if enabled is not None and enabled != self.opts['enabled']:
-      self.menuActTriggered(self.item, 'Toggle Enable')
+      self.menuActTriggered('Toggle Enable')
     super().setOpts(**opts)
 
 

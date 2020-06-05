@@ -46,14 +46,13 @@ def test_est_clear_bounds(clearedApp):
   # Change to easy processor first for speed
   clctn = clearedApp.mainImg.procCollection
   prevProc = clctn.curProcessor
-  basicProc = clctn.nameToProcMapping['Basic Shapes']
-  clctn.changeActiveAlg(basicProc)
+  clctn.switchActiveProcessor('Basic Shapes')
   clearedApp.estimateBoundaries()
   assert len(clearedApp.compMgr.compDf) > 0, 'Comp not created after global estimate'
   clearedApp.clearBoundaries()
   assert len(clearedApp.compMgr.compDf) == 0, 'Comps not cleared after clearing boundaries'
   # Restore state
-  clctn.changeActiveAlg(prevProc)
+  clctn.switchActiveProcessor(prevProc)
 
 def test_export_all_comps(clearedApp):
   compFile = EXPORT_DIR/'tmp.csv'

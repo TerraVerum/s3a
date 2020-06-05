@@ -40,7 +40,6 @@ class FREditableImg(pg.PlotWidget):
 
 
     self.procCollection = FR_SINGLETON.algParamMgr.createProcessorForClass(self)
-    self.procCollection.image = self.image
 
     # -----
     # DRAWING OPTIONS
@@ -62,6 +61,10 @@ class FREditableImg(pg.PlotWidget):
   @property
   def image(self) -> Optional[NChanImg]:
     return self.imgItem.image
+
+  @property
+  def curProcessor(self):
+      return self.procCollection.curProcessor
 
   def handleShapeFinished(self, roi: FRExtendedROI) -> Optional[np.ndarray]:
     """
@@ -164,8 +167,8 @@ class FRMainImage(FREditableImg):
       verts = self.shapeCollection.shapeVerts.astype(int)
 
       with BusyCursor():
-        self.procCollection.run(fgVerts=verts, bgVerts=None)
-      newVerts = self.procCollection.resultAsVerts(not self.multCompsOnCreate)
+        self.curProcessor.run(image=self.image, fgVerts=verts, bgVerts=None)
+      newVerts = self.curProcessor.resultAsVerts(not self.multCompsOnCreate)
       # Discard entries with no real vertices
       newComps = FR_SINGLETON.tableData.makeCompDf(len(newVerts))
       newComps[REQD_TBL_FIELDS.VERTICES] = newVerts
@@ -206,7 +209,6 @@ class FRMainImage(FREditableImg):
       self.imgItem.clear()
     else:
       self.imgItem.setImage(imgSrc)
-    self.procCollection.image = imgSrc
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_CLEAR_SHAPE_MAIN)
   def clearCurDrawShape(self):
@@ -271,7 +273,7 @@ class FRFocusedImage(FREditableImg):
     # Check for flood fill
 
     compMask = self.region.embedMaskInImg(self.image.shape[:2])
-    newMask = self.procCollection.run(prevCompMask=compMask, **vertsDict)
+    newMask = self.curProcessor.run(image=self.image, prevCompMask=compMask, **vertsDict)
     if not np.array_equal(newMask,compMask):
       self.region.updateFromMask(newMask)
 
@@ -323,7 +325,6 @@ class FRFocusedImage(FREditableImg):
                          bbox[0,0]:bbox[1,0],
                          :]
     self.imgItem.setImage(newCompImg)
-    self.procCollection.image = newCompImg
 
   @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
   def updateRegionFromVerts(self, newVerts: FRComplexVertices, offset: FRVertices=None):

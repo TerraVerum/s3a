@@ -36,7 +36,7 @@ class CompDfTester:
 
     retVal = []
     for ii in range(self.numComps):
-      radius = RND.integers(0, max(imShape)//5)
+      radius = RND.integers(5, max(imShape)//5)
       o_x = RND.integers(0, imShape[1])
       o_y = RND.integers(0, imShape[0])
       verts = FRComplexVertices.fromBwMask(cv.circle(mask, (o_x, o_y), radius, 1))
