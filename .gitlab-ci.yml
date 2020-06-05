@@ -5,7 +5,7 @@ before_script:
   - apt-get install -y libgl1-mesa-glx xvfb
   - apt-get install -y python3-pyqt5
   - python --version
-  - pip install git+https://gitlab.com/ficsresearch/imageprocessing
+  - pip install git+https://gitlab.com/ficsresearch/imageprocessing@development
   - pip install -e .
   - xvfb-run python -c "from cdef.generalutils import resolveAuthorName;resolveAuthorName('testauthor')"
 
