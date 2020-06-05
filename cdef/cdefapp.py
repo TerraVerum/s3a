@@ -121,10 +121,10 @@ class FRCdefApp(FRAnnotatorUI):
     # SETTINGS
     for editor in FR_SINGLETON.registerableEditors:
         self.createMenuOptForEditor(self.paramTools, editor)
-    profileLoadFunc = self.importQuickLoaderProfile
-    self.createMenuOptForEditor(self.menuFile, FR_SINGLETON.quickLoader, profileLoadFunc)
+    self.createMenuOptForEditor(self.menuFile, FR_SINGLETON.quickLoader,
+                                self.importQuickLoaderProfile)
     if quickLoaderArgs is not None:
-      profileLoadFunc(quickLoaderArgs)
+      self.importQuickLoaderProfile(quickLoaderArgs)
 
     # EDIT
     self.undoAct.triggered.connect(lambda: FR_SINGLETON.actionStack.undo())
@@ -280,7 +280,10 @@ class FRCdefApp(FRAnnotatorUI):
                allowOverwriteDefault=allowOverwriteDefault)
     self.sigLayoutSaved.emit()
 
-  def importQuickLoaderProfile(self, profileSrc: dict):
+  def importQuickLoaderProfile(self, profileSrc: Union[str, dict]):
+    if isinstance(profileSrc, str):
+      profileSrc = {FR_SINGLETON.quickLoader.name: profileSrc}
+
     imgFname = profileSrc.pop('Image', None)
     if imgFname is not None:
       self.resetMainImg(imgFname)

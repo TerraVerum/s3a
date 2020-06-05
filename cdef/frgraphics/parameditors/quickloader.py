@@ -140,6 +140,7 @@ class FRQuickLoaderEditor(FRParamEditor):
       paramStateName = profileSrc.get(editor.name, None)
       if paramStateName is not None:
         editor.loadParamState(paramStateName)
+    return profileSrc
 
 
   def saveParamState(self, saveName: str=None, paramState: dict=None,
