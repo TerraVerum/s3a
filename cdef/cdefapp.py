@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
-from collections import defaultdict
 from functools import partial
-from os.path import join
 from pathlib import Path
 from typing import Callable, Dict, Any, Union, Optional
 
@@ -363,7 +361,7 @@ class FRCdefApp(FRAnnotatorUI):
 
   @Slot()
   def populateLoadLayoutOptions(self):
-    layoutGlob = join(LAYOUTS_DIR, '*.dockstate')
+    layoutGlob = LAYOUTS_DIR.glob('*.dockstate')
     addDirItemsToMenu(self.menuLayout, layoutGlob, self.loadLayoutActionTriggered)
 
   @Slot()

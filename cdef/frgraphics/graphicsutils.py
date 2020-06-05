@@ -135,6 +135,7 @@ def addDirItemsToMenu(parentMenu: QtWidgets.QMenu, dirGlob: Generator,
   if removeExistingChildren:
     encounteredSep = False
     for ii, action in enumerate(parentMenu.children()):
+      action: QtWidgets.QAction
       if encounteredSep:
         parentMenu.removeAction(action)
       elif action.isSeparator():
