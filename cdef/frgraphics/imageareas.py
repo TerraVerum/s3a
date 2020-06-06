@@ -264,7 +264,7 @@ class FRFocusedImage(FREditableImg):
     # Component modification subject to processor
     # For now assume a single point indicates foreground where multiple indicate
     # background selection
-    verts = self.shapeCollection.shapeVerts.astype(int)
+    roiVerts = roiVerts.astype(int)
     vertsDict = {'fgVerts': None, 'bgVerts': None}
     if self.drawAction == FR_CONSTS.DRAW_ACT_ADD:
       vertsDict['fgVerts'] = roiVerts
