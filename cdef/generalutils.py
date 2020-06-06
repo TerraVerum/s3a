@@ -126,3 +126,26 @@ def resolveAuthorName(providedAuthName: Optional[str]) -> Optional[str]:
 
 def augmentException(ex: Exception, prependedMsg: str):
   ex.args = (prependedMsg, *ex.args)
+
+def makeUniqueBaseClass(obj: Any):
+  """
+  Overwrites obj's class to a mixin base class.
+  Property objects only work in Python if assigned to the *class* of an object, e.g.
+  >>> class b:
+  >>>   num = property(lambda self: 4)
+  >>> ob = b()
+  >>> ob.num # works as expected
+  >>> ob.num2 = property(lambda self: 6)
+  >>> ob.num2 # Property object at ... -- NOT AS EXPECTED!
+  To work around this, simply use <type(ob).num2 = ...>. However, for regisetering properties,
+  this means *all* objects of that type will have the properties of all other objects.
+  To fix this, a mixin is added to this object and the property is added to the mixin.
+  That way, the original object class is not altered, and each separate object will not
+  end up sharing the same parameters.
+  In summary, this feature enables the assignment
+  >>> type(ob).a = property(...)
+  without all other `b` objects also receiving this property.
+  """
+  class mixin(type(obj)): pass
+  obj.__class__ = mixin
+  return mixin

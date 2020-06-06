@@ -288,10 +288,12 @@ class FRParamEditor(QtWidgets.QDockWidget):
     filename.unlink()
     self.sigParamStateDeleted.emit(stateName)
 
-  def registerProps(self, clsObj, constParams: List[FRParam]):
+  def registerProps(self, groupingName: Union[type, str], constParams: List[FRParam],
+                    parentParamPath:Collection[str]=None, asProperty=True, **extraOpts):
     outProps = []
     for param in constParams:
-      outProps.append(self.registerProp(clsObj, param))
+      outProps.append(self.registerProp(groupingName, param, parentParamPath,
+                                        asProperty, **extraOpts))
     return outProps
 
   def _addParamGroup(self, groupName: str):
@@ -301,7 +303,8 @@ class FRParamEditor(QtWidgets.QDockWidget):
     return paramForCls
 
   def registerProp(self, groupingName: Union[type, str], constParam: FRParam,
-                   parentParamPath:Collection[str]=None, asProperty=True, **etxraOpts):
+                   parentParamPath:Collection[str]=None, asProperty=True,
+                   objForAssignment=None, **etxraOpts):
     """
     Registers a property defined by *constParam* that will appear in the respective
     parameter editor.
@@ -333,8 +336,8 @@ class FRParamEditor(QtWidgets.QDockWidget):
 
     if isinstance(groupingName, type):
       clsName = groupingName.__qualname__
-    else:
-      clsName = groupingName
+    else: # This way even if a string wasn't passed in we deal with it like a string
+      clsName = str(groupingName)
     paramName = self.classNameToParamMapping[clsName].name
     if paramName in self.params.names:
       paramForCls = self.params.child(paramName)
