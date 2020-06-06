@@ -55,6 +55,8 @@ class FRCustomMenuParameter(parameterTypes.GroupParameter):
   def makeTreeItem(self, depth):
     item = super().makeTreeItem(depth)
     self.item = item
+    if not hasattr(item, 'contextMenu'):
+      item.contextMenu = QtWidgets.QMenu()
     item.contextMenuEvent = lambda ev: item.contextMenu.popup(ev.globalPos())
     for actName in self.menuActions:
       act = item.contextMenu.addAction(actName)
@@ -68,9 +70,13 @@ class FRCustomMenuParameter(parameterTypes.GroupParameter):
   def setOpts(self, **opts):
     super().setOpts()
 
+_toggleName = 'Toggle Enable'
 class FRProcGroupParameter(FRCustomMenuParameter):
   def __init__(self, **opts):
-    super().__init__(menuActions=['Toggle Enable'], **opts)
+    menuActions = opts.pop('menuActions', [])
+    if _toggleName not in menuActions:
+      menuActions.append(_toggleName)
+    super().__init__(menuActions=menuActions, **opts)
     disableFont = QtGui.QFont()
     disableFont.setStrikeOut(True)
     self.enabledFontMap = {True: None, False: disableFont}
@@ -95,7 +101,7 @@ class FRProcGroupParameter(FRCustomMenuParameter):
   def setOpts(self, **opts):
     enabled = opts.get('enabled', None)
     if enabled is not None and enabled != self.opts['enabled']:
-      self.menuActTriggered('Toggle Enable')
+      self.menuActTriggered(_toggleName)
     super().setOpts(**opts)
 
 

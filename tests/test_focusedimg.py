@@ -1,11 +1,11 @@
-from typing import Sequence
-
+import cv2 as cv
 import numpy as np
 import pytest
-
 from pyqtgraph.Qt import QtTest, QtGui, QtCore
+from skimage.measure import points_in_poly
 
-from cdef.frgraphics.rois import FRPolygonROI
+from cdef.frgraphics.regions import FRShapeCollection
+from cdef.structures import FRVertices
 
 QTest = QtTest.QTest
 
@@ -18,10 +18,9 @@ from cdef.projectvars import REQD_TBL_FIELDS, FR_CONSTS
 app, dfTester = defaultApp_tester()
 
 mgr = app.compMgr
-moduleFImg = app.focusedImg
 # Make the processor wellformed
-moduleFImg.procCollection.switchActiveProcessor('Basic Shapes')
-proc = moduleFImg.curProcessor
+app.focusedImg.procCollection.switchActiveProcessor('Basic Shapes')
+proc = app.focusedImg.curProcessor
 for stage in proc.processor.stages:
   if stage.allowDisable:
     proc.setStageEnabled([stage.name], False)
@@ -29,49 +28,97 @@ stack = FR_SINGLETON.actionStack
 
 mgr.addComps(dfTester.compDf)
 
-def leftClickGen(pos: Sequence, dbclick=False):
+def leftClickGen(pos: FRVertices, dbclick=False):
   Ev = QtCore.QEvent
   Qt = QtCore.Qt
   if dbclick:
     typ = Ev.MouseButtonDblClick
   else:
     typ = Ev.MouseButtonPress
-  pos = QtCore.QPointF(*pos)
-  out = QtGui.QMouseEvent(typ, moduleFImg.imgItem.mapToScene(pos),
-                          Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+  pos = QtCore.QPointF(*pos.asPoint())
+  out = QtGui.QMouseEvent(typ, pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
   return out
 
 @pytest.fixture
 def clearFImg():
-  moduleFImg.resetImage()
-  return moduleFImg
+  app.focusedImg.resetImage()
+  return app.focusedImg
 
 @pytest.fixture
 def fImg(clearFImg):
   app.updateCurComp(mgr.compDf.iloc[[0],:])
-  return moduleFImg
+  return app.focusedImg
 
 @pytest.fixture
-def polyRoi():
-  roi = FRPolygonROI()
+def roiFactory():
+  clctn = FRShapeCollection((FR_CONSTS.DRAW_SHAPE_POLY, FR_CONSTS.DRAW_SHAPE_RECT),
+                            app.focusedImg)
+  def _polyRoi(pts: FRVertices):
+    clctn.curShape = FR_CONSTS.DRAW_SHAPE_RECT
+    for pt in pts:
+      ev = leftClickGen(pt)
+      clctn.buildRoi(ev)
 
-def test_update(clearFImg):
+  return _polyRoi
+
+
+def test_update(clearFImg: FRFocusedImage):
   assert clearFImg.image is None
   mgr.addComps(dfTester.compDf.copy())
-  focusedId = RND.integers(NUM_COMPS)
-  newCompDf = mgr.compDf.loc[focusedId]
-  clearFImg.updateAll(app.mainImg.image, newCompDf)
+  focusedId = NUM_COMPS
+  newCompSer = mgr.compDf.loc[focusedId]
+  # Action 1
+  clearFImg.updateAll(app.mainImg.image, newCompSer)
   assert clearFImg.image is not None
-  assert np.array_equal(clearFImg.compSer[REQD_TBL_FIELDS.VERTICES],
-                        newCompDf[REQD_TBL_FIELDS.VERTICES])
+  assert clearFImg.compSer.equals(newCompSer)
+  assert np.array_equal(clearFImg.bbox[1,:] - clearFImg.bbox[0,:], clearFImg.image.shape[:2][::-1])
+
+  # Action 2
+  newerSer = mgr.compDf.loc[0]
+  clearFImg.updateAll(app.mainImg.image, newerSer)
+
+  FR_SINGLETON.actionStack.undo()
+  assert clearFImg.compSer.equals(newCompSer)
+  FR_SINGLETON.actionStack.undo()
+  assert clearFImg.image is None
+
+  FR_SINGLETON.actionStack.redo()
+  assert clearFImg.compSer.equals(newCompSer)
+  FR_SINGLETON.actionStack.redo()
+  assert clearFImg.compSer.equals(newerSer)
+
+
+
 
 def test_region_modify(fImg: FRFocusedImage):
   shapeBnds = fImg.image.shape[:2]
   reach = np.min(shapeBnds)
+  oldVerts = fImg.region.verts
   fImg.shapeCollection.curShape = FR_CONSTS.DRAW_SHAPE_POLY
   fImg.drawAction = FR_CONSTS.DRAW_ACT_ADD
-  fImg.mousePressEvent(leftClickGen((5,5)))
-  fImg.mousePressEvent(leftClickGen((reach,reach)))
-  fImg.mousePressEvent(leftClickGen((reach,5)))
-  fImg.mousePressEvent(leftClickGen((5,5)))
-  assert fImg.region.image.sum() > 0
+  imsum = lambda: fImg.region.image.sum()
+
+  # 1st action
+  fImg.updateRegionFromVerts(None)
+  assert imsum() == 0
+
+  newVerts = FRVertices([[5,5], [reach, reach], [reach, 5], [5,5]])
+  newMask = np.zeros(shapeBnds, 'uint8')
+  cv.fillPoly(newMask, [newVerts], 1)
+  newMask = newMask > 0
+
+  # 2nd action
+  fImg.handleShapeFinished(newVerts)
+  assert np.array_equal(fImg.region.embedMaskInImg(shapeBnds), newMask)
+
+  FR_SINGLETON.actionStack.undo()
+  # Cmp to first action
+  assert imsum() == 0
+  FR_SINGLETON.actionStack.undo()
+  # Cmp to original
+  assert fImg.region.verts == oldVerts
+
+  FR_SINGLETON.actionStack.redo()
+  assert imsum() == 0
+  FR_SINGLETON.actionStack.redo()
+  assert np.array_equal(fImg.region.embedMaskInImg(shapeBnds), newMask)

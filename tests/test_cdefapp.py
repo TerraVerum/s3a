@@ -6,8 +6,8 @@ import pytest
 from appsetup import (NUM_COMPS, SAMPLE_IMG,
                       TESTS_DIR, SAMPLE_IMG_DIR, clearTmpFiles, RND, defaultApp_tester)
 from cdef import FR_SINGLETON
-from cdef.projectvars import REQD_TBL_FIELDS
-from cdef.structures import FRAlgProcessorError
+from cdef.projectvars import REQD_TBL_FIELDS, LAYOUTS_DIR
+from cdef.structures import FRAlgProcessorError, FRCdefException
 
 EXPORT_DIR = TESTS_DIR/'files'
 
@@ -82,3 +82,12 @@ def test_change_comp(clearedApp):
   assert fImg.image is not None
   stack.undo()
   assert fImg.image is None
+
+def test_save_layout():
+  with pytest.raises(FRCdefException):
+    app.saveLayout('default')
+  app.saveLayout('tmp')
+  savePath = LAYOUTS_DIR/f'tmp.dockstate'
+  assert savePath.exists()
+  savePath.unlink()
+

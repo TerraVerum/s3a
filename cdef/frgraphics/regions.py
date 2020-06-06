@@ -60,26 +60,32 @@ class FRShapeCollection(QtCore.QObject):
       self.forceBlockRois = True
 
 
-  def buildRoi(self, imgItem: pg.ImageItem, ev: QtGui.QMouseEvent):
+  def buildRoi(self, ev: QtGui.QMouseEvent, imgItem: pg.ImageItem=None):
     """
-        Construct the current shape ROI depending on mouse movement and current shape parameters
-        :param imgItem: Image the ROI is drawn upon. Either focused imgItem or main imgItem
-        :param ev: Mouse event
-        """
+    Construct the current shape ROI depending on mouse movement and current shape parameters
+    :param imgItem: Image the ROI is drawn upon, used for mapping event coordinates
+      from a scene to pixel coordinates. If *None*, event coordinates are assumed
+      to already be relative to pixel coordinates.
+    :param ev: Mouse event
+    """
     # Unblock on mouse press
-    if (imgItem.image is not None
+    # None imgitem is only the case during programmatic calls so allow this case
+    if ((imgItem is None or imgItem.image is not None)
         and ev.type() == ev.MouseButtonPress
         and ev.button() == QtCore.Qt.LeftButton):
       self.forceBlockRois = False
     if self.forceBlockRois: return
-    posRelToImg = imgItem.mapFromScene(ev.pos())
+    if imgItem is not None:
+      posRelToImg = imgItem.mapFromScene(ev.pos())
+    else:
+      posRelToImg = ev.pos()
     # Form of rate-limiting -- only simulate click if the next pixel is at least one away
     # from the previous pixel location
     xyCoord = FRVertices([[posRelToImg.x(), posRelToImg.y()]], dtype=float)
     curRoi = self.roiForShape[self.curShape]
     constructingRoi, self.shapeVerts = curRoi.updateShape(ev, xyCoord)
     if self.shapeVerts is not None:
-      self.sigShapeFinished.emit(curRoi)
+      self.sigShapeFinished.emit(self.shapeVerts)
 
     if not constructingRoi:
       # Vertices from the completed shape are already stored, so clean up the shapes.
@@ -282,8 +288,8 @@ class FRVertexDefinedImg(pg.ImageItem):
 
   def embedMaskInImg(self, toEmbedShape: Tuple[int, int]):
     outImg = np.zeros(toEmbedShape, dtype=bool)
-    idxs = tuple(slice(0, self.image.shape[ii]) for ii in range(2))
-    outImg[idxs] = self.image
+    selfShp = self.image.shape
+    outImg[0:selfShp[0], 0:selfShp[1]] = self.image
     return outImg
 
   @FR_SINGLETON.actionStack.undoable('Modify Focused Region')

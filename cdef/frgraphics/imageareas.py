@@ -45,7 +45,7 @@ class FREditableImg(pg.PlotWidget):
     # DRAWING OPTIONS
     # -----
     self.drawAction: FRParam = FR_CONSTS.DRAW_ACT_PAN
-    self.shapeCollection = FRShapeCollection(parent=self, allowableShapes=allowableShapes)
+    self.shapeCollection = FRShapeCollection(allowableShapes, self)
     self.shapeCollection.sigShapeFinished.connect(self.handleShapeFinished)
 
     # Make sure panning is allowed before creating draw widget
@@ -66,7 +66,7 @@ class FREditableImg(pg.PlotWidget):
   def curProcessor(self):
       return self.procCollection.curProcessor
 
-  def handleShapeFinished(self, roi: FRExtendedROI) -> Optional[np.ndarray]:
+  def handleShapeFinished(self, roiVerts: FRVertices) -> Optional[np.ndarray]:
     """
     Overloaded in child classes to process new regions
     """
@@ -101,13 +101,13 @@ class FREditableImg(pg.PlotWidget):
     super().mousePressEvent(ev)
     if ev.buttons() == QtCore.Qt.LeftButton \
         and self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
-      self.shapeCollection.buildRoi(self.imgItem, ev)
+      self.shapeCollection.buildRoi(ev, self.imgItem)
 
   def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent):
     super().mouseDoubleClickEvent(ev)
     if ev.buttons() == QtCore.Qt.LeftButton \
         and self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
-      self.shapeCollection.buildRoi(self.imgItem, ev)
+      self.shapeCollection.buildRoi(ev, self.imgItem)
 
   def mouseMoveEvent(self, ev: QtGui.QMouseEvent):
     """
@@ -116,7 +116,7 @@ class FREditableImg(pg.PlotWidget):
     """
     super().mouseMoveEvent(ev)
     if self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
-      self.shapeCollection.buildRoi(self.imgItem, ev)
+      self.shapeCollection.buildRoi(ev, self.imgItem)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
     """
@@ -127,7 +127,7 @@ class FREditableImg(pg.PlotWidget):
     super().mouseReleaseEvent(ev)
     # if ev.buttons() == QtCore.Qt.LeftButton:
     if self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
-      self.shapeCollection.buildRoi(self.imgItem, ev)
+      self.shapeCollection.buildRoi(ev, self.imgItem)
 
   def clearCurDrawShape(self):
     self.shapeCollection.clearAllRois()
@@ -156,8 +156,8 @@ class FRMainImage(FREditableImg):
 
     self.switchBtnMode(FR_CONSTS.DRAW_ACT_ADD)
 
-  def handleShapeFinished(self, roi: FRExtendedROI) -> Optional[np.ndarray]:
-    if (self.drawAction == FR_CONSTS.DRAW_ACT_SELECT) and roi.connected:
+  def handleShapeFinished(self, roiVerts: FRVertices) -> Optional[np.ndarray]:
+    if (self.drawAction == FR_CONSTS.DRAW_ACT_SELECT) and roiVerts.connected:
       # Selection
       self.sigSelectionBoundsMade.emit(self.shapeCollection.shapeVerts)
     elif self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
@@ -257,7 +257,7 @@ class FRFocusedImage(FREditableImg):
   def resetImage(self):
     self.updateAll(None)
 
-  def handleShapeFinished(self, roi: FRExtendedROI) -> Optional[np.ndarray]:
+  def handleShapeFinished(self, roiVerts: FRVertices) -> Optional[np.ndarray]:
     if self.drawAction == FR_CONSTS.DRAW_ACT_PAN:
       return
 
@@ -267,9 +267,9 @@ class FRFocusedImage(FREditableImg):
     verts = self.shapeCollection.shapeVerts.astype(int)
     vertsDict = {'fgVerts': None, 'bgVerts': None}
     if self.drawAction == FR_CONSTS.DRAW_ACT_ADD:
-      vertsDict['fgVerts'] = verts
+      vertsDict['fgVerts'] = roiVerts
     elif self.drawAction == FR_CONSTS.DRAW_ACT_REM:
-      vertsDict['bgVerts'] = verts
+      vertsDict['bgVerts'] = roiVerts
     # Check for flood fill
 
     compMask = self.region.embedMaskInImg(self.image.shape[:2])
@@ -327,7 +327,7 @@ class FRFocusedImage(FREditableImg):
     self.imgItem.setImage(newCompImg)
 
   @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
-  def updateRegionFromVerts(self, newVerts: FRComplexVertices, offset: FRVertices=None):
+  def updateRegionFromVerts(self, newVerts: FRComplexVertices=None, offset: FRVertices=None):
     # Component vertices are nan-separated regions
     oldVerts = self.region.verts
     oldImg = self.region.image
