@@ -16,7 +16,7 @@ def nanConcatList(vertList) -> FRVertices:
   NaN entries between each separate list
   """
   nanSep = np.ones((1,2), dtype=int)*np.nan
-  allVerts = []
+  allVerts = [np.zeros((0,2))]
   for curVerts in vertList:
     allVerts.append(curVerts)
     if len(curVerts) == 0: continue

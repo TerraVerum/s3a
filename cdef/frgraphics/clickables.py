@@ -1,33 +1,15 @@
+import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.GraphicsScene.mouseEvents import MouseDragEvent
 from pyqtgraph.Qt import QtCore, QtGui
+from skimage.measure import points_in_poly
 
 from cdef.structures import FRVertices
 
 Signal = QtCore.pyqtSignal
 
-import numpy as np
 
-
-# class FRClickableImageItem(pg.ImageItem):
-#   """ Depracated class"""
-#   sigClicked = Signal(object)
-#
-#   clickable = True
-#   requireCtrlKey = True
-#
-#   def mouseClickEvent(self, ev: QtGui.QMouseEvent):
-#     # Capture clicks only if component is present and user allows it
-#     # And user pressed control
-#     keyMods = ev.modifiers()
-#     if not ev.isAccepted() and ev.button() == QtCore.Qt.LeftButton \
-#        and self.clickable and self.image is not None \
-#        and (keyMods == QtCore.Qt.ControlModifier or not self.requireCtrlKey):
-#       xyCoord = np.round(np.array([[ev.pos().x(), ev.pos().y()]], dtype='int'))
-#       self.sigClicked.emit(xyCoord)
-#     super().mouseClickEvent(ev)
-
-class FRCentroidScatterItem(pg.ScatterPlotItem):
+class FRBoundScatterPlot(pg.ScatterPlotItem):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     # TODO: Find out where the mouse is and make sure it's above a point before changing
@@ -42,74 +24,64 @@ class FRCentroidScatterItem(pg.ScatterPlotItem):
   #   else:
   #     self.unsetCursor()
 
-  def centroidsWithin(self, selection: FRVertices):
+  def boundsWithin(self, selection: FRVertices):
     # TODO: Optimize for rectangular selections
-    polyPoints = [QtCore.QPointF(*row) for row in selection]
-    selectionPoly = QtGui.QPolygonF(polyPoints)
+    # polyPoints = [QtCore.QPointF(*row) for row in selection]
+    # selectionPoly = QtGui.QPolygonF(polyPoints)
+    if self.data['x'] is None:
+      return np.array([])
     pointLocs = np.column_stack(self.getData())
     # tfIsInSelection = (pointLocs[0] >= bbox[0]) \
     #   & (pointLocs[0] <= bbox[2]) \
     #   & (pointLocs[1] >= bbox[1]) \
     #   & (pointLocs[1] <= bbox[3])
-    tfIsInSelection = np.array([selectionPoly.containsPoint(QtCore.QPointF(*row), QtCore.Qt.WindingFill)
-                                for row in pointLocs], dtype=bool)
+    tfIsInSelection = points_in_poly(pointLocs, selection)
+    # tfIsInSelection = np.array([selectionPoly.containsPoint(QtCore.QPointF(*row), QtCore.Qt.WindingFill)
+    #                             for row in pointLocs], dtype=bool)
     return np.array([point.data() for point in self.points()[tfIsInSelection]])
 
-# class ClickableTextItem(pg.TextItem):
-#   """Deprecated class"""
-#   @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_BOUNDARY_COLOR)
-#   def boundClr(self): pass
-#   @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_VALID_ID_COLOR)
-#   def validIdClr(self): pass
-#   @FR_SINGLETON.scheme.registerProp(FR_CONSTS.SCHEME_NONVALID_ID_COLOR)
-#   def invalidIdClr(self): pass
-#
-#
-#
-#   sigClicked = Signal()
-#   def __init__(self, *args, **kwargs):
-#     super().__init__(*args, **kwargs)
-#
-#     self.origCursor = self.cursor()
-#     self.hoverCursor = QtCore.Qt.PointingHandCursor
-#     self.setAnchor((0.5,0.5))
-#     self.setAcceptHoverEvents(True)
-#
-#   def hoverEnterEvent(self, ev):
-#     self.setCursor(self.hoverCursor)
-#
-#   def hoverLeaveEvent(self, ev):
-#     self.unsetCursor()
-#
-#   def mousePressEvent(self, ev: QtGui.QMouseEvent):
-#     self.sigClicked.emit()
-#     ev.accept()
-#
-#   def setText(self, newText: str, validated: bool = False):
-#     """
-#     Overload setting text to utilize scheme editor
-#     """
-#     schemeClrProp = self.invalidIdClr
-#     if validated:
-#       schemeClrProp = self.validIdClr
-#
-#     curFont = self.textItem.font()
-#     curFont.setPointSize(self.txtSize)
-#     self.setFont(curFont)
-#
-#     self.setColor(schemeClrProp)
-#
-#     super().setText(newText)
-#
-#   def update(self, newText, newVerts, newValid):
-#     # Case when verts is empty or all NaN. Assume it is not possible for one vertex to
-#     # be NaN while the other is a real number
-#     if np.any(np.isfinite(newVerts)):
-#       newPos = np.mean(newVerts, axis=0)
-#     else:
-#       newPos = np.ones(2)*np.nan
-#     self.setPos(newPos[0], newPos[1])
-#     self.setText(newText, newValid)
+  def pointsAt(self, pos: QtCore.QPointF):
+    """
+    The default implementation only checks a square around each spot. However, this is not
+    precise enough for my needs. It also triggers when clicking *inside* the spot boundary,
+    which I don't want.
+    """
+    pts = []
+    spots = self.points()
+    strokerWidth = spots[0].pen().width()/2
+    for spot in spots: # type: pg.SpotItem
+      symb = QtGui.QPainterPath(spot.symbol())
+      symb.translate(spot.pos())
+      stroker = QtGui.QPainterPathStroker()
+      stroker.setWidth(strokerWidth)
+      mousePath = stroker.createStroke(symb)
+      # Only trigger when clicking a boundary, not the inside of the shape
+      if mousePath.contains(pos):
+        pts.append(spot)
+    return pts[::-1]
+
+  def measureSpotSizes(self, dataSet):
+    """
+    Override the method so that it takes symbol size into account
+    """
+    for rec in dataSet:
+      ## keep track of the maximum spot size and pixel size
+      symbol, size, pen, brush = self.getSpotOpts(rec)
+      br = symbol.boundingRect()
+      size = max(br.width(), br.height())*2
+      width = 0
+      pxWidth = 0
+      if self.opts['pxMode']:
+        pxWidth = size + pen.widthF()
+      else:
+        width = size
+        if pen.isCosmetic():
+          pxWidth += pen.widthF()
+        else:
+          width += pen.widthF()
+      self._maxSpotWidth = max(self._maxSpotWidth, width)
+      self._maxSpotPxWidth = max(self._maxSpotPxWidth, pxWidth)
+    self.bounds = [None, None]
 
 class FRRightPanViewBox(pg.ViewBox):
   def mouseDragEvent(self, ev: MouseDragEvent, axis=None):

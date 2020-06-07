@@ -69,8 +69,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     FR_SINGLETON.scheme.sigParamStateUpdated.connect(lambda: self._updateFilter(self._filter))
     compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
 
-    for plt in self.regionPlots.boundPlt, self.regionPlots.centroidPlts:
-      mainImg.addItem(plt)
+    mainImg.addItem(self.regionPlots.boundPlt)
 
   def redrawComps(self, idLists):
     # Following mix of cases are possible:
@@ -127,10 +126,11 @@ class FRCompDisplayFilter(QtCore.QObject):
     # If min and max are the same, just check for points at mouse position
     if np.abs(selection[0] - selection[1]).sum() < 0.01:
       qtPoint = QtCore.QPointF(*selection[0])
-      selectedSpots = self.regionPlots.centroidPlts.pointsAt(qtPoint)
+      selectedSpots = self.regionPlots.boundPlt.pointsAt(qtPoint)
       selectedIds = [spot.data() for spot in selectedSpots]
     else:
-      selectedIds = self.regionPlots.centroidPlts.centroidsWithin(selection)
+      selectedIds = self.regionPlots.boundPlt.boundsWithin(selection)
+      selectedIds = np.unique(selectedIds)
 
     # -----
     # Obtain table idxs corresponding to ids so rows can be highlighted

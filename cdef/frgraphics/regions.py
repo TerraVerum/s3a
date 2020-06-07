@@ -5,14 +5,15 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pandas import DataFrame as df
+from pyqtgraph import arrayToQPath
 from pyqtgraph.Qt import QtGui, QtCore
 
-from cdef import FR_SINGLETON
+from cdef import FR_SINGLETON, appInst
 from cdef.generalutils import coerceDfTypes, nanConcatList
 from cdef.projectvars import REQD_TBL_FIELDS, FR_CONSTS
 from cdef.structures import FRParam, FRVertices, FRComplexVertices, OneDArr, BlackWhiteImg
 from cdef.structures.typeoverloads import GrayImg
-from .clickables import FRCentroidScatterItem
+from .clickables import FRBoundScatterPlot
 from .rois import SHAPE_ROI_MAPPING, FRExtendedROI
 
 Signal = QtCore.pyqtSignal
@@ -139,32 +140,36 @@ def _makeTxtSymbol(txt: str, fontSize: int):
   outSymbol = tr.map(outSymbol)
   return outSymbol
 
+def _makeBoundSymbol(verts: FRVertices):
+  verts = verts - verts.min(0, keepdims=True)
+  path = arrayToQPath(*verts.T, connect='finite')
+  return path
+
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MULT_REG_PLT)
 class FRMultiRegionPlot(QtCore.QObject):
   @classmethod
   def __initEditorParams__(cls):
-    (cls.nonvalidIdClr, cls.validIdClr, cls.boundClr,cls.boundWidth,
-    cls.idMarkerSz, cls.selectedIdBorder) = FR_SINGLETON.scheme.registerProps(cls,
-      [FR_CONSTS.SCHEME_NONVALID_ID_COLOR, FR_CONSTS.SCHEME_VALID_ID_COLOR,
-       FR_CONSTS.SCHEME_BOUNDARY_COLOR, FR_CONSTS.SCHEME_BOUNDARY_WIDTH,
-       FR_CONSTS.SCHEME_ID_MARKER_SZ, FR_CONSTS.SCHEME_SELECTED_ID_BORDER]
-    )
+    (cls.focusedBoundClr, cls.selectedBoundClr, cls.boundClr, cls.boundWidth) = \
+      FR_SINGLETON.scheme.registerProps(
+        cls, [FR_CONSTS.SCHEME_FOC_BRUSH_CLR, FR_CONSTS.SCHEME_SEL_BOUND_CLR,
+              FR_CONSTS.SCHEME_BOUND_CLR, FR_CONSTS.SCHEME_BOUND_WIDTH])
 
 
-  # Helper class for IDE assistance during dataframe access
   def __init__(self, parent=None):
     super().__init__(parent)
-    self.boundPlt = pg.PlotDataItem(connect='finite')
-    self.centroidPlts = FRCentroidScatterItem(pen=None)
+    self.boundPlt = FRBoundScatterPlot(brush=None, size=1, pxMode=False)
+    self.boundPlt.setZValue(50)
     self.data = makeMultiRegionDf(0)
 
     # 'pointsAt' is an expensive operation if many points are in the scatterplot. Since
     # this will be called anyway when a selection box is made in the main image, disable
     # mouse click listener to avoid doing all that work for nothing.
-    self.centroidPlts.mouseClickEvent = lambda ev: None
+    # self.centroidPlts.mouseClickEvent = lambda ev: None
+    self.boundPlt.mouseClickEvent = lambda ev: None
     # Also disable sigClicked. This way, users who try connecting to this signal won't get
     # code that runs but never triggers
-    self.centroidPlts.sigClicked = None
+    # self.centroidPlts.sigClicked = None
+    self.boundPlt.sigPointsClicked = None
 
   def resetRegionList(self, newIds: Optional[Sequence]=None, newRegionDf: Optional[df]=None):
     if newIds is None:
@@ -179,60 +184,51 @@ class FRMultiRegionPlot(QtCore.QObject):
     Marks 'selectedIds' as currently selected by changing their scheme to user-specified
     selection values.
     """
-    selectedIdPens = np.empty(len(self.data), dtype=object)
-    selectedIdPens.fill(None)
-    selectedIdxs = np.isin(self.data.index, selectedIds)
-    selectedIdPens[selectedIdxs] = pg.mkPen(self.selectedIdBorder, width=3)
+    selectPen = pg.mkPen(color=self.selectedBoundClr, width=self.boundWidth*2)
 
-    self.centroidPlts.setPen(selectedIdPens)
+    defaultPen = pg.mkPen(width=self.boundWidth, color=self.boundClr)
+    newPens = np.array([defaultPen]*len(self.data))
+    selectionPen = pg.mkPen(width=self.boundWidth*2, color=self.selectedBoundClr)
+    newPens[np.isin(self.data.index, selectedIds)] = selectionPen
+    self.boundPlt.setPen(newPens)
+    self.boundPlt.invalidate()
+
 
   def focusById(self, focusedIds: OneDArr):
     """
     Colors 'focusedIds' to indicate they are present in a focused view.
     """
-    focusedIdSymbs = np.empty(len(self.data), dtype='<U4')
-    focusedIdSymbs.fill('o')
-    focusedIdSizes = np.empty(len(self.data))
-    focusedIdSizes.fill(self.idMarkerSz)
-    focusedIdxs = np.isin(self.data.index, focusedIds)
+    brushes = np.array([None]*len(self.data))
 
-    # TODO: Make GUI properties for these?
-    focusedIdSymbs[focusedIdxs] = 'star'
-    focusedIdSizes[focusedIdxs] *= 3
-    self.centroidPlts.setSymbol(focusedIdSymbs)
-    self.centroidPlts.setSize(focusedIdSizes)
+    brushes[np.isin(self.data.index, focusedIds)] = pg.mkBrush(self.focusedBoundClr)
+    self.boundPlt.setBrush(brushes)
+    self.boundPlt.invalidate()
 
 
   def updatePlot(self):
     # -----------
     # Update data
     # -----------
-    plotRegions = [np.ones((0,2))]
-    idLocs = [np.ones((0,2))]
+    boundLocs = []
+    boundSymbs = []
+    if self.data.empty:
+      self.boundPlt.setData(x=[], y=[], data=[])
+      return
 
-    for region in self.data.loc[:, REQD_TBL_FIELDS.VERTICES]:
+    for region, _id in zip(self.data.loc[:, REQD_TBL_FIELDS.VERTICES],
+                           self.data.index):
       concatRegion = nanConcatList(region)
-      idLoc = np.nanmean(concatRegion, 0)
-      idLocs.append(idLoc)
-      # Before stacking regions, add first point of region to end of region vertices.
-      # This will make the whole region connected in the output plot
-      # Insert nan to make separate components unconnected
-      plotRegions.append(concatRegion)
-    idLocs = np.vstack(idLocs)
-    # TODO: If the 'development' branch of pyqtgraph is set up, the clickable portion of each
-    #   plot can be the ID of the component. Otherwise it must be a non-descript item.
-    #scatSymbols = [_makeTxtSymbol(str(curId), idSz) for curId in self.data.index]
-    scatSymbols = [None]*len(self.data)
+      boundLoc = np.nanmin(concatRegion, 0, keepdims=True)
+      boundSymbol = pg.arrayToQPath(*(concatRegion-boundLoc).T, connect='finite')
 
-    brushes = np.empty(len(self.data), dtype=object)
-    brushes.fill(pg.mkBrush(self.nonvalidIdClr))
-    brushes[self.data.loc[:, REQD_TBL_FIELDS.VALIDATED]] = pg.mkBrush(self.validIdClr)
+      boundLocs.append(boundLoc)
+      boundSymbs.append(boundSymbol)
 
-    self.centroidPlts.setData(x=idLocs[:, 0], y=idLocs[:, 1], size=self.idMarkerSz, brush=brushes,
-                              data=self.data.index, symbol=scatSymbols)
-    plotRegions = np.vstack(plotRegions)
-    boundPen = pg.mkPen(color=self.boundClr, width=self.boundWidth)
-    self.boundPlt.setData(plotRegions[:,0], plotRegions[:,1], pen=boundPen)
+    plotRegions = np.vstack(boundLocs)
+    width = self.boundWidth
+    boundPen = pg.mkPen(color=self.boundClr, width=width)
+    self.boundPlt.setData(*plotRegions.T, pen=boundPen, symbol=boundSymbs,
+                          data=self.data.index)
 
   def __getitem__(self, keys: Tuple[Any,...]):
     """
@@ -264,7 +260,7 @@ class FRMultiRegionPlot(QtCore.QObject):
     # Now we can add entries that weren't in our original dataframe
     # If not all set values were provided in the new dataframe, fix this by embedding
     # it into the default dataframe
-    newDataDf = makeMultiRegionDf(np.sum(newEntryIdxs), idList=regionIds[newEntryIdxs])
+    newDataDf = makeMultiRegionDf(int(np.sum(newEntryIdxs)), idList=regionIds[newEntryIdxs])
     newDataDf.loc[:, keysDf.columns] = keysDf.loc[newEntryIdxs, :]
     self.data = pd.concat((self.data, newDataDf))
     # Retain type information

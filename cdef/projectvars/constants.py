@@ -66,15 +66,13 @@ class _FRConsts(FRParamGroup):
   # --------------------------
   # SCHEME PARAMETERS
   # --------------------------
-  SCHEME_USE_DARK_THEME     : FRParam = newParam('Use dark theme', False)
-  SCHEME_VALID_ID_COLOR     : FRParam = newParam('Validated ID Color', '0f0', 'color')
-  SCHEME_NONVALID_ID_COLOR  : FRParam = newParam('Non-Validated ID Color', 'f00', 'color')
-  SCHEME_BOUNDARY_COLOR     : FRParam = newParam('Component Boundary Color', 'ff0', 'color')
-  SCHEME_BOUNDARY_WIDTH     : FRParam = newParam('Component Boundary Width', 2)
-  SCHEME_ID_MARKER_SZ       : FRParam = newParam('ID Marker Size', 10)
-  SCHEME_SELECTED_ID_BORDER : FRParam = newParam('Selected ID Border color', '00f', 'color')
-  SCHEME_REG_VERT_COLOR     : FRParam = newParam('Vertex Color', '0f0', 'color')
-  SCHEME_REG_FILL_COLOR     : FRParam = newParam('Fill Color', '00ff0046', 'color')
+  SCHEME_USE_DARK_THEME : FRParam = newParam('Use dark theme', False)
+  SCHEME_BOUND_CLR      : FRParam = newParam('Normal Boundary Color', 'ff0', 'color')
+  SCHEME_SEL_BOUND_CLR  : FRParam = newParam('Selected Boundary Color', '00f', 'color')
+  SCHEME_FOC_BRUSH_CLR  : FRParam = newParam('Focused Brush Color', 'f007', 'color')
+  SCHEME_BOUND_WIDTH    : FRParam = newParam('Boundary Width', 7)
+  SCHEME_REG_VERT_COLOR : FRParam = newParam('Vertex Color', '0f0', 'color')
+  SCHEME_REG_FILL_COLOR : FRParam = newParam('Fill Color', '00ff0046', 'color')
 
   # --------------------------
   # REGION-CREATION PARAMETERS
