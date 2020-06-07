@@ -82,11 +82,11 @@ def dialogGetAuthorName(parent: QtWidgets.QMainWindow) -> str:
   :return:
   """
   annPath = Path(ANN_AUTH_DIR)
-  annFile = annPath.joinpath('defaultAuthor.txt')
+  authorFname = annPath.joinpath('defaultAuthor.txt')
   msgDlg = QtWidgets.QMessageBox(parent)
   msgDlg.setModal(True)
-  if annFile.exists():
-    with open(str(annFile), 'r') as ifile:
+  if authorFname.exists():
+    with open(str(authorFname), 'r') as ifile:
       lines = ifile.readlines()
       if not lines:
         reply = msgDlg.No

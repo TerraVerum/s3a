@@ -26,8 +26,7 @@ def test_change_img(clearedApp):
   im2 = RND.integers(0, 255, SAMPLE_IMG.shape, 'uint8')
   name = Path('./testfile').absolute()
   clearedApp.resetMainImg(name, im2)
-  assert name == FR_SINGLETON.tableData.annFile, \
-                   'Annotation source not set after loading image on start'
+  assert name == app.srcImgFname, 'Annotation source not set after loading image on start'
 
   np.testing.assert_array_equal(clearedApp.mainImg.image, im2,
                                 'Main image doesn\'t match sample image')
@@ -35,7 +34,7 @@ def test_change_img(clearedApp):
 def test_change_img_none(clearedApp):
   clearedApp.resetMainImg()
   assert clearedApp.mainImg.image is None
-  assert FR_SINGLETON.tableData.annFile is None
+  assert app.srcImgFname is None
 
 def test_est_bounds_no_img(clearedApp):
   clearedApp.resetMainImg()
@@ -68,7 +67,7 @@ def test_load_comps_merge(clearedApp):
 
   clearedApp.loadCompList(str(compFile))
   equalCols = np.setdiff1d(dfTester.compDf.columns, [REQD_TBL_FIELDS.INST_ID,
-                                                     REQD_TBL_FIELDS.ANN_FILENAME])
+                                                     REQD_TBL_FIELDS.SRC_IMG_FILENAME])
   dfCmp = clearedApp.compMgr.compDf[equalCols].values == dfTester.compDf[equalCols].values
   assert np.all(dfCmp), 'Loaded dataframe doesn\'t match daved dataframe'
 

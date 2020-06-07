@@ -252,25 +252,26 @@ class FRComponentIO:
   def __init__(self):
     self.compDf: Optional[df] = None
 
-  def prepareDf(self, compDf: df, displayIds: OneDArr=None):
+  def prepareDf(self, compDf: df, displayIds: OneDArr=None, srcImgFname: Path=None):
     """
     :param compDf: The component dataframe that came from the component manager
     :param displayIds: If not self.exportOnlyVis, exports every component in the
       dataframe. Otherwise, just exports the requested IDs
+    :param srcImgFname: Main image filename. This associates each new annotation
+      to this main image where they came from
     """
     if self.exportOnlyVis and displayIds is not None:
       exportIds = displayIds
     else:
       exportIds = compDf.index
     exportDf: df = compDf.loc[exportIds,:].copy()
-    mainImgFpath = FR_SINGLETON.tableData.annFile
-    if not self.includeFullSourceImgName:
+    if not self.includeFullSourceImgName and srcImgFname is not None:
       # Only use the file name, not the whole path
-      mainImgFpath = mainImgFpath.name
+      srcImgFname = srcImgFname.name
     # Assign correct export name for only new components
-    overwriteIdxs = exportDf[REQD_TBL_FIELDS.ANN_FILENAME] == FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
+    overwriteIdxs = exportDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME] == FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
     # TODO: Maybe the current filename will match the current file indicator. What happens then?
-    exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.ANN_FILENAME] = mainImgFpath
+    exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = srcImgFname
     self.compDf = exportDf
 
   # -----

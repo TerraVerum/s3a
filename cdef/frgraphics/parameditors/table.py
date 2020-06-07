@@ -68,11 +68,10 @@ class FRTableFilterEditor(FRParamEditor):
 
 class FRTableData:
 
-  def __init__(self, annAuthor: str=None, annFile: str=None):
+  def __init__(self, annAuthor: str=None):
     self.filter = FRTableFilterEditor()
 
     self.annAuthor = annAuthor
-    self.annFile = annFile
 
     self.allFields: List[FRParam] = list(REQD_TBL_FIELDS)
     self.compClasses = [COMP_CLASS_NA]
@@ -98,7 +97,7 @@ class FRTableData:
     # Set the metadata for this application run
     outDf[REQD_TBL_FIELDS.ANN_AUTHOR] = self.annAuthor
     outDf[REQD_TBL_FIELDS.ANN_TIMESTAMP] = datetime.now().strftime(DATE_FORMAT)
-    outDf[REQD_TBL_FIELDS.ANN_FILENAME] = FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
+    outDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME] = FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
     if dropRow:
       outDf = outDf.drop(index=REQD_TBL_FIELDS.INST_ID.value)
     return outDf

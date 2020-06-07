@@ -57,6 +57,7 @@ class FRCdefApp(FRAnnotatorUI):
     # DATA ATTRIBUTES
     # ---------------
     self.hasUnsavedChanges = False
+    self.srcImgFname = None
 
     self.statBar = QtWidgets.QStatusBar(self)
     self.setStatusBar(self.statBar)
@@ -263,7 +264,7 @@ class FRCdefApp(FRAnnotatorUI):
         self.mainImg.setImage(imgData)
       else:
         self.mainImg.setImage(fileName)
-      FR_SINGLETON.tableData.annFile = fileName
+      self.srcImgFname = fileName
       self.focusedImg.resetImage()
       self.mainImg.plotItem.vb.autoRange()
       if self.estBoundsOnStart:
@@ -300,7 +301,8 @@ class FRCdefApp(FRAnnotatorUI):
       FR_SINGLETON.quickLoader.buildFromUserProfile(profileSrc)
 
   def exportCompList(self, outFname: str):
-    self.compExporter.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds)
+    self.compExporter.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds,
+                                self.srcImgFname)
     self.compExporter.exportCsv(outFname)
     self.hasUnsavedChanges = False
 

@@ -34,13 +34,13 @@ COMP_CLASS_NA = FRParam('Unassigned')
 
 @dataclass
 class _ReqdTableFields(FRParamGroup):
-  INST_ID       : FRParam = newParam('Instance ID', -1)
-  VERTICES      : FRParam = newParam('Vertices', FRComplexVertices())
-  VALIDATED     : FRParam = newParam('Validated', False)
-  ANN_AUTHOR    : FRParam = newParam('Author', "")
-  ANN_FILENAME  : FRParam = newParam('Source Image Filename', "")
-  ANN_TIMESTAMP : FRParam = newParam('Timestamp', "")
-  COMP_CLASS    : FRParam = newParam('Class', COMP_CLASS_NA)
+  INST_ID          : FRParam = newParam('Instance ID', -1)
+  VERTICES         : FRParam = newParam('Vertices', FRComplexVertices())
+  VALIDATED        : FRParam = newParam('Validated', False)
+  ANN_AUTHOR       : FRParam = newParam('Author', "")
+  SRC_IMG_FILENAME : FRParam = newParam('Source Image Filename', "")
+  ANN_TIMESTAMP    : FRParam = newParam('Timestamp', "")
+  COMP_CLASS       : FRParam = newParam('Class', COMP_CLASS_NA)
 REQD_TBL_FIELDS = _ReqdTableFields()
 
 
