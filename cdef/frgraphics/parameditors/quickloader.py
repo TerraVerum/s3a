@@ -81,7 +81,12 @@ class FREditorListModel(QtCore.QAbstractListModel):
 
 def _addRmOption(param: Parameter):
   item = next(iter(param.items.keys()))
-  menu: QtWidgets.QMenu = item.contextMenu
+
+  try:
+    menu: QtWidgets.QMenu = item.contextMenu
+  except AttributeError: # If the menu doesn't exist yet
+    menu = QtWidgets.QMenu()
+    item.contextMenu = menu
   existingActs = [act.text() for act in menu.actions()]
   if 'Remove' not in existingActs:
     item.contextMenu.addAction('Remove').triggered.connect(item.requestRemove)
