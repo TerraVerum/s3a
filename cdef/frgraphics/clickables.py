@@ -48,7 +48,7 @@ class FRBoundScatterPlot(pg.ScatterPlotItem):
     """
     pts = []
     spots = self.points()
-    strokerWidth = spots[0].pen().width()/2
+    strokerWidth = spots[0].pen().width()
     for spot in spots: # type: pg.SpotItem
       symb = QtGui.QPainterPath(spot.symbol())
       symb.translate(spot.pos())

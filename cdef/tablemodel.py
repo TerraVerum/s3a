@@ -70,8 +70,13 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
   @FR_SINGLETON.actionStack.undoable('Alter Component Data')
   def setData(self, index, value, role=QtCore.Qt.EditRole) -> bool:
     oldVal = self.compDf.iloc[index.row(), index.column()]
-    if oldVal is value:
-      return True
+    # Try-catch for case of numpy arrays
+    noChange = oldVal == value
+    try:
+      if noChange:
+        return True
+    except ValueError:
+      pass
     self.compDf.iloc[index.row(), index.column()] = value
     toEmit = self.defaultEmitDict.copy()
     toEmit['changed'] = np.array([self.compDf.index[index.row()]])

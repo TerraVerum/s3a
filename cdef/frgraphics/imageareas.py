@@ -11,7 +11,8 @@ from cdef import FR_SINGLETON
 from cdef.generalutils import getClippedBbox
 from ..processingimpls import segmentComp
 from cdef.projectvars import REQD_TBL_FIELDS, FR_CONSTS
-from cdef.structures import FRParam, FRVertices, FRComplexVertices, FilePath
+from cdef.structures import FRParam, FRVertices, FRComplexVertices, FilePath, \
+  BlackWhiteImg
 from cdef.structures import NChanImg
 from .clickables import FRRightPanViewBox
 from .drawopts import FRDrawOpts
@@ -233,8 +234,6 @@ class FRFocusedImage(FREditableImg):
     self.addItem(self.region)
 
     self.compSer: pd.Series = FR_SINGLETON.tableData.makeCompDf().squeeze()
-    # Image representation of component boundaries
-    self.compMask = np.zeros((1,1), bool)
 
     self.bbox = np.zeros((2, 2), dtype='int32')
 
