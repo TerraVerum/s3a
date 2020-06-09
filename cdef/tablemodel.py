@@ -41,8 +41,7 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
 
     self.compDf = FR_SINGLETON.tableData.makeCompDf(0)
 
-    noEditParams = set(REQD_TBL_FIELDS) - {REQD_TBL_FIELDS.COMP_CLASS,
-                                           REQD_TBL_FIELDS.VALIDATED}
+    noEditParams = set(REQD_TBL_FIELDS) - {REQD_TBL_FIELDS.COMP_CLASS}
     self.noEditColIdxs = [self.colTitles.index(col.name) for col in noEditParams]
 
   # ------

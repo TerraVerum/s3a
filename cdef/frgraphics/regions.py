@@ -112,7 +112,7 @@ class FRShapeCollection(QtCore.QObject):
 def makeMultiRegionDf(numRows=1, whichCols=None, idList=None) -> df:
   df_list = []
   if whichCols is None:
-    whichCols = (REQD_TBL_FIELDS.INST_ID, REQD_TBL_FIELDS.VERTICES, REQD_TBL_FIELDS.VALIDATED)
+    whichCols = (REQD_TBL_FIELDS.INST_ID, REQD_TBL_FIELDS.VERTICES)
   elif isinstance(whichCols, FRParam):
     whichCols = [whichCols]
   for _ in range(numRows):

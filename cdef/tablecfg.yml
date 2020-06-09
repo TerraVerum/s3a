@@ -1,4 +1,5 @@
 opt-tbl-fields:
+  Validated: false
   Device Text : ''
   Board Text : ''
   Logo : ''

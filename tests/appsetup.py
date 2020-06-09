@@ -56,13 +56,6 @@ class CompDfTester:
     compDf.loc[:, REQD_TBL_FIELDS.COMP_CLASS] = newClasses
     return newClasses
 
-  def fillRandomValids(self, compDf: df=None):
-    if compDf is None:
-      compDf = self.compDf
-    newValids = RND.integers(0, 2, NUM_COMPS, bool)
-    compDf[REQD_TBL_FIELDS.VALIDATED] = newValids
-    return newValids
-
 def clearTmpFiles(exceptFiles: List[str] =None):
   if exceptFiles is None:
     exceptFiles: List[str] = []

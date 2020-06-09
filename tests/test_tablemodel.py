@@ -64,13 +64,9 @@ def test_change_comps(sampleComps):
   changeList = mgr.addComps(sampleComps, FR_ENUMS.COMP_ADD_AS_NEW)
   cmpChangeList(changeList, added=oldIds)
 
-  newValids = dfTester.fillRandomValids(sampleComps)
   newClasses = dfTester.fillRandomClasses(sampleComps)
   changeList = mgr.addComps(sampleComps, FR_ENUMS.COMP_ADD_AS_MERGE)
   cmpChangeList(changeList, changed=oldIds)
-  np.testing.assert_array_equal(mgr.compDf[REQD_TBL_FIELDS.VALIDATED].values,
-                                newValids, '"Validated" list doesn\'t match during'
-                                           ' test_change_comps')
   np.testing.assert_array_equal(newClasses,
                                 mgr.compDf[REQD_TBL_FIELDS.COMP_CLASS].values,
                                 '"Class" list doesn\'t match during test_change_comps')
@@ -111,7 +107,6 @@ def test_rm_undo(sampleComps):
 #   colVals = {
 #     _.VERTICES: [FRComplexVertices(FRVertices([[1,2], [3,4]]))],
 #     _.COMP_CLASS: FR_SINGLETON.tableData.compClasses[4],
-#     _.VALIDATED: True,
 #     _.ANN_AUTHOR: 'Hi There',
 #     _.ANN_FILENAME: 'newfilename'
 #   }

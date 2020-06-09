@@ -36,7 +36,6 @@ COMP_CLASS_NA = FRParam('Unassigned')
 class _ReqdTableFields(FRParamGroup):
   INST_ID          : FRParam = newParam('Instance ID', -1)
   VERTICES         : FRParam = newParam('Vertices', FRComplexVertices())
-  VALIDATED        : FRParam = newParam('Validated', False)
   ANN_AUTHOR       : FRParam = newParam('Author', "")
   SRC_IMG_FILENAME : FRParam = newParam('Source Image Filename', "")
   ANN_TIMESTAMP    : FRParam = newParam('Timestamp', "")
