@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import contextlib
 from collections import deque
+import copy
 from functools import wraps
 from typing import Callable, Generator, Deque, Union, Type, Any, List
 
@@ -40,12 +41,21 @@ class _FRAction:
       # Need to init runner for when backward is called
       self._runner = self._generator(*args, **kwargs)
 
-  def forward(self):
-    """Do or redo the action"""
+  def forward(self, graceful=False):
+    """
+    Do or redo the action
+
+    :param graceful: Whether to show an error on stop iteration or not. If a function
+      is registered as undoable but doesn't contain a yield expression this is useful,
+      i.e. performing a redo when that redo may not have a corresponding undo again
+    """
     self._runner = self._generator(*self.args, **self.kwargs)
     # Forward use is expired, so treat as backward now
     self.treatAsUndo = True
-    return next(self._runner)
+    if not graceful:
+      return next(self._runner)
+    else:
+      return gracefulNext(self._runner)
 
   def backward(self):
     """Undo the action"""
@@ -107,15 +117,15 @@ class FRActionStack:
     self.actions: Deque[_FRAction] = deque(maxlen=maxlen)
     self._curReceiver = self.actions
     self._savepoint: Union[EmptyType, _FRAction] = EMPTY
-    self.undoCallbacks: List[Callable] = []
-    self.doCallbacks: List[Callable] = []
+    self.stackChangedCallbacks: List[Callable] = []
 
   @contextlib.contextmanager
   def group(self, descr: str=None, flushUnusedRedos=False):
     """ Return a context manager for grouping undoable actions.
 
     All actions which occur within the group will be undone by a single call
-    of `stack.undo`."""
+    of `stack.undo`.
+    """
     newActBuffer: deque[_FRAction] = deque()
     with _FRBufferOverride(self, newActBuffer):
       yield
@@ -125,30 +135,44 @@ class FRActionStack:
           if act.treatAsUndo:
             act.backward()
           else:
-            act.forward()
+            act.forward(graceful=True)
         yield
     if self._curReceiver is not None:
       self._curReceiver.append(_FRAction(grpAct, descr=descr, treatAsUndo=True))
     if flushUnusedRedos:
       self.flushUnusedRedos()
 
-  def undoable(self, descr=None):
+  def undoable(self, descr=None, asGroup=False, copyArgs=False):
     """ Decorator which creates a new undoable action type.
 
-    This decorator should be used on a generator of the following format::
-      @undoable(descr)
-      def operation(*args):
-        do_operation_code
-        yield returnval
-        undo_operator_code
+    Parameters
+    ___________
+    :param descr: Description of this action, e.g. "add components", etc.
+    :param asGroup: If *True* assumes this undoable function is a composition
+      of other undoable functions. This is a simple alias for
+      >>> with stack.group('descr', flushUnusedRedos=True):
+      >>>  func(*args, **kwargs)
+    :param copyArgs: Whether to make a copy of the arguments used for the undo
+      function. This is useful for functions where the input argument is modified
+      during the function call. WARNING: UNTESTED
     """
     def decorator(generatorFn: Callable[[...], Generator]):
       nonlocal descr
       if descr is None:
         descr = generatorFn.__name__
       @wraps(generatorFn)
-      def inner(*args, **kwargs):
+      def inner_group(*args, **kwargs):
+        with self.group(descr, flushUnusedRedos=True):
+          ret = generatorFn(*args, **kwargs)
+        self._processCallbacks()
+        return ret
+
+      @wraps(generatorFn)
+      def inner_action(*args, **kwargs):
         shouldAppend = True
+        if copyArgs:
+          args = tuple(copy.copy(arg) for arg in args)
+          kwargs = {k: copy.copy(v) for k, v in kwargs.items()}
         action = _FRAction(generatorFn, args, kwargs, descr)
         try:
           with self.ignoreActions():
@@ -162,9 +186,32 @@ class FRActionStack:
           # State change of application means old redos are invalid
           self.flushUnusedRedos()
         # Else: doesn't get added to the queue
+        self._processCallbacks()
         return ret
-      return inner
+      if asGroup:
+        return inner_group
+      else:
+        return inner_action
     return decorator
+
+  def _processCallbacks(self):
+    if self._curReceiver is self.actions:
+      for callback in self.stackChangedCallbacks:
+        callback()
+
+  @property
+  def undoDescr(self):
+    if self.canUndo:
+      return self.actions[-1].descr
+    else:
+      return None
+
+  @property
+  def redoDescr(self):
+    if self.canRedo:
+      return self.actions[0].descr
+    else:
+      return None
 
   @property
   def canUndo(self):
@@ -176,11 +223,22 @@ class FRActionStack:
     """ Return *True* if redos are available """
     return len(self.actions) > 0 and not self.actions[0].treatAsUndo
 
+  def resizeStack(self, newMaxLen: int):
+    if newMaxLen == self.actions.maxlen:
+      return
+    newDeque: Deque[_FRAction] = deque(maxlen=newMaxLen)
+    newDeque.extend(self.actions)
+    receiverNeedsReset = True if self._curReceiver is self.actions else False
+    self.actions = newDeque
+    if receiverNeedsReset:
+      self._curReceiver = self.actions
+
   def flushUnusedRedos(self):
     while self.canRedo:
       if self.actions[0] is self._savepoint:
         self._savepoint = EMPTY
       self.actions.popleft()
+    self._processCallbacks()
 
   def revertToSavepoint(self):
     if self._savepoint is EMPTY:
@@ -193,6 +251,7 @@ class FRActionStack:
       actFn = self.redo
     while self.changedSinceLastSave:
       actFn()
+    self._processCallbacks()
 
   def redo(self):
     """
@@ -206,10 +265,8 @@ class FRActionStack:
 
     self.actions.rotate(-1)
     with self.ignoreActions():
-      ret = self.actions[-1].forward()
-    if self.actions is self.actions:
-      for callback in self.doCallbacks:
-        callback()
+      ret = self.actions[-1].forward(graceful=True)
+    self._processCallbacks()
     return ret
 
   def undo(self):
@@ -222,15 +279,14 @@ class FRActionStack:
     with self.ignoreActions():
       ret = self.actions[-1].backward()
     self.actions.rotate(1)
-    if self.actions is self.actions:
-      for callback in self.undoCallbacks:
-        callback()
+    self._processCallbacks()
     return ret
 
   def clear(self):
     """ Clear the undo list. """
     self._savepoint = EMPTY
     self.actions.clear()
+    self._processCallbacks()
 
   def setSavepoint(self):
     """ Set the savepoint. """

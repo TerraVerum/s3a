@@ -94,7 +94,7 @@ class FRCdefApp(FRAnnotatorUI):
                                            self)
 
     self.mainImg.imgItem.sigImageChanged.connect(self.clearBoundaries)
-    self.compDisplay.sigCompsSelected.connect(self.updateCurComp)
+    self.compDisplay.sigCompsSelected.connect(lambda newComps: self.changeFocusedComp(newComps))
 
     # ---------------
     # UI ELEMENT SIGNALS
@@ -126,8 +126,14 @@ class FRCdefApp(FRAnnotatorUI):
       self.importQuickLoaderProfile(quickLoaderArgs)
 
     # EDIT
-    self.undoAct.triggered.connect(lambda: FR_SINGLETON.actionStack.undo())
-    self.redoAct.triggered.connect(lambda: FR_SINGLETON.actionStack.redo())
+    stack = FR_SINGLETON.actionStack
+    self.undoAct.triggered.connect(lambda: stack.undo())
+    self.redoAct.triggered.connect(lambda: stack.redo())
+    def updateUndoRedoTxts():
+      self.undoAct.setText(f'Undo: {stack.undoDescr}')
+      self.redoAct.setText(f'Redo: {stack.redoDescr}')
+    stack.stackChangedCallbacks.append(updateUndoRedoTxts)
+
 
 
     # ANALYTICS
@@ -223,11 +229,18 @@ class FRCdefApp(FRAnnotatorUI):
       return
     self.focusedImg.updateRegionFromVerts(self.focusedImg.compSer[REQD_TBL_FIELDS.VERTICES])
 
+  @FR_SINGLETON.actionStack.undoable('Accept Focused Region')
   def acceptFocusedRegion(self):
+    oldSer = self.focusedImg.compSer.copy()
     self.focusedImg.saveNewVerts()
     modifiedComp = self.focusedImg.compSer
-    self.compMgr.addComps(modifiedComp.to_frame().T, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
+    modified_df = modifiedComp.to_frame().T
+    self.compMgr.addComps(modified_df, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
     self.compDisplay.regionPlots.focusById([modifiedComp[REQD_TBL_FIELDS.INST_ID]])
+    yield
+    self.focusedImg.saveNewVerts(oldSer[REQD_TBL_FIELDS.VERTICES])
+    self.compMgr.addComps(oldSer.to_frame().T, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
+
 
   def estimateBoundaries(self):
     with BusyCursor():
@@ -241,6 +254,7 @@ class FRCdefApp(FRAnnotatorUI):
   def clearBoundaries(self):
     self.compMgr.rmComps()
 
+  @FR_SINGLETON.actionStack.undoable('Change Main Image')
   def resetMainImg(self, fileName: FilePath=None, imgData: NChanImg=None,
                    clearExistingComps=True):
     """
@@ -255,20 +269,27 @@ class FRCdefApp(FRAnnotatorUI):
     :param clearExistingComps: If True, erases all existing components on image load.
       Else, they are retained.
     """
+    oldFile = self.srcImgFname
+    oldData = self.mainImg.image
+    oldComps = self.compMgr.compDf.copy()
     if fileName is not None:
       fileName = Path(fileName).resolve()
-    with BusyCursor():
-      if clearExistingComps:
-        self.compMgr.rmComps()
-      if imgData is not None:
-        self.mainImg.setImage(imgData)
-      else:
-        self.mainImg.setImage(fileName)
-      self.srcImgFname = fileName
-      self.focusedImg.resetImage()
-      self.mainImg.plotItem.vb.autoRange()
-      if self.estBoundsOnStart:
-        self.estimateBoundaries()
+    if clearExistingComps:
+      self.compMgr.rmComps()
+    if imgData is not None:
+      self.mainImg.setImage(imgData)
+    else:
+      self.mainImg.setImage(fileName)
+    self.srcImgFname = fileName
+    self.focusedImg.resetImage()
+    self.mainImg.plotItem.vb.autoRange()
+    if self.estBoundsOnStart:
+      self.estimateBoundaries()
+    yield
+    self.resetMainImg(oldFile, oldData, clearExistingComps)
+    if clearExistingComps:
+      # Old comps were cleared, so put them back
+      self.compMgr.addComps(oldComps)
 
   def loadLayout(self, layoutName: str):
     layoutFilename = LAYOUTS_DIR/f'{layoutName}.dockstate'
@@ -339,13 +360,13 @@ class FRCdefApp(FRAnnotatorUI):
     self.hasUnsavedChanges = True
 
   @Slot(object)
+  @FR_SINGLETON.actionStack.undoable('Create New Comp', asGroup=True)
   def add_focusComp(self, newComps: df):
-    with FR_SINGLETON.actionStack.group('Create New Comp', flushUnusedRedos=True):
-      self.compMgr.addComps(newComps)
-      # Make sure index matches ID before updating current component
-      newComps = newComps.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
-      # Focus is performed by comp table
-      self.updateCurComp(newComps)
+    self.compMgr.addComps(newComps)
+    # Make sure index matches ID before updating current component
+    newComps = newComps.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
+    # Focus is performed by comp table
+    self.changeFocusedComp(newComps)
 
 
   # ---------------
@@ -356,7 +377,8 @@ class FRCdefApp(FRAnnotatorUI):
     fileFilter = "Image Files (*.png; *.tif; *.jpg; *.jpeg; *.bmp; *.jfif);; All files(*.*)"
     fname = popupFilePicker(self, 'Select Main Image', fileFilter)
     if fname is not None:
-      self.resetMainImg(fname)
+      with BusyCursor():
+        self.resetMainImg(fname)
 
   @Slot(str)
   def loadLayoutActionTriggered(self, layoutName):
@@ -447,9 +469,8 @@ class FRCdefApp(FRAnnotatorUI):
   # ---------------
   # CUSTOM UI ELEMENT CALLBACKS
   # ---------------
-  @Slot(object)
-  @FR_SINGLETON.actionStack.undoable('Change Current Component')
-  def updateCurComp(self, newComps: df):
+  @FR_SINGLETON.actionStack.undoable('Change Focused Component')
+  def changeFocusedComp(self, newComps: df, forceKeepLastChange=False):
     oldSer = self.focusedImg.compSer.copy()
     oldImg = self.focusedImg.image
     if len(newComps) == 0:
@@ -464,8 +485,13 @@ class FRCdefApp(FRAnnotatorUI):
     mainImg = self.mainImg.image
     self.focusedImg.updateAll(mainImg, newComp)
     self.curCompIdLbl.setText(f'Component ID: {newCompId}')
+    # Nothing happened since the last component change, so just replace it instead of
+    # adding a distinct action to the buffer queue
+    stack = FR_SINGLETON.actionStack
+    if not forceKeepLastChange and stack.undoDescr == 'Change Focused Component':
+      stack.actions.pop()
     yield
     if oldImg is not None and len(oldSer.loc[REQD_TBL_FIELDS.VERTICES]) > 0:
-      self.updateCurComp(oldSer.to_frame().T)
+      self.changeFocusedComp(oldSer.to_frame().T, forceKeepLastChange=True)
     else:
       self.focusedImg.resetImage()

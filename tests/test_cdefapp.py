@@ -76,7 +76,7 @@ def test_change_comp(clearedApp):
   fImg = clearedApp.focusedImg
   mgr.addComps(dfTester.compDf.copy())
   comp = mgr.compDf.loc[[RND.integers(NUM_COMPS)]]
-  clearedApp.updateCurComp(comp)
+  clearedApp.changeFocusedComp(comp)
   assert clearedApp.focusedImg.compSer.equals(comp.squeeze())
   assert fImg.image is not None
   stack.undo()

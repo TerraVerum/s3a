@@ -306,7 +306,6 @@ class FRVertexDefinedImg(pg.ImageItem):
       else:
         regionData = srcImg.copy()
 
-
     self.setImage(regionData, levels=[0, 2], lut=self.getLUTFromScheme())
     yield
     self.updateFromVertices(oldVerts, oldImg)
@@ -322,7 +321,7 @@ class FRVertexDefinedImg(pg.ImageItem):
       return
     verts = FRComplexVertices.fromBwMask(newMask)
     newMask[verts.y_flat, verts.x_flat] = 2
-    self.updateFromVertices(verts)
+    self.updateFromVertices(verts, srcImg=newMask)
     return
 
   def getLUTFromScheme(self):

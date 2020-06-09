@@ -287,24 +287,24 @@ class FRFocusedImage(FREditableImg):
 
     if mainImg is None:
       self.imgItem.clear()
-      self.region.updateFromVertices(FRComplexVertices())
+      self.updateRegionFromVerts(None)
       self.shapeCollection.clearAllRois()
-      return
-    newVerts: FRComplexVertices = newComp[REQD_TBL_FIELDS.VERTICES]
-    # Since values INSIDE the dataframe are reset instead of modified, there is no
-    # need to go through the trouble of deep copying
-    self.compSer = newComp.copy(deep=False)
-
-    # Propagate all resultant changes
-    if not isAlreadyTrimmed:
-      self.updateBbox(mainImg.shape, newVerts)
-      bboxToUse = self.bbox
     else:
-      bboxToUse = FRVertices([[0,0], mainImg.shape[:2]])
-      self.bbox = bboxToUse
-    self.updateCompImg(mainImg, bboxToUse)
-    self.updateRegionFromVerts(newVerts, bboxToUse[0,:])
-    self.autoRange()
+      newVerts: FRComplexVertices = newComp[REQD_TBL_FIELDS.VERTICES]
+      # Since values INSIDE the dataframe are reset instead of modified, there is no
+      # need to go through the trouble of deep copying
+      self.compSer = newComp.copy(deep=False)
+
+      # Propagate all resultant changes
+      if not isAlreadyTrimmed:
+        self.updateBbox(mainImg.shape, newVerts)
+        bboxToUse = self.bbox
+      else:
+        bboxToUse = FRVertices([[0,0], mainImg.shape[:2]])
+        self.bbox = bboxToUse
+      self.updateCompImg(mainImg, bboxToUse)
+      self.updateRegionFromVerts(newVerts, bboxToUse[0,:])
+      self.autoRange()
     yield
     self.updateAll(oldImg, oldComp, True)
 
@@ -330,7 +330,10 @@ class FRFocusedImage(FREditableImg):
   def updateRegionFromVerts(self, newVerts: FRComplexVertices=None, offset: FRVertices=None):
     # Component vertices are nan-separated regions
     oldVerts = self.region.verts
-    oldImg = self.region.image
+    oldRegionImg = self.region.image
+
+    oldSelfImg = self.image
+    oldSer = self.compSer
 
     if offset is None:
       offset = self.bbox[0,:]
@@ -347,10 +350,16 @@ class FRFocusedImage(FREditableImg):
       yield
     else:
       return
-    self.region.updateFromVertices(oldVerts, oldImg)
+    if self.compSer.loc[REQD_TBL_FIELDS.INST_ID] != oldSer.loc[REQD_TBL_FIELDS.INST_ID]:
+      self.updateAll(oldSelfImg, oldSer, isAlreadyTrimmed=True)
+    self.region.updateFromVertices(oldVerts, oldRegionImg)
 
-  def saveNewVerts(self):
+
+  def saveNewVerts(self, overrideVerts: FRComplexVertices=None):
     # Add in offset from main image to FRVertexRegion vertices
+    if overrideVerts is not None:
+      self.compSer.loc[REQD_TBL_FIELDS.VERTICES] = overrideVerts
+      return
     newVerts = self.region.verts.copy()
     for vertList in newVerts:
       vertList += self.bbox[0,:]

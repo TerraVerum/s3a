@@ -46,7 +46,7 @@ def clearFImg():
 
 @pytest.fixture
 def fImg(clearFImg):
-  app.updateCurComp(mgr.compDf.iloc[[0],:])
+  app.changeFocusedComp(mgr.compDf.iloc[[0], :])
   return app.focusedImg
 
 @pytest.fixture

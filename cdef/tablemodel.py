@@ -102,7 +102,7 @@ class FRComponentMgr(FRCompTableModel):
       # Nothing to undo
       return toEmit
 
-  # Delete entries with no vertices, since they make work within the app difficult.
+    # Delete entries with no vertices, since they make work within the app difficult.
     # TODO: Is this the appropriate response?
     verts = newCompsDf[REQD_TBL_FIELDS.VERTICES]
     dropIds = newCompsDf.index[verts.map(FRComplexVertices.isEmpty)]
@@ -117,7 +117,8 @@ class FRComponentMgr(FRCompTableModel):
       dropIds = np.array([], dtype=int)
 
     # Track dropped data for undo
-    alteredDataDf = self.compDf.loc[self.compDf.index.intersection(newCompsDf.index)]
+    alteredIdxs = np.concatenate([newCompsDf.index.values, dropIds])
+    alteredDataDf = self.compDf.loc[self.compDf.index.intersection(alteredIdxs)]
 
     # Delete entries that were updated to have no vertices
     toEmit.update(self.rmComps(dropIds, emitChange=False))
