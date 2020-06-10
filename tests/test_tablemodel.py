@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from appsetup import (CompDfTester, makeCompDf, NUM_COMPS, SAMPLE_IMG,
-                      SAMPLE_IMG_DIR, clearTmpFiles, RND, defaultApp_tester)
+                      SAMPLE_IMG_FNAME, clearTmpFiles, RND, defaultApp_tester)
 from cdef import FRCdefApp, FR_SINGLETON
 from cdef.projectvars import FR_ENUMS
 from cdef.projectvars import REQD_TBL_FIELDS

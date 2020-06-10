@@ -4,7 +4,7 @@ from typing import List
 
 import cv2 as cv
 import numpy as np
-from skimage import io
+from skimage import io, data
 from pandas import DataFrame as df
 
 from cdef import FR_SINGLETON, FRCdefApp
@@ -14,12 +14,15 @@ from cdef.structures import FRComplexVertices
 makeCompDf = FR_SINGLETON.tableData.makeCompDf
 
 TESTS_DIR = BASE_DIR.parent/'tests'
-IMG_DIR = BASE_DIR.parent/'images'
 EXPORT_DIR = TESTS_DIR/'files'
+IMG_DIR = EXPORT_DIR
 
 NUM_COMPS = 15
-SAMPLE_IMG_DIR = IMG_DIR/'circuitBoard.png'
-SAMPLE_IMG = io.imread(SAMPLE_IMG_DIR)
+SAMPLE_IMG_FNAME = IMG_DIR/'hubble_deep_field.png'
+SAMPLE_IMG = data.hubble_deep_field()
+if not SAMPLE_IMG_FNAME.exists():
+  SAMPLE_IMG_FNAME.parent.mkdir(exist_ok=True, parents=True)
+  io.imsave(SAMPLE_IMG_FNAME, SAMPLE_IMG)
 
 RND = np.random.default_rng(seed=42)
 
@@ -66,7 +69,7 @@ def clearTmpFiles(exceptFiles: List[str] =None):
         file.unlink()
 
 def defaultApp_tester():
-  app = FRCdefApp(Image=SAMPLE_IMG_DIR)
+  app = FRCdefApp(Image=SAMPLE_IMG_FNAME)
   dfTester = CompDfTester(NUM_COMPS)
   dfTester.fillRandomVerts(imShape=SAMPLE_IMG.shape)
   dfTester.fillRandomClasses()

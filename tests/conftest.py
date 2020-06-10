@@ -1,11 +1,11 @@
 import pytest
 
-from appsetup import CompDfTester, SAMPLE_IMG_DIR, NUM_COMPS, SAMPLE_IMG
+from appsetup import CompDfTester, SAMPLE_IMG_FNAME, NUM_COMPS, SAMPLE_IMG
 
 # Construct app outside setUp to drastically reduce loading times
 from cdef import FRCdefApp, FR_SINGLETON
 
-app = FRCdefApp(Image=SAMPLE_IMG_DIR)
+app = FRCdefApp(Image=SAMPLE_IMG_FNAME)
 mgr = app.compMgr
 stack = FR_SINGLETON.actionStack
 

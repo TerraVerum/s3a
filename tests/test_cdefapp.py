@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from appsetup import (NUM_COMPS, SAMPLE_IMG,
-                      TESTS_DIR, SAMPLE_IMG_DIR, clearTmpFiles, RND, defaultApp_tester)
+                      TESTS_DIR, SAMPLE_IMG_FNAME, clearTmpFiles, RND, defaultApp_tester)
 from cdef import FR_SINGLETON
 from cdef.projectvars import REQD_TBL_FIELDS, LAYOUTS_DIR
 from cdef.structures import FRAlgProcessorError, FRCdefException
@@ -18,7 +18,7 @@ mgr = app.compMgr
 def clearedApp():
   clearTmpFiles()
   app.clearBoundaries()
-  app.resetMainImg(SAMPLE_IMG_DIR, SAMPLE_IMG)
+  app.resetMainImg(SAMPLE_IMG_FNAME, SAMPLE_IMG)
   FR_SINGLETON.actionStack.clear()
   return app
 
