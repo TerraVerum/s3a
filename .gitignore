@@ -15,4 +15,4 @@ dist
 menuopts
 
 # Auto-generated test files
-/tests/files
+/apptests/files

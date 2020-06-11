@@ -7,7 +7,7 @@ before_script:
   - python --version
   - pip install git+https://gitlab.com/ficsresearch/imageprocessing@development
   - pip install -e .
-  - xvfb-run python -c "from cdef.generalutils import resolveAuthorName;resolveAuthorName('testauthor')"
+  - xvfb-run python -c "from s3a.generalutils import resolveAuthorName;resolveAuthorName('testauthor')"
 
 stages:
   - Test
@@ -15,4 +15,4 @@ stages:
 pytest:
   stage: Test
   script:
-    - xvfb-run pytest ./tests
+    - xvfb-run pytest ./apptests

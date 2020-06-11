@@ -19,15 +19,15 @@ for line in lines:
 
 
 setup(
-  name='cdef',
+  name='s3a',
   version='0.1.0',
-  package_dir={'cdef':'cdef'},
+  package_dir={'s3a':'s3a'},
   packages=find_packages(),
-  data_files=[('cdef/cdef/icons', _mltGlob('cdef/icons', '*.svg', '*.png')),
-  ('cdef/cdef/', _mltGlob('cdef/', '*.yml'))],
+  data_files=[('s3a/s3a/icons', _mltGlob('s3a/icons', '*.svg', '*.png')),
+  ('s3a/s3a', _mltGlob('s3a/', '*.yml'))],
   install_requires=required,
   include_package_data=True,
-  url='https://gitlab.com/ficsresearch/cdef',
+  url='https://gitlab.com/ficsresearch/s3a',
   license='',
   author='Nathan Jessurun',
   author_email='njessurun@ufl.edu',
