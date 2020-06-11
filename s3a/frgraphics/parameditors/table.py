@@ -102,6 +102,9 @@ class FRTableData:
       outDf = outDf.drop(index=REQD_TBL_FIELDS.INST_ID.value)
     return outDf
 
+  def makeCompSer(self):
+    return self.makeCompDf().squeeze()
+
   def loadCfg(self, cfgFname: FilePath):
     with open(cfgFname, 'r') as ifile:
       cfg: dict = yaml.load(ifile)

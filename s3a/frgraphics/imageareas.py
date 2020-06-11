@@ -237,7 +237,7 @@ class FRFocusedImage(FREditableImg):
     self.region = FRVertexDefinedImg()
     self.addItem(self.region)
 
-    self.compSer: pd.Series = FR_SINGLETON.tableData.makeCompDf().squeeze()
+    self.compSer: pd.Series = FR_SINGLETON.tableData.makeCompSer()
 
     self.bbox = np.zeros((2, 2), dtype='int32')
 
@@ -292,6 +292,7 @@ class FRFocusedImage(FREditableImg):
       self.imgItem.clear()
       self.updateRegionFromVerts(None)
       self.shapeCollection.clearAllRois()
+      self.compSer = FR_SINGLETON.tableData.makeCompSer()
     else:
       newVerts: FRComplexVertices = newComp[REQD_TBL_FIELDS.VERTICES]
       # Since values INSIDE the dataframe are reset instead of modified, there is no
@@ -353,7 +354,8 @@ class FRFocusedImage(FREditableImg):
       yield
     else:
       return
-    if self.compSer.loc[REQD_TBL_FIELDS.INST_ID] != oldSer.loc[REQD_TBL_FIELDS.INST_ID]:
+    if (self.compSer.loc[REQD_TBL_FIELDS.INST_ID] != oldSer.loc[REQD_TBL_FIELDS.INST_ID]
+        or self.image is None):
       self.updateAll(oldSelfImg, oldSer, isAlreadyTrimmed=True)
     self.region.updateFromVertices(oldVerts, oldRegionImg)
 

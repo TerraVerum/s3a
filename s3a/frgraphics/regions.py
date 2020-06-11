@@ -184,8 +184,6 @@ class FRMultiRegionPlot(QtCore.QObject):
     Marks 'selectedIds' as currently selected by changing their scheme to user-specified
     selection values.
     """
-    if len(selectedIds) == 0:
-      return
     defaultPen = pg.mkPen(width=self.boundWidth, color=self.boundClr)
     newPens = np.array([defaultPen]*len(self.data))
     selectionPen = pg.mkPen(width=self.boundWidth*2, color=self.selectedBoundClr)
@@ -198,8 +196,6 @@ class FRMultiRegionPlot(QtCore.QObject):
     """
     Colors 'focusedIds' to indicate they are present in a focused view.
     """
-    if len(focusedIds) == 0:
-      return
     brushes = np.array([None]*len(self.data))
 
     brushes[np.isin(self.data.index, focusedIds)] = pg.mkBrush(self.focusedBoundClr)
