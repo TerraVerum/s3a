@@ -48,7 +48,7 @@ More information about the capabilities of this tool are outlined in the [projec
 
 ## License
 
-This tool is free for personal and commercial use, provided you cite the following papers:
+This tool is free for personal and commercial use (except the limits imposed by the PyQt5 library). If you publish something based on results obtained through this app, please cite the following papers:
 
 {{Awaiting publication}}
 
