@@ -40,8 +40,8 @@ class S3A(FRAnnotatorUI):
 
   @classmethod
   def __initEditorParams__(cls):
-    cls.estBoundsOnStart = FR_SINGLETON.generalProps.registerProp(cls,
-        FR_CONSTS.PROP_EST_BOUNDS_ON_START)
+    cls.estBoundsOnStart, cls.undoBuffSz = FR_SINGLETON.generalProps.registerProps(cls,
+        [FR_CONSTS.PROP_EST_BOUNDS_ON_START, FR_CONSTS.PROP_UNDO_BUF_SZ])
     cls.useDarkTheme = FR_SINGLETON.scheme.registerProp(cls, FR_CONSTS.SCHEME_USE_DARK_THEME)
 
   def __init__(self, **quickLoaderArgs):
@@ -102,6 +102,7 @@ class S3A(FRAnnotatorUI):
     self.acceptRegionBtn.clicked.connect(self.acceptRegionBtnClicked)
 
     FR_SINGLETON.scheme.sigParamStateUpdated.connect(self.updateTheme)
+    FR_SINGLETON.generalProps.sigParamStateUpdated.connect(self.updateUndoBuffSz)
 
     # Menu options
     # FILE
@@ -210,6 +211,9 @@ class S3A(FRAnnotatorUI):
     if self.useDarkTheme:
       style = qdarkstyle.load_stylesheet()
     self.setStyleSheet(style)
+
+  def updateUndoBuffSz(self, _genProps: Dict[str, Any]):
+    FR_SINGLETON.actionStack.resizeStack(self.undoBuffSz)
 
   def clearFocusedRegion(self):
     # Reset drawn comp vertices to nothing

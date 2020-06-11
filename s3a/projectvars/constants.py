@@ -86,7 +86,7 @@ class _FRConsts(FRParamGroup):
                                                  'Rather, a new compnent will be created for each closed boundary.')
   PROP_CROP_MARGIN_PCT      : FRParam = newParam('Crop Padding (% of image size)', 15)
   PROP_FOCUSED_SEED_THRESH  : FRParam = newParam('Seedpoint Threshold in Focused Image', 7.)
-  PROP_UNDO_BUF_SZ          : FRParam = newParam('Size of Region Undo Buffer', 30)
+  PROP_UNDO_BUF_SZ          : FRParam = newParam('Size of Undo Buffer', 150)
   PROP_STEPS_BW_SAVE        : FRParam = newParam('Operations Between Buffer Saves', 1)
   PROP_CHECK_LARGE_CHANGES  : FRParam = newParam('Save buffer during large region changes', True)
 
