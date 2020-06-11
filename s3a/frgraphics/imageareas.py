@@ -5,6 +5,7 @@ import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph import BusyCursor
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from s3a.procwrapper import FRImgProcWrapper
 from skimage.io import imread
 
 from s3a import FR_SINGLETON
@@ -66,6 +67,9 @@ class FREditableImg(pg.PlotWidget):
   @property
   def curProcessor(self):
       return self.procCollection.curProcessor
+  @curProcessor.setter
+  def curProcessor(self, newProcessor: Union[str, FRImgProcWrapper]):
+    self.procCollection.switchActiveProcessor(newProcessor)
 
   def handleShapeFinished(self, roiVerts: FRVertices) -> Optional[np.ndarray]:
     """
