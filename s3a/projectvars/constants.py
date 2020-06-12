@@ -89,6 +89,7 @@ class _FRConsts(FRParamGroup):
   PROP_UNDO_BUF_SZ          : FRParam = newParam('Size of Undo Buffer', 150)
   PROP_STEPS_BW_SAVE        : FRParam = newParam('Operations Between Buffer Saves', 1)
   PROP_CHECK_LARGE_CHANGES  : FRParam = newParam('Save buffer during large region changes', True)
+  PROP_SHOW_TBL_ON_COMP_CREATE: FRParam = newParam('Show popup table when creating component', False)
 
   # --------------------------
   # SHORTCUT PARAMETERS

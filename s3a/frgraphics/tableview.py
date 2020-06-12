@@ -111,6 +111,10 @@ class FRCompTableView(QtWidgets.QTableView):
   """
   sigSelectionChanged = Signal(object)
 
+  @classmethod
+  def __initEditorParams__(cls):
+    cls.showOnCreate = FR_SINGLETON.generalProps.registerProp(cls, FR_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE)
+
   def __init__(self, *args, minimal=False):
     """
     Creates the table.
@@ -256,6 +260,32 @@ class FRCompTableView(QtWidgets.QTableView):
                                         QtWidgets.QMessageBox.Ok)
       return None, None
     return idList, colIdxs
+
+
+  def setAs(self, idList: Sequence[int], colIdxs: Sequence[int]=None, shouldRun=True):
+    if self.showOnCreate:
+      shouldRun = False
+    if not shouldRun:
+      if colIdxs is None:
+        colIdxs = np.arange(self.mgr.columnCount(), dtype=int)
+        colIdxs = np.setdiff1d(colIdxs, self.mgr.noEditColIdxs)
+
+      dataToSet = self.mgr.compDf.loc[[idList[0]], :].copy()
+      with FR_SINGLETON.actionStack.ignoreActions():
+        self.popup.setData(dataToSet, colIdxs)
+        wasAccepted = self.popup.exec()
+      if wasAccepted and len(self.popup.dirtyColIdxs) > 0:
+        toOverwrite = self.mgr.compDf.loc[idList].copy()
+        # Only overwrite dirty columns from popup
+
+        colIdxs = np.intersect1d(colIdxs, self.popup.dirtyColIdxs)
+        # Some bug is preventing the single assignment value from broadcasting
+        overwriteData = self.popup.data
+        setVals = [overwriteData.iloc[0, colIdxs] for _ in range(len(idList))]
+        toOverwrite.iloc[:, colIdxs] = setVals
+        self.mgr.addComps(toOverwrite, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
+
+
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_TBL_SET_AS)
   def setAsTriggered(self):

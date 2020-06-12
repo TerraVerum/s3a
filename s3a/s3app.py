@@ -397,6 +397,8 @@ class S3A(FRAnnotatorUI):
     # Make sure index matches ID before updating current component
     newComps = newComps.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
     # Focus is performed by comp table
+    if self.isVisible():
+      self.compTbl.setAs(newComps.index)
     self.changeFocusedComp(newComps)
 
 
