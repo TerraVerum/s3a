@@ -26,6 +26,8 @@ Slot = QtCore.pyqtSlot
 QCursor = QtGui.QCursor
 
 class FREditableImg(pg.PlotWidget):
+  sigMousePosChanged = Signal(object)
+
   def __init__(self, parent=None, allowableShapes: Tuple[FRParam,...]=None,
                allowableActions: Tuple[FRParam,...]=None, **kargs):
     super().__init__(parent, viewBox=FRRightPanViewBox(), **kargs)
@@ -122,6 +124,17 @@ class FREditableImg(pg.PlotWidget):
     super().mouseMoveEvent(ev)
     if self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
       self.shapeCollection.buildRoi(ev, self.imgItem)
+
+    posRelToImage = self.imgItem.mapFromScene(ev.pos())
+    pxRow = int(posRelToImage.y())
+    pxCol = int(posRelToImage.x())
+    if (self.imgItem.image is not None):
+      if (pxCol < self.imgItem.image.shape[1] and pxCol > 0 and pxRow < self.imgItem.image.shape[0] and pxRow > 0):
+        pxColor = self.imgItem.image[pxRow, pxCol]
+        # pos = ev.pos()
+        pos = pxRow, pxCol
+        info = pos, pxColor
+        self.sigMousePosChanged.emit(info)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
     """

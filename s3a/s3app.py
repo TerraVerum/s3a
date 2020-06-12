@@ -63,7 +63,38 @@ class S3A(FRAnnotatorUI):
                'To start without error, provide an author name explicitly, e.g.\n'
                '"python -m s3a --author=<Author Name>"')
     FR_SINGLETON.tableData.annAuthor = authorName
-    self.statBar.showMessage(authorName)
+    #self.statBar.showMessage(authorName)
+
+    self.mouseCoords = QtWidgets.QLabel(f"Author: {authorName} Mouse Coords")
+
+    self.pxColor = QtWidgets.QLabel("Pixel Color")
+
+    def setInfo(info):
+      self.mouseCoords.setText(f'Author: {authorName} | Mouse (x,y): {info[0][1]}, {info[0][0]} | Pixel Color: ')
+      self.pxColor.setText(f'{info[1]}')
+      var = 0
+      if(len(info[1]) == 3):
+        if(((var + info[1][0] + info[1][1] + info[1][2]) / 3) > 127):
+          self.pxColor.setStyleSheet(
+            f'background:rgb({info[1][0]}, {info[1][1]}, {info[1][2]}); color:black;  font-weight:16px')
+        else:
+          self.pxColor.setStyleSheet(
+            f'background:rgb({info[1][0]}, {info[1][1]}, {info[1][2]}); color:white;  font-weight:16px')
+      else:
+        if(info[1][0] > 127):
+          self.pxColor.setStyleSheet(
+            f'background:rgb({info[1][0]}, {info[1][0]}, {info[1][0]}); color:black;  font-weight:16px')
+        else:
+          self.pxColor.setStyleSheet(
+            f'background:rgb({info[1][0]}, {info[1][0]}, {info[1][0]}); color:white;  font-weight:16px')
+
+
+
+    self.mainImg.sigMousePosChanged.connect(lambda info: setInfo(info))
+    # self.focusedImg.sigMousePosChanged.connect(lambda info: setInfo(info))
+    self.statBar.show()
+    self.statBar.addWidget(self.mouseCoords)
+    self.statBar.addWidget(self.pxColor)
 
     # Flesh out pg components
     # ---------------
