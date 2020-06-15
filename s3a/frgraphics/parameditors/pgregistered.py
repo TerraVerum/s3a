@@ -85,6 +85,7 @@ class FRProcGroupParameter(FRCustomMenuParameter):
   def makeTreeItem(self, depth):
     item = super().makeTreeItem(depth)
     self.enabledFontMap[True] = QtGui.QFont(item.font(0))
+    item.setFont(0, self.enabledFontMap[self.opts['enabled']])
     self.item = item
     return item
 

@@ -67,12 +67,27 @@ class FRGeneralProcWrapper(ABC):
       valType = 'atomicgroup'
       if isinstance(childStage, Process) and childStage.allowDisable:
         valType = 'procgroup'
-      curGroup = FRParam(name=childStage.name, valType=valType, value=[])
-      self.editor.registerProp(self.algName, curGroup, paramParent, asProperty=False)
+      curGroup = FRParam(name=childStage.name, valType=valType, value=[],)
+      self.editor.registerProp(self.algName, curGroup, paramParent, asProperty=False,
+                               enabled=not childStage.disabled)
       self.unpackStages(childStage, paramParent=paramParent + (childStage.name,))
+
+  def setStageEnabled(self, stageIdx: Sequence[str], enabled: bool):
+    paramForStage: FRCustomMenuParameter = self.editor.params.child(self.algName, *stageIdx)
+    prevEnabled = paramForStage.opts['enabled']
+    if prevEnabled != enabled:
+      paramForStage.menuActTriggered('Toggle Enable')
 
   def run(self, **kwargs):
     raise NotImplementedError
+
+  def __repr__(self) -> str:
+    selfCls = type(self)
+    oldName: str = super().__repr__()
+    # Remove module name for brevity
+    oldName = oldName.replace(f'{selfCls.__module__}.{selfCls.__name__}',
+                              f'{selfCls.__name__} \'{self.algName}\'')
+    return oldName
 
 class FRImgProcWrapper(FRGeneralProcWrapper):
   def __init__(self, processor: ImageProcess, editor: s3a.frgraphics.parameditors.genericeditor.FRParamEditor):
@@ -84,7 +99,11 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     updateStage.allowDisable = False
     resizeStage = ImageProcess.fromFunction(return_to_full_size, 'Return to Full Size')
     resizeStage.allowDisable = False
-    processor.stages = [cropStage] + processor.stages + [updateStage, basicOpsCombo(), resizeStage]
+    if hasattr(processor, 'addBasicOps') and not processor.addBasicOps:
+      finalStages = [updateStage, resizeStage]
+    else:
+      finalStages = [updateStage, basicOpsCombo(), resizeStage]
+    processor.stages = [cropStage] + processor.stages + finalStages
     super().__init__(processor, editor)
 
   def run(self, **kwargs):
@@ -122,9 +141,3 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     # else, all vertices belong to the same component
     else:
       return [initialList]
-
-  def setStageEnabled(self, stageIdx: Sequence[str], enabled: bool):
-    paramForStage: FRCustomMenuParameter = self.editor.params.child(self.algName, *stageIdx)
-    prevEnabled = paramForStage.opts['enabled']
-    if prevEnabled != enabled:
-      paramForStage.menuActTriggered('Toggle Enable')

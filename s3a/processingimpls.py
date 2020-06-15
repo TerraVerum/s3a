@@ -330,6 +330,12 @@ class FRTopLevelProcessors:
   @staticmethod
   def w_basicShapesProcessor():
     proc = ImageProcess.fromFunction(get_basic_shapes, name='Basic Shapes')
+    basicops = basicOpsCombo()
+    proc.addProcess(basicops)
+    for stage in basicops.stages:
+      if stage.name == 'Open -> Close':
+        stage.disabled = True
+        break
     return proc
 
   @staticmethod
