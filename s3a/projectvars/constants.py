@@ -62,6 +62,7 @@ class _FRConsts(FRParamGroup):
   CLS_IMG_AREA         : FRParam = newParam('Base Image Area')
   CLS_MAIN_IMG_AREA    : FRParam = newParam('Main Image Area')
   CLS_FOCUSED_IMG_AREA : FRParam = newParam('Focused Component Image Area')
+  CLS_ROI_CLCTN        : FRParam = newParam('Draw-able Shapes')
   # --------------------------
   # SCHEME PARAMETERS
   # --------------------------
@@ -72,6 +73,8 @@ class _FRConsts(FRParamGroup):
   SCHEME_BOUND_WIDTH    : FRParam = newParam('Boundary Width', 7)
   SCHEME_REG_VERT_COLOR : FRParam = newParam('Vertex Color', '0f0', 'color')
   SCHEME_REG_FILL_COLOR : FRParam = newParam('Fill Color', '00ff0046', 'color')
+  SCHEME_ROI_LINE_CLR   : FRParam = newParam('ROI Line Color', 'fff', 'color')
+  SCHEME_ROI_LINE_WIDTH : FRParam = newParam('ROI Line Width', 1)
 
   # --------------------------
   # REGION-CREATION PARAMETERS

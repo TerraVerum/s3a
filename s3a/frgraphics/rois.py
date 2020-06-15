@@ -1,3 +1,4 @@
+import sys
 from typing import Optional, Callable, Dict
 
 import numpy as np
@@ -215,3 +216,11 @@ SHAPE_ROI_MAPPING: Dict[FRParam, Callable[[], FRExtendedROI]] = {
   FR_CONSTS.DRAW_SHAPE_RECT: FRRectROI,
   FR_CONSTS.DRAW_SHAPE_POLY: FRPolygonROI,
 }
+
+# Adapted from https://groups.google.com/forum/#!msg/pyqtgraph/tWtjJOQF5x4/CnQF6IgmDAAJ
+# def boundingRect(_roi: pg.ROI):
+#   pw = 0.5 * _roi.currentPen.width()
+#   return QtCore.QRectF(-0.5 * pw, -0.5 * pw, pw + _roi.state['size'][0], pw + _roi.state['size'][1]).normalized()
+#
+# for roi in SHAPE_ROI_MAPPING.values():
+#   roi.boundingRect = boundingRect

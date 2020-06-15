@@ -19,10 +19,16 @@ from .rois import SHAPE_ROI_MAPPING, FRExtendedROI
 Signal = QtCore.pyqtSignal
 Slot = QtCore.pyqtSlot
 
-
+@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_ROI_CLCTN)
 class FRShapeCollection(QtCore.QObject):
   # Signal(FRExtendedROI)
   sigShapeFinished = Signal(object)
+
+  @classmethod
+  def __initEditorParams__(cls):
+    cls.roiClr, cls.roiLineWidth = FR_SINGLETON.scheme.registerProps(cls,
+                   [FR_CONSTS.SCHEME_ROI_LINE_CLR, FR_CONSTS.SCHEME_ROI_LINE_WIDTH])
+
   def __init__(self, allowableShapes: Tuple[FRParam,...]=None, parent: pg.GraphicsView=None):
     super().__init__(parent)
     if allowableShapes is None:
@@ -43,6 +49,8 @@ class FRShapeCollection(QtCore.QObject):
       newRoi.hide()
     self.addRoisToView(parent)
 
+    FR_SINGLETON.scheme.sigParamStateUpdated.connect(lambda: self.clearAllRois())
+
   def addRoisToView(self, view: pg.GraphicsView):
     self._parent = view
     if view is not None:
@@ -57,7 +65,9 @@ class FRShapeCollection(QtCore.QObject):
         #  integer index, removeHandle of PolyLine requires handle object. So,
         #  even though PolyLine should be able  to handle remove by index, it can't
         roi.removeHandle(roi.handles[0]['item'])
-        roi.hide()
+      roi.hide()
+      roi.pen.setColor(self.roiClr)
+      roi.pen.setWidth(self.roiLineWidth)
       self.forceBlockRois = True
 
 
