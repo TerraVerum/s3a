@@ -326,8 +326,7 @@ class FRTopLevelProcessors:
   @staticmethod
   def d_graphCutProcessor():
     proc = graphCutSegmentation(numSegs=100)
-    proc.addFunction(cvt_to_uint)
-    proc.addProcess(otsuThresholdProcess())
+    proc.addProcess(otsuThresholdProcess(binaryOutput=True))
     return proc
 
   @staticmethod
