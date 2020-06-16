@@ -378,10 +378,10 @@ class S3A(FRAnnotatorUI):
     self.compMgr.addComps(newComps, loadType)
 
   def showNewCompAnalytics(self):
-    self.mainImg.curProcessor.processor.plotStages()
+    self.mainImg.curProcessor.processor.plotStages(ignoreDuplicateResults=True)
 
   def showModCompAnalytics(self):
-    self.focusedImg.curProcessor.processor.plotStages()
+    self.focusedImg.curProcessor.processor.plotStages(ignoreDuplicateResults=True)
 
   # ---------------
   # MISC CALLBACKS

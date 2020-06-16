@@ -12,7 +12,8 @@ from s3a.generalutils import splitListAtNans, getClippedBbox
 from s3a.structures import BlackWhiteImg, FRVertices, NChanImg, FRComplexVertices, \
   GrayImg, RgbImg
 from imageprocessing import algorithms
-from imageprocessing.algorithms import watershedProcess, graphCutSegmentation
+from imageprocessing.algorithms import watershedProcess, graphCutSegmentation, \
+  otsuThresholdProcess
 from imageprocessing.common import Image
 from imageprocessing.processing import ImageIO, ImageProcess
 
@@ -193,10 +194,13 @@ def return_to_full_size(image: Image, origImg: Image, boundSlices: Tuple[slice])
 def fill_holes(image: Image):
   return ImageIO(image=binary_fill_holes(image))
 
+def cvt_to_uint(image: Image):
+  if image.ndim > 2:
+    image = image.asGrayScale()
+  return ImageIO(image = image.astype('uint8'), display=None)
+
 def openClose():
   proc = ImageIO().initProcess('Open -> Close')
-  def cvt_to_uint(image: Image):
-    return ImageIO(image = image.astype('uint8'), display=None)
   proc.addFunction(cvt_to_uint)
   proc.addProcess(algorithms.morphologyExProcess(cv.MORPH_OPEN))
   proc.addProcess(algorithms.morphologyExProcess(cv.MORPH_CLOSE))
@@ -321,7 +325,10 @@ class FRTopLevelProcessors:
 
   @staticmethod
   def d_graphCutProcessor():
-    return graphCutSegmentation(numSegs=100)
+    proc = graphCutSegmentation(numSegs=100)
+    proc.addFunction(cvt_to_uint)
+    proc.addProcess(otsuThresholdProcess())
+    return proc
 
   @staticmethod
   def a_grabCutProcessor():
