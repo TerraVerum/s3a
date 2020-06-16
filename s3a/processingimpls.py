@@ -196,7 +196,7 @@ def fill_holes(image: Image):
 def openClose():
   proc = ImageIO().initProcess('Open -> Close')
   def cvt_to_uint(image: Image):
-    return ImageIO(image = image.astype('uint8'))
+    return ImageIO(image = image.astype('uint8'), display=None)
   proc.addFunction(cvt_to_uint)
   proc.addProcess(algorithms.morphologyExProcess(cv.MORPH_OPEN))
   proc.addProcess(algorithms.morphologyExProcess(cv.MORPH_CLOSE))
