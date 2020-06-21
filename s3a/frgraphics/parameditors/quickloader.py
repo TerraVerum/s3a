@@ -5,6 +5,7 @@ from typing import List, Dict, Union
 
 from pyqtgraph.Qt import QtCore, QtWidgets
 from pyqtgraph.parametertree.parameterTypes import ActionParameter, GroupParameter, Parameter
+from .pgregistered import FRACtionWithShortcutParameter as ActWithShc
 
 from s3a.projectvars import QUICK_LOAD_DIR
 from .genericeditor import FRParamEditor
@@ -121,7 +122,7 @@ class FRQuickLoaderEditor(FRParamEditor):
         invalidGrps.append(grp)
         hasInvalidEntries = True
         continue
-      for act in grp: # type: ActionParameter
+      for act in grp: # type: ActWithShc
         self.addActForEditor(editor, act.name(), act)
     for grp in invalidGrps:
       grp.remove()
@@ -150,7 +151,7 @@ class FRQuickLoaderEditor(FRParamEditor):
 
   def saveParamState(self, saveName: str=None, paramState: dict=None,
                      allowOverwriteDefault=False):
-    stateDict = self.paramDictWithOpts(['type'], [ActionParameter, GroupParameter])
+    stateDict = self.paramDictWithOpts(['type', 'shortcutSeq'], [ActWithShc, GroupParameter])
     super().saveParamState(saveName, stateDict, allowOverwriteDefault)
 
 
@@ -158,8 +159,8 @@ class FRQuickLoaderEditor(FRParamEditor):
     super().applyBtnClicked()
     for grp in self.params.childs: # type: GroupParameter
       if grp.hasChildren():
-        act: ActionParameter = next(iter(grp))
-        act.sigActivated.emit(act)
+        act: ActWithShc = next(iter(grp))
+        act.activate()
 
   @Slot()
   def addFromLineEdit(self):
@@ -174,7 +175,7 @@ class FRQuickLoaderEditor(FRParamEditor):
     self.addActForEditor(editor, paramState)
 
 
-  def addActForEditor(self, editor: FRParamEditor, paramState: str, act: ActionParameter=None):
+  def addActForEditor(self, editor: FRParamEditor, paramState: str, act: ActWithShc=None):
     if editor.name not in self.params.names:
       curGroup = self.params.addChild(dict(name=editor.name, type='group', removable=True))
     else:
@@ -185,7 +186,7 @@ class FRQuickLoaderEditor(FRParamEditor):
 
     curGroup.opts['removable'] = True
     if act is None and paramState not in curGroup.names:
-      act = ActionParameter(name=paramState, removable=True, type='action')
+      act = ActWithShc(name=paramState, removable=True, type='actionwithshortcut')
       curGroup.addChild(act)
     elif act is not None:
       act.opts['removable'] = True
@@ -193,7 +194,7 @@ class FRQuickLoaderEditor(FRParamEditor):
     act.sigActivated.connect(
       lambda _act: self._safeLoadParamState(_act, editor,paramState))
 
-  def _safeLoadParamState(self, action: ActionParameter, editor: FRParamEditor,
+  def _safeLoadParamState(self, action: ActWithShc, editor: FRParamEditor,
                           paramState: str):
     """
     It is possible for the quick loader to refer to a param state that no longer

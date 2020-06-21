@@ -1,8 +1,9 @@
 from functools import partial
 from typing import Optional, List
 
-from pyqtgraph.Qt import QtGui, QtWidgets
+from pyqtgraph.Qt import QtGui, QtWidgets, QtCore
 from pyqtgraph.parametertree import parameterTypes, Parameter
+from pyqtgraph.parametertree.parameterTypes import ActionParameterItem, ActionParameter
 
 
 class FRShortcutParameterItem(parameterTypes.WidgetParameterItem):
@@ -40,9 +41,29 @@ class FRShortcutParameter(Parameter):
   itemClass = FRShortcutParameterItem
 
   def __init__(self, **opts):
-    # Before initializing super, turn the string keystroke into a key sequence
-    value = opts.get('value', '')
     super().__init__(**opts)
+
+class FRActionWithShortcutParameterItem(ActionParameterItem):
+  def __init__(self, param, depth):
+    super().__init__(param, depth)
+    shortcutSeq = param.opts.get('shortcutSeq', '')
+
+    shcLabel = QtWidgets.QLabel('Shortcut: ', self.layoutWidget)
+    self.layout.addWidget(shcLabel)
+
+    self.keySeqEdit = QtWidgets.QKeySequenceEdit(shortcutSeq)
+    self.shortcut = QtWidgets.QShortcut(shortcutSeq, self.layoutWidget,
+                                        context=QtCore.Qt.ApplicationShortcut)
+    self.shortcut.activated.connect(self.buttonClicked)
+    def updateShortcut(newSeq: QtGui.QKeySequence):
+      self.shortcut.setKey(newSeq)
+      param.opts['shortcutSeq'] = newSeq.toString()
+    self.keySeqEdit.keySequenceChanged.connect(updateShortcut)
+
+    self.layout.addWidget(self.keySeqEdit)
+
+class FRACtionWithShortcutParameter(ActionParameter):
+  itemClass = FRActionWithShortcutParameterItem
 
 class FRCustomMenuParameter(parameterTypes.GroupParameter):
   def __init__(self, menuActions: List[str]=None, **opts):
@@ -126,3 +147,4 @@ parameterTypes.registerParameterType('NoneType', FRNoneParameter)
 parameterTypes.registerParameterType('shortcut', FRShortcutParameter)
 parameterTypes.registerParameterType('procgroup', FRProcGroupParameter)
 parameterTypes.registerParameterType('atomicgroup', FRAtomicGroupParameter)
+parameterTypes.registerParameterType('actionwithshortcut', FRACtionWithShortcutParameter)

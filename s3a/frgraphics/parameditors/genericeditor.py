@@ -251,7 +251,8 @@ class FRParamEditor(QtWidgets.QDockWidget):
         addCustomOpts(dChild, pChild)
       if type(paramRoot) in addTo:
         for opt in addList:
-          dictRoot[opt] = paramRoot.opts[opt]
+          if opt in paramRoot.opts:
+            dictRoot[opt] = paramRoot.opts[opt]
       for opt in removeList:
         if dictRoot.get(opt, True) is None:
           dictRoot.pop(opt)
