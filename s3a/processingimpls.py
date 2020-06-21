@@ -1,4 +1,5 @@
-from typing import Tuple, List
+from functools import partial
+from typing import Tuple, List, Optional
 
 import cv2 as cv
 import numpy as np
@@ -64,9 +65,7 @@ def cornersToFullBoundary(cornerVerts: FRVertices, sizeLimit: float=np.inf) -> F
   if np.prod(fillShape) > sizeLimit:
     return cornerVerts
 
-  tmpImgToFill = np.zeros(fillShape, dtype='uint8')
-
-  filledMask = cv.fillPoly(tmpImgToFill, [cornerVerts], 1) > 0
+  filledMask = FRComplexVertices([cornerVerts]).toMask(fillShape)
   return FRComplexVertices.fromBwMask(filledMask, simplifyVerts=False).filledVerts().stack()
 
 def colorLabelsWithMean(labelImg: GrayImg, refImg: NChanImg) -> RgbImg:
@@ -135,6 +134,7 @@ def crop_to_verts(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
                           ])
   if fgVerts.empty:
     asForeground = False
+    prevCompMask = ~prevCompMask
     fgVerts = bgVerts
     bgVerts = FRVertices()
 
@@ -161,7 +161,7 @@ def update_area(image: Image, asForeground: bool,
     bitOperation = np.bitwise_or
   else:
     # Add to background
-    bitOperation = lambda curRegion, other: curRegion & (~other)
+    bitOperation = lambda curRegion, other: ~(curRegion | other)
   return ImageIO(image=bitOperation(prevCompMask, image))
 
 def return_to_full_size(image: Image, origImg: Image, boundSlices: Tuple[slice]):
@@ -207,9 +207,8 @@ def rm_small_comps(image: Image, minSzThreshold=30):
 
 def get_basic_shapes(image: Image, fgVerts: FRVertices):
   # Convert indices into boolean index masks
-  mask = np.zeros(image.shape[0:2], dtype='uint8')
-  fillPolyArg = splitListAtNans(fgVerts)
-  mask = cv.fillPoly(mask, fillPolyArg, 1)
+  verts = splitListAtNans(fgVerts)
+  mask = verts.toMask(image.shape[0:2])
   # Foreground is additive, bg is subtractive. If both fg and bg are present, default to keeping old value
   return ImageIO(image=mask)
 
@@ -230,24 +229,35 @@ def basicOpsCombo():
   proc.addProcess(toAdd[2])
   return proc
 
+
+def _grabcutResultToMask(gcResult):
+  return np.where((gcResult==2)|(gcResult==0), False, True)
+
+# First two cols are vertices, third col is fill value
+_fgHistory = FRComplexVertices()
+_bgHistory = FRComplexVertices()
 def cv_grabcut(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
                prevCompMask: BlackWhiteImg, asForeground: bool, noPrevMask: bool,
-               iters=5):
+               firstRun: bool, iters=5, keepVertHistory=True):
+  global _fgHistory, _bgHistory
   if image.size == 0:
     return ImageIO(image=np.zeros_like(prevCompMask))
   img = cv.cvtColor(image, cv.COLOR_RGB2BGR)
   # Turn foreground into x-y-width-height
   bgdModel = np.zeros((1,65),np.float64)
   fgdModel = np.zeros((1,65),np.float64)
-  if not asForeground:
-    fgdClr = cv.GC_PR_BGD
-    bgdClr = cv.GC_PR_FGD
-  else:
-    fgdClr = cv.GC_PR_FGD
-    bgdClr = cv.GC_PR_BGD
   mask = np.zeros(prevCompMask.shape, dtype='uint8')
-  mask[prevCompMask == 1] = fgdClr
-  mask[prevCompMask == 0] = bgdClr
+  mask[prevCompMask == 1] = cv.GC_PR_FGD
+  mask[prevCompMask == 0] = cv.GC_PR_BGD
+  if firstRun or not keepVertHistory:
+    _fgHistory = FRComplexVertices()
+    _bgHistory = FRComplexVertices()
+  vertsIter = [_fgHistory, _bgHistory]
+  if asForeground:
+    _fgHistory.append(fgVerts)
+  else:
+    _bgHistory.append(fgVerts)
+    vertsIter = reversed(vertsIter)
 
   allverts = np.vstack([fgVerts, bgVerts])
   cvRect = np.array([allverts.min(0), allverts.max(0) - allverts.min(0)]).flatten()
@@ -258,17 +268,19 @@ def cv_grabcut(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
     mode = cv.GC_INIT_WITH_RECT
   else:
     mode = cv.GC_INIT_WITH_MASK
-    for verts, fillClr in zip([fgVerts, bgVerts], [1, 0]):
+    clipFn = lambda verts: np.clip(verts, a_min=1,
+                                   a_max=np.array(mask.shape[::-1])-2, out=verts)
+    for cplxVerts, fillClr in zip(vertsIter, [1, 0]):
+      cplxVerts: FRComplexVertices
       # Grabcut throws errors when the mask is totally full or empty. To prevent this,
       # clip vertices to allow at least a 1-pixel boundary on all image sides
-      verts = np.clip(verts, a_min=1, a_max=np.array(mask.shape[::-1])-2).view(FRVertices)
-      if verts.connected and len(verts) > 0:
-        cv.fillPoly(mask, [verts], fillClr)
-      else:
-        mask[verts.rows, verts.cols] = fillClr
+      for curVerts in cplxVerts:
+        clipFn(curVerts)
+
+      mask = cplxVerts.toMask(mask, fillColor=fillClr, asBool=False, warnIfTooSmall=False)
   cv.grabCut(img, mask, cvRect, bgdModel, fgdModel, iters, mode=mode)
   outMask = np.where((mask==2)|(mask==0), False, True)
-  return ImageIO(image=outMask)
+  return ImageIO(image=outMask, grabcutDisplay=mask, display='grabcutDisplay')
 
 def region_grow(image: Image, prevCompMask: BlackWhiteImg, fgVerts: FRVertices,
                 seedThresh=10):
@@ -329,3 +341,20 @@ class FRTopLevelProcessors:
   @staticmethod
   def c_watershedProcessor():
     return watershedProcess()
+    
+  @staticmethod
+  def e_otsuThresholding():
+    proc = otsuThresholdProcess(binaryOutput=True)
+    
+    def smart_select_foreground(image: Image, fgVerts: FRVertices, asForeground: bool):
+      # Otsu just splits the region into two classes, but we want to make sure the fg is
+      # actually fg. It could be that the algo got it backwards
+      # *image* should be bool at this point
+      fgColor = image[fgVerts[0,:]]
+      if not asForeground:
+        fgColor = not fgColor
+      return ImageIO(image=image == fgColor)
+      
+    proc.addFunction(smart_select_foreground)
+    return proc
+      

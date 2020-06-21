@@ -128,6 +128,8 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
       kwargs['prevCompMask'] = np.zeros(image.shape[:2], bool)
     else:
       noPrevMask = False
+    if kwargs.get('firstRun', None) is None:
+      kwargs['firstRun'] = True
     newIo = ImageIO(**kwargs, noPrevMask=noPrevMask)
 
     try:

@@ -254,6 +254,8 @@ class FRFocusedImage(FREditableImg):
 
     self.bbox = np.zeros((2, 2), dtype='int32')
 
+    self.firstRun = True
+
     self.switchBtnMode(FR_CONSTS.DRAW_ACT_ADD)
     self.switchBtnMode(FR_CONSTS.DRAW_SHAPE_PAINT)
 
@@ -289,7 +291,9 @@ class FRFocusedImage(FREditableImg):
     # Check for flood fill
 
     compMask = self.region.embedMaskInImg(self.image.shape[:2])
-    newMask = self.curProcessor.run(image=self.image, prevCompMask=compMask, **vertsDict)
+    newMask = self.curProcessor.run(image=self.image, prevCompMask=compMask, **vertsDict,
+                                    firstRun=self.firstRun)
+    self.firstRun = False
     if not np.array_equal(newMask,compMask):
       self.region.updateFromMask(newMask)
 
@@ -322,6 +326,7 @@ class FRFocusedImage(FREditableImg):
       self.updateCompImg(mainImg, bboxToUse)
       self.updateRegionFromVerts(newVerts, bboxToUse[0,:])
       self.autoRange()
+      self.firstRun = True
     yield
     self.updateAll(oldImg, oldComp, True)
 
