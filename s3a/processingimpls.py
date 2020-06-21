@@ -17,26 +17,6 @@ from imageprocessing.algorithms import watershedProcess, graphCutSegmentation, \
 from imageprocessing.common import Image
 from imageprocessing.processing import ImageIO, ImageProcess
 
-def rmSmallComps(bwMask: BlackWhiteImg, minSz: int=0) -> BlackWhiteImg:
-  """
-  Removes components smaller than :param:`minSz` from the input mask.
-
-  :param bwMask: Input mask
-  :param minSz: Minimum individual component size allowed. That is, regions smaller
-        than :param:`minSz` connected pixels will be removed from the output.
-  :return: output mask without small components
-  """
-  # make sure we don't modify the input data
-  bwMask = bwMask.copy()
-  if minSz < 1:
-    return bwMask
-  regions = regionprops(label(bwMask))
-  for region in regions:
-    if region.area < minSz:
-      coords = region.coords
-      bwMask[coords[:, 0], coords[:, 1]] = False
-  return bwMask
-
 def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int, otherBbox: np.ndarray=None) -> (np.ndarray, np.ndarray):
   verts = np.vstack(verts)
   img_np = image
@@ -215,7 +195,7 @@ def keep_largest_comp(image: Image):
   out[coords[:,0], coords[:,1]] = True
   return ImageIO(image=out)
 
-def rm_small_comp(image: Image, minSzThreshold=30):
+def rm_small_comps(image: Image, minSzThreshold=30):
   regionPropTbl = area_coord_regionTbl(image)
   validCoords = regionPropTbl.coords[regionPropTbl.area >= minSzThreshold]
   out = np.zeros(image.shape, bool)
@@ -242,7 +222,7 @@ def convert_to_squares(image: Image):
 def basicOpsCombo():
   proc = ImageIO().initProcess('Basic Region Operations')
   toAdd: List[ImageProcess] = []
-  for func in fill_holes, keep_largest_comp, rm_small_comp:
+  for func in fill_holes, keep_largest_comp, rm_small_comps:
     toAdd.append(ImageProcess.fromFunction(func, name=func.__name__.replace('_', ' ').title()))
   proc.addProcess(toAdd[0])
   proc.addProcess(openClose())
@@ -336,12 +316,7 @@ class FRTopLevelProcessors:
   @staticmethod
   def w_basicShapesProcessor():
     proc = ImageProcess.fromFunction(get_basic_shapes, name='Basic Shapes')
-    basicops = basicOpsCombo()
-    proc.addProcess(basicops)
-    for stage in basicops.stages:
-      if stage.name == 'Open -> Close':
-        stage.disabled = True
-        break
+    proc.disabledStages = [['Basic Region Operations', 'Open -> Close']]
     return proc
 
   @staticmethod

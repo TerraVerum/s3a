@@ -35,6 +35,14 @@ def procRunWrapper(proc: Process, groupParam: Parameter):
     return oldRun(io, force=force, disable=disable, verbose=verbose)
   return newRun
 
+def _getNestedName(curProc: ProcessStage, nestedName: List[str]):
+  for stage in curProc.stages:
+    if stage.name == nestedName[0]:
+      if len(nestedName) == 1:
+        return stage
+      else:
+        return _getNestedName(stage, nestedName[1:])
+
 class FRGeneralProcWrapper(ABC):
   def __init__(self, processor: ImageProcess, editor: s3a.frgraphics.parameditors.genericeditor.FRParamEditor):
     self.processor = processor
@@ -99,12 +107,14 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     updateStage.allowDisable = False
     resizeStage = ImageProcess.fromFunction(return_to_full_size, 'Return to Full Size')
     resizeStage.allowDisable = False
-    if hasattr(processor, 'addBasicOps') and not processor.addBasicOps:
-      finalStages = [updateStage, resizeStage]
-    else:
-      finalStages = [updateStage, basicOpsCombo(), resizeStage]
+    finalStages = [updateStage, basicOpsCombo(), resizeStage]
     processor.stages = [cropStage] + processor.stages + finalStages
+    if hasattr(processor, 'disabledStages'):
+      for namePath in processor.disabledStages:
+        proc = _getNestedName(processor, namePath)
+        proc.disabled = True
     super().__init__(processor, editor)
+
 
   def run(self, **kwargs):
     if kwargs.get('image', None) is None:
