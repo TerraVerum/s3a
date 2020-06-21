@@ -5,7 +5,7 @@ from pyqtgraph.Qt import QtTest, QtGui, QtCore
 from skimage.measure import points_in_poly
 
 from s3a.frgraphics.regions import FRShapeCollection
-from s3a.structures import FRVertices
+from s3a.structures import FRVertices, FRComplexVertices
 
 QTest = QtTest.QTest
 
@@ -103,8 +103,8 @@ def test_region_modify(fImg: FRFocusedImage):
   assert imsum() == 0
 
   newVerts = FRVertices([[5,5], [reach, reach], [reach, 5], [5,5]])
-  newMask = np.zeros(shapeBnds, 'uint8')
-  cv.fillPoly(newMask, [newVerts], 1)
+  cplxVerts = FRComplexVertices([newVerts])
+  newMask = cplxVerts.toMask(shapeBnds)
   newMask = newMask > 0
 
   # 2nd action

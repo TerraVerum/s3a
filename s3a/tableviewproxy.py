@@ -213,8 +213,8 @@ class FRCompDisplayFilter(QtCore.QObject):
       xmin, xmax, ymin, ymax = [param[val][0] for param in (xParam, yParam) for val in ['min', 'max']]
 
       for vertIdx, verts in enumerate(dfAtParam):
-        xVerts = verts.x_flat
-        yVerts = verts.y_flat
+        stackedVerts: FRVertices = verts.stack()
+        xVerts, yVerts = stackedVerts.x, stackedVerts.y
         isAllowed = np.all((xVerts >= xmin) & (xVerts <= xmax)) & \
                     np.all((yVerts >= ymin) & (yVerts <= ymax))
         vertsAllowed[vertIdx] = isAllowed

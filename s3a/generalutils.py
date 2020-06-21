@@ -7,7 +7,7 @@ from pandas import DataFrame as df
 
 from s3a.projectvars import ANN_AUTH_DIR
 from s3a.structures.typeoverloads import TwoDArr
-from .structures import FRVertices, FRParam
+from .structures import FRVertices, FRParam, FRComplexVertices
 
 
 def nanConcatList(vertList) -> FRVertices:
@@ -44,7 +44,7 @@ def splitListAtNans(concatVerts:FRVertices):
     curIdx = nanEntry+1
   # Account for final grouping of verts
   allVerts.append(concatVerts[curIdx:,:].astype('int'))
-  return allVerts
+  return FRComplexVertices(allVerts, coerceListElements=True)
 
 
 def sliceToArray(keySlice: slice, arrToSlice: np.ndarray):

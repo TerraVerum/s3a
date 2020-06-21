@@ -302,15 +302,16 @@ class FRVertexDefinedImg(pg.ImageItem):
     oldVerts = self.verts
 
     self.verts = newVerts.copy()
-    if len(newVerts.x_flat) == 0:
+    if len(newVerts) == 0:
       regionData = np.zeros((1, 1), dtype=bool)
     else:
       if srcImg is None:
-        newImgShape = newVerts.stack().max(0)[::-1] + 1
+        stackedVerts = newVerts.stack()
+        newImgShape = stackedVerts.max(0)[::-1] + 1
         regionData = np.zeros(newImgShape, dtype='uint8')
         cv.fillPoly(regionData, newVerts, 1)
         # Make vertices full brightness
-        regionData[newVerts.y_flat, newVerts.x_flat] = 2
+        regionData[stackedVerts.rows, stackedVerts.cols] = 2
       else:
         regionData = srcImg.copy()
 
@@ -328,7 +329,8 @@ class FRVertexDefinedImg(pg.ImageItem):
       # Nothing to do
       return
     verts = FRComplexVertices.fromBwMask(newMask)
-    newMask[verts.y_flat, verts.x_flat] = 2
+    stackedVerts = verts.stack()
+    newMask[stackedVerts.rows, stackedVerts.cols] = 2
     self.updateFromVertices(verts, srcImg=newMask)
     return
 

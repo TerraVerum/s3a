@@ -1,14 +1,15 @@
 from __future__ import annotations
+
 from ast import literal_eval
 from typing import Union, List, Sequence
 from warnings import warn
 
-import numpy as np
 import cv2 as cv
+import numpy as np
 
-from .typeoverloads import BlackWhiteImg
 from .exceptions import FRIllFormedVerticesError
-from s3a.projectvars.enums import FR_ENUMS
+from .typeoverloads import BlackWhiteImg, NChanImg
+from ..projectvars.enums import FR_ENUMS
 
 
 class FRVertices(np.ndarray):
@@ -86,11 +87,14 @@ class FRComplexVertices(list):
   """See cv.findContours for hierarchy explanation. Used in cv.RETR_CCOMP mode."""
 
   def __init__(self, inputArr: Union[List[FRVertices], np.ndarray]=None,
-               hierarchy: Union[np.ndarray, FR_ENUMS]=None):
+               hierarchy: Union[np.ndarray, FR_ENUMS]=None,
+               coerceListElements=False):
     if hierarchy is None:
       hierarchy = FR_ENUMS.HIER_ALL_FILLED
     if inputArr is None:
       inputArr = []
+    if coerceListElements:
+      inputArr = [FRVertices(el) for el in inputArr]
     super().__init__(inputArr)
     # No hierarchy required unless list is longer than length 1
     numInpts = len(inputArr)
@@ -105,14 +109,10 @@ class FRComplexVertices(list):
 
   def append(self, verts:FRVertices=None) -> None:
     if verts is not None:
-      self.append(verts)
+      super().append(verts)
 
   def isEmpty(self):
     return len(self.stack()) == 0
-
-  @property
-  def x_flat(self):
-    return self.stack().x
 
   @property
   def x(self):
@@ -121,10 +121,6 @@ class FRComplexVertices(list):
   def x(self, newX):
     for lst, newLstX in zip(self, newX):
       lst.x = newLstX
-
-  @property
-  def y_flat(self):
-    return self.stack().y
 
   @property
   def y(self):
@@ -163,16 +159,38 @@ class FRComplexVertices(list):
     idxs = np.nonzero(self.hierarchy[:,3] != -1)[0]
     return FRComplexVertices([self[ii] for ii in idxs])
 
-  def toBwMask(self, maskShape: Sequence, warnIfTooSmall=True):
-    vertMax = self.stack().max(0)
-    if warnIfTooSmall and vertMax > np.array(maskShape[:2]):
-      warn('Vertices don\'t fit in the provided mask size.\n'
-           f'Vertex shape: {vertMax}, mask shape: {maskShape}')
-    out = np.zeros(maskShape, bool)
+  def toMask(self, maskShape: Union[Sequence, NChanImg], fillColor=None, asBool=True,
+             checkForDisconnectedVerts=False, warnIfTooSmall=True):
+    if warnIfTooSmall:
+      cmpShape = maskShape if isinstance(maskShape, Sequence) else maskShape.shape[:2]
+      # Wait until inside 'if' so max isn't unnecessarily calculated
+      vertMax = self.stack().max(0)[::-1]
+      if np.any(vertMax > np.array(maskShape[:2])):
+        warn('Vertices don\'t fit in the provided mask size.\n'
+             f'Vertex shape: {vertMax}, mask shape: {maskShape}')
+    if checkForDisconnectedVerts:
+      fillArg = []
+      for verts in self: # type: FRVertices
+        if verts.connected:
+          fillArg.append(verts)
+        else:
+          # Make sure each point is treated separately, not part of a shape
+          # to fill
+          fillArg.extend(verts)
+    else:
+      fillArg = self
+    if isinstance(maskShape, NChanImg):
+      out = maskShape
+    else:
+      out = np.zeros(maskShape, 'uint8')
     nChans = 1 if out.ndim < 3 else out.shape[2]
-    fillClr = tuple([1 for _ in range(nChans)])
-    cv.fillPoly(out, self, fillClr)
-    return out
+    if fillColor is None:
+      fillColor = tuple([fillColor for _ in range(nChans)])
+    cv.fillPoly(out, fillArg, fillColor)
+    if asBool:
+      return out > 0
+    else:
+      return out
 
   @staticmethod
   def fromBwMask(bwMask: BlackWhiteImg, simplifyVerts=True, externOnly=False) -> FRComplexVertices:
