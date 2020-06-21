@@ -1,12 +1,12 @@
 import sys
 from functools import partial
 from functools import wraps
-from glob import glob
 from os.path import basename
 from pathlib import Path
-from traceback import format_exception, format_exception_only
+from traceback import format_exception
 from typing import Optional, Union, Callable, Generator
 
+import numpy as np
 from ruamel.yaml import YAML
 
 from s3a import appInst
@@ -164,6 +164,11 @@ def create_addMenuAct(mainWin: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, t
   else:
     return act
 
+
+def findMainWin():
+  allWidgets = appInst.topLevelWidgets()
+  isGlobalWidget = [isinstance(o, QtWidgets.QMainWindow) for o in allWidgets]
+  return allWidgets[np.argmax(isGlobalWidget)]
 
 class FRPopupLineEditor(QtWidgets.QLineEdit):
   def __init__(self, parent: QtWidgets.QWidget=None, model: QtCore.QAbstractListModel=None):

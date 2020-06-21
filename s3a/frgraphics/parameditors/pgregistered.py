@@ -5,6 +5,8 @@ from pyqtgraph.Qt import QtGui, QtWidgets, QtCore
 from pyqtgraph.parametertree import parameterTypes, Parameter
 from pyqtgraph.parametertree.parameterTypes import ActionParameterItem, ActionParameter
 
+from ..graphicsutils import findMainWin
+
 
 class FRShortcutParameterItem(parameterTypes.WidgetParameterItem):
   """
@@ -44,7 +46,7 @@ class FRShortcutParameter(Parameter):
     super().__init__(**opts)
 
 class FRActionWithShortcutParameterItem(ActionParameterItem):
-  def __init__(self, param, depth):
+  def __init__(self, param: Parameter, depth):
     super().__init__(param, depth)
     shortcutSeq = param.opts.get('shortcutSeq', '')
 
@@ -52,13 +54,18 @@ class FRActionWithShortcutParameterItem(ActionParameterItem):
     self.layout.addWidget(shcLabel)
 
     self.keySeqEdit = QtWidgets.QKeySequenceEdit(shortcutSeq)
-    self.shortcut = QtWidgets.QShortcut(shortcutSeq, self.layoutWidget,
-                                        context=QtCore.Qt.ApplicationShortcut)
+    # Without the main window as a parent, the shortcut will not activate when
+    # the quickloader is hidden
+    # TODO: Maybe it is desirable for shortcuts to only work when quickloader
+    self.shortcut = QtWidgets.QShortcut(shortcutSeq, findMainWin())
     self.shortcut.activated.connect(self.buttonClicked)
     def updateShortcut(newSeq: QtGui.QKeySequence):
       self.shortcut.setKey(newSeq)
       param.opts['shortcutSeq'] = newSeq.toString()
     self.keySeqEdit.keySequenceChanged.connect(updateShortcut)
+
+    # Make sure that when a parameter is removed, the shortcut is also deactivated
+    param.sigRemoved.connect(lambda: self.shortcut.setParent(None))
 
     self.layout.addWidget(self.keySeqEdit)
 

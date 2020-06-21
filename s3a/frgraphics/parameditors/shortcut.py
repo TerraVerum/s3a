@@ -10,6 +10,7 @@ from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from .genericeditor import FRParamEditor
 from s3a.projectvars import SHORTCUTS_DIR
 from s3a.structures import FRParam, FRIllRegisteredPropError
+from ..graphicsutils import findMainWin
 
 
 def _class_fnNamesFromFnQualname(qualname: str) -> (str, str):
@@ -67,9 +68,7 @@ class FRShortcutsEditor(FRParamEditor):
 
     # If the registered class is not a graphical widget, the shortcut
     # needs a global context
-    allWidgets = pg.mkQApp().topLevelWidgets()
-    isGlobalWidget = [isinstance(o, QtWidgets.QMainWindow) for o in allWidgets]
-    self.mainWinRef = weakref.proxy(allWidgets[np.argmax(isGlobalWidget)])
+    self.mainWinRef = weakref.proxy(findMainWin())
     self.boundFnsPerClass: Dict[str, List[FRBoundFnParams]] = {}
     """Holds the parameters associated with this registered class"""
 
