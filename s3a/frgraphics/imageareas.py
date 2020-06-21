@@ -197,7 +197,7 @@ class FRMainImage(FREditableImg):
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
     super().mouseReleaseEvent(ev)
-    if self.drawAction == FR_CONSTS.DRAW_ACT_PAN:
+    if self.drawAction == FR_CONSTS.DRAW_ACT_PAN and self.image is not None:
       # Simulate a click-wide boundary selection so points can be selected in pan mode
       pos = self.imgItem.mapFromScene(ev.pos())
       xx, yy, = pos.x(), pos.y()
