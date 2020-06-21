@@ -2,7 +2,7 @@ import pickle
 import sys
 from ast import literal_eval
 from pathlib import Path
-from stat import S_IRGRP
+from stat import S_IREAD, S_IRGRP, S_IROTH
 from typing import Union, Any, Optional, List, Tuple
 
 import cv2 as cv
@@ -316,7 +316,7 @@ class FRComponentIO:
           exportDf[col] = _paramSerToStrSer(exportDf[col], col.value)
       if outFile is not None:
         exportDf.to_csv(outFile, index=False)
-        outPath.chmod(S_IRGRP)
+        outPath.chmod(S_IREAD|S_IRGRP|S_IROTH)
     except Exception as ex:
       errMsg = f'Error on parsing column "{col.name}"\n'
       augmentException(ex, errMsg)
