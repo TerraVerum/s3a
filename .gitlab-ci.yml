@@ -15,4 +15,4 @@ stages:
 pytest:
   stage: Test
   script:
-    - xvfb-run pytest ./apptests
+    - xvfb-run -a pytest ./apptests
