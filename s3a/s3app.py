@@ -275,8 +275,7 @@ class S3A(FRAnnotatorUI):
 
   def estimateBoundaries(self):
     with BusyCursor():
-      self.mainImg.curProcessor.run(image=self.mainImg.image,
-                                    prevCompMask=None, fgVerts=None, bgVerts=None)
+      self.mainImg.curProcessor.run(image=self.mainImg.image)
       verts = self.mainImg.curProcessor.resultAsVerts(localEstimate=False)
       components = FR_SINGLETON.tableData.makeCompDf(len(verts))
       components[REQD_TBL_FIELDS.VERTICES] = verts

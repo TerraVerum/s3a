@@ -307,9 +307,7 @@ class FRVertexDefinedImg(pg.ImageItem):
     else:
       if srcImg is None:
         stackedVerts = newVerts.stack()
-        newImgShape = stackedVerts.max(0)[::-1] + 1
-        regionData = np.zeros(newImgShape, dtype='uint8')
-        cv.fillPoly(regionData, newVerts, 1)
+        regionData = newVerts.toMask()
         # Make vertices full brightness
         regionData[stackedVerts.rows, stackedVerts.cols] = 2
       else:

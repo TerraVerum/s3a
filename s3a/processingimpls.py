@@ -65,7 +65,7 @@ def cornersToFullBoundary(cornerVerts: FRVertices, sizeLimit: float=np.inf) -> F
   if np.prod(fillShape) > sizeLimit:
     return cornerVerts
 
-  filledMask = FRComplexVertices([cornerVerts]).toMask(fillShape)
+  filledMask = FRComplexVertices([cornerVerts]).toMask(tuple(fillShape))
   return FRComplexVertices.fromBwMask(filledMask, simplifyVerts=False).filledVerts().stack()
 
 def colorLabelsWithMean(labelImg: GrayImg, refImg: NChanImg) -> RgbImg:
@@ -114,9 +114,13 @@ def area_coord_regionTbl(_image: Image):
   _regionPropTbl = pd.DataFrame(regionDict)
   return _regionPropTbl
 
-def crop_to_verts(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
-                  prevCompMask: BlackWhiteImg, margin=10):
 
+# 0 = unspecified, 1 = background, 2 = foreground
+_historyMask = np.array([[]], 'uint8')
+def crop_to_verts(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
+                  prevCompMask: BlackWhiteImg, firstRun: bool, margin=10,
+                  keepVertHistory=True):
+  global _historyMask
   maskLocs = np.nonzero(prevCompMask)
   maskCoords = np.hstack([m[:,None] for m in reversed(maskLocs)])
   if maskCoords.size > 0:
@@ -124,17 +128,32 @@ def crop_to_verts(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
   else:
     maskBbox = None
 
+  if firstRun or not keepVertHistory:
+    _historyMask = np.zeros(image.shape[:2], 'uint8')
+
   asForeground = True
   allVerts = []
+
+  # 0 = unspecified, 1 = background, 2 = foreground
+  for fillClr, verts in enumerate([bgVerts, fgVerts], 1):
+    if not verts.empty:
+      cv.fillPoly(_historyMask, [verts], fillClr)
+
   if fgVerts.empty and bgVerts.empty:
     # Give whole image as input
     shape = image.shape[:2][::-1]
     fgVerts = FRVertices([[0,0], [0, shape[1]-1],
-                           [shape[0]-1, shape[1]-1], [shape[0]-1, 0]
-                          ])
+                          [shape[0]-1, shape[1]-1], [shape[0]-1, 0]
+                         ])
+    fgVerts = cornersToFullBoundary(fgVerts)
+    _historyMask[fgVerts.rows, fgVerts.cols] = True
+  curHistory = _historyMask.copy()
   if fgVerts.empty:
     asForeground = False
     prevCompMask = ~prevCompMask
+    # Invert the history mask
+    curHistory[_historyMask == 2] = 1
+    curHistory[_historyMask == 1] = 2
     fgVerts = bgVerts
     bgVerts = FRVertices()
 
@@ -143,16 +162,15 @@ def crop_to_verts(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
   allVerts = np.vstack(allVerts)
   cropped, bounds = getCroppedImg(image, allVerts, margin, maskBbox)
   vertOffset = bounds.min(0)
-  fgbg = []
   for vertList in fgVerts, bgVerts:
     vertList -= vertOffset
-    vertList = np.clip(vertList, a_min=[0,0], a_max=bounds[1,:]-1)
-    fgbg.append(vertList)
+    np.clip(vertList, a_min=[0,0], a_max=bounds[1,:]-1, out=vertList)
   boundSlices = slice(*bounds[:,1]), slice(*bounds[:,0])
   prevCompMask = prevCompMask[boundSlices]
-  return ImageIO(image=cropped, fgVerts=fgbg[0], bgVerts=fgbg[1], prevCompMask=prevCompMask,
+  curHistory = curHistory[boundSlices]
+  return ImageIO(image=cropped, fgVerts=fgVerts, bgVerts=bgVerts, prevCompMask=prevCompMask,
                  boundSlices=boundSlices, origImg=image, asForeground=asForeground,
-                 allVerts=allVerts)
+                 allVerts=allVerts, historyMask=curHistory)
 
 def update_area(image: Image, asForeground: bool,
                 prevCompMask):
@@ -233,13 +251,9 @@ def basicOpsCombo():
 def _grabcutResultToMask(gcResult):
   return np.where((gcResult==2)|(gcResult==0), False, True)
 
-# First two cols are vertices, third col is fill value
-_fgHistory = FRComplexVertices()
-_bgHistory = FRComplexVertices()
 def cv_grabcut(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
-               prevCompMask: BlackWhiteImg, asForeground: bool, noPrevMask: bool,
-               firstRun: bool, iters=5, keepVertHistory=True):
-  global _fgHistory, _bgHistory
+               prevCompMask: BlackWhiteImg, noPrevMask: bool,
+               historyMask: GrayImg, iters=5):
   if image.size == 0:
     return ImageIO(image=np.zeros_like(prevCompMask))
   img = cv.cvtColor(image, cv.COLOR_RGB2BGR)
@@ -249,15 +263,8 @@ def cv_grabcut(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
   mask = np.zeros(prevCompMask.shape, dtype='uint8')
   mask[prevCompMask == 1] = cv.GC_PR_FGD
   mask[prevCompMask == 0] = cv.GC_PR_BGD
-  if firstRun or not keepVertHistory:
-    _fgHistory = FRComplexVertices()
-    _bgHistory = FRComplexVertices()
-  vertsIter = [_fgHistory, _bgHistory]
-  if asForeground:
-    _fgHistory.append(fgVerts)
-  else:
-    _bgHistory.append(fgVerts)
-    vertsIter = reversed(vertsIter)
+  mask[historyMask == 2] = cv.GC_FGD
+  mask[historyMask == 1] = cv.GC_BGD
 
   allverts = np.vstack([fgVerts, bgVerts])
   cvRect = np.array([allverts.min(0), allverts.max(0) - allverts.min(0)]).flatten()
@@ -268,30 +275,19 @@ def cv_grabcut(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
     mode = cv.GC_INIT_WITH_RECT
   else:
     mode = cv.GC_INIT_WITH_MASK
-    clipFn = lambda verts: np.clip(verts, a_min=1,
-                                   a_max=np.array(mask.shape[::-1])-2, out=verts)
-    for cplxVerts, fillClr in zip(vertsIter, [1, 0]):
-      cplxVerts: FRComplexVertices
-      # Grabcut throws errors when the mask is totally full or empty. To prevent this,
-      # clip vertices to allow at least a 1-pixel boundary on all image sides
-      for curVerts in cplxVerts:
-        clipFn(curVerts)
-
-      mask = cplxVerts.toMask(mask, fillColor=fillClr, asBool=False, warnIfTooSmall=False)
   cv.grabCut(img, mask, cvRect, bgdModel, fgdModel, iters, mode=mode)
   outMask = np.where((mask==2)|(mask==0), False, True)
   return ImageIO(image=outMask, grabcutDisplay=mask, display='grabcutDisplay')
 
-def region_grow(image: Image, prevCompMask: BlackWhiteImg, fgVerts: FRVertices,
-                seedThresh=10):
+def region_grow(image: Image, fgVerts: FRVertices, seedThresh=10):
   if image.size == 0:
-    return ImageIO(image=prevCompMask)
+    return ImageIO(image=np.zeros(image.shape[:2], bool))
   if np.all(fgVerts == fgVerts[0, :]):
     # Remove unnecessary redundant seedpoints
     fgVerts = fgVerts[[0], :]
   if fgVerts.shape[0] == 1:
     # Grow outward
-    growFunc = growSeedpoint
+    growFunc = growSeedpoint_cv_fastButErratic
     fgVerts.connected = False
   else:
     # Grow inward

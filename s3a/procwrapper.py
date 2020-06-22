@@ -2,20 +2,25 @@ from __future__ import annotations
 
 from abc import ABC
 from functools import wraps
-from typing import Tuple, List, Sequence
+from typing import Tuple, List, Sequence, Optional
 from warnings import warn
 
 import numpy as np
+import cv2 as cv
 from pyqtgraph.parametertree import Parameter
 
 import s3a
 from imageprocessing.processing import ImageIO, ProcessStage, AtomicProcess, Process, \
   ImageProcess, ProcessIO
+
+from .frgraphics.graphicsutils import raiseErrorLater
 from .frgraphics.parameditors import genericeditor
 from .frgraphics.parameditors.pgregistered import FRCustomMenuParameter
+from .generalutils import augmentException
 from .processingimpls import crop_to_verts, update_area, basicOpsCombo, \
   return_to_full_size
-from .structures import FRParam, FRComplexVertices, FRAlgProcessorError, FRVertices
+from .structures import FRParam, FRComplexVertices, FRAlgProcessorError, FRVertices, \
+  GrayImg
 
 
 def atomicRunWrapper(proc: AtomicProcess, names: List[str], params: List[Parameter]):
@@ -115,28 +120,15 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
         proc.disabled = True
     super().__init__(processor, editor)
 
-
   def run(self, **kwargs):
-    if kwargs.get('image', None) is None:
-      raise FRAlgProcessorError('Cannot run processor without an image')
-    image = kwargs['image']
-    for name in 'fgVerts', 'bgVerts':
-      if kwargs.get(name, None) is None:
-        kwargs[name] = FRVertices()
-    if kwargs.get('prevCompMask', None) is None:
-      noPrevMask = True
-      kwargs['prevCompMask'] = np.zeros(image.shape[:2], bool)
-    else:
-      noPrevMask = False
-    if kwargs.get('firstRun', None) is None:
-      kwargs['firstRun'] = True
-    newIo = ImageIO(**kwargs, noPrevMask=noPrevMask)
+    newIo = self._ioDictFromRunKwargs(kwargs)
 
     try:
       result = self.processor.run(newIo, force=True)
     except Exception as ex:
-      warn(f'Exception during processor run:\n{ex}')
+      augmentException(ex, 'Exception during processor run:')
       result = ImageIO(image=kwargs['prevCompMask'])
+      raiseErrorLater(ex)
 
     outImg = result['image'].astype(bool)
     if outImg.ndim > 2:
@@ -153,3 +145,21 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     # else, all vertices belong to the same component
     else:
       return [initialList]
+
+  @staticmethod
+  def _ioDictFromRunKwargs(runKwargs):
+    image = runKwargs.get('image', None)
+    if image is None:
+      raise FRAlgProcessorError('Cannot run processor without an image')
+
+    runKwargs.setdefault('firstRun', True)
+    for name in 'fgVerts', 'bgVerts':
+      runKwargs.setdefault(name, FRVertices())
+
+    if runKwargs.get('prevCompMask', None) is None:
+      noPrevMask = True
+      runKwargs['prevCompMask'] = np.zeros(image.shape[:2], bool)
+    else:
+      noPrevMask = False
+
+    return ImageIO(**runKwargs, noPrevMask=noPrevMask)

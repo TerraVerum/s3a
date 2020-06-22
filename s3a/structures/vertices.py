@@ -159,8 +159,12 @@ class FRComplexVertices(list):
     idxs = np.nonzero(self.hierarchy[:,3] != -1)[0]
     return FRComplexVertices([self[ii] for ii in idxs])
 
-  def toMask(self, maskShape: Union[Sequence, NChanImg], fillColor=None, asBool=True,
+  def toMask(self, maskShape: Union[Sequence, NChanImg]=None, fillColor=None, asBool=True,
              checkForDisconnectedVerts=False, warnIfTooSmall=True):
+    if maskShape is None:
+      maskShape = tuple(self.stack().max(0)[::-1]+1)
+      # Guaranteed not to be too small
+      warnIfTooSmall = False
     if warnIfTooSmall:
       cmpShape = maskShape if isinstance(maskShape, Sequence) else maskShape.shape[:2]
       # Wait until inside 'if' so max isn't unnecessarily calculated
@@ -185,7 +189,7 @@ class FRComplexVertices(list):
       out = np.zeros(maskShape, 'uint8')
     nChans = 1 if out.ndim < 3 else out.shape[2]
     if fillColor is None:
-      fillColor = tuple([fillColor for _ in range(nChans)])
+      fillColor = tuple([1 for _ in range(nChans)])
     cv.fillPoly(out, fillArg, fillColor)
     if asBool:
       return out > 0

@@ -182,10 +182,10 @@ class FRMainImage(FREditableImg):
       # Component modification subject to processor
       # For now assume a single point indicates foreground where multiple indicate
       # background selection
-      verts = self.shapeCollection.shapeVerts.astype(int)
+      verts = roiVerts.astype(int)
 
       with BusyCursor():
-        self.curProcessor.run(image=self.image, fgVerts=verts, bgVerts=None)
+        self.curProcessor.run(image=self.image, fgVerts=verts)
       newVerts = self.curProcessor.resultAsVerts(not self.multCompsOnCreate)
       # Discard entries with no real vertices
       newComps = FR_SINGLETON.tableData.makeCompDf(len(newVerts))
@@ -283,12 +283,11 @@ class FRFocusedImage(FREditableImg):
     # For now assume a single point indicates foreground where multiple indicate
     # background selection
     roiVerts = roiVerts.astype(int)
-    vertsDict = {'fgVerts': None, 'bgVerts': None}
+    vertsDict = {}
     if self.drawAction == FR_CONSTS.DRAW_ACT_ADD:
       vertsDict['fgVerts'] = roiVerts
     elif self.drawAction == FR_CONSTS.DRAW_ACT_REM:
       vertsDict['bgVerts'] = roiVerts
-    # Check for flood fill
 
     compMask = self.region.embedMaskInImg(self.image.shape[:2])
     newMask = self.curProcessor.run(image=self.image, prevCompMask=compMask, **vertsDict,
