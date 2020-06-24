@@ -1,16 +1,19 @@
 import copy
 import sys
 from datetime import datetime
-from typing import List
+from functools import lru_cache
+from typing import List, Union, Any, Dict, Tuple
 
 from pandas import DataFrame as df
 from ruamel.yaml import YAML
+import numpy as np
 
 import s3a.frgraphics
+from s3a.frgraphics.graphicsutils import raiseErrorLater
 from s3a.frgraphics.parameditors import FRParamEditor
 from s3a.projectvars import FILTERS_DIR, REQD_TBL_FIELDS, COMP_CLASS_NA, DATE_FORMAT, \
   FR_CONSTS
-from s3a.structures import FRParam, FilePath
+from s3a.structures import FRParam, FilePath, FRParamGroup, FRParamParseError
 
 yaml = YAML()
 
@@ -63,7 +66,19 @@ class FRTableFilterEditor(FRParamEditor):
       _filterForParam(param) for param in paramList
     ]
     self.params.clearChildren()
-    self.params.addChildren(newParams)
+    badCols = []
+    for ii, child in enumerate(newParams):
+      try:
+        self.params.addChild(child)
+      except KeyError:
+        badCols.append(paramList[ii])
+    if len(badCols) > 0:
+      colNames = [f'"{col}"' for col in badCols]
+      colTypes = np.unique([f'"{col.valType}"' for col in badCols])
+      raiseErrorLater(FRParamParseError(f'The table does not know how to create a'
+                                        f' filter for fields {", ".join(colNames)}'
+                                        f' since types {", ".join(colTypes)} do not'
+                                        f' have corresponding filters'))
 
 
 class FRTableData:
@@ -108,17 +123,19 @@ class FRTableData:
   def loadCfg(self, cfgFname: FilePath):
     with open(cfgFname, 'r') as ifile:
       cfg: dict = yaml.load(ifile)
+    paramParser = FRYamlParser(cfg)
+
     self.resetLists()
-    for compCls in cfg.get('classes', []):
-      newParam = FRParam(compCls, group=self.compClasses)
-      self.compClasses.append(newParam)
-    for field, values in cfg.get('opt-tbl-fields', {}).items():
-      if isinstance(values, dict):
-        param = FRParam(field, **values)
-      else:
-        param = FRParam(field, values)
+    if 'classes' in cfg:
+      self.compClasses.extend(paramParser.parseList('classes',self.compClasses))
+    # for compCls in cfg.get('classes', []):
+    #   newParam = FRParam(compCls, group=self.compClasses)
+    #   self.compClasses.append(newParam)
+    for field in cfg.get('opt-tbl-fields', {}):
+      param = paramParser['opt-tbl-fields', field]
       param.group = self.allFields
       self.allFields.append(param)
+
     self.filter.updateParamList(self.allFields)
 
   def resetLists(self):
@@ -126,3 +143,61 @@ class FRTableData:
       lst.clear()
     self.allFields.extend(list(REQD_TBL_FIELDS))
     self.compClasses.append(COMP_CLASS_NA)
+
+
+NestedIndexer = Union[str, Tuple[str,...]]
+class FRYamlParser:
+  def __init__(self, cfg: dict):
+    self.cfg = cfg
+
+  def parseList(self, listName: NestedIndexer, groupOwner: Union[List, FRParamGroup]=None):
+    paramList = self.getNestedDict(listName)
+    outList = []
+    if groupOwner is None:
+      groupOwner = outList
+    for paramName in paramList:
+      curParam = FRParam(paramName)
+      curParam.group = groupOwner
+      outList.append(curParam)
+    return outList
+
+  @lru_cache(maxsize=None)
+  def __getitem__(self, paramName: NestedIndexer):
+    value = self.getNestedDict(paramName)
+    if isinstance(paramName, tuple):
+      paramName = paramName[-1]
+    parsedParam = FRParam(paramName, value)
+    # Handle parameters that are changed by ruamel into SimpleParameter
+    if isinstance(value, bool):
+      pass
+      # Keeps 'int' from triggering
+    elif isinstance(value, float):
+      parsedParam.valType = 'float'
+    elif isinstance(value, int):
+      parsedParam.valType = 'int'
+
+    elif isinstance(value, list):
+      parsedParam = self.parseList(paramName[-1])[0]
+
+    # User-specified cases
+    elif isinstance(value, dict):
+      trueType = value.setdefault('valType', 'NoneType')
+      trueValue = value['value']
+      if trueType in self.cfg:
+        # Just handle lists as the non-general case for now
+        # TODO: Extend?
+        lst = self.parseList(trueType)
+        parsedParam.value = FRParamGroup.fromString(lst, trueValue)
+        parsedParam.valType = 'FRParam'
+      else:
+        parsedParam = FRParam(paramName, **value)
+    return parsedParam
+
+  def getNestedDict(self, namePath: NestedIndexer):
+    if isinstance(namePath, str):
+      namePath = (namePath,)
+    out = self.cfg
+    while len(namePath) > 0:
+      out = out[namePath[0]]
+      namePath = namePath[1:]
+    return out

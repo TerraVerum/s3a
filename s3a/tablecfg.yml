@@ -1,9 +1,17 @@
 opt-tbl-fields:
   Validated: false
-  Device Text : ''
-  Board Text : ''
-  Logo : ''
-  Notes : ''
+  Device Text:
+    value: ''
+    valType: text
+  Board Text:
+    value: ''
+    valType: text
+  Logo:
+    value: ''
+    valType: text
+  Notes:
+    value: ''
+    valType: text
 
 classes:
   - Resistor

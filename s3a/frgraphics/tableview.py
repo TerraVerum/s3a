@@ -3,12 +3,15 @@ from typing import Sequence
 
 import numpy as np
 import pandas as pd
-import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
+from pyqtgraph.parametertree import Parameter
+from pyqtgraph.parametertree.Parameter import PARAM_TYPES
+from pyqtgraph.parametertree.parameterTypes import TextParameterItem, TextParameter
 
 from s3a import FR_SINGLETON
 from s3a.projectvars import FR_CONSTS, FR_ENUMS, REQD_TBL_FIELDS
+from s3a.structures import FRS3AException
 from s3a.tablemodel import FRCompTableModel, FRComponentMgr
 
 Slot = QtCore.pyqtSlot
@@ -139,24 +142,31 @@ class FRCompTableView(QtWidgets.QTableView):
       cursor = QtGui.QCursor()
       self.customContextMenuRequested.connect(lambda: self.menu.exec_(cursor.pos()))
 
-    validOpts = [True, False]
-    boolDelegate = FRComboBoxDelegate(self, comboValues=validOpts)
-
     self.instIdColIdx = TBL_FIELDS.index(REQD_TBL_FIELDS.INST_ID)
 
     for ii, field in enumerate(TBL_FIELDS):
       curType = field.valType
       curval = field.value
-      if curType == 'bool':
-        self.setItemDelegateForColumn(ii, boolDelegate)
-      elif curType == 'Enum':
-        self.setItemDelegateForColumn(ii, FRComboBoxDelegate(self, comboValues=list(type(curval))))
+      paramDict = dict(type=curType, default=curval)
+      if curType == 'Enum':
+        paramDict['type'] = 'list'
+        paramDict.update(values=list(type(curval)))
       elif curType == 'FRParam':
-        self.setItemDelegateForColumn(ii, FRComboBoxDelegate(self, comboValues=list(curval.group)))
-      elif curType in ['int', 'float']:
-        self.setItemDelegateForColumn(ii, FRSpinBoxDelegate(self, spinType=curType))
-      else:
-        self.setItemDelegateForColumn(ii, FRTextDelegate(self))
+        paramDict['type'] = 'list'
+        paramDict.update(values=list(curval.group))
+      elif curType == 'bool':
+        # TODO: Get checkbox to stay in table after editing for a smoother appearance.
+        #   For now, the easiest solution is to just use dropdown
+        paramDict['type'] = 'list'
+        paramDict.update(values=['True', 'False'])
+      try:
+        self.setItemDelegateForColumn(ii, FRPgParamDelegate(paramDict, self))
+      except FRS3AException:
+        # Parameter doesn't have a registered pyqtgraph editor, so default to
+        # generic text editor
+        paramDict['type'] = 'text'
+        paramDict['default'] = str(curval)
+        self.setItemDelegateForColumn(ii, FRPgParamDelegate(paramDict, self))
 
     self.horizontalHeader().setSectionsMovable(True)
 
@@ -285,8 +295,6 @@ class FRCompTableView(QtWidgets.QTableView):
         toOverwrite.iloc[:, colIdxs] = setVals
         self.mgr.addComps(toOverwrite, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
 
-
-
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_TBL_SET_AS)
   def setAsTriggered(self):
     if self.minimal: return
@@ -310,86 +318,46 @@ class FRCompTableView(QtWidgets.QTableView):
       toOverwrite.iloc[:, colIdxs] = setVals
       self.mgr.addComps(toOverwrite, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
 
-class FRTextDelegate(QtWidgets.QItemDelegate):
-  def createEditor(self, parent, option, index):
-    editor = QtWidgets.QPlainTextEdit(parent)
-    editor.setTabChangesFocus(True)
-    return editor
-
-  def setEditorData(self, editor: QtWidgets.QPlainTextEdit, index):
-    text = index.data(QtCore.Qt.DisplayRole)
-    editor.setPlainText(text)
-
-  def setModelData(self, editor: QtWidgets.QTextEdit,
-                   model: FRCompTableModel,
-                   index: QtCore.QModelIndex):
-    model.setData(index, editor.toPlainText())
-
-  def updateEditorGeometry(self, editor: QtWidgets.QPlainTextEdit,
-                           option: QtWidgets.QStyleOptionViewItem,
-                           index: QtCore.QModelIndex):
-    editor.setGeometry(option.rect)
+# Monkey patch pyqtgraph text box to allow tab changing focus
+class FRMonkeyPatchedTextParameterItem(TextParameterItem):
+  def makeWidget(self):
+    textBox: QtWidgets.QTextEdit = super().makeWidget()
+    textBox.setTabChangesFocus(True)
+    return textBox
+TextParameter.itemClass = FRMonkeyPatchedTextParameterItem
 
 
-class FRComboBoxDelegate(QtWidgets.QStyledItemDelegate):
-  def __init__(self, parent=None, comboValues=None, comboNames=None):
+class FRPgParamDelegate(QtWidgets.QStyledItemDelegate):
+  def __init__(self, paramDict: dict, parent=None):
     super().__init__(parent)
-    if comboValues is None:
-      comboValues = []
-    self.comboValues: list = comboValues
-    if comboNames is None:
-      self.comboNames = [str(val) for val in comboValues]
+    errMsg = f'{self.__class__} can only create parameter editors from'
+    ' registered pg widgets that implement makeWidget()'
 
-  def createEditor(self, parent, option, index):
-    editor = QtWidgets.QComboBox(parent)
-    editor.addItems(self.comboNames)
-    return editor
-
-  def setEditorData(self, editor: QtWidgets.QComboBox, index: QtCore.QModelIndex):
-    curVal = index.data(QtCore.Qt.DisplayRole)
-    editor.setCurrentIndex(self.comboNames.index(curVal))
-
-  def setModelData(self, editor: QtWidgets.QComboBox,
-                   model: FRCompTableModel,
-                   index: QtCore.QModelIndex):
-    model.setData(index, self.comboValues[editor.currentIndex()])
-
-  def updateEditorGeometry(self, editor: QtWidgets.QPlainTextEdit,
-                           option: QtWidgets.QStyleOptionViewItem,
-                           index: QtCore.QModelIndex):
-    editor.setGeometry(option.rect)
-
-class FRSpinBoxDelegate(QtWidgets.QStyledItemDelegate):
-  def __init__(self, parent=None, spinType = 'int'):
-    super().__init__(parent)
-    self.defs = {
-      'value': 0, 'min': None, 'max': None,
-      'step': 1.0,
-      'siPrefix': False, 'suffix': '', 'decimals': 3,
-    }
-    if spinType == 'int':
-      self.defs['minStep'] = 1.0
+    if paramDict['type'] not in PARAM_TYPES:
+      raise FRS3AException(errMsg)
+    paramDict.update(name='dummy')
+    param = Parameter.create(**paramDict)
+    if hasattr(param.itemClass, 'makeWidget'):
+      self.item = param.itemClass(param, 0)
     else:
-      self.defs['step'] = 0.1
-    self.defs['dec'] = spinType != 'int'
-    self.defs['int'] = spinType == 'int'
-
+      raise FRS3AException(errMsg)
 
   def createEditor(self, parent, option, index: QtCore.QModelIndex):
-    editor = pg.SpinBox(parent, **self.defs)
-    editor.setMaximumHeight(editor.maximumWidth())
+    editor = self.item.makeWidget()
+    editor.setParent(parent)
+    editor.setMaximumSize(option.rect.width(), option.rect.height())
     return editor
 
-  def setEditorData(self, editor: pg.SpinBox, index: QtCore.QModelIndex):
-    curVal = index.data(QtCore.Qt.DisplayRole)
-    editor.setValue(curVal)
-
-  def setModelData(self, editor: pg.SpinBox,
+  def setModelData(self, editor: QtWidgets.QWidget,
                    model: FRCompTableModel,
                    index: QtCore.QModelIndex):
     model.setData(index, editor.value())
 
-  def updateEditorGeometry(self, editor: QtWidgets.QPlainTextEdit,
+  def setEditorData(self, editor: QtWidgets.QWidget, index):
+    value = index.data(QtCore.Qt.EditRole)
+    editor.setValue(value)
+
+  def updateEditorGeometry(self, editor: QtWidgets.QWidget,
                            option: QtWidgets.QStyleOptionViewItem,
                            index: QtCore.QModelIndex):
     editor.setGeometry(option.rect)

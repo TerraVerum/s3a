@@ -7,10 +7,11 @@ from pyqtgraph.Qt import QtCore, QtGui
 from s3a.frgraphics import tableview
 from s3a.structures.typeoverloads import OneDArr
 from . import FR_SINGLETON
+from .frgraphics.graphicsutils import raiseErrorLater
 from .frgraphics.imageareas import FRMainImage
 from .frgraphics.regions import FRMultiRegionPlot
 from .projectvars import FR_CONSTS, REQD_TBL_FIELDS
-from .structures import FRVertices, FRParam
+from .structures import FRVertices, FRParam, FRParamParseError, FRS3AException
 from .tablemodel import FRComponentMgr
 
 Signal = QtCore.pyqtSignal
@@ -70,6 +71,8 @@ class FRCompDisplayFilter(QtCore.QObject):
     compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
 
     mainImg.addItem(self.regionPlots.boundPlt)
+
+    self.filterableCols = self.findFilterableCols()
 
   def redrawComps(self, idLists):
     # Following mix of cases are possible:
@@ -164,13 +167,37 @@ class FRCompDisplayFilter(QtCore.QObject):
 
   def _populateDisplayedIds(self):
     curComps = self._compMgr.compDf.copy()
-    for param in curComps.columns:
+    for param in self.filterableCols:
       curComps = self.filterByParamType(curComps, param)
 
     # Give self the id list of surviving comps
     self.displayedIds = curComps[REQD_TBL_FIELDS.INST_ID]
 
+  def findFilterableCols(self):
+    curComps = self._compMgr.compDf.copy()
+    filterableCols = []
+    badCols = []
+    for param in curComps.columns:
+      try:
+        curComps = self.filterByParamType(curComps, param)
+        filterableCols.append(param)
+      except FRParamParseError:
+        badCols.append(param)
+    if len(badCols) > 0:
+      badTypes = np.unique([f'"{col.valType}"' for col in badCols])
+      badCols = map(lambda val: f'"{val}"', badCols)
+      raiseErrorLater(FRS3AException(f'The table filter does not know how to handle'
+                                     f' columns {", ".join(badCols)} since no'
+                                     f' filter exists for types {", ".join(badTypes)}'))
+    return filterableCols
+
+
+
   def filterByParamType(self, compDf: df, param: FRParam):
+    # TODO: Each type should probably know how to filter itself. That is,
+    #  find some way of keeping this logic from just being an if/else tree...
+    if param.name not in self._filter:
+      return compDf
     valType = param.valType
     # idx 0 = value, 1 = children
     curFilterParam = self._filter[param.name][1]
@@ -200,7 +227,7 @@ class FRCompDisplayFilter(QtCore.QObject):
           allowedParams.append(groupSubParam)
       compDf = compDf.loc[np.isin(existingParams, allowedParams),:]
       return compDf
-    elif valType == 'str':
+    elif valType in ['str', 'text']:
       allowedRegex = self._filter[param.name][0]
       isCompAllowed = dfAtParam.str.contains(allowedRegex, regex=True, case=False)
       compDf = compDf.loc[isCompAllowed,:]
@@ -220,6 +247,9 @@ class FRCompDisplayFilter(QtCore.QObject):
         vertsAllowed[vertIdx] = isAllowed
       compDf = compDf.loc[vertsAllowed,:]
       return compDf
+    else:
+      raise FRParamParseError('No filter type exists for parameters of type '
+                                        f'{valType}. Did not filter column {param.name}.')
 
 
   @Slot()
