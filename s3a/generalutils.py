@@ -125,7 +125,7 @@ def resolveAuthorName(providedAuthName: Optional[str]) -> Optional[str]:
   return lines[0]
 
 def augmentException(ex: Exception, prependedMsg: str):
-  ex.args = (prependedMsg, *ex.args)
+  ex.args = prependedMsg + ex.args[0], *ex.args[1:]
 
 def makeUniqueBaseClass(obj: Any):
   """

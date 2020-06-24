@@ -217,6 +217,7 @@ class FRPopupLineEditor(QtWidgets.QLineEdit):
     if self.text() == '':
       self.completer().setCompletionPrefix('')
 
+
 def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
   """
   When a qt application encounters an error, it will generally crash the entire
@@ -227,6 +228,10 @@ def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
   """
   # Procedure taken from https://stackoverflow.com/a/40674244/9463643
   def new_except_hook(etype, evalue, tb):
+    # Allow sigabort to kill the app
+    if etype == KeyboardInterrupt:
+      appInst.exit(1)
+      raise
     msgWithTrace = ''.join(format_exception(etype, evalue, tb))
     msgWithoutTrace = str(evalue)
     dlg = FRScrollableErrorDialog(win, notCritical=issubclass(etype, FRS3AException),
