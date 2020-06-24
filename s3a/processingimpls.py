@@ -18,7 +18,8 @@ from imageprocessing.algorithms import watershedProcess, graphCutSegmentation, \
 from imageprocessing.common import Image
 from imageprocessing.processing import ImageIO, ImageProcess
 
-def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int, otherBbox: np.ndarray=None) -> (np.ndarray, np.ndarray):
+def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int, otherBbox: np.ndarray=None,
+                  coordsAsSlices=False) -> (np.ndarray, np.ndarray):
   verts = np.vstack(verts)
   img_np = image
   compCoords = np.vstack([verts.min(0), verts.max(0)])
@@ -27,9 +28,14 @@ def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int, otherBbox: np
       for ii, cmpFunc in zip(range(2), [min, max]):
         compCoords[ii,dim] = cmpFunc(compCoords[ii,dim], otherBbox[ii,dim])
   compCoords = getClippedBbox(img_np.shape, compCoords, margin)
+  coordSlices = (slice(compCoords[0,1], compCoords[1,1]),
+                 slice(compCoords[0,0],compCoords[1,0]))
   # Verts are x-y, index into image with row-col
-  croppedImg = image[compCoords[0,1]:compCoords[1,1], compCoords[0,0]:compCoords[1,0], :]
-  return croppedImg, compCoords
+  croppedImg = image[coordSlices + (slice(None),)]
+  if coordsAsSlices:
+    return croppedImg, coordSlices
+  else:
+    return croppedImg, compCoords
 
 def growSeedpoint(img: NChanImg, seeds: FRVertices, thresh: float) -> BlackWhiteImg:
   shape = np.array(img.shape[0:2])
@@ -279,7 +285,7 @@ def cv_grabcut(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
   outMask = np.where((mask==2)|(mask==0), False, True)
   return ImageIO(image=outMask, grabcutDisplay=mask, display='grabcutDisplay')
 
-def region_grow(image: Image, fgVerts: FRVertices, seedThresh=10):
+def region_grow(image: Image, fgVerts: FRVertices, seedThresh=10, areaOfEffect=30):
   if image.size == 0:
     return ImageIO(image=np.zeros(image.shape[:2], bool))
   if np.all(fgVerts == fgVerts[0, :]):
@@ -287,24 +293,29 @@ def region_grow(image: Image, fgVerts: FRVertices, seedThresh=10):
     fgVerts = fgVerts[[0], :]
   if fgVerts.shape[0] == 1:
     # Grow outward
-    growFunc = growSeedpoint_cv_fastButErratic
+    growFunc = growSeedpoint
     fgVerts.connected = False
   else:
     # Grow inward
-    growFunc = lambda *args: ~growSeedpoint_cv_fastButErratic(*args)
+    growFunc = lambda *args: ~growSeedpoint(*args)
 
-  tmpImgToFill = np.zeros(image.shape[0:2], dtype='uint8')
+  outMask = np.zeros(image.shape[0:2], bool)
   # For small enough shapes, get all boundary pixels instead of just shape vertices
   if fgVerts.connected:
     fgVerts = cornersToFullBoundary(fgVerts, 50e3)
 
-  newRegion = growFunc(image, fgVerts, seedThresh)
+  # Don't let region grow outside area of effect
+  img_aoe, coords = getCroppedImg(image, fgVerts, areaOfEffect, coordsAsSlices=True)
+  # Offset vertices before filling
+  seeds = fgVerts - [coords[1].start, coords[0].start]
+  newRegion = growFunc(img_aoe, seeds, seedThresh)
+  outMask[coords] = newRegion
   if fgVerts.connected:
     # For connected vertices, zero out region locations outside the user defined area
-    filledMask = cv.fillPoly(tmpImgToFill, [fgVerts], 1) > 0
-    newRegion[~filledMask] = False
+    filledMask = cv.fillPoly(np.zeros_like(outMask, dtype='uint8'), [fgVerts], 1) > 0
+    outMask[~filledMask] = False
 
-  return ImageIO(image=newRegion)
+  return ImageIO(image=outMask)
 
 class FRTopLevelProcessors:
   @staticmethod
