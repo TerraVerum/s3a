@@ -1,17 +1,23 @@
 from pathlib import Path
+from time import sleep
 
 import numpy as np
 import pytest
+from pyqtgraph.Qt import QtCore
 
 from appsetup import (NUM_COMPS, SAMPLE_IMG,
                       TESTS_DIR, SAMPLE_IMG_FNAME, clearTmpFiles, RND, defaultApp_tester)
-from s3a import FR_SINGLETON
-from s3a.projectvars import REQD_TBL_FIELDS, LAYOUTS_DIR
+
+from apptests.appsetup import CompDfTester
+from s3a import FR_SINGLETON, S3A, appInst
+from s3a.projectvars import REQD_TBL_FIELDS, LAYOUTS_DIR, FR_ENUMS
 from s3a.structures import FRAlgProcessorError, FRS3AException
 
 EXPORT_DIR = TESTS_DIR/'files'
 
 app, dfTester = defaultApp_tester()
+app: S3A
+dfTester: CompDfTester
 mgr = app.compMgr
 
 @pytest.fixture
@@ -89,4 +95,26 @@ def test_save_layout():
   savePath = LAYOUTS_DIR/f'tmp.dockstate'
   assert savePath.exists()
   savePath.unlink()
+
+def test_autosave(clearedApp):
+  interval = 0.01
+  app.startAutosave(interval, EXPORT_DIR, 'autosave')
+  testComps1 = dfTester.compDf.copy()
+  app.compMgr.addComps(testComps1)
+  app.autosaveTimer.timeout.emit()
+  appInst.processEvents()
+  dfTester.fillRandomVerts()
+  testComps2 = testComps1.append(dfTester.compDf.copy())
+  app.compMgr.addComps(testComps2)
+  app.autosaveTimer.timeout.emit()
+  appInst.processEvents()
+
+  dfTester.fillRandomClasses()
+  testComps3 = testComps2.append(dfTester.compDf.copy())
+  app.compMgr.addComps(testComps3)
+  app.autosaveTimer.timeout.emit()
+  app.stopAutosave()
+  savedFiles = list(EXPORT_DIR.glob('autosave*.csv'))
+  assert len(savedFiles) >= 3, 'Not enough autosaves generated'
+
 

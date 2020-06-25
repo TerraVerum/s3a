@@ -152,8 +152,6 @@ class S3A(FRAnnotatorUI):
     # Load layout options
     self.saveLayout('Default', allowOverwriteDefault=True)
 
-    self.startAutosave(0.5, Path('./tmpout'), 'test')
-
   # -----------------------------
   # S3A CLASS FUNCTIONS
   # -----------------------------
@@ -240,7 +238,7 @@ class S3A(FRAnnotatorUI):
         self.pxColor.setStyleSheet(
           f'background:rgb({info[1][0]}, {info[1][0]}, {info[1][0]}); color:white;  font-weight:16px')
 
-  def startAutosave(self, interval_mins: int, autosaveFolder: FilePath, baseName: str):
+  def startAutosave(self, interval_mins: float, autosaveFolder: FilePath, baseName: str):
     autosaveFolder.mkdir(exist_ok=True, parents=True)
     # Qtimer expects ms, turn mins->s->ms
     self.autosaveTimer = QtCore.QTimer(self)
