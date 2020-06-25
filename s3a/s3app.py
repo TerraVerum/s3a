@@ -15,7 +15,8 @@ from . import FR_SINGLETON
 from .frgraphics.annotator_ui import FRAnnotatorUI
 from .frgraphics.graphicsutils import (dialogGetSaveFileName, addDirItemsToMenu,
                                        attemptFileLoad, popupFilePicker,
-                                       disableAppDuringFunc, makeExceptionsShowDialogs)
+                                       disableAppDuringFunc, makeExceptionsShowDialogs,
+                                       autosaveOptsDialog)
 from .frgraphics.graphicsutils import saveToFile
 from .frgraphics.parameditors import FRParamEditor
 from .generalutils import resolveAuthorName
@@ -54,6 +55,7 @@ class S3A(FRAnnotatorUI):
     # ---------------
     self.hasUnsavedChanges = False
     self.srcImgFname = None
+    self.autosaveTimer: Optional[QtCore.QTimer] = None
 
     self.statBar = QtWidgets.QStatusBar(self)
     self.setStatusBar(self.statBar)
@@ -144,6 +146,8 @@ class S3A(FRAnnotatorUI):
     self.exportLabelImgAct.triggered.connect(self.exportLabelImgActionTriggered)
     self.loadCompsAct_merge.triggered.connect(lambda: self.loadCompsActionTriggered(FR_ENUMS.COMP_ADD_AS_MERGE))
     self.loadCompsAct_new.triggered.connect(lambda: self.loadCompsActionTriggered(FR_ENUMS.COMP_ADD_AS_NEW))
+    self.startAutosaveAct.triggered.connect(self.autosaveAcionTriggered)
+    self.stopAutosaveAct.triggered.connect(self.stopAutosave)
 
     # SETTINGS
     for editor in FR_SINGLETON.registerableEditors:
@@ -162,14 +166,14 @@ class S3A(FRAnnotatorUI):
       self.redoAct.setText(f'Redo: {stack.redoDescr}')
     stack.stackChangedCallbacks.append(updateUndoRedoTxts)
 
-
-
     # ANALYTICS
     self.newCompAnalyticsAct.triggered.connect(self.showNewCompAnalytics)
     self.modCompAnalyticsAct.triggered.connect(self.showModCompAnalytics)
 
     # Load layout options
     self.saveLayout('Default', allowOverwriteDefault=True)
+
+    self.startAutosave(0.5, Path('./tmpout'), 'test')
 
   # -----------------------------
   # S3A CLASS FUNCTIONS
@@ -237,11 +241,44 @@ class S3A(FRAnnotatorUI):
   # -----
   # App functionality
   # -----
+  def startAutosave(self, interval_mins: int, autosaveFolder: FilePath, baseName: str):
+    autosaveFolder.mkdir(exist_ok=True, parents=True)
+    # Qtimer expects ms, turn mins->s->ms
+    self.autosaveTimer = QtCore.QTimer(self)
+    # Figure out where to start the counter
+    existingFiles = list(autosaveFolder.glob(f'{baseName}*.csv'))
+    if len(existingFiles) == 0:
+      counter = 0
+    else:
+      counter = max(map(lambda fname: int(fname.stem.rsplit('_')[1]), existingFiles))
+    def save_incrementCounter():
+      nonlocal counter
+      baseSaveNamePlusFolder = autosaveFolder/f'{baseName}_{counter}.csv'
+      counter += 1
+      self.exportCompList(baseSaveNamePlusFolder)
+
+    self.autosaveTimer.timeout.connect(save_incrementCounter)
+    self.autosaveTimer.start(interval_mins*60*1000)
+
+  def stopAutosave(self):
+    self.autosaveTimer.stop()
+
+  def autosaveAcionTriggered(self):
+    saveDlg = autosaveOptsDialog(self)
+    success = saveDlg.exec()
+    if success:
+      interval = saveDlg.intervalEdit.value()
+      baseName = saveDlg.baseFileNameEdit.text()
+      folderName = Path(saveDlg.folderName)
+      self.startAutosave(interval, folderName, baseName)
+
   def updateTheme(self, _newScheme: Dict[str, Any]):
     style = ''
     if self.useDarkTheme:
       style = qdarkstyle.load_stylesheet()
     self.setStyleSheet(style)
+    for opts in self.focusedImg.drawOptsWidget, self.mainImg.drawOptsWidget:
+      opts.horizWidth = opts.layout().minimumSize().width()
 
   def updateUndoBuffSz(self, _genProps: Dict[str, Any]):
     FR_SINGLETON.actionStack.resizeStack(self.undoBuffSz)

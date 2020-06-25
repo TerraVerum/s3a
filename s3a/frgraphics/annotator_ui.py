@@ -119,6 +119,12 @@ class FRAnnotatorUI(QtWidgets.QMainWindow):
     self.loadCompsAct_merge = create_addMenuAct(self, self.menuLoad_Components, 'Update as &Merge')
     self.loadCompsAct_new = create_addMenuAct(self, self.menuLoad_Components, 'Append as &New')
 
+    # File / autosave
+    self.menuAutosave = create_addMenuAct(self, self.menuFile, '&Autosave...', True)
+    self.startAutosaveAct = create_addMenuAct(self, self.menuAutosave, 'Star&t Autosave')
+    self.stopAutosaveAct = create_addMenuAct(self, self.menuAutosave, 'Sto&p Autosave')
+
+
     # Edit
     self.undoAct = create_addMenuAct(self, self.menuEdit, '&Undo')
     self.undoAct.setShortcut('Ctrl+Z')

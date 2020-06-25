@@ -303,3 +303,54 @@ class FRScrollableErrorDialog(QtWidgets.QDialog):
     verticalLayout.addLayout(btnLayout)
     ok.setFocus()
     updateTxt()
+
+def autosaveOptsDialog(parent):
+  dlg = QtWidgets.QDialog(parent)
+  layout = QtWidgets.QGridLayout(dlg)
+  dlg.setLayout(layout)
+
+  fileBtn = QtWidgets.QPushButton('Select Output Folder')
+  folderNameDisplay = QtWidgets.QLabel('', dlg)
+  def retrieveFolderName():
+    folderDlg = QtWidgets.QFileDialog(dlg)
+    folderDlg.setModal(True)
+    folderName = folderDlg.getExistingDirectory(dlg, 'Select Output Folder')
+
+    dlg.folderName = folderName
+    folderNameDisplay.setText(folderName)
+  fileBtn.clicked.connect(retrieveFolderName)
+
+  layout.addWidget(folderNameDisplay, 0, 0)
+  layout.addWidget(fileBtn, 0, 1)
+
+  saveLbl = QtWidgets.QLabel('Save Name:', dlg)
+  baseFileNameEdit = QtWidgets.QLineEdit(dlg)
+  dlg.baseFileNameEdit = baseFileNameEdit
+
+  layout.addWidget(saveLbl, 1, 0)
+  layout.addWidget(baseFileNameEdit, 1, 1)
+
+  intervalLbl = QtWidgets.QLabel('Save Interval (mins):', dlg)
+  intervalEdit = QtWidgets.QSpinBox(dlg)
+  intervalEdit.setMinimum(1)
+  dlg.intervalEdit = intervalEdit
+
+  layout.addWidget(intervalLbl, 2, 0)
+  layout.addWidget(intervalEdit, 2, 1)
+
+  saveDescr = QtWidgets.QLabel('Every <em>interval</em> minutes, a new autosave is<br/>'
+                               'created from the component list. Its name is<br/>'
+                               '[Parent Folder]/[base name]_[counter].csv, where<br/>'
+                               'counter is the current save file number.', dlg)
+  layout.addWidget(saveDescr, 3, 0, 1, 2)
+
+
+  okBtn = QtWidgets.QPushButton('Ok')
+  cancelBtn = QtWidgets.QPushButton('Cancel')
+  cancelBtn.clicked.connect(dlg.reject)
+  okBtn.clicked.connect(dlg.accept)
+  dlg.okBtn = okBtn
+
+  layout.addWidget(okBtn, 4, 0)
+  layout.addWidget(cancelBtn, 4, 1)
+  return dlg
