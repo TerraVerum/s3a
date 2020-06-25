@@ -23,7 +23,7 @@ from .generalutils import resolveAuthorName
 from .projectvars.constants import FR_CONSTS
 from .projectvars.constants import LAYOUTS_DIR, REQD_TBL_FIELDS
 from .projectvars.enums import FR_ENUMS, _FREnums
-from .structures import FRAppIOError, NChanImg, FilePath
+from .structures import FRAppIOError, NChanImg, FilePath, FRVertices
 from .tablemodel import FRComponentIO
 from .tablemodel import FRComponentMgr
 from .tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
@@ -308,12 +308,7 @@ class S3A(FRAnnotatorUI):
 
 
   def estimateBoundaries(self):
-    with BusyCursor():
-      self.mainImg.curProcessor.run(image=self.mainImg.image)
-      verts = self.mainImg.curProcessor.resultAsVerts(localEstimate=False)
-      components = FR_SINGLETON.tableData.makeCompDf(len(verts))
-      components[REQD_TBL_FIELDS.VERTICES] = verts
-      self.compMgr.addComps(components)
+    self.mainImg.handleShapeFinished(FRVertices())
 
   def clearBoundaries(self):
     self.compMgr.rmComps()

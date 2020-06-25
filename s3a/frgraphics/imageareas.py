@@ -143,8 +143,8 @@ class FREditableImg(pg.PlotWidget):
     :return: Whether the mouse release completes the current ROI
     """
     super().mouseReleaseEvent(ev)
-    # if ev.buttons() == QtCore.Qt.LeftButton:
-    if self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
+    if (self.drawAction != FR_CONSTS.DRAW_ACT_PAN
+        and ev.button() == QtCore.Qt.LeftButton):
       self.shapeCollection.buildRoi(ev, self.imgItem)
 
   def clearCurDrawShape(self):
@@ -184,9 +184,20 @@ class FRMainImage(FREditableImg):
       # background selection
       verts = roiVerts.astype(int)
 
+      globalEstimate = self.multCompsOnCreate or roiVerts.empty
+      namePath = ['Basic Region Operations', 'Keep Largest Comp']
+      oldState = None
+      if globalEstimate:
+        oldState = self.curProcessor.setStageEnabled(namePath, False)
+
       with BusyCursor():
         self.curProcessor.run(image=self.image, fgVerts=verts)
-      newVerts = self.curProcessor.resultAsVerts(not self.multCompsOnCreate)
+      newVerts = self.curProcessor.resultAsVerts(not globalEstimate)
+
+      # Reset keep_largest_comp if necessary
+      if globalEstimate:
+        self.curProcessor.setStageEnabled(namePath, oldState)
+
       # Discard entries with no real vertices
       newComps = FR_SINGLETON.tableData.makeCompDf(len(newVerts))
       newComps[REQD_TBL_FIELDS.VERTICES] = newVerts
