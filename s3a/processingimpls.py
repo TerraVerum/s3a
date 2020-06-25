@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Sequence
 
 import cv2 as cv
 import numpy as np
@@ -14,19 +14,21 @@ from s3a.structures import BlackWhiteImg, FRVertices, NChanImg, FRComplexVertice
   GrayImg, RgbImg
 from imageprocessing import algorithms
 from imageprocessing.algorithms import watershedProcess, graphCutSegmentation, \
-  otsuThresholdProcess
+  otsuThresholdProcess, otsu_threshold
 from imageprocessing.common import Image
 from imageprocessing.processing import ImageIO, ImageProcess
 
-def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int, otherBbox: np.ndarray=None,
+def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int,
+                  *otherBboxes: np.ndarray,
                   coordsAsSlices=False) -> (np.ndarray, np.ndarray):
   verts = np.vstack(verts)
   img_np = image
   compCoords = np.vstack([verts.min(0), verts.max(0)])
-  if otherBbox is not None:
+  if len(otherBboxes) > 0:
     for dim in range(2):
       for ii, cmpFunc in zip(range(2), [min, max]):
-        compCoords[ii,dim] = cmpFunc(compCoords[ii,dim], otherBbox[ii,dim])
+        otherCmpVals = [curBbox[ii, dim] for curBbox in otherBboxes]
+        compCoords[ii,dim] = cmpFunc(compCoords[ii,dim], *otherCmpVals)
   compCoords = getClippedBbox(img_np.shape, compCoords, margin)
   coordSlices = (slice(compCoords[0,1], compCoords[1,1]),
                  slice(compCoords[0,0],compCoords[1,0]))
@@ -123,77 +125,99 @@ def area_coord_regionTbl(_image: Image):
 
 # 0 = unspecified, 1 = background, 2 = foreground
 _historyMask = np.array([[]], 'uint8')
-def crop_to_verts(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
-                  prevCompMask: BlackWhiteImg, firstRun: bool, margin=10,
-                  keepVertHistory=True):
+def format_vertices(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
+                    prevCompMask: BlackWhiteImg, firstRun: bool,
+                    keepVertHistory=True):
   global _historyMask
-  maskLocs = np.nonzero(prevCompMask)
-  maskCoords = np.hstack([m[:,None] for m in reversed(maskLocs)])
-  if maskCoords.size > 0:
-    maskBbox = np.vstack([maskCoords.min(0), maskCoords.max(0)])
-  else:
-    maskBbox = None
 
   if firstRun or not keepVertHistory:
     _historyMask = np.zeros(image.shape[:2], 'uint8')
 
   asForeground = True
-  allVerts = []
-
   # 0 = unspecified, 1 = background, 2 = foreground
   for fillClr, verts in enumerate([bgVerts, fgVerts], 1):
     if not verts.empty:
       cv.fillPoly(_historyMask, [verts], fillClr)
 
+  fullImShape_xy = image.shape[:2][::-1]
   if fgVerts.empty and bgVerts.empty:
     # Give whole image as input
-    shape = image.shape[:2][::-1]
-    fgVerts = FRVertices([[0,0], [0, shape[1]-1],
-                          [shape[0]-1, shape[1]-1], [shape[0]-1, 0]
-                         ])
+    fgVerts = FRVertices([[0,                   0],
+                          [0,                   fullImShape_xy[1]-1],
+                          [fullImShape_xy[0]-1, fullImShape_xy[1]-1],
+                          [fullImShape_xy[0]-1, 0]
+                          ])
     fgVerts = cornersToFullBoundary(fgVerts)
     _historyMask[fgVerts.rows, fgVerts.cols] = True
   curHistory = _historyMask.copy()
   if fgVerts.empty:
+    # Invert the mask and paint foreground pixels
     asForeground = False
-    prevCompMask = ~prevCompMask
-    # Invert the history mask
+    # Invert the history mask too
     curHistory[_historyMask == 2] = 1
     curHistory[_historyMask == 1] = 2
     fgVerts = bgVerts
     bgVerts = FRVertices()
 
-  allVerts.append(fgVerts)
-  allVerts.append(bgVerts)
-  allVerts = np.vstack(allVerts)
-  cropped, bounds = getCroppedImg(image, allVerts, margin, maskBbox)
+  if asForeground:
+    foregroundAdjustedCompMask = prevCompMask.copy()
+  else:
+    foregroundAdjustedCompMask = ~prevCompMask
+
+  # Default to bound slices that encompass the whole image
+  bounds = np.array([[0, 0], image.shape[:2][::-1]])
+  boundSlices = slice(*bounds[:,1]), slice(*bounds[:,0])
+  return ImageIO(image=image, fgVerts=fgVerts, bgVerts=bgVerts, asForeground=asForeground,
+                 historyMask = _historyMask, prevCompMask=foregroundAdjustedCompMask,
+                 origCompMask=prevCompMask, boundSlices=boundSlices)
+
+def crop_to_verts(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
+                  prevCompMask: BlackWhiteImg, margin_pctImgSize=10):
+  allVerts = np.vstack([fgVerts, bgVerts])
+  margin = round(max(image.shape[:2])*(margin_pctImgSize/100))
+  cropped, bounds = getCroppedImg(image, allVerts, margin)
   vertOffset = bounds.min(0)
   for vertList in fgVerts, bgVerts:
     vertList -= vertOffset
     np.clip(vertList, a_min=[0,0], a_max=bounds[1,:]-1, out=vertList)
   boundSlices = slice(*bounds[:,1]), slice(*bounds[:,0])
-  prevCompMask = prevCompMask[boundSlices]
-  curHistory = curHistory[boundSlices]
-  return ImageIO(image=cropped, fgVerts=fgVerts, bgVerts=bgVerts, prevCompMask=prevCompMask,
-                 boundSlices=boundSlices, origImg=image, asForeground=asForeground,
-                 allVerts=allVerts, historyMask=curHistory)
+  croppedCompMask = prevCompMask[boundSlices]
+  curHistory = _historyMask[boundSlices]
+  return ImageIO(image=cropped, fgVerts=fgVerts, bgVerts=bgVerts, prevCompMask=croppedCompMask,
+                 boundSlices=boundSlices, historyMask=curHistory)
 
-def update_area(image: Image, asForeground: bool,
-                prevCompMask):
-  prevCompMask = prevCompMask.copy()
+def apply_process_result(image: Image, asForeground: bool,
+                         prevCompMask: BlackWhiteImg, origCompMask: BlackWhiteImg,
+                         boundSlices: Tuple[slice,slice]):
   if asForeground:
     bitOperation = np.bitwise_or
   else:
     # Add to background
     bitOperation = lambda curRegion, other: ~(curRegion | other)
-  return ImageIO(image=bitOperation(prevCompMask, image))
+  # The other basic operations need the rest of the component mask to work properly,
+  # so expand the current area of interest only as much as needed. Returning to full size
+  # now would incur unnecessary addtional processing times for the full-sized image
+  outMask = origCompMask.copy()
+  outMask[boundSlices] = bitOperation(prevCompMask, image)
+  foregroundPixs = np.c_[np.nonzero(outMask)]
+  # Keep algorithm from failing when no foreground pixels exist
+  if len(foregroundPixs) == 0:
+    mins = [0,0]
+    maxs = [1,1]
+  else:
+    mins = foregroundPixs.min(0)
+    maxs = foregroundPixs.max(0)
+  # Add 1 to max slice so stopping value is last foreground pixel
+  newSlices = (slice(mins[0], maxs[0]+1), slice(mins[1], maxs[1]+1))
+  return ImageIO(image=outMask[newSlices], boundSlices=newSlices)
 
-def return_to_full_size(image: Image, origImg: Image, boundSlices: Tuple[slice]):
-  outMask = np.zeros(origImg.shape[:2])
+def return_to_full_size(image: Image, origCompMask: BlackWhiteImg,
+                        boundSlices: Tuple[slice]):
+  out = np.zeros_like(origCompMask)
   if image.ndim > 2:
     image = image.asGrayScale()
-  outMask[boundSlices] = image
-  return ImageIO(image=outMask)
+  out[boundSlices] = image
+  return ImageIO(image=out)
 
 def fill_holes(image: Image):
   return ImageIO(image=binary_fill_holes(image))
@@ -285,7 +309,7 @@ def cv_grabcut(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
   outMask = np.where((mask==2)|(mask==0), False, True)
   return ImageIO(image=outMask, grabcutDisplay=mask, display='grabcutDisplay')
 
-def region_grow(image: Image, fgVerts: FRVertices, seedThresh=10, areaOfEffect=30):
+def region_grow(image: Image, fgVerts: FRVertices, seedThresh=10):
   if image.size == 0:
     return ImageIO(image=np.zeros(image.shape[:2], bool))
   if np.all(fgVerts == fgVerts[0, :]):
@@ -299,17 +323,17 @@ def region_grow(image: Image, fgVerts: FRVertices, seedThresh=10, areaOfEffect=3
     # Grow inward
     growFunc = lambda *args: ~growSeedpoint(*args)
 
-  outMask = np.zeros(image.shape[0:2], bool)
+  # outMask = np.zeros(image.shape[0:2], bool)
   # For small enough shapes, get all boundary pixels instead of just shape vertices
   if fgVerts.connected:
     fgVerts = cornersToFullBoundary(fgVerts, 50e3)
 
   # Don't let region grow outside area of effect
-  img_aoe, coords = getCroppedImg(image, fgVerts, areaOfEffect, coordsAsSlices=True)
+  # img_aoe, coords = getCroppedImg(image, fgVerts, areaOfEffect, coordsAsSlices=True)
   # Offset vertices before filling
-  seeds = fgVerts - [coords[1].start, coords[0].start]
-  newRegion = growFunc(img_aoe, seeds, seedThresh)
-  outMask[coords] = newRegion
+  # seeds = fgVerts - [coords[1].start, coords[0].start]
+  outMask = growFunc(image, fgVerts, seedThresh)
+  # outMask[coords] = newRegion
   if fgVerts.connected:
     # For connected vertices, zero out region locations outside the user defined area
     filledMask = cv.fillPoly(np.zeros_like(outMask, dtype='uint8'), [fgVerts], 1) > 0
@@ -325,7 +349,7 @@ class FRTopLevelProcessors:
   @staticmethod
   def d_graphCutProcessor():
     proc = graphCutSegmentation(numSegs=100)
-    proc.addProcess(otsuThresholdProcess(binaryOutput=True))
+    proc.addFunction(otsu_threshold, binaryOutput=True)
     return proc
 
   @staticmethod
@@ -337,31 +361,3 @@ class FRTopLevelProcessors:
     proc = ImageProcess.fromFunction(get_basic_shapes, name='Basic Shapes')
     proc.disabledStages = [['Basic Region Operations', 'Open -> Close']]
     return proc
-
-  @staticmethod
-  def z_onlySquaresProcessor():
-    proc = FRTopLevelProcessors.w_basicShapesProcessor()
-    proc.name = 'Only Squares'
-    proc.addProcess(ImageProcess.fromFunction(convert_to_squares, name=convert_to_squares.__name__))
-    return proc
-
-  @staticmethod
-  def c_watershedProcessor():
-    return watershedProcess()
-    
-  @staticmethod
-  def e_otsuThresholding():
-    proc = otsuThresholdProcess(binaryOutput=True)
-    
-    def smart_select_foreground(image: Image, fgVerts: FRVertices, asForeground: bool):
-      # Otsu just splits the region into two classes, but we want to make sure the fg is
-      # actually fg. It could be that the algo got it backwards
-      # *image* should be bool at this point
-      fgColor = image[fgVerts[0,:]]
-      if not asForeground:
-        fgColor = not fgColor
-      return ImageIO(image=image == fgColor)
-      
-    proc.addFunction(smart_select_foreground)
-    return proc
-      

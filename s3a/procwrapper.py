@@ -17,8 +17,8 @@ from .frgraphics.graphicsutils import raiseErrorLater
 from .frgraphics.parameditors import genericeditor
 from .frgraphics.parameditors.pgregistered import FRCustomMenuParameter
 from .generalutils import augmentException
-from .processingimpls import crop_to_verts, update_area, basicOpsCombo, \
-  return_to_full_size
+from .processingimpls import crop_to_verts, apply_process_result, basicOpsCombo, \
+  return_to_full_size, format_vertices
 from .structures import FRParam, FRComplexVertices, FRAlgProcessorError, FRVertices, \
   GrayImg
 
@@ -106,14 +106,18 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
   def __init__(self, processor: ImageProcess, editor: s3a.frgraphics.parameditors.genericeditor.FRParamEditor):
     # Each processor is encapsulated in processes that crop the image to the region of
     # interest specified by the user, and re-expand the area after processing
-    cropStage = ImageProcess.fromFunction(crop_to_verts, name='Crop to Vertices')
-    cropStage.allowDisable = False
-    updateStage = ImageProcess.fromFunction(update_area, 'Update Cropped Area')
+    formatStage = ImageProcess.fromFunction(format_vertices, name='Format Vertices')
+    formatStage.allowDisable = False
+    cropStage = ImageProcess.fromFunction(crop_to_verts, name='Crop to Local Area')
+
+    updateStage = ImageProcess.fromFunction(apply_process_result, 'Update Cropped Area')
     updateStage.allowDisable = False
     resizeStage = ImageProcess.fromFunction(return_to_full_size, 'Return to Full Size')
     resizeStage.allowDisable = False
+
     finalStages = [updateStage, basicOpsCombo(), resizeStage]
-    processor.stages = [cropStage] + processor.stages + finalStages
+    processor.stages = [formatStage, cropStage] + processor.stages + finalStages
+
     if hasattr(processor, 'disabledStages'):
       for namePath in processor.disabledStages:
         proc = _getNestedName(processor, namePath)
