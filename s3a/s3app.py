@@ -434,6 +434,7 @@ class S3A(FRAnnotatorUI):
       return objForMenu.loadParamState(nameToLoad)
 
   @Slot()
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_EXPORT_COMP_LIST)
   def exportCompListActionTriggered(self):
     fileDlg = QtWidgets.QFileDialog()
     # TODO: Delegate this to the exporter. Make a function that makes the right file filter,

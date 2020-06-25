@@ -89,7 +89,7 @@ class _FRConsts(FRParamGroup):
                                                  'Rather, a new compnent will be created for each closed boundary.')
   PROP_CROP_MARGIN_PCT      : FRParam = newParam('Crop Padding (% of image size)', 15)
   PROP_FOCUSED_SEED_THRESH  : FRParam = newParam('Seedpoint Threshold in Focused Image', 7.)
-  PROP_UNDO_BUF_SZ          : FRParam = newParam('Size of Undo Buffer', 150)
+  PROP_UNDO_BUF_SZ          : FRParam = newParam('Size of Undo Buffer', 300)
   PROP_STEPS_BW_SAVE        : FRParam = newParam('Operations Between Buffer Saves', 1)
   PROP_CHECK_LARGE_CHANGES  : FRParam = newParam('Save buffer during large region changes', True)
   PROP_SHOW_TBL_ON_COMP_CREATE: FRParam = newParam('Show popup table when creating component', False)
@@ -99,6 +99,7 @@ class _FRConsts(FRParamGroup):
   # --------------------------
   SHC_CLEAR_BOUNDARIES      : FRParam = newParam('Clear Boundaries', 'Ctrl+C', 'shortcut')
   SHC_ESTIMATE_BOUNDARIES   : FRParam = newParam('Estimate Boundaries', 'Ctrl+E', 'shortcut')
+  SHC_EXPORT_COMP_LIST      : FRParam = newParam('Export Component List', 'Ctrl+S', 'shortcut')
   SHC_CLEAR_SHAPE_MAIN      : FRParam = newParam('Clear Draw Shape in Main Image', 'Esc', 'shortcut')
   SHC_CLEAR_SHAPE_FOC       : FRParam = newParam('Clear Draw Shape in Focused Image', 'Esc', 'shortcut')
   SHC_DESEL_ALL_BOUNDARIES  : FRParam = newParam('Deselect All Main Image Boundaries', 'Esc', 'shortcut')
