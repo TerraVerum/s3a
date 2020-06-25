@@ -104,7 +104,7 @@ class FRParamGroup:
     """
     Allows user to create a :class:`FRParam` object from its string value
     """
-    paramName = paramName.lower()
+    paramName = str(paramName.lower())
     for param in group:
       if param.name.lower() == paramName:
         return param

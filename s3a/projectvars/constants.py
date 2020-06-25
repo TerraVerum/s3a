@@ -108,7 +108,7 @@ class _FRConsts(FRParamGroup):
   SHC_TBL_DEL_ROWS          : FRParam = newParam('Delete Table Rows', 'Del', 'shortcut')
   SHC_UNDO_MOD_REGION       : FRParam = newParam('Undo Modify Region', 'Ctrl+Z', 'shortcut')
   SHC_REDO_MOD_REGION       : FRParam = newParam('Redo Modify Region', 'Ctrl+Y', 'shortcut')
-  SHC_ACCEPT_REGION         : FRParam = newParam('Accept and Save Region Edits', '1', 'shortcut')
+  SHC_ACCEPT_REGION         : FRParam = newParam('Accept and Save Focused Image Edits', '1', 'shortcut')
   SHC_DRAW_FG               : FRParam = newParam('Add to Foreground', 'Alt+D,F', 'shortcut')
   SHC_DRAW_BG               : FRParam = newParam('Add to Background', 'Alt+D,B', 'shortcut')
   SHC_DRAW_SELECT           : FRParam = newParam('Enter "Select" Mode', 'Alt+D,S', 'shortcut')
