@@ -168,7 +168,7 @@ def format_vertices(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
   bounds = np.array([[0, 0], image.shape[:2][::-1]])
   boundSlices = slice(*bounds[:,1]), slice(*bounds[:,0])
   return ImageIO(image=image, fgVerts=fgVerts, bgVerts=bgVerts, asForeground=asForeground,
-                 historyMask = _historyMask, prevCompMask=foregroundAdjustedCompMask,
+                 historyMask=curHistory, prevCompMask=foregroundAdjustedCompMask,
                  origCompMask=prevCompMask, boundSlices=boundSlices)
 
 def crop_to_verts(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
