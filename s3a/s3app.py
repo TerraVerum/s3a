@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Callable, Dict, Any, Union, Optional
 
 import pandas as pd
+import numpy as np
 import qdarkstyle
 from pandas import DataFrame as df
 from pyqtgraph import BusyCursor
@@ -238,21 +239,24 @@ class S3A(FRAnnotatorUI):
         self.pxColor.setStyleSheet(
           f'background:rgb({info[1][0]}, {info[1][0]}, {info[1][0]}); color:white;  font-weight:16px')
 
-  def startAutosave(self, interval_mins: float, autosaveFolder: FilePath, baseName: str):
+  def startAutosave(self, interval_mins: float, autosaveFolder: Path, baseName: str):
     autosaveFolder.mkdir(exist_ok=True, parents=True)
+    lastSavedDf = None
     # Qtimer expects ms, turn mins->s->ms
     self.autosaveTimer = QtCore.QTimer(self)
     # Figure out where to start the counter
-    existingFiles = list(autosaveFolder.glob(f'{baseName}*.csv'))
+    globExpr = lambda: autosaveFolder.glob(f'{baseName}*.csv')
+    existingFiles = list(globExpr())
     if len(existingFiles) == 0:
       counter = 0
     else:
-      counter = max(map(lambda fname: int(fname.stem.rsplit('_')[1]), existingFiles))
+      counter = max(map(lambda fname: int(fname.stem.rsplit('_')[1]), existingFiles)) + 1
     def save_incrementCounter():
       nonlocal counter
       baseSaveNamePlusFolder = autosaveFolder/f'{baseName}_{counter}.csv'
       counter += 1
-      self.exportCompList(baseSaveNamePlusFolder)
+      if not np.array_equal(self.compMgr.compDf, lastSavedDf):
+        self.exportCompList(baseSaveNamePlusFolder)
 
     self.autosaveTimer.timeout.connect(save_incrementCounter)
     self.autosaveTimer.start(interval_mins*60*1000)
@@ -380,7 +384,7 @@ class S3A(FRAnnotatorUI):
       # Unclaimed arguments
       FR_SINGLETON.quickLoader.buildFromUserProfile(profileSrc)
 
-  def exportCompList(self, outFname: str):
+  def exportCompList(self, outFname: Union[str, Path]):
     self.compExporter.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds,
                                 self.srcImgFname)
     self.compExporter.exportCsv(outFname)
