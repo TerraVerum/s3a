@@ -71,28 +71,7 @@ class S3A(FRAnnotatorUI):
 
     self.pxColor = QtWidgets.QLabel("Pixel Color")
 
-    def setInfo(info):
-      self.mouseCoords.setText(f'Author: {authorName} | Mouse (x,y): {info[0][1]}, {info[0][0]} | Pixel Color: ')
-      self.pxColor.setText(f'{info[1]}')
-      var = 0
-      if(len(info[1]) == 3):
-        if(((var + info[1][0] + info[1][1] + info[1][2]) / 3) > 127):
-          self.pxColor.setStyleSheet(
-            f'background:rgb({info[1][0]}, {info[1][1]}, {info[1][2]}); color:black;  font-weight:16px')
-        else:
-          self.pxColor.setStyleSheet(
-            f'background:rgb({info[1][0]}, {info[1][1]}, {info[1][2]}); color:white;  font-weight:16px')
-      else:
-        if(info[1][0] > 127):
-          self.pxColor.setStyleSheet(
-            f'background:rgb({info[1][0]}, {info[1][0]}, {info[1][0]}); color:black;  font-weight:16px')
-        else:
-          self.pxColor.setStyleSheet(
-            f'background:rgb({info[1][0]}, {info[1][0]}, {info[1][0]}); color:white;  font-weight:16px')
-
-
-
-    self.mainImg.sigMousePosChanged.connect(lambda info: setInfo(info))
+    self.mainImg.sigMousePosChanged.connect(lambda info: self.setInfo(info))
     # self.focusedImg.sigMousePosChanged.connect(lambda info: setInfo(info))
     self.statBar.show()
     self.statBar.addWidget(self.mouseCoords)
@@ -241,6 +220,26 @@ class S3A(FRAnnotatorUI):
   # -----
   # App functionality
   # -----
+  def setInfo(self, info):
+    authorName = FR_SINGLETON.tableData.annAuthor
+    self.mouseCoords.setText(f'Author: {authorName} | Mouse (x,y): {info[0][1]}, {info[0][0]} | Pixel Color: ')
+    self.pxColor.setText(f'{info[1]}')
+    var = 0
+    if len(info[1]) == 3:
+      if ((var + info[1][0] + info[1][1] + info[1][2]) / 3) > 127:
+        self.pxColor.setStyleSheet(
+          f'background:rgb({info[1][0]}, {info[1][1]}, {info[1][2]}); color:black;  font-weight:16px')
+      else:
+        self.pxColor.setStyleSheet(
+          f'background:rgb({info[1][0]}, {info[1][1]}, {info[1][2]}); color:white;  font-weight:16px')
+    else:
+      if info[1][0] > 127:
+        self.pxColor.setStyleSheet(
+          f'background:rgb({info[1][0]}, {info[1][0]}, {info[1][0]}); color:black;  font-weight:16px')
+      else:
+        self.pxColor.setStyleSheet(
+          f'background:rgb({info[1][0]}, {info[1][0]}, {info[1][0]}); color:white;  font-weight:16px')
+
   def startAutosave(self, interval_mins: int, autosaveFolder: FilePath, baseName: str):
     autosaveFolder.mkdir(exist_ok=True, parents=True)
     # Qtimer expects ms, turn mins->s->ms

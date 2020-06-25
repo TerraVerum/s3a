@@ -30,7 +30,7 @@ class FRDrawOpts(QtWidgets.QWidget):
     self.horizWidth = self.layout().minimumSize().width()
 
   def resizeEvent(self, ev: QtGui.QResizeEvent) -> None:
-    if ev.size().width() < self.horizWidth + 10:
+    if self.width() < self.horizWidth + 30:
       self.topLayout.setDirection(self.topLayout.TopToBottom)
     else:
       self.topLayout.setDirection(self.topLayout.LeftToRight)
