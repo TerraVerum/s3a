@@ -282,7 +282,7 @@ class FRComponentIO:
   # -----
   # Export options
   # -----
-  def exportCsv(self, outFile: str=None, **pdExportArgs) -> (Any, str):
+  def exportCsv(self, outFile: Union[str, Path]=None, **pdExportArgs) -> (Any, str):
     """
 
     :param outFile: Name of the output file location. If *None*, no file is created. However,
@@ -297,7 +297,6 @@ class FRComponentIO:
       'index': False
     }
     outPath = Path(outFile)
-    outPath.parent.mkdir(exist_ok=True)
     defaultExportParams.update(pdExportArgs)
     # Make sure no rows are truncated
     pd.set_option('display.max_rows', sys.maxsize)
@@ -310,6 +309,7 @@ class FRComponentIO:
       # Format special columns appropriately
       # Since CSV export significantly modifies the df, make a copy before doing all these
       # operations
+      outPath.parent.mkdir(exist_ok=True, parents=True)
       exportDf = self.compDf.copy(deep=True)
       for col in exportDf:
         if not isinstance(col.value, str):
