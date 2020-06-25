@@ -22,7 +22,7 @@ class FRShortcutParameterItem(parameterTypes.WidgetParameterItem):
     item = QtWidgets.QKeySequenceEdit()
 
     item.sigChanged = item.editingFinished
-    item.value = lambda: item.keySequence().fromString()
+    item.value = lambda: item.keySequence().toString()
     item.setValue = item.setKeySequence
     self.item = item
     return self.item
