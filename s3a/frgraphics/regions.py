@@ -156,7 +156,7 @@ def _makeBoundSymbol(verts: FRVertices):
   return path
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MULT_REG_PLT)
-class FRMultiRegionPlot(QtCore.QObject):
+class FRMultiRegionPlot(FRBoundScatterPlot):
   @classmethod
   def __initEditorParams__(cls):
     (cls.focusedBoundClr, cls.selectedBoundClr, cls.boundClr, cls.boundWidth) = \
@@ -166,27 +166,27 @@ class FRMultiRegionPlot(QtCore.QObject):
 
 
   def __init__(self, parent=None):
-    super().__init__(parent)
-    self.boundPlt = FRBoundScatterPlot(brush=None, size=1, pxMode=False)
-    self.boundPlt.setZValue(50)
-    self.data = makeMultiRegionDf(0)
+    super().__init__(brush=None, size=1, pxMode=False)
+    self.setParent(parent)
+    self.setZValue(50)
+    self.regionData = makeMultiRegionDf(0)
 
     # 'pointsAt' is an expensive operation if many points are in the scatterplot. Since
     # this will be called anyway when a selection box is made in the main image, disable
     # mouse click listener to avoid doing all that work for nothing.
     # self.centroidPlts.mouseClickEvent = lambda ev: None
-    self.boundPlt.mouseClickEvent = lambda ev: None
+    self.mouseClickEvent = lambda ev: None
     # Also disable sigClicked. This way, users who try connecting to this signal won't get
     # code that runs but never triggers
     # self.centroidPlts.sigClicked = None
-    self.boundPlt.sigPointsClicked = None
+    self.sigPointsClicked = None
 
   def resetRegionList(self, newIds: Optional[Sequence]=None, newRegionDf: Optional[df]=None):
     if newIds is None:
       newIds = []
     if newRegionDf is None:
       newRegionDf = makeMultiRegionDf(0)
-    self.data = makeMultiRegionDf(0)
+    self.regionData = makeMultiRegionDf(0)
     self[newIds,newRegionDf.columns] = newRegionDf
 
   def selectById(self, selectedIds: OneDArr):
@@ -194,27 +194,27 @@ class FRMultiRegionPlot(QtCore.QObject):
     Marks 'selectedIds' as currently selected by changing their scheme to user-specified
     selection values.
     """
-    if len(self.data) == 0:
+    if len(self.regionData) == 0:
       return
     defaultPen = pg.mkPen(width=self.boundWidth, color=self.boundClr)
-    newPens = np.array([defaultPen]*len(self.data))
+    newPens = np.array([defaultPen]*len(self.regionData))
     selectionPen = pg.mkPen(width=self.boundWidth*2, color=self.selectedBoundClr)
-    newPens[np.isin(self.data.index, selectedIds)] = selectionPen
-    self.boundPlt.setPen(newPens)
-    self.boundPlt.invalidate()
+    newPens[np.isin(self.regionData.index, selectedIds)] = selectionPen
+    self.setPen(newPens)
+    self.invalidate()
 
 
   def focusById(self, focusedIds: OneDArr):
     """
     Colors 'focusedIds' to indicate they are present in a focused view.
     """
-    if len(self.data) == 0:
+    if len(self.regionData) == 0:
       return
-    brushes = np.array([None]*len(self.data))
+    brushes = np.array([None]*len(self.regionData))
 
-    brushes[np.isin(self.data.index, focusedIds)] = pg.mkBrush(self.focusedBoundClr)
-    self.boundPlt.setBrush(brushes)
-    self.boundPlt.invalidate()
+    brushes[np.isin(self.regionData.index, focusedIds)] = pg.mkBrush(self.focusedBoundClr)
+    self.setBrush(brushes)
+    self.invalidate()
 
 
   def updatePlot(self):
@@ -223,12 +223,12 @@ class FRMultiRegionPlot(QtCore.QObject):
     # -----------
     boundLocs = []
     boundSymbs = []
-    if self.data.empty:
-      self.boundPlt.setData(x=[], y=[], data=[])
+    if self.regionData.empty:
+      self.setData(x=[], y=[], data=[])
       return
 
-    for region, _id in zip(self.data.loc[:, REQD_TBL_FIELDS.VERTICES],
-                           self.data.index):
+    for region, _id in zip(self.regionData.loc[:, REQD_TBL_FIELDS.VERTICES],
+                           self.regionData.index):
       concatRegion = nanConcatList(region)
       boundLoc = np.nanmin(concatRegion, 0, keepdims=True)
       boundSymbol = pg.arrayToQPath(*(concatRegion-boundLoc).T, connect='finite')
@@ -239,14 +239,14 @@ class FRMultiRegionPlot(QtCore.QObject):
     plotRegions = np.vstack(boundLocs)
     width = self.boundWidth
     boundPen = pg.mkPen(color=self.boundClr, width=width)
-    self.boundPlt.setData(*plotRegions.T, pen=boundPen, symbol=boundSymbs,
-                          data=self.data.index)
+    self.setData(*plotRegions.T, pen=boundPen, symbol=boundSymbs,
+                          data=self.regionData.index)
 
   def __getitem__(self, keys: Tuple[Any,...]):
     """
     Allows retrieval of vertex/valid list for a given set of IDs
     """
-    return self.data.loc[keys[0], keys[1:]]
+    return self.regionData.loc[keys[0], keys[1:]]
 
   def __setitem__(self, keys: Tuple, vals: Sequence):
     if not isinstance(keys, tuple):
@@ -260,27 +260,27 @@ class FRMultiRegionPlot(QtCore.QObject):
       regionIds = keys[0]
       setVals = keys[1:]
     # First update old entries
-    newEntryIdxs = np.isin(regionIds, self.data.index, invert=True)
+    newEntryIdxs = np.isin(regionIds, self.regionData.index, invert=True)
     keysDf = makeMultiRegionDf(len(regionIds), setVals)
     keysDf = keysDf.set_index(regionIds)
     # Since we may only be resetting one parameter (either valid or regions),
     # Make sure to keep the old parameter value for the unset index
-    keysDf.update(self.data)
+    keysDf.update(self.regionData)
     keysDf.loc[regionIds, setVals] = vals
-    self.data.update(keysDf)
+    self.regionData.update(keysDf)
 
     # Now we can add entries that weren't in our original dataframe
     # If not all set values were provided in the new dataframe, fix this by embedding
     # it into the default dataframe
     newDataDf = makeMultiRegionDf(int(np.sum(newEntryIdxs)), idList=regionIds[newEntryIdxs])
     newDataDf.loc[:, keysDf.columns] = keysDf.loc[newEntryIdxs, :]
-    self.data = pd.concat((self.data, newDataDf))
+    self.regionData = pd.concat((self.regionData, newDataDf))
     # Retain type information
-    coerceDfTypes(self.data, makeMultiRegionDf(0).columns)
+    coerceDfTypes(self.regionData, makeMultiRegionDf(0).columns)
     self.updatePlot()
 
   def drop(self, ids):
-    self.data.drop(index=ids, inplace=True)
+    self.regionData.drop(index=ids, inplace=True)
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_VERT_IMG)
 class FRVertexDefinedImg(pg.ImageItem):

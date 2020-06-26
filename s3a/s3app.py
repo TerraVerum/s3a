@@ -305,7 +305,7 @@ class S3A(FRAnnotatorUI):
     modifiedComp = self.focusedImg.compSer
     modified_df = modifiedComp.to_frame().T
     self.compMgr.addComps(modified_df, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
-    self.compDisplay.regionPlots.focusById([modifiedComp[REQD_TBL_FIELDS.INST_ID]])
+    self.compDisplay.regionPlot.focusById([modifiedComp[REQD_TBL_FIELDS.INST_ID]])
     yield
     self.focusedImg.saveNewVerts(oldSer[REQD_TBL_FIELDS.VERTICES])
     self.compMgr.addComps(oldSer.to_frame().T, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
@@ -547,7 +547,7 @@ class S3A(FRAnnotatorUI):
     #   the current displayed.
     newComp: pd.Series = newComps.iloc[-1,:]
     newCompId = newComp[REQD_TBL_FIELDS.INST_ID]
-    self.compDisplay.regionPlots.focusById([newCompId])
+    self.compDisplay.regionPlot.focusById([newCompId])
     mainImg = self.mainImg.image
     self.focusedImg.updateAll(mainImg, newComp)
     self.curCompIdLbl.setText(f'Component ID: {newCompId}')

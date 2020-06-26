@@ -59,7 +59,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     self._compTbl = compTbl
     self._compMgr = compMgr
 
-    self.regionPlots = FRMultiRegionPlot()
+    self.regionPlot = FRMultiRegionPlot()
     self.displayedIds = np.array([], dtype=int)
     self.selectedIds = np.array([], dtype=int)
 
@@ -70,7 +70,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     FR_SINGLETON.scheme.sigParamStateUpdated.connect(lambda: self._updateFilter(self._filter))
     compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
 
-    mainImg.addItem(self.regionPlots.boundPlt)
+    mainImg.addItem(self.regionPlot)
 
     self.filterableCols = self.findFilterableCols()
 
@@ -103,7 +103,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     # Remove all IDs that aren't displayed
     # FIXME: This isn't working correctly at the moment
     # self._regionPlots.drop(np.setdiff1d(self._regionPlots.data.index, self._displayedIds))
-    self.regionPlots.resetRegionList(self.displayedIds, compDf.loc[self.displayedIds, regCols])
+    self.regionPlot.resetRegionList(self.displayedIds, compDf.loc[self.displayedIds, regCols])
     # noinspection PyTypeChecker
     # self._reflectTableSelectionChange(np.intersect1d(self.displayedIds, self.selectedIds))
 
@@ -120,7 +120,7 @@ class FRCompDisplayFilter(QtCore.QObject):
   @Slot(object)
   def _reflectTableSelectionChange(self, selectedIds: OneDArr):
     self.selectedIds = selectedIds
-    self.regionPlots.selectById(selectedIds)
+    self.regionPlot.selectById(selectedIds)
     self.sigCompsSelected.emit(self._compMgr.compDf.loc[selectedIds, :])
 
   @Slot(object)
@@ -131,10 +131,10 @@ class FRCompDisplayFilter(QtCore.QObject):
     # If min and max are the same, just check for points at mouse position
     if np.abs(selection[0] - selection[1]).sum() < 0.01:
       qtPoint = QtCore.QPointF(*selection[0])
-      selectedSpots = self.regionPlots.boundPlt.pointsAt(qtPoint)
+      selectedSpots = self.regionPlot.pointsAt(qtPoint)
       selectedIds = [spot.data() for spot in selectedSpots]
     else:
-      selectedIds = self.regionPlots.boundPlt.boundsWithin(selection)
+      selectedIds = self.regionPlot.boundsWithin(selection)
       selectedIds = np.unique(selectedIds)
 
     # -----
@@ -254,4 +254,4 @@ class FRCompDisplayFilter(QtCore.QObject):
 
   @Slot()
   def resetCompBounds(self):
-    self.regionPlots.resetRegionList()
+    self.regionPlot.resetRegionList()
