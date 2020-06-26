@@ -170,6 +170,9 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
     self.setParent(parent)
     self.setZValue(50)
     self.regionData = makeMultiRegionDf(0)
+    self.selectedIds = np.array([], dtype=int)
+    self.focusedIds = np.array([], dtype=int)
+
 
     # 'pointsAt' is an expensive operation if many points are in the scatterplot. Since
     # this will be called anyway when a selection box is made in the main image, disable
@@ -196,6 +199,7 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
     """
     if len(self.regionData) == 0:
       return
+    self.selectedIds = selectedIds
     defaultPen = pg.mkPen(width=self.boundWidth, color=self.boundClr)
     newPens = np.array([defaultPen]*len(self.regionData))
     selectionPen = pg.mkPen(width=self.boundWidth*2, color=self.selectedBoundClr)
@@ -210,6 +214,7 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
     """
     if len(self.regionData) == 0:
       return
+    self.focusedIds = focusedIds
     brushes = np.array([None]*len(self.regionData))
 
     brushes[np.isin(self.regionData.index, focusedIds)] = pg.mkBrush(self.focusedBoundClr)
@@ -241,6 +246,8 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
     boundPen = pg.mkPen(color=self.boundClr, width=width)
     self.setData(*plotRegions.T, pen=boundPen, symbol=boundSymbs,
                           data=self.regionData.index)
+    self.selectById(self.selectedIds)
+    self.focusById(self.focusedIds)
 
   def __getitem__(self, keys: Tuple[Any,...]):
     """
