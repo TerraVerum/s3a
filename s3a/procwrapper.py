@@ -131,7 +131,7 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     try:
       result = self.processor.run(newIo, force=True)
     except Exception as ex:
-      augmentException(ex, 'Exception during processor run:')
+      augmentException(ex, 'Exception during processor run:\n')
       result = ImageIO(image=kwargs['prevCompMask'])
       raiseErrorLater(ex)
 

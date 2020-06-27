@@ -11,7 +11,7 @@ from skimage.segmentation import quickshift
 
 from s3a.generalutils import splitListAtNans, getClippedBbox
 from s3a.structures import BlackWhiteImg, FRVertices, NChanImg, FRComplexVertices, \
-  GrayImg, RgbImg
+  GrayImg, RgbImg, FRAlgProcessorError
 from imageprocessing import algorithms
 from imageprocessing.algorithms import watershedProcess, graphCutSegmentation, \
   otsuThresholdProcess, otsu_threshold
@@ -172,9 +172,15 @@ def format_vertices(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
                  origCompMask=prevCompMask, boundSlices=boundSlices)
 
 def crop_to_verts(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
-                  prevCompMask: BlackWhiteImg, margin_pctImgSize=10):
+                  prevCompMask: BlackWhiteImg, margin_pctRoiSize=10):
   allVerts = np.vstack([fgVerts, bgVerts])
-  margin = round(max(image.shape[:2])*(margin_pctImgSize/100))
+  if len(allVerts) == 1:
+    # Single point, use image size as reference shape
+    vertArea_rowCol = image.shape[:2]
+  else:
+    # Lots of points, use their bounded area
+    vertArea_rowCol = (allVerts.max(0)-allVerts.min(0))[::-1]
+  margin = round(max(vertArea_rowCol) * (margin_pctRoiSize / 100))
   cropped, bounds = getCroppedImg(image, allVerts, margin)
   vertOffset = bounds.min(0)
   for vertList in fgVerts, bgVerts:
@@ -226,6 +232,11 @@ def cvt_to_uint(image: Image):
   if image.ndim > 2:
     image = image.asGrayScale()
   return ImageIO(image = image.astype('uint8'), display=None)
+
+def disallow_paint_tool(_image: Image, fgVerts: FRVertices, bgVerts: FRVertices):
+  if len(np.vstack([fgVerts, bgVerts])) < 2:
+    raise FRAlgProcessorError('This algorithm requires an enclosed area to work.'
+                              ' Only one vertex was given as an input.')
 
 def openClose():
   proc = ImageIO().initProcess('Open -> Close')
@@ -348,13 +359,15 @@ class FRTopLevelProcessors:
 
   @staticmethod
   def d_graphCutProcessor():
-    proc = graphCutSegmentation(numSegs=100)
+    proc = ImageProcess.fromFunction(disallow_paint_tool, name="Graph Cut")
+    proc.addProcess(graphCutSegmentation(numSegs=100))
     proc.addFunction(otsu_threshold, binaryOutput=True)
     return proc
 
   @staticmethod
   def a_grabCutProcessor():
-    return ImageProcess.fromFunction(cv_grabcut, name='Primitive Grab Cut')
+    proc = ImageProcess.fromFunction(cv_grabcut, name='Primitive Grab Cut')
+    return proc
 
   @staticmethod
   def w_basicShapesProcessor():
