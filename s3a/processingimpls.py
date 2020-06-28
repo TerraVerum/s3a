@@ -237,6 +237,7 @@ def disallow_paint_tool(_image: Image, fgVerts: FRVertices, bgVerts: FRVertices)
   if len(np.vstack([fgVerts, bgVerts])) < 2:
     raise FRAlgProcessorError('This algorithm requires an enclosed area to work.'
                               ' Only one vertex was given as an input.')
+  return ImageIO(image=_image)
 
 def openClose():
   proc = ImageIO().initProcess('Open -> Close')
