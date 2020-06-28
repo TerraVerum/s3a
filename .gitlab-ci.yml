@@ -7,6 +7,7 @@ before_script:
   - python --version
   - pip install git+https://gitlab.com/ficsresearch/imageprocessing@development
   - pip install -e .
+  - pip install pytest-cov
   - xvfb-run python -c "from s3a.generalutils import resolveAuthorName;resolveAuthorName('testauthor')"
 
 stages:
@@ -15,4 +16,4 @@ stages:
 pytest:
   stage: Test
   script:
-    - xvfb-run -a pytest ./apptests
+    - xvfb-run -a pytest ./apptests --cov-report term --cov=.
