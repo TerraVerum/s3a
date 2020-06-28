@@ -97,6 +97,10 @@ class FRRectROI(pg.RectROI, FRROIExtension):
     otherCorners = [sz * [0, 1], sz * [1, 1], sz * [1, 0]]
 
     verts_np = np.vstack([origin, *(origin + otherCorners)])
+
+    # This happens when user clicks -- all verts are in the same spot
+    if np.all(verts_np[0,:] == verts_np[1,:]):
+      verts_np = verts_np[[0]]
     verts = FRVertices(verts_np, connected=self.connected, dtype=float)
     return verts
 

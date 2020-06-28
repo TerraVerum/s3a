@@ -8,6 +8,7 @@ from scipy.ndimage import binary_fill_holes
 from skimage.measure import regionprops, label, regionprops_table
 from skimage.morphology import flood
 from skimage.segmentation import quickshift
+from sklearn.utils import resample
 
 from s3a.generalutils import splitListAtNans, getClippedBbox
 from s3a.structures import BlackWhiteImg, FRVertices, NChanImg, FRComplexVertices, \
@@ -70,11 +71,13 @@ def cornersToFullBoundary(cornerVerts: FRVertices, sizeLimit: float=np.inf) -> F
   :return: List with one vertex for every border pixel, unless *sizeLimit* is violated.
   """
   fillShape = cornerVerts.asRowCol().max(0)+1
-  if np.prod(fillShape) > sizeLimit:
-    return cornerVerts
-
   filledMask = FRComplexVertices([cornerVerts]).toMask(tuple(fillShape))
-  return FRComplexVertices.fromBwMask(filledMask, simplifyVerts=False).filledVerts().stack()
+  cornerVerts = FRComplexVertices.fromBwMask(filledMask, simplifyVerts=False).filledVerts().stack()
+  numCornerVerts = len(cornerVerts)
+  if numCornerVerts > sizeLimit:
+    spacingPerSamp = int(numCornerVerts/sizeLimit)
+    cornerVerts = cornerVerts[::spacingPerSamp]
+  return cornerVerts
 
 def colorLabelsWithMean(labelImg: GrayImg, refImg: NChanImg) -> RgbImg:
   outImg = np.empty(refImg.shape)
@@ -171,8 +174,8 @@ def format_vertices(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
                  historyMask=curHistory, prevCompMask=foregroundAdjustedCompMask,
                  origCompMask=prevCompMask, boundSlices=boundSlices)
 
-def crop_to_verts(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
-                  prevCompMask: BlackWhiteImg, margin_pctRoiSize=10):
+def crop_to_local_area(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
+                       prevCompMask: BlackWhiteImg, margin_pctRoiSize=10):
   allVerts = np.vstack([fgVerts, bgVerts])
   if len(allVerts) == 1:
     # Single point, use image size as reference shape
@@ -189,8 +192,14 @@ def crop_to_verts(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
   boundSlices = slice(*bounds[:,1]), slice(*bounds[:,0])
   croppedCompMask = prevCompMask[boundSlices]
   curHistory = _historyMask[boundSlices]
+
+  rectThickness = int(max(1, *image.shape)*0.005)
+  toPlot = cv.rectangle(image.copy(), tuple(bounds[0,:]), tuple(bounds[1,:]),
+                        (255,0,0), rectThickness)
+  toPlot = Image(toPlot, name='Cropped Region')
+
   return ImageIO(image=cropped, fgVerts=fgVerts, bgVerts=bgVerts, prevCompMask=croppedCompMask,
-                 boundSlices=boundSlices, historyMask=curHistory)
+                 boundSlices=boundSlices, historyMask=curHistory, toPlot=toPlot, display='toPlot')
 
 def apply_process_result(image: Image, asForeground: bool,
                          prevCompMask: BlackWhiteImg, origCompMask: BlackWhiteImg,

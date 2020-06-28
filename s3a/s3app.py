@@ -19,12 +19,13 @@ from .frgraphics.graphicsutils import (dialogGetSaveFileName, addDirItemsToMenu,
                                        disableAppDuringFunc, makeExceptionsShowDialogs,
                                        autosaveOptsDialog)
 from .frgraphics.graphicsutils import saveToFile
+from .frgraphics.imageareas import FREditableImg
 from .frgraphics.parameditors import FRParamEditor
 from .generalutils import resolveAuthorName
 from .projectvars.constants import FR_CONSTS
 from .projectvars.constants import LAYOUTS_DIR, REQD_TBL_FIELDS
 from .projectvars.enums import FR_ENUMS, _FREnums
-from .structures import FRAppIOError, NChanImg, FilePath, FRVertices
+from .structures import FRAppIOError, NChanImg, FilePath, FRVertices, FRAlgProcessorError
 from .tablemodel import FRComponentIO
 from .tablemodel import FRComponentMgr
 from .tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
@@ -153,7 +154,10 @@ class S3A(FRAnnotatorUI):
     # Load layout options
     self.saveLayout('Default', allowOverwriteDefault=True)
 
-  # -----------------------------
+    self.mainImg.procCollection.switchActiveProcessor('Region Growing')
+
+
+# -----------------------------
   # S3A CLASS FUNCTIONS
   # -----------------------------
   # -----
@@ -410,10 +414,10 @@ class S3A(FRAnnotatorUI):
     self.compMgr.addComps(newComps, loadType)
 
   def showNewCompAnalytics(self):
-    self.mainImg.curProcessor.processor.plotStages(ignoreDuplicateResults=True)
+    self._check_plotStages(self.mainImg)
 
   def showModCompAnalytics(self):
-    self.focusedImg.curProcessor.processor.plotStages(ignoreDuplicateResults=True)
+    self._check_plotStages(self.focusedImg)
 
   # ---------------
   # MISC CALLBACKS
@@ -432,6 +436,14 @@ class S3A(FRAnnotatorUI):
     if self.isVisible():
       self.compTbl.setAs(newComps.index)
     self.changeFocusedComp(newComps)
+
+  @staticmethod
+  def _check_plotStages(img: FREditableImg):
+    proc = img.curProcessor.processor
+    if proc.result is None:
+      raise FRAlgProcessorError('Analytics can only be shown after the algorithm'
+                                ' was run.')
+    proc.plotStages(ignoreDuplicateResults=True)
 
 
   # ---------------
