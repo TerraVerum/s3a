@@ -6,6 +6,8 @@ import cv2 as cv
 import numpy as np
 from skimage import io, data
 from pandas import DataFrame as df
+import matplotlib.pyplot as plt
+
 
 from s3a import FR_SINGLETON, S3A
 from s3a.projectvars import REQD_TBL_FIELDS, BASE_DIR
@@ -74,3 +76,14 @@ def defaultApp_tester():
   dfTester.fillRandomVerts(imShape=SAMPLE_IMG.shape)
   dfTester.fillRandomClasses()
   return app, dfTester
+
+class _block_pltShow:
+  def __init__(self):
+    self.oldShow = None
+
+  def __enter__(self):
+    self.oldShow = plt.show
+    plt.show = lambda: None
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    plt.show = self.oldShow

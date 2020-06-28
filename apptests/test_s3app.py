@@ -4,14 +4,16 @@ from time import sleep
 import numpy as np
 import pytest
 from pyqtgraph.Qt import QtCore
+import matplotlib.pyplot as plt
 
 from appsetup import (NUM_COMPS, SAMPLE_IMG,
-                      TESTS_DIR, SAMPLE_IMG_FNAME, clearTmpFiles, RND, defaultApp_tester)
+                      TESTS_DIR, SAMPLE_IMG_FNAME, clearTmpFiles, RND, defaultApp_tester,
+                      _block_pltShow)
 
 from apptests.appsetup import CompDfTester
 from s3a import FR_SINGLETON, S3A, appInst
 from s3a.projectvars import REQD_TBL_FIELDS, LAYOUTS_DIR, FR_ENUMS
-from s3a.structures import FRAlgProcessorError, FRS3AException
+from s3a.structures import FRAlgProcessorError, FRS3AException, FRVertices
 
 EXPORT_DIR = TESTS_DIR/'files'
 
@@ -116,5 +118,23 @@ def test_autosave(clearedApp):
   app.stopAutosave()
   savedFiles = list(EXPORT_DIR.glob('autosave*.csv'))
   assert len(savedFiles) >= 3, 'Not enough autosaves generated'
+
+def test_stage_plotting(clearedApp):
+  with _block_pltShow():
+    with pytest.raises(FRAlgProcessorError):
+      clearedApp.showModCompAnalytics()
+    with pytest.raises(FRAlgProcessorError):
+      clearedApp.showNewCompAnalytics()
+    # Make a component so modofications can be tested
+    mainImg = clearedApp.mainImg
+    mainImg.procCollection.switchActiveProcessor('Basic Shapes')
+    mainImg.handleShapeFinished(FRVertices())
+    clearedApp.showNewCompAnalytics()
+    assert clearedApp.focusedImg.compSer.loc[REQD_TBL_FIELDS.INST_ID] >= 0
+
+    focImg = clearedApp.focusedImg
+    focImg.procCollection.switchActiveProcessor('Basic Shapes')
+    focImg.handleShapeFinished(FRVertices())
+    clearedApp.showModCompAnalytics()
 
 
