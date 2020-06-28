@@ -154,10 +154,7 @@ class S3A(FRAnnotatorUI):
     # Load layout options
     self.saveLayout('Default', allowOverwriteDefault=True)
 
-    self.mainImg.procCollection.switchActiveProcessor('Region Growing')
-
-
-# -----------------------------
+  # -----------------------------
   # S3A CLASS FUNCTIONS
   # -----------------------------
   # -----
