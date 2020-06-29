@@ -129,7 +129,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     :param selection: bounding box of user selection: [xmin ymin; xmax ymax]
     """
     # If min and max are the same, just check for points at mouse position
-    if np.abs(selection[0] - selection[1]).sum() < 0.01:
+    if len(selection) == 1 or np.abs(selection[0] - selection[1]).sum() < 0.01:
       qtPoint = QtCore.QPointF(*selection[0])
       selectedSpots = self.regionPlot.pointsAt(qtPoint)
       selectedIds = [spot.data() for spot in selectedSpots]

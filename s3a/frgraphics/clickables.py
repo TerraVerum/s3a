@@ -43,11 +43,14 @@ class FRBoundScatterPlot(pg.ScatterPlotItem):
   def pointsAt(self, pos: QtCore.QPointF):
     """
     The default implementation only checks a square around each spot. However, this is not
-    precise enough for my needs. It also triggers when clicking *inside* the spot boundary,
+    precise enough for my needs. The overloaded pointsAt checks any polygonal area as defined
+    by the spot boundary. It also triggers when clicking *inside* the spot boundary,
     which I don't want.
     """
     pts = []
     spots = self.points()
+    if len(spots) == 0:
+      return spots
     strokerWidth = spots[0].pen().width()
     for spot in spots: # type: pg.SpotItem
       symb = QtGui.QPainterPath(spot.symbol())
