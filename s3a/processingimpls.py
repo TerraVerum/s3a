@@ -370,7 +370,9 @@ class FRTopLevelProcessors:
   @staticmethod
   def d_graphCutProcessor():
     proc = ImageProcess.fromFunction(disallow_paint_tool, name="Graph Cut")
-    proc.addProcess(graphCutSegmentation(numSegs=100))
+    gcProc = graphCutSegmentation(numSegs=100)
+    gcProc.allowDisable = False
+    proc.addProcess(gcProc)
     proc.addFunction(otsu_threshold, binaryOutput=True)
     return proc
 
