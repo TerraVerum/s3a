@@ -47,9 +47,10 @@ class S3A(FRAnnotatorUI):
         [FR_CONSTS.PROP_EST_BOUNDS_ON_START, FR_CONSTS.PROP_UNDO_BUF_SZ])
     cls.useDarkTheme = FR_SINGLETON.scheme.registerProp(cls, FR_CONSTS.SCHEME_USE_DARK_THEME)
 
-  def __init__(self, **quickLoaderArgs):
+  def __init__(self, exceptionsAsDialogs=True, **quickLoaderArgs):
     super().__init__()
-    makeExceptionsShowDialogs(self)
+    if exceptionsAsDialogs:
+      makeExceptionsShowDialogs(self)
 
     self.addEditorDocks()
     # ---------------

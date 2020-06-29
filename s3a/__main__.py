@@ -30,7 +30,7 @@ def main(gui=True, tableCfg: FilePath=None, **profileArgs) -> Optional[S3A]:
   if tableCfg is not None:
     FR_SINGLETON.tableData.loadCfg(tableCfg)
   profileArgs = {k.title(): v for k, v in profileArgs.items()}
-  win = S3A(**profileArgs)
+  win = S3A(**profileArgs, exceptionsAsDialogs=gui)
   if gui:
     QtCore.QTimer.singleShot(0, win.showMaximized)
     sys.exit(appInst.exec())

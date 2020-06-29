@@ -71,7 +71,7 @@ def clearTmpFiles(exceptFiles: List[str] =None):
         file.unlink()
 
 def defaultApp_tester():
-  app = S3A(Image=SAMPLE_IMG_FNAME)
+  app = S3A(Image=SAMPLE_IMG_FNAME, exceptionsAsDialogs=False)
   dfTester = CompDfTester(NUM_COMPS)
   dfTester.fillRandomVerts(imShape=SAMPLE_IMG.shape)
   dfTester.fillRandomClasses()

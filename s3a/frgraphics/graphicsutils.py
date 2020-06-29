@@ -117,11 +117,6 @@ def dialogGetAuthorName(parent: QtWidgets.QMainWindow) -> str:
     sys.exit(0)
   return name
 
-def raiseErrorLater(err: Exception):
-  def _raise():
-    raise err
-  QtCore.QTimer.singleShot(0, _raise)
-
 def attemptFileLoad(fpath: FilePath , openMode='r') -> Union[dict, bytes]:
   with open(fpath, openMode) as ifile:
     loadObj = yaml.load(ifile)
@@ -217,7 +212,7 @@ class FRPopupLineEditor(QtWidgets.QLineEdit):
     if self.text() == '':
       self.completer().setCompletionPrefix('')
 
-
+old_sys_except_hook = sys.excepthook
 def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
   """
   When a qt application encounters an error, it will generally crash the entire
@@ -240,8 +235,16 @@ def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
     dlg.exec()
   def patch_excepthook():
     sys.excepthook = new_except_hook
-
   QtCore.QTimer.singleShot(0, patch_excepthook)
+
+def raiseErrorLater(err: Exception):
+  # Fire immediately if not in gui mode
+  if sys.excepthook is old_sys_except_hook:
+    raise err
+  # else
+  def _raise():
+    raise err
+  QtCore.QTimer.singleShot(0, _raise)
 
 
 class FRScrollableErrorDialog(QtWidgets.QDialog):
