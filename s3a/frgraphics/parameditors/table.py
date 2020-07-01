@@ -50,6 +50,7 @@ def _filterForParam(param: FRParam):
   else:
     # Assumes string
     paramWithoutChild['value'] = ''
+    paramWithoutChild['type'] = 'str'
     return paramWithoutChild
 
 class FRTableFilterEditor(FRParamEditor):
