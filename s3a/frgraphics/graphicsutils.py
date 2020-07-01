@@ -10,7 +10,7 @@ import numpy as np
 from ruamel.yaml import YAML
 
 from s3a import appInst
-from s3a.structures import FRAppIOError, FRS3AException, FilePath
+from s3a.structures import FRAppIOError, FRS3AException, FilePath, FRS3AWarning
 
 yaml = YAML()
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
@@ -229,7 +229,8 @@ def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
       raise
     msgWithTrace = ''.join(format_exception(etype, evalue, tb))
     msgWithoutTrace = str(evalue)
-    dlg = FRScrollableErrorDialog(win, notCritical=issubclass(etype, FRS3AException),
+    dlg = FRScrollableErrorDialog(win, notCritical=issubclass(etype, (FRS3AException,
+                                                                      FRS3AWarning)),
                                   msgWithTrace=msgWithTrace, msgWithoutTrace=msgWithoutTrace)
     dlg.show()
     dlg.exec()

@@ -1,5 +1,12 @@
+validated:
+  - 'True'
+  - 'False'
+  - 'Revisit'
+
 opt-tbl-fields:
-  Validated: false
+  Validated:
+    value: "True"
+    valType: validated
   Device Text:
     value: ''
     valType: text
@@ -9,6 +16,7 @@ opt-tbl-fields:
   Logo:
     value: ''
     valType: text
+  Defect: false
   Notes:
     value: ''
     valType: text

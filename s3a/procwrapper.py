@@ -20,7 +20,7 @@ from .generalutils import augmentException
 from .processingimpls import crop_to_local_area, apply_process_result, basicOpsCombo, \
   return_to_full_size, format_vertices
 from .structures import FRParam, FRComplexVertices, FRAlgProcessorError, FRVertices, \
-  GrayImg
+  FRS3AWarning
 
 
 def atomicRunWrapper(proc: AtomicProcess, names: List[str], params: List[Parameter]):
@@ -133,7 +133,7 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     except Exception as ex:
       augmentException(ex, 'Exception during processor run:\n')
       result = ImageIO(image=kwargs['prevCompMask'])
-      raiseErrorLater(ex)
+      warn(str(ex), FRS3AWarning)
 
     outImg = result['image'].astype(bool)
     if outImg.ndim > 2:

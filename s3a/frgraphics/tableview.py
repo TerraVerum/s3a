@@ -1,5 +1,6 @@
 from functools import partial
 from typing import Sequence
+from warnings import warn
 
 import numpy as np
 import pandas as pd
@@ -11,7 +12,7 @@ from pyqtgraph.parametertree.parameterTypes import TextParameterItem, TextParame
 
 from s3a import FR_SINGLETON
 from s3a.projectvars import FR_CONSTS, FR_ENUMS, REQD_TBL_FIELDS
-from s3a.structures import FRS3AException
+from s3a.structures import FRS3AException, FRS3AWarning
 from s3a.tablemodel import FRCompTableModel, FRComponentMgr
 
 Slot = QtCore.pyqtSlot
@@ -265,9 +266,7 @@ class FRCompTableView(QtWidgets.QTableView):
     colIdxs = pd.unique(colIdxs)
     colIdxs = np.setdiff1d(colIdxs, self.model().sourceModel().noEditColIdxs)
     if len(idList) == 0 or len(colIdxs) == 0:
-      QtWidgets.QMessageBox.information(self, 'No Editable Data',
-                                        'No editable columns selected. Nothing to do.',
-                                        QtWidgets.QMessageBox.Ok)
+      warn('No editable columns selected. Nothing to do.', FRS3AWarning)
       return None, None
     return idList, colIdxs
 

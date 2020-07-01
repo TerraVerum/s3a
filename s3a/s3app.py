@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import warnings
 from functools import partial
 from pathlib import Path
 from typing import Callable, Dict, Any, Union, Optional
@@ -25,7 +26,8 @@ from .generalutils import resolveAuthorName
 from .projectvars.constants import FR_CONSTS
 from .projectvars.constants import LAYOUTS_DIR, REQD_TBL_FIELDS
 from .projectvars.enums import FR_ENUMS, _FREnums
-from .structures import FRAppIOError, NChanImg, FilePath, FRVertices, FRAlgProcessorError
+from .structures import FRAppIOError, NChanImg, FilePath, FRVertices, FRAlgProcessorError, \
+  FRS3AWarning
 from .tablemodel import FRComponentIO
 from .tablemodel import FRComponentMgr
 from .tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
@@ -50,6 +52,7 @@ class S3A(FRAnnotatorUI):
   def __init__(self, exceptionsAsDialogs=True, **quickLoaderArgs):
     super().__init__()
     if exceptionsAsDialogs:
+      warnings.simplefilter('error', FRS3AWarning)
       makeExceptionsShowDialogs(self)
 
     self.addEditorDocks()
