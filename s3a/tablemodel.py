@@ -224,7 +224,7 @@ def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> pd.Series:
   }
   defaultFunc = lambda strVal: paramType(strVal)
   funcToUse = funcMap.get(paramType, defaultFunc)
-  return strSeries.apply(funcToUse)
+  return strSeries.apply(funcToUse).values
 
 def _paramSerToStrSer(paramSer: pd.Series, paramVal: Any) -> pd.Series:
   # TODO: Move along with above function?
@@ -384,32 +384,30 @@ class FRComponentIO:
     :param inFile: Name of file to import
     :return: Tuple: DF that will be exported if successful extraction
     """
-    col = None
+    field = FRParam('None', None)
     try:
-      csvDf = pd.read_csv(inFile, keep_default_na=False)
+      csvDf = pd.read_csv(inFile, keep_default_na=False, dtype=object)
+      outDf = FR_SINGLETON.tableData.makeCompDf(len(csvDf))
       # Objects in the original frame are represented as strings, so try to convert these
       # as needed
-      csvDf = csvDf[[field.name for field in TBL_FIELDS]]
-      stringCols = csvDf.columns[csvDf.dtypes == object]
-      valToParamMap = {param.name: param.value for param in TBL_FIELDS}
-      for col in stringCols:
-        paramVal = valToParamMap[col]
-        # No need to perform this expensive computation if the values are already strings
-        if not isinstance(paramVal, str):
-          csvDf[col] = _strSerToParamSer(csvDf[col], valToParamMap[col])
-      csvDf.columns = TBL_FIELDS
-      csvDf = csvDf.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
+      for field in TBL_FIELDS:
+        if field.name in csvDf:
+          if isinstance(field.value, str):
+            outDf[field] = csvDf[field.name]
+          else:
+            outDf[field] = _strSerToParamSer(csvDf[field.name], field.value)
+      outDf = outDf.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
 
-      cls.checkVertBounds(csvDf[REQD_TBL_FIELDS.VERTICES], imShape)
+      cls.checkVertBounds(outDf[REQD_TBL_FIELDS.VERTICES], imShape)
     except Exception as ex:
       # Rethrow exception with insight about column number
       # Procedure copied from https://stackoverflow.com/a/6062677/9463643
-      errMsg = f'Error importing column "{col}":\n'
+      errMsg = f'Error importing column "{field.name}":\n'
       augmentException(ex, errMsg)
       raise
     # TODO: Apply this function to individual rows instead of the whole dataframe. This will allow malformed
     #  rows to gracefully fall off the dataframe with some sort of warning message
-    return csvDf
+    return outDf
 
   @classmethod
   def buildFromPkl(cls, inFile: FilePath, imShape: Tuple=None) -> df:
