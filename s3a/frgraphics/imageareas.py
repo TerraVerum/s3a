@@ -270,6 +270,8 @@ class FRFocusedImage(FREditableImg):
 
     self.switchBtnMode(FR_CONSTS.DRAW_ACT_ADD)
     self.switchBtnMode(FR_CONSTS.DRAW_SHAPE_PAINT)
+    # Disable local cropping on primitive grab cut by default
+    self.procCollection.nameToProcMapping['Primitive Grab Cut'].setStageEnabled(['Crop to Local Area'], False)
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_BG, [FR_CONSTS.DRAW_ACT_REM])
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_FG, [FR_CONSTS.DRAW_ACT_ADD])
