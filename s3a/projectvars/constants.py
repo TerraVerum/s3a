@@ -97,8 +97,8 @@ class _FRConsts(FRParamGroup):
   # --------------------------
   # SHORTCUT PARAMETERS
   # --------------------------
-  SHC_CLEAR_BOUNDARIES      : FRParam = newParam('Clear Boundaries', 'Ctrl+C', 'shortcut')
-  SHC_ESTIMATE_BOUNDARIES   : FRParam = newParam('Estimate Boundaries', 'Ctrl+E', 'shortcut')
+  SHC_CLEAR_BOUNDARIES      : FRParam = newParam('Clear Boundaries', 'Ctrl+Alt+Shift+C', 'shortcut')
+  SHC_ESTIMATE_BOUNDARIES   : FRParam = newParam('Estimate Boundaries', 'Ctrl+Alt+Shift+E', 'shortcut')
   SHC_EXPORT_COMP_LIST      : FRParam = newParam('Export Component List', 'Ctrl+S', 'shortcut')
   SHC_CLEAR_SHAPE_MAIN      : FRParam = newParam('Clear Draw Shape in Main Image', 'Esc', 'shortcut')
   SHC_CLEAR_SHAPE_FOC       : FRParam = newParam('Clear Draw Shape in Focused Image', 'Esc', 'shortcut')
