@@ -128,13 +128,14 @@ class FREditableImg(pg.PlotWidget):
     posRelToImage = self.imgItem.mapFromScene(ev.pos())
     pxRow = int(posRelToImage.y())
     pxCol = int(posRelToImage.x())
-    if (self.imgItem.image is not None):
-      if (pxCol < self.imgItem.image.shape[1] and pxCol > 0 and pxRow < self.imgItem.image.shape[0] and pxRow > 0):
-        pxColor = self.imgItem.image[pxRow, pxCol]
-        # pos = ev.pos()
-        pos = pxRow, pxCol
-        info = pos, pxColor
-        self.sigMousePosChanged.emit(info)
+    if (self.imgItem.image is not None
+        and 0 < pxCol < self.imgItem.image.shape[1]
+        and 0 < pxRow < self.imgItem.image.shape[0]):
+      pxColor = self.imgItem.image[pxRow, pxCol]
+      # pos = ev.pos()
+      pos = pxRow, pxCol
+      info = pos, pxColor
+      self.sigMousePosChanged.emit(info)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
     """

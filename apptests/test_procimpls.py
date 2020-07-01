@@ -2,10 +2,8 @@ import cv2 as cv
 import numpy as np
 from imageprocessing.processing import ImageProcess
 
-from appsetup import (TESTS_DIR, defaultApp_tester)
+from appsetup import (defaultApp_tester)
 from s3a.structures import FRVertices
-
-EXPORT_DIR = TESTS_DIR/'files'
 
 app, dfTester = defaultApp_tester()
 # Use a small image for faster testing

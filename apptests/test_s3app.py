@@ -7,15 +7,13 @@ from pyqtgraph.Qt import QtCore
 import matplotlib.pyplot as plt
 
 from appsetup import (NUM_COMPS, SAMPLE_IMG,
-                      TESTS_DIR, SAMPLE_IMG_FNAME, clearTmpFiles, RND, defaultApp_tester,
+                      EXPORT_DIR, SAMPLE_IMG_FNAME, clearTmpFiles, RND, defaultApp_tester,
                       _block_pltShow)
 
 from apptests.appsetup import CompDfTester
 from s3a import FR_SINGLETON, S3A, appInst
 from s3a.projectvars import REQD_TBL_FIELDS, LAYOUTS_DIR, FR_ENUMS
 from s3a.structures import FRAlgProcessorError, FRS3AException, FRVertices
-
-EXPORT_DIR = TESTS_DIR/'files'
 
 app, dfTester = defaultApp_tester()
 app: S3A
