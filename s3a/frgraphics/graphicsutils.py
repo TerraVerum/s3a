@@ -224,8 +224,9 @@ def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
   # Procedure taken from https://stackoverflow.com/a/40674244/9463643
   def new_except_hook(etype, evalue, tb):
     # Allow sigabort to kill the app
-    if etype == KeyboardInterrupt:
+    if etype in [KeyboardInterrupt, SystemExit]:
       appInst.exit(1)
+      appInst.processEvents()
       raise
     msgWithTrace = ''.join(format_exception(etype, evalue, tb))
     msgWithoutTrace = str(evalue)
