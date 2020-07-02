@@ -387,7 +387,9 @@ class FRComponentIO:
     field = FRParam('None', None)
     try:
       csvDf = pd.read_csv(inFile, keep_default_na=False, dtype=object)
-      outDf = FR_SINGLETON.tableData.makeCompDf(len(csvDf))
+      # Decouple index from instance ID until after transfer from csvDf is complete
+      # This was causing very strange behavior without reset_index()...
+      outDf = FR_SINGLETON.tableData.makeCompDf(len(csvDf)).reset_index(drop=True)
       # Objects in the original frame are represented as strings, so try to convert these
       # as needed
       for field in TBL_FIELDS:
