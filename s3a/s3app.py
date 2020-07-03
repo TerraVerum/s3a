@@ -18,10 +18,10 @@ from .frgraphics.annotator_ui import FRAnnotatorUI
 from .frgraphics.graphicsutils import (dialogGetSaveFileName, addDirItemsToMenu,
                                        attemptFileLoad, popupFilePicker,
                                        disableAppDuringFunc, makeExceptionsShowDialogs,
-                                       autosaveOptsDialog)
+                                       autosaveOptsDialog, create_addMenuAct)
 from .frgraphics.graphicsutils import saveToFile
 from .frgraphics.imageareas import FREditableImg
-from .frgraphics.parameditors import FRParamEditor
+from .frgraphics.parameditors import FRParamEditor, FRParamEditorDockGrouping
 from .generalutils import resolveAuthorName
 from .projectvars.constants import FR_CONSTS
 from .projectvars.constants import LAYOUTS_DIR, REQD_TBL_FIELDS
@@ -55,6 +55,7 @@ class S3A(FRAnnotatorUI):
       warnings.simplefilter('error', FRS3AWarning)
       makeExceptionsShowDialogs(self)
 
+    FR_SINGLETON.sigDocksAdded.connect(lambda newDocks: self.addEditorDocks(newDocks))
     self.addEditorDocks()
     # ---------------
     # DATA ATTRIBUTES
@@ -135,8 +136,8 @@ class S3A(FRAnnotatorUI):
     self.stopAutosaveAct.triggered.connect(self.stopAutosave)
 
     # SETTINGS
-    for editor in FR_SINGLETON.registerableEditors:
-        self.createMenuOptForEditor(self.paramTools, editor)
+    for dock in FR_SINGLETON.docks:
+        self.createMenuOptForDock(self.paramTools, dock)
     self.createMenuOptForEditor(self.menuFile, FR_SINGLETON.quickLoader,
                                 self.importQuickLoaderProfile)
     if quickLoaderArgs is not None:
@@ -181,32 +182,52 @@ class S3A(FRAnnotatorUI):
       ev.accept()
       FR_SINGLETON.close()
 
-  def addEditorDocks(self):
+  def addEditorDocks(self, docks=None):
+    if docks is None:
+      docks = FR_SINGLETON.docks
     # Define out here to retain scope
-    editor = None
-    for editor in FR_SINGLETON.allEditors:
-      editor.setParent(self)
-      self.addDockWidget(QtCore.Qt.RightDockWidgetArea, editor)
-    for nextEditor in FR_SINGLETON.allEditors[:-1]:
-      self.tabifyDockWidget(editor, nextEditor)
+    dock = None
+    for dock in docks:
+      dock.setParent(self)
+      self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
+    for nextEditor in docks[:-1]:
+      self.tabifyDockWidget(dock, nextEditor)
+
+  def createMenuOptForDock(self, parentMenu: QtWidgets.QMenu,
+                           dockEditor: Union[FRParamEditor, FRParamEditorDockGrouping],
+                           loadFunc=None):
+    if isinstance(dockEditor, FRParamEditor):
+      self.createMenuOptForEditor(parentMenu, dockEditor, loadFunc)
+    else:
+      # FRParamEditorDockGrouping
+      newMenu = create_addMenuAct(self, parentMenu, dockEditor.name, True)
+      for editor in dockEditor.editors:
+        # "Main Image Settings" -> "Settings"
+        nameWithoutBase = editor.name.split(dockEditor.name)[1][1:]
+        self.createMenuOptForEditor(newMenu, editor, loadFunc, overrideName=nameWithoutBase)
 
   def createMenuOptForEditor(self, parentMenu: QtWidgets.QMenu, editor: FRParamEditor,
-                             loadFunc=None):
+                             loadFunc=None, overrideName=None):
+    if overrideName is None:
+      overrideName = editor.name
     if editor.hasMenuOption:
       return
     if loadFunc is None:
       loadFunc = partial(self.paramEditorLoadActTriggered, editor)
-    name = editor.name
-    newMenu = QtWidgets.QMenu(name, self)
-    editAct = QtWidgets.QAction ('Edit ' + name, self)
+    newMenu = QtWidgets.QMenu(overrideName, self)
+    editAct = QtWidgets.QAction('Open ' + overrideName, self)
     newMenu.addAction(editAct)
     newMenu.addSeparator()
     def showFunc(_editor=editor):
-      editor.show()
+      _editor.dock.show()
       # "Show" twice forces 1) window to exist and 2) it is currently raised and focused
       # These guarantees are not met if "show" is only called once
-      editor.show()
-    editAct.triggered.connect(showFunc)
+      _editor.dock.raise_()
+      if isinstance(_editor.dock, FRParamEditorDockGrouping):
+        tabs: QtWidgets.QTabWidget = _editor.dock.tabs
+        dockIdx = tabs.indexOf(_editor.dockContentsWidget)
+        tabs.setCurrentIndex(dockIdx)
+    editAct.triggered.connect(lambda: showFunc())
     populateFunc = partial(self.populateParamEditorMenuOpts, editor, newMenu, loadFunc)
     editor.sigParamStateCreated.connect(populateFunc)
     # Initialize default menus
@@ -309,6 +330,9 @@ class S3A(FRAnnotatorUI):
     self.focusedImg.saveNewVerts()
     modifiedComp = self.focusedImg.compSer
     modified_df = modifiedComp.to_frame().T
+    # keepCols = [REQD_TBL_FIELDS.VERTICES, REQD_TBL_FIELDS.INST_ID]
+    # xpondingComp = self.compMgr.compDf[[modifiedComp[REQD_TBL_FIELDS.INST_ID]]].copy()
+    # xpondingComp.at[0, REQD_TBL_FIELDS.VERTICES] = modifiedComp[REQD_TBL_FIELDS.VERTICES]
     self.compMgr.addComps(modified_df, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
     self.compDisplay.regionPlot.focusById([modifiedComp[REQD_TBL_FIELDS.INST_ID]])
     yield

@@ -1,22 +1,20 @@
 from __future__ import annotations
 
 from os.path import join
-from pathlib import Path
 from typing import Optional, Dict, List, Callable, Union
 
-import numpy as np
-from pyqtgraph import BusyCursor
+from imageprocessing.processing import ImageProcess
 from pyqtgraph.Qt import QtCore
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.parameterTypes import ListParameter
 
 from s3a.procwrapper import FRImgProcWrapper
 from s3a.projectvars import MENU_OPTS_DIR
-from s3a.structures import FRComplexVertices, FRVertices, NChanImg, FRParam, \
+from s3a.structures import FRComplexVertices, FRParam, \
   FRAlgProcessorError
-from imageprocessing.processing import ImageProcess
-from .genericeditor import FRParamEditor, _frPascalCaseToTitle
+from .genericeditor import FRParamEditor
 from .pgregistered import FRProcGroupParameter
+from ...generalutils import frPascalCaseToTitle
 
 Signal = QtCore.Signal
 
@@ -31,20 +29,21 @@ class FRAlgPropsMgr(FRParamEditor):
     # Don't save a default file for this class
     return super().registerGroup(groupParam, saveDefault=False, **opts)
 
-  def createProcessorForClass(self, clsObj) -> FRAlgCollectionEditor:
+  def createProcessorForClass(self, clsObj, editorName=None) -> FRAlgCollectionEditor:
     clsName = type(clsObj).__name__
     editorDir = join(MENU_OPTS_DIR, clsName, '')
-    # Strip "FR" from class name before retrieving name
-    editorName = _frPascalCaseToTitle(clsName[2:]) + ' Processor'
+    if editorName is None:
+      # Strip "FR" from class name before retrieving name
+      editorName = frPascalCaseToTitle(clsName) + ' Processor'
     newEditor = FRAlgCollectionEditor(editorDir, self.processorCtors, name=editorName)
-    self.spawnedCollections.append(newEditor)
+    # self.spawnedCollections.append(newEditor)
     # Wrap in property so changes propagate to the calling class
     lims = newEditor.algOpts.opts['limits']
     defaultKey = next(iter(lims))
     defaultAlg = lims[defaultKey]
     newEditor.algOpts.setDefault(defaultAlg)
     newEditor.switchActiveProcessor(proc=defaultAlg)
-    self.sigProcessorCreated.emit(newEditor)
+    # self.sigProcessorCreated.emit(newEditor)
     return newEditor
 
   def addProcessCtor(self, procCtor: Callable[[], ImageProcess]):

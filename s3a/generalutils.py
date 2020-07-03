@@ -1,3 +1,4 @@
+import re
 from collections import deque
 from pathlib import Path
 from typing import Any, Optional, List, Collection
@@ -125,7 +126,7 @@ def resolveAuthorName(providedAuthName: Optional[str]) -> Optional[str]:
   return lines[0]
 
 def augmentException(ex: Exception, prependedMsg: str):
-  ex.args = prependedMsg + ex.args[0], *ex.args[1:]
+  ex.args = (prependedMsg + str(ex),)
 
 def makeUniqueBaseClass(obj: Any):
   """
@@ -149,3 +150,17 @@ def makeUniqueBaseClass(obj: Any):
   class mixin(type(obj)): pass
   obj.__class__ = mixin
   return mixin
+
+
+def frPascalCaseToTitle(name: str) -> str:
+  """
+  Helper utility to turn a FRPascaleCase name to a 'Title Case' title
+  :param name: camel-cased name
+  :return: Space-separated, properly capitalized version of :param:`Name`
+  """
+  if not name:
+    return name
+  if name.startswith('FR'):
+    name = name[2:]
+  name = re.sub(r'(\w)([A-Z])', r'\1 \2', name)
+  return name.title()

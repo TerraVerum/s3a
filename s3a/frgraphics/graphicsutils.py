@@ -254,6 +254,7 @@ class FRScrollableErrorDialog(QtWidgets.QDialog):
                msgWithTrace='', msgWithoutTrace=''):
     super().__init__(parent)
     style = self.style()
+    self.setModal(True)
 
     if notCritical:
       icon = style.standardIcon(style.SP_MessageBoxInformation)

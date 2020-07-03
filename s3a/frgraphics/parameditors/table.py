@@ -11,7 +11,7 @@ import numpy as np
 import s3a.frgraphics
 from s3a.frgraphics.graphicsutils import raiseErrorLater
 from s3a.frgraphics.parameditors import FRParamEditor
-from s3a.projectvars import FILTERS_DIR, REQD_TBL_FIELDS, COMP_CLASS_NA, DATE_FORMAT, \
+from s3a.projectvars import TABLE_DIR, REQD_TBL_FIELDS, COMP_CLASS_NA, DATE_FORMAT, \
   FR_CONSTS
 from s3a.structures import FRParam, FilePath, FRParamGroup, FRParamParseError
 
@@ -60,7 +60,7 @@ class FRTableFilterEditor(FRParamEditor):
     _FILTER_PARAMS = [
       _filterForParam(param) for param in paramList
     ]
-    super().__init__(parent, paramList=_FILTER_PARAMS, saveDir=FILTERS_DIR, fileType='filter')
+    super().__init__(parent, paramList=_FILTER_PARAMS, saveDir=TABLE_DIR, fileType='filter')
 
   def updateParamList(self, paramList: List[FRParam]):
     newParams = [

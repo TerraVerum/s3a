@@ -1,13 +1,16 @@
-import re
+from __future__ import annotations
+
+import weakref
 from functools import wraps
 from pathlib import Path
-from typing import List, Dict, Any, Union, Collection, Type, Set
+from typing import List, Dict, Any, Union, Collection, Type, Set, Tuple
 
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter, ParameterTree
 
 from s3a.frgraphics.graphicsutils import dialogGetSaveFileName, saveToFile, \
   attemptFileLoad
+from s3a.generalutils import frPascalCaseToTitle
 from s3a.structures import FRParam, ContainsSharedProps, FilePath
 
 Signal = QtCore.Signal
@@ -18,28 +21,77 @@ def clearUnwantedParamVals(paramState: dict):
   if paramState.get('value', True) is None:
     paramState.pop('value')
 
+class FRParamEditorDockGrouping(QtWidgets.QDockWidget):
 
+  def __init__(self, editors: List[FRParamEditor], dockName, parent=None):
+    super().__init__(parent)
+    self.tabs = QtWidgets.QTabWidget(self)
+    self.hide()
+    for editor in editors:
+      # "Main Image Settings" -> "Settings"
+      self.tabs.addTab(editor.dockContentsWidget, editor.name.split(dockName)[1][1:])
+      editor.dock = self
+    mainLayout = QtWidgets.QVBoxLayout()
+    mainLayout.addWidget(self.tabs)
+    centralWidget = QtWidgets.QWidget()
+    centralWidget.setLayout(mainLayout)
+    self.setWidget(centralWidget)
+    if dockName is None:
+      dockName = editors[0].name
+    self.setObjectName(dockName)
+    self.setWindowTitle(dockName)
+
+    self.name = dockName
+    self.editors = editors
+
+_childTuple_asValue = Tuple[FRParam,...]
+childTuple_asParam = Tuple[Tuple[FRParam,...], bool]
+_keyType = Union[FRParam, Union[_childTuple_asValue, childTuple_asParam]]
 class FRParamEditor(QtWidgets.QDockWidget):
+  """
+  GUI controls for user-interactive parameters within S3A. Each window consists of
+  a parameter tree and basic saving capabilities.
+  """
+  _spawnedEditors = []
   sigParamStateCreated = Signal(str)
   sigParamStateUpdated = Signal(dict)
   sigParamStateDeleted = Signal(str)
 
   def __init__(self, parent=None, paramList: List[Dict]=None, saveDir: FilePath='.',
-               fileType='param', saveDlgName='Save As', name=None,
-               childForOverride: Parameter=None):
+               fileType='param', name=None, childForOverride: Parameter=None,
+               registerCls: Type=None, registerParam: FRParam=None):
+    """
+    GUI controls for user-interactive parameters within S3A. Each window consists of
+    a parameter tree and basic saving capabilities.
+
+    :param parent: GUI parent of this window
+    :param paramList: User-editable parameters. This is often *None* and parameters
+      are added dynamically within the code.
+    :param saveDir: When "save" is performed, the resulting settings will be saved
+      here.
+    :param fileType: The filetype of the saved settings. E.g. if a settings configuration
+      is saved with the name "test", it will result in a file "test.&lt;fileType&gt;"
+    :param name: User-readable name of this parameter editor
+    :param childForOverride: Generally for internal use. If provided, it will
+      be inserted into the parameter tree instead of a newly created parameter.
+    :param registerCls: If this editor was created to hold parameters for a specific
+      class, then that class must be provided here. It will ensure registered
+      parameters actually appear in this editor. See :func:`FRParamEditor.registerGroup`
+    :param registerParam: The grouping parameter to hold registered parameters
+      for the regiseterd class. See :func:`FRParamEditor.registerGroup`
+    """
+    super().__init__(parent)
     # Place in list so an empty value gets unpacked into super constructor
     if paramList is None:
       paramList = []
-
     if name is None:
       try:
         propClsName = type(self).__name__
         name = propClsName[:propClsName.index('Editor')]
-        name = _frPascalCaseToTitle(name)
+        name = frPascalCaseToTitle(name)
       except ValueError:
         name = "Parameter Editor"
-
-    super().__init__(parent)
+    self.dock = self
     self.hide()
     self.setWindowTitle(name)
     self.setObjectName(name)
@@ -85,7 +137,6 @@ class FRParamEditor(QtWidgets.QDockWidget):
     # -----------
     self.saveDir = Path(saveDir)
     self.fileType = fileType
-    self._saveDlgName = saveDlgName
     self._stateBeforeEdit = self.params.saveState()
     self.lastAppliedName = None
 
@@ -122,6 +173,10 @@ class FRParamEditor(QtWidgets.QDockWidget):
     self.closeBtn.clicked.connect(self.close)
     self.applyBtn.clicked.connect(self.applyBtnClicked)
 
+    if registerCls is not None:
+      self.registerGroup(registerParam)(registerCls)
+    self._spawnedEditors.append(weakref.proxy(self))
+
   def _paramTreeChanged(self, param, child, idx):
     self._stateBeforeEdit = self.params.saveState()
 
@@ -138,7 +193,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
 
 
   # Helper method for accessing simple parameter values
-  def __getitem__(self, keys: Union[tuple, FRParam, Collection[FRParam]]):
+  def __getitem__(self, keys: _keyType):
     """
     Convenience function for accessing child parameters within a parameter editor.
       - If :param:`keys` is a single :class:`FRParam`, the value at that parameter is
@@ -148,9 +203,9 @@ class FRParamEditor(QtWidgets.QDockWidget):
         * The first element of the tuple must correspond to the base name within the
           parameter grouping in order to properly extract the corresponding children.
           For instance, to extract MARGIN from :class:`FRGeneralPropertiesEditor`,
-              you must first specify the group parent for that parameter:
-              >>> margin = FR_SINGLETON.generalProps[FR_CONSTS.CLS_FOCUSED_IMG_AREA,
-              >>>   FR_CONSTS.MARGIN]
+          you must first specify the group parent for that parameter:
+            >>> margin = FR_SINGLETON.generalProps[FR_CONSTS.CLS_FOCUSED_IMG_AREA,
+            >>>   FR_CONSTS.MARGIN]
         * The second parameter must be a signle :class:`FRParam` objects or a sequence
           of :class:`FRParam` objects. If a sequence is given, a list of output values
           respecting input order is provided.
@@ -158,15 +213,15 @@ class FRParamEditor(QtWidgets.QDockWidget):
           object is returned instead of the :func:`value()<Parameter.value>` data
           *within* the object.
 
-    :param keys: One of of the following:
-    :return:
+    :param keys: As explained above.
+    :return: Either a :class:`Parameter<pyqtgraph.Parameter>` or value of that parameter,
     """
     returnSingle = False
     extractObj = False
     if isinstance(keys, tuple):
       if len(keys) > 2:
         extractObj = True
-      baseParam = [keys[0].name]
+      baseParam = [keys[0].name] if keys[0] is not None else []
       keys = keys[1]
     else:
       baseParam = []
@@ -213,7 +268,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
 
   def saveAsBtnClicked(self):
     paramState = self.params.saveState(filter='user')
-    saveName = dialogGetSaveFileName(self, self._saveDlgName, self.lastAppliedName)
+    saveName = dialogGetSaveFileName(self, 'Save As', self.lastAppliedName)
     self.saveParamState(saveName, paramState)
 
   def saveParamState(self, saveName: str=None, paramState: dict=None,
@@ -339,11 +394,15 @@ class FRParamEditor(QtWidgets.QDockWidget):
       clsName = groupingName.__qualname__
     else: # This way even if a string wasn't passed in we deal with it like a string
       clsName = str(groupingName)
-    paramName = self.classNameToParamMapping[clsName].name
-    if paramName in self.params.names:
-      paramForCls = self.params.child(paramName)
+    groupParam = self.classNameToParamMapping[clsName]
+    if groupParam is None:
+      paramForCls = self.params
     else:
-      paramForCls = self._addParamGroup(paramName)
+      paramName = groupParam.name
+      if paramName in self.params.names:
+        paramForCls = self.params.child(paramName)
+      else:
+        paramForCls = self._addParamGroup(paramName)
 
     if parentParamPath is not None and len(parentParamPath) > 0:
       paramForCls = paramForCls.param(*parentParamPath)
@@ -384,13 +443,14 @@ class FRParamEditor(QtWidgets.QDockWidget):
 
     return paramAccessor
 
-  def registerGroup(self, groupParam: FRParam, **opts):
+  def registerGroup(self, groupParam: FRParam=None, **opts):
     """
     Intended for use as a class decorator. Registers a class as able to hold
     customizable shortcuts.
 
     :param groupParam: Parameter holding the name of this class as it should appear
       in this parameter editor. As such, it should be human readable.
+      If *None*, params will be shown at the top-level of the parameter tree
     :param opts: Additional registration options. Accepted values:
       - nameFromParam: This is available so objects without a dedicated class can
       also be registered. In that case, a spoof class is registered under the name
@@ -403,7 +463,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
       all shared properties contained in the '__initEditorParams__' method, if it exists
       in the class.
     """
-    opts['nameFromParam'] = opts.get('nameFromParam', False)
+    opts.setdefault('nameFromParam', False)
     def classDecorator(cls: Union[Type, Any]=None):
       if cls is None:
         # In this case nameFromParam must be provided. Use a dummy class for the
@@ -429,9 +489,6 @@ class FRParamEditor(QtWidgets.QDockWidget):
             and issubclass(cls, ContainsSharedProps)):
           _INITIALIZED_CLASSES.add(cls)
           cls.__initEditorParams__()
-          superObj = super(cls, clsObj)
-          if isinstance(superObj, ContainsSharedProps):
-           superObj.__initEditorParams__()
 
         if opts.get('saveDefault', True):
           self.saveParamState(saveName='Default', allowOverwriteDefault=True)
@@ -461,17 +518,3 @@ class FRParamEditor(QtWidgets.QDockWidget):
 
 
 _INITIALIZED_CLASSES: Set[Type[ContainsSharedProps]] = set()
-
-
-def _frPascalCaseToTitle(name: str) -> str:
-  """
-  Helper utility to turn a FRPascaleCase name to a 'Title Case' title
-  :param name: camel-cased name
-  :return: Space-separated, properly capitalized version of :param:`Name`
-  """
-  if not name:
-    return name
-  if name.startswith('FR'):
-    name = name[2:]
-  name = re.sub(r'(\w)([A-Z])', r'\1 \2', name)
-  return name.title()

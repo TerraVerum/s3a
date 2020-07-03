@@ -9,9 +9,11 @@ from s3a.procwrapper import FRImgProcWrapper
 from skimage.io import imread
 
 from s3a import FR_SINGLETON
-from s3a.generalutils import getClippedBbox
+from s3a.generalutils import getClippedBbox, frPascalCaseToTitle
+from .parameditors import FRParamEditor, FRParamEditorDockGrouping
 from ..processingimpls import segmentComp
-from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS
+from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS, MAIN_IMG_DIR, BASE_DIR, \
+  MENU_OPTS_DIR
 from s3a.structures import FRParam, FRVertices, FRComplexVertices, FilePath, \
   BlackWhiteImg
 from s3a.structures import NChanImg
@@ -28,6 +30,23 @@ QCursor = QtGui.QCursor
 class FREditableImg(pg.PlotWidget):
   sigMousePosChanged = Signal(object)
 
+  @classmethod
+  def __initEditorParams__(cls):
+    groupName = frPascalCaseToTitle(cls.__name__)
+    cls.toolsDir = MENU_OPTS_DIR / groupName.lower()
+    cls.toolsEditor = FRParamEditor(
+      saveDir=cls.toolsDir, fileType=groupName.lower() + 'tools',
+      name=groupName + ' Tools', registerCls=cls
+    )
+
+    cls.procCollection = FR_SINGLETON.algParamMgr.createProcessorForClass(
+      cls, editorName=groupName + ' Processor'
+    )
+    dockGroup = FRParamEditorDockGrouping(
+      [cls.toolsEditor, cls.procCollection], dockName=groupName
+    )
+    FR_SINGLETON.addDocks(dockGroup)
+
   def __init__(self, parent=None, allowableShapes: Tuple[FRParam,...]=None,
                allowableActions: Tuple[FRParam,...]=None, **kargs):
     super().__init__(parent, viewBox=FRRightPanViewBox(), **kargs)
@@ -41,9 +60,6 @@ class FREditableImg(pg.PlotWidget):
     self.imgItem = pg.ImageItem()
     self.imgItem.setZValue(-100)
     self.addItem(self.imgItem)
-
-
-    self.procCollection = FR_SINGLETON.algParamMgr.createProcessorForClass(self)
 
     # -----
     # DRAWING OPTIONS
@@ -159,6 +175,7 @@ class FRMainImage(FREditableImg):
 
   @classmethod
   def __initEditorParams__(cls):
+    super().__initEditorParams__()
     cls.multCompsOnCreate = FR_SINGLETON.generalProps.registerProp(cls,
                               FR_CONSTS.PROP_MK_MULT_COMPS_ON_ADD)
 
@@ -249,6 +266,7 @@ class FRFocusedImage(FREditableImg):
 
   @classmethod
   def __initEditorParams__(cls):
+    super().__initEditorParams__()
     cls.compCropMargin = FR_SINGLETON.generalProps.registerProp(cls, FR_CONSTS.PROP_CROP_MARGIN_PCT)
 
   def __init__(self, parent=None, **kargs):
