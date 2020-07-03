@@ -328,6 +328,9 @@ class FRFocusedImage(FREditableImg):
       # Since values INSIDE the dataframe are reset instead of modified, there is no
       # need to go through the trouble of deep copying
       self.compSer = newComp.copy(deep=False)
+      # Remove all other fields so they don't overwrite main component fields on update
+      keepCols = [REQD_TBL_FIELDS.INST_ID, REQD_TBL_FIELDS.VERTICES]
+      self.compSer = self.compSer[keepCols]
 
       # Propagate all resultant changes
       if not isAlreadyTrimmed:
