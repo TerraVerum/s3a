@@ -10,7 +10,7 @@ from s3a.frgraphics.graphicsutils import dialogGetSaveFileName, saveToFile, \
   attemptFileLoad
 from s3a.structures import FRParam, ContainsSharedProps, FilePath
 
-Signal = QtCore.pyqtSignal
+Signal = QtCore.Signal
 
 def clearUnwantedParamVals(paramState: dict):
   for k, child in paramState.get('children', {}).items():

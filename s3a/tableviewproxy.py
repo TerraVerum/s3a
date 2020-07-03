@@ -16,8 +16,8 @@ from .structures import FRVertices, FRParam, FRParamParseError, FRS3AException, 
   FRS3AWarning
 from .tablemodel import FRComponentMgr
 
-Signal = QtCore.pyqtSignal
-Slot = QtCore.pyqtSlot
+Signal = QtCore.Signal
+Slot = QtCore.Slot
 
 TBL_FIELDS = FR_SINGLETON.tableData.allFields
 

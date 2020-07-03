@@ -21,8 +21,8 @@ from .regions import FRShapeCollection, FRVertexDefinedImg
 # Required to trigger property registration
 from .rois import FRExtendedROI
 
-Signal = QtCore.pyqtSignal
-Slot = QtCore.pyqtSlot
+Signal = QtCore.Signal
+Slot = QtCore.Slot
 QCursor = QtGui.QCursor
 
 class FREditableImg(pg.PlotWidget):

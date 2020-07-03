@@ -33,7 +33,7 @@ def main(gui=True, tableCfg: FilePath=None, **profileArgs) -> Optional[S3A]:
   win = S3A(**profileArgs, exceptionsAsDialogs=gui)
   if gui:
     QtCore.QTimer.singleShot(0, win.showMaximized)
-    sys.exit(appInst.exec())
+    sys.exit(appInst.exec_())
   else:
     return win
 

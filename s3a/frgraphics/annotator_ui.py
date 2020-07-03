@@ -1,6 +1,6 @@
 from pyqtgraph.Qt import  QtCore, QtWidgets
 
-Slot = QtCore.pyqtSlot
+Slot = QtCore.Slot
 
 from .graphicsutils import create_addMenuAct, FRPopupLineEditor
 from .imageareas import FRMainImage, FRFocusedImage

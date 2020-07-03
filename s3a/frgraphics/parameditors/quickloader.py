@@ -12,7 +12,7 @@ from .genericeditor import FRParamEditor
 from ..graphicsutils import FRPopupLineEditor, raiseErrorLater
 from ...structures import FRIllRegisteredPropError
 
-Slot = QtCore.pyqtSlot
+Slot = QtCore.Slot
 
 class FREditorListModel(QtCore.QAbstractListModel):
   def __init__(self, editorList: List[FRParamEditor], parent: QtWidgets.QWidget=None):

@@ -16,8 +16,8 @@ from s3a.structures.typeoverloads import GrayImg
 from .clickables import FRBoundScatterPlot
 from .rois import SHAPE_ROI_MAPPING, FRExtendedROI
 
-Signal = QtCore.pyqtSignal
-Slot = QtCore.pyqtSlot
+Signal = QtCore.Signal
+Slot = QtCore.Slot
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_ROI_CLCTN)
 class FRShapeCollection(QtCore.QObject):

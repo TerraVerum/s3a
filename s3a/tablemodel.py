@@ -20,8 +20,8 @@ from .projectvars import FR_ENUMS, REQD_TBL_FIELDS
 from .projectvars.constants import FR_CONSTS
 from .structures import FRComplexVertices, FRParam, FRAppIOError
 
-Slot = QtCore.pyqtSlot
-Signal = QtCore.pyqtSignal
+Slot = QtCore.Slot
+Signal = QtCore.Signal
 
 TBL_FIELDS = FR_SINGLETON.tableData.allFields
 

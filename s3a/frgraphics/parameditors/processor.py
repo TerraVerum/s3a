@@ -18,7 +18,7 @@ from imageprocessing.processing import ImageProcess
 from .genericeditor import FRParamEditor, _frPascalCaseToTitle
 from .pgregistered import FRProcGroupParameter
 
-Signal = QtCore.pyqtSignal
+Signal = QtCore.Signal
 
 class FRAlgPropsMgr(FRParamEditor):
   sigProcessorCreated = Signal(object) # Signal(FRAlgCollectionEditor)

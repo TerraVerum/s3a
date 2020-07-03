@@ -6,7 +6,7 @@ from skimage.measure import points_in_poly
 
 from s3a.structures import FRVertices
 
-Signal = QtCore.pyqtSignal
+Signal = QtCore.Signal
 
 
 class FRBoundScatterPlot(pg.ScatterPlotItem):

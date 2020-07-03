@@ -32,8 +32,8 @@ from .tablemodel import FRComponentIO
 from .tablemodel import FRComponentMgr
 from .tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
 
-Slot = QtCore.pyqtSlot
-Signal = QtCore.pyqtSignal
+Slot = QtCore.Slot
+Signal = QtCore.Signal
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_ANNOTATOR)
 class S3A(FRAnnotatorUI):

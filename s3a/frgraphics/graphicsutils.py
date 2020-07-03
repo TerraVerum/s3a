@@ -17,7 +17,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
 from s3a.projectvars import ANN_AUTH_DIR
 
-Signal = QtCore.pyqtSignal
+Signal = QtCore.Signal
 QCursor = QtGui.QCursor
 
 def disableAppDuringFunc(func):
