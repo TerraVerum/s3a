@@ -9,7 +9,7 @@ app, dfTester = defaultApp_tester()
 # Use a small image for faster testing
 baseImg = np.zeros((5,5), 'uint8')
 baseImg[2,2] = 255
-imgSrc = cv.resize(baseImg, (250,250), interpolation=cv.INTER_NEAREST)
+imgSrc = cv.resize(baseImg, (100,100), interpolation=cv.INTER_NEAREST)
 imgSrc = np.tile(imgSrc[:,:,None], (1,1,3))
 mgr = app.compMgr
 mImg = app.mainImg

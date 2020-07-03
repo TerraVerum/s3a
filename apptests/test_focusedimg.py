@@ -9,7 +9,7 @@ from s3a.structures import FRVertices, FRComplexVertices
 
 QTest = QtTest.QTest
 
-from appsetup import (NUM_COMPS, RND, defaultApp_tester)
+from appsetup import (NUM_COMPS, RND, defaultApp_tester, FIMG_SER_COLS)
 from s3a import FR_SINGLETON
 from s3a.frgraphics.imageareas import FRFocusedImage
 from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS
@@ -69,6 +69,7 @@ def test_update(clearFImg: FRFocusedImage):
   newCompSer = mgr.compDf.loc[focusedId]
   # Action 1
   clearFImg.updateAll(app.mainImg.image, newCompSer)
+  newCompSer = newCompSer[FIMG_SER_COLS]
   assert clearFImg.image is not None
   assert clearFImg.compSer.equals(newCompSer)
   assert np.array_equal(clearFImg.bbox[1,:] - clearFImg.bbox[0,:], clearFImg.image.shape[:2][::-1])
@@ -85,10 +86,7 @@ def test_update(clearFImg: FRFocusedImage):
   FR_SINGLETON.actionStack.redo()
   assert clearFImg.compSer.equals(newCompSer)
   FR_SINGLETON.actionStack.redo()
-  assert clearFImg.compSer.equals(newerSer)
-
-
-
+  assert clearFImg.compSer.equals(newerSer[FIMG_SER_COLS])
 
 def test_region_modify(fImg: FRFocusedImage):
   shapeBnds = fImg.image.shape[:2]

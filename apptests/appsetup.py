@@ -19,6 +19,8 @@ TESTS_DIR = BASE_DIR.parent/'apptests'
 EXPORT_DIR = TESTS_DIR/'files'
 IMG_DIR = EXPORT_DIR
 
+FIMG_SER_COLS = [REQD_TBL_FIELDS.INST_ID, REQD_TBL_FIELDS.VERTICES]
+
 NUM_COMPS = 15
 SAMPLE_IMG_FNAME = IMG_DIR/'hubble_deep_field.png'
 SAMPLE_IMG = data.hubble_deep_field()

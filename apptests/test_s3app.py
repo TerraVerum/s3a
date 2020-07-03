@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 from appsetup import (NUM_COMPS, SAMPLE_IMG,
                       EXPORT_DIR, SAMPLE_IMG_FNAME, clearTmpFiles, RND, defaultApp_tester,
-                      _block_pltShow)
+                      _block_pltShow, FIMG_SER_COLS)
 
 from apptests.appsetup import CompDfTester
 from s3a import FR_SINGLETON, S3A, appInst
@@ -83,7 +83,7 @@ def test_change_comp(clearedApp):
   mgr.addComps(dfTester.compDf.copy())
   comp = mgr.compDf.loc[[RND.integers(NUM_COMPS)]]
   clearedApp.changeFocusedComp(comp)
-  assert clearedApp.focusedImg.compSer.equals(comp.squeeze())
+  assert clearedApp.focusedImg.compSer.equals(comp.squeeze()[FIMG_SER_COLS])
   assert fImg.image is not None
   stack.undo()
   assert fImg.image is None
@@ -118,6 +118,8 @@ def test_autosave(clearedApp):
   assert len(savedFiles) >= 3, 'Not enough autosaves generated'
 
 def test_stage_plotting(clearedApp):
+  for editableImg in clearedApp.mainImg, clearedApp.focusedImg:
+    editableImg.procCollection = FR_SINGLETON.algParamMgr.createProcessorForClass(editableImg)
   with _block_pltShow():
     with pytest.raises(FRAlgProcessorError):
       clearedApp.showModCompAnalytics()
