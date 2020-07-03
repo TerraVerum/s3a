@@ -9,7 +9,7 @@ from pyqtgraph import arrayToQPath
 from pyqtgraph.Qt import QtGui, QtCore
 
 from s3a import FR_SINGLETON, appInst
-from s3a.generalutils import coerceDfTypes, nanConcatList
+from s3a.generalutils import coerceDfTypes, stackedVertsPlusConnections
 from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS
 from s3a.structures import FRParam, FRVertices, FRComplexVertices, OneDArr, BlackWhiteImg
 from s3a.structures.typeoverloads import GrayImg
@@ -234,9 +234,9 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
 
     for region, _id in zip(self.regionData.loc[:, REQD_TBL_FIELDS.VERTICES],
                            self.regionData.index):
-      concatRegion = nanConcatList(region)
+      concatRegion, isfinite = stackedVertsPlusConnections(region)
       boundLoc = np.nanmin(concatRegion, 0, keepdims=True)
-      boundSymbol = pg.arrayToQPath(*(concatRegion-boundLoc).T, connect='finite')
+      boundSymbol = pg.arrayToQPath(*(concatRegion-boundLoc).T, connect=isfinite)
 
       boundLocs.append(boundLoc)
       boundSymbs.append(boundSymbol)

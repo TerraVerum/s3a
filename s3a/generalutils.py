@@ -11,23 +11,29 @@ from s3a.structures.typeoverloads import TwoDArr
 from .structures import FRVertices, FRParam, FRComplexVertices
 
 
-def nanConcatList(vertList) -> FRVertices:
+def stackedVertsPlusConnections(vertList: List[np.ndarray]) -> (FRVertices, np.ndarray):
   """
-  Utility for concatenating all vertices within a list while adding
-  NaN entries between each separate list
+  Utility for concatenating all vertices within a list while recording where separations
+  occurred
   """
-  nanSep = np.ones((1,2), dtype=int)*np.nan
   allVerts = [np.zeros((0,2))]
+  separationIdxs = []
+  idxOffset = 0
   for curVerts in vertList:
     allVerts.append(curVerts)
-    if len(curVerts) == 0: continue
+    vertsLen = len(curVerts)
+    if vertsLen == 0: continue
     # Close the current shape
     allVerts.append(curVerts[0,:])
-    allVerts.append(nanSep)
-  # Take away last nan if it exists
-  # if len(allVerts) > 0:
-  #   allVerts.pop()
-  return FRVertices(np.vstack(allVerts), dtype=float)
+    separationIdxs.append(idxOffset + vertsLen)
+    idxOffset += vertsLen + 1
+  # Take away last separator if it exists
+  if len(separationIdxs) > 0:
+    separationIdxs.pop()
+  allVerts = np.vstack(allVerts)
+  isfinite = np.ones(len(allVerts), bool)
+  isfinite[separationIdxs] = False
+  return FRVertices(allVerts, dtype=float), isfinite
   #return FRVertices(dtype=float)
 
 
