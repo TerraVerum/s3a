@@ -8,7 +8,6 @@ from pyqtgraph.Qt import QtWidgets
 
 __all__ = ['appInst', 'S3A', 'FR_SINGLETON']
 
-# Configure pg to correctly read image dimensions
 pg.setConfigOptions(imageAxisOrder='row-major')
 
 
@@ -21,6 +20,10 @@ if appInst is None:
 pg.mkQApp()
 # Allow selectable text in message boxes
 appInst.setStyleSheet("QMessageBox { messagebox-text-interaction-flags: 5; }")
+
+import s3a.frgraphics.graphicsutils as gutils
+appInst.installEventFilter(
+  gutils.QAwesomeTooltipEventFilter(appInst))
 
 # Import here to resolve resolution order
 import s3a.projectvars

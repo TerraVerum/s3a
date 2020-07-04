@@ -50,8 +50,8 @@ class FRActionWithShortcutParameterItem(ActionParameterItem):
     super().__init__(param, depth)
     shortcutSeq = param.opts.get('shortcutSeq', '')
 
-    shcLabel = QtWidgets.QLabel('Shortcut: ', self.layoutWidget)
-    self.layout.addWidget(shcLabel)
+    # shcLabel = QtWidgets.QLabel('Shortcut: ', self.layoutWidget)
+    # self.layout.addWidget(shcLabel)
 
     self.keySeqEdit = QtWidgets.QKeySequenceEdit(shortcutSeq)
     # Without the main window as a parent, the shortcut will not activate when
@@ -59,6 +59,10 @@ class FRActionWithShortcutParameterItem(ActionParameterItem):
     # TODO: Maybe it is desirable for shortcuts to only work when quickloader
     self.shortcut = QtWidgets.QShortcut(shortcutSeq, findMainWin())
     self.shortcut.activated.connect(self.buttonClicked)
+    button: QtWidgets.QPushButton = self.button
+    tip = self.param.opts.get('tip', None)
+    if tip is not None:
+      button.setToolTip(tip)
     def updateShortcut(newSeq: QtGui.QKeySequence):
       self.shortcut.setKey(newSeq)
       param.opts['shortcutSeq'] = newSeq.toString()
