@@ -122,8 +122,8 @@ class FRCompDisplayFilter(QtCore.QObject):
 
 
   def mergeSelectedComps(self, keepId: int=None):
-    """See signature for :meth:`FRCompDisplayFilter.mergeCompsById"""
-    selection, _ = self._compTbl.getIds_colsFromSelection()
+    """See signature for :meth:`FRComponentMgr.mergeCompsById`"""
+    selection, _ = self._compTbl.getIds_colsFromSelection(ignoreNoEditCols=True)
 
     if keepId is None and len(selection > 0):
       keepId = selection[0]
@@ -131,7 +131,7 @@ class FRCompDisplayFilter(QtCore.QObject):
       self._compMgr.mergeCompsById(selection, keepId)
     except FRS3AWarning:
       # No merge was performed, don't alter the table selection
-      pass
+      raise
     else:
       self.selectRowsById(np.array([keepId]), QtCore.QItemSelectionModel.ClearAndSelect)
 

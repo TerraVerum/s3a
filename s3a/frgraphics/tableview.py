@@ -252,7 +252,7 @@ class FRCompTableView(QtWidgets.QTableView):
     self.mgr.addComps(toOverwrite, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
     self.clearSelection()
 
-  def getIds_colsFromSelection(self):
+  def getIds_colsFromSelection(self, ignoreNoEditCols=False):
     selectedIdxs = self.selectedIndexes()
     idList = []
     colIdxs = []
@@ -264,9 +264,10 @@ class FRCompTableView(QtWidgets.QTableView):
       colIdxs.append(idx.column())
     idList = pd.unique(idList)
     colIdxs = pd.unique(colIdxs)
-    colIdxs = np.setdiff1d(colIdxs, self.model().sourceModel().noEditColIdxs)
+    if not ignoreNoEditCols:
+      colIdxs = np.setdiff1d(colIdxs, self.model().sourceModel().noEditColIdxs)
     if len(idList) == 0 or len(colIdxs) == 0:
-      warn('No editable columns selected. Nothing to do.', FRS3AWarning)
+      warn('No editable columns selected.', FRS3AWarning)
       return None, None
     return idList, colIdxs
 

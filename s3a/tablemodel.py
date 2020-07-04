@@ -241,7 +241,7 @@ class FRComponentMgr(FRCompTableModel):
     keepInfo[REQD_TBL_FIELDS.VERTICES] = newVerts
 
     self.rmComps(mergeComps.index)
-    self.addComps(keepInfo.to_frame().T)
+    self.addComps(keepInfo.to_frame().T, FR_ENUMS.COMP_ADD_AS_MERGE)
     yield
     self.addComps(mergeComps, FR_ENUMS.COMP_ADD_AS_MERGE)
 
