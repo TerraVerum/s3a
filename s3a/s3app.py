@@ -5,6 +5,7 @@ import warnings
 from functools import partial
 from pathlib import Path
 from typing import Callable, Dict, Any, Union, Optional
+from warnings import warn
 
 import pandas as pd
 import numpy as np
@@ -326,7 +327,13 @@ class S3A(FRAnnotatorUI):
 
   @FR_SINGLETON.actionStack.undoable('Accept Focused Region')
   def acceptFocusedRegion(self):
-    oldSer = self.focusedImg.compSer.copy()
+    # If the component was deleted
+    focusedId = self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]
+    if focusedId not in self.compMgr.compDf.index:
+      warn('Cannot accept region as this component was deleted.', FRS3AWarning)
+      return
+    oldSer = self.compMgr.compDf.loc[focusedId].copy()
+
     self.focusedImg.saveNewVerts()
     modifiedComp = self.focusedImg.compSer
     modified_df = modifiedComp.to_frame().T
