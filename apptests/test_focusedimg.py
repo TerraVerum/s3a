@@ -54,7 +54,7 @@ def roiFactory():
   clctn = FRShapeCollection((FR_CONSTS.DRAW_SHAPE_POLY, FR_CONSTS.DRAW_SHAPE_RECT),
                             app.focusedImg)
   def _polyRoi(pts: FRVertices):
-    clctn.curShape = FR_CONSTS.DRAW_SHAPE_RECT
+    clctn.curShapeParam = FR_CONSTS.DRAW_SHAPE_RECT
     for pt in pts:
       ev = leftClickGen(pt)
       clctn.buildRoi(ev)
@@ -92,7 +92,7 @@ def test_region_modify(fImg: FRFocusedImage):
   shapeBnds = fImg.image.shape[:2]
   reach = np.min(shapeBnds)
   oldVerts = fImg.region.verts
-  fImg.shapeCollection.curShape = FR_CONSTS.DRAW_SHAPE_POLY
+  fImg.shapeCollection.curShapeParam = FR_CONSTS.DRAW_SHAPE_POLY
   fImg.drawAction = FR_CONSTS.DRAW_ACT_ADD
   imsum = lambda: fImg.region.image.sum()
 

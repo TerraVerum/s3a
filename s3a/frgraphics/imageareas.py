@@ -5,23 +5,20 @@ import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph import BusyCursor
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from s3a.procwrapper import FRImgProcWrapper
 from skimage.io import imread
 
 from s3a import FR_SINGLETON
 from s3a.generalutils import getClippedBbox, frPascalCaseToTitle
-from .parameditors import FRParamEditor, FRParamEditorDockGrouping
-from ..processingimpls import segmentComp
-from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS, MAIN_IMG_DIR, BASE_DIR, \
-  MENU_OPTS_DIR
-from s3a.structures import FRParam, FRVertices, FRComplexVertices, FilePath, \
-  BlackWhiteImg
+from s3a.procwrapper import FRImgProcWrapper
+from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS, MENU_OPTS_DIR, FR_ENUMS
+from s3a.structures import FRParam, FRVertices, FRComplexVertices, FilePath
 from s3a.structures import NChanImg
 from .clickables import FRRightPanViewBox
 from .drawopts import FRDrawOpts
+from .parameditors import FRParamEditor, FRParamEditorDockGrouping
 from .regions import FRShapeCollection, FRVertexDefinedImg
+
 # Required to trigger property registration
-from .rois import FRExtendedROI
 
 Signal = QtCore.Signal
 Slot = QtCore.Slot
@@ -76,7 +73,7 @@ class FREditableImg(pg.PlotWidget):
     for group in btnGroups:
       group.buttonToggled.connect(self._handleBtnToggle)
     self.drawOptsWidget.selectOpt(self.drawAction)
-    self.drawOptsWidget.selectOpt(self.shapeCollection.curShape)
+    self.drawOptsWidget.selectOpt(self.shapeCollection.curShapeParam)
 
   @property
   def image(self) -> Optional[NChanImg]:
@@ -118,7 +115,7 @@ class FREditableImg(pg.PlotWidget):
       self.drawAction = self.drawOptsWidget.actionBtnParamMap[btn]
     else:
       # Shape toggle
-      self.shapeCollection.curShape = self.drawOptsWidget.shapeBtnParamMap[btn]
+      self.shapeCollection.curShapeParam = self.drawOptsWidget.shapeBtnParamMap[btn]
 
   def mousePressEvent(self, ev: QtGui.QMouseEvent):
     super().mousePressEvent(ev)
@@ -169,9 +166,11 @@ class FREditableImg(pg.PlotWidget):
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MAIN_IMG_AREA)
 class FRMainImage(FREditableImg):
-  sigComponentCreated = Signal(object)
+  sigComponentsCreated = Signal(object) # pd.DataFrame
+  sigComponentsUpdated = Signal(object) # pd.DataFrame
+  sigComponentsRemoved = Signal(object) # OneDArr
   # Hooked up during __init__
-  sigSelectionBoundsMade = Signal(object)
+  sigSelectionBoundsMade = Signal(object) # FRVertices
 
   @classmethod
   def __initEditorParams__(cls):
@@ -188,10 +187,14 @@ class FRMainImage(FREditableImg):
     super().__init__(parent, allowableShapes=allowedShapes,
                      allowableActions=allowedActions, **kargs)
 
+
     # -----
     # Image Item
     # -----
     self.setImage(imgSrc)
+    self.compFromLastProcResult: Optional[pd.DataFrame] = None
+    self.lastProcVerts: Optional[FRVertices] = None
+    self.overrideCompVertsAct.sigActivated.connect(lambda: self.overrideLastProcResult())
 
     self.switchBtnMode(FR_CONSTS.DRAW_ACT_ADD)
 
@@ -212,7 +215,7 @@ class FRMainImage(FREditableImg):
         oldState = self.curProcessor.setStageEnabled(namePath, False)
 
       with BusyCursor():
-        self.curProcessor.run(image=self.image, fgVerts=verts)
+        self.curProcessor.run(image=self.image, fgVerts=verts.copy())
       newVerts = self.curProcessor.resultAsVerts(not globalEstimate)
 
       # Reset keep_largest_comp if necessary
@@ -222,10 +225,13 @@ class FRMainImage(FREditableImg):
       # Discard entries with no real vertices
       newComps = FR_SINGLETON.tableData.makeCompDf(len(newVerts))
       newComps[REQD_TBL_FIELDS.VERTICES] = newVerts
+      self.compFromLastProcResult = newComps
+      self.lastProcVerts = verts
       if len(newComps) == 0:
+        self.compFromLastProcResult = FR_SINGLETON.tableData.makeCompDf()
         return
       # TODO: Determine more robust solution for separated vertices. For now use largest component
-      self.sigComponentCreated.emit(newComps)
+      self.sigComponentsCreated.emit(newComps)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
     super().mouseReleaseEvent(ev)
@@ -259,6 +265,29 @@ class FRMainImage(FREditableImg):
       self.imgItem.clear()
     else:
       self.imgItem.setImage(imgSrc)
+
+  def overrideLastProcResult(self):
+    # Nest work function so undo isn't influenced by currently selected component
+    @FR_SINGLETON.actionStack.undoable('Override Last Process Result')
+    def doOverride(comps=self.compFromLastProcResult, verts=self.lastProcVerts):
+      if comps is None: return
+      newVerts = FRComplexVertices([verts])
+
+      newComp = comps.iloc[[0],:].copy()
+      compId = newComp.index[0]
+      newComp.at[compId, REQD_TBL_FIELDS.VERTICES] = newVerts
+      self.sigComponentsRemoved.emit(comps.loc[:, REQD_TBL_FIELDS.INST_ID])
+      if compId == -1:
+        self.sigComponentsCreated.emit(newComp)
+      else:
+        self.sigComponentsUpdated.emit(newComp)
+      yield
+      if compId == -1:
+        self.sigComponentsRemoved.emit(newComp.index)
+      else:
+        self.sigComponentsUpdated.emit(comps)
+    doOverride()
+
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_CLEAR_SHAPE_MAIN)
   def clearCurDrawShape(self):

@@ -93,7 +93,7 @@ class FRShapeCollection(QtCore.QObject):
     # Form of rate-limiting -- only simulate click if the next pixel is at least one away
     # from the previous pixel location
     xyCoord = FRVertices([[posRelToImg.x(), posRelToImg.y()]], dtype=float)
-    curRoi = self.roiForShape[self.curShape]
+    curRoi = self.roiForShape[self.curShapeParam]
     constructingRoi, self.shapeVerts = curRoi.updateShape(ev, xyCoord)
     if self.shapeVerts is not None:
       self.sigShapeFinished.emit(self.shapeVerts)
@@ -106,9 +106,9 @@ class FRShapeCollection(QtCore.QObject):
       curRoi.show()
 
   @property
-  def curShape(self): return self._curShape
-  @curShape.setter
-  def curShape(self, newShape: FRParam):
+  def curShapeParam(self): return self._curShape
+  @curShapeParam.setter
+  def curShapeParam(self, newShape: FRParam):
     """
     When the shape is changed, be sure to reset the underlying ROIs
     :param newShape: New shape
@@ -118,6 +118,10 @@ class FRShapeCollection(QtCore.QObject):
     if newShape != self._curShape:
       self.clearAllRois()
     self._curShape = newShape
+
+  @property
+  def curShape(self):
+      return self.roiForShape[self._curShape]
 
 def makeMultiRegionDf(numRows=1, whichCols=None, idList=None) -> df:
   df_list = []

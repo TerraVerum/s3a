@@ -90,7 +90,16 @@ class S3A(FRAnnotatorUI):
     # ---------------
     # MAIN IMAGE
     # ---------------
-    self.mainImg.sigComponentCreated.connect(self.add_focusComp)
+    self.mainImg.sigComponentsCreated.connect(self.add_focusComp)
+
+    def handleUpdate(comps):
+      self.compMgr.addComps(comps, FR_ENUMS.COMP_ADD_AS_MERGE)
+      self.changeFocusedComp(comps)
+    self.mainImg.sigComponentsUpdated.connect(handleUpdate)
+
+    self.mainImg.sigComponentsRemoved.connect(
+      lambda compIds: self.compMgr.rmComps(compIds)
+    )
 
     # ---------------
     # COMPONENT MANAGER

@@ -107,7 +107,10 @@ class _FRConsts(FRParamGroup):
                                                    helpText='Merges the selected components'
                                                    ' into one, keeping all properties of'
                                                    ' the first in the selection')
-  TOOL_OVERRIDE_VERTS_ACT : FRParam = newParam('Override Created Boundary',
+  TOOL_SPLIT_COMPS            : FRParam = newParam('Split Selected Components',
+                                                   valType='actionwithshortcut',
+                                                   helpText='Makes a separate component for each distinct boundary of all selected components.')
+  TOOL_OVERRIDE_VERTS_ACT     : FRParam = newParam('Override Created Boundary',
                                               valType='actionwithshortcut',
                                               helpText='Overrides the created bounary'
                                                             ' to be the shape of the ROI, not'
