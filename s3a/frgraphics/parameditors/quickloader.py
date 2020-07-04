@@ -2,6 +2,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Dict, Union
+from warnings import warn
 
 from pyqtgraph.Qt import QtCore, QtWidgets
 from pyqtgraph.parametertree.parameterTypes import ActionParameter, GroupParameter, Parameter
@@ -10,7 +11,7 @@ from .pgregistered import FRActionWithShortcutParameter as ActWithShc
 from s3a.projectvars import QUICK_LOAD_DIR
 from .genericeditor import FRParamEditor
 from ..graphicsutils import FRPopupLineEditor, raiseErrorLater
-from ...structures import FRIllRegisteredPropError
+from ...structures import FRIllRegisteredPropError, FRS3AWarning
 
 Slot = QtCore.Slot
 
@@ -138,14 +139,18 @@ class FRQuickLoaderEditor(FRParamEditor):
   def buildFromUserProfile(self, profileSrc: dict):
     # If quick loader is given along with other params, use the quick loader as the
     # base and apply other settings on top of it
-    selfStateName = profileSrc.get(self.name, None)
-    if selfStateName is not None:
-      self.loadParamState(selfStateName)
+    errSettings = []
 
-    for editor in self.listModel.uniqueEditors:
+    for editor in [self] + self.listModel.uniqueEditors:
       paramStateName = profileSrc.get(editor.name, None)
       if paramStateName is not None:
-        editor.loadParamState(paramStateName)
+        try:
+          editor.loadParamState(paramStateName)
+        except Exception as ex:
+          errSettings.append(f'{editor.name}: {ex}')
+    if len(errSettings) > 0:
+      warn('The following settings could not be loaded (shown as <setting>: <exception>)\n'
+           + "\n\n".join(errSettings), FRS3AWarning)
     return profileSrc
 
 

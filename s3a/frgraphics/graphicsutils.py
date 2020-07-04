@@ -238,6 +238,7 @@ def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
   def patch_excepthook():
     sys.excepthook = new_except_hook
   QtCore.QTimer.singleShot(0, patch_excepthook)
+  appInst.processEvents()
 
 def raiseErrorLater(err: Exception):
   # Fire immediately if not in gui mode
@@ -344,10 +345,11 @@ def autosaveOptsDialog(parent):
   layout.addWidget(intervalLbl, 2, 0)
   layout.addWidget(intervalEdit, 2, 1)
 
-  saveDescr = QtWidgets.QLabel('Every <em>interval</em> minutes, a new autosave is<br/>'
-                               'created from the component list. Its name is<br/>'
-                               '[Parent Folder]/[base name]_[counter].csv, where<br/>'
-                               'counter is the current save file number.', dlg)
+  saveDescr = QtWidgets.QLabel('Every <em>interval</em> minutes, a new autosave is'
+                               ' created from the component list. Its name is'
+                               ' [Parent Folder]/[base name]_[counter].csv, where'
+                               ' counter is the current save file number.', dlg)
+  saveDescr.setWordWrap(True)
   layout.addWidget(saveDescr, 3, 0, 1, 2)
 
 

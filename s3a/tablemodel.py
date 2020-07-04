@@ -475,6 +475,6 @@ class FRComponentIO:
     vertMaxs = np.vstack(vertMaxs)
     offendingIds = np.nonzero(np.any(vertMaxs >= imShape, axis=1))[0]
     if len(offendingIds) > 0:
-      raise FRAppIOError(f'Vertices on some components extend beyond image dimensions. '
-                          f'Perhaps this export came from a different image?\n'
-                          f'Offending IDs: {offendingIds}')
+      warn(f'Vertices on some components extend beyond image dimensions. '
+           f'Perhaps this export came from a different image?\n'
+           f'Offending IDs: {offendingIds}', FRS3AWarning)

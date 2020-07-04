@@ -19,7 +19,8 @@ from .frgraphics.annotator_ui import FRAnnotatorUI
 from .frgraphics.graphicsutils import (dialogGetSaveFileName, addDirItemsToMenu,
                                        attemptFileLoad, popupFilePicker,
                                        disableAppDuringFunc, makeExceptionsShowDialogs,
-                                       autosaveOptsDialog, create_addMenuAct)
+                                       autosaveOptsDialog, create_addMenuAct,
+                                       raiseErrorLater)
 from .frgraphics.graphicsutils import saveToFile
 from .frgraphics.imageareas import FREditableImg
 from .frgraphics.parameditors import FRParamEditor, FRParamEditorDockGrouping
@@ -295,10 +296,14 @@ class S3A(FRAnnotatorUI):
     saveDlg = autosaveOptsDialog(self)
     success = saveDlg.exec()
     if success:
-      interval = saveDlg.intervalEdit.value()
-      baseName = saveDlg.baseFileNameEdit.text()
-      folderName = Path(saveDlg.folderName)
-      self.startAutosave(interval, folderName, baseName)
+      try:
+        interval = saveDlg.intervalEdit.value()
+        baseName = saveDlg.baseFileNameEdit.text()
+        folderName = Path(saveDlg.folderName)
+      except AttributeError:
+        warn('Some information was not provided -- autosave not started.', FRS3AWarning)
+      else:
+        self.startAutosave(interval, folderName, baseName)
 
   def updateTheme(self, _newScheme: Dict[str, Any]):
     style = ''
@@ -404,21 +409,29 @@ class S3A(FRAnnotatorUI):
     if isinstance(profileSrc, str):
       profileSrc = {FR_SINGLETON.quickLoader.name: profileSrc}
 
-    imgFname = profileSrc.pop('Image', None)
-    if imgFname is not None:
-      self.resetMainImg(imgFname)
+    loads = ['Image', 'Annotations', 'Layout']
+    fns = [self.resetMainImg, self.loadCompList, self.loadLayoutActionTriggered]
+    errSettings = []
 
-    annFname = profileSrc.pop('Annotations', None)
-    if annFname is not None:
-      self.loadCompList(annFname)
-
-    layoutName = profileSrc.pop('Layout', None)
-    if layoutName is not None:
-      self.loadLayoutActionTriggered(layoutName)
+    for load, fn in zip(loads, fns):
+      try:
+        val: Any = profileSrc.pop(load, None)
+        if val is not None:
+          fn(val)
+      except Exception as ex:
+        errSettings.append(f'{load}: {ex}')
 
     if profileSrc:
       # Unclaimed arguments
-      FR_SINGLETON.quickLoader.buildFromUserProfile(profileSrc)
+      try:
+        FR_SINGLETON.quickLoader.buildFromUserProfile(profileSrc)
+      except Exception as ex:
+        errSettings.append(f'{"Quick Loader"}: {ex}')
+
+    if len(errSettings) > 0:
+      err = FRAppIOError('The following settings were not loaded (shown as <setting>: <exception>)\n'
+                         + "\n\n".join(errSettings))
+      raiseErrorLater(err)
 
   def exportCompList(self, outFname: Union[str, Path]):
     self.compExporter.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds,
