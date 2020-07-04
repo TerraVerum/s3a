@@ -13,7 +13,8 @@ from appsetup import (NUM_COMPS, SAMPLE_IMG,
 from apptests.appsetup import CompDfTester
 from s3a import FR_SINGLETON, S3A, appInst
 from s3a.projectvars import REQD_TBL_FIELDS, LAYOUTS_DIR, FR_ENUMS
-from s3a.structures import FRAlgProcessorError, FRS3AException, FRVertices
+from s3a.structures import FRAlgProcessorError, FRS3AException, FRVertices, \
+  FRComplexVertices, FRS3AWarning
 
 app, dfTester = defaultApp_tester()
 app: S3A
@@ -76,6 +77,15 @@ def test_load_comps_merge(clearedApp):
                                                      REQD_TBL_FIELDS.SRC_IMG_FILENAME])
   dfCmp = clearedApp.compMgr.compDf[equalCols].values == dfTester.compDf[equalCols].values
   assert np.all(dfCmp), 'Loaded dataframe doesn\'t match daved dataframe'
+
+def test_import_large_verts(sampleComps, clearedApp):
+  sampleComps.loc[:, REQD_TBL_FIELDS.INST_ID] = np.arange(len(sampleComps))
+  sampleComps.at[0, REQD_TBL_FIELDS.VERTICES] = FRComplexVertices([FRVertices([[50e3, 50e3]])])
+  io = app.compExporter
+  io.prepareDf(sampleComps)
+  io.exportCsv(EXPORT_DIR/'Bad Verts.csv')
+  with pytest.warns(FRS3AWarning):
+    io.buildFromCsv(EXPORT_DIR/'Bad Verts.csv', app.mainImg.image.shape)
 
 def test_change_comp(clearedApp):
   stack = FR_SINGLETON.actionStack

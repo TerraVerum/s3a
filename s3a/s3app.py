@@ -436,7 +436,7 @@ class S3A(FRAnnotatorUI):
   def exportCompList(self, outFname: Union[str, Path]):
     self.compExporter.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds,
                                 self.srcImgFname)
-    self.compExporter.exportCsv(outFname)
+    self.compExporter.exportByFileType(outFname)
     self.hasUnsavedChanges = False
 
   def exportLabeledImg(self, outFname: str=None):

@@ -7,15 +7,15 @@ appropriate.
 from __future__ import annotations
 
 import contextlib
-from collections import deque
 import copy
+from collections import deque
 from functools import wraps
 from typing import Callable, Generator, Deque, Union, Type, Any, List
 
 from typing_extensions import Protocol
 
-from s3a.frgraphics.graphicsutils import raiseErrorLater
-from s3a.structures import FRActionStackError, FRS3AException
+from s3a.structures import FRActionStackError
+
 
 # _generatorCallable = Callable[[...], Union[Generator, Any]]
 class FRAction:
@@ -41,15 +41,23 @@ class FRAction:
       # Need to init runner for when backward is called
       self._runner = self._generator(*args, **kwargs)
 
-  def reassignGenerator(self, newGenerator: Callable[[...], Union[Generator, Any]], newArgs=None, newKwargs=None):
-    if newGenerator is not None:
-      self._generator = newGenerator
-    if newArgs is None:
-      newArgs = ()
-    if newKwargs is None:
-      newKwargs = {}
-    self.args = newArgs
-    self.kwargs = newKwargs
+  def reassignBackward(self, backwardFn: Callable[[...], Any], backwardArgs=(),
+                       backwardKwargs=None):
+
+    if backwardKwargs is None:
+      backwardKwargs = {}
+    oldGenerator = self._generator
+    def newGenerator(*args, **kwargs):
+      # Keep forward
+      yield next(oldGenerator(*args, **kwargs))
+      # Alter backwards
+      yield backwardFn(*backwardArgs, **backwardKwargs)
+    self._generator = newGenerator
+    if self.treatAsUndo:
+      # Already in current runner, so change it
+      def newRunner():
+        yield backwardFn(*backwardArgs, **backwardKwargs)
+      self._runner = newRunner()
 
   def forward(self, graceful=False):
     """

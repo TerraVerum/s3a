@@ -77,8 +77,9 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
       if noChange:
         return True
     except ValueError:
+      # Happens with array comparison
       pass
-    self.compDf.iloc[index.row(), index.column()] = value
+    self.compDf.iat[index.row(), index.column()] = value
     toEmit = self.defaultEmitDict.copy()
     toEmit['changed'] = np.array([self.compDf.index[index.row()]])
     self.sigCompsChanged.emit(toEmit)
@@ -214,7 +215,7 @@ class FRComponentMgr(FRCompTableModel):
     self.addComps(removedData, FR_ENUMS.COMP_ADD_AS_MERGE)
 
   @FR_SINGLETON.actionStack.undoable('Merge Components')
-  def mergeCompsById(self, mergeIds: OneDArr, keepId: int=None):
+  def mergeCompVertsById(self, mergeIds: OneDArr, keepId: int=None):
     """
     Merges the selected components
 
@@ -290,6 +291,10 @@ class FRComponentIO:
   def __init__(self):
     self.compDf: Optional[df] = None
 
+  @property
+  def handledExportTypes(self):
+      return ['csv', 'pkl']
+
   def prepareDf(self, compDf: df, displayIds: OneDArr=None, srcImgFname: Path=None):
     """
     :param compDf: The component dataframe that came from the component manager
@@ -312,17 +317,26 @@ class FRComponentIO:
     exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = srcImgFname
     self.compDf = exportDf
 
+  def exportByFileType(self, outFile: Union[str, Path]):
+    outFile = Path(outFile)
+    exportType = outFile.suffix.strip('.')
+    if exportType in self.handledExportTypes:
+      exportFn = getattr(self, 'export'+exportType.title())
+    else:
+      exportFn = None
+    if exportFn is not None:
+      exportFn(outFile)
   # -----
   # Export options
   # -----
-  def exportCsv(self, outFile: Union[str, Path]=None, **pdExportArgs) -> (Any, str):
+  def exportCsv(self, outFile: Union[str, Path]=None, **pdExportArgs):
     """
 
     :param outFile: Name of the output file location. If *None*, no file is created. However,
       the export object will still be created and returned.
     :param pdExportArgs: Dictionary of values passed to underlying pandas export function.
       These will overwrite the default options for :func:`exportToFile <FRComponentMgr.exportToFile>`
-    :return: (Export object, Success or failure of the operation) tuple.
+    :return: Export version of the component data.
     """
     defaultExportParams = {
       'na_rep': 'NaN',
@@ -361,7 +375,7 @@ class FRComponentIO:
       np.set_printoptions(**oldNpOpts)
     return exportDf
 
-  def exportPkl(self, outFile=None) -> (Any, str):
+  def exportPkl(self, outFile: Union[str, Path]=None) -> (Any, str):
     """
     See the function signature for :func:`exportCsv <FRComponentIO.exportCsv>`
     """
@@ -449,7 +463,6 @@ class FRComponentIO:
     """
     See docstring for :func:`self.buildFromCsv`
     """
-    pklDf = None
     pklDf = pd.read_pickle(inFile)
     cls.checkVertBounds(pklDf[REQD_TBL_FIELDS.VERTICES], imShape)
     return pklDf

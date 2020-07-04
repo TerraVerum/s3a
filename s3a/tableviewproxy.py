@@ -128,7 +128,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     if keepId is None and len(selection > 0):
       keepId = selection[0]
     try:
-      self._compMgr.mergeCompsById(selection, keepId)
+      self._compMgr.mergeCompVertsById(selection, keepId)
     except FRS3AWarning:
       # No merge was performed, don't alter the table selection
       raise

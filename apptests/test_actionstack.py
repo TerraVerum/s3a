@@ -47,6 +47,10 @@ class StackForTesting(FRActionStack):
 
     self.lst = []
 
+  def clear(self):
+    super().clear()
+    self.lst.clear()
+
 def test_group():
   stack = StackForTesting()
   stack.grpOp()
@@ -188,3 +192,39 @@ def test_savepoint():
 
   stack.revertToSavepoint()
   assert stack.lst == list(range(COUNT))
+
+def test_reassign_backward():
+  stack = StackForTesting()
+  newlst = []
+  newAppend = lambda: newlst.append(5)
+  # Test in forward state
+  for _ in range(COUNT):
+    stack.op()
+    stack.actions[-1].reassignBackward(newAppend)
+  for _ in range(COUNT):
+    stack.undo()
+  assert len(stack.actions) == COUNT
+  assert newlst == [5]*COUNT
+
+  # Make sure it works going backward
+  for _ in range(COUNT):
+    stack.redo()
+  assert len(stack.lst) == 2*COUNT
+  for _ in range(COUNT):
+    stack.undo()
+  assert newlst == [5]*COUNT*2
+
+  # Make sure doing reassign after undo works too
+  stack.clear()
+  newlst.clear()
+  for _ in range(COUNT):
+    stack.op()
+  for _ in range(COUNT):
+    stack.undo()
+  for ii in range(COUNT):
+    stack.actions[ii].reassignBackward(newAppend)
+  for _ in range(COUNT):
+    stack.redo()
+  for _ in range(COUNT):
+    stack.undo()
+  assert newlst == [5]*COUNT
