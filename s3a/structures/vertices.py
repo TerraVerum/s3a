@@ -169,9 +169,9 @@ class FRComplexVertices(list):
       cmpShape = maskShape if isinstance(maskShape, Sequence) else maskShape.shape[:2]
       # Wait until inside 'if' so max isn't unnecessarily calculated
       vertMax = self.stack().max(0)[::-1]
-      if np.any(vertMax > np.array(maskShape[:2])):
+      if np.any(vertMax > np.array(cmpShape[:2])):
         warn('Vertices don\'t fit in the provided mask size.\n'
-             f'Vertex shape: {vertMax}, mask shape: {maskShape}')
+             f'Vertex shape: {vertMax}, mask shape: {cmpShape}')
     if checkForDisconnectedVerts:
       fillArg = []
       for verts in self: # type: FRVertices
@@ -213,7 +213,9 @@ class FRComplexVertices(list):
       compVertices.append(FRVertices(contour[:,0,:]))
     if hierarchy is None:
       hierarchy = np.ones((0,1,4), int)*-1
-    return FRComplexVertices(compVertices, hierarchy[:,0,:])
+    else:
+      hierarchy = hierarchy[0,:,:]
+    return FRComplexVertices(compVertices, hierarchy)
 
   def __str__(self) -> str:
     """
