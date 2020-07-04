@@ -67,6 +67,7 @@ class FRCompDisplayFilter(QtCore.QObject):
 
     # Attach to UI signals
     mainImg.sigSelectionBoundsMade.connect(self._reflectSelectionBoundsMade)
+    mainImg.mergeCompsAct.sigActivated.connect(lambda *args: self.mergeSelectedComps())
     compMgr.sigCompsChanged.connect(self.redrawComps)
     filterEditor.sigParamStateUpdated.connect(self._updateFilter)
     FR_SINGLETON.scheme.sigParamStateUpdated.connect(lambda: self._updateFilter(self._filter))
@@ -119,11 +120,47 @@ class FRCompDisplayFilter(QtCore.QObject):
     self._filter = newFilterDict
     self.redrawComps(self._compMgr.defaultEmitDict)
 
+
+  def mergeSelectedComps(self, keepId: int=None):
+    """See signature for :meth:`FRCompDisplayFilter.mergeCompsById"""
+    selection, _ = self._compTbl.getIds_colsFromSelection()
+
+    if keepId is None and len(selection > 0):
+      keepId = selection[0]
+    try:
+      self._compMgr.mergeCompsById(selection, keepId)
+    except FRS3AWarning:
+      # No merge was performed, don't alter the table selection
+      pass
+    else:
+      self.selectRowsById(np.array([keepId]), QtCore.QItemSelectionModel.ClearAndSelect)
+
   @Slot(object)
   def _reflectTableSelectionChange(self, selectedIds: OneDArr):
     self.selectedIds = selectedIds
     self.regionPlot.selectById(selectedIds)
     self.sigCompsSelected.emit(self._compMgr.compDf.loc[selectedIds, :])
+
+  def selectRowsById(self, ids: OneDArr,
+                     selectionMode=QtCore.QItemSelectionModel.Rows):
+    selectionModel = self._compTbl.selectionModel()
+    sortModel = self._compTbl.model()
+    isFirst = True
+    shouldScroll = len(ids) > 0
+    selectionList = QtCore.QItemSelection()
+    for curId in ids:
+      idRow = np.nonzero(self._compMgr.compDf.index == curId)[0][0]
+      # Map this ID to its sorted position in the list
+      idxForId = sortModel.mapFromSource(self._compMgr.index(idRow, 0))
+      selectionList.select(idxForId, idxForId)
+      if isFirst and shouldScroll:
+        self._compTbl.scrollTo(idxForId, self._compTbl.PositionAtCenter)
+        isFirst = False
+    # noinspection PyTypeChecker
+    selectionModel.select(selectionList, selectionMode)
+    self.selectedIds = ids
+    self._compTbl.setFocus()
+
 
   @Slot(object)
   def _reflectSelectionBoundsMade(self, selection: Union[OneDArr, FRVertices]):
@@ -148,23 +185,7 @@ class FRCompDisplayFilter(QtCore.QObject):
       mode |= QtCore.QItemSelectionModel.Select
     else:
       mode |= QtCore.QItemSelectionModel.ClearAndSelect
-    selectionModel = self._compTbl.selectionModel()
-    sortModel = self._compTbl.model()
-    isFirst = True
-    shouldScroll = len(selectedIds) > 0
-    selectionList = QtCore.QItemSelection()
-    for curId in selectedIds:
-      idRow = np.nonzero(self._compMgr.compDf.index == curId)[0][0]
-      # Map this ID to its sorted position in the list
-      idxForId = sortModel.mapFromSource(self._compMgr.index(idRow, 0))
-      selectionList.select(idxForId, idxForId)
-      if isFirst and shouldScroll:
-        self._compTbl.scrollTo(idxForId, self._compTbl.PositionAtCenter)
-        isFirst = False
-    # noinspection PyTypeChecker
-    selectionModel.select(selectionList, mode)
-    self.selectedIds = selectedIds
-    self._compTbl.setFocus()
+    self.selectRowsById(selectedIds, mode)
     # TODO: Better management of widget focus here
 
   def _populateDisplayedIds(self):

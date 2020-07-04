@@ -5,7 +5,7 @@ from typing import List, Dict, Union
 
 from pyqtgraph.Qt import QtCore, QtWidgets
 from pyqtgraph.parametertree.parameterTypes import ActionParameter, GroupParameter, Parameter
-from .pgregistered import FRACtionWithShortcutParameter as ActWithShc
+from .pgregistered import FRActionWithShortcutParameter as ActWithShc
 
 from s3a.projectvars import QUICK_LOAD_DIR
 from .genericeditor import FRParamEditor

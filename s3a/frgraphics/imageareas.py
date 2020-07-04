@@ -178,6 +178,9 @@ class FRMainImage(FREditableImg):
     super().__initEditorParams__()
     cls.multCompsOnCreate = FR_SINGLETON.generalProps.registerProp(cls,
                               FR_CONSTS.PROP_MK_MULT_COMPS_ON_ADD)
+    cls.mergeCompsAct, cls.overrideCompVertsAct = cls.toolsEditor.registerProps(
+      cls, [FR_CONSTS.TOOL_MERGE_COMPS, FR_CONSTS.TOOL_OVERRIDE_VERTS_ACT],
+      asProperty=False)
 
   def __init__(self, parent=None, imgSrc=None, **kargs):
     allowedShapes = (FR_CONSTS.DRAW_SHAPE_RECT, FR_CONSTS.DRAW_SHAPE_POLY)

@@ -82,20 +82,36 @@ class _FRConsts(FRParamGroup):
   # --------------------------
   # REGION-CREATION PARAMETERS
   # --------------------------
-  PROP_MAIN_IMG_SEED_THRESH : FRParam = newParam('Seedpoint Threshold in Main Image', 10.)
-  PROP_MIN_COMP_SZ          : FRParam = newParam('Minimum New Component Size (px)', 50)
-  PROP_NEW_COMP_SZ          : FRParam = newParam('New Component Side Length (px)', 30)
-  PROP_EST_BOUNDS_ON_START  : FRParam = newParam('Estimate Boundaries on Image Load', False)
-  PROP_MK_MULT_COMPS_ON_ADD : FRParam = newParam('New Component for Each Separate Boundary', False,
-                                                 helpText='When creating a new component in the main image, '
-                                                 'separate boundaries will not be assigned to one single component. '
-                                                 'Rather, a new compnent will be created for each closed boundary.')
-  PROP_CROP_MARGIN_PCT      : FRParam = newParam('Crop Padding (% of image size)', 15)
-  PROP_FOCUSED_SEED_THRESH  : FRParam = newParam('Seedpoint Threshold in Focused Image', 7.)
-  PROP_UNDO_BUF_SZ          : FRParam = newParam('Size of Undo Buffer', 300)
-  PROP_STEPS_BW_SAVE        : FRParam = newParam('Operations Between Buffer Saves', 1)
-  PROP_CHECK_LARGE_CHANGES  : FRParam = newParam('Save buffer during large region changes', True)
-  PROP_SHOW_TBL_ON_COMP_CREATE: FRParam = newParam('Show popup table when creating component', False)
+  PROP_MAIN_IMG_SEED_THRESH    : FRParam = newParam('Seedpoint Threshold in Main Image', 10.)
+  PROP_MIN_COMP_SZ             : FRParam = newParam('Minimum New Component Size (px)', 50)
+  PROP_NEW_COMP_SZ             : FRParam = newParam('New Component Side Length (px)', 30)
+  PROP_EST_BOUNDS_ON_START     : FRParam = newParam('Estimate Boundaries on Image Load', False)
+  PROP_MK_MULT_COMPS_ON_ADD    : FRParam = newParam('New Component for Each Separate Boundary', False,
+                                                    helpText='When creating a new component in the '
+                                                             'main image, separate boundaries'
+                                                             ' will not be assigned to one single'
+                                                             ' component. Rather, a new compnent'
+                                                             ' will be created for each closed boundary.')
+  PROP_CROP_MARGIN_PCT         : FRParam = newParam('Crop Padding (% of image size)', 15)
+  PROP_FOCUSED_SEED_THRESH     : FRParam = newParam('Seedpoint Threshold in Focused Image', 7.)
+  PROP_UNDO_BUF_SZ             : FRParam = newParam('Size of Undo Buffer', 300)
+  PROP_STEPS_BW_SAVE           : FRParam = newParam('Operations Between Buffer Saves', 1)
+  PROP_CHECK_LARGE_CHANGES     : FRParam = newParam('Save buffer during large region changes', True)
+  PROP_SHOW_TBL_ON_COMP_CREATE : FRParam = newParam('Show popup table when creating component', False)
+
+  # --------------------------
+  # WINDOW TOOLS
+  # --------------------------
+  TOOL_MERGE_COMPS            : FRParam = newParam('Merge Selected Components',
+                                                   valType='actionwithshortcut',
+                                                   helpText='Merges the selected components'
+                                                   ' into one, keeping all properties of'
+                                                   ' the first in the selection')
+  TOOL_OVERRIDE_VERTS_ACT : FRParam = newParam('Override Created Boundary',
+                                              valType='actionwithshortcut',
+                                              helpText='Overrides the created bounary'
+                                                            ' to be the shape of the ROI, not'
+                                                            ' the result of the image processor')
 
   # --------------------------
   # SHORTCUT PARAMETERS

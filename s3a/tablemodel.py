@@ -4,6 +4,7 @@ from ast import literal_eval
 from pathlib import Path
 from stat import S_IREAD, S_IRGRP, S_IROTH
 from typing import Union, Any, Optional, List, Tuple
+from warnings import warn
 
 import cv2 as cv
 import numpy as np
@@ -12,7 +13,7 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 from skimage import io
 
-from s3a.structures import OneDArr, FRParamGroup, FilePath
+from s3a.structures import OneDArr, FRParamGroup, FilePath, FRS3AWarning
 from s3a.structures.typeoverloads import TwoDArr, NChanImg
 from . import FR_SINGLETON
 from .generalutils import coerceDfTypes, augmentException
@@ -211,6 +212,38 @@ class FRComponentMgr(FRCompTableModel):
 
     # Undo code
     self.addComps(removedData, FR_ENUMS.COMP_ADD_AS_MERGE)
+
+  @FR_SINGLETON.actionStack.undoable('Merge Components')
+  def mergeCompsById(self, mergeIds: OneDArr, keepId: int=None):
+    """
+    Merges the selected components
+
+    :param mergeIds: Ids of components to merge. If *None*, defaults to current user
+      selection.
+    :param keepId: If provided, the selected component with this ID is used as
+      the merged component columns (except for the vertices, of course). Else,
+      this will default to the first component in the selection.
+    """
+    if len(mergeIds) < 2:
+      warn(f'Less than two compontns are selected, so "merge" is a no-op.', FRS3AWarning)
+      return
+    mergeComps: df = self.compDf.loc[mergeIds].copy()
+    if keepId is None:
+      keepId = mergeIds[0]
+
+    keepInfo = mergeComps.loc[keepId].copy()
+    allVerts = [v.stack() for v in mergeComps[REQD_TBL_FIELDS.VERTICES]]
+    maskShape = np.max(np.vstack(allVerts), 0)[::-1]
+    mask = np.zeros(maskShape, bool)
+    for verts in mergeComps[REQD_TBL_FIELDS.VERTICES]: # type: FRComplexVertices
+      mask |= verts.toMask(tuple(maskShape))
+    newVerts = FRComplexVertices.fromBwMask(mask)
+    keepInfo[REQD_TBL_FIELDS.VERTICES] = newVerts
+
+    self.rmComps(mergeComps.index)
+    self.addComps(keepInfo.to_frame().T)
+    yield
+    self.addComps(mergeComps, FR_ENUMS.COMP_ADD_AS_MERGE)
 
 def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> pd.Series:
   paramType = type(paramVal)

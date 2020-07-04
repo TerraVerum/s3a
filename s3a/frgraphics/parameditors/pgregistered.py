@@ -69,7 +69,7 @@ class FRActionWithShortcutParameterItem(ActionParameterItem):
 
     self.layout.addWidget(self.keySeqEdit)
 
-class FRACtionWithShortcutParameter(ActionParameter):
+class FRActionWithShortcutParameter(ActionParameter):
   itemClass = FRActionWithShortcutParameterItem
 
 class FRCustomMenuParameter(parameterTypes.GroupParameter):
@@ -154,4 +154,4 @@ parameterTypes.registerParameterType('NoneType', FRNoneParameter)
 parameterTypes.registerParameterType('shortcut', FRShortcutParameter)
 parameterTypes.registerParameterType('procgroup', FRProcGroupParameter)
 parameterTypes.registerParameterType('atomicgroup', FRAtomicGroupParameter)
-parameterTypes.registerParameterType('actionwithshortcut', FRACtionWithShortcutParameter)
+parameterTypes.registerParameterType('actionwithshortcut', FRActionWithShortcutParameter)
