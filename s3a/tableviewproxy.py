@@ -3,17 +3,18 @@ from warnings import warn
 
 import numpy as np
 from pandas import DataFrame as df
+import pandas as pd
 from pyqtgraph.Qt import QtCore, QtGui
 
 from s3a.frgraphics import tableview
 from s3a.structures.typeoverloads import OneDArr
-from . import FR_SINGLETON
+from . import FR_SINGLETON, appInst
 from .frgraphics.graphicsutils import raiseErrorLater
 from .frgraphics.imageareas import FRMainImage
 from .frgraphics.regions import FRMultiRegionPlot
-from .projectvars import FR_CONSTS, REQD_TBL_FIELDS
+from .projectvars import FR_CONSTS, REQD_TBL_FIELDS, FR_ENUMS
 from .structures import FRVertices, FRParam, FRParamParseError, FRS3AException, \
-  FRS3AWarning
+  FRS3AWarning, FRComplexVertices
 from .tablemodel import FRComponentMgr
 
 Signal = QtCore.Signal
@@ -67,6 +68,7 @@ class FRCompDisplayFilter(QtCore.QObject):
 
     # Attach to UI signals
     mainImg.sigSelectionBoundsMade.connect(self._reflectSelectionBoundsMade)
+
     mainImg.mergeCompsAct.sigActivated.connect(lambda *args: self.mergeSelectedComps())
     compMgr.sigCompsChanged.connect(self.redrawComps)
     filterEditor.sigParamStateUpdated.connect(self._updateFilter)
@@ -119,7 +121,6 @@ class FRCompDisplayFilter(QtCore.QObject):
   def _updateFilter(self, newFilterDict):
     self._filter = newFilterDict
     self.redrawComps(self._compMgr.defaultEmitDict)
-
 
   def mergeSelectedComps(self, keepId: int=None):
     """See signature for :meth:`FRComponentMgr.mergeCompsById`"""
@@ -210,8 +211,8 @@ class FRCompDisplayFilter(QtCore.QObject):
       badTypes = np.unique([f'"{col.valType}"' for col in badCols])
       badCols = map(lambda val: f'"{val}"', badCols)
       warn(f'The table filter does not know how to handle'
-                                     f' columns {", ".join(badCols)} since no'
-                                     f' filter exists for types {", ".join(badTypes)}',
+           f' columns {", ".join(badCols)} since no'
+           f' filter exists for types {", ".join(badTypes)}',
            FRS3AWarning)
     return filterableCols
 

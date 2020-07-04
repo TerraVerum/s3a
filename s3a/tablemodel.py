@@ -226,7 +226,7 @@ class FRComponentMgr(FRCompTableModel):
       this will default to the first component in the selection.
     """
     if len(mergeIds) < 2:
-      warn(f'Less than two compontns are selected, so "merge" is a no-op.', FRS3AWarning)
+      warn(f'Less than two components are selected, so "merge" is a no-op.', FRS3AWarning)
       return
     mergeComps: df = self.compDf.loc[mergeIds].copy()
     if keepId is None:
