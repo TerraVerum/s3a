@@ -278,7 +278,7 @@ class S3A(FRAnnotatorUI):
 
   def startAutosave(self, interval_mins: float, autosaveFolder: Path, baseName: str):
     autosaveFolder.mkdir(exist_ok=True, parents=True)
-    lastSavedDf = None
+    lastSavedDf = self.compMgr.compDf.copy()
     # Qtimer expects ms, turn mins->s->ms
     self.autosaveTimer = QtCore.QTimer(self)
     # Figure out where to start the counter
@@ -290,14 +290,15 @@ class S3A(FRAnnotatorUI):
       counter = max(map(lambda fname: int(fname.stem.rsplit('_')[1]), existingFiles)) + 1
 
     def save_incrementCounter():
-      nonlocal counter
+      nonlocal counter, lastSavedDf
       baseSaveNamePlusFolder = autosaveFolder/f'{baseName}_{counter}.csv'
       counter += 1
       if not np.array_equal(self.compMgr.compDf, lastSavedDf):
         self.exportCompList(baseSaveNamePlusFolder)
+        lastSavedDf = self.compMgr.compDf.copy()
 
     self.autosaveTimer.timeout.connect(save_incrementCounter)
-    self.autosaveTimer.start(interval_mins*60*1000)
+    self.autosaveTimer.start(int(interval_mins*60*1000))
 
   def stopAutosave(self):
     self.autosaveTimer.stop()
