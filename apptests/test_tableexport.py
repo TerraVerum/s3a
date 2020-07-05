@@ -4,13 +4,12 @@ from io import StringIO
 import numpy as np
 import pytest
 
-from appsetup import EXPORT_DIR, defaultApp_tester
+from conftest import app, dfTester
+from testingconsts import EXPORT_DIR
 from s3a.generalutils import augmentException
 from s3a.projectvars import REQD_TBL_FIELDS
 from s3a.structures import FRS3AException, FRComplexVertices, FRVertices, FRS3AWarning
 from s3a.tablemodel import FRComponentIO
-
-app, dfTester = defaultApp_tester()
 
 def test_normal_export(sampleComps):
   io = app.compExporter

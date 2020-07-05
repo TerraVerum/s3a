@@ -2,16 +2,13 @@ import numpy as np
 import pytest
 from pyqtgraph.Qt import QtCore
 
-from appsetup import (makeCompDf, NUM_COMPS, clearTmpFiles, RND, defaultApp_tester)
+from conftest import NUM_COMPS, app, mgr, stack, dfTester
+from helperclasses import makeCompDf, clearTmpFiles
+from testingconsts import RND
 from s3a import FR_SINGLETON
 from s3a.projectvars import FR_ENUMS
 from s3a.projectvars import REQD_TBL_FIELDS
 from s3a.structures import FRComplexVertices, FRS3AWarning, FRVertices
-
-# Construct app outside setUp to drastically reduce loading times
-app, dfTester = defaultApp_tester()
-mgr = app.compMgr
-stack = FR_SINGLETON.actionStack
 
 oldIds = np.arange(NUM_COMPS, dtype=int)
 

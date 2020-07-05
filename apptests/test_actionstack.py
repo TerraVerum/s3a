@@ -1,9 +1,7 @@
-from typing import List, Any, Callable
-
-from s3a.actionstack import FRActionStack
 import numpy as np
 import pytest
 
+from s3a.actionstack import FRActionStack
 from s3a.structures import FRActionStackError
 
 COUNT = 10
