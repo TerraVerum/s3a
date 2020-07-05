@@ -1,19 +1,16 @@
-from collections import defaultdict
-from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Union
+from pathlib import Path
+from typing import List
 from warnings import warn
 
 from pyqtgraph.Qt import QtCore, QtWidgets
-from pyqtgraph.parametertree.parameterTypes import ActionParameter, GroupParameter, Parameter
-from .pgregistered import FRActionWithShortcutParameter as ActWithShc
+from pyqtgraph.parametertree.parameterTypes import GroupParameter, Parameter
 
 from s3a.projectvars import QUICK_LOAD_DIR
 from .genericeditor import FRParamEditor
+from .pgregistered import FRActionWithShortcutParameter as ActWithShc
 from ..graphicsutils import FRPopupLineEditor, raiseErrorLater
 from ...structures import FRIllRegisteredPropError, FRS3AWarning
-
-Slot = QtCore.Slot
 
 class FREditorListModel(QtCore.QAbstractListModel):
   def __init__(self, editorList: List[FRParamEditor], parent: QtWidgets.QWidget=None):
@@ -167,7 +164,6 @@ class FRQuickLoaderEditor(FRParamEditor):
         act: ActWithShc = next(iter(grp))
         act.activate()
 
-  @Slot()
   def addFromLineEdit(self):
     completer = self.addNewParamState.completer()
     selection = completer.completionModel()

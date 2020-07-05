@@ -14,7 +14,7 @@ from pandas import DataFrame as df
 from pyqtgraph import BusyCursor
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
-from . import FR_SINGLETON
+from .frgraphics.parameditors import FR_SINGLETON
 from .frgraphics.annotator_ui import FRAnnotatorUI
 from .frgraphics.graphicsutils import (dialogGetSaveFileName, addDirItemsToMenu,
                                        attemptFileLoad, popupFilePicker,
@@ -34,7 +34,6 @@ from .tablemodel import FRComponentIO
 from .tablemodel import FRComponentMgr
 from .tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
 
-Slot = QtCore.Slot
 Signal = QtCore.Signal
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_ANNOTATOR)
@@ -476,11 +475,9 @@ class S3A(FRAnnotatorUI):
   # ---------------
   # MISC CALLBACKS
   # ---------------
-  @Slot(object)
   def _recordCompChange(self):
     self.hasUnsavedChanges = True
 
-  @Slot(object)
   @FR_SINGLETON.actionStack.undoable('Create New Comp', asGroup=True)
   def add_focusComp(self, newComps: df):
     self.compMgr.addComps(newComps)
@@ -503,7 +500,6 @@ class S3A(FRAnnotatorUI):
   # ---------------
   # MENU CALLBACKS
   # ---------------
-  @Slot()
   def openImgActionTriggered(self):
     fileFilter = "Image Files (*.png; *.tif; *.jpg; *.jpeg; *.bmp; *.jfif);; All files(*.*)"
     fname = popupFilePicker(self, 'Select Main Image', fileFilter)
@@ -511,16 +507,13 @@ class S3A(FRAnnotatorUI):
       with BusyCursor():
         self.resetMainImg(fname)
 
-  @Slot(str)
   def loadLayoutActionTriggered(self, layoutName):
     self.loadLayout(layoutName)
 
-  @Slot()
   def populateLoadLayoutOptions(self):
     layoutGlob = LAYOUTS_DIR.glob('*.dockstate')
     addDirItemsToMenu(self.menuLayout, layoutGlob, self.loadLayoutActionTriggered)
 
-  @Slot()
   def saveLayoutActionTriggered(self):
     outName = dialogGetSaveFileName(self, 'Layout Name')
     if outName is None or outName == '':
@@ -532,7 +525,6 @@ class S3A(FRAnnotatorUI):
     with BusyCursor():
       return objForMenu.loadParamState(nameToLoad)
 
-  @Slot()
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_EXPORT_COMP_LIST)
   def exportCompListActionTriggered(self):
     fileDlg = QtWidgets.QFileDialog()
@@ -543,7 +535,6 @@ class S3A(FRAnnotatorUI):
     if len(fname) > 0:
       self.exportCompList(fname)
 
-  @Slot()
   def exportLabelImgActionTriggered(self):
     """
     # Note -- These three functions will be a single dialog with options
@@ -576,15 +567,12 @@ class S3A(FRAnnotatorUI):
   # BUTTON CALLBACKS
   # ---------------
   # Push buttons
-  @Slot()
   def clearRegionBtnClicked(self):
     self.clearFocusedRegion()
 
-  @Slot()
   def resetRegionBtnClicked(self):
     self.resetFocusedRegion()
 
-  @Slot()
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_ACCEPT_REGION)
   def acceptRegionBtnClicked(self):
     self.acceptFocusedRegion()
@@ -594,7 +582,6 @@ class S3A(FRAnnotatorUI):
   def estimateBoundariesBtnClicked(self):
     self.estimateBoundaries()
 
-  @Slot()
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_CLEAR_BOUNDARIES)
   def clearBoundariesClicked(self):
     self.clearBoundaries()

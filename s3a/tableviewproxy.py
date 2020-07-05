@@ -18,7 +18,6 @@ from .structures import FRVertices, FRParam, FRParamParseError, FRS3AException, 
 from .tablemodel import FRComponentMgr
 
 Signal = QtCore.Signal
-Slot = QtCore.Slot
 
 TBL_FIELDS = FR_SINGLETON.tableData.allFields
 
@@ -136,7 +135,6 @@ class FRCompDisplayFilter(QtCore.QObject):
     else:
       self.selectRowsById(np.array([keepId]), QtCore.QItemSelectionModel.ClearAndSelect)
 
-  @Slot(object)
   def _reflectTableSelectionChange(self, selectedIds: OneDArr):
     self.selectedIds = selectedIds
     self.regionPlot.selectById(selectedIds)
@@ -163,7 +161,6 @@ class FRCompDisplayFilter(QtCore.QObject):
     self._compTbl.setFocus()
 
 
-  @Slot(object)
   def _reflectSelectionBoundsMade(self, selection: Union[OneDArr, FRVertices]):
     """
     :param selection: bounding box of user selection: [xmin ymin; xmax ymax]
@@ -274,6 +271,5 @@ class FRCompDisplayFilter(QtCore.QObject):
     return compDf
 
 
-  @Slot()
   def resetCompBounds(self):
     self.regionPlot.resetRegionList()

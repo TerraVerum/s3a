@@ -21,7 +21,6 @@ from .regions import FRShapeCollection, FRVertexDefinedImg
 # Required to trigger property registration
 
 Signal = QtCore.Signal
-Slot = QtCore.Slot
 QCursor = QtGui.QCursor
 
 class FREditableImg(pg.PlotWidget):
@@ -100,7 +99,6 @@ class FREditableImg(pg.PlotWidget):
     # If this is reached, a param was passed in that doesn't correspond to a valid button
     # TODO: return soemthing else?
 
-  @Slot(QtWidgets.QAbstractButton, bool)
   def _handleBtnToggle(self, btn: QtWidgets.QPushButton, isChecked: bool):
     """
     This function will be called for each button check and corresponding UNCHECK

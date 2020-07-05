@@ -15,7 +15,6 @@ from s3a.projectvars import FR_CONSTS, FR_ENUMS, REQD_TBL_FIELDS
 from s3a.structures import FRS3AException, FRS3AWarning
 from s3a.tablemodel import FRCompTableModel, FRComponentMgr
 
-Slot = QtCore.Slot
 Signal = QtCore.Signal
 
 TBL_FIELDS = FR_SINGLETON.tableData.allFields
