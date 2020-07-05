@@ -4,7 +4,7 @@ import sys
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Callable, Dict, Any, Union, Optional
+from typing import Callable, Dict, Any, Union, Optional, Tuple
 from warnings import warn
 
 import pandas as pd
@@ -67,13 +67,12 @@ class S3A(FRAnnotatorUI):
 
     self.statBar = QtWidgets.QStatusBar(self)
     self.setStatusBar(self.statBar)
-    authorName = resolveAuthorName(quickLoaderArgs.get('Author', None))
+    authorName = resolveAuthorName(quickLoaderArgs.pop('Author', None))
     if authorName is None:
       sys.exit('No author name provided and no default author exists. Exiting.\n'
                'To start without error, provide an author name explicitly, e.g.\n'
                '"python -m s3a --author=<Author Name>"')
     FR_SINGLETON.tableData.annAuthor = authorName
-    #self.statBar.showMessage(authorName)
 
     self.mouseCoords = QtWidgets.QLabel(f"Author: {authorName} Mouse Coords")
 
@@ -255,25 +254,27 @@ class S3A(FRAnnotatorUI):
   # -----
   # App functionality
   # -----
-  def setInfo(self, info):
+  def setInfo(self, info: Tuple[Tuple[int, int], np.ndarray]):
     authorName = FR_SINGLETON.tableData.annAuthor
-    self.mouseCoords.setText(f'Author: {authorName} | Mouse (x,y): {info[0][1]}, {info[0][0]} | Pixel Color: ')
-    self.pxColor.setText(f'{info[1]}')
-    var = 0
-    if len(info[1]) == 3:
-      if ((var + info[1][0] + info[1][1] + info[1][2]) / 3) > 127:
-        self.pxColor.setStyleSheet(
-          f'background:rgb({info[1][0]}, {info[1][1]}, {info[1][2]}); color:black;  font-weight:16px')
-      else:
-        self.pxColor.setStyleSheet(
-          f'background:rgb({info[1][0]}, {info[1][1]}, {info[1][2]}); color:white;  font-weight:16px')
+    rowColCoords = info[0]
+    color = info[1]
+    self.mouseCoords.setText(f'Author: {authorName} | Mouse (x,y): {rowColCoords[1]}, {rowColCoords[0]} | Pixel Color: ')
+    self.pxColor.setText(f'{color}')
+    if color.dtype == float:
+      # Turn to uint
+      color = (color*255).astype('uint8')
+    # Regardless of the number of image channels, display as RGBA color
+    if color.size == 1:
+      color = np.array([color[0]]*3 + [255])
+    elif color.size == 3:
+      color = np.concatenate([color, [255]])
+    # Else: assume already RGBA
+    # Determine text color based on background color
+    if np.mean(color) > 127:
+      fontColor = 'black'
     else:
-      if info[1][0] > 127:
-        self.pxColor.setStyleSheet(
-          f'background:rgb({info[1][0]}, {info[1][0]}, {info[1][0]}); color:black;  font-weight:16px')
-      else:
-        self.pxColor.setStyleSheet(
-          f'background:rgb({info[1][0]}, {info[1][0]}, {info[1][0]}); color:white;  font-weight:16px')
+      fontColor = 'white'
+    self.pxColor.setStyleSheet(f'background:rgba{tuple(color)}; color:{fontColor}; font-weight: 16px')
 
   def startAutosave(self, interval_mins: float, autosaveFolder: Path, baseName: str):
     autosaveFolder.mkdir(exist_ok=True, parents=True)
@@ -287,6 +288,7 @@ class S3A(FRAnnotatorUI):
       counter = 0
     else:
       counter = max(map(lambda fname: int(fname.stem.rsplit('_')[1]), existingFiles)) + 1
+
     def save_incrementCounter():
       nonlocal counter
       baseSaveNamePlusFolder = autosaveFolder/f'{baseName}_{counter}.csv'

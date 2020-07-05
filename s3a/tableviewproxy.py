@@ -18,7 +18,6 @@ from .structures import FRVertices, FRParam, FRParamParseError, FRS3AException, 
 from .tablemodel import FRComponentMgr
 
 Signal = QtCore.Signal
-
 TBL_FIELDS = FR_SINGLETON.tableData.allFields
 
 class FRCompSortFilter(QtCore.QSortFilterProxyModel):
@@ -125,7 +124,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     """See signature for :meth:`FRComponentMgr.mergeCompsById`"""
     selection, _ = self._compTbl.getIds_colsFromSelection(ignoreNoEditCols=True)
 
-    if keepId is None and len(selection > 0):
+    if keepId is None and selection is not None and len(selection > 0):
       keepId = selection[0]
     try:
       self._compMgr.mergeCompVertsById(selection, keepId)

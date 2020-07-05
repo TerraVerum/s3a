@@ -214,7 +214,7 @@ class FRComponentMgr(FRCompTableModel):
     self.addComps(removedData, FR_ENUMS.COMP_ADD_AS_MERGE)
 
   @FR_SINGLETON.actionStack.undoable('Merge Components')
-  def mergeCompVertsById(self, mergeIds: OneDArr, keepId: int=None):
+  def mergeCompVertsById(self, mergeIds: OneDArr=None, keepId: int=None):
     """
     Merges the selected components
 
@@ -224,7 +224,7 @@ class FRComponentMgr(FRCompTableModel):
       the merged component columns (except for the vertices, of course). Else,
       this will default to the first component in the selection.
     """
-    if len(mergeIds) < 2:
+    if mergeIds is None or len(mergeIds) < 2:
       warn(f'Less than two components are selected, so "merge" is a no-op.', FRS3AWarning)
       return
     mergeComps: df = self.compDf.loc[mergeIds].copy()
