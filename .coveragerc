@@ -1,0 +1,4 @@
+[run]
+# Mostly graphics helpers, so they can't really be tested
+omit =
+    s3a/frgraphics/graphicsutils.py
