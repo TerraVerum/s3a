@@ -20,14 +20,14 @@ def sampleComps():
 
 @pytest.fixture(autouse=True)
 def resetApp_tester(request):
+  if 'noclear' in request.keywords:
+    return
   if 'smallimage' in request.keywords:
     app.resetMainImg(SAMPLE_SMALL_IMG_FNAME, SAMPLE_SMALL_IMG)
   else:
     app.resetMainImg(SAMPLE_IMG_FNAME, SAMPLE_IMG)
   if 'withcomps' in request.keywords:
     mgr.addComps(dfTester.compDf.copy())
-    return
-  if 'noclear' in request.keywords:
     return
   app.clear()
   dfTester.fillRandomVerts(app.mainImg.image.shape)
