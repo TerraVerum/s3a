@@ -67,7 +67,7 @@ class S3A(FRAnnotatorUI):
 
     self.statBar = QtWidgets.QStatusBar(self)
     self.setStatusBar(self.statBar)
-    authorName = resolveAuthorName(quickLoaderArgs.pop('Author', None))
+    authorName = resolveAuthorName(quickLoaderArgs.pop('author', None))
     if authorName is None:
       sys.exit('No author name provided and no default author exists. Exiting.\n'
                'To start without error, provide an author name explicitly, e.g.\n'
@@ -428,7 +428,7 @@ class S3A(FRAnnotatorUI):
     if isinstance(profileSrc, str):
       profileSrc = {FR_SINGLETON.quickLoader.name: profileSrc}
 
-    loads = ['Image', 'Annotations', 'Layout']
+    loads = ['image', 'annotations', 'layout']
     fns = [self.resetMainImg, self.loadCompList, self.loadLayoutActionTriggered]
     errSettings = []
 

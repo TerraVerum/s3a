@@ -139,7 +139,7 @@ class FRQuickLoaderEditor(FRParamEditor):
     errSettings = []
 
     for editor in [self] + self.listModel.uniqueEditors:
-      paramStateName = profileSrc.get(editor.name, None)
+      paramStateName = profileSrc.get(editor.name.replace(' ', '').lower(), None)
       if paramStateName is not None:
         try:
           editor.loadParamState(paramStateName)

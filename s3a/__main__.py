@@ -29,7 +29,7 @@ def main(gui=True, tableCfg: FilePath=None, **profileArgs) -> Optional[S3A]:
   # Parameter editors are named in title-case, so ensure this is how keys are formatted
   if tableCfg is not None:
     FR_SINGLETON.tableData.loadCfg(tableCfg)
-  profileArgs = {k.title(): v for k, v in profileArgs.items()}
+  profileArgs = {k.replace(' ', '').lower(): v for k, v in profileArgs.items()}
   win = S3A(**profileArgs, exceptionsAsDialogs=gui)
   if gui:
     QtCore.QTimer.singleShot(0, win.showMaximized)
