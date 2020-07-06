@@ -109,7 +109,9 @@ class _FRConsts(FRParamGroup):
                                                    ' the first in the selection')
   TOOL_SPLIT_COMPS            : FRParam = newParam('Split Selected Components',
                                                    valType='actionwithshortcut',
-                                                   helpText='Makes a separate component for each distinct boundary of all selected components.')
+                                                   helpText='Makes a separate component for '
+                                                            'each distinct boundary of all '
+                                                            'selected components.')
   TOOL_OVERRIDE_VERTS_ACT     : FRParam = newParam('Override Created Boundary',
                                               valType='actionwithshortcut',
                                               helpText='Overrides the created bounary'

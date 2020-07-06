@@ -245,6 +245,32 @@ class FRComponentMgr(FRCompTableModel):
     yield
     self.addComps(mergeComps, FR_ENUMS.COMP_ADD_AS_MERGE)
 
+  @FR_SINGLETON.actionStack.undoable('Split Components')
+  def splitCompVertsById(self, splitIds: OneDArr):
+    """
+    Makes a separate component for each distinct boundary in all selected components.
+    For instance, if two components are selected, and each has two separate circles as
+    vertices, then 4 total components will exist after this operation.
+
+    Each new component will have the table fields of its parent
+
+    :param splitIds: Ids of components to split up
+    """
+    splitComps = self.compDf.loc[splitIds, :].copy()
+    newComps_lst = []
+    for _, comp in splitComps.iterrows():
+      verts = comp[REQD_TBL_FIELDS.VERTICES]
+      childComps = pd.concat([comp.to_frame().T]*len(verts))
+      newVerts = [FRComplexVertices([v]) for v in verts]
+      childComps.loc[:, REQD_TBL_FIELDS.VERTICES] = newVerts
+      newComps_lst.append(childComps)
+    newComps = pd.concat(newComps_lst)
+    self.rmComps(splitComps.index)
+    self.addComps(newComps)
+    yield
+    self.rmComps(newComps.index)
+    self.addComps(splitComps, FR_ENUMS.COMP_ADD_AS_MERGE)
+
 def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> pd.Series:
   paramType = type(paramVal)
   # TODO: Move this to a more obvious place?

@@ -68,6 +68,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     mainImg.sigSelectionBoundsMade.connect(self._reflectSelectionBoundsMade)
 
     mainImg.mergeCompsAct.sigActivated.connect(lambda *args: self.mergeSelectedComps())
+    mainImg.splitCompsAct.sigActivated.connect(lambda *args: self.splitSelectedComps())
     compMgr.sigCompsChanged.connect(self.redrawComps)
     filterEditor.sigParamStateUpdated.connect(self._updateFilter)
     FR_SINGLETON.scheme.sigParamStateUpdated.connect(lambda: self._updateFilter(self._filter))
@@ -119,6 +120,14 @@ class FRCompDisplayFilter(QtCore.QObject):
   def _updateFilter(self, newFilterDict):
     self._filter = newFilterDict
     self.redrawComps(self._compMgr.defaultEmitDict)
+
+  def splitSelectedComps(self):
+    """See signature for :meth:`FRComponentMgr.splitCompsById`"""
+    selection, _ = self._compTbl.getIds_colsFromSelection(ignoreNoEditCols=True)
+    if selection is None:
+      return
+    self._compMgr.splitCompVertsById(selection)
+    self.selectRowsById(selection, QtCore.QItemSelectionModel.ClearAndSelect)
 
   def mergeSelectedComps(self, keepId: int=None):
     """See signature for :meth:`FRComponentMgr.mergeCompsById`"""
