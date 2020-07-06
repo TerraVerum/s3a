@@ -119,7 +119,7 @@ def dialogGetAuthorName(parent: QtWidgets.QMainWindow) -> str:
 
 def attemptFileLoad(fpath: FilePath , openMode='r') -> Union[dict, bytes]:
   with open(fpath, openMode) as ifile:
-    loadObj = yaml.load(ifile)
+    loadObj = dict(yaml.load(ifile))
   return loadObj
 
 def addDirItemsToMenu(parentMenu: QtWidgets.QMenu, dirGlob: Generator,
@@ -303,7 +303,6 @@ class FRScrollableErrorDialog(QtWidgets.QDialog):
         newText = msgWithoutTrace
       showTrace = not showTrace
       scrollMsg.setText(newText)
-
     toggleTrace.clicked.connect(lambda: updateTxt())
 
     btnLayout.addItem(spacerItem)

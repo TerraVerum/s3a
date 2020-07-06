@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from inspect import isclass
 from os.path import join
 from typing import Optional, Dict, List, Callable, Union
 
@@ -30,7 +31,9 @@ class FRAlgPropsMgr(FRParamEditor):
     return super().registerGroup(groupParam, saveDefault=False, **opts)
 
   def createProcessorForClass(self, clsObj, editorName=None) -> FRAlgCollectionEditor:
-    clsName = type(clsObj).__name__
+    if not isclass(clsObj):
+      clsObj = type(clsObj)
+    clsName = clsObj.__name__
     editorDir = join(MENU_OPTS_DIR, clsName, '')
     if editorName is None:
       # Strip "FR" from class name before retrieving name
