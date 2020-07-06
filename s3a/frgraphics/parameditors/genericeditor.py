@@ -189,7 +189,6 @@ class FRParamEditor(QtWidgets.QDockWidget):
     # self.dockContentsWidget.setMinimumWidth(totWidth)
     self.tree.setColumnWidth(0, self.width()//2)
     self.resize(self.tree.width(), self.height())
-    self.tree.setMinimumWidth(self.tree.width())
 
 
   # Helper method for accessing simple parameter values
@@ -334,7 +333,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
     if stateDict is not None:
       return stateDict
     dictFilename = self.formatFileName(stateName)
-    stateDict = attemptFileLoad(dictFilename)
+    stateDict = dict(attemptFileLoad(dictFilename))
     return stateDict
 
   def deleteParamState(self, stateName: str):
