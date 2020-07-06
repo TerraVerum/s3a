@@ -127,7 +127,8 @@ class FRCompDisplayFilter(QtCore.QObject):
     if selection is None or len(selection) < 2:
       # Nothing to do
       return
-    keepId = selection[0]
+    if keepId is None:
+      keepId = selection[0]
     try:
       self._compMgr.mergeCompVertsById(selection, keepId)
     except FRS3AWarning:

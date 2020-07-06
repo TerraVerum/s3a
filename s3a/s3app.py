@@ -174,6 +174,14 @@ class S3A(FRAnnotatorUI):
   # -----
   # Gui stuff
   # -----
+  def forceClose(self):
+    """
+    Allows the app to close even if it has unsaved changes. Useful for closing
+    within a script
+    """
+    self.hasUnsavedChanges = False
+    self.close()
+
   def closeEvent(self, ev: QtGui.QCloseEvent):
     # Confirm all components have been saved
     shouldExit = False

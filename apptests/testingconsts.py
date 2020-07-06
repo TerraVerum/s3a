@@ -1,5 +1,6 @@
 import cv2 as cv
 import numpy as np
+from numpy import VisibleDeprecationWarning
 from skimage import data
 from skimage import io
 
@@ -7,8 +8,7 @@ from s3a.projectvars import BASE_DIR, REQD_TBL_FIELDS
 
 NUM_COMPS = 15
 TESTS_DIR = BASE_DIR.parent/'apptests'
-EXPORT_DIR = TESTS_DIR/'files'
-IMG_DIR = EXPORT_DIR
+IMG_DIR = TESTS_DIR/'files'
 FIMG_SER_COLS = [REQD_TBL_FIELDS.INST_ID, REQD_TBL_FIELDS.VERTICES]
 RND = np.random.default_rng(seed=42)
 
@@ -24,6 +24,9 @@ SAMPLE_SMALL_IMG_FNAME = IMG_DIR/'smallimg.png'
 
 for impath, im in zip([SAMPLE_SMALL_IMG_FNAME, SAMPLE_IMG_FNAME],
                       [SAMPLE_SMALL_IMG, SAMPLE_IMG]):
-  if not impath.exists():
-    impath.parent.mkdir(exist_ok=True, parents=True)
-    io.imsave(impath, im)
+  impath.parent.mkdir(exist_ok=True, parents=True)
+  io.imsave(impath, im)
+
+from warnings import simplefilter
+simplefilter('error', DeprecationWarning)
+simplefilter('error', VisibleDeprecationWarning)

@@ -1,12 +1,16 @@
+import shutil
+import sys
+
 import matplotlib.pyplot as plt
 import pytest
+from numpy import VisibleDeprecationWarning
 
-from helperclasses import CompDfTester, S3ATester
-from s3a import FR_SINGLETON
+from helperclasses import CompDfTester
+from s3a import FR_SINGLETON, S3A
 from testingconsts import SAMPLE_IMG, SAMPLE_IMG_FNAME, NUM_COMPS, \
-  SAMPLE_SMALL_IMG, SAMPLE_SMALL_IMG_FNAME
+  SAMPLE_SMALL_IMG, SAMPLE_SMALL_IMG_FNAME, IMG_DIR
 
-app = S3ATester(Image=SAMPLE_IMG_FNAME, exceptionsAsDialogs=False)
+app = S3A(Image=SAMPLE_IMG_FNAME, exceptionsAsDialogs=False)
 mgr = app.compMgr
 stack = FR_SINGLETON.actionStack
 
@@ -18,21 +22,21 @@ dfTester.fillRandomClasses()
 def sampleComps():
   return dfTester.compDf.copy()
 
+# Each test can request wheter it starts with components, small image, etc.
+# After each test, all components are removed from the app
 @pytest.fixture(autouse=True)
 def resetApp_tester(request):
-  if 'noclear' in request.keywords:
-    return
   if 'smallimage' in request.keywords:
     app.resetMainImg(SAMPLE_SMALL_IMG_FNAME, SAMPLE_SMALL_IMG)
   else:
     app.resetMainImg(SAMPLE_IMG_FNAME, SAMPLE_IMG)
   if 'withcomps' in request.keywords:
+    dfTester.fillRandomVerts(app.mainImg.image.shape)
+    dfTester.fillRandomClasses()
     mgr.addComps(dfTester.compDf.copy())
-    return
-  app.clear()
-  dfTester.fillRandomVerts(app.mainImg.image.shape)
-  dfTester.fillRandomClasses()
-  return
+  yield
+  stack.clear()
+  app.clearBoundaries()
 
 
 class _block_pltShow:

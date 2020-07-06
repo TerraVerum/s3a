@@ -48,10 +48,9 @@ def roiFactory():
 
   return _polyRoi
 
-@pytest.mark.noclear
+@pytest.mark.withcomps
 def test_update():
   assert fImg.image is None
-  mgr.addComps(dfTester.compDf.copy())
   focusedId = NUM_COMPS-1
   newCompSer = mgr.compDf.loc[focusedId]
   # Action 1
@@ -75,7 +74,6 @@ def test_update():
   FR_SINGLETON.actionStack.redo()
   assert fImg.compSer.equals(newerSer[FIMG_SER_COLS])
 
-@pytest.mark.noclear
 def test_region_modify(sampleComps):
   app.add_focusComp(sampleComps)
   shapeBnds = fImg.image.shape[:2]
@@ -119,10 +117,11 @@ def test_selectionbounds_all():
                        [imBounds[0], imBounds[1]],
                         [imBounds[0], 0]])
   app.mainImg.sigSelectionBoundsMade.emit(bounds)
-  assert len(app.compDisplay.selectedIds) == NUM_COMPS
+  assert len(app.compDisplay.selectedIds) == len(mgr.compDf)
 
 @pytest.mark.withcomps
 def test_selectionbounds_none():
   app.compTbl.clearSelection()
+  # Selection in negative area ensures no comps will be selected
   app.mainImg.sigSelectionBoundsMade.emit(FRVertices([[-100,-100]]))
   assert len(app.compDisplay.selectedIds) == 0

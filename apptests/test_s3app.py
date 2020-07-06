@@ -11,7 +11,7 @@ from s3a.generalutils import resolveAuthorName
 from s3a.projectvars import REQD_TBL_FIELDS, LAYOUTS_DIR, ANN_AUTH_DIR
 from s3a.structures import FRAlgProcessorError, FRS3AException, FRVertices, \
   FRComplexVertices, FRS3AWarning
-from testingconsts import EXPORT_DIR, FIMG_SER_COLS, RND, SAMPLE_IMG
+from testingconsts import FIMG_SER_COLS, RND, SAMPLE_IMG
 
 
 def test_change_img():
@@ -46,13 +46,13 @@ def test_est_clear_bounds():
   # Restore state
   clctn.switchActiveProcessor(prevProc)
 
-def test_export_all_comps():
-  compFile = EXPORT_DIR/'tmp.csv'
+def test_export_all_comps(tmpdir):
+  compFile = tmpdir/'tmp.csv'
   app.exportCompList(str(compFile))
   assert compFile.exists(), 'All-comp export didn\'t produce a component list'
 
-def test_load_comps_merge():
-  compFile = EXPORT_DIR/'tmp.csv'
+def test_load_comps_merge(tmpdir):
+  compFile = tmpdir/'tmp.csv'
 
   app.compMgr.addComps(dfTester.compDf)
   app.exportCompList(str(compFile))
@@ -64,14 +64,14 @@ def test_load_comps_merge():
   dfCmp = app.compMgr.compDf[equalCols].values == dfTester.compDf[equalCols].values
   assert np.all(dfCmp), 'Loaded dataframe doesn\'t match daved dataframe'
 
-def test_import_large_verts(sampleComps, ):
+def test_import_large_verts(sampleComps, tmpdir):
   sampleComps.loc[:, REQD_TBL_FIELDS.INST_ID] = np.arange(len(sampleComps))
   sampleComps.at[0, REQD_TBL_FIELDS.VERTICES] = FRComplexVertices([FRVertices([[50e3, 50e3]])])
   io = app.compExporter
   io.prepareDf(sampleComps)
-  io.exportCsv(EXPORT_DIR/'Bad Verts.csv')
+  io.exportCsv(tmpdir/'Bad Verts.csv')
   with pytest.warns(FRS3AWarning):
-    io.buildFromCsv(EXPORT_DIR/'Bad Verts.csv', app.mainImg.image.shape)
+    io.buildFromCsv(tmpdir/'Bad Verts.csv', app.mainImg.image.shape)
 
 def test_change_comp():
   stack = FR_SINGLETON.actionStack
@@ -92,9 +92,11 @@ def test_save_layout():
   assert savePath.exists()
   savePath.unlink()
 
-def test_autosave():
+def test_autosave(tmpdir):
   interval = 0.01
-  app.startAutosave(interval, EXPORT_DIR, 'autosave')
+  # Wrap in path otherwise some path ops don't work as expected
+  tmpdir = Path(tmpdir)
+  app.startAutosave(interval, tmpdir, 'autosave')
   testComps1 = dfTester.compDf.copy()
   app.compMgr.addComps(testComps1)
   app.autosaveTimer.timeout.emit()
@@ -110,7 +112,7 @@ def test_autosave():
   app.compMgr.addComps(testComps3)
   app.autosaveTimer.timeout.emit()
   app.stopAutosave()
-  savedFiles = list(EXPORT_DIR.glob('autosave*.csv'))
+  savedFiles = list(tmpdir.glob('autosave*.csv'))
   assert len(savedFiles) >= 3, 'Not enough autosaves generated'
 
 def test_stage_plotting():
@@ -141,10 +143,10 @@ def test_no_author():
     S3A()
   resolveAuthorName('testauthor')
 
-def test_unsaved_changes(sampleComps):
+def test_unsaved_changes(sampleComps, tmpdir):
   app.compMgr.addComps(sampleComps)
   assert app.hasUnsavedChanges
-  app.exportCompList(EXPORT_DIR/'export.csv')
+  app.exportCompList(tmpdir/'export.csv')
   assert not app.hasUnsavedChanges
 
 def test_set_colorinfo():
