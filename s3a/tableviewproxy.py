@@ -124,7 +124,10 @@ class FRCompDisplayFilter(QtCore.QObject):
     """See signature for :meth:`FRComponentMgr.mergeCompsById`"""
     selection, _ = self._compTbl.getIds_colsFromSelection(ignoreNoEditCols=True)
 
-    if keepId is None and selection is not None and len(selection > 0):
+    if selection is None or len(selection) < 2:
+      # Nothing to do
+      return
+    if keepId is None:
       keepId = selection[0]
     try:
       self._compMgr.mergeCompVertsById(selection, keepId)

@@ -1,23 +1,21 @@
-from functools import partial
-from typing import Tuple, List, Optional, Sequence
+from typing import Tuple, List
 
 import cv2 as cv
 import numpy as np
 import pandas as pd
+from imageprocessing import algorithms
+from imageprocessing.common import Image
+from imageprocessing.processing import ImageIO, ImageProcess
 from scipy.ndimage import binary_fill_holes
 from skimage.measure import regionprops, label, regionprops_table
 from skimage.morphology import flood
 from skimage.segmentation import quickshift
-from sklearn.utils import resample
+import skimage.segmentation as seg
 
 from s3a.generalutils import splitListAtNans, getClippedBbox
 from s3a.structures import BlackWhiteImg, FRVertices, NChanImg, FRComplexVertices, \
   GrayImg, RgbImg, FRAlgProcessorError
-from imageprocessing import algorithms
-from imageprocessing.algorithms import watershedProcess, graphCutSegmentation, \
-  otsuThresholdProcess, otsu_threshold
-from imageprocessing.common import Image
-from imageprocessing.processing import ImageIO, ImageProcess
+
 
 def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int,
                   *otherBboxes: np.ndarray,
@@ -86,14 +84,6 @@ def colorLabelsWithMean(labelImg: GrayImg, refImg: NChanImg) -> RgbImg:
     curmask = labelImg == curLabel
     outImg[curmask,:] = refImg[curmask,:].reshape(-1,3).mean(0)
   return outImg
-
-def segmentComp(compImg: RgbImg, maxDist: np.float, kernSz=10) -> RgbImg:
-  # For maxDist of 0, the input isn't changed and it takes a long time
-  if maxDist < 1:
-    return compImg
-  segImg = quickshift(compImg, kernel_size=kernSz, max_dist=maxDist)
-  # Color segmented image with mean values
-  return colorLabelsWithMean(segImg, compImg)
 
 def growSeedpoint_cv_fastButErratic(img: NChanImg, seeds: FRVertices, thresh: float):
   if len(seeds) == 0:
@@ -330,6 +320,50 @@ def cv_grabcut(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
   outMask = np.where((mask==2)|(mask==0), False, True)
   return ImageIO(image=outMask, grabcutDisplay=mask, display='grabcutDisplay')
 
+def quickshift_seg(image: Image, fgVerts: FRVertices, maxDist=10., kernelSize=5,
+               sigma=0.0):
+  # For maxDist of 0, the input isn't changed and it takes a long time
+  if maxDist == 0:
+    return image
+  segImg = quickshift(image, kernel_size=kernelSize, max_dist=maxDist,
+                      sigma=sigma)
+
+def k_means(image: Image, kVal=5, attempts=10):
+  # Logic taken from https://docs.opencv.org/master/d1/d5c/tutorial_py_kmeans_opencv.html
+  clrs = image.reshape(-1, image.depth)
+  clrs = clrs.astype('float32')
+  criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+  ret, lbls, imgMeans = cv.kmeans(clrs, kVal, None, criteria, attempts,
+                             cv.KMEANS_RANDOM_CENTERS)
+  # Now convert back into uint8, and make original image
+  imgMeans = imgMeans.astype('uint8')
+  lbls = lbls.reshape(image.shape[:2])
+  return ImageIO(image=lbls, imgMeans=imgMeans,
+                 disp=imgMeans[lbls], display='disp')
+
+def binarize_kmeans(image: Image, fgVerts: FRVertices, imgMeans: np.ndarray,
+                    removeBoundaryLbls=True,
+                    discardLargesetLbl=False):
+  if removeBoundaryLbls == discardLargesetLbl:
+    raise FRAlgProcessorError('Exactly one of *removeBoundaryLbls* or'
+                              ' *discardLargesetLbl* must be *True*.')
+  # Binarize by turning all boundary labels into background and keeping forground
+  out = np.zeros(image.shape, bool)
+  numLbls = imgMeans.shape[0]
+  if removeBoundaryLbls:
+    discardLbls = np.unique(image[fgVerts.rows, fgVerts.cols])\
+    # For a single point vertex, invert this rule
+    if fgVerts.shape[0] == 1:
+      discardLbls = np.setdiff1d(np.arange(numLbls), discardLbls)
+  else:
+    discardLbls = np.argsort(np.histogram(image, numLbls)[0])[[-1]]
+  # if not asForeground:
+  #   discardLbls = np.setdiff1d(np.arange(numLbls), discardLbls)
+  keepMembership = ~np.isin(image, discardLbls)
+  out[keepMembership] = True
+  return ImageIO(image=out)
+
+
 def region_grow(image: Image, fgVerts: FRVertices, seedThresh=10):
   if image.size == 0:
     return ImageIO(image=np.zeros(image.shape[:2], bool))
@@ -368,12 +402,9 @@ class FRTopLevelProcessors:
     return ImageProcess.fromFunction(region_grow, name='Region Growing')
 
   @staticmethod
-  def d_graphCutProcessor():
-    proc = ImageProcess.fromFunction(disallow_paint_tool, name="Graph Cut")
-    gcProc = graphCutSegmentation(numSegs=100)
-    gcProc.allowDisable = False
-    proc.addProcess(gcProc)
-    proc.addFunction(otsu_threshold, binaryOutput=True)
+  def c_kMeansProcessor():
+    proc = ImageProcess.fromFunction(k_means, name='K Means')
+    proc.addFunction(binarize_kmeans)
     return proc
 
   @staticmethod

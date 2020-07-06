@@ -9,7 +9,7 @@ from pandas import DataFrame as df
 from s3a import FR_SINGLETON, S3A
 from s3a.projectvars import REQD_TBL_FIELDS
 from s3a.structures import FRComplexVertices, FRParam
-from testingconsts import RND, SAMPLE_IMG_FNAME, EXPORT_DIR, SAMPLE_SMALL_IMG_FNAME
+from testingconsts import RND, SAMPLE_IMG_FNAME, SAMPLE_SMALL_IMG_FNAME, IMG_DIR
 
 makeCompDf = FR_SINGLETON.tableData.makeCompDf
 
@@ -50,18 +50,10 @@ class CompDfTester:
     return newClasses
 
 
-@FR_SINGLETON.registerGroup(FRParam('Testing Class'))
-class S3ATester(S3A):
-  def clear(self):
-    clearTmpFiles([SAMPLE_SMALL_IMG_FNAME, SAMPLE_IMG_FNAME])
-    self.clearBoundaries()
-    FR_SINGLETON.actionStack.clear()
-
-
 def clearTmpFiles(exceptFiles: List[Path] =None):
   if exceptFiles is None:
     exceptFiles: List[Path] = []
-  for file in EXPORT_DIR.glob('*'):
+  for file in IMG_DIR.glob('*'):
     if file not in exceptFiles:
       file.chmod(stat.S_IWRITE)
       file.unlink()

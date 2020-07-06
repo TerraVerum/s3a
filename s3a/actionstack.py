@@ -144,7 +144,7 @@ class FRActionStack:
     All actions which occur within the group will be undone by a single call
     of `stack.undo`.
     """
-    newActBuffer: deque[FRAction] = deque()
+    newActBuffer: Deque[FRAction] = deque()
     with _FRBufferOverride(self, newActBuffer):
       yield
     def grpAct():

@@ -5,26 +5,25 @@ import numpy as np
 import pytest
 
 from conftest import app, dfTester
-from testingconsts import EXPORT_DIR
 from s3a.generalutils import augmentException
 from s3a.projectvars import REQD_TBL_FIELDS
 from s3a.structures import FRS3AException, FRComplexVertices, FRVertices, FRS3AWarning
 from s3a.tablemodel import FRComponentIO
 
-def test_normal_export(sampleComps):
+def test_normal_export(sampleComps, tmpdir):
   io = app.compExporter
   io.exportOnlyVis = False
   io.prepareDf(sampleComps)
   for ftype in io.handledExportTypes:
-    curPath = EXPORT_DIR / f'normalExport - All IDs.{ftype}'
+    curPath = tmpdir / f'normalExport - All IDs.{ftype}'
     doAndAssertExport(curPath, io, 'Normal export with all IDs not successful.')
 
 
 
-def test_filter_export(sampleComps):
+def test_filter_export(sampleComps, tmpdir):
   io = app.compExporter
 
-  curPath = EXPORT_DIR / 'normalExport - Filtered IDs export all.csv'
+  curPath = tmpdir / 'normalExport - Filtered IDs export all.csv'
   filterIds = np.array([0,3,2])
   io.exportOnlyVis = False
   io.prepareDf(sampleComps, filterIds)
@@ -35,7 +34,7 @@ def test_filter_export(sampleComps):
   # With export only visible false, should still export whole frame
   doAndAssertExport(curPath, io, 'Normal export with filter ids passed not successful.')
 
-  curPath = EXPORT_DIR / 'normalExport - Filtered IDs export filtered.csv'
+  curPath = tmpdir / 'normalExport - Filtered IDs export filtered.csv'
   io.exportOnlyVis = True
   io.prepareDf(sampleComps, filterIds)
   np.testing.assert_array_equal(io.compDf.index, filterIds,
@@ -44,13 +43,14 @@ def test_filter_export(sampleComps):
   # With export only visible false, should still export whole frame
   doAndAssertExport(curPath, io, 'Export with filtered ids not successful.')
 
-def test_bad_import():
+def test_bad_import(tmpdir):
   io = app.compExporter
-  ofile = open(EXPORT_DIR/'junkfile.csv', 'w')
-  ofile.write('Vertices\nabsolute junk')
-  ofile.close()
-  with pytest.raises(Exception):
-    io.buildFromCsv(EXPORT_DIR/'junkfile.csv')
+  for ext in io.handledExportTypes:
+    ofile = open(tmpdir/f'junkfile.{ext}', 'w')
+    ofile.write('Vertices\nabsolute junk')
+    ofile.close()
+    with pytest.raises(Exception):
+      io.buildFromCsv(tmpdir/f'junkfile.{ext}')
 
 
 def doAndAssertExport(fpath: Path, io: FRComponentIO, failMsg: str):

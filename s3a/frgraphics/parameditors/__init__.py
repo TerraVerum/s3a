@@ -17,7 +17,7 @@ Signal = QtCore.Signal
 
 class FRGeneralPropertiesEditor(FRParamEditor):
   def __init__(self, parent=None):
-    super().__init__(parent, paramList=[], saveDir=GEN_PROPS_DIR, fileType='regctrl')
+    super().__init__(parent, paramList=[], saveDir=GEN_PROPS_DIR, fileType='genprops')
 
 
 class FRColorSchemeEditor(FRParamEditor):
