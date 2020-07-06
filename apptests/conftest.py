@@ -1,14 +1,14 @@
-import shutil
 import sys
+import traceback
+import warnings
 
 import matplotlib.pyplot as plt
 import pytest
-from numpy import VisibleDeprecationWarning
 
 from helperclasses import CompDfTester
 from s3a import FR_SINGLETON, S3A
 from testingconsts import SAMPLE_IMG, SAMPLE_IMG_FNAME, NUM_COMPS, \
-  SAMPLE_SMALL_IMG, SAMPLE_SMALL_IMG_FNAME, IMG_DIR
+  SAMPLE_SMALL_IMG, SAMPLE_SMALL_IMG_FNAME
 
 app = S3A(Image=SAMPLE_IMG_FNAME, exceptionsAsDialogs=False)
 mgr = app.compMgr
@@ -17,6 +17,20 @@ stack = FR_SINGLETON.actionStack
 dfTester = CompDfTester(NUM_COMPS)
 dfTester.fillRandomVerts(imShape=SAMPLE_IMG.shape)
 dfTester.fillRandomClasses()
+
+@pytest.fixture(scope='session', autouse=True)
+def cfg_warnings():
+  oldWarnings = warnings.showwarning
+  def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
+
+    log = file if hasattr(file,'write') else sys.stderr
+    traceback.print_stack(file=log)
+    log.write(warnings.formatwarning(message, category, filename, lineno, line))
+
+  warnings.showwarning = warn_with_traceback
+  yield
+  # Set back to normal
+  warnings.showwarning = oldWarnings
 
 @pytest.fixture(scope="module")
 def sampleComps():
