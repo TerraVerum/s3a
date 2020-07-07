@@ -5,7 +5,7 @@ validated:
 
 opt-tbl-fields:
   Validated:
-    value: "True"
+    value: "False"
     valType: validated
   Device Text:
     value: ''

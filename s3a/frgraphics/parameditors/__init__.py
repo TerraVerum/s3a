@@ -40,7 +40,8 @@ class _FRSingleton(QtCore.QObject):
     self.generalProps = FRGeneralPropertiesEditor()
 
     self.algParamMgr = FRAlgPropsMgr()
-    self.docks: List[FRParamEditor] = [self.scheme, self.generalProps, self.shortcuts]
+    self.docks: List[FRParamEditor] = [self.scheme, self.generalProps, self.shortcuts,
+        self.filter]
     self.quickLoader = FRQuickLoaderEditor(editorList=self.registerableEditors)
     self.docks.append(self.quickLoader)
     addFn = self.quickLoader.listModel.addEditors
