@@ -23,7 +23,7 @@ def leftClick(pt: Tuple[int, int]):
   clctn.buildRoi(event)
 
 
-def test_roi_vert_drag(qtbot):
+def test_roi_vert_drag():
   # For now just make sure no errors occur when dragging one vertex, since
   # this is a legal and expected op for every one
   pt = (0,0)
