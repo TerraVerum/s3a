@@ -44,15 +44,15 @@ class _FRSingleton(QtCore.QObject):
         self.filter]
     self.quickLoader = FRQuickLoaderEditor(editorList=self.registerableEditors)
     self.docks.append(self.quickLoader)
-    addFn = self.quickLoader.listModel.addEditors
-    self.algParamMgr.sigProcessorCreated.connect(lambda editor: addFn([editor]))
+    # addFn = self.quickLoader.listModel.addEditors
+    # self.algParamMgr.sigProcessorCreated.connect(lambda editor: addFn([editor]))
 
     self.actionStack = FRActionStack()
 
   @property
   def registerableEditors(self):
     outList = []
-    for editor in self.docks + self.algParamMgr.spawnedCollections:
+    for editor in self.docks:
       if isinstance(editor, FRParamEditorDockGrouping):
         outList.extend(editor.editors)
       else:

@@ -37,7 +37,6 @@ class FRShapeCollection(QtCore.QObject):
     self.forceBlockRois = True
 
     self._curShape = allowableShapes[0]
-    self._allowableShapes = allowableShapes
     self._parent = parent
 
     for shape in allowableShapes:

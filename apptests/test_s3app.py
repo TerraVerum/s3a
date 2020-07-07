@@ -11,7 +11,8 @@ from s3a.generalutils import resolveAuthorName
 from s3a.projectvars import REQD_TBL_FIELDS, LAYOUTS_DIR, ANN_AUTH_DIR
 from s3a.structures import FRAlgProcessorError, FRS3AException, FRVertices, \
   FRComplexVertices, FRS3AWarning
-from testingconsts import FIMG_SER_COLS, RND, SAMPLE_IMG
+from testingconsts import FIMG_SER_COLS, RND, SAMPLE_IMG, SAMPLE_IMG_FNAME, \
+  SAMPLE_SMALL_IMG_FNAME
 
 
 def test_change_img():
@@ -135,7 +136,6 @@ def test_stage_plotting():
     focImg.handleShapeFinished(FRVertices())
     app.showModCompAnalytics()
 
-@pytest.mark.noclear
 def test_no_author():
   p = Path(ANN_AUTH_DIR/'defaultAuthor.txt')
   p.unlink()
@@ -162,3 +162,14 @@ def test_set_colorinfo():
     bgColor = np.array(literal_eval(bgColor))
     assert bgColor.size == 4
     assert np.all(np.isin(clr, bgColor))
+
+@pytest.mark.withcomps
+def test_quickload_profile(tmpdir):
+  outfile = Path(tmpdir)/'tmp.csv'
+  app.exportCompList(outfile)
+  app.importQuickLoaderProfile(
+    dict(image=str(SAMPLE_IMG_FNAME), layout='Default', annotations=str(outfile),
+    mainimageprocessor='Default', focusedimageprocessor='Default',
+    colorscheme='Default', tablefilter='Default', mainimagetools='Default',
+    focusedimagetools='Default', generalproperties='Default', shortcuts='Default'
+  ))

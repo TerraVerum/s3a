@@ -20,7 +20,7 @@ from ...generalutils import frPascalCaseToTitle
 Signal = QtCore.Signal
 
 class FRAlgPropsMgr(FRParamEditor):
-  sigProcessorCreated = Signal(object) # Signal(FRAlgCollectionEditor)
+  # sigProcessorCreated = Signal(object) # Signal(FRAlgCollectionEditor)
   def __init__(self, parent=None):
     super().__init__(parent, fileType='', saveDir='')
     self.processorCtors : List[Callable[[], ImageProcess]] = []
@@ -39,7 +39,7 @@ class FRAlgPropsMgr(FRParamEditor):
       # Strip "FR" from class name before retrieving name
       editorName = frPascalCaseToTitle(clsName) + ' Processor'
     newEditor = FRAlgCollectionEditor(editorDir, self.processorCtors, name=editorName)
-    # self.spawnedCollections.append(newEditor)
+    self.spawnedCollections.append(newEditor)
     # Wrap in property so changes propagate to the calling class
     lims = newEditor.algOpts.opts['limits']
     defaultKey = next(iter(lims))

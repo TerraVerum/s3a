@@ -185,13 +185,16 @@ class FRQuickLoaderEditor(FRParamEditor):
       curGroup = self.params.names[editor.name]
       _addRmOption(curGroup)
 
+    if paramState in curGroup.names:
+      # Duplicate option, no reason to add
+      return
     curGroup.opts['removable'] = True
-    if act is None and paramState not in curGroup.names:
+    if act is None:
       act = ActWithShc(name=paramState, removable=True, type='actionwithshortcut')
-      curGroup.addChild(act)
-    elif act is not None:
-      act.opts['removable'] = True
-      _addRmOption(act)
+    curGroup.addChild(act)
+
+    act.opts['removable'] = True
+    _addRmOption(act)
     act.sigActivated.connect(
       lambda _act: self._safeLoadParamState(_act, editor,paramState))
 
