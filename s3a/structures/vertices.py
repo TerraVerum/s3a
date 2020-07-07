@@ -231,7 +231,8 @@ class FRComplexVertices(list):
 
   def __eq__(self, other: FRComplexVertices):
     # lstLens = lambda lst: np.array([len(el) for el in lst])
-    return np.array_equal(self, other)
+    cmps = [np.asarray(arr, dtype=object) for arr in (self, other)]
+    return np.array_equal(*cmps)
 
   def __ne__(self, other):
     return not self == other
