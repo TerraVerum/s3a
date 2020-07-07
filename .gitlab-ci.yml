@@ -6,8 +6,8 @@ before_script:
   - apt-get install -y python3-pyqt5
   - python --version
   - pip install git+https://gitlab.com/ficsresearch/imageprocessing@development
-  - pip install -e .
   - pip install --upgrade pyqt5==5.13
+  - pip install -e .
   - pip install pytest-cov
   - xvfb-run python -c "from s3a.generalutils import resolveAuthorName;resolveAuthorName('testauthor')"
 
