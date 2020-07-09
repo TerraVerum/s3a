@@ -94,12 +94,17 @@ class FRShortcutsEditor(FRParamEditor):
     groupParams.append(param)
     self.boundFnsPerGroup[grouping] = groupParams
 
-  def _extendedGroupingDecorator(self, grouping: Any, groupParam: FRParam, **opts):
-    self.addRegisteredFuncsFromGroup(grouping, groupParam)
-    super()._extendedGroupingDecorator(grouping, groupParam, **opts)
-
   def _extendedClassInit(self, clsObj: Any, groupParam: FRParam):
-    boundParamList = self.boundFnsPerGroup.get(type(clsObj).__qualname__, [])
+    grouping = type(clsObj)
+    try:
+      self.addRegisteredFuncsFromGroup(grouping, groupParam)
+    except Exception as ex:
+      # Already added previously.
+      # This is the easiest way to check error type since pg throws a raw exception,
+      # not a subclass
+      if 'Already have child' not in str(ex):
+        raise
+    boundParamList = self.boundFnsPerGroup.get(grouping.__qualname__, [])
     for boundParam in boundParamList:
       seqCopy = QtGui.QKeySequence(boundParam.param.value)
       try:
@@ -130,9 +135,11 @@ class FRShortcutsEditor(FRParamEditor):
     baseClasses = _getAllBases(grouping)
     for baseCls in baseClasses:
       iterGroupings.append(baseCls.__qualname__)
+    boundFns_includingBases = []
 
-    for grouping in iterGroupings:
-      groupParamList = self.boundFnsPerGroup.get(grouping, [])
+    for curGrouping in iterGroupings:
+      groupParamList = self.boundFnsPerGroup.get(curGrouping, [])
+      boundFns_includingBases.extend(groupParamList)
       # Don't add a category unless at least one list element is present
       if len(groupParamList) == 0: continue
       # If a human-readable name was given, replace class name with human name
@@ -151,6 +158,10 @@ class FRShortcutsEditor(FRParamEditor):
         self.params.child(groupParam.name).addChildren(paramChildren)
       else:
         self.params.addChild(paramGroup)
+
+    # Now make sure when props are registered for this grouping, they include
+    # base class shortcuts too
+    self.boundFnsPerGroup[grouping.__qualname__] = boundFns_includingBases
 
   def registerProp(self, *args, **etxraOpts):
     """
