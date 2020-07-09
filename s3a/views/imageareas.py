@@ -303,7 +303,8 @@ class FRFocusedImage(FREditableImgModel):
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
-    cls.compCropMargin = FR_SINGLETON.generalProps.registerProp(cls, FR_CONSTS.PROP_CROP_MARGIN_PCT)
+    cls.compCropMargin, cls.treatMarginAsPct = FR_SINGLETON.generalProps.registerProps(
+      cls, [FR_CONSTS.PROP_CROP_MARGIN_VAL, FR_CONSTS.PROP_TREAT_MARGIN_AS_PCT])
 
   def __init__(self, parent=None, **kargs):
     allowableShapes = (
@@ -406,8 +407,10 @@ class FRFocusedImage(FREditableImgModel):
     bbox = np.vstack([concatVerts.min(0),
                       concatVerts.max(0)])
     # Account for margins
-    padding = max((bbox[1,:] - bbox[0,:])*self.compCropMargin/2/100)
-    self.bbox = getClippedBbox(mainImgShape, bbox, int(padding))
+    padVal = self.compCropMargin
+    if self.treatMarginAsPct:
+      padVal = max((bbox[1,:] - bbox[0,:])*self.compCropMargin/2/100)
+    self.bbox = getClippedBbox(mainImgShape, bbox, int(padVal))
 
   def updateCompImg(self, mainImg, bbox: FRVertices=None):
     if bbox is None:
