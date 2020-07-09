@@ -67,7 +67,7 @@ class S3ABase(QtWidgets.QMainWindow):
     # -----
     # MAIN IMAGE
     # -----
-    self.mainImg.imgItem.sigImageChanged.connect(self.clearBoundaries)
+    self.mainImg.imgItem.sigImageChanged.connect(lambda: self.clearBoundaries())
     self.mainImg.sigCompsCreated.connect(self.add_focusComp)
     self.mainImg.sigCompsRemoved.connect(
       lambda compIds: self.compMgr.rmComps(compIds)

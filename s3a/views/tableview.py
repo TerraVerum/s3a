@@ -202,16 +202,16 @@ class FRCompTableView(QtWidgets.QTableView):
     menu.setTitle('Table Actions')
 
     remAct = QtWidgets.QAction("Remove", menu)
-    remAct.triggered.connect(self.removeSelectedRows_gui)
+    remAct.triggered.connect(lambda: self.removeSelectedRows_gui())
     menu.addAction(remAct)
 
     overwriteAct = QtWidgets.QAction("Set Same As First", menu)
-    overwriteAct.triggered.connect(self.overwriteSelectedRows_gui)
+    overwriteAct.triggered.connect(lambda: self.overwriteSelectedRows_gui())
     menu.addAction(overwriteAct)
 
     setAsAct = QtWidgets.QAction("Set As...", menu)
     menu.addAction(setAsAct)
-    setAsAct.triggered.connect(self.setSelectedCellsAs_gui)
+    setAsAct.triggered.connect(lambda: self.setSelectedCellsAs_gui())
 
     return menu
 
@@ -302,9 +302,9 @@ class FRCompTableView(QtWidgets.QTableView):
       colIdxs = overrideColIdxs
     else:
       colIdxs = np.arange(len(FR_SINGLETON.tableData.allFields))
-    if idList is None:
+    colIdxs = np.setdiff1d(colIdxs, self.mgr.noEditColIdxs)
+    if idList is None or len(colIdxs) == 0:
       return
-
     dataToSet = self.mgr.compDf.loc[[idList[0]],:].copy()
     with FR_SINGLETON.actionStack.ignoreActions():
       self.popup.setData(dataToSet, colIdxs)

@@ -180,7 +180,7 @@ class FRPopupLineEditor(QtWidgets.QLineEdit):
     completer.setFilterMode(QtCore.Qt.MatchContains)
     completer.activated.connect(lambda: QtCore.QTimer.singleShot(0, self.clear))
 
-    self.textChanged.connect(self.resetCompleterPrefix)
+    self.textChanged.connect(lambda: self.resetCompleterPrefix())
 
     self.setCompleter(completer)
 
