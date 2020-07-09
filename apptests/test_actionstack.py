@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from s3a.actionstack import FRActionStack
+from s3a.models.actionstack import FRActionStack
 from s3a.structures import FRActionStackError
 
 COUNT = 10

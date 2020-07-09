@@ -1,14 +1,11 @@
 from pathlib import Path
-from io import StringIO
 
 import numpy as np
 import pytest
 
-from conftest import app, dfTester
+from conftest import app
 from s3a.generalutils import augmentException
-from s3a.projectvars import REQD_TBL_FIELDS
-from s3a.structures import FRS3AException, FRComplexVertices, FRVertices, FRS3AWarning
-from s3a.tablemodel import FRComponentIO
+from s3a.models.tablemodel import FRComponentIO
 
 def test_normal_export(sampleComps, tmpdir):
   io = app.compExporter

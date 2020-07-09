@@ -2,7 +2,7 @@ from typing import List, Union
 
 from pyqtgraph.Qt import QtWidgets, QtCore
 
-from s3a.actionstack import FRActionStack
+from s3a.models.actionstack import FRActionStack
 from s3a.projectvars import GEN_PROPS_DIR, SCHEMES_DIR, BASE_DIR
 from s3a.structures import FRParam
 from . import pgregistered
@@ -14,6 +14,7 @@ from .table import FRTableFilterEditor, FRTableData
 
 Signal = QtCore.Signal
 
+__all__ = ['FR_SINGLETON', 'FRParamEditor', 'FRParamEditorDockGrouping']
 
 class FRGeneralPropertiesEditor(FRParamEditor):
   def __init__(self, parent=None):
@@ -74,11 +75,11 @@ class _FRSingleton(QtCore.QObject):
       self.sigDocksAdded.emit(docks)
 
 
-  def registerGroup(self, clsParam: FRParam, **opts):
+  def registerGroup(self, groupParam: FRParam, **opts):
     def multiEditorClsDecorator(cls):
       # Since all legwork is done inside the editors themselves, simply call each decorator from here as needed
       for editor in self.registerableEditors:
-        cls = editor.registerGroup(clsParam, **opts)(cls)
+        cls = editor.registerGroup(groupParam, **opts)(cls)
       return cls
     return multiEditorClsDecorator
 

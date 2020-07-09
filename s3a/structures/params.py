@@ -27,10 +27,10 @@ class FRParam:
   valType: Optional[str] = None
   """
   Type of the variable if not easily inferrable from the value itself. 
-    For instance, class:`FRShortcutParameter<s3a.frgraphics.parameditors.FRShortcutParameter>`
+    For instance, class:`FRShortcutParameter<s3a.views.parameditors.FRShortcutParameter>`
     is indicated with string values (e.g. 'Ctrl+D'), so the user must explicitly specify 
     that such an :class:`FRParam` is of type 'shortcut' (as defined in 
-    :class:`FRShortcutParameter<s3a.frgraphics.parameditors.FRShortcutParameter>`)
+    :class:`FRShortcutParameter<s3a.views.parameditors.FRShortcutParameter>`)
     If the type *is* easily inferrable, this may be left blank.
   """
   helpText: str = ''

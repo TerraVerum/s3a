@@ -1,0 +1,310 @@
+import sys
+from pathlib import Path
+from typing import Optional, Union, Callable, Dict, Any
+from warnings import warn
+
+import numpy as np
+import pandas as pd
+from PyQt5 import QtCore, QtWidgets
+from pandas import DataFrame as df
+
+from s3a.views.parameditors import FR_SINGLETON
+from s3a.views.imageareas import FRMainImage, FRFocusedImage, FREditableImgModel
+from s3a.graphicsutils import addDirItemsToMenu, raiseErrorLater
+from s3a.views.parameditors import FRParamEditor
+from s3a.views.tableview import FRCompTableView
+from s3a.generalutils import resolveAuthorName
+from s3a.projectvars import FR_CONSTS, FR_ENUMS, REQD_TBL_FIELDS
+from s3a.structures import FRS3AWarning, FRVertices, FilePath, NChanImg, FRAppIOError, \
+  FRAlgProcessorError
+from s3a.models.tablemodel import FRComponentIO, FRComponentMgr
+from s3a.controls.tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
+
+__all__ = ['S3ABase']
+
+@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_S3A_MODEL)
+class S3ABase(QtWidgets.QMainWindow):
+  """
+  Top-level widget for producing component bounding regions from an input image.
+  """
+  @classmethod
+  def __initEditorParams__(cls):
+    cls.estBoundsOnStart, cls.undoBuffSz = FR_SINGLETON.generalProps.registerProps(cls,
+        [FR_CONSTS.PROP_EST_BOUNDS_ON_START, FR_CONSTS.PROP_UNDO_BUF_SZ])
+    cls.useDarkTheme = FR_SINGLETON.scheme.registerProp(cls, FR_CONSTS.SCHEME_USE_DARK_THEME)
+
+  def __init__(self, parent=None, **quickLoaderArgs):
+    super().__init__(parent)
+    self.mainImg = FRMainImage()
+    self.focusedImg = FRFocusedImage()
+    self.compMgr = FRComponentMgr()
+    self.compExporter = FRComponentIO()
+    self.compTbl = FRCompTableView()
+    self.compDisplay = FRCompDisplayFilter(self.compMgr, self.mainImg, self.compTbl)
+
+    self.compTbl.setSortingEnabled(True)
+    self.compTbl.setAlternatingRowColors(True)
+    # Allow filtering/sorting
+    self.sortFilterProxy = FRCompSortFilter(self.compMgr)
+    self.compTbl.setModel(self.sortFilterProxy)
+
+    self.hasUnsavedChanges = False
+    self.srcImgFname = None
+    self.autosaveTimer: Optional[QtCore.QTimer] = None
+    self.quickLoaderFuncs = {
+      'image': self.resetMainImg,
+      'annotations': self.loadCompList
+    }
+
+    # Connect signals
+    # -----
+    # COMPONENT MANAGER
+    # -----
+    def handleUpdate(*_args):
+      self.hasUnsavedChanges = True
+    self.compMgr.sigCompsChanged.connect(handleUpdate)
+
+    # -----
+    # MAIN IMAGE
+    # -----
+    self.mainImg.imgItem.sigImageChanged.connect(self.clearBoundaries)
+    self.mainImg.sigCompsCreated.connect(self.add_focusComp)
+    self.mainImg.sigCompsRemoved.connect(
+      lambda compIds: self.compMgr.rmComps(compIds)
+    )
+
+    # -----
+    # COMPONENT TABLE
+    # -----
+    self.compDisplay.sigCompsSelected.connect(lambda newComps: self.changeFocusedComp(newComps))
+
+    def handleUpdate(comps):
+      self.compMgr.addComps(comps, FR_ENUMS.COMP_ADD_AS_MERGE)
+      self.changeFocusedComp(comps)
+    self.mainImg.sigCompsUpdated.connect(handleUpdate)
+
+    # -----
+    # MISC
+    # -----
+    FR_SINGLETON.generalProps.sigParamStateUpdated.connect(self.updateUndoBuffSz)
+
+    authorName = resolveAuthorName(quickLoaderArgs.pop('author', None))
+    if authorName is None:
+      sys.exit('No author name provided and no default author exists. Exiting.\n'
+               'To start without error, provide an author name explicitly, e.g.\n'
+               '"python -m s3a --author=<Author Name>"')
+    FR_SINGLETON.tableData.annAuthor = authorName
+
+  @staticmethod
+  def populateParamEditorMenuOpts(objForMenu: FRParamEditor, winMenu: QtWidgets.QMenu,
+                                  triggerFn: Callable):
+    addDirItemsToMenu(winMenu,
+                      objForMenu.saveDir.glob(f'*.{objForMenu.fileType}'),
+                      triggerFn)
+
+  def startAutosave(self, interval_mins: float, autosaveFolder: Path, baseName: str):
+    autosaveFolder.mkdir(exist_ok=True, parents=True)
+    lastSavedDf = self.compMgr.compDf.copy()
+    # Qtimer expects ms, turn mins->s->ms
+    self.autosaveTimer = QtCore.QTimer()
+    # Figure out where to start the counter
+    globExpr = lambda: autosaveFolder.glob(f'{baseName}*.csv')
+    existingFiles = list(globExpr())
+    if len(existingFiles) == 0:
+      counter = 0
+    else:
+      counter = max(map(lambda fname: int(fname.stem.rsplit('_')[1]), existingFiles)) + 1
+
+    def save_incrementCounter():
+      nonlocal counter, lastSavedDf
+      baseSaveNamePlusFolder = autosaveFolder/f'{baseName}_{counter}.csv'
+      counter += 1
+      if not np.array_equal(self.compMgr.compDf, lastSavedDf):
+        self.exportCompList(baseSaveNamePlusFolder)
+        lastSavedDf = self.compMgr.compDf.copy()
+
+    self.autosaveTimer.timeout.connect(save_incrementCounter)
+    self.autosaveTimer.start(int(interval_mins*60*1000))
+
+  def stopAutosave(self):
+    self.autosaveTimer.stop()
+
+  def updateUndoBuffSz(self, _genProps: Dict[str, Any]):
+    FR_SINGLETON.actionStack.resizeStack(self.undoBuffSz)
+
+  def clearFocusedRegion(self):
+    # Reset drawn comp vertices to nothing
+    # Only perform action if image currently exists
+    if self.focusedImg.image is None:
+      return
+    self.focusedImg.updateRegionFromVerts(None)
+
+  def resetFocusedRegion(self):
+    # Reset drawn comp vertices to nothing
+    # Only perform action if image currently exists
+    if self.focusedImg.image is None:
+      return
+    self.focusedImg.updateRegionFromVerts(self.focusedImg.compSer[REQD_TBL_FIELDS.VERTICES])
+
+  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_ACCEPT_REGION)
+  @FR_SINGLETON.actionStack.undoable('Accept Focused Region')
+  def acceptFocusedRegion(self):
+    # If the component was deleted
+    focusedId = self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]
+    if focusedId not in self.compMgr.compDf.index:
+      warn('Cannot accept region as this component was deleted.', FRS3AWarning)
+      return
+    oldSer = self.compMgr.compDf.loc[focusedId].copy()
+
+    self.focusedImg.saveNewVerts()
+    modifiedComp = self.focusedImg.compSer
+    modified_df = modifiedComp.to_frame().T
+    self.compMgr.addComps(modified_df, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.compDisplay.regionPlot.focusById([modifiedComp[REQD_TBL_FIELDS.INST_ID]])
+    yield
+    self.focusedImg.saveNewVerts(oldSer[REQD_TBL_FIELDS.VERTICES])
+    self.compMgr.addComps(oldSer.to_frame().T, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
+
+  def estimateBoundaries(self):
+    self.mainImg.handleShapeFinished(FRVertices())
+
+  def clearBoundaries(self):
+    self.compMgr.rmComps()
+
+  @FR_SINGLETON.actionStack.undoable('Change Main Image')
+  def resetMainImg(self, fileName: FilePath=None, imgData: NChanImg=None,
+                   clearExistingComps=True):
+    """
+    * If fileName is None, the main and focused images are blacked out.
+    * If only fileName is provided, it is assumed to be an image. The image data
+    will be populated by reading in that file.
+    * If both fileName and imgData are provided, then imgData is used to populate the
+    image, and fileName is assumed to be the file associated with that data.
+
+    :param fileName: Filename either to load or that corresponds to imgData
+    :param imgData: N-Channel numpy image
+    :param clearExistingComps: If True, erases all existing components on image load.
+      Else, they are retained.
+    """
+    oldFile = self.srcImgFname
+    oldData = self.mainImg.image
+    oldComps = self.compMgr.compDf.copy()
+    if fileName is not None:
+      fileName = Path(fileName).resolve()
+    if clearExistingComps:
+      self.compMgr.rmComps()
+    if imgData is not None:
+      self.mainImg.setImage(imgData)
+    else:
+      self.mainImg.setImage(fileName)
+    self.srcImgFname = fileName
+    self.focusedImg.resetImage()
+    self.mainImg.plotItem.vb.autoRange()
+    if self.estBoundsOnStart:
+      self.estimateBoundaries()
+    yield
+    self.resetMainImg(oldFile, oldData, clearExistingComps)
+    if clearExistingComps:
+      # Old comps were cleared, so put them back
+      self.compMgr.addComps(oldComps)
+
+  def importQuickLoaderProfile(self, profileSrc: Union[str, dict]):
+    if isinstance(profileSrc, str):
+      profileSrc = {FR_SINGLETON.quickLoader.name: profileSrc}
+
+    errSettings = []
+
+    for load, fn in self.quickLoaderFuncs.items():
+      try:
+        val: Any = profileSrc.pop(load, None)
+        if val is not None:
+          fn(val)
+      except Exception as ex:
+        errSettings.append(f'{load}: {ex}')
+
+    if profileSrc:
+      # Unclaimed arguments
+      try:
+        FR_SINGLETON.quickLoader.buildFromUserProfile(profileSrc)
+      except Exception as ex:
+        errSettings.append(f'{"Quick Loader"}: {ex}')
+
+    if len(errSettings) > 0:
+      err = FRAppIOError('The following settings were not loaded (shown as <setting>: <exception>)\n'
+                         + "\n\n".join(errSettings))
+      raiseErrorLater(err)
+
+
+  def exportCompList(self, outFname: Union[str, Path]):
+    self.compExporter.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds,
+                                self.srcImgFname)
+    self.compExporter.exportByFileType(outFname)
+    self.hasUnsavedChanges = False
+
+  def exportLabeledImg(self, outFname: str=None):
+    self.compExporter.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds)
+    return self.compExporter.exportLabeledImg(self.mainImg.image.shape, outFname)
+
+  def loadCompList(self, inFname: str, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
+    pathFname = Path(inFname)
+    if self.mainImg.image is None:
+      raise FRAppIOError('Cannot load components when no main image is set.')
+    fType = pathFname.suffix[1:]
+    if fType == 'csv':
+      newComps = FRComponentIO.buildFromCsv(inFname, self.mainImg.image.shape)
+    elif fType == 's3apkl':
+      # Operation may take a long time, but we don't want to start the wait cursor until
+      # after dialog selection
+      newComps = FRComponentIO.buildFromPkl(inFname, self.mainImg.image.shape)
+    else:
+      raise FRAppIOError(f'Extension {fType} is not recognized. Must be one of: csv, s3apkl')
+    self.compMgr.addComps(newComps, loadType)
+
+  def showNewCompAnalytics(self):
+    self._check_plotStages(self.mainImg)
+
+  def showModCompAnalytics(self):
+    self._check_plotStages(self.focusedImg)
+
+  @FR_SINGLETON.actionStack.undoable('Create New Comp', asGroup=True)
+  def add_focusComp(self, newComps: df):
+    self.compMgr.addComps(newComps)
+    # Make sure index matches ID before updating current component
+    newComps = newComps.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
+    # Focus is performed by comp table
+    self.changeFocusedComp(newComps)
+
+  @staticmethod
+  def _check_plotStages(img: FREditableImgModel):
+    proc = img.curProcessor.processor
+    if proc.result is None:
+      raise FRAlgProcessorError('Analytics can only be shown after the algorithm'
+                                ' was run.')
+    proc.plotStages(ignoreDuplicateResults=True)
+
+  @FR_SINGLETON.actionStack.undoable('Change Focused Component')
+  def changeFocusedComp(self, newComps: df, forceKeepLastChange=False):
+    oldSer = self.focusedImg.compSer.copy()
+    oldImg = self.focusedImg.image
+    if len(newComps) == 0:
+      return
+    # TODO: More robust scenario if multiple comps are in the dataframe
+    #   For now, just use the last in the selection. This is so that if multiple
+    #   components are selected in a row, the most recently selected is always
+    #   the current displayed.
+    newComp: pd.Series = newComps.iloc[-1,:]
+    newCompId = newComp[REQD_TBL_FIELDS.INST_ID]
+    self.compDisplay.regionPlot.focusById([newCompId])
+    mainImg = self.mainImg.image
+    self.focusedImg.updateAll(mainImg, newComp)
+    self.curCompIdLbl.setText(f'Component ID: {newCompId}')
+    # Nothing happened since the last component change, so just replace it instead of
+    # adding a distinct action to the buffer queue
+    stack = FR_SINGLETON.actionStack
+    if not forceKeepLastChange and stack.undoDescr == 'Change Focused Component':
+      stack.actions.pop()
+    yield
+    if oldImg is not None and len(oldSer.loc[REQD_TBL_FIELDS.VERTICES]) > 0:
+      self.changeFocusedComp(oldSer.to_frame().T, forceKeepLastChange=True)
+    else:
+      self.focusedImg.resetImage()

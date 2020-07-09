@@ -1,30 +1,34 @@
-from typing import Union, Tuple, Optional
+from typing import Union, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
+from PyQt5 import QtCore, QtWidgets, QtGui
 from pyqtgraph import BusyCursor
-from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from pyqtgraph.Qt import QtCore, QtGui
 from skimage.io import imread
 
 from s3a import FR_SINGLETON
 from s3a.generalutils import getClippedBbox, frPascalCaseToTitle
-from s3a.procwrapper import FRImgProcWrapper
-from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS, MENU_OPTS_DIR, FR_ENUMS
-from s3a.structures import FRParam, FRVertices, FRComplexVertices, FilePath
+from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS, MENU_OPTS_DIR
+from s3a.structures import FRParam, FRVertices, FRComplexVertices, FilePath, NChanImg
 from s3a.structures import NChanImg
+from .parameditors import FRParamEditor, FRParamEditorDockGrouping
 from .clickables import FRRightPanViewBox
 from .drawopts import FRDrawOpts
-from .parameditors import FRParamEditor, FRParamEditorDockGrouping
-from .regions import FRShapeCollection, FRVertexDefinedImg
+from .procwrapper import  FRImgProcWrapper
+from .regions import FRVertexDefinedImg
 
-# Required to trigger property registration
+__all__ = ['FRMainImage', 'FRFocusedImage', 'FREditableImgModel']
+
+from s3a.controls.drawctrl import FRShapeCollection
 
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
 
-class FREditableImg(pg.PlotWidget):
-  sigMousePosChanged = Signal(object)
+
+class FREditableImgModel(pg.PlotWidget):
+  sigMousePosChanged = QtCore.Signal(object)
 
   @classmethod
   def __initEditorParams__(cls):
@@ -162,11 +166,12 @@ class FREditableImg(pg.PlotWidget):
   def clearCurDrawShape(self):
     self.shapeCollection.clearAllRois()
 
+
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MAIN_IMG_AREA)
-class FRMainImage(FREditableImg):
-  sigComponentsCreated = Signal(object) # pd.DataFrame
-  sigComponentsUpdated = Signal(object) # pd.DataFrame
-  sigComponentsRemoved = Signal(object) # OneDArr
+class FRMainImage(FREditableImgModel):
+  sigCompsCreated = Signal(object) # pd.DataFrame
+  sigCompsUpdated = Signal(object) # pd.DataFrame
+  sigCompsRemoved = Signal(object) # OneDArr
   # Hooked up during __init__
   sigSelectionBoundsMade = Signal(object) # FRVertices
 
@@ -230,7 +235,7 @@ class FRMainImage(FREditableImg):
         self.compFromLastProcResult = FR_SINGLETON.tableData.makeCompDf()
         return
       # TODO: Determine more robust solution for separated vertices. For now use largest component
-      self.sigComponentsCreated.emit(newComps)
+      self.sigCompsCreated.emit(newComps)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
     super().mouseReleaseEvent(ev)
@@ -275,16 +280,16 @@ class FRMainImage(FREditableImg):
       newComp = comps.iloc[[0],:].copy()
       compId = newComp.index[0]
       newComp.at[compId, REQD_TBL_FIELDS.VERTICES] = newVerts
-      self.sigComponentsRemoved.emit(comps.loc[:, REQD_TBL_FIELDS.INST_ID])
+      self.sigCompsRemoved.emit(comps.loc[:, REQD_TBL_FIELDS.INST_ID])
       if compId == -1:
-        self.sigComponentsCreated.emit(newComp)
+        self.sigCompsCreated.emit(newComp)
       else:
-        self.sigComponentsUpdated.emit(newComp)
+        self.sigCompsUpdated.emit(newComp)
       yield
       if compId == -1:
-        self.sigComponentsRemoved.emit(newComp.index)
+        self.sigCompsRemoved.emit(newComp.index)
       else:
-        self.sigComponentsUpdated.emit(comps)
+        self.sigCompsUpdated.emit(comps)
     doOverride()
 
 
@@ -293,7 +298,7 @@ class FRMainImage(FREditableImg):
     super().clearCurDrawShape()
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_FOCUSED_IMG_AREA)
-class FRFocusedImage(FREditableImg):
+class FRFocusedImage(FREditableImgModel):
 
   @classmethod
   def __initEditorParams__(cls):

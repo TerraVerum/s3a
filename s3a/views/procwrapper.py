@@ -2,26 +2,23 @@ from __future__ import annotations
 
 from abc import ABC
 from functools import wraps
-from typing import Tuple, List, Sequence, Optional
+from typing import Tuple, List, Sequence
 from warnings import warn
 
 import numpy as np
-import cv2 as cv
+from imageprocessing.processing import ImageIO, ProcessStage, AtomicProcess, Process, \
+  ImageProcess, ProcessIO
 from pyqtgraph.parametertree import Parameter
 
 import s3a
-from imageprocessing.processing import ImageIO, ProcessStage, AtomicProcess, Process, \
-  ImageProcess, ProcessIO
-
-from .frgraphics.graphicsutils import raiseErrorLater
-from .frgraphics.parameditors import genericeditor
-from .frgraphics.parameditors.pgregistered import FRCustomMenuParameter
-from .generalutils import augmentException
-from .processingimpls import crop_to_local_area, apply_process_result, basicOpsCombo, \
+from s3a.generalutils import augmentException
+from s3a.processingimpls import crop_to_local_area, apply_process_result, basicOpsCombo, \
   return_to_full_size, format_vertices
-from .structures import FRParam, FRComplexVertices, FRAlgProcessorError, FRVertices, \
+from s3a.structures import FRParam, FRComplexVertices, FRAlgProcessorError, FRVertices, \
   FRS3AWarning
+from s3a.views.parameditors.pgregistered import FRCustomMenuParameter
 
+__all__ = ['FRImgProcWrapper', 'FRGeneralProcWrapper']
 
 def atomicRunWrapper(proc: AtomicProcess, names: List[str], params: List[Parameter]):
   oldRun = proc.run
@@ -41,7 +38,7 @@ def procRunWrapper(proc: Process, groupParam: Parameter):
   return newRun
 
 class FRGeneralProcWrapper(ABC):
-  def __init__(self, processor: ImageProcess, editor: s3a.frgraphics.parameditors.genericeditor.FRParamEditor):
+  def __init__(self, processor: ImageProcess, editor: s3a.views.parameditors.genericeditor.FRParamEditor):
     self.processor = processor
     self.algName = processor.name
     self.algParam = FRParam(self.algName)
@@ -56,7 +53,7 @@ class FRGeneralProcWrapper(ABC):
       params: List[Parameter] = []
       for key, val in stage.input.hyperParams.items():
         curParam = FRParam(name=key, value=val)
-        pgParam = self.editor.registerProp(self.algName, curParam, paramParent, asProperty=False)
+        pgParam = self.editor.registerProp(self.algParam, curParam, paramParent, asProperty=False)
         params.append(pgParam)
       stage.run = atomicRunWrapper(stage, stage.input.hyperParamKeys, params)
       return
@@ -73,7 +70,7 @@ class FRGeneralProcWrapper(ABC):
       if isinstance(childStage, Process) and childStage.allowDisable:
         valType = 'procgroup'
       curGroup = FRParam(name=childStage.name, valType=valType, value=[],)
-      self.editor.registerProp(self.algName, curGroup, paramParent, asProperty=False,
+      self.editor.registerProp(self.algParam, curGroup, paramParent, asProperty=False,
                                enabled=not childStage.disabled)
       self.unpackStages(childStage, paramParent=paramParent + (childStage.name,))
 
@@ -104,7 +101,7 @@ class FRGeneralProcWrapper(ABC):
           return cls.getNestedName(stage, nestedName[1:])
 
 class FRImgProcWrapper(FRGeneralProcWrapper):
-  def __init__(self, processor: ImageProcess, editor: s3a.frgraphics.parameditors.genericeditor.FRParamEditor):
+  def __init__(self, processor: ImageProcess, editor: s3a.views.parameditors.genericeditor.FRParamEditor):
     # Each processor is encapsulated in processes that crop the image to the region of
     # interest specified by the user, and re-expand the area after processing
     formatStage = ImageProcess.fromFunction(format_vertices, name='Format Vertices')

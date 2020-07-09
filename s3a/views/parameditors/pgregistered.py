@@ -1,11 +1,11 @@
 from functools import partial
 from typing import Optional, List
 
-from pyqtgraph.Qt import QtGui, QtWidgets, QtCore
+from pyqtgraph.Qt import QtGui, QtWidgets
 from pyqtgraph.parametertree import parameterTypes, Parameter
 from pyqtgraph.parametertree.parameterTypes import ActionParameterItem, ActionParameter
 
-from ..graphicsutils import findMainWin
+from s3a.graphicsutils import findMainWin
 
 
 class FRShortcutParameterItem(parameterTypes.WidgetParameterItem):

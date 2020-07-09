@@ -6,6 +6,7 @@ from pyqtgraph.Qt import QtWidgets, QtGui
 from s3a.projectvars import FR_CONSTS
 from s3a.structures import FRParam, FRParamGroup
 
+__all__ = ['FRDrawOpts']
 
 class FRDrawOpts(QtWidgets.QWidget):
   def __init__(self, parent=None, shapes: Tuple[FRParamGroup, ...]=None, actions: Tuple[FRParamGroup, ...]=None):

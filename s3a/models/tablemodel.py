@@ -15,11 +15,13 @@ from skimage import io
 
 from s3a.structures import OneDArr, FRParamGroup, FilePath, FRS3AWarning
 from s3a.structures.typeoverloads import TwoDArr, NChanImg
-from . import FR_SINGLETON
-from .generalutils import coerceDfTypes, augmentException
-from .projectvars import FR_ENUMS, REQD_TBL_FIELDS
-from .projectvars.constants import FR_CONSTS
-from .structures import FRComplexVertices, FRParam, FRAppIOError
+from s3a import FR_SINGLETON
+from s3a.generalutils import coerceDfTypes, augmentException
+from s3a.projectvars import FR_ENUMS, REQD_TBL_FIELDS
+from s3a.projectvars.constants import FR_CONSTS
+from s3a.structures import FRComplexVertices, FRParam, FRAppIOError
+
+__all__ = ['FRComponentMgr', 'FRComponentIO', 'FRCompTableModel']
 
 Signal = QtCore.Signal
 

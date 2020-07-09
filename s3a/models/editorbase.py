@@ -2,16 +2,19 @@ from __future__ import annotations
 
 import weakref
 from functools import wraps
+from inspect import isclass
 from pathlib import Path
-from typing import List, Dict, Any, Union, Collection, Type, Set, Tuple
+from typing import List, Dict, Any, Union, Collection, Type, Set, Tuple, Sequence
 
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter, ParameterTree
 
-from s3a.frgraphics.graphicsutils import dialogGetSaveFileName, saveToFile, \
+from s3a.graphicsutils import saveToFile, \
   attemptFileLoad
 from s3a.generalutils import frPascalCaseToTitle
-from s3a.structures import FRParam, ContainsSharedProps, FilePath
+from s3a.structures import FRParam, ContainsSharedProps, FilePath, FRParamParseError
+
+__all__ = ['FRParamEditorBase']
 
 Signal = QtCore.Signal
 
@@ -21,33 +24,13 @@ def clearUnwantedParamVals(paramState: dict):
   if paramState.get('value', True) is None:
     paramState.pop('value')
 
-class FRParamEditorDockGrouping(QtWidgets.QDockWidget):
+oneOrMultChildren = Union[Sequence[FRParam], FRParam]
+_childTuple_asValue = Tuple[FRParam, oneOrMultChildren]
+childTuple_asParam = Tuple[FRParam, oneOrMultChildren, bool]
+_keyType = Union[_childTuple_asValue, childTuple_asParam]
 
-  def __init__(self, editors: List[FRParamEditor], dockName, parent=None):
-    super().__init__(parent)
-    self.tabs = QtWidgets.QTabWidget(self)
-    self.hide()
-    for editor in editors:
-      # "Main Image Settings" -> "Settings"
-      self.tabs.addTab(editor.dockContentsWidget, editor.name.split(dockName)[1][1:])
-      editor.dock = self
-    mainLayout = QtWidgets.QVBoxLayout()
-    mainLayout.addWidget(self.tabs)
-    centralWidget = QtWidgets.QWidget()
-    centralWidget.setLayout(mainLayout)
-    self.setWidget(centralWidget)
-    if dockName is None:
-      dockName = editors[0].name
-    self.setObjectName(dockName)
-    self.setWindowTitle(dockName)
 
-    self.name = dockName
-    self.editors = editors
-
-_childTuple_asValue = Tuple[FRParam,...]
-childTuple_asParam = Tuple[Tuple[FRParam,...], bool]
-_keyType = Union[FRParam, Union[_childTuple_asValue, childTuple_asParam]]
-class FRParamEditor(QtWidgets.QDockWidget):
+class FRParamEditorBase(QtWidgets.QDockWidget):
   """
   GUI controls for user-interactive parameters within S3A. Each window consists of
   a parameter tree and basic saving capabilities.
@@ -80,7 +63,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
     :param registerParam: The grouping parameter to hold registered parameters
       for the regiseterd class. See :func:`FRParamEditor.registerGroup`
     """
-    super().__init__(parent)
+    super().__init__()
     # Place in list so an empty value gets unpacked into super constructor
     if paramList is None:
       paramList = []
@@ -91,18 +74,14 @@ class FRParamEditor(QtWidgets.QDockWidget):
         name = frPascalCaseToTitle(name)
       except ValueError:
         name = "Parameter Editor"
-    self.dock = self
-    self.hide()
-    self.setWindowTitle(name)
-    self.setObjectName(name)
 
-    self.classNameToParamMapping: Dict[str, FRParam] = {}
+    self.groupingToParamMapping: Dict[Any, FRParam] = {}
     """
     Allows the editor to associate a class name with its human-readable parameter
     name
     """
 
-    self.classInstToEditorMapping: Dict[Any, FRParamEditor] = {}
+    self.classInstToEditorMapping: Dict[Any, FRParamEditorBase] = {}
     """
     For editors that register parameters for *other* editors,
      this allows parameters to be updated from the correct editor
@@ -140,56 +119,9 @@ class FRParamEditor(QtWidgets.QDockWidget):
     self._stateBeforeEdit = self.params.saveState()
     self.lastAppliedName = None
 
-    # This will be set to 'True' when an action for this editor is added to
-    # the main window menu
-    self.hasMenuOption = False
-
-    # -----------
-    # Additional widget buttons
-    # -----------
-    self.saveAsBtn = QtWidgets.QPushButton('Save As...')
-    self.applyBtn = QtWidgets.QPushButton('Apply')
-    self.closeBtn = QtWidgets.QPushButton('Close')
-
-    # -----------
-    # Widget layout
-    # -----------
-    self.dockContentsWidget = QtWidgets.QWidget(parent)
-    self.setWidget(self.dockContentsWidget)
-    btnLayout = QtWidgets.QHBoxLayout()
-    btnLayout.addWidget(self.saveAsBtn)
-    btnLayout.addWidget(self.applyBtn)
-    btnLayout.addWidget(self.closeBtn)
-
-    self.centralLayout = QtWidgets.QVBoxLayout(self.dockContentsWidget)
-    self.centralLayout.addWidget(self.tree)
-    self.centralLayout.addLayout(btnLayout)
-    # self.setLayout(centralLayout)
-    self.tree.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
-    # -----------
-    # UI Element Signals
-    # -----------
-    self.saveAsBtn.clicked.connect(self.saveAsBtnClicked)
-    self.closeBtn.clicked.connect(self.close)
-    self.applyBtn.clicked.connect(self.applyBtnClicked)
-
     if registerCls is not None:
       self.registerGroup(registerParam)(registerCls)
     self._spawnedEditors.append(weakref.proxy(self))
-
-  def _paramTreeChanged(self, param, child, idx):
-    self._stateBeforeEdit = self.params.saveState()
-
-  def _expandCols(self):
-    # totWidth = 0
-    for colIdx in range(2):
-      self.tree.resizeColumnToContents(colIdx)
-    #   totWidth += self.tree.columnWidth(colIdx) + self.tree.margin
-    # appInst.processEvents()
-    # self.dockContentsWidget.setMinimumWidth(totWidth)
-    self.tree.setColumnWidth(0, self.width()//2)
-    self.resize(self.tree.width(), self.height())
-
 
   # Helper method for accessing simple parameter values
   def __getitem__(self, keys: _keyType):
@@ -239,24 +171,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
     else:
       return outVals
 
-  def show(self):
-    self.setWindowState(QtCore.Qt.WindowActive)
-    # Necessary on MacOS
-    self.raise_()
-    # Necessary on Windows
-    self.activateWindow()
-    self.applyBtn.setFocus()
-    super().show()
-
-
-  def reject(self):
-    """
-    If window is closed apart from pressing 'accept', restore pre-edit state
-    """
-    self.params.restoreState(self._stateBeforeEdit, removeChildren=False)
-    super().reject()
-
-  def applyBtnClicked(self):
+  def applyChanges(self):
     # Don't emit any signals if nothing changed
     newState = self.params.saveState(filter='user')
     outDict = self.params.getValues()
@@ -264,11 +179,6 @@ class FRParamEditor(QtWidgets.QDockWidget):
       self._stateBeforeEdit = newState
       self.sigParamStateUpdated.emit(outDict)
     return outDict
-
-  def saveAsBtnClicked(self):
-    paramState = self.params.saveState(filter='user')
-    saveName = dialogGetSaveFileName(self, 'Save As', self.lastAppliedName)
-    self.saveParamState(saveName, paramState)
 
   def saveParamState(self, saveName: str=None, paramState: dict=None,
                      allowOverwriteDefault=False):
@@ -284,8 +194,8 @@ class FRParamEditor(QtWidgets.QDockWidget):
     clearUnwantedParamVals(paramState)
     self.saveDir.mkdir(parents=True, exist_ok=True)
     saveToFile(paramState, self.formatFileName(saveName),
-                        allowOverwriteDefault=allowOverwriteDefault)
-    self.applyBtnClicked()
+               allowOverwriteDefault=allowOverwriteDefault)
+    self.applyChanges()
     outDict: dict = self.params.getValues()
     self.lastAppliedName = saveName
     self.sigParamStateCreated.emit(saveName)
@@ -320,7 +230,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
                      addChildren=False, removeChildren=False):
     loadDict = self._parseStateDict(stateName, stateDict)
     self.params.restoreState(loadDict, addChildren=addChildren, removeChildren=removeChildren)
-    self.applyBtnClicked()
+    self.applyChanges()
     self.lastAppliedName = stateName
     return loadDict
 
@@ -357,14 +267,14 @@ class FRParamEditor(QtWidgets.QDockWidget):
     self.params.addChild(paramForCls)
     return paramForCls
 
-  def registerProp(self, groupingName: Union[type, str], constParam: FRParam,
+  def registerProp(self, grouping: Union[type, Any], constParam: FRParam,
                    parentParamPath:Collection[str]=None, asProperty=True,
                    objForAssignment=None, **etxraOpts):
     """
     Registers a property defined by *constParam* that will appear in the respective
     parameter editor.
 
-    :param groupingName: If *type* it must be a class. In this case, this parameter will
+    :param grouping: If *type* it must be a class. In this case, this parameter will
       be listed under the registered class of the same exact name.
       If *str*, *groupingName* must match the exact same string name passed in during
       :func:`registerGroup <FRParamEditor.registerGroup>`. Otherwise, an error will
@@ -389,11 +299,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
     paramOpts.update(etxraOpts)
     paramForEditor = Parameter.create(**paramOpts)
 
-    if isinstance(groupingName, type):
-      clsName = groupingName.__qualname__
-    else: # This way even if a string wasn't passed in we deal with it like a string
-      clsName = str(groupingName)
-    groupParam = self.classNameToParamMapping[clsName]
+    groupParam = self.groupingToParamMapping[grouping]
     if groupParam is None:
       paramForCls = self.params
     else:
@@ -418,26 +324,23 @@ class FRParamEditor(QtWidgets.QDockWidget):
       # Retrieve class name from the class instance, since this function call may
       # have resulted from an inhereted class. This only matters if the class name was
       # used instead of a generic string parameter value
-      nonlocal clsName
-      if not isinstance(groupingName, str):
-        clsName = type(clsObj).__qualname__
       if clsObj in self.classInstToEditorMapping:
         xpondingEditor = self.classInstToEditorMapping[clsObj]
       else:
         xpondingEditor = self
-      return clsName, xpondingEditor
+      return xpondingEditor
 
     # Else, create a property and return that instead
     @property
     def paramAccessor(clsObj):
-      trueClsName, xpondingEditor = _paramAccessHelper(clsObj)
-      return xpondingEditor[self.classNameToParamMapping[trueClsName], constParam]
+      xpondingEditor = _paramAccessHelper(clsObj)
+      return xpondingEditor[self.groupingToParamMapping[grouping], constParam]
 
     @paramAccessor.setter
     def paramAccessor(clsObj, newVal):
-      trueClsName, xpondingEditor = _paramAccessHelper(clsObj)
+      xpondingEditor = _paramAccessHelper(clsObj)
 
-      param = xpondingEditor[self.classNameToParamMapping[trueClsName], constParam, True]
+      param = xpondingEditor[self.groupingToParamMapping[grouping], constParam, True]
       param.setValue(newVal)
 
     return paramAccessor
@@ -453,7 +356,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
     :param opts: Additional registration options. Accepted values:
       - nameFromParam: This is available so objects without a dedicated class can
       also be registered. In that case, a spoof class is registered under the name
-      'clsParam.name' instead of '[decorated class].__qualname__'.
+      'groupParam.name' instead of '[decorated class].__qualname__'.
       - forceCreate: Normally, the class is not registered until at least one property
       (or method) is registered to it. That way, classes registered for other editors
       don't erroneously appear. *forceCreate* will override this rule, creating this
@@ -463,45 +366,61 @@ class FRParamEditor(QtWidgets.QDockWidget):
       in the class.
     """
     opts.setdefault('nameFromParam', False)
-    def classDecorator(cls: Union[Type, Any]=None):
-      if cls is None:
+    def groupingDecorator(grouping: Union[Type, Any]=None):
+      notAClass = False
+      if grouping is None or opts['nameFromParam']:
         # In this case nameFromParam must be provided. Use a dummy class for the
         # rest of the proceedings
-        cls = type('DummyClass', (), {})
-      if not isinstance(cls, type):
-        # Instance was passed, not class
-        cls = type(cls)
-      if opts['nameFromParam']:
-        clsName = groupParam.name
-      else:
-        clsName = cls.__qualname__
-      oldClsInit = cls.__init__
-      self._extendedClassDecorator(cls, groupParam, **opts)
+        grouping = groupParam
+        notAClass = True
+      elif not isclass(grouping):
+        raise FRParamParseError('Grouping must be either *None* or a class.')
+
+      self._extendedGroupingDecorator(grouping, groupParam, **opts)
+      self.groupingToParamMapping.setdefault(grouping, groupParam)
 
       if opts.get('forceCreate', False):
-        self._addParamGroup(clsName)
+        self._addParamGroup(groupParam.name)
 
-      self.classNameToParamMapping[clsName] = groupParam
+      if notAClass:
+        return
+      # Else, need to be sure editor opts are proprely registered on init
+
+      oldClsInit = grouping.__init__
+
       @wraps(oldClsInit)
       def newClassInit(clsObj, *args, **kwargs):
+        # In the case of inheritance, the class type may not match type(clsObj)
+        # Redefine grouping here in that event
+        cls = type(clsObj)
+        groupParam = self.groupingToParamMapping[cls]
+
         if (cls not in _INITIALIZED_CLASSES
             and issubclass(cls, ContainsSharedProps)):
           _INITIALIZED_CLASSES.add(cls)
           cls.__initEditorParams__()
+        # Occurs when parameters are not already initialized from a subclass
+        if clsObj not in self.classInstToEditorMapping:
+          self.classInstToEditorMapping[clsObj] = self
+          doExtendedInit = True
+        else:
+          doExtendedInit = False
 
-        if opts.get('saveDefault', True):
-          self.saveParamState(saveName='Default', allowOverwriteDefault=True)
-        self.classInstToEditorMapping[clsObj] = self
         retVal = oldClsInit(clsObj, *args, **kwargs)
-        self._extendedClassInit(clsObj, groupParam)
-        return retVal
-      cls.__init__ = newClassInit
-      return cls
-    if opts['nameFromParam']:
-      classDecorator()
-    return classDecorator
 
-  def _extendedClassInit(self, clsObj: Any, clsParam: FRParam):
+        if doExtendedInit:
+          self._extendedClassInit(clsObj, groupParam)
+          if opts.get('saveDefault', True):
+            self.saveParamState(saveName='Default', allowOverwriteDefault=True)
+        return retVal
+
+      grouping.__init__ = newClassInit
+      return grouping
+    if opts['nameFromParam']:
+      groupingDecorator()
+    return groupingDecorator
+
+  def _extendedClassInit(self, clsObj: Any, groupParam: FRParam):
     """
     For editors that need to perform any initializations within the decorated class,
       they must be able to access the decorated class' *init* function and modify it.
@@ -510,7 +429,7 @@ class FRParamEditor(QtWidgets.QDockWidget):
     """
     return
 
-  def _extendedClassDecorator(self, cls: Any, clsParam: FRParam, **opts):
+  def _extendedGroupingDecorator(self, cls: Any, groupParam: FRParam, **opts):
     """
     Editors needing additional class decorator boilerplates will place it in this overloaded function
     """

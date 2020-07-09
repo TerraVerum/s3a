@@ -6,7 +6,7 @@ ql = FR_SINGLETON.quickLoader
 def test_normal_use():
   for editor in FR_SINGLETON.registerableEditors:
     ql.addActForEditor(editor, 'Default')
-  ql.applyBtnClicked()
+  ql.applyChanges()
   # No errors should occur
 
 def test_add_mult_times():

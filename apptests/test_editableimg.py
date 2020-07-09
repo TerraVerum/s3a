@@ -4,9 +4,9 @@ from pyqtgraph.Qt import QtGui, QtCore
 
 from conftest import NUM_COMPS, app, mgr, dfTester
 from s3a import FR_SINGLETON
-from s3a.frgraphics.imageareas import FRFocusedImage
-from s3a.frgraphics.regions import FRShapeCollection
-from s3a.frgraphics.rois import FRRectROI
+from s3a.views.imageareas import FRFocusedImage
+from s3a.controls.drawctrl import FRShapeCollection
+from s3a.views.rois import FRRectROI
 from s3a.projectvars import FR_CONSTS
 from s3a.structures import FRVertices, FRComplexVertices, FRParam
 from testingconsts import FIMG_SER_COLS

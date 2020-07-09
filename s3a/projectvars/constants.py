@@ -52,6 +52,7 @@ class _FRConsts(FRParamGroup):
   # CLASS NAMES
   # --------------------------
   CLS_ANNOTATOR        : FRParam = newParam('S3A Window')
+  CLS_S3A_MODEL        : FRParam = newParam('S3A Model')
 
   CLS_COMP_TBL         : FRParam = newParam('Component Table')
   CLS_COMP_MGR         : FRParam = newParam('Component Manager')

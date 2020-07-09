@@ -11,9 +11,11 @@ from pyqtgraph.parametertree.Parameter import PARAM_TYPES
 from pyqtgraph.parametertree.parameterTypes import TextParameterItem, TextParameter
 
 from s3a import FR_SINGLETON
+from s3a.models.tablemodel import FRCompTableModel, FRComponentMgr
 from s3a.projectvars import FR_CONSTS, FR_ENUMS, REQD_TBL_FIELDS
-from s3a.structures import FRS3AException, FRS3AWarning
-from s3a.tablemodel import FRCompTableModel, FRComponentMgr
+from s3a.structures import FRS3AException, FRS3AWarning, OneDArr
+
+__all__ = ['FRCompTableView']
 
 Signal = QtCore.Signal
 
@@ -158,7 +160,7 @@ class FRCompTableView(QtWidgets.QTableView):
         # TODO: Get checkbox to stay in table after editing for a smoother appearance.
         #   For now, the easiest solution is to just use dropdown
         paramDict['type'] = 'list'
-        paramDict.update(values=['True', 'False'])
+        paramDict.update(values={'True': True, 'False': False})
       try:
         self.setItemDelegateForColumn(ii, FRPgParamDelegate(paramDict, self))
       except FRS3AException:
@@ -200,21 +202,21 @@ class FRCompTableView(QtWidgets.QTableView):
     menu.setTitle('Table Actions')
 
     remAct = QtWidgets.QAction("Remove", menu)
-    remAct.triggered.connect(self.removeTriggered)
+    remAct.triggered.connect(self.removeSelectedRows_gui)
     menu.addAction(remAct)
 
     overwriteAct = QtWidgets.QAction("Set Same As First", menu)
-    overwriteAct.triggered.connect(self.overwriteTriggered)
+    overwriteAct.triggered.connect(self.overwriteSelectedRows_gui)
     menu.addAction(overwriteAct)
 
     setAsAct = QtWidgets.QAction("Set As...", menu)
     menu.addAction(setAsAct)
-    setAsAct.triggered.connect(self.setAsTriggered)
+    setAsAct.triggered.connect(self.setSelectedCellsAs_gui)
 
     return menu
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_TBL_DEL_ROWS)
-  def removeTriggered(self):
+  def removeSelectedRows_gui(self):
     if self.minimal: return
 
     # Make sure the user actually wants this
@@ -231,7 +233,7 @@ class FRCompTableView(QtWidgets.QTableView):
 
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_TBL_SET_SAME_AS_FIRST)
-  def overwriteTriggered(self):
+  def overwriteSelectedRows_gui(self):
     if self.minimal: return
 
     # Make sure the user actually wants this
@@ -251,7 +253,7 @@ class FRCompTableView(QtWidgets.QTableView):
     self.mgr.addComps(toOverwrite, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
     self.clearSelection()
 
-  def getIds_colsFromSelection(self, ignoreNoEditCols=False):
+  def getIds_colsFromSelection(self, ignoreNoEditCols=False, ignoreNoneSelection=False):
     selectedIdxs = self.selectedIndexes()
     idList = []
     colIdxs = []
@@ -265,40 +267,41 @@ class FRCompTableView(QtWidgets.QTableView):
     colIdxs = pd.unique(colIdxs)
     if not ignoreNoEditCols:
       colIdxs = np.setdiff1d(colIdxs, self.model().sourceModel().noEditColIdxs)
-    if len(idList) == 0 or len(colIdxs) == 0:
+    if not ignoreNoneSelection and (len(idList) == 0 or len(colIdxs) == 0):
       warn('No editable columns selected.', FRS3AWarning)
       return None, None
     return idList, colIdxs
 
+  def setCellsAs(self, idList: Sequence[int], colIdxs: Sequence[int],
+                 overwriteData: df):
+    if colIdxs is None:
+      colIdxs = np.arange(self.mgr.columnCount(), dtype=int)
+      colIdxs = np.setdiff1d(colIdxs, self.mgr.noEditColIdxs)
+    if len(idList) == 0 or len(colIdxs) == 0:
+      warn('No editable cells were specified so no action was performed',
+           FRS3AWarning)
+      return
 
-  def setAs(self, idList: Sequence[int], colIdxs: Sequence[int]=None, shouldRun=True):
-    if self.showOnCreate:
-      shouldRun = False
-    if not shouldRun:
-      if colIdxs is None:
-        colIdxs = np.arange(self.mgr.columnCount(), dtype=int)
-        colIdxs = np.setdiff1d(colIdxs, self.mgr.noEditColIdxs)
+    toOverwrite = self.mgr.compDf.loc[idList].copy()
+    # Only overwrite dirty columns from popup
 
-      dataToSet = self.mgr.compDf.loc[[idList[0]], :].copy()
-      with FR_SINGLETON.actionStack.ignoreActions():
-        self.popup.setData(dataToSet, colIdxs)
-        wasAccepted = self.popup.exec()
-      if wasAccepted and len(self.popup.dirtyColIdxs) > 0:
-        toOverwrite = self.mgr.compDf.loc[idList].copy()
-        # Only overwrite dirty columns from popup
-
-        colIdxs = np.intersect1d(colIdxs, self.popup.dirtyColIdxs)
-        # Some bug is preventing the single assignment value from broadcasting
-        overwriteData = self.popup.data
-        setVals = [overwriteData.iloc[0, colIdxs] for _ in range(len(idList))]
-        toOverwrite.iloc[:, colIdxs] = setVals
-        self.mgr.addComps(toOverwrite, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
+    # Some bug is preventing the single assignment value from broadcasting
+    setVals = [overwriteData.iloc[0, colIdxs] for _ in range(len(idList))]
+    toOverwrite.iloc[:, colIdxs] = setVals
+    self.mgr.addComps(toOverwrite, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_TBL_SET_AS)
-  def setAsTriggered(self):
+  def setSelectedCellsAs_gui(self, overrideIds: OneDArr=None, overrideColIdxs: OneDArr=None):
     if self.minimal: return
 
-    idList, colIdxs = self.getIds_colsFromSelection()
+    idList, _ = self.getIds_colsFromSelection(ignoreNoEditCols=True,
+                                                    ignoreNoneSelection=True)
+    if overrideIds is not None:
+      idList = overrideIds
+    if overrideColIdxs is not None:
+      colIdxs = overrideColIdxs
+    else:
+      colIdxs = np.arange(len(FR_SINGLETON.tableData.allFields))
     if idList is None:
       return
 
@@ -307,15 +310,10 @@ class FRCompTableView(QtWidgets.QTableView):
       self.popup.setData(dataToSet, colIdxs)
       wasAccepted = self.popup.exec()
     if wasAccepted and len(self.popup.dirtyColIdxs) > 0:
-      toOverwrite = self.mgr.compDf.loc[idList].copy()
-      # Only overwrite dirty columns from popup
-
       colIdxs = np.intersect1d(colIdxs, self.popup.dirtyColIdxs)
-      # Some bug is preventing the single assignment value from broadcasting
-      overwriteData = self.popup.data
-      setVals = [overwriteData.iloc[0,colIdxs] for _ in range(len(idList))]
-      toOverwrite.iloc[:, colIdxs] = setVals
-      self.mgr.addComps(toOverwrite, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
+      # False positive
+      # noinspection PyTypeChecker
+      self.setCellsAs(idList, colIdxs, self.popup.data)
 
 # Monkey patch pyqtgraph text box to allow tab changing focus
 class FRMonkeyPatchedTextParameterItem(TextParameterItem):

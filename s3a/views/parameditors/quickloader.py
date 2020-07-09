@@ -1,5 +1,4 @@
 from pathlib import Path
-from pathlib import Path
 from typing import List
 from warnings import warn
 
@@ -9,7 +8,7 @@ from pyqtgraph.parametertree.parameterTypes import GroupParameter, Parameter
 from s3a.projectvars import QUICK_LOAD_DIR
 from .genericeditor import FRParamEditor
 from .pgregistered import FRActionWithShortcutParameter as ActWithShc
-from ..graphicsutils import FRPopupLineEditor, raiseErrorLater
+from s3a.graphicsutils import FRPopupLineEditor, raiseErrorLater
 from ...structures import FRIllRegisteredPropError, FRS3AWarning
 
 class FREditorListModel(QtCore.QAbstractListModel):
@@ -130,7 +129,7 @@ class FRQuickLoaderEditor(FRParamEditor):
                f"Must be one of:\n" \
                f"{[e.name for e in self.listModel.uniqueEditors]}"
       raiseErrorLater(FRIllRegisteredPropError(errMsg))
-    self.applyBtnClicked()
+    self.applyChanges()
     return ret
 
   def buildFromUserProfile(self, profileSrc: dict):
@@ -151,14 +150,14 @@ class FRQuickLoaderEditor(FRParamEditor):
     return profileSrc
 
 
-  def saveParamState(self, saveName: str=None, paramState: dict=None,
-                     allowOverwriteDefault=False):
+  def saveState(self, saveName: str=None, paramState: dict=None,
+                allowOverwriteDefault=False):
     stateDict = self.paramDictWithOpts(['type', 'shortcutSeq'], [ActWithShc, GroupParameter])
-    super().saveParamState(saveName, stateDict, allowOverwriteDefault)
+    super().saveState(saveName, stateDict, allowOverwriteDefault)
 
 
-  def applyBtnClicked(self):
-    super().applyBtnClicked()
+  def applyChanges(self):
+    super().applyChanges()
     for grp in self.params.childs: # type: GroupParameter
       if grp.hasChildren():
         act: ActWithShc = next(iter(grp))

@@ -6,10 +6,10 @@ import cv2 as cv
 import numpy as np
 from pandas import DataFrame as df
 
-from s3a import FR_SINGLETON, S3A
+from s3a import FR_SINGLETON
 from s3a.projectvars import REQD_TBL_FIELDS
-from s3a.structures import FRComplexVertices, FRParam
-from testingconsts import RND, SAMPLE_IMG_FNAME, SAMPLE_SMALL_IMG_FNAME, IMG_DIR
+from s3a.structures import FRComplexVertices
+from testingconsts import RND, IMG_DIR
 
 makeCompDf = FR_SINGLETON.tableData.makeCompDf
 

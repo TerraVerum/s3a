@@ -1,4 +1,3 @@
-import sys
 from typing import Optional, Callable, Dict
 
 import numpy as np
@@ -9,6 +8,8 @@ from s3a.projectvars import FR_CONSTS
 from s3a.structures import FRParam
 from s3a.structures import FRVertices
 
+__all__ = ['FRRectROI', 'FRPaintFillROI', 'FRPolygonROI', 'SHAPE_ROI_MAPPING',
+           'FRExtendedROI']
 
 def _clearPoints(roi: pg.ROI):
   while roi.handles:

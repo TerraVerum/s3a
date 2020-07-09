@@ -1,11 +1,12 @@
 import sys
-from typing import Optional, Union
-from s3a.structures import FilePath
+from typing import Optional
+from .structures import FilePath
 
 import fire
 from pyqtgraph.Qt import QtCore
 
-from . import appInst, S3A, FR_SINGLETON
+from . import appInst, FR_SINGLETON
+from .views.s3agui import S3A
 
 
 def main(gui=True, tableCfg: FilePath=None, **profileArgs) -> Optional[S3A]:
@@ -30,7 +31,7 @@ def main(gui=True, tableCfg: FilePath=None, **profileArgs) -> Optional[S3A]:
   if tableCfg is not None:
     FR_SINGLETON.tableData.loadCfg(tableCfg)
   profileArgs = {k.replace(' ', '').lower(): v for k, v in profileArgs.items()}
-  win = S3A(**profileArgs, exceptionsAsDialogs=gui)
+  win = S3A(**profileArgs)
   if gui:
     QtCore.QTimer.singleShot(0, win.showMaximized)
     sys.exit(appInst.exec_())

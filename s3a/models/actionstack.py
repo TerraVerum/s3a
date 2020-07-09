@@ -16,6 +16,7 @@ from typing_extensions import Protocol
 
 from s3a.structures import FRActionStackError
 
+__all__ = ['FRActionStack', 'FRAction']
 
 # _generatorCallable = Callable[[...], Union[Generator, Any]]
 class FRAction:

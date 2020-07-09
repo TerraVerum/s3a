@@ -3,19 +3,18 @@ from warnings import warn
 
 import numpy as np
 from pandas import DataFrame as df
-import pandas as pd
 from pyqtgraph.Qt import QtCore, QtGui
 
-from s3a.frgraphics import tableview
+from s3a.views import tableview
 from s3a.structures.typeoverloads import OneDArr
-from . import FR_SINGLETON, appInst
-from .frgraphics.graphicsutils import raiseErrorLater
-from .frgraphics.imageareas import FRMainImage
-from .frgraphics.regions import FRMultiRegionPlot
-from .projectvars import FR_CONSTS, REQD_TBL_FIELDS, FR_ENUMS
-from .structures import FRVertices, FRParam, FRParamParseError, FRS3AException, \
-  FRS3AWarning, FRComplexVertices
-from .tablemodel import FRComponentMgr
+from s3a import FR_SINGLETON
+from s3a.views.imageareas import FRMainImage
+from s3a.views.regions import FRMultiRegionPlot
+from s3a.projectvars import FR_CONSTS, REQD_TBL_FIELDS
+from s3a.structures import FRVertices, FRParam, FRParamParseError, FRS3AWarning
+from s3a.models.tablemodel import FRComponentMgr
+
+__all__ = ['FRCompSortFilter', 'FRCompDisplayFilter']
 
 Signal = QtCore.Signal
 TBL_FIELDS = FR_SINGLETON.tableData.allFields
@@ -171,7 +170,6 @@ class FRCompDisplayFilter(QtCore.QObject):
     self.selectedIds = ids
     self._compTbl.setFocus()
 
-
   def _reflectSelectionBoundsMade(self, selection: Union[OneDArr, FRVertices]):
     """
     :param selection: bounding box of user selection: [xmin ymin; xmax ymax]
@@ -223,8 +221,6 @@ class FRCompDisplayFilter(QtCore.QObject):
            f' filter exists for types {", ".join(badTypes)}',
            FRS3AWarning)
     return filterableCols
-
-
 
   def filterByParamType(self, compDf: df, param: FRParam):
     # TODO: Each type should probably know how to filter itself. That is,

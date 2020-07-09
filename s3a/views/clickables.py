@@ -8,6 +8,7 @@ from s3a.structures import FRVertices
 
 Signal = QtCore.Signal
 
+__all__ = ['FRBoundScatterPlot', 'FRRightPanViewBox']
 
 class FRBoundScatterPlot(pg.ScatterPlotItem):
   def __init__(self, *args, **kwargs):

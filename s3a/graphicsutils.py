@@ -9,6 +9,7 @@ from typing import Optional, Union, Callable, Generator
 
 import numpy as np
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
+import pyqtgraph as pg
 from ruamel.yaml import YAML
 
 from s3a import appInst

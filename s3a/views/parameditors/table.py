@@ -2,15 +2,14 @@ import copy
 import sys
 from datetime import datetime
 from functools import lru_cache
-from typing import List, Union, Any, Dict, Tuple
+from typing import List, Union, Tuple
 
 from pandas import DataFrame as df
 from ruamel.yaml import YAML
 import numpy as np
 
-import s3a.frgraphics
-from s3a.frgraphics.graphicsutils import raiseErrorLater
-from s3a.frgraphics.parameditors import FRParamEditor
+from s3a.graphicsutils import raiseErrorLater
+from s3a.views.parameditors import FRParamEditor
 from s3a.projectvars import TABLE_DIR, REQD_TBL_FIELDS, COMP_CLASS_NA, DATE_FORMAT, \
   FR_CONSTS
 from s3a.structures import FRParam, FilePath, FRParamGroup, FRParamParseError
