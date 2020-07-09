@@ -58,10 +58,10 @@ class S3A(S3ABase):
 
   def _hookupSignals(self):
     # Buttons
-    self.openImgAct.triggered.connect(self.resetMainImg_gui)
+    self.openImgAct.triggered.connect(lambda: self.resetMainImg_gui())
     self.clearRegionBtn.clicked.connect(self.clearFocusedRegion)
-    self.resetRegionBtn.clicked.connect(self.resetFocusedRegion)
-    self.acceptRegionBtn.clicked.connect(self.acceptFocusedRegion)
+    self.resetRegionBtn.clicked.connect(lambda: self.resetFocusedRegion())
+    self.acceptRegionBtn.clicked.connect(lambda: self.acceptFocusedRegion())
 
     FR_SINGLETON.scheme.sigParamStateUpdated.connect(self.updateTheme)
 
