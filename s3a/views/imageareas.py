@@ -48,8 +48,8 @@ class FREditableImgModel(pg.PlotWidget):
     )
     FR_SINGLETON.addDocks(dockGroup)
 
-  def __init__(self, parent=None, allowableShapes: Tuple[FRParam,...]=None,
-               allowableActions: Tuple[FRParam,...]=None, **kargs):
+  def __init__(self, parent=None, allowableShapes: Tuple[FRParam,...]=(),
+               allowableActions: Tuple[FRParam,...]=(), **kargs):
     super().__init__(parent, viewBox=FRRightPanViewBox(), **kargs)
     self.setAspectLocked(True)
     self.getViewBox().invertY()

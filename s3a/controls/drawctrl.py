@@ -20,7 +20,7 @@ class FRShapeCollection(QtCore.QObject):
     cls.roiClr, cls.roiLineWidth = FR_SINGLETON.scheme.registerProps(cls,
                    [FR_CONSTS.SCHEME_ROI_LINE_CLR, FR_CONSTS.SCHEME_ROI_LINE_WIDTH])
 
-  def __init__(self, allowableShapes: Tuple[FRParam,...]=None, parent: pg.GraphicsView=None):
+  def __init__(self, allowableShapes: Tuple[FRParam,...]=(), parent: pg.GraphicsView=None):
     super().__init__(parent)
     if allowableShapes is None:
       allowableShapes = set()
@@ -29,7 +29,7 @@ class FRShapeCollection(QtCore.QObject):
     self.roiForShape: Dict[FRParam, Union[pg.ROI, FRExtendedROI]] = {}
     self.forceBlockRois = True
 
-    self._curShape = allowableShapes[0]
+    self._curShape = allowableShapes[0] if len(allowableShapes) > 0 else None
     self._parent = parent
 
     for shape in allowableShapes:
