@@ -237,10 +237,10 @@ class S3A(S3ABase):
   def saveLayout(self, layoutName: Union[str, Path]=None, allowOverwriteDefault=False):
     dockStates = self.saveState().data()
     if Path(layoutName).is_absolute():
-      saveFile = layoutName
+      savePathPlusStem = layoutName
     else:
-      saveFile = LAYOUTS_DIR/f'{layoutName}.dockstate'
-
+      savePathPlusStem = LAYOUTS_DIR/layoutName
+    saveFile = savePathPlusStem.with_suffix(f'.dockstate')
     saveToFile(dockStates, saveFile,
                allowOverwriteDefault=allowOverwriteDefault)
     self.sigLayoutSaved.emit()

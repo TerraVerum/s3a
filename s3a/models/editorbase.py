@@ -267,9 +267,10 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     if stateName is None:
       stateName = self.lastAppliedName
     if stateName.is_absolute():
-      return stateName
+      statePathPlusStem = stateName
     else:
-      return self.saveDir/f'{stateName}.{self.fileType}'
+      statePathPlusStem = self.saveDir/stateName
+    return statePathPlusStem.with_suffix(f'.{self.fileType}')
 
   def _parseStateDict(self, stateName: Union[str, Path], stateDict: dict=None):
     if stateDict is not None:
