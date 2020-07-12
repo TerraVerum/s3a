@@ -66,6 +66,7 @@ def test_load_comps_merge(tmpdir):
   assert np.all(dfCmp), 'Loaded dataframe doesn\'t match daved dataframe'
 
 def test_import_large_verts(sampleComps, tmpdir):
+  sampleComps = sampleComps.copy()
   sampleComps.loc[:, REQD_TBL_FIELDS.INST_ID] = np.arange(len(sampleComps))
   sampleComps.at[0, REQD_TBL_FIELDS.VERTICES] = FRComplexVertices([FRVertices([[50e3, 50e3]])])
   io = app.compIo
@@ -173,3 +174,19 @@ def test_quickload_profile(tmpdir):
     colorscheme='Default', tablefilter='Default', mainimagetools='Default',
     focusedimagetools='Default', generalproperties='Default', shortcuts='Default'
   ))
+
+def test_load_last_settings(tmpdir, sampleComps):
+  tmpdir = Path(tmpdir)
+  newApp = S3A(exceptionsAsDialogs=False, loadLastState=False)
+  newApp.appStateEditor.saveDir = tmpdir
+  newApp.setMainImg(SAMPLE_IMG_FNAME, SAMPLE_IMG)
+  newApp.add_focusComp(sampleComps)
+  newApp.forceClose()
+  del newApp
+  newApp = S3A(exceptionsAsDialogs=False, loadLastState=False)
+  newApp.appStateEditor.saveDir = tmpdir
+  newApp.appStateEditor.loadParamState()
+  assert np.array_equal(newApp.mainImg.image, SAMPLE_IMG)
+  sampleComps[REQD_TBL_FIELDS.SRC_IMG_FILENAME] = SAMPLE_IMG_FNAME.name
+  assert np.array_equal(sampleComps, newApp.compMgr.compDf)
+
