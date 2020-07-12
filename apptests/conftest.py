@@ -38,9 +38,9 @@ def sampleComps():
 @pytest.fixture(autouse=True)
 def resetApp_tester(request):
   if 'smallimage' in request.keywords:
-    app.resetMainImg(SAMPLE_SMALL_IMG_FNAME, SAMPLE_SMALL_IMG)
+    app.setMainImg(SAMPLE_SMALL_IMG_FNAME, SAMPLE_SMALL_IMG)
   else:
-    app.resetMainImg(SAMPLE_IMG_FNAME, SAMPLE_IMG)
+    app.setMainImg(SAMPLE_IMG_FNAME, SAMPLE_IMG)
   if 'withcomps' in request.keywords:
     dfTester.fillRandomVerts(app.mainImg.image.shape)
     dfTester.fillRandomClasses()

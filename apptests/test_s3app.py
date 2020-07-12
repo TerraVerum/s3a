@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from conftest import NUM_COMPS, _block_pltShow, app, mgr, dfTester
-from s3a import FR_SINGLETON, appInst
+from s3a import FR_SINGLETON, appInst, S3A
 from s3a.models.s3abase import S3ABase
 from s3a.generalutils import resolveAuthorName
 from s3a.projectvars import REQD_TBL_FIELDS, LAYOUTS_DIR, ANN_AUTH_DIR
@@ -18,19 +18,19 @@ from testingconsts import FIMG_SER_COLS, RND, SAMPLE_IMG, SAMPLE_IMG_FNAME
 def test_change_img():
   im2 = RND.integers(0, 255, SAMPLE_IMG.shape, 'uint8')
   name = Path('./testfile').absolute()
-  app.resetMainImg(name, im2)
+  app.setMainImg(name, im2)
   assert name == app.srcImgFname, 'Annotation source not set after loading image on start'
 
   np.testing.assert_array_equal(app.mainImg.image, im2,
                                 'Main image doesn\'t match sample image')
 
 def test_change_img_none():
-  app.resetMainImg()
+  app.setMainImg()
   assert app.mainImg.image is None
   assert app.srcImgFname is None
 
 def test_est_bounds_no_img():
-  app.resetMainImg()
+  app.setMainImg()
   with pytest.raises(FRAlgProcessorError):
     app.estimateBoundaries()
 
@@ -68,7 +68,7 @@ def test_load_comps_merge(tmpdir):
 def test_import_large_verts(sampleComps, tmpdir):
   sampleComps.loc[:, REQD_TBL_FIELDS.INST_ID] = np.arange(len(sampleComps))
   sampleComps.at[0, REQD_TBL_FIELDS.VERTICES] = FRComplexVertices([FRVertices([[50e3, 50e3]])])
-  io = app.compExporter
+  io = app.compIo
   io.prepareDf(sampleComps)
   io.exportCsv(tmpdir/'Bad Verts.csv')
   with pytest.warns(FRS3AWarning):

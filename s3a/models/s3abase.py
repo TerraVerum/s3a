@@ -40,7 +40,7 @@ class S3ABase(QtWidgets.QMainWindow):
     self.mainImg = FRMainImage()
     self.focusedImg = FRFocusedImage()
     self.compMgr = FRComponentMgr()
-    self.compExporter = FRComponentIO()
+    self.compIo = FRComponentIO()
     self.compTbl = FRCompTableView()
     self.compDisplay = FRCompDisplayFilter(self.compMgr, self.mainImg, self.compTbl)
 
@@ -59,7 +59,7 @@ class S3ABase(QtWidgets.QMainWindow):
     # -----
     self.appStateEditor = FRAppStateEditor(self, name='App State Editor')
     self.appStateEditor.addImportExportOpts(
-      'image', lambda fname: self.resetMainImg(fname, clearExistingComps=False),
+      'image', lambda fname: self.setMainImg(fname, clearExistingComps=False),
       lambda: str(self.srcImgFname)
     )
     def saveExistingComps():
@@ -192,8 +192,8 @@ class S3ABase(QtWidgets.QMainWindow):
     self.compMgr.rmComps()
 
   @FR_SINGLETON.actionStack.undoable('Change Main Image')
-  def resetMainImg(self, fileName: FilePath=None, imgData: NChanImg=None,
-                   clearExistingComps=True):
+  def setMainImg(self, fileName: FilePath=None, imgData: NChanImg=None,
+                 clearExistingComps=True):
     """
     * If fileName is None, the main and focused images are blacked out.
     * If only fileName is provided, it is assumed to be an image. The image data
@@ -223,20 +223,20 @@ class S3ABase(QtWidgets.QMainWindow):
     if self.estBoundsOnStart:
       self.estimateBoundaries()
     yield
-    self.resetMainImg(oldFile, oldData, clearExistingComps)
+    self.setMainImg(oldFile, oldData, clearExistingComps)
     if clearExistingComps:
       # Old comps were cleared, so put them back
       self.compMgr.addComps(oldComps)
 
   def exportCompList(self, outFname: Union[str, Path], readOnly=True):
-    self.compExporter.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds,
-                                self.srcImgFname)
-    self.compExporter.exportByFileType(outFname, readOnly=readOnly)
+    self.compIo.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds,
+                          self.srcImgFname)
+    self.compIo.exportByFileType(outFname, readOnly=readOnly)
     self.hasUnsavedChanges = False
 
   def exportLabeledImg(self, outFname: str=None):
-    self.compExporter.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds)
-    return self.compExporter.exportLabeledImg(self.mainImg.image.shape, outFname)
+    self.compIo.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds)
+    return self.compIo.exportLabeledImg(self.mainImg.image.shape, outFname)
 
   def loadCompList(self, inFname: str, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
     pathFname = Path(inFname)

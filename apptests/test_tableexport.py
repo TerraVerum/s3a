@@ -8,7 +8,7 @@ from s3a.generalutils import augmentException
 from s3a.models.tablemodel import FRComponentIO
 
 def test_normal_export(sampleComps, tmpdir):
-  io = app.compExporter
+  io = app.compIo
   io.exportOnlyVis = False
   io.prepareDf(sampleComps)
   for ftype in io.handledExportTypes:
@@ -18,7 +18,7 @@ def test_normal_export(sampleComps, tmpdir):
 
 
 def test_filter_export(sampleComps, tmpdir):
-  io = app.compExporter
+  io = app.compIo
 
   curPath = tmpdir / 'normalExport - Filtered IDs export all.csv'
   filterIds = np.array([0,3,2])
@@ -41,7 +41,7 @@ def test_filter_export(sampleComps, tmpdir):
   doAndAssertExport(curPath, io, 'Export with filtered ids not successful.')
 
 def test_bad_import(tmpdir):
-  io = app.compExporter
+  io = app.compIo
   for ext in io.handledExportTypes:
     ofile = open(tmpdir/f'junkfile.{ext}', 'w')
     ofile.write('Vertices\nabsolute junk')

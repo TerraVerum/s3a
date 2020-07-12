@@ -250,7 +250,7 @@ class S3A(S3ABase):
     fname = popupFilePicker(self, 'Select Main Image', fileFilter)
     if fname is not None:
       with BusyCursor():
-        self.resetMainImg(fname)
+        self.setMainImg(fname)
 
   def startAutosave_gui(self):
     saveDlg = autosaveOptsDialog(self)
