@@ -13,9 +13,10 @@ from s3a.views.parameditors import FR_SINGLETON
 from s3a.views.imageareas import FRMainImage, FRFocusedImage, FREditableImgModel
 from s3a.graphicsutils import addDirItemsToMenu, raiseErrorLater
 from s3a.views.parameditors import FRParamEditor
+from s3a.views.parameditors.appstate import FRAppStateEditor
 from s3a.views.tableview import FRCompTableView
 from s3a.generalutils import resolveAuthorName
-from s3a.projectvars import FR_CONSTS, FR_ENUMS, REQD_TBL_FIELDS
+from s3a.projectvars import FR_CONSTS, FR_ENUMS, REQD_TBL_FIELDS, APP_STATE_DIR
 from s3a.structures import FRS3AWarning, FRVertices, FilePath, NChanImg, FRAppIOError, \
   FRAlgProcessorError
 from s3a.models.tablemodel import FRComponentIO, FRComponentMgr
@@ -52,10 +53,22 @@ class S3ABase(QtWidgets.QMainWindow):
     self.hasUnsavedChanges = False
     self.srcImgFname = None
     self.autosaveTimer: Optional[QtCore.QTimer] = None
-    self.quickLoaderFuncs = {
-      'image': self.resetMainImg,
-      'annotations': self.loadCompList
-    }
+
+    # -----
+    # INTERFACE WITH QUICK LOADER
+    # -----
+    self.appStateEditor = FRAppStateEditor(self, name='App State Editor')
+    self.appStateEditor.addImportExportOpts(
+      'image', lambda fname: self.resetMainImg(fname, clearExistingComps=False),
+      lambda: str(self.srcImgFname)
+    )
+    def saveExistingComps():
+      saveName = self.appStateEditor.saveDir / 'savedState.csv'
+      self.exportCompList(saveName, readOnly=False)
+      return str(saveName)
+    loadExistingComps = lambda infile: self.loadCompList(infile, FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.appStateEditor.addImportExportOpts(
+      'annotations', loadExistingComps, saveExistingComps)
 
     # Connect signals
     # -----
@@ -215,37 +228,10 @@ class S3ABase(QtWidgets.QMainWindow):
       # Old comps were cleared, so put them back
       self.compMgr.addComps(oldComps)
 
-  def importQuickLoaderProfile(self, profileSrc: Union[str, dict]):
-    if isinstance(profileSrc, str):
-      profileSrc = {FR_SINGLETON.quickLoader.name: profileSrc}
-
-    errSettings = []
-
-    for load, fn in self.quickLoaderFuncs.items():
-      try:
-        val: Any = profileSrc.pop(load, None)
-        if val is not None:
-          fn(val)
-      except Exception as ex:
-        errSettings.append(f'{load}: {ex}')
-
-    if profileSrc:
-      # Unclaimed arguments
-      try:
-        FR_SINGLETON.quickLoader.buildFromUserProfile(profileSrc)
-      except Exception as ex:
-        errSettings.append(f'{"Quick Loader"}: {ex}')
-
-    if len(errSettings) > 0:
-      err = FRAppIOError('The following settings were not loaded (shown as <setting>: <exception>)\n'
-                         + "\n\n".join(errSettings))
-      raiseErrorLater(err)
-
-
-  def exportCompList(self, outFname: Union[str, Path]):
+  def exportCompList(self, outFname: Union[str, Path], readOnly=True):
     self.compExporter.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds,
                                 self.srcImgFname)
-    self.compExporter.exportByFileType(outFname)
+    self.compExporter.exportByFileType(outFname, readOnly=readOnly)
     self.hasUnsavedChanges = False
 
   def exportLabeledImg(self, outFname: str=None):

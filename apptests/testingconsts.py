@@ -5,6 +5,7 @@ from skimage import data
 from skimage import io
 
 from s3a.projectvars import BASE_DIR, REQD_TBL_FIELDS
+from s3a.structures import FRS3AWarning
 
 NUM_COMPS = 15
 TESTS_DIR = BASE_DIR.parent/'apptests'
@@ -27,6 +28,7 @@ for impath, im in zip([SAMPLE_SMALL_IMG_FNAME, SAMPLE_IMG_FNAME],
   impath.parent.mkdir(exist_ok=True, parents=True)
   io.imsave(impath, im)
 
-from warnings import simplefilter
-simplefilter('error', DeprecationWarning)
-simplefilter('error', VisibleDeprecationWarning)
+# from warnings import simplefilter
+# simplefilter('error', DeprecationWarning)
+# simplefilter('error', VisibleDeprecationWarning)
+# simplefilter('error', FRS3AWarning)

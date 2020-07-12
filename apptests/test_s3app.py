@@ -167,8 +167,8 @@ def test_set_colorinfo():
 def test_quickload_profile(tmpdir):
   outfile = Path(tmpdir)/'tmp.csv'
   app.exportCompList(outfile)
-  app.importQuickLoaderProfile(
-    dict(image=str(SAMPLE_IMG_FNAME), layout='Default', annotations=str(outfile),
+  app.appStateEditor.loadParamState(
+    stateDict=dict(image=str(SAMPLE_IMG_FNAME), layout='Default', annotations=str(outfile),
     mainimageprocessor='Default', focusedimageprocessor='Default',
     colorscheme='Default', tablefilter='Default', mainimagetools='Default',
     focusedimagetools='Default', generalproperties='Default', shortcuts='Default'

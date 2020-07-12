@@ -12,7 +12,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets
 
 from s3a.views.parameditors import FRParamEditor, FRParamEditorDockGrouping, FR_SINGLETON
 from s3a.models.s3abase import S3ABase
-from s3a.projectvars import LAYOUTS_DIR, FR_CONSTS, FR_ENUMS
+from s3a.projectvars import LAYOUTS_DIR, FR_CONSTS, FR_ENUMS, APP_STATE_DIR
 from s3a.projectvars.enums import _FREnums
 from s3a.structures import FRS3AWarning
 from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
@@ -37,9 +37,16 @@ class S3A(S3ABase):
     superLoaderArgs = {'author': quickLoaderArgs.pop('author', None)}
     super().__init__(parent, **superLoaderArgs)
     if exceptionsAsDialogs:
-        warnings.simplefilter('error', FRS3AWarning)
-        makeExceptionsShowDialogs(self)
-    self.quickLoaderFuncs.update(layout=self.loadLayout)
+      warnings.simplefilter('error', FRS3AWarning)
+      makeExceptionsShowDialogs(self)
+      QtCore.QTimer.singleShot(0, self.requestLoadSavedSettings_gui)
+    elif loadLastState:
+      self.appStateEditor.loadParamState()
+    def saveRecentLayout():
+      outFile = self.appStateEditor.saveDir/'savedLayout'
+      self.saveLayout(outFile)
+      return str(outFile)
+    self.appStateEditor.addImportExportOpts('layout', self.loadLayout, saveRecentLayout)
     self.APP_TITLE = 'FICS Semi-Supervised Semantic Annotator'
     self.CUR_COMP_LBL = 'Current Component ID:'
     self.setWindowTitle(self.APP_TITLE)
@@ -51,12 +58,16 @@ class S3A(S3ABase):
     self.acceptRegionBtn = QtWidgets.QPushButton('Accept')
     self.acceptRegionBtn.setStyleSheet("background-color:lightgreen")
 
+    # Dummy editor for layout options since it doesn't really have editable settings
+    # Maybe later this can be elevated to have more options
+    self.layoutEditor = FRParamEditor(self, None, LAYOUTS_DIR, 'dockstate', 'Layout')
+
     self._buildGui()
     self._buildMenu()
     self._hookupSignals()
 
-    if quickLoaderArgs is not None:
-      self.importQuickLoaderProfile(quickLoaderArgs)
+    if len(quickLoaderArgs) > 0:
+      self.appStateEditor.loadParamState(stateDict=quickLoaderArgs)
 
     # Load layout options
     self.saveLayout('Default', allowOverwriteDefault=True)
@@ -96,6 +107,7 @@ class S3A(S3ABase):
     self.modCompAnalyticsAct.triggered.connect(self.showModCompAnalytics)
 
     self.saveAllEditorDefaults()
+
   def _buildGui(self):
     self.setDockNestingEnabled(True)
     self.setTabPosition(QtCore.Qt.AllDockWidgetAreas, QtWidgets.QTabWidget.North)
@@ -214,16 +226,22 @@ class S3A(S3ABase):
     # SETTINGS
     for dock in FR_SINGLETON.docks:
       self.createMenuOptForDock(self.paramTools, dock)
-    self.createMenuOptForEditor(self.menuFile, FR_SINGLETON.quickLoader,
-                                self.importQuickLoaderProfile)
+    self.createMenuOptForEditor(self.menuFile, FR_SINGLETON.quickLoader)
 
-  def loadLayout(self, layoutName: str):
-    layoutFilename = LAYOUTS_DIR/f'{layoutName}.dockstate'
+  def loadLayout(self, layoutName: Union[str, Path]):
+    layoutFilename = Path(layoutName)
+    if not layoutName.is_absolute():
+      layoutFilename = LAYOUTS_DIR/f'{layoutName}.dockstate'
     self.restoreState(attemptFileLoad(layoutFilename))
 
-  def saveLayout(self, layoutName: str=None, allowOverwriteDefault=False):
+  def saveLayout(self, layoutName: Union[str, Path]=None, allowOverwriteDefault=False):
     dockStates = self.saveState().data()
-    saveToFile(dockStates, LAYOUTS_DIR/f'{layoutName}.dockstate',
+    if Path(layoutName).is_absolute():
+      saveFile = layoutName
+    else:
+      saveFile = LAYOUTS_DIR/f'{layoutName}.dockstate'
+
+    saveToFile(dockStates, saveFile,
                allowOverwriteDefault=allowOverwriteDefault)
     self.sigLayoutSaved.emit()
 
@@ -299,6 +317,16 @@ class S3A(S3ABase):
   def clearBoundaries_gui(self):
     self.clearBoundaries()
 
+  def requestLoadSavedSettings_gui(self):
+    if not self.appStateEditor.RECENT_STATE_FNAME.exists():
+      return
+    success = QtWidgets.QMessageBox.question(
+      self, 'Load Previous State', 'Do you want to load all previous app'
+                                   ' settings (image, annotations, algorithms, etc.)?',
+      QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.No) == QtWidgets.QMessageBox.Ok
+    if success:
+      self.appStateEditor.loadParamState()
+
   def closeEvent(self, ev: QtGui.QCloseEvent):
     # Confirm all components have been saved
     shouldExit = False
@@ -315,6 +343,7 @@ class S3A(S3ABase):
       # Clean up all editor windows, which could potentially be left open
       ev.accept()
       FR_SINGLETON.close()
+      self.appStateEditor.saveParamState()
 
   def forceClose(self):
     """

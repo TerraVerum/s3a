@@ -344,7 +344,7 @@ class FRComponentIO:
     exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = srcImgFname
     self.compDf = exportDf
 
-  def exportByFileType(self, outFile: Union[str, Path]):
+  def exportByFileType(self, outFile: Union[str, Path], **exportArgs):
     outFile = Path(outFile)
     exportType = outFile.suffix.strip('.')
     if exportType in self.handledExportTypes:
@@ -352,17 +352,18 @@ class FRComponentIO:
     else:
       exportFn = None
     if exportFn is not None:
-      exportFn(outFile)
+      exportFn(outFile, **exportArgs)
   # -----
   # Export options
   # -----
-  def exportCsv(self, outFile: Union[str, Path]=None, **pdExportArgs):
+  def exportCsv(self, outFile: Union[str, Path]=None, readOnly=True, **pdExportArgs):
     """
 
     :param outFile: Name of the output file location. If *None*, no file is created. However,
       the export object will still be created and returned.
     :param pdExportArgs: Dictionary of values passed to underlying pandas export function.
       These will overwrite the default options for :func:`exportToFile <FRComponentMgr.exportToFile>`
+    :param readOnly: Whether this export should be read-only
     :return: Export version of the component data.
     """
     defaultExportParams = {
@@ -390,7 +391,8 @@ class FRComponentIO:
           exportDf[col] = _paramSerToStrSer(exportDf[col], col.value)
       if outFile is not None:
         exportDf.to_csv(outFile, index=False)
-        outPath.chmod(S_IREAD|S_IRGRP|S_IROTH)
+        if readOnly:
+          outPath.chmod(S_IREAD|S_IRGRP|S_IROTH)
     except Exception as ex:
       errMsg = f'Error on parsing column "{col.name}"\n'
       augmentException(ex, errMsg)
