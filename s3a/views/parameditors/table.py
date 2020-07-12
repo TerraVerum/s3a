@@ -12,7 +12,7 @@ from s3a.graphicsutils import raiseErrorLater
 from s3a.views.parameditors import FRParamEditor
 from s3a.projectvars import TABLE_DIR, REQD_TBL_FIELDS, COMP_CLASS_NA, DATE_FORMAT, \
   FR_CONSTS
-from s3a.structures import FRParam, FilePath, FRParamGroup, FRParamParseError
+from s3a.structures import FRParam, FilePath, FRParamGroup, FRParamEditorError
 
 yaml = YAML()
 
@@ -75,7 +75,7 @@ class FRTableFilterEditor(FRParamEditor):
     if len(badCols) > 0:
       colNames = [f'"{col}"' for col in badCols]
       colTypes = np.unique([f'"{col.valType}"' for col in badCols])
-      raiseErrorLater(FRParamParseError(f'The table does not know how to create a'
+      raiseErrorLater(FRParamEditorError(f'The table does not know how to create a'
                                         f' filter for fields {", ".join(colNames)}'
                                         f' since types {", ".join(colTypes)} do not'
                                         f' have corresponding filters'))

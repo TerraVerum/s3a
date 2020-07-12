@@ -4,7 +4,8 @@ import weakref
 from functools import wraps
 from inspect import isclass
 from pathlib import Path
-from typing import List, Dict, Any, Union, Collection, Type, Set, Tuple, Sequence
+from typing import List, Dict, Any, Union, Collection, Type, Set, Tuple, Sequence, \
+  Callable
 
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter, ParameterTree
@@ -12,14 +13,13 @@ from pyqtgraph.parametertree import Parameter, ParameterTree
 from s3a.graphicsutils import saveToFile, \
   attemptFileLoad
 from s3a.generalutils import frPascalCaseToTitle
-from s3a.structures import FRParam, ContainsSharedProps, FilePath, FRParamParseError
-
+from s3a.structures import FRParam, ContainsSharedProps, FilePath, FRParamEditorError
 __all__ = ['FRParamEditorBase']
 
 Signal = QtCore.Signal
 
 def clearUnwantedParamVals(paramState: dict):
-  for k, child in paramState.get('children', {}).items():
+  for _k, child in paramState.get('children', {}).items():
     clearUnwantedParamVals(child)
   if paramState.get('value', True) is None:
     paramState.pop('value')
@@ -29,20 +29,27 @@ _childTuple_asValue = Tuple[FRParam, oneOrMultChildren]
 childTuple_asParam = Tuple[FRParam, oneOrMultChildren, bool]
 _keyType = Union[_childTuple_asValue, childTuple_asParam]
 
+SPAWNED_EDITORS: List[FRParamEditorBase] = []
+"""
+Eventually, it would be nice to implemenet a global search bar that can find/modify
+any action, shortcut, etc. from any parameter. This tracker is an easy way to fascilitate
+such a feature. A `class:FRPopupLineEditor` can be created with a model derived from
+all parameters from SPAWNED_EDITORS, thereby letting a user see any option from any
+param editor.
+"""
 
 class FRParamEditorBase(QtWidgets.QDockWidget):
   """
   GUI controls for user-interactive parameters within S3A. Each window consists of
   a parameter tree and basic saving capabilities.
   """
-  _spawnedEditors = []
   sigParamStateCreated = Signal(str)
   sigParamStateUpdated = Signal(dict)
   sigParamStateDeleted = Signal(str)
 
   def __init__(self, parent=None, paramList: List[Dict]=None, saveDir: FilePath='.',
-               fileType='param', name=None, childForOverride: Parameter=None,
-               registerCls: Type=None, registerParam: FRParam=None):
+               fileType='param', name=None, topTreeChild: Parameter=None,
+               registerCls: Type=None, registerParam: FRParam=None, **registerGroupOpts):
     """
     GUI controls for user-interactive parameters within S3A. Each window consists of
     a parameter tree and basic saving capabilities.
@@ -55,21 +62,24 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     :param fileType: The filetype of the saved settings. E.g. if a settings configuration
       is saved with the name "test", it will result in a file "test.&lt;fileType&gt;"
     :param name: User-readable name of this parameter editor
-    :param childForOverride: Generally for internal use. If provided, it will
+    :param topTreeChild: Generally for internal use. If provided, it will
       be inserted into the parameter tree instead of a newly created parameter.
     :param registerCls: If this editor was created to hold parameters for a specific
       class, then that class must be provided here. It will ensure registered
       parameters actually appear in this editor. See :func:`FRParamEditor.registerGroup`
     :param registerParam: The grouping parameter to hold registered parameters
       for the regiseterd class. See :func:`FRParamEditor.registerGroup`
+    :param registerGroupOpts: These parameters are directly passed as kwargs
+      to :func:`FRParamEditor.registerGroup`.
     """
-    super().__init__()
+    super().__init__(parent)
+    cls = type(self)
     # Place in list so an empty value gets unpacked into super constructor
     if paramList is None:
       paramList = []
     if name is None:
       try:
-        propClsName = type(self).__name__
+        propClsName = cls.__name__
         name = propClsName[:propClsName.index('Editor')]
         name = frPascalCaseToTitle(name)
       except ValueError:
@@ -101,8 +111,8 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     self.params.sigStateChanged.connect(self._paramTreeChanged)
     self.tree = ParameterTree()
     topParam = self.params
-    if childForOverride is not None:
-      topParam = childForOverride
+    if topTreeChild is not None:
+      topParam = topTreeChild
     self.tree.setParameters(topParam, showTop=False)
     self.tree.header().setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
 
@@ -120,8 +130,8 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     self.lastAppliedName = None
 
     if registerCls is not None:
-      self.registerGroup(registerParam)(registerCls)
-    self._spawnedEditors.append(weakref.proxy(self))
+      self.registerGroup(registerParam, **registerGroupOpts)(registerCls)
+    SPAWNED_EDITORS.append(weakref.proxy(self))
 
   # Helper method for accessing simple parameter values
   def __getitem__(self, keys: _keyType):
@@ -172,6 +182,7 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
       return outVals
 
   def applyChanges(self):
+    """Broadcasts that this parameter editor has updated changes"""
     # Don't emit any signals if nothing changed
     newState = self.params.saveState(filter='user')
     outDict = self.params.getValues()
@@ -181,7 +192,7 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     return outDict
 
   def saveParamState(self, saveName: str=None, paramState: dict=None,
-                     allowOverwriteDefault=False):
+                     allowOverwriteDefault=False, blockWrite=False):
     """
     * Returns dict on successful parameter save and emits sigParamStateCreated.
     * Returns None if no save name was given
@@ -192,17 +203,33 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
       paramState = self.params.saveState(filter='user')
     # Remove non-useful values
     clearUnwantedParamVals(paramState)
-    self.saveDir.mkdir(parents=True, exist_ok=True)
-    saveToFile(paramState, self.formatFileName(saveName),
-               allowOverwriteDefault=allowOverwriteDefault)
-    self.applyChanges()
-    outDict: dict = self.params.getValues()
+    if not blockWrite and self.saveDir is not None:
+      self.saveDir.mkdir(parents=True, exist_ok=True)
+      saveToFile(paramState, self.formatFileName(saveName),
+                 allowOverwriteDefault=allowOverwriteDefault)
+    # self.applyChanges()
     self.lastAppliedName = saveName
-    self.sigParamStateCreated.emit(saveName)
-    return outDict
+    self.sigParamStateCreated.emit(str(saveName))
+    return paramState
+
+  def saveCurStateAsDefault(self):
+    self.saveParamState('Default', allowOverwriteDefault=True)
 
   def paramDictWithOpts(self, addList: List[str]=None, addTo: List[type(Parameter)]=None,
                         removeList: List[str]=None, paramDict: Dict[str, Any]=None):
+    """
+    Allows customized alterations to which portions of a pyqtgraph parameter will be saved
+    in the export. The default option only allows saving all or no extra options. This
+    allows you to specify which options should be saved, and what parameter types they
+    should be saved for.
+
+    :param addList: Options to include in the export for *addTo* type parameters
+    :param addTo: Which parameter types should get these options
+    :param removeList: Options to exclude in the export for *addTo* type parameters
+    :param paramDict: The initial export that should be modified. This is usually the
+      output of `Parameter().saveState(filter='user')`
+    :return: Modified version of :paramDict: with alterations as explained above
+    """
     if addList is None:
       addList = []
     if addTo is None:
@@ -226,24 +253,29 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     return paramDict
 
 
-  def loadParamState(self, stateName: str, stateDict: dict=None,
-                     addChildren=False, removeChildren=False):
+  def loadParamState(self, stateName: Union[str, Path], stateDict: dict=None,
+                     addChildren=False, removeChildren=False, applyChanges=True):
     loadDict = self._parseStateDict(stateName, stateDict)
     self.params.restoreState(loadDict, addChildren=addChildren, removeChildren=removeChildren)
-    self.applyChanges()
+    if applyChanges:
+      self.applyChanges()
     self.lastAppliedName = stateName
     return loadDict
 
-  def formatFileName(self, stateName: str=None):
+  def formatFileName(self, stateName: Union[str, Path]=None):
+    stateName = Path(stateName)
     if stateName is None:
       stateName = self.lastAppliedName
-    return self.saveDir/f'{stateName}.{self.fileType}'
+    if stateName.is_absolute():
+      return stateName
+    else:
+      return self.saveDir/f'{stateName}.{self.fileType}'
 
-  def _parseStateDict(self, stateName: str, stateDict: dict=None):
+  def _parseStateDict(self, stateName: Union[str, Path], stateDict: dict=None):
     if stateDict is not None:
       return stateDict
     dictFilename = self.formatFileName(stateName)
-    stateDict = dict(attemptFileLoad(dictFilename))
+    stateDict = attemptFileLoad(dictFilename)
     return stateDict
 
   def deleteParamState(self, stateName: str):
@@ -319,28 +351,14 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     if not asProperty:
       return paramForEditor
 
-    def _paramAccessHelper(clsObj):
-      # when class isn't fully instantiated
-      # Retrieve class name from the class instance, since this function call may
-      # have resulted from an inhereted class. This only matters if the class name was
-      # used instead of a generic string parameter value
-      if clsObj in self.classInstToEditorMapping:
-        xpondingEditor = self.classInstToEditorMapping[clsObj]
-      else:
-        xpondingEditor = self
-      return xpondingEditor
-
     # Else, create a property and return that instead
     @property
     def paramAccessor(clsObj):
-      xpondingEditor = _paramAccessHelper(clsObj)
-      return xpondingEditor[self.groupingToParamMapping[grouping], constParam]
+      return self[self.groupingToParamMapping[grouping], constParam]
 
     @paramAccessor.setter
     def paramAccessor(clsObj, newVal):
-      xpondingEditor = _paramAccessHelper(clsObj)
-
-      param = xpondingEditor[self.groupingToParamMapping[grouping], constParam, True]
+      param = self[self.groupingToParamMapping[grouping], constParam, True]
       param.setValue(newVal)
 
     return paramAccessor
@@ -354,67 +372,54 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
       in this parameter editor. As such, it should be human readable.
       If *None*, params will be shown at the top-level of the parameter tree
     :param opts: Additional registration options. Accepted values:
-      - nameFromParam: This is available so objects without a dedicated class can
+      :key nameFromParam: This is available so objects without a dedicated class can
       also be registered. In that case, a spoof class is registered under the name
       'groupParam.name' instead of '[decorated class].__qualname__'.
-      - forceCreate: Normally, the class is not registered until at least one property
+      :key forceCreate: Normally, the class is not registered until at least one property
       (or method) is registered to it. That way, classes registered for other editors
       don't erroneously appear. *forceCreate* will override this rule, creating this
       parameter immediately.
+      :key useNewInit: When a class is passed in as a group to register, it is often
+      beneficial to ensure its __initEditorParams__ method is called (if it exists) and
+      other setup procedures are followed. However, if a param editor is created *inside*
+      __initEditorParams__ (or in other circumstances where the class is already initialized
+      but an editor is created dynamically), this is an unnecessary and even harmful step.
+      Passing *useNewInit*=False will ensure the __init__ method for the registered class
+      is *not* altered.
     :return: Undecorated class, but with a new __init__ method which initializes
       all shared properties contained in the '__initEditorParams__' method, if it exists
-      in the class.
+      in the class. For exceptions to this rule see `key:useNewInit`.
     """
     opts.setdefault('nameFromParam', False)
     def groupingDecorator(grouping: Union[Type, Any]=None):
-      notAClass = False
       if grouping is None or opts['nameFromParam']:
         # In this case nameFromParam must be provided. Use a dummy class for the
         # rest of the proceedings
         grouping = groupParam
-        notAClass = True
-      elif not isclass(grouping):
-        raise FRParamParseError('Grouping must be either *None* or a class.')
+      self.groupingToParamMapping.setdefault(grouping, groupParam)
+
+      isAClass = isclass(grouping)
+
+
+      if isAClass and grouping not in REGISTERED_GROUPINGS:
+        REGISTERED_GROUPINGS.add(grouping)
+        oldInit = grouping.__init__
+        @wraps(oldInit)
+        def newInit(clsObj, *args, **kwargs):
+          grouping = type(clsObj)
+          if grouping not in INITIALIZED_GROUPINGS and issubclass(grouping, ContainsSharedProps):
+            INITIALIZED_GROUPINGS.add(grouping)
+            clsObj.__initEditorParams__()
+          oldInit(clsObj, *args, **kwargs)
+          for editor in SPAWNED_EDITORS:
+            editor._extendedClassInit(clsObj, groupParam)
+        grouping.__init__ = newInit
 
       self._extendedGroupingDecorator(grouping, groupParam, **opts)
-      self.groupingToParamMapping.setdefault(grouping, groupParam)
 
       if opts.get('forceCreate', False):
         self._addParamGroup(groupParam.name)
 
-      if notAClass:
-        return
-      # Else, need to be sure editor opts are proprely registered on init
-
-      oldClsInit = grouping.__init__
-
-      @wraps(oldClsInit)
-      def newClassInit(clsObj, *args, **kwargs):
-        # In the case of inheritance, the class type may not match type(clsObj)
-        # Redefine grouping here in that event
-        cls = type(clsObj)
-        groupParam = self.groupingToParamMapping[cls]
-
-        if (cls not in _INITIALIZED_CLASSES
-            and issubclass(cls, ContainsSharedProps)):
-          _INITIALIZED_CLASSES.add(cls)
-          cls.__initEditorParams__()
-        # Occurs when parameters are not already initialized from a subclass
-        if clsObj not in self.classInstToEditorMapping:
-          self.classInstToEditorMapping[clsObj] = self
-          doExtendedInit = True
-        else:
-          doExtendedInit = False
-
-        retVal = oldClsInit(clsObj, *args, **kwargs)
-
-        if doExtendedInit:
-          self._extendedClassInit(clsObj, groupParam)
-          if opts.get('saveDefault', True):
-            self.saveParamState(saveName='Default', allowOverwriteDefault=True)
-        return retVal
-
-      grouping.__init__ = newClassInit
       return grouping
     if opts['nameFromParam']:
       groupingDecorator()
@@ -435,4 +440,5 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     """
 
 
-_INITIALIZED_CLASSES: Set[Type[ContainsSharedProps]] = set()
+INITIALIZED_GROUPINGS = set()
+REGISTERED_GROUPINGS = set()

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List
+from typing import List, Union
 from warnings import warn
 
 from pyqtgraph.Qt import QtCore, QtWidgets
@@ -9,7 +9,7 @@ from s3a.projectvars import QUICK_LOAD_DIR
 from .genericeditor import FRParamEditor
 from .pgregistered import FRActionWithShortcutParameter as ActWithShc
 from s3a.graphicsutils import FRPopupLineEditor, raiseErrorLater
-from ...structures import FRIllRegisteredPropError, FRS3AWarning
+from ...structures import FRParamEditorError, FRS3AWarning
 
 class FREditorListModel(QtCore.QAbstractListModel):
   def __init__(self, editorList: List[FRParamEditor], parent: QtWidgets.QWidget=None):
@@ -104,8 +104,10 @@ class FRQuickLoaderEditor(FRParamEditor):
 
     self.addNewParamState.completer().activated.connect(self.addFromLineEdit)
 
-  def loadParamState(self, stateName: str, stateDict: dict=None, addChildren=False, removeChildren=False):
-    ret = super().loadParamState(stateName, stateDict, addChildren=True, removeChildren=True)
+  def loadParamState(self, stateName: Union[str, Path], stateDict: dict=None,
+                     addChildren=False, removeChildren=False, applyChanges=True):
+    ret = super().loadParamState(stateName, stateDict, addChildren=True, removeChildren=True,
+                                 applyChanges=False)
     invalidGrps = []
     editorNames = [e.name for e in self.listModel.uniqueEditors]
     hasInvalidEntries = False
@@ -128,8 +130,9 @@ class FRQuickLoaderEditor(FRParamEditor):
                f"{[grp.name() for grp in invalidGrps]}\n" \
                f"Must be one of:\n" \
                f"{[e.name for e in self.listModel.uniqueEditors]}"
-      raiseErrorLater(FRIllRegisteredPropError(errMsg))
-    self.applyChanges()
+      raiseErrorLater(FRParamEditorError(errMsg))
+    if applyChanges:
+      self.applyChanges()
     return ret
 
   def buildFromUserProfile(self, profileSrc: dict):
@@ -150,10 +153,10 @@ class FRQuickLoaderEditor(FRParamEditor):
     return profileSrc
 
 
-  def saveState(self, saveName: str=None, paramState: dict=None,
-                allowOverwriteDefault=False):
+  def saveParamState(self, saveName: str=None, paramState: dict=None,
+                     allowOverwriteDefault=False, blockWrite=False):
     stateDict = self.paramDictWithOpts(['type', 'shortcutSeq'], [ActWithShc, GroupParameter])
-    super().saveState(saveName, stateDict, allowOverwriteDefault)
+    super().saveParamState(saveName, stateDict, allowOverwriteDefault, blockWrite)
 
 
   def applyChanges(self):
@@ -183,8 +186,10 @@ class FRQuickLoaderEditor(FRParamEditor):
       # It is not made possible through the context menu. Fix this
       curGroup = self.params.names[editor.name]
       _addRmOption(curGroup)
+      if act is None:
+        act = curGroup.child(paramState)
 
-    if paramState in curGroup.names:
+    if paramState in curGroup.names and act is not None and act.isActivateConnected:
       # Duplicate option, no reason to add
       return
     curGroup.opts['removable'] = True
@@ -195,7 +200,8 @@ class FRQuickLoaderEditor(FRParamEditor):
     act.opts['removable'] = True
     _addRmOption(act)
     act.sigActivated.connect(
-      lambda _act: self._safeLoadParamState(_act, editor,paramState))
+      lambda _act: self._safeLoadParamState(_act, editor, paramState))
+    act.isActivateConnected = True
 
   def _safeLoadParamState(self, action: ActWithShc, editor: FRParamEditor,
                           paramState: str):
@@ -210,6 +216,6 @@ class FRQuickLoaderEditor(FRParamEditor):
       action.remove()
       # Wait until end of process cycle to raise error
       formattedState = self.listModel.displayFormat.format(editor=editor, stateName=paramState)
-      raiseErrorLater(FRIllRegisteredPropError(
+      raiseErrorLater(FRParamEditorError(
         f'Attempted to load {formattedState} but the setting was not found.'
       ))

@@ -158,15 +158,20 @@ def makeUniqueBaseClass(obj: Any):
   return mixin
 
 
-def frPascalCaseToTitle(name: str) -> str:
+def frPascalCaseToTitle(name: str, addSpaces=True) -> str:
   """
   Helper utility to turn a FRPascaleCase name to a 'Title Case' title
   :param name: camel-cased name
+  :param addSpaces: Whether to add spaces in the final result
   :return: Space-separated, properly capitalized version of :param:`Name`
   """
   if not name:
     return name
   if name.startswith('FR'):
     name = name[2:]
-  name = re.sub(r'(\w)([A-Z])', r'\1 \2', name)
+  if addSpaces:
+    replace = r'\1 \2'
+  else:
+    replace = r'\1\2'
+  name = re.sub(r'(\w)([A-Z])', replace, name)
   return name.title()

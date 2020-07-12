@@ -6,7 +6,7 @@ from typing import Any, Optional, Collection, Union
 from typing_extensions import Protocol, runtime_checkable
 from warnings import warn
 
-from .exceptions import FRParamParseError
+from .exceptions import FRParamEditorError
 
 @runtime_checkable
 class ContainsSharedProps(Protocol):
@@ -115,7 +115,7 @@ class FRParamGroup:
     baseWarnMsg = f'String representation "{paramName}" was not recognized.\n'
     if defaultParam is None:
       # No default specified, so we have to raise Exception
-      raise FRParamParseError(baseWarnMsg + 'No class default is specified.')
+      raise FRParamEditorError(baseWarnMsg + 'No class default is specified.')
     # No exception needed, since the user specified a default type in the derived class
     warn(baseWarnMsg + f'Defaulting to {defaultParam.name}')
     return defaultParam

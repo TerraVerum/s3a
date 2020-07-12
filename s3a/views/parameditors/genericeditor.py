@@ -50,10 +50,10 @@ class FRParamEditor(FRParamEditorBase):
   a parameter tree and basic saving capabilities.
   """
   def __init__(self, parent=None, paramList: List[Dict]=None, saveDir: FilePath='.',
-               fileType='param', name=None, childForOverride: Parameter=None,
-               registerCls: Type=None, registerParam: FRParam=None):
-    super().__init__(parent, paramList, saveDir, fileType, name, childForOverride,
-                     registerCls, registerParam)
+               fileType='param', name=None, topTreeChild: Parameter=None,
+               registerCls: Type=None, registerParam: FRParam=None, **registerGroupOpts):
+    super().__init__(parent, paramList, saveDir, fileType, name, topTreeChild,
+                     registerCls, registerParam, **registerGroupOpts)
     self.dock = self
     self.hide()
     self.setWindowTitle(self.name)
@@ -94,7 +94,6 @@ class FRParamEditor(FRParamEditorBase):
 
     if registerCls is not None:
       self.registerGroup(registerParam)(registerCls)
-    self._spawnedEditors.append(weakref.proxy(self))
 
   def _paramTreeChanged(self, param, child, idx):
     self._stateBeforeEdit = self.params.saveState()

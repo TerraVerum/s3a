@@ -26,7 +26,12 @@ __all__ = ['S3A']
 class S3A(S3ABase):
   sigLayoutSaved = QtCore.Signal()
 
-  def __init__(self, parent=None, exceptionsAsDialogs=True, **quickLoaderArgs):
+  @classmethod
+  def __initEditorParams__(cls):
+    super().__initEditorParams__()
+
+  def __init__(self, parent=None, exceptionsAsDialogs=True, loadLastState=True,
+               **quickLoaderArgs):
     # Wait to import quick loader profiles until after self initialization so
     # customized loading functions also get called
     superLoaderArgs = {'author': quickLoaderArgs.pop('author', None)}
@@ -90,6 +95,7 @@ class S3A(S3ABase):
     self.newCompAnalyticsAct.triggered.connect(self.showNewCompAnalytics)
     self.modCompAnalyticsAct.triggered.connect(self.showModCompAnalytics)
 
+    self.saveAllEditorDefaults()
   def _buildGui(self):
     self.setDockNestingEnabled(True)
     self.setTabPosition(QtCore.Qt.AllDockWidgetAreas, QtWidgets.QTabWidget.North)

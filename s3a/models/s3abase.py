@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from typing import Optional, Union, Callable, Dict, Any
+from typing import Optional, Union, Callable, Dict, Any, List
 from warnings import warn
 
 import numpy as np
@@ -8,6 +8,7 @@ import pandas as pd
 from PyQt5 import QtCore, QtWidgets
 from pandas import DataFrame as df
 
+from s3a.models.editorbase import SPAWNED_EDITORS
 from s3a.views.parameditors import FR_SINGLETON
 from s3a.views.imageareas import FRMainImage, FRFocusedImage, FREditableImgModel
 from s3a.graphicsutils import addDirItemsToMenu, raiseErrorLater
@@ -94,6 +95,12 @@ class S3ABase(QtWidgets.QMainWindow):
                'To start without error, provide an author name explicitly, e.g.\n'
                '"python -m s3a --author=<Author Name>"')
     FR_SINGLETON.tableData.annAuthor = authorName
+    self.saveAllEditorDefaults()
+
+  @staticmethod
+  def saveAllEditorDefaults():
+    for editor in FR_SINGLETON.registerableEditors:
+      editor.saveCurStateAsDefault()
 
   @staticmethod
   def populateParamEditorMenuOpts(objForMenu: FRParamEditor, winMenu: QtWidgets.QMenu,

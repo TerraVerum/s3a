@@ -129,6 +129,7 @@ class FRCompTableView(QtWidgets.QTableView):
        Otherwise, only contains minimal features.
     """
     super().__init__(*args)
+    # self.__initEditorParams__()
     self._prevSelRows = np.array([])
     self.setSortingEnabled(True)
 

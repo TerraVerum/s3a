@@ -11,7 +11,7 @@ from s3a import FR_SINGLETON
 from s3a.views.imageareas import FRMainImage
 from s3a.views.regions import FRMultiRegionPlot
 from s3a.projectvars import FR_CONSTS, REQD_TBL_FIELDS
-from s3a.structures import FRVertices, FRParam, FRParamParseError, FRS3AWarning
+from s3a.structures import FRVertices, FRParam, FRParamEditorError, FRS3AWarning
 from s3a.models.tablemodel import FRComponentMgr
 
 __all__ = ['FRCompSortFilter', 'FRCompDisplayFilter']
@@ -211,7 +211,7 @@ class FRCompDisplayFilter(QtCore.QObject):
       try:
         curComps = self.filterByParamType(curComps, param)
         filterableCols.append(param)
-      except FRParamParseError:
+      except FRParamEditorError:
         badCols.append(param)
     if len(badCols) > 0:
       badTypes = np.unique([f'"{col.valType}"' for col in badCols])

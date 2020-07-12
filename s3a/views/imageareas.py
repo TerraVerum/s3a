@@ -33,10 +33,11 @@ class FREditableImgModel(pg.PlotWidget):
   @classmethod
   def __initEditorParams__(cls):
     groupName = frPascalCaseToTitle(cls.__name__)
-    cls.toolsDir = MENU_OPTS_DIR / groupName.lower()
+    lowerGroupName = groupName.lower()
+    cls.toolsDir = MENU_OPTS_DIR / lowerGroupName
     cls.toolsEditor = FRParamEditor(
-      saveDir=cls.toolsDir, fileType=groupName.lower() + 'tools',
-      name=groupName + ' Tools', registerCls=cls
+      saveDir=cls.toolsDir, fileType=lowerGroupName.replace(' ', '') + 'tools',
+      name=groupName + ' Tools', registerCls=cls, useNewInit=False
     )
 
     cls.procCollection = FR_SINGLETON.algParamMgr.createProcessorForClass(
@@ -178,8 +179,7 @@ class FRMainImage(FREditableImgModel):
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
-    cls.multCompsOnCreate = FR_SINGLETON.generalProps.registerProp(cls,
-                              FR_CONSTS.PROP_MK_MULT_COMPS_ON_ADD)
+    cls.multCompsOnCreate = cls.toolsEditor.registerProp(cls, FR_CONSTS.PROP_MK_MULT_COMPS_ON_ADD)
     cls.mergeCompsAct, cls.splitCompsAct, cls.overrideCompVertsAct = cls.toolsEditor.registerProps(
       cls, [FR_CONSTS.TOOL_MERGE_COMPS, FR_CONSTS.TOOL_SPLIT_COMPS,
             FR_CONSTS.TOOL_OVERRIDE_VERTS_ACT],

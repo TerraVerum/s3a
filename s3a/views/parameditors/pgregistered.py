@@ -76,6 +76,11 @@ class FRActionWithShortcutParameterItem(ActionParameterItem):
 class FRActionWithShortcutParameter(ActionParameter):
   itemClass = FRActionWithShortcutParameterItem
 
+  def __init__(self, **opts):
+    super().__init__(**opts)
+    self.isActivateConnected = False
+
+
 class FRCustomMenuParameter(parameterTypes.GroupParameter):
   def __init__(self, menuActions: List[str]=None, **opts):
     if menuActions is None:

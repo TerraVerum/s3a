@@ -1,6 +1,6 @@
 import weakref
 from dataclasses import dataclass
-from functools import partial
+from functools import partial, wraps
 from inspect import isclass
 from typing import Tuple, Callable, Union, Any, Dict, List
 
@@ -8,8 +8,9 @@ from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
 from .genericeditor import FRParamEditor
 from s3a.projectvars import SHORTCUTS_DIR
-from s3a.structures import FRParam, FRIllRegisteredPropError
+from s3a.structures import FRParam, FRParamEditorError
 from s3a.graphicsutils import findMainWin
+from s3a.models.editorbase import INITIALIZED_GROUPINGS
 
 
 def _class_fnNamesFromFnQualname(qualname: str) -> (str, str):
@@ -71,6 +72,7 @@ class FRShortcutsEditor(FRParamEditor):
     # needs a global context
     self.mainWinRef = findMainWin()
     self.boundFnsPerGroup: Dict[FRParam, List[FRBoundFnParams]] = {}
+    self._objsWithShortcuts = set()
     """Holds the parameters associated with this registered class"""
 
   def registerMethod(self, constParam: FRParam, fnArgs=None):
@@ -96,10 +98,13 @@ class FRShortcutsEditor(FRParamEditor):
 
   def _extendedClassInit(self, clsObj: Any, groupParam: FRParam):
     grouping = type(clsObj)
+    if clsObj in self._objsWithShortcuts:
+      return
+    self._objsWithShortcuts.add(clsObj)
     try:
       self.addRegisteredFuncsFromGroup(grouping, groupParam)
     except Exception as ex:
-      # Already added previously.
+      # Already added previously from a different class.
       # This is the easiest way to check error type since pg throws a raw exception,
       # not a subclass
       if 'Already have child' not in str(ex):
@@ -167,7 +172,7 @@ class FRShortcutsEditor(FRParamEditor):
     """
     Properties should never be registered as shortcuts, so make sure this is disallowed
     """
-    raise FRIllRegisteredPropError('Cannot register property/attribute as a shortcut')
+    raise FRParamEditorError('Cannot register property/attribute as a shortcut')
 
   def applyChanges(self):
     for shortcut in self.shortcuts: #type: FREditableShortcut
