@@ -263,6 +263,15 @@ class FRMouseFollowingRegionPlot(pg.PlotCurveItem):
     self.dataMin = FRVertices()
     self.offset = FRVertices([[0,0]])
 
+    self.setShadowPen(color='k', width=2*self.opts['pen'].width())
+    """
+    Instead of a customizeable color palette for the copy shape, it is easier to
+    have a black outline and white inline color for the shape plot which ensures
+    all vertices are visible on any background. However, it is not easy to create
+    a multicolored pen in pyqt -- the much simpler solution is to simply create
+    a shadow pen, where one has a boundary twice as thick as the other.
+    """
+
     self._connectivity = np.ndarray([], bool)
     mainImg.sigMousePosChanged.connect(self.mainMouseMoved)
 
