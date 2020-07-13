@@ -324,7 +324,8 @@ class S3A(S3ABase):
                                    ' settings (image, annotations, algorithms, etc.)?',
       QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.No) == QtWidgets.QMessageBox.Ok
     if success:
-      self.appStateEditor.loadParamState()
+      with BusyCursor():
+        self.appStateEditor.loadParamState()
 
   def closeEvent(self, ev: QtGui.QCloseEvent):
     # Confirm all components have been saved
