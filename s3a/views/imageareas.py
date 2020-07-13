@@ -18,7 +18,7 @@ from .drawopts import FRDrawOpts
 from .procwrapper import  FRImgProcWrapper
 from .regions import FRVertexDefinedImg
 
-__all__ = ['FRMainImage', 'FRFocusedImage', 'FREditableImgModel']
+__all__ = ['FRMainImage', 'FRFocusedImage', 'FREditableImgBase']
 
 from s3a.controls.drawctrl import FRShapeCollection
 
@@ -26,8 +26,10 @@ Signal = QtCore.Signal
 QCursor = QtGui.QCursor
 
 
-class FREditableImgModel(pg.PlotWidget):
-  sigMousePosChanged = QtCore.Signal(object)
+class FREditableImgBase(pg.PlotWidget):
+  sigMousePosChanged = QtCore.Signal(object, object)
+  """FRVertices() coords, [[[img pixel]]] np.ndarray"""
+
 
   @classmethod
   def __initEditorParams__(cls):
@@ -168,7 +170,7 @@ class FREditableImgModel(pg.PlotWidget):
 
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MAIN_IMG_AREA)
-class FRMainImage(FREditableImgModel):
+class FRMainImage(FREditableImgBase):
   sigCompsCreated = Signal(object) # pd.DataFrame
   sigCompsUpdated = Signal(object) # pd.DataFrame
   sigCompsRemoved = Signal(object) # OneDArr
@@ -297,7 +299,7 @@ class FRMainImage(FREditableImgModel):
     super().clearCurDrawShape()
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_FOCUSED_IMG_AREA)
-class FRFocusedImage(FREditableImgModel):
+class FRFocusedImage(FREditableImgBase):
 
   @classmethod
   def __initEditorParams__(cls):

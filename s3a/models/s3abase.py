@@ -10,7 +10,7 @@ from pandas import DataFrame as df
 
 from s3a.models.editorbase import SPAWNED_EDITORS
 from s3a.views.parameditors import FR_SINGLETON
-from s3a.views.imageareas import FRMainImage, FRFocusedImage, FREditableImgModel
+from s3a.views.imageareas import FRMainImage, FRFocusedImage, FREditableImgBase
 from s3a.graphicsutils import addDirItemsToMenu, raiseErrorLater
 from s3a.views.parameditors import FRParamEditor
 from s3a.views.parameditors.appstate import FRAppStateEditor
@@ -268,7 +268,7 @@ class S3ABase(QtWidgets.QMainWindow):
     self.changeFocusedComp(newComps)
 
   @staticmethod
-  def _check_plotStages(img: FREditableImgModel):
+  def _check_plotStages(img: FREditableImgBase):
     proc = img.curProcessor.processor
     if proc.result is None:
       raise FRAlgProcessorError('Analytics can only be shown after the algorithm'
