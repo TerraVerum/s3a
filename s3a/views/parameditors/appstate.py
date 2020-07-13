@@ -22,7 +22,6 @@ class FRAppStateEditor(FRParamEditor):
     # TODO: Add params to choose which features are saved, etc.
     super().__init__(parent, paramList, saveDir, fileType, name, topTreeChild,
                      registerCls, registerParam)
-    self.RECENT_STATE_FNAME = self.saveDir/f'recent.{fileType}'
     self._stateFuncsDf = pd.DataFrame(columns=['importFuncs', 'exportFuncs'])
 
   def saveParamState(self, saveName: str=None, paramState: dict=None,
@@ -83,3 +82,7 @@ class FRAppStateEditor(FRParamEditor):
     newRow = pd.Series([importFunc, exportFunc], name=optName,
                        index=self._stateFuncsDf.columns)
     self._stateFuncsDf: pd.DataFrame = self._stateFuncsDf.append(newRow)
+
+  @property
+  def RECENT_STATE_FNAME(self):
+      return self.saveDir/f'recent.{self.fileType}'
