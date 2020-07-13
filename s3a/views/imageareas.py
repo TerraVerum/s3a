@@ -3,9 +3,8 @@ from typing import Union, Optional, Tuple
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
-from PyQt5 import QtCore, QtWidgets, QtGui
 from pyqtgraph import BusyCursor
-from pyqtgraph.Qt import QtCore, QtGui
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from skimage.io import imread
 
 from s3a import FR_SINGLETON

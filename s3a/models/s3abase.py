@@ -5,7 +5,7 @@ from warnings import warn
 
 import numpy as np
 import pandas as pd
-from PyQt5 import QtCore, QtWidgets
+from pyqtgraph.Qt import QtCore, QtWidgets
 from pandas import DataFrame as df
 
 from s3a.models.editorbase import SPAWNED_EDITORS

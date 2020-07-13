@@ -5,10 +5,9 @@ from typing import Optional, Union, Tuple, Dict, Any
 
 import numpy as np
 import qdarkstyle
-from PyQt5 import QtGui
 from pandas import DataFrame as df
 from pyqtgraph import BusyCursor
-from pyqtgraph.Qt import QtCore, QtWidgets
+from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
 from s3a.views.parameditors import FRParamEditor, FRParamEditorDockGrouping, FR_SINGLETON
 from s3a.models.s3abase import S3ABase

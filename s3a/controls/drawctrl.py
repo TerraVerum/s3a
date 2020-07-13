@@ -1,7 +1,7 @@
 from typing import Tuple, Dict, Union
 
 import pyqtgraph as pg
-from PyQt5 import QtCore, QtGui
+from pyqtgraph.Qt import QtCore, QtGui
 
 from s3a import FR_SINGLETON
 from s3a.projectvars import FR_CONSTS
