@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Tuple, Sequence, Optional, Any
 
 import numpy as np
@@ -13,8 +15,9 @@ from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS
 from s3a.structures import FRParam, FRVertices, FRComplexVertices, OneDArr, BlackWhiteImg
 from s3a.structures.typeoverloads import GrayImg
 from .clickables import FRBoundScatterPlot
+from . import imageareas
 
-__all__ = ['FRMultiRegionPlot', 'FRVertexDefinedImg']
+__all__ = ['FRMultiRegionPlot', 'FRVertexDefinedImg', 'FRMouseFollowingRegionPlot']
 
 Signal = QtCore.Signal
 
@@ -247,3 +250,43 @@ class FRVertexDefinedImg(pg.ImageItem):
     for clr in self.fillClr, self.vertClr:
       lut.append(clr.getRgb())
     return np.array(lut, dtype='uint8')
+
+class FRMouseFollowingRegionPlot(pg.PlotCurveItem):
+  sigActivated = QtCore.Signal()
+  sigDeactivated = QtCore.Signal()
+
+  def __init__(self, mainImg: imageareas.FREditableImgBase=None, parent=None):
+    super().__init__(parent)
+    self.active = False
+    self.baseData = FRVertices()
+    self.regionIds = np.ndarray([])
+    self.dataMin = FRVertices()
+    self.offset = FRVertices([[0,0]])
+
+    self._connectivity = np.ndarray([], bool)
+    mainImg.sigMousePosChanged.connect(self.mainMouseMoved)
+
+  def mainMouseMoved(self, xyPos: FRVertices, _pxColor: np.ndarray):
+    if not self.active: return
+    newData = self.baseData + xyPos
+    self.setData(newData[:,0], newData[:,1], connect=self._connectivity)
+    self.offset = xyPos - self.dataMin
+
+  def resetBaseData(self, baseData: FRComplexVertices, regionIds: OneDArr):
+    plotData, connectivity = stackedVertsPlusConnections(baseData)
+
+    try:
+      self.dataMin = plotData.min(0)
+    except ValueError:
+      # When no elements are in the array
+      self.dataMin = FRVertices([[0,0]])
+    baseData: FRVertices = plotData - self.dataMin
+    self.baseData = baseData
+    self._connectivity = connectivity
+    self.setData(plotData[:,0], plotData[:,1], connect=connectivity)
+
+    self.regionIds = regionIds
+
+  def erase(self):
+    self.resetBaseData(FRComplexVertices(), np.array([]))
+    self.active = False

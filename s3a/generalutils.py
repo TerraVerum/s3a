@@ -11,7 +11,7 @@ from s3a.structures.typeoverloads import TwoDArr
 from .structures import FRVertices, FRParam, FRComplexVertices
 
 
-def stackedVertsPlusConnections(vertList: List[np.ndarray]) -> (FRVertices, np.ndarray):
+def stackedVertsPlusConnections(vertList: FRComplexVertices) -> (FRVertices, np.ndarray):
   """
   Utility for concatenating all vertices within a list while recording where separations
   occurred

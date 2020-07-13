@@ -49,12 +49,8 @@ class FRShapeCollection(QtCore.QObject):
         view.addItem(roi)
 
   def clearAllRois(self):
-    for roi in self.roiForShape.values():
-      while roi.handles:
-        # TODO: Submit bug request in pyqtgraph. removeHandle of ROI takes handle or
-        #  integer index, removeHandle of PolyLine requires handle object. So,
-        #  even though PolyLine should be able  to handle remove by index, it can't
-        roi.removeHandle(roi.handles[0]['item'])
+    for roi in self.roiForShape.values(): # type: FRExtendedROI
+      roi.clear()
       roi.hide()
       roi.pen.setColor(self.roiClr)
       roi.pen.setWidth(self.roiLineWidth)
@@ -91,6 +87,7 @@ class FRShapeCollection(QtCore.QObject):
     if not constructingRoi:
       # Vertices from the completed shape are already stored, so clean up the shapes.
       curRoi.hide()
+      self.curShape.clear()
     else:
       # Still constructing ROI. Show it
       curRoi.show()

@@ -10,13 +10,13 @@ from skimage.io import imread
 from s3a import FR_SINGLETON
 from s3a.generalutils import getClippedBbox, frPascalCaseToTitle
 from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS, MENU_OPTS_DIR
-from s3a.structures import FRParam, FRVertices, FRComplexVertices, FilePath, NChanImg
+from s3a.structures import FRParam, FRVertices, FRComplexVertices, FilePath
 from s3a.structures import NChanImg
 from .parameditors import FRParamEditor, FRParamEditorDockGrouping
 from .clickables import FRRightPanViewBox
 from .drawopts import FRDrawOpts
 from .procwrapper import  FRImgProcWrapper
-from .regions import FRVertexDefinedImg
+from .regions import FRVertexDefinedImg, FRMouseFollowingRegionPlot
 
 __all__ = ['FRMainImage', 'FRFocusedImage', 'FREditableImgBase']
 
@@ -66,6 +66,8 @@ class FREditableImgBase(pg.PlotWidget):
     # -----
     # DRAWING OPTIONS
     # -----
+    self.regionCopier = FRMouseFollowingRegionPlot(self)
+
     self.drawAction: FRParam = FR_CONSTS.DRAW_ACT_PAN
     self.shapeCollection = FRShapeCollection(allowableShapes, self)
     self.shapeCollection.sigShapeFinished.connect(self.handleShapeFinished)
@@ -101,6 +103,7 @@ class FREditableImgBase(pg.PlotWidget):
                     self.drawOptsWidget.shapeBtnParamMap.inv]:
       if newMode in curDict:
         curDict[newMode].setChecked(True)
+        self.regionCopier.erase()
         return
     # If this is reached, a param was passed in that doesn't correspond to a valid button
     # TODO: return soemthing else?
@@ -116,15 +119,20 @@ class FREditableImgBase(pg.PlotWidget):
     """
     if not isChecked: return
     if btn in self.drawOptsWidget.actionBtnParamMap:
+      oldAction = self.drawAction
       self.drawAction = self.drawOptsWidget.actionBtnParamMap[btn]
+      # The copier shape only needs to be cleared if we *were* in a copyable
+      if oldAction in self.copyActs:
+        self.regionCopier.erase()
     else:
       # Shape toggle
       self.shapeCollection.curShapeParam = self.drawOptsWidget.shapeBtnParamMap[btn]
 
   def mousePressEvent(self, ev: QtGui.QMouseEvent):
     super().mousePressEvent(ev)
-    if ev.buttons() == QtCore.Qt.LeftButton \
-        and self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
+    if (ev.buttons() == QtCore.Qt.LeftButton
+        and not self.regionCopier.active
+        and self.drawAction != FR_CONSTS.DRAW_ACT_PAN):
       self.shapeCollection.buildRoi(ev, self.imgItem)
 
   def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent):
@@ -143,16 +151,15 @@ class FREditableImgBase(pg.PlotWidget):
       self.shapeCollection.buildRoi(ev, self.imgItem)
 
     posRelToImage = self.imgItem.mapFromScene(ev.pos())
-    pxRow = int(posRelToImage.y())
-    pxCol = int(posRelToImage.x())
+    pxY = int(posRelToImage.y())
+    pxX = int(posRelToImage.x())
     if (self.imgItem.image is not None
-        and 0 < pxCol < self.imgItem.image.shape[1]
-        and 0 < pxRow < self.imgItem.image.shape[0]):
-      pxColor = self.imgItem.image[pxRow, pxCol]
+        and 0 < pxX < self.imgItem.image.shape[1]
+        and 0 < pxY < self.imgItem.image.shape[0]):
+      pxColor = self.imgItem.image[pxY, pxX]
       # pos = ev.pos()
-      pos = pxRow, pxCol
-      info = pos, pxColor
-      self.sigMousePosChanged.emit(info)
+      pos = FRVertices([pxX, pxY])
+      self.sigMousePosChanged.emit(pos, pxColor)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
     """
@@ -167,6 +174,10 @@ class FREditableImgBase(pg.PlotWidget):
 
   def clearCurDrawShape(self):
     self.shapeCollection.clearAllRois()
+
+  @property
+  def copyActs(self):
+      return [FR_CONSTS.DRAW_ACT_COPY, FR_CONSTS.DRAW_ACT_MOVE]
 
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MAIN_IMG_AREA)
@@ -188,11 +199,10 @@ class FRMainImage(FREditableImgBase):
 
   def __init__(self, parent=None, imgSrc=None, **kargs):
     allowedShapes = (FR_CONSTS.DRAW_SHAPE_RECT, FR_CONSTS.DRAW_SHAPE_POLY)
-    allowedActions = (FR_CONSTS.DRAW_ACT_SELECT,FR_CONSTS.DRAW_ACT_ADD)
+    allowedActions = (FR_CONSTS.DRAW_ACT_SELECT,FR_CONSTS.DRAW_ACT_ADD,
+                      *self.copyActs)
     super().__init__(parent, allowableShapes=allowedShapes,
                      allowableActions=allowedActions, **kargs)
-
-
     # -----
     # Image Item
     # -----
@@ -204,10 +214,13 @@ class FRMainImage(FREditableImgBase):
     self.switchBtnMode(FR_CONSTS.DRAW_ACT_ADD)
 
   def handleShapeFinished(self, roiVerts: FRVertices) -> Optional[np.ndarray]:
-    if (self.drawAction == FR_CONSTS.DRAW_ACT_SELECT) and roiVerts.connected:
+    if (self.drawAction in [FR_CONSTS.DRAW_ACT_SELECT] + self.copyActs
+        and roiVerts.connected):
       # Selection
-      self.sigSelectionBoundsMade.emit(self.shapeCollection.shapeVerts)
-    elif self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
+      self.sigSelectionBoundsMade.emit(roiVerts)
+      if self.drawAction in self.copyActs:
+        self.regionCopier.sigActivated.emit()
+    elif self.drawAction == FR_CONSTS.DRAW_ACT_ADD:
       # Component modification subject to processor
       # For now assume a single point indicates foreground where multiple indicate
       # background selection
@@ -240,12 +253,18 @@ class FRMainImage(FREditableImgBase):
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
     super().mouseReleaseEvent(ev)
-    if self.drawAction == FR_CONSTS.DRAW_ACT_PAN and self.image is not None:
+    if self.image is None: return
+    pos = self.imgItem.mapFromScene(ev.pos())
+    xx, yy, = pos.x(), pos.y()
+    pos = FRVertices([[xx, yy]])
+    if self.drawAction == FR_CONSTS.DRAW_ACT_PAN:
       # Simulate a click-wide boundary selection so points can be selected in pan mode
-      pos = self.imgItem.mapFromScene(ev.pos())
-      xx, yy, = pos.x(), pos.y()
       squareCorners = FRVertices([[xx, yy], [xx, yy]], dtype=float)
       self.sigSelectionBoundsMade.emit(squareCorners)
+
+  def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent):
+    super().mouseDoubleClickEvent(ev)
+    self.regionCopier.sigDeactivated.emit()
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_FG, [FR_CONSTS.DRAW_ACT_ADD])
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_PAN, [FR_CONSTS.DRAW_ACT_PAN])
@@ -297,6 +316,7 @@ class FRMainImage(FREditableImgBase):
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_CLEAR_SHAPE_MAIN)
   def clearCurDrawShape(self):
     super().clearCurDrawShape()
+    self.regionCopier.erase()
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_FOCUSED_IMG_AREA)
 class FRFocusedImage(FREditableImgBase):
@@ -316,6 +336,7 @@ class FRFocusedImage(FREditableImgBase):
     )
     super().__init__(parent, allowableShapes, allowableActions, **kargs)
     self.region = FRVertexDefinedImg()
+
     self.addItem(self.region)
 
     self.compSer: pd.Series = FR_SINGLETON.tableData.makeCompSer()

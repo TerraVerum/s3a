@@ -154,7 +154,7 @@ def test_set_colorinfo():
   # various number of channels in image
   for clr in [[5], [5,5,5], [4,4,4,4]]:
     clr = np.array(clr)
-    app.setInfo(((100,100), clr))
+    app.setInfo((100,100), clr)
     assert '100, 100' in app.mouseCoords.text()
     assert f'{clr}' in app.pxColor.text()
     bgText = app.pxColor.styleSheet()

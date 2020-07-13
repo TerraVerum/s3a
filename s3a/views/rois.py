@@ -11,15 +11,17 @@ from s3a.structures import FRVertices
 __all__ = ['FRRectROI', 'FRPaintFillROI', 'FRPolygonROI', 'SHAPE_ROI_MAPPING',
            'FRExtendedROI']
 
+from s3a.views.clickables import FRBoundScatterPlot
+
 def _clearPoints(roi: pg.ROI):
   while roi.handles:
     roi.removeHandle(0)
 
-# --------
-# COLLECTION OF OVERLOADED ROIS THAT KNOW HOW TO UPDATE THEMSELEVES AS NEEDED WITHIN
-# THE ANNOTATOR REGIONS
-# --------
 class FRROIExtension:
+  """
+  Collection of overloaded rois that know how to update themseleves as needed within
+  the annotator regions
+  """
   connected = True
 
   def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: FRVertices) -> (bool, Optional[FRVertices]):
@@ -37,6 +39,13 @@ class FRROIExtension:
 
   @property
   def vertices(self): return FRVertices()
+
+  def clear(self: pg.ROI):
+    while self.handles:
+      # TODO: Submit bug request in pyqtgraph. removeHandle of ROI takes handle or
+      #  integer index, removeHandle of PolyLine requires handle object. So,
+      #  even though PolyLine should be able  to handle remove by index, it can't
+      self.removeHandle(self.handles[0]['item'])
 
 class FRExtendedROI(pg.ROI, FRROIExtension):
   """

@@ -5,8 +5,8 @@ import pytest
 
 from conftest import app, mgr, stack
 from s3a import appInst, FR_SINGLETON
-from s3a.projectvars import REQD_TBL_FIELDS
-from s3a.structures import FRComplexVertices
+from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS
+from s3a.structures import FRComplexVertices, FRParam, FRVertices
 from s3a.views.tableview import FRCompTableView
 
 
@@ -36,6 +36,8 @@ def test_split_selected_comps():
   app.compTbl.selectAll()
   app.compDisplay.splitSelectedComps()
   assert len(mgr.compDf) == 4
+  # Once for focused comp, once for splitting
+  stack.undo()
   stack.undo()
   assert len(mgr.compDf) == 1
 
@@ -71,3 +73,34 @@ def test_set_as_gui(sampleComps):
   editableDf = view.mgr.compDf.iloc[:, editCols]
   cmpDf = pd.concat([view.mgr.compDf.iloc[[0], editCols]]*len(view.mgr.compDf))
   assert np.array_equal(editableDf.values, cmpDf.values)
+
+@pytest.mark.withcomps
+def test_move_comps():
+  copyHelper(FR_CONSTS.DRAW_ACT_MOVE)
+  oldComps = mgr.compDf.copy()
+  app.compDisplay.finishRegionCopier(True)
+  compCopiedCompDfs(oldComps, mgr.compDf)
+
+
+@pytest.mark.withcomps
+def test_copy_comps():
+  copyHelper(FR_CONSTS.DRAW_ACT_COPY)
+  oldComps = mgr.compDf.copy()
+  app.compDisplay.finishRegionCopier(True)
+  assert len(mgr.compDf) == 2*len(oldComps)
+  compCopiedCompDfs(oldComps, mgr.compDf, newStartIdx=len(oldComps))
+
+
+def compCopiedCompDfs(old: pd.DataFrame, new: pd.DataFrame, newStartIdx=0):
+  for ii in range(len(old)):
+    oldComp = old.iloc[ii, :]
+    for jj in range(len(oldComp[REQD_TBL_FIELDS.VERTICES])):
+      oldComp[REQD_TBL_FIELDS.VERTICES][jj] += 50
+    oldComp.at[REQD_TBL_FIELDS.INST_ID] += newStartIdx
+    assert np.array_equal(oldComp, new.iloc[newStartIdx+ii, :])
+
+def copyHelper(act: FRParam):
+  copier = app.mainImg.regionCopier
+  copier.offset = FRVertices([[50, 50]])
+  copier.regionIds = mgr.compDf.index
+  app.mainImg.drawAction = act

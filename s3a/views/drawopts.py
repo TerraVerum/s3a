@@ -9,7 +9,7 @@ from s3a.structures import FRParam, FRParamGroup
 __all__ = ['FRDrawOpts']
 
 class FRDrawOpts(QtWidgets.QWidget):
-  def __init__(self, parent=None, shapes: Tuple[FRParamGroup, ...]=None, actions: Tuple[FRParamGroup, ...]=None):
+  def __init__(self, parent=None, shapes: Tuple[FRParam, ...]=None, actions: Tuple[FRParam, ...]=None):
     """
     Creates a draw options widget hosting both shape and action selection buttons.
     :param parent: UI widget whose destruction will also destroy these widgets

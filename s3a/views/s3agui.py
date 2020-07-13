@@ -1,7 +1,7 @@
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Optional, Union, Tuple, Dict, Any
+from typing import Optional, Union, Tuple, Dict, Any, List
 
 import numpy as np
 import qdarkstyle
@@ -13,7 +13,7 @@ from s3a.views.parameditors import FRParamEditor, FRParamEditorDockGrouping, FR_
 from s3a.models.s3abase import S3ABase
 from s3a.projectvars import LAYOUTS_DIR, FR_CONSTS, FR_ENUMS, APP_STATE_DIR
 from s3a.projectvars.enums import _FREnums
-from s3a.structures import FRS3AWarning
+from s3a.structures import FRS3AWarning, FRVertices
 from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
   autosaveOptsDialog, attemptFileLoad, popupFilePicker, \
   disableAppDuringFunc, saveToFile, dialogGetSaveFileName, addDirItemsToMenu
@@ -158,7 +158,7 @@ class S3A(S3ABase):
 
     self.pxColor = QtWidgets.QLabel("Pixel Color")
 
-    self.mainImg.sigMousePosChanged.connect(lambda info: self.setInfo(info))
+    self.mainImg.sigMousePosChanged.connect(lambda pos, pxColor: self.setInfo(pos, pxColor))
     # self.focusedImg.sigMousePosChanged.connect(lambda info: setInfo(info))
     self.statBar.show()
     self.statBar.addWidget(self.mouseCoords)
@@ -413,27 +413,25 @@ class S3A(S3ABase):
     layoutGlob = LAYOUTS_DIR.glob('*.dockstate')
     addDirItemsToMenu(self.menuLayout, layoutGlob, self.loadLayout)
 
-  def setInfo(self, info: Tuple[Tuple[int, int], np.ndarray]):
+  def setInfo(self, xyPos: FRVertices, pxColor: np.ndarray):
     authorName = FR_SINGLETON.tableData.annAuthor
-    rowColCoords = info[0]
-    color = info[1]
-    self.mouseCoords.setText(f'Author: {authorName} | Mouse (x,y): {rowColCoords[1]}, {rowColCoords[0]} | Pixel Color: ')
-    self.pxColor.setText(f'{color}')
-    if color.dtype == float:
+    self.mouseCoords.setText(f'Author: {authorName} | Mouse (x,y): {xyPos[0]}, {xyPos[1]} | Pixel Color: ')
+    self.pxColor.setText(f'{pxColor}')
+    if pxColor.dtype == float:
       # Turn to uint
-      color = (color*255).astype('uint8')
+      pxColor = (pxColor*255).astype('uint8')
     # Regardless of the number of image channels, display as RGBA color
-    if color.size == 1:
-      color = np.array([color[0]]*3 + [255])
-    elif color.size == 3:
-      color = np.concatenate([color, [255]])
+    if pxColor.size == 1:
+      pxColor = np.array([pxColor[0]]*3 + [255])
+    elif pxColor.size == 3:
+      pxColor = np.concatenate([pxColor, [255]])
     # Else: assume already RGBA
     # Determine text color based on background color
-    if np.mean(color) > 127:
+    if np.mean(pxColor) > 127:
       fontColor = 'black'
     else:
       fontColor = 'white'
-    self.pxColor.setStyleSheet(f'background:rgba{tuple(color)}; color:{fontColor}; font-weight: 16px')
+    self.pxColor.setStyleSheet(f'background:rgba{tuple(pxColor)}; color:{fontColor}; font-weight: 16px')
 
   def updateTheme(self, _newScheme: Dict[str, Any]):
     style = ''

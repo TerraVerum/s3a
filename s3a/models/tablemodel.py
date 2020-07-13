@@ -267,11 +267,13 @@ class FRComponentMgr(FRCompTableModel):
       childComps.loc[:, REQD_TBL_FIELDS.VERTICES] = newVerts
       newComps_lst.append(childComps)
     newComps = pd.concat(newComps_lst)
-    self.rmComps(splitComps.index)
-    self.addComps(newComps)
-    yield
-    self.rmComps(newComps.index)
-    self.addComps(splitComps, FR_ENUMS.COMP_ADD_AS_MERGE)
+    # Keep track of which comps were removed and added by this op
+    outDict = self.rmComps(splitComps.index)
+    outDict.update(self.addComps(newComps))
+    yield outDict
+    undoDict = self.rmComps(newComps.index)
+    undoDict.update(self.addComps(splitComps, FR_ENUMS.COMP_ADD_AS_MERGE))
+    return undoDict
 
 def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> pd.Series:
   paramType = type(paramVal)

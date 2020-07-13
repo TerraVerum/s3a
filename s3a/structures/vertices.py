@@ -15,13 +15,12 @@ from ..projectvars.enums import FR_ENUMS
 class FRVertices(np.ndarray):
   connected = True
 
-  def __new__(cls, inputArr: Union[list, np.ndarray, tuple]=None, connected=True, **kwargs):
+  def __new__(cls, inputArr: Union[list, np.ndarray, tuple]=None, connected=True, dtype=int,
+              **kwargs):
+    # Default to integer type if not specified, since this is how pixel coordinates will be represented anyway
     # See numpy docs on subclassing ndarray
     if inputArr is None:
       inputArr = np.zeros((0,2))
-    # Default to integer type if not specified, since this is how pixel coordinates will be represented anyway
-    if 'dtype' not in kwargs:
-      kwargs['dtype'] = int
     arr = np.asarray(inputArr, **kwargs).view(cls)
     arr.connected = connected
     return arr

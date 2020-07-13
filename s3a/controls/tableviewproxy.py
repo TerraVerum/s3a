@@ -5,14 +5,15 @@ import numpy as np
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui
 
-from s3a.views import tableview
-from s3a.structures.typeoverloads import OneDArr
 from s3a import FR_SINGLETON
+from s3a.models.tablemodel import FRComponentMgr
+from s3a.projectvars import FR_CONSTS, REQD_TBL_FIELDS
+from s3a.structures import FRVertices, FRParam, FRParamEditorError, FRS3AWarning, \
+  FRComplexVertices
+from s3a.structures.typeoverloads import OneDArr
+from s3a.views import tableview
 from s3a.views.imageareas import FRMainImage
 from s3a.views.regions import FRMultiRegionPlot
-from s3a.projectvars import FR_CONSTS, REQD_TBL_FIELDS
-from s3a.structures import FRVertices, FRParam, FRParamEditorError, FRS3AWarning
-from s3a.models.tablemodel import FRComponentMgr
 
 __all__ = ['FRCompSortFilter', 'FRCompDisplayFilter']
 
@@ -63,8 +64,12 @@ class FRCompDisplayFilter(QtCore.QObject):
     self.displayedIds = np.array([], dtype=int)
     self.selectedIds = np.array([], dtype=int)
 
+    self.regionCopier = mainImg.regionCopier
+
     # Attach to UI signals
     mainImg.sigSelectionBoundsMade.connect(self._reflectSelectionBoundsMade)
+    self.regionCopier.sigDeactivated.connect(lambda *args: self.finishRegionCopier())
+    self.regionCopier.sigActivated.connect(lambda *args: self.activateRegionCopier())
 
     mainImg.mergeCompsAct.sigActivated.connect(lambda *args: self.mergeSelectedComps())
     mainImg.splitCompsAct.sigActivated.connect(lambda *args: self.splitSelectedComps())
@@ -74,10 +79,11 @@ class FRCompDisplayFilter(QtCore.QObject):
     compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
 
     mainImg.addItem(self.regionPlot)
+    mainImg.addItem(self.regionCopier)
 
     self.filterableCols = self.findFilterableCols()
 
-  def redrawComps(self, idLists):
+  def redrawComps(self, idLists=None):
     # Following mix of cases are possible:
     # Components: DELETED, UNCHANGED, CHANGED, NEW
     # New is different from changed since id plot already exists (unhide vs. create)
@@ -125,8 +131,8 @@ class FRCompDisplayFilter(QtCore.QObject):
     selection, _ = self._compTbl.getIds_colsFromSelection(ignoreNoEditCols=True)
     if selection is None:
       return
-    self._compMgr.splitCompVertsById(selection)
-    self.selectRowsById(selection, QtCore.QItemSelectionModel.ClearAndSelect)
+    changes = self._compMgr.splitCompVertsById(selection)
+    self.selectRowsById(changes['added'], QtCore.QItemSelectionModel.ClearAndSelect)
 
   def mergeSelectedComps(self, keepId: int=None):
     """See signature for :meth:`FRComponentMgr.mergeCompsById`"""
@@ -170,6 +176,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     self.selectedIds = ids
     self._compTbl.setFocus()
 
+
   def _reflectSelectionBoundsMade(self, selection: Union[OneDArr, FRVertices]):
     """
     :param selection: bounding box of user selection: [xmin ymin; xmax ymax]
@@ -192,7 +199,8 @@ class FRCompDisplayFilter(QtCore.QObject):
       mode |= QtCore.QItemSelectionModel.Select
     else:
       mode |= QtCore.QItemSelectionModel.ClearAndSelect
-    self.selectRowsById(selectedIds, mode)
+    if not self.regionCopier.active:
+      self.selectRowsById(selectedIds, mode)
     # TODO: Better management of widget focus here
 
   def _populateDisplayedIds(self):
@@ -202,6 +210,34 @@ class FRCompDisplayFilter(QtCore.QObject):
 
     # Give self the id list of surviving comps
     self.displayedIds = curComps[REQD_TBL_FIELDS.INST_ID]
+
+  def activateRegionCopier(self, selectedIds: OneDArr=None):
+    if selectedIds is None:
+      selectedIds = self.selectedIds
+    if len(selectedIds) == 0: return
+    vertsList = self._compMgr.compDf.loc[selectedIds, REQD_TBL_FIELDS.VERTICES]
+    allVerts = FRComplexVertices()
+    for verts in vertsList:
+      allVerts.append(verts.stack())
+    self.regionCopier.resetBaseData(allVerts, selectedIds)
+    self.regionCopier.active = True
+
+  def finishRegionCopier(self, keepResult=True):
+    if not keepResult: return
+    newComps = self._compMgr.compDf.loc[self.regionCopier.regionIds].copy()
+    regionOffset = self.regionCopier.offset.astype(int)
+    for idx in newComps.index:
+      newVerts = []
+      for verts in newComps.at[idx, REQD_TBL_FIELDS.VERTICES]:
+        verts = verts + regionOffset
+        newVerts.append(verts)
+      newComps.at[idx, REQD_TBL_FIELDS.VERTICES] = FRComplexVertices(newVerts)
+    if self._mainImgArea.drawAction == FR_CONSTS.DRAW_ACT_MOVE:
+      self._mainImgArea.sigCompsUpdated.emit(newComps)
+      self.regionCopier.erase()
+    elif self._mainImgArea.drawAction == FR_CONSTS.DRAW_ACT_COPY:
+      self._mainImgArea.sigCompsCreated.emit(newComps)
+      self.activateRegionCopier(newComps.index)
 
   def findFilterableCols(self):
     curComps = self._compMgr.compDf.copy()

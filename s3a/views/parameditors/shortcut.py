@@ -75,7 +75,7 @@ class FRShortcutsEditor(FRParamEditor):
     self._objsWithShortcuts = set()
     """Holds the parameters associated with this registered class"""
 
-  def registerMethod(self, constParam: FRParam, fnArgs=None):
+  def registerMethod(self, constParam: FRParam, fnArgs: List[Any]=None):
     """
     Designed for use as a function decorator. Registers the decorated function into a list
     of methods known to the :class:`FRShortcutsEditor`. These functions are then accessable from
