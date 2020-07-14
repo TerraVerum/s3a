@@ -193,7 +193,7 @@ class FRComplexVertices(list):
     if isinstance(maskShape, NChanImg):
       out = maskShape
     else:
-      out = np.zeros(maskShape, 'uint8')
+      out = np.zeros(maskShape, 'uint16')
     nChans = 1 if out.ndim < 3 else out.shape[2]
     if fillColor is None:
       fillColor = tuple([1 for _ in range(nChans)])
