@@ -228,10 +228,10 @@ class S3A(S3ABase):
     self.createMenuOptForEditor(self.menuFile, FR_SINGLETON.quickLoader)
 
   def loadLayout(self, layoutName: Union[str, Path]):
-    layoutFilename = Path(layoutName)
+    layoutName = Path(layoutName)
     if not layoutName.is_absolute():
-      layoutFilename = LAYOUTS_DIR/f'{layoutName}.dockstate'
-    self.restoreState(attemptFileLoad(layoutFilename))
+      layoutName = LAYOUTS_DIR/f'{layoutName}.dockstate'
+    self.restoreState(attemptFileLoad(layoutName))
 
   def saveLayout(self, layoutName: Union[str, Path]=None, allowOverwriteDefault=False):
     dockStates = self.saveState().data()
@@ -415,6 +415,7 @@ class S3A(S3ABase):
     addDirItemsToMenu(self.menuLayout, layoutGlob, self.loadLayout)
 
   def setInfo(self, xyPos: FRVertices, pxColor: np.ndarray):
+    if pxColor is None: return
     authorName = FR_SINGLETON.tableData.annAuthor
     self.mouseCoords.setText(f'Author: {authorName} | Mouse (x,y): {xyPos[0]}, {xyPos[1]} | Pixel Color: ')
     self.pxColor.setText(f'{pxColor}')

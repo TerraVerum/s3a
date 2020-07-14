@@ -1,12 +1,16 @@
 from __future__ import annotations
-import re
+
+import html
 import weakref
 from dataclasses import dataclass, fields, field
 from typing import Any, Optional, Collection, Union
-from typing_extensions import Protocol, runtime_checkable
 from warnings import warn
 
+from pyqtgraph.Qt import QtCore
+from typing_extensions import Protocol, runtime_checkable
+
 from .exceptions import FRParamEditorError
+
 
 @runtime_checkable
 class ContainsSharedProps(Protocol):
@@ -45,6 +49,10 @@ class FRParam:
       # Infer from value
       valType = type(self.value).__name__
       self.valType = valType
+    ht = self.helpText
+    if (ht is not None and len(ht) > 0
+        and not QtCore.Qt.mightBeRichText(self.helpText)):
+      self.helpText = f'<qt>{html.escape(self.helpText)}</qt>'
 
   def __str__(self):
     return f'{self.name}'
@@ -129,7 +137,7 @@ class FRParamGroup:
     return None
 
 
-def newParam(name, val=None, valType=None, helpText=''):
+def newParam(name: str, val: Any=None, valType: str=None, helpText=''):
   """
   Factory for creating new parameters within a :class:`FRParamGroup`.
 

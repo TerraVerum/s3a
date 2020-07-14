@@ -28,8 +28,10 @@ QCursor = QtGui.QCursor
 
 class FREditableImgBase(pg.PlotWidget):
   sigMousePosChanged = QtCore.Signal(object, object)
-  """FRVertices() coords, [[[img pixel]]] np.ndarray"""
-
+  """
+  FRVertices() coords, [[[img pixel]]] np.ndarray. If the mouse pos is outside
+  image bounds, the second param will be *None*.
+  """
 
   @classmethod
   def __initEditorParams__(cls):
@@ -40,7 +42,6 @@ class FREditableImgBase(pg.PlotWidget):
       saveDir=cls.toolsDir, fileType=lowerGroupName.replace(' ', '') + 'tools',
       name=groupName + ' Tools', registerCls=cls, useNewInit=False
     )
-
     cls.procCollection = FR_SINGLETON.algParamMgr.createProcessorForClass(
       cls, editorName=groupName + ' Processor'
     )
@@ -55,7 +56,6 @@ class FREditableImgBase(pg.PlotWidget):
     self.setAspectLocked(True)
     self.getViewBox().invertY()
     self.setMouseEnabled(True)
-
     # -----
     # IMAGE
     # -----
@@ -122,8 +122,7 @@ class FREditableImgBase(pg.PlotWidget):
       oldAction = self.drawAction
       self.drawAction = self.drawOptsWidget.actionBtnParamMap[btn]
       # The copier shape only needs to be cleared if we *were* in a copyable
-      if oldAction in self.copyActs:
-        self.regionCopier.erase()
+      self.regionCopier.erase()
     else:
       # Shape toggle
       self.shapeCollection.curShapeParam = self.drawOptsWidget.shapeBtnParamMap[btn]
@@ -153,13 +152,14 @@ class FREditableImgBase(pg.PlotWidget):
     posRelToImage = self.imgItem.mapFromScene(ev.pos())
     pxY = int(posRelToImage.y())
     pxX = int(posRelToImage.x())
+    pxColor = None
     if (self.imgItem.image is not None
         and 0 < pxX < self.imgItem.image.shape[1]
         and 0 < pxY < self.imgItem.image.shape[0]):
       pxColor = self.imgItem.image[pxY, pxX]
       # pos = ev.pos()
-      pos = FRVertices([pxX, pxY])
-      self.sigMousePosChanged.emit(pos, pxColor)
+    pos = FRVertices([pxX, pxY])
+    self.sigMousePosChanged.emit(pos, pxColor)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
     """
@@ -175,11 +175,6 @@ class FREditableImgBase(pg.PlotWidget):
   def clearCurDrawShape(self):
     self.shapeCollection.clearAllRois()
 
-  @property
-  def copyActs(self):
-      return [FR_CONSTS.DRAW_ACT_COPY, FR_CONSTS.DRAW_ACT_MOVE]
-
-
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MAIN_IMG_AREA)
 class FRMainImage(FREditableImgBase):
   sigCompsCreated = Signal(object) # pd.DataFrame
@@ -192,15 +187,15 @@ class FRMainImage(FREditableImgBase):
   def __initEditorParams__(cls):
     super().__initEditorParams__()
     cls.multCompsOnCreate = cls.toolsEditor.registerProp(cls, FR_CONSTS.PROP_MK_MULT_COMPS_ON_ADD)
-    cls.mergeCompsAct, cls.splitCompsAct, cls.overrideCompVertsAct = cls.toolsEditor.registerProps(
+    (cls.mergeCompsAct, cls.splitCompsAct, cls.overrideCompVertsAct,
+     cls.moveCompsAct, cls.copyCompsAct) = cls.toolsEditor.registerProps(
       cls, [FR_CONSTS.TOOL_MERGE_COMPS, FR_CONSTS.TOOL_SPLIT_COMPS,
-            FR_CONSTS.TOOL_OVERRIDE_VERTS_ACT],
-      asProperty=False)
+            FR_CONSTS.TOOL_OVERRIDE_VERTS_ACT, FR_CONSTS.TOOL_MOVE_REGIONS,
+            FR_CONSTS.TOOL_COPY_REGIONS], asProperty=False)
 
   def __init__(self, parent=None, imgSrc=None, **kargs):
     allowedShapes = (FR_CONSTS.DRAW_SHAPE_RECT, FR_CONSTS.DRAW_SHAPE_POLY)
-    allowedActions = (FR_CONSTS.DRAW_ACT_SELECT,FR_CONSTS.DRAW_ACT_ADD,
-                      *self.copyActs)
+    allowedActions = (FR_CONSTS.DRAW_ACT_SELECT,FR_CONSTS.DRAW_ACT_ADD)
     super().__init__(parent, allowableShapes=allowedShapes,
                      allowableActions=allowedActions, **kargs)
     # -----
@@ -210,16 +205,16 @@ class FRMainImage(FREditableImgBase):
     self.compFromLastProcResult: Optional[pd.DataFrame] = None
     self.lastProcVerts: Optional[FRVertices] = None
     self.overrideCompVertsAct.sigActivated.connect(lambda: self.overrideLastProcResult())
+    for act in self.copyCompsAct, self.moveCompsAct:
+      act.sigActivated.connect(lambda: self.regionCopier.sigCopyStarted.emit())
 
     self.switchBtnMode(FR_CONSTS.DRAW_ACT_ADD)
 
   def handleShapeFinished(self, roiVerts: FRVertices) -> Optional[np.ndarray]:
-    if (self.drawAction in [FR_CONSTS.DRAW_ACT_SELECT] + self.copyActs
-        and roiVerts.connected):
+    if self.regionCopier.active: return
+    if self.drawAction in [FR_CONSTS.DRAW_ACT_SELECT] and roiVerts.connected:
       # Selection
       self.sigSelectionBoundsMade.emit(roiVerts)
-      if self.drawAction in self.copyActs:
-        self.regionCopier.sigActivated.emit()
     elif self.drawAction == FR_CONSTS.DRAW_ACT_ADD:
       # Component modification subject to processor
       # For now assume a single point indicates foreground where multiple indicate
@@ -264,7 +259,7 @@ class FRMainImage(FREditableImgBase):
 
   def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent):
     super().mouseDoubleClickEvent(ev)
-    self.regionCopier.sigDeactivated.emit()
+    self.regionCopier.sigCopyStopped.emit()
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_FG, [FR_CONSTS.DRAW_ACT_ADD])
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_PAN, [FR_CONSTS.DRAW_ACT_PAN])

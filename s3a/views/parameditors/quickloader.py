@@ -5,11 +5,12 @@ from warnings import warn
 from pyqtgraph.Qt import QtCore, QtWidgets
 from pyqtgraph.parametertree.parameterTypes import GroupParameter, Parameter
 
+from s3a.graphicsutils import FRPopupLineEditor, raiseErrorLater
 from s3a.projectvars import QUICK_LOAD_DIR
 from .genericeditor import FRParamEditor
 from .pgregistered import FRActionWithShortcutParameter as ActWithShc
-from s3a.graphicsutils import FRPopupLineEditor, raiseErrorLater
 from ...structures import FRParamEditorError, FRS3AWarning
+
 
 class FREditorListModel(QtCore.QAbstractListModel):
   def __init__(self, editorList: List[FRParamEditor], parent: QtWidgets.QWidget=None):

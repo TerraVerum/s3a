@@ -4,16 +4,16 @@ import weakref
 from functools import wraps
 from inspect import isclass
 from pathlib import Path
-from typing import List, Dict, Any, Union, Collection, Type, Set, Tuple, Sequence, \
-  Callable
+from typing import List, Dict, Any, Union, Collection, Type, Tuple, Sequence
 
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter, ParameterTree
 
+from s3a.generalutils import frPascalCaseToTitle
 from s3a.graphicsutils import saveToFile, \
   attemptFileLoad
-from s3a.generalutils import frPascalCaseToTitle
-from s3a.structures import FRParam, ContainsSharedProps, FilePath, FRParamEditorError
+from s3a.structures import FRParam, ContainsSharedProps, FilePath
+
 __all__ = ['FRParamEditorBase']
 
 Signal = QtCore.Signal
@@ -108,8 +108,11 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     # Construct parameter tree
     # -----------
     self.params = Parameter.create(name='Parameters', type='group', children=paramList)
-    self.params.sigStateChanged.connect(self._paramTreeChanged)
     self.tree = ParameterTree()
+    self.tree.setTextElideMode(QtCore.Qt.ElideRight)
+
+    self.params.sigStateChanged.connect(self._paramTreeChanged)
+
     topParam = self.params
     if topTreeChild is not None:
       topParam = topTreeChild
@@ -132,6 +135,9 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     if registerCls is not None:
       self.registerGroup(registerParam, **registerGroupOpts)(registerCls)
     SPAWNED_EDITORS.append(weakref.proxy(self))
+
+  def _paramTreeChanged(self, rootParam: Parameter, changeDesc: str, data: Tuple[Parameter, int]):
+    self._stateBeforeEdit = self.params.saveState()
 
   # Helper method for accessing simple parameter values
   def __getitem__(self, keys: _keyType):
@@ -214,6 +220,20 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
 
   def saveCurStateAsDefault(self):
     self.saveParamState('Default', allowOverwriteDefault=True)
+    iterator = QtWidgets.QTreeWidgetItemIterator(self.tree)
+    item: QtWidgets.QTreeWidgetItem = iterator.value()
+    while item is not None:
+      # TODO: Set word wrap on long labels. Currently either can show '...' or wrap but not
+      #   both
+      # if self.tree.itemWidget(item, 0) is None:
+      #   lbl = QtWidgets.QLabel(item.text(0))
+      #   self.tree.setItemWidget(item, 0, lbl)
+      if ('tip' in item.param.opts
+          and len(item.toolTip(0)) == 0
+          and self.tree.itemWidget(item, 0) is None):
+        item.setToolTip(0, item.param.opts['tip'])
+      iterator += 1
+      item = iterator.value()
 
   def paramDictWithOpts(self, addList: List[str]=None, addTo: List[type(Parameter)]=None,
                         removeList: List[str]=None, paramDict: Dict[str, Any]=None):
@@ -296,7 +316,6 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
 
   def _addParamGroup(self, groupName: str):
     paramForCls = Parameter.create(name=groupName, type='group')
-    paramForCls.sigStateChanged.connect(self._paramTreeChanged)
     self.params.addChild(paramForCls)
     return paramForCls
 

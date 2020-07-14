@@ -1,7 +1,5 @@
-import os
 from dataclasses import dataclass
 from pathlib import Path
-from datetime import datetime
 
 # Preference directories
 from s3a.structures import FRComplexVertices, FRParam, FRParamGroup, newParam
@@ -126,8 +124,18 @@ class _FRConsts(FRParamGroup):
   TOOL_OVERRIDE_VERTS_ACT     : FRParam = newParam('Override Created Boundary',
                                               valType='actionwithshortcut',
                                               helpText='Overrides the created bounary'
-                                                            ' to be the shape of the ROI, not'
-                                                            ' the result of the image processor')
+                                                       ' to be the shape of the ROI, not'
+                                                       ' the result of the image processor')
+  TOOL_COPY_REGIONS           : FRParam = newParam('Copy Selected Boundaries', valType='actionwithshortcut',
+                                                   helpText='Copies the selected components.'
+                                                            ' They can be pasted by <b>double-clicking</b>'
+                                                            ' on the destination location. When done copying,'
+                                                            ' press the shortcut for *Clear Draw Shape in Main Image*'
+                                                            ' or change the current draw action.')
+  TOOL_MOVE_REGIONS           : FRParam = newParam('Move Selected Boundaries', valType='actionwithshortcut',
+                                                   helpText='Moves the selected components.'
+                                                            ' They can be pasted by <b>double-clicking</b>'
+                                                            ' on the destination location.')
 
   # --------------------------
   # SHORTCUT PARAMETERS
@@ -183,8 +191,6 @@ class _FRConsts(FRParamGroup):
   # Actions
   DRAW_ACT_ADD    : FRParam = newParam('Add to Foreground', str(ICON_DIR/'foreground.png'), 'icon')
   DRAW_ACT_REM    : FRParam = newParam('Add to Background', str(ICON_DIR/'background.png'), 'icon')
-  DRAW_ACT_COPY   : FRParam = newParam('Select && Copy')
-  DRAW_ACT_MOVE   : FRParam = newParam('Select && Move')
   DRAW_ACT_SELECT : FRParam = newParam('Select', str(ICON_DIR/'select.svg'), 'icon')
   DRAW_ACT_PAN    : FRParam = newParam('Pan', str(ICON_DIR/'pan.svg'), 'icon')
 FR_CONSTS = _FRConsts()

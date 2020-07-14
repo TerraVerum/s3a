@@ -76,7 +76,7 @@ def test_set_as_gui(sampleComps):
 
 @pytest.mark.withcomps
 def test_move_comps():
-  copyHelper(FR_CONSTS.DRAW_ACT_MOVE)
+  copyHelper(copyMode=False)
   oldComps = mgr.compDf.copy()
   app.compDisplay.finishRegionCopier(True)
   compCopiedCompDfs(oldComps, mgr.compDf)
@@ -84,7 +84,7 @@ def test_move_comps():
 
 @pytest.mark.withcomps
 def test_copy_comps():
-  copyHelper(FR_CONSTS.DRAW_ACT_COPY)
+  copyHelper(copyMode=True)
   oldComps = mgr.compDf.copy()
   app.compDisplay.finishRegionCopier(True)
   assert len(mgr.compDf) == 2*len(oldComps)
@@ -99,8 +99,8 @@ def compCopiedCompDfs(old: pd.DataFrame, new: pd.DataFrame, newStartIdx=0):
     oldComp.at[REQD_TBL_FIELDS.INST_ID] += newStartIdx
     assert np.array_equal(oldComp, new.iloc[newStartIdx+ii, :])
 
-def copyHelper(act: FRParam):
+def copyHelper(copyMode=True):
   copier = app.mainImg.regionCopier
   copier.offset = FRVertices([[50, 50]])
   copier.regionIds = mgr.compDf.index
-  app.mainImg.drawAction = act
+  copier.inCopyMode = copyMode

@@ -23,8 +23,8 @@ appInst.setStyleSheet("QMessageBox { messagebox-text-interaction-flags: 5; }")
 
 from . import graphicsutils as gutils
 
-appInst.installEventFilter(
-  gutils.QAwesomeTooltipEventFilter(appInst))
+# appInst.installEventFilter(
+#   gutils.QAwesomeTooltipEventFilter(appInst))
 
 # Import here to resolve resolution order
 import s3a.projectvars

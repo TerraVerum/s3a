@@ -122,6 +122,7 @@ def test_selectionbounds_all():
 @pytest.mark.withcomps
 def test_selectionbounds_none():
   app.compTbl.clearSelection()
+  app.compDisplay.selectedIds = np.array([], dtype=int)
   # Selection in negative area ensures no comps will be selected
   app.mainImg.sigSelectionBoundsMade.emit(FRVertices([[-100,-100]]))
   assert len(app.compDisplay.selectedIds) == 0

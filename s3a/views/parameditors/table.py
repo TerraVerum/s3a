@@ -4,15 +4,15 @@ from datetime import datetime
 from functools import lru_cache
 from typing import List, Union, Tuple
 
+import numpy as np
 from pandas import DataFrame as df
 from ruamel.yaml import YAML
-import numpy as np
 
 from s3a.graphicsutils import raiseErrorLater
-from s3a.views.parameditors import FRParamEditor
 from s3a.projectvars import TABLE_DIR, REQD_TBL_FIELDS, COMP_CLASS_NA, DATE_FORMAT, \
   FR_CONSTS
 from s3a.structures import FRParam, FilePath, FRParamGroup, FRParamEditorError
+from s3a.views.parameditors import FRParamEditor
 
 yaml = YAML()
 

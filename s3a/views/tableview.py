@@ -6,16 +6,15 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
-from pyqtgraph.parametertree import Parameter
-from pyqtgraph.parametertree.Parameter import PARAM_TYPES
-from pyqtgraph.parametertree.parameterTypes import TextParameterItem, TextParameter
 
 from s3a import FR_SINGLETON
-from s3a.models.tablemodel import FRCompTableModel, FRComponentMgr
+from s3a.models.tablemodel import FRComponentMgr
 from s3a.projectvars import FR_CONSTS, FR_ENUMS, REQD_TBL_FIELDS
 from s3a.structures import FRS3AException, FRS3AWarning, OneDArr
 
 __all__ = ['FRCompTableView']
+
+from .parameditors import pgregistered
 
 Signal = QtCore.Signal
 
@@ -163,13 +162,13 @@ class FRCompTableView(QtWidgets.QTableView):
         paramDict['type'] = 'list'
         paramDict.update(values={'True': True, 'False': False})
       try:
-        self.setItemDelegateForColumn(ii, FRPgParamDelegate(paramDict, self))
+        self.setItemDelegateForColumn(ii, pgregistered.FRPgParamDelegate(paramDict, self))
       except FRS3AException:
         # Parameter doesn't have a registered pyqtgraph editor, so default to
         # generic text editor
         paramDict['type'] = 'text'
         paramDict['default'] = str(curval)
-        self.setItemDelegateForColumn(ii, FRPgParamDelegate(paramDict, self))
+        self.setItemDelegateForColumn(ii, pgregistered.FRPgParamDelegate(paramDict, self))
 
     self.horizontalHeader().setSectionsMovable(True)
 
@@ -315,47 +314,3 @@ class FRCompTableView(QtWidgets.QTableView):
       # False positive
       # noinspection PyTypeChecker
       self.setCellsAs(idList, colIdxs, self.popup.data)
-
-# Monkey patch pyqtgraph text box to allow tab changing focus
-class FRMonkeyPatchedTextParameterItem(TextParameterItem):
-  def makeWidget(self):
-    textBox: QtWidgets.QTextEdit = super().makeWidget()
-    textBox.setTabChangesFocus(True)
-    return textBox
-TextParameter.itemClass = FRMonkeyPatchedTextParameterItem
-
-
-class FRPgParamDelegate(QtWidgets.QStyledItemDelegate):
-  def __init__(self, paramDict: dict, parent=None):
-    super().__init__(parent)
-    errMsg = f'{self.__class__} can only create parameter editors from'
-    ' registered pg widgets that implement makeWidget()'
-
-    if paramDict['type'] not in PARAM_TYPES:
-      raise FRS3AException(errMsg)
-    paramDict.update(name='dummy')
-    param = Parameter.create(**paramDict)
-    if hasattr(param.itemClass, 'makeWidget'):
-      self.item = param.itemClass(param, 0)
-    else:
-      raise FRS3AException(errMsg)
-
-  def createEditor(self, parent, option, index: QtCore.QModelIndex):
-    editor = self.item.makeWidget()
-    editor.setParent(parent)
-    editor.setMaximumSize(option.rect.width(), option.rect.height())
-    return editor
-
-  def setModelData(self, editor: QtWidgets.QWidget,
-                   model: FRCompTableModel,
-                   index: QtCore.QModelIndex):
-    model.setData(index, editor.value())
-
-  def setEditorData(self, editor: QtWidgets.QWidget, index):
-    value = index.data(QtCore.Qt.EditRole)
-    editor.setValue(value)
-
-  def updateEditorGeometry(self, editor: QtWidgets.QWidget,
-                           option: QtWidgets.QStyleOptionViewItem,
-                           index: QtCore.QModelIndex):
-    editor.setGeometry(option.rect)

@@ -1,16 +1,14 @@
-import weakref
 from dataclasses import dataclass
-from functools import partial, wraps
+from functools import partial
 from inspect import isclass
 from typing import Tuple, Callable, Union, Any, Dict, List
 
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
-from .genericeditor import FRParamEditor
+from s3a.graphicsutils import findMainWin
 from s3a.projectvars import SHORTCUTS_DIR
 from s3a.structures import FRParam, FRParamEditorError
-from s3a.graphicsutils import findMainWin
-from s3a.models.editorbase import INITIALIZED_GROUPINGS
+from .genericeditor import FRParamEditor
 
 
 def _class_fnNamesFromFnQualname(qualname: str) -> (str, str):

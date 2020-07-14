@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import weakref
 from typing import List, Dict, Union, Type, Tuple
 
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter
 
-from s3a.models.editorbase import FRParamEditorBase
 from s3a.graphicsutils import dialogGetSaveFileName
+from s3a.models.editorbase import FRParamEditorBase
 from s3a.structures import FRParam, FilePath
 
 Signal = QtCore.Signal
@@ -94,9 +93,6 @@ class FRParamEditor(FRParamEditorBase):
 
     if registerCls is not None:
       self.registerGroup(registerParam)(registerCls)
-
-  def _paramTreeChanged(self, param, child, idx):
-    self._stateBeforeEdit = self.params.saveState()
 
   def _expandCols(self):
     # totWidth = 0

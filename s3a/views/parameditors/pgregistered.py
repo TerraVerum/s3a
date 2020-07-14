@@ -1,12 +1,59 @@
 from functools import partial
 from typing import Optional, List
 
-from pyqtgraph.Qt import QtGui, QtWidgets
-from pyqtgraph.parametertree import parameterTypes, Parameter
-from pyqtgraph.parametertree.parameterTypes import ActionParameterItem, ActionParameter
+from pyqtgraph import TreeWidgetItem
+from pyqtgraph.Qt import QtGui, QtWidgets, QtCore
+from pyqtgraph.parametertree import parameterTypes, Parameter, ParameterTree
+from pyqtgraph.parametertree.Parameter import PARAM_TYPES
+from pyqtgraph.parametertree.parameterTypes import ActionParameterItem, ActionParameter, \
+  TextParameterItem, TextParameter, WidgetParameterItem
 
 from s3a.graphicsutils import findMainWin
+from s3a.structures import FRS3AException
 
+class FRMonkeyPatchedTextParameterItem(TextParameterItem):
+  def makeWidget(self):
+    textBox: QtWidgets.QTextEdit = super().makeWidget()
+    textBox.setTabChangesFocus(True)
+    return textBox
+
+# Monkey patch pyqtgraph text box to allow tab changing focus
+TextParameter.itemClass = FRMonkeyPatchedTextParameterItem
+
+class FRPgParamDelegate(QtWidgets.QStyledItemDelegate):
+  def __init__(self, paramDict: dict, parent=None):
+    super().__init__(parent)
+    errMsg = f'{self.__class__} can only create parameter editors from'
+    ' registered pg widgets that implement makeWidget()'
+
+    if paramDict['type'] not in PARAM_TYPES:
+      raise FRS3AException(errMsg)
+    paramDict.update(name='dummy')
+    param = Parameter.create(**paramDict)
+    if hasattr(param.itemClass, 'makeWidget'):
+      self.item = param.itemClass(param, 0)
+    else:
+      raise FRS3AException(errMsg)
+
+  def createEditor(self, parent, option, index: QtCore.QModelIndex):
+    editor = self.item.makeWidget()
+    editor.setParent(parent)
+    editor.setMaximumSize(option.rect.width(), option.rect.height())
+    return editor
+
+  def setModelData(self, editor: QtWidgets.QWidget,
+                   model: QtCore.QAbstractTableModel,
+                   index: QtCore.QModelIndex):
+    model.setData(index, editor.value())
+
+  def setEditorData(self, editor: QtWidgets.QWidget, index):
+    value = index.data(QtCore.Qt.EditRole)
+    editor.setValue(value)
+
+  def updateEditorGeometry(self, editor: QtWidgets.QWidget,
+                           option: QtWidgets.QStyleOptionViewItem,
+                           index: QtCore.QModelIndex):
+    editor.setGeometry(option.rect)
 
 class FRShortcutParameterItem(parameterTypes.WidgetParameterItem):
   """

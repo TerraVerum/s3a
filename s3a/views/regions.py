@@ -252,12 +252,13 @@ class FRVertexDefinedImg(pg.ImageItem):
     return np.array(lut, dtype='uint8')
 
 class FRMouseFollowingRegionPlot(pg.PlotCurveItem):
-  sigActivated = QtCore.Signal()
-  sigDeactivated = QtCore.Signal()
+  sigCopyStarted = QtCore.Signal()
+  sigCopyStopped = QtCore.Signal()
 
   def __init__(self, mainImg: imageareas.FREditableImgBase=None, parent=None):
     super().__init__(parent)
     self.active = False
+    self.inCopyMode = True
     self.baseData = FRVertices()
     self.regionIds = np.ndarray([])
     self.dataMin = FRVertices()

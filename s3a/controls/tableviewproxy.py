@@ -68,8 +68,8 @@ class FRCompDisplayFilter(QtCore.QObject):
 
     # Attach to UI signals
     mainImg.sigSelectionBoundsMade.connect(self._reflectSelectionBoundsMade)
-    self.regionCopier.sigDeactivated.connect(lambda *args: self.finishRegionCopier())
-    self.regionCopier.sigActivated.connect(lambda *args: self.activateRegionCopier())
+    self.regionCopier.sigCopyStarted.connect(lambda *args: self.activateRegionCopier())
+    self.regionCopier.sigCopyStopped.connect(lambda *args: self.finishRegionCopier())
 
     mainImg.mergeCompsAct.sigActivated.connect(lambda *args: self.mergeSelectedComps())
     mainImg.splitCompsAct.sigActivated.connect(lambda *args: self.splitSelectedComps())
@@ -173,7 +173,10 @@ class FRCompDisplayFilter(QtCore.QObject):
         isFirst = False
     # noinspection PyTypeChecker
     selectionModel.select(selectionList, selectionMode)
-    self.selectedIds = ids
+    # if int(selectionMode & QtCore.QItemSelectionModel.ClearAndSelect) > 0:
+    #   self.selectedIds = ids
+    # else: # Add to selection without clearing old selection
+    #   self.selectedIds = np.concatenate([self.selectedIds, ids])
     self._compTbl.setFocus()
 
 
@@ -226,18 +229,30 @@ class FRCompDisplayFilter(QtCore.QObject):
     if not keepResult: return
     newComps = self._compMgr.compDf.loc[self.regionCopier.regionIds].copy()
     regionOffset = self.regionCopier.offset.astype(int)
+    # TODO: Truncate vertices that lie outside image boundaries
+    # Invalid if any verts are outside image bounds
+    truncatedCompIds = []
+    # imShape_xy = self._mainImgArea.image.shape[:2][::-1]
     for idx in newComps.index:
       newVerts = []
       for verts in newComps.at[idx, REQD_TBL_FIELDS.VERTICES]:
         verts = verts + regionOffset
+        # goodVerts = np.all(verts >= imShape_xy, 1)
+        # if not np.all(goodVerts):
+        #   verts = verts[goodVerts,:]
+        #   truncatedCompIds.append(idx)
         newVerts.append(verts)
       newComps.at[idx, REQD_TBL_FIELDS.VERTICES] = FRComplexVertices(newVerts)
-    if self._mainImgArea.drawAction == FR_CONSTS.DRAW_ACT_MOVE:
-      self._mainImgArea.sigCompsUpdated.emit(newComps)
-      self.regionCopier.erase()
-    elif self._mainImgArea.drawAction == FR_CONSTS.DRAW_ACT_COPY:
+    # truncatedCompIds = np.unique(truncatedCompIds)
+    if self.regionCopier.inCopyMode:
       self._mainImgArea.sigCompsCreated.emit(newComps)
       self.activateRegionCopier(newComps.index)
+    else: # Move mode
+      self._mainImgArea.sigCompsUpdated.emit(newComps)
+      self.regionCopier.erase()
+    # if len(truncatedCompIds) > 0:
+    #   warn(f'Some regions extended beyond image dimensions. Boundaries for the following'
+    #        f' components were altered: {truncatedCompIds}', FRS3AWarning)
 
   def findFilterableCols(self):
     curComps = self._compMgr.compDf.copy()
