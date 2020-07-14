@@ -219,10 +219,7 @@ class FRCompDisplayFilter(QtCore.QObject):
       selectedIds = self.selectedIds
     if len(selectedIds) == 0: return
     vertsList = self._compMgr.compDf.loc[selectedIds, REQD_TBL_FIELDS.VERTICES]
-    allVerts = FRComplexVertices()
-    for verts in vertsList:
-      allVerts.append(verts.stack())
-    self.regionCopier.resetBaseData(allVerts, selectedIds)
+    self.regionCopier.resetBaseData(vertsList, selectedIds)
     self.regionCopier.active = True
 
   def finishRegionCopier(self, keepResult=True):

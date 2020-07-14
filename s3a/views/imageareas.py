@@ -103,7 +103,6 @@ class FREditableImgBase(pg.PlotWidget):
                     self.drawOptsWidget.shapeBtnParamMap.inv]:
       if newMode in curDict:
         curDict[newMode].setChecked(True)
-        self.regionCopier.erase()
         return
     # If this is reached, a param was passed in that doesn't correspond to a valid button
     # TODO: return soemthing else?
@@ -119,10 +118,9 @@ class FREditableImgBase(pg.PlotWidget):
     """
     if not isChecked: return
     if btn in self.drawOptsWidget.actionBtnParamMap:
-      oldAction = self.drawAction
       self.drawAction = self.drawOptsWidget.actionBtnParamMap[btn]
-      # The copier shape only needs to be cleared if we *were* in a copyable
-      self.regionCopier.erase()
+      if self.regionCopier.active:
+        self.regionCopier.erase()
     else:
       # Shape toggle
       self.shapeCollection.curShapeParam = self.drawOptsWidget.shapeBtnParamMap[btn]

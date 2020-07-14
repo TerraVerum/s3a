@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Tuple, Sequence, Optional, Any
+from typing import Tuple, Sequence, Optional, Any, List
 
 import numpy as np
 import pandas as pd
@@ -282,11 +282,21 @@ class FRMouseFollowingRegionPlot(pg.PlotCurveItem):
     self.setData(newData[:,0], newData[:,1], connect=self._connectivity)
     self.offset = xyPos - self.dataMin
 
-  def resetBaseData(self, baseData: FRComplexVertices, regionIds: OneDArr):
-    plotData, connectivity = stackedVertsPlusConnections(baseData)
+  def resetBaseData(self, baseData: List[FRComplexVertices], regionIds: OneDArr):
+    allData = FRComplexVertices()
+    allConnctivity = []
+    for verts in baseData: # each list element represents one component
+      plotData, connectivity = stackedVertsPlusConnections(verts)
+      allData.append(plotData)
+      allConnctivity.append(connectivity)
+      if len(connectivity) > 0:
+        connectivity[-1] = False
+    plotData = allData.stack()
+    connectivity = np.concatenate(allConnctivity)
 
     try:
       self.dataMin = plotData.min(0)
+      # connectivity[addtnlFalseConnectivityIdxs] = False
     except ValueError:
       # When no elements are in the array
       self.dataMin = FRVertices([[0,0]])
@@ -298,5 +308,5 @@ class FRMouseFollowingRegionPlot(pg.PlotCurveItem):
     self.regionIds = regionIds
 
   def erase(self):
-    self.resetBaseData(FRComplexVertices(), np.array([]))
+    self.resetBaseData([FRComplexVertices()], np.array([]))
     self.active = False
