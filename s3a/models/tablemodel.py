@@ -468,14 +468,14 @@ class FRComponentIO:
     if imShape is None:
       vertMax = FRComplexVertices.stackedMax(self.compDf[REQD_TBL_FIELDS.VERTICES])
       imShape = tuple(vertMax[::-1] + 1)
-    outMask = np.zeros(imShape[:2], 'uint8')
+    outMask = np.zeros(imShape[:2], int)
     for idx, comp in self.compDf.iterrows():
       verts: FRComplexVertices = comp[REQD_TBL_FIELDS.VERTICES]
       idx: int
       outMask = verts.toMask(outMask, idx+1, False, False)
 
     if outFile is not None:
-      io.imsave(outFile, outMask, check_contrast=False)
+      io.imsave(outFile, outMask.astype('uint16'), check_contrast=False)
     return outMask
 
   # -----
