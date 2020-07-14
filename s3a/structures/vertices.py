@@ -144,6 +144,13 @@ class FRComplexVertices(list):
     else:
       return FRVertices(np.vstack(self), dtype=newDtype)
 
+  @classmethod
+  def stackedMax(cls, complexVertList: list):
+    """
+    Returns the max along dimension 0 for a list of complex vertices
+    """
+    return np.vstack([v.stack() for v in complexVertList]).max(0)
+
   def filledVerts(self) -> FRComplexVertices:
     """
     Retrieves all vertex lists corresponding to filled regions in the complex shape
@@ -158,8 +165,9 @@ class FRComplexVertices(list):
     idxs = np.nonzero(self.hierarchy[:,3] != -1)[0]
     return FRComplexVertices([self[ii] for ii in idxs])
 
-  def toMask(self, maskShape: Union[Sequence, NChanImg]=None, fillColor=None, asBool=True,
-             checkForDisconnectedVerts=False, warnIfTooSmall=True):
+  def toMask(self, maskShape: Union[Sequence, NChanImg]=None,
+             fillColor: Union[int, float, np.ndarray]=None,
+             asBool=True, checkForDisconnectedVerts=False, warnIfTooSmall=True):
     if maskShape is None:
       maskShape = tuple(self.stack().max(0)[::-1]+1)
       # Guaranteed not to be too small

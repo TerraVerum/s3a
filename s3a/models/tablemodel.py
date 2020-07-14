@@ -6,6 +6,7 @@ from stat import S_IREAD, S_IRGRP, S_IROTH
 from typing import Union, Any, Optional, List, Tuple
 from typing_extensions import Literal
 from warnings import warn
+import re
 
 import cv2 as cv
 import numpy as np
@@ -13,8 +14,9 @@ import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 from skimage import io
+from skimage.measure import label
 
-from s3a.structures import OneDArr, FRParamGroup, FilePath, FRS3AWarning
+from s3a.structures import OneDArr, FRParamGroup, FilePath, FRS3AWarning, GrayImg
 from s3a.structures.typeoverloads import TwoDArr, NChanImg
 from s3a import FR_SINGLETON
 from s3a.generalutils import coerceDfTypes, augmentException
@@ -334,9 +336,11 @@ class FRComponentIO:
     :param typeFilter: type filter for handled io types. For instanece, if typ='png', then
       a file filter list with only 'id.png' and 'class.png' will appear.
     """
+    if isinstance(typeFilter, str):
+      typeFilter = [typeFilter]
     fileFilters = []
     for typ, info in dict(**self.handledIoTypes, **extraOpts).items():
-      if typeFilter in typ:
+      if any([t in typ for t in typeFilter]):
         fileFilters.append(f'{info} (*.{typ})')
     return ';;'.join(fileFilters)
 
@@ -369,25 +373,22 @@ class FRComponentIO:
   def buildByFileType(self, inFile: Union[str, Path], imShape: Tuple[int]=None, **importArgs):
     return self._ioByFileType(inFile, 'buildFrom', imShape=imShape, **importArgs)
 
-  def _ioByFileType(self, fname: Union[str, Path],
+  def _ioByFileType(self, fpath: Union[str, Path],
                     buildOrExport=Literal['buildFrom', 'export'], **ioArgs):
-    fname = Path(fname)
-    ioType = fname.suffix.strip('.').title()
-    if ioType == 'Png':
-      # Could be ID png or class png
-      ioType = fname.stem.split('.')[-1].title() + ioType
-    if ioType.lower() in self.handledIoTypes:
-      ioFn = getattr(self, buildOrExport+ioType, None)
-    else:
-      ioFn = None
-    if ioFn is not None:
-      return ioFn(fname, **ioArgs)
+    fpath = Path(fpath)
+    fname = fpath.name
+    cmpTypes = np.array(list(self.handledIoTypes.keys()))
+    typIdx = [typ in fname for typ in cmpTypes]
+    if not any(typIdx):
+      return
+    fnNameSuffix = cmpTypes[typIdx][0].title().replace('.', '')
+    ioFn = getattr(self, buildOrExport+fnNameSuffix, None)
+    return ioFn(fpath, **ioArgs)
   # -----
   # Export options
   # -----
   def exportCsv(self, outFile: Union[str, Path]=None, readOnly=True, **pdExportArgs):
     """
-
     :param outFile: Name of the output file location. If *None*, no file is created. However,
       the export object will still be created and returned.
     :param pdExportArgs: Dictionary of values passed to underlying pandas export function.
@@ -444,33 +445,38 @@ class FRComponentIO:
       self.compDf.to_pickle(outFile)
     return pklDf
 
-  def exportLabeledImg(self,
-                       mainImgShape: Tuple[int],
-                       outFile: str = None,
-                       types: List[FRParam] = None,
-                       colorPerType: TwoDArr = None,
-                       ) -> (NChanImg, str):
-    # Set up input arguments
-    if types is None:
-      types = [param for param in FR_SINGLETON.tableData.compClasses]
-    if colorPerType is None:
-      colorPerType = np.arange(1, len(types) + 1, dtype=int)[:,None]
-    outShape = mainImgShape[:2]
-    if colorPerType.shape[1] > 1:
-      outShape += (colorPerType.shape[1],)
-    out = np.zeros(outShape, 'uint8')
-
+  def exportClassPng(self, outFile: FilePath = None, imShape: Tuple[int]=None, **kwargs):
     # Create label to output mapping
-    for curType, color in zip(types, colorPerType):
-      outlines = self.compDf.loc[self.compDf[REQD_TBL_FIELDS.COMP_CLASS] == curType, REQD_TBL_FIELDS.VERTICES].values
-      cvFillArg = [arr[0] for arr in outlines]
-      cvClrArg = tuple([int(val) for val in color])
-      cv.fillPoly(out, cvFillArg, cvClrArg)
+    classes = FR_SINGLETON.tableData.compClasses
+    colors = self.compDf[REQD_TBL_FIELDS.COMP_CLASS].apply(classes.index)+1
+    origIdxs = self.compDf.index
+    self.compDf.index = colors
+    ret = self.exportIdPng(outFile, imShape, **kwargs)
+    self.compDf.index = origIdxs
+
+    return ret
+
+  def exportIdPng(self, outFile: FilePath=None,
+                  imShape: Tuple[int]=None, **kwargs):
+    """
+    Creates a 2D grayscale image where each component is colored with its isntance ID + 1.
+    *Note* Since Id 0 would end up not coloring the mask, all IDs must be offest by 1.
+    :param imShape: The size of this output image
+    :param outFile: Where to save the output. If *None*, no export is created.
+    :return:
+    """
+    if imShape is None:
+      vertMax = FRComplexVertices.stackedMax(self.compDf[REQD_TBL_FIELDS.VERTICES])
+      imShape = tuple(vertMax[::-1] + 1)
+    outMask = np.zeros(imShape[:2], 'uint8')
+    for idx, comp in self.compDf.iterrows():
+      verts: FRComplexVertices = comp[REQD_TBL_FIELDS.VERTICES]
+      idx: int
+      outMask = verts.toMask(outMask, idx+1, False, False)
 
     if outFile is not None:
-      io.imsave(outFile, out, check_contrast=False)
-
-    return out
+      io.imsave(outFile, outMask, check_contrast=False)
+    return outMask
 
   # -----
   # Import options
@@ -525,6 +531,23 @@ class FRComponentIO:
     cls.checkVertBounds(pklDf[REQD_TBL_FIELDS.VERTICES], imShape)
     return pklDf
 
+  @classmethod
+  def buildFromIdPng(cls, inFile: FilePath, imShape: Tuple=None) -> df:
+    labelImg = io.imread(inFile, as_gray=True)
+    outDf = cls._idImgToDf(labelImg)
+    cls.checkVertBounds(outDf[REQD_TBL_FIELDS.VERTICES], imShape)
+    return outDf
+
+  @classmethod
+  def buildFromClassPng(cls, inFile: FilePath, imShape: Tuple=None) -> df:
+    outDf = cls.buildFromIdPng(inFile, imShape)
+    # Convert what the ID import treated as an inst id into indices for class
+    clsArray = np.array(FR_SINGLETON.tableData.compClasses)
+    outDf[REQD_TBL_FIELDS.COMP_CLASS] = clsArray[outDf[REQD_TBL_FIELDS.INST_ID]]
+    outDf.reset_index(inplace=True, drop=True)
+    outDf[REQD_TBL_FIELDS.INST_ID] = outDf.index
+    return outDf
+
   @staticmethod
   def checkVertBounds(vertSer: pd.Series, imShape: tuple):
     """
@@ -536,7 +559,7 @@ class FRComponentIO:
     :return: Raises error if offending vertices are present, since this is an indication the component file
       was from a different image
     """
-    if imShape is None:
+    if imShape is None or len(vertSer) == 0:
       # Nothing we can do if no shape is given
       return
     # Image shape from row-col -> x-y
@@ -549,3 +572,17 @@ class FRComponentIO:
       warn(f'Vertices on some components extend beyond image dimensions. '
            f'Perhaps this export came from a different image?\n'
            f'Offending IDs: {offendingIds}', FRS3AWarning)
+
+  @classmethod
+  def _idImgToDf(cls, idImg: GrayImg):
+    # Skip 0 since it's indicative of background
+    regionIds = np.unique(idImg)[1:]
+    allVerts = []
+    for curId in regionIds:
+      verts = FRComplexVertices.fromBwMask(idImg == curId)
+      allVerts.append(verts)
+    outDf = FR_SINGLETON.tableData.makeCompDf(regionIds.size)
+    # Subtract 1 since instance ids are 0-indexed
+    outDf[REQD_TBL_FIELDS.INST_ID] = regionIds-1
+    outDf[REQD_TBL_FIELDS.VERTICES] = allVerts
+    return outDf

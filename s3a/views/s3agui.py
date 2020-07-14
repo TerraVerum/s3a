@@ -38,7 +38,8 @@ class S3A(S3ABase):
     if exceptionsAsDialogs:
       warnings.simplefilter('error', FRS3AWarning)
       makeExceptionsShowDialogs(self)
-      QtCore.QTimer.singleShot(0, self.requestLoadSavedSettings_gui)
+      if loadLastState:
+        QtCore.QTimer.singleShot(0, self.requestLoadSavedSettings_gui)
     elif loadLastState:
       self.appStateEditor.loadParamState()
     def saveRecentLayout():
@@ -292,7 +293,7 @@ class S3A(S3ABase):
 
   def loadCompList_gui(self, loadType: _FREnums):
     # TODO: See note about exporting comps. Delegate the filepicker activity to importer
-    fileFilter = self.compIo.handledIoTypes_fileFilter('csv')
+    fileFilter = self.compIo.handledIoTypes_fileFilter(['csv', 'pkl'])
     fname = popupFilePicker(self, 'Select Load File', fileFilter)
     if fname is None:
       return
