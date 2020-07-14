@@ -205,8 +205,16 @@ class FRMainImage(FREditableImgBase):
     self.compFromLastProcResult: Optional[pd.DataFrame] = None
     self.lastProcVerts: Optional[FRVertices] = None
     self.overrideCompVertsAct.sigActivated.connect(lambda: self.overrideLastProcResult())
-    for act in self.copyCompsAct, self.moveCompsAct:
-      act.sigActivated.connect(lambda: self.regionCopier.sigCopyStarted.emit())
+    copier = self.regionCopier
+    def startCopy():
+      copier.inCopyMode = True
+      copier.sigCopyStarted.emit()
+    self.copyCompsAct.sigActivated.connect(startCopy)
+
+    def startMove():
+      copier.inCopyMode = False
+      copier.sigCopyStarted.emit()
+    self.moveCompsAct.sigActivated.connect(startMove)
 
     self.switchBtnMode(FR_CONSTS.DRAW_ACT_ADD)
 
