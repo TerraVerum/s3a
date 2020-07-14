@@ -11,7 +11,7 @@ def test_normal_export(sampleComps, tmpdir):
   io = app.compIo
   io.exportOnlyVis = False
   io.prepareDf(sampleComps)
-  for ftype in io.handledExportTypes:
+  for ftype in io.handledIoTypes:
     curPath = tmpdir / f'normalExport - All IDs.{ftype}'
     doAndAssertExport(curPath, io, 'Normal export with all IDs not successful.')
 
@@ -42,7 +42,7 @@ def test_filter_export(sampleComps, tmpdir):
 
 def test_bad_import(tmpdir):
   io = app.compIo
-  for ext in io.handledExportTypes:
+  for ext in io.handledIoTypes:
     ofile = open(tmpdir/f'junkfile.{ext}', 'w')
     ofile.write('Vertices\nabsolute junk')
     ofile.close()

@@ -4,6 +4,7 @@ from ast import literal_eval
 from pathlib import Path
 from stat import S_IREAD, S_IRGRP, S_IROTH
 from typing import Union, Any, Optional, List, Tuple
+from typing_extensions import Literal
 from warnings import warn
 
 import cv2 as cv
@@ -321,8 +322,23 @@ class FRComponentIO:
     self.compDf: Optional[df] = None
 
   @property
-  def handledExportTypes(self):
-      return ['csv', 'pkl']
+  def handledIoTypes(self):
+      return {'csv': 'CSV Files', 'pkl': 'Pickle Files', 'id.png': 'ID Grayscale Image',
+              'class.png': 'Class Grayscale Image'}
+
+  def handledIoTypes_fileFilter(self, typeFilter='', **extraOpts):
+    """
+    Helper for creating a file filter out of the handled IO types. The returned list of
+    strings is suitable for inserting into a QFileDialog.
+
+    :param typeFilter: type filter for handled io types. For instanece, if typ='png', then
+      a file filter list with only 'id.png' and 'class.png' will appear.
+    """
+    fileFilters = []
+    for typ, info in dict(**self.handledIoTypes, **extraOpts).items():
+      if typeFilter in typ:
+        fileFilters.append(f'{info} (*.{typ})')
+    return ';;'.join(fileFilters)
 
   def prepareDf(self, compDf: df, displayIds: OneDArr=None, srcImgFname: Path=None):
     """
@@ -347,14 +363,25 @@ class FRComponentIO:
     self.compDf = exportDf
 
   def exportByFileType(self, outFile: Union[str, Path], **exportArgs):
-    outFile = Path(outFile)
-    exportType = outFile.suffix.strip('.')
-    if exportType in self.handledExportTypes:
-      exportFn = getattr(self, 'export'+exportType.title())
+    self._ioByFileType(outFile, 'export', **exportArgs)
+
+
+  def buildByFileType(self, inFile: Union[str, Path], imShape: Tuple[int]=None, **importArgs):
+    return self._ioByFileType(inFile, 'buildFrom', imShape=imShape, **importArgs)
+
+  def _ioByFileType(self, fname: Union[str, Path],
+                    buildOrExport=Literal['buildFrom', 'export'], **ioArgs):
+    fname = Path(fname)
+    ioType = fname.suffix.strip('.').title()
+    if ioType == 'Png':
+      # Could be ID png or class png
+      ioType = fname.stem.split('.')[-1].title() + ioType
+    if ioType.lower() in self.handledIoTypes:
+      ioFn = getattr(self, buildOrExport+ioType, None)
     else:
-      exportFn = None
-    if exportFn is not None:
-      exportFn(outFile, **exportArgs)
+      ioFn = None
+    if ioFn is not None:
+      return ioFn(fname, **ioArgs)
   # -----
   # Export options
   # -----

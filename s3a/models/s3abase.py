@@ -236,21 +236,17 @@ class S3ABase(QtWidgets.QMainWindow):
 
   def exportLabeledImg(self, outFname: str=None):
     self.compIo.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds)
-    return self.compIo.exportLabeledImg(self.mainImg.image.shape, outFname)
+    return self.compIo.exportByFileType(outFname, imShape=self.mainImg.image.shape)
 
   def loadCompList(self, inFname: str, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
     pathFname = Path(inFname)
     if self.mainImg.image is None:
       raise FRAppIOError('Cannot load components when no main image is set.')
     fType = pathFname.suffix[1:]
-    if fType == 'csv':
-      newComps = FRComponentIO.buildFromCsv(inFname, self.mainImg.image.shape)
-    elif fType == 's3apkl':
-      # Operation may take a long time, but we don't want to start the wait cursor until
-      # after dialog selection
-      newComps = FRComponentIO.buildFromPkl(inFname, self.mainImg.image.shape)
-    else:
-      raise FRAppIOError(f'Extension {fType} is not recognized. Must be one of: csv, s3apkl')
+    if fType not in self.compIo.handledIoTypes:
+      raise FRAppIOError(f'Extension {fType} is not recognized. Must be one of:\n'
+                         + self.compIo.handledIoTypes_fileFilter())
+    newComps = self.compIo.buildByFileType(inFname, self.mainImg.image.shape)
     self.compMgr.addComps(newComps, loadType)
 
   def showNewCompAnalytics(self):

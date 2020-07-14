@@ -269,7 +269,7 @@ class S3A(S3ABase):
     fileDlg = QtWidgets.QFileDialog()
     # TODO: Delegate this to the exporter. Make a function that makes the right file filter,
     #   and calls the right exporter function after the filename is retrieved.
-    fileFilter = "CSV Files (*.csv)"
+    fileFilter = self.compIo.handledIoTypes_fileFilter()
     outFname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilter)
     if len(outFname) > 0:
       super().exportCompList(outFname)
@@ -285,14 +285,14 @@ class S3A(S3ABase):
     fileDlg = QtWidgets.QFileDialog()
     # TODO: Delegate this to the exporter. Make a function that makes the right file filter,
     #   and calls the right exporter function after the filename is retrieved.
-    fileFilter = "Label Mask Image (*.png; *.tif; *.jpg; *.jpeg; *.bmp; *.jfif);; All files(*.*)"
-    fname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilter)
+    fileFilters = self.compIo.handledIoTypes_fileFilter('png', **{'*': 'All Files'})
+    fname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilters)
     if len(fname) > 0:
       super().exportLabeledImg(fname)
 
   def loadCompList_gui(self, loadType: _FREnums):
     # TODO: See note about exporting comps. Delegate the filepicker activity to importer
-    fileFilter = "CSV Files (*.csv)"
+    fileFilter = self.compIo.handledIoTypes_fileFilter('csv')
     fname = popupFilePicker(self, 'Select Load File', fileFilter)
     if fname is None:
       return
