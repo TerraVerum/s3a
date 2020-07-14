@@ -186,7 +186,14 @@ class S3ABase(QtWidgets.QMainWindow):
     self.compMgr.addComps(oldSer.to_frame().T, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
 
   def estimateBoundaries(self):
-    self.mainImg.handleShapeFinished(FRVertices())
+    oldAct = self.mainImg.drawAction
+    try:
+      self.mainImg.drawAction = FR_CONSTS.DRAW_ACT_ADD
+      self.mainImg.handleShapeFinished(FRVertices())
+    except Exception as ex:
+      raise
+    finally:
+      self.mainImg.drawAction = oldAct
 
   def clearBoundaries(self):
     self.compMgr.rmComps()
@@ -231,7 +238,8 @@ class S3ABase(QtWidgets.QMainWindow):
   def exportCompList(self, outFname: Union[str, Path], readOnly=True):
     self.compIo.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds,
                           self.srcImgFname)
-    self.compIo.exportByFileType(outFname, readOnly=readOnly)
+    self.compIo.exportByFileType(outFname, imShape=self.mainImg.image.shape,
+                                 readOnly=readOnly)
     self.hasUnsavedChanges = False
 
   def exportLabeledImg(self, outFname: str=None):
@@ -243,7 +251,7 @@ class S3ABase(QtWidgets.QMainWindow):
     if self.mainImg.image is None:
       raise FRAppIOError('Cannot load components when no main image is set.')
     fType = pathFname.suffix[1:]
-    if fType not in self.compIo.handledIoTypes:
+    if not any(fType in typ for typ in self.compIo.handledIoTypes):
       raise FRAppIOError(f'Extension {fType} is not recognized. Must be one of:\n'
                          + self.compIo.handledIoTypes_fileFilter())
     newComps = self.compIo.buildByFileType(inFname, self.mainImg.image.shape)

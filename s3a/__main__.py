@@ -9,7 +9,7 @@ from . import appInst, FR_SINGLETON
 from .views.s3agui import S3A
 
 
-def main(gui=True, tableCfg: FilePath=None, **profileArgs) -> Optional[S3A]:
+def main(gui=True, tableCfg: FilePath=None, loadLastState=True, **profileArgs) -> Optional[S3A]:
   """
   Calling code for the S3A application.
 
@@ -31,7 +31,7 @@ def main(gui=True, tableCfg: FilePath=None, **profileArgs) -> Optional[S3A]:
   if tableCfg is not None:
     FR_SINGLETON.tableData.loadCfg(tableCfg)
   profileArgs = {k.replace(' ', '').lower(): v for k, v in profileArgs.items()}
-  win = S3A(exceptionsAsDialogs=gui, **profileArgs)
+  win = S3A(exceptionsAsDialogs=gui, loadLastState=loadLastState, **profileArgs)
   if gui:
     QtCore.QTimer.singleShot(0, win.showMaximized)
     sys.exit(appInst.exec_())
