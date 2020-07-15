@@ -21,7 +21,7 @@ class FRVertices(np.ndarray):
     # See numpy docs on subclassing ndarray
     if inputArr is None:
       inputArr = np.zeros((0,2))
-    arr = np.asarray(inputArr, **kwargs).view(cls)
+    arr = np.asarray(inputArr, dtype=dtype, **kwargs).view(cls)
     arr.connected = connected
     return arr
 
@@ -215,14 +215,15 @@ class FRComplexVertices(list):
     # outside
     #bwmask = dilation(bwmask, np.ones((3,3), dtype=bool))
     contours, hierarchy = cv.findContours(bwMask.astype('uint8'), retrMethod, approxMethod)
-    compVertices = []
+    compVertices = FRComplexVertices()
     for contour in contours:
       compVertices.append(FRVertices(contour[:,0,:]))
     if hierarchy is None:
       hierarchy = np.ones((0,1,4), int)*-1
     else:
       hierarchy = hierarchy[0,:,:]
-    return FRComplexVertices(compVertices, hierarchy)
+    compVertices.hierarchy = hierarchy
+    return compVertices
 
   def __str__(self) -> str:
     """

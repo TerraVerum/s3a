@@ -107,8 +107,8 @@ class _FRConsts(FRParamGroup):
                                                              ' parameter determines whether'
                                                              ' the viewbox shrinks only to'
                                                              ' the current selection (if *False*)'
-                                                             ' or just ensures teh view contains'
-                                                             ' the selected componetn (if *True*)')
+                                                             ' or just ensures the view contains'
+                                                             ' the selected component (if *True*)')
   PROP_FOCUSED_SEED_THRESH     : FRParam = newParam('Seedpoint Threshold in Focused Image', 7.)
   PROP_UNDO_BUF_SZ             : FRParam = newParam('Size of Undo Buffer', 300)
   PROP_STEPS_BW_SAVE           : FRParam = newParam('Operations Between Buffer Saves', 1)

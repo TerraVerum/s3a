@@ -4,7 +4,8 @@ import weakref
 from functools import wraps
 from inspect import isclass
 from pathlib import Path
-from typing import List, Dict, Any, Union, Collection, Type, Tuple, Sequence
+from typing import List, Dict, Any, Union, Collection, Type, Tuple, Sequence, Optional
+from warnings import warn
 
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter, ParameterTree
@@ -12,7 +13,8 @@ from pyqtgraph.parametertree import Parameter, ParameterTree
 from s3a.generalutils import frPascalCaseToTitle
 from s3a.graphicsutils import saveToFile, \
   attemptFileLoad
-from s3a.structures import FRParam, ContainsSharedProps, FilePath
+from s3a.structures import FRParam, ContainsSharedProps, FilePath, FRParamEditorError, \
+  FRS3AWarning
 
 __all__ = ['FRParamEditorBase']
 
@@ -85,7 +87,7 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
       except ValueError:
         name = "Parameter Editor"
 
-    self.groupingToParamMapping: Dict[Any, FRParam] = {}
+    self.groupingToParamMapping: Dict[Any, Optional[FRParam]] = {}
     """
     Allows the editor to associate a class name with its human-readable parameter
     name
@@ -351,7 +353,13 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     paramOpts.update(etxraOpts)
     paramForEditor = Parameter.create(**paramOpts)
 
+    if grouping not in self.groupingToParamMapping:
+      warn(f'The provided grouping "{grouping}" was not recognized, perhaps because '
+           f' `registerGroup()` was never called with this grouping. Registering now'
+           f' as a top-level grouping.')
+      self.registerGroup(None)(grouping)
     groupParam = self.groupingToParamMapping[grouping]
+
     if groupParam is None:
       paramForCls = self.params
     else:

@@ -103,6 +103,9 @@ class FRParamGroup:
   def __len__(self):
     return len(fields(self))
 
+  def __str__(self):
+    return f'{[f.name for f in self]}'
+
   def __post_init__(self):
     for param in self:
       param.group = weakref.proxy(self)

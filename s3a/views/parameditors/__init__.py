@@ -70,7 +70,7 @@ class _FRSingleton(QtCore.QObject):
       if isinstance(dock, FRParamEditorDockGrouping):
         self.quickLoader.listModel.addEditors(dock.editors)
       else:
-        self.quickLoader.listModel.addEditors(dock)
+        self.quickLoader.listModel.addEditors([dock])
 
     if not blockEmit:
       self.sigDocksAdded.emit(docks)

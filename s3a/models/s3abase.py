@@ -63,6 +63,8 @@ class S3ABase(QtWidgets.QMainWindow):
       lambda: str(self.srcImgFname)
     )
     def saveExistingComps():
+      if self.mainImg.image is None:
+        return None
       saveName = self.appStateEditor.saveDir / 'savedState.csv'
       self.exportCompList(saveName, readOnly=False)
       return str(saveName)
