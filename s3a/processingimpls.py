@@ -10,11 +10,9 @@ from scipy.ndimage import binary_fill_holes
 from skimage.measure import regionprops, label, regionprops_table
 from skimage.morphology import flood
 from skimage.segmentation import quickshift
-import skimage.segmentation as seg
 
-from s3a.generalutils import splitListAtNans, getClippedBbox
-from s3a.structures import BlackWhiteImg, FRVertices, NChanImg, FRComplexVertices, \
-  GrayImg, RgbImg, FRAlgProcessorError
+from s3a.generalutils import splitListAtNans, getClippedBbox, cornersToFullBoundary
+from s3a.structures import BlackWhiteImg, FRVertices, NChanImg, GrayImg, RgbImg, FRAlgProcessorError
 
 
 def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int,
@@ -52,30 +50,6 @@ def growSeedpoint(img: NChanImg, seeds: FRVertices, thresh: float) -> BlackWhite
       curBwMask = flood(img[...,chan], tuple(seed), tolerance=thresh)
       bwOut |= curBwMask
   return bwOut
-
-def cornersToFullBoundary(cornerVerts: FRVertices, sizeLimit: float=np.inf) -> FRVertices:
-  """
-  From a list of corner vertices, returns a list with one vertex for every border pixel.
-  Example:
-  >>> cornerVerts = FRVertices([[0,0], [100,0], [100,100],[0,100]])
-  >>> cornersToFullBoundary(cornerVerts)
-  # [[0,0], [1,0], ..., [100,0], [100,1], ..., [100,100], ..., ..., [0,100]]
-  :param cornerVerts: Corners of the represented polygon
-  :param sizeLimit: The largest number of pixels from the enclosed area allowed before the full boundary is no
-  longer returned. For instance:
-    >>> cornerVerts = FRVertices([[0,0], [1000,0], [1000,1000],[0,1000]])
-    >>> cornersToFullBoundary(cornerVerts, 10e5)
-    will *NOT* return all boundary vertices, since the enclosed area (10e6) is larger than sizeLimit.
-  :return: List with one vertex for every border pixel, unless *sizeLimit* is violated.
-  """
-  fillShape = cornerVerts.asRowCol().max(0)+1
-  filledMask = FRComplexVertices([cornerVerts]).toMask(tuple(fillShape))
-  cornerVerts = FRComplexVertices.fromBwMask(filledMask, simplifyVerts=False).filledVerts().stack()
-  numCornerVerts = len(cornerVerts)
-  if numCornerVerts > sizeLimit:
-    spacingPerSamp = int(numCornerVerts/sizeLimit)
-    cornerVerts = cornerVerts[::spacingPerSamp]
-  return cornerVerts
 
 def colorLabelsWithMean(labelImg: GrayImg, refImg: NChanImg) -> RgbImg:
   outImg = np.empty(refImg.shape)

@@ -1,5 +1,6 @@
 from typing import Union, Optional, Tuple
 
+import cv2 as cv
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
@@ -8,14 +9,14 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from skimage.io import imread
 
 from s3a import FR_SINGLETON
-from s3a.generalutils import getClippedBbox, frPascalCaseToTitle
+from s3a.generalutils import getClippedBbox, frPascalCaseToTitle, cornersToFullBoundary
 from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS, MENU_OPTS_DIR
 from s3a.structures import FRParam, FRVertices, FRComplexVertices, FilePath
 from s3a.structures import NChanImg
-from .parameditors import FRParamEditor, FRParamEditorDockGrouping
 from .clickables import FRRightPanViewBox
 from .drawopts import FRDrawOpts
-from .procwrapper import  FRImgProcWrapper
+from .parameditors import FRParamEditor, FRParamEditorDockGrouping
+from .procwrapper import FRImgProcWrapper
 from .regions import FRVertexDefinedImg, FRMouseFollowingRegionPlot
 
 __all__ = ['FRMainImage', 'FRFocusedImage', 'FREditableImgBase']
@@ -167,7 +168,7 @@ class FREditableImgBase(pg.PlotWidget):
     """
     super().mouseReleaseEvent(ev)
     if (self.drawAction != FR_CONSTS.DRAW_ACT_PAN
-        and ev.button() == QtCore.Qt.LeftButton):
+        and ev.button() == QtCore.Qt.LeftButton and not self.regionCopier.active):
       self.shapeCollection.buildRoi(ev, self.imgItem)
 
   def clearCurDrawShape(self):
@@ -258,14 +259,15 @@ class FRMainImage(FREditableImgBase):
     pos = self.imgItem.mapFromScene(ev.pos())
     xx, yy, = pos.x(), pos.y()
     pos = FRVertices([[xx, yy]])
-    if self.drawAction == FR_CONSTS.DRAW_ACT_PAN:
+    if self.drawAction == FR_CONSTS.DRAW_ACT_PAN and not self.regionCopier.active:
       # Simulate a click-wide boundary selection so points can be selected in pan mode
       squareCorners = FRVertices([[xx, yy], [xx, yy]], dtype=float)
       self.sigSelectionBoundsMade.emit(squareCorners)
 
   def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent):
     super().mouseDoubleClickEvent(ev)
-    self.regionCopier.sigCopyStopped.emit()
+    if self.regionCopier.active:
+      self.regionCopier.sigCopyStopped.emit()
 
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_FG, [FR_CONSTS.DRAW_ACT_ADD])
   @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_PAN, [FR_CONSTS.DRAW_ACT_PAN])
@@ -296,7 +298,12 @@ class FRMainImage(FREditableImgBase):
     @FR_SINGLETON.actionStack.undoable('Override Last Process Result')
     def doOverride(comps=self.compFromLastProcResult, verts=self.lastProcVerts):
       if comps is None: return
-      newVerts = FRComplexVertices([verts])
+      # Trim verts to image boundaries if necessary
+      vMin = verts.min(0)
+      if np.any(vMin < 0) or np.any(verts.max(0) > self.image.shape[:2][::-1]):
+        newVerts = cornersToFullBoundary(verts, stackResult=False)
+      else:
+        newVerts = FRComplexVertices([verts])
 
       newComp = comps.iloc[[0],:].copy()
       compId = newComp.index[0]

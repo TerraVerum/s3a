@@ -1,7 +1,7 @@
 import re
 from collections import deque
 from pathlib import Path
-from typing import Any, Optional, List, Collection, Callable
+from typing import Any, Optional, List, Collection, Callable, Tuple, Union
 
 import numpy as np
 from pandas import DataFrame as df
@@ -190,3 +190,38 @@ def _safeCallFuncList(fnNames: Collection[str], funcLst: List[Callable],
       errs.append(f'{key}: {ex}')
       rets.append(None)
   return rets, errs
+
+def cornersToFullBoundary(cornerVerts: Union[FRVertices, FRComplexVertices], sizeLimit: float=np.inf,
+                          fillShape: Tuple[int]=None, stackResult=True) -> Union[FRVertices, FRComplexVertices]:
+  """
+  From a list of corner vertices, returns a list with one vertex for every border pixel.
+  Example:
+  >>> cornerVerts = FRVertices([[0,0], [100,0], [100,100],[0,100]])
+  >>> cornersToFullBoundary(cornerVerts)
+  # [[0,0], [1,0], ..., [100,0], [100,1], ..., [100,100], ..., ..., [0,100]]
+  :param cornerVerts: Corners of the represented polygon
+  :param sizeLimit: The largest number of pixels from the enclosed area allowed before the full boundary is no
+  longer returned. For instance:
+    >>> cornerVerts = FRVertices([[0,0], [1000,0], [1000,1000],[0,1000]])
+    >>> cornersToFullBoundary(cornerVerts, 10e5)
+    will *NOT* return all boundary vertices, since the enclosed area (10e6) is larger than sizeLimit.
+  :param fillShape: Size of mask to create. Useful if verts may extend beyond image dimensions
+    and should be truncated. If None, no truncation will occur except for negative verts.
+  :param stackResult: Whether the result should be FRComplexVertices (if stackResult is False)
+    or a stacked list of exterior verts (if stackResult is True)
+  :return: List with one vertex for every border pixel, unless *sizeLimit* is violated.
+  """
+  if isinstance(cornerVerts, FRVertices):
+    cornerVerts = FRComplexVertices([cornerVerts])
+  if fillShape is not None:
+    fillShape = tuple(fillShape)
+  filledMask = cornerVerts.toMask(fillShape, warnIfTooSmall=False)
+  cornerVerts = FRComplexVertices.fromBwMask(filledMask, simplifyVerts=False)
+  if not stackResult:
+    return cornerVerts
+  cornerVerts = cornerVerts.filledVerts().stack()
+  numCornerVerts = len(cornerVerts)
+  if numCornerVerts > sizeLimit:
+    spacingPerSamp = int(numCornerVerts/sizeLimit)
+    cornerVerts = cornerVerts[::spacingPerSamp]
+  return cornerVerts
