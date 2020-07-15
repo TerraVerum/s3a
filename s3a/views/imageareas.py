@@ -332,7 +332,7 @@ class FRFocusedImage(FREditableImgBase):
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
-    cls.compCropMargin, cls.treatMarginAsPct = FR_SINGLETON.generalProps.registerProps(
+    cls.compCropMargin, cls.treatMarginAsPct = cls.toolsEditor.registerProps(
       cls, [FR_CONSTS.PROP_CROP_MARGIN_VAL, FR_CONSTS.PROP_TREAT_MARGIN_AS_PCT])
 
   def __init__(self, parent=None, **kargs):
