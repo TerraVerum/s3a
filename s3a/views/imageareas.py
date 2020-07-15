@@ -51,7 +51,7 @@ class FREditableImgBase(pg.PlotWidget):
     )
     FR_SINGLETON.addDocks(dockGroup)
 
-    cls.compCropMargin, cls.treatMarginAsPct = cls.toolsEditor.registerProps(
+    cls.compCropMargin, cls.treatMarginAsPct = FR_SINGLETON.generalProps.registerProps(
       cls, [FR_CONSTS.PROP_CROP_MARGIN_VAL, FR_CONSTS.PROP_TREAT_MARGIN_AS_PCT])
 
   def __init__(self, parent=None, allowableShapes: Tuple[FRParam,...]=(),
@@ -193,7 +193,7 @@ class FRMainImage(FREditableImgBase):
       cls, [FR_CONSTS.TOOL_MERGE_COMPS, FR_CONSTS.TOOL_SPLIT_COMPS,
             FR_CONSTS.TOOL_OVERRIDE_VERTS_ACT, FR_CONSTS.TOOL_MOVE_REGIONS,
             FR_CONSTS.TOOL_COPY_REGIONS], asProperty=False)
-    (cls.multCompsOnCreate, cls.onlyGrowViewbox) = cls.toolsEditor.registerProps(
+    (cls.multCompsOnCreate, cls.onlyGrowViewbox) = FR_SINGLETON.generalProps.registerProps(
       cls, [FR_CONSTS.PROP_MK_MULT_COMPS_ON_ADD, FR_CONSTS.PROP_ONLY_GROW_MAIN_VB])
 
   def __init__(self, parent=None, imgSrc=None, **kargs):
