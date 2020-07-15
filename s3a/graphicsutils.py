@@ -9,7 +9,6 @@ from typing import Optional, Union, Callable, Generator
 
 import numpy as np
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-import pyqtgraph as pg
 from ruamel.yaml import YAML
 
 from s3a import appInst
@@ -238,6 +237,12 @@ def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
     dlg.exec()
   def patch_excepthook():
     sys.excepthook = new_except_hook
+  QtCore.QTimer.singleShot(0, patch_excepthook)
+  appInst.processEvents()
+
+def restoreExceptionBehavior():
+  def patch_excepthook():
+    sys.excepthook = old_sys_except_hook
   QtCore.QTimer.singleShot(0, patch_excepthook)
   appInst.processEvents()
 

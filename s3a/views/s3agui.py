@@ -6,17 +6,20 @@ from typing import Optional, Union, Tuple, Dict, Any, List
 import numpy as np
 import qdarkstyle
 from pandas import DataFrame as df
-from pyqtgraph import BusyCursor
+import pyqtgraph as pg
+from pyqtgraph.console import ConsoleWidget
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
 from s3a.views.parameditors import FRParamEditor, FRParamEditorDockGrouping, FR_SINGLETON
 from s3a.models.s3abase import S3ABase
-from s3a.projectvars import LAYOUTS_DIR, FR_CONSTS, FR_ENUMS, APP_STATE_DIR
+from s3a.projectvars import LAYOUTS_DIR, FR_CONSTS, FR_ENUMS, APP_STATE_DIR, \
+  REQD_TBL_FIELDS
 from s3a.projectvars.enums import _FREnums
 from s3a.structures import FRS3AWarning, FRVertices
 from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
   autosaveOptsDialog, attemptFileLoad, popupFilePicker, \
-  disableAppDuringFunc, saveToFile, dialogGetSaveFileName, addDirItemsToMenu
+  disableAppDuringFunc, saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
+  restoreExceptionBehavior
 from .imageareas import FRFocusedImage
 
 __all__ = ['S3A']
@@ -29,19 +32,15 @@ class S3A(S3ABase):
   def __initEditorParams__(cls):
     super().__initEditorParams__()
 
-  def __init__(self, parent=None, exceptionsAsDialogs=True, loadLastState=True,
+  def __init__(self, parent=None, guiMode=True, loadLastState=None,
                **quickLoaderArgs):
     # Wait to import quick loader profiles until after self initialization so
     # customized loading functions also get called
     superLoaderArgs = {'author': quickLoaderArgs.pop('author', None)}
     super().__init__(parent, **superLoaderArgs)
-    if exceptionsAsDialogs:
+    if guiMode:
       warnings.simplefilter('error', FRS3AWarning)
       makeExceptionsShowDialogs(self)
-      if loadLastState:
-        QtCore.QTimer.singleShot(0, self.requestLoadSavedSettings_gui)
-    elif loadLastState:
-      self.appStateEditor.loadParamState()
     def saveRecentLayout():
       outFile = self.appStateEditor.saveDir/'savedLayout'
       self.saveLayout(outFile)
@@ -66,11 +65,13 @@ class S3A(S3ABase):
     self._buildMenu()
     self._hookupSignals()
 
+    # Load layout options
+    self.saveLayout('Default', allowOverwriteDefault=True)
+
     if len(quickLoaderArgs) > 0:
       self.appStateEditor.loadParamState(stateDict=quickLoaderArgs)
 
-    # Load layout options
-    self.saveLayout('Default', allowOverwriteDefault=True)
+    QtCore.QTimer.singleShot(0, lambda: self._maybeLoadLastState(guiMode, loadLastState))
 
   def _hookupSignals(self):
     # Buttons
@@ -228,6 +229,26 @@ class S3A(S3ABase):
       self.createMenuOptForDock(self.paramTools, dock)
     self.createMenuOptForEditor(self.menuFile, FR_SINGLETON.quickLoader)
 
+  def _maybeLoadLastState(self, guiMode: bool, loadLastState: bool=None):
+    """
+    Helper function to determine whether the last application state should be loaded,
+    and loads the last state if desired.
+    :param guiMode: Whether this application is running in gui mode
+    :param loadLastState: If *None*, the user will be prompted via dialog for whether
+      to load the last application state. Otherwise, its boolean value is used.
+    """
+    if not self.appStateEditor.RECENT_STATE_FNAME.exists():
+      return
+    if loadLastState is None and guiMode:
+      loadLastState = QtWidgets.QMessageBox.question(
+        self, 'Load Previous State', 'Do you want to load all previous app'
+                                     ' settings (image, annotations, algorithms, etc.)?',
+        QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No) == QtWidgets.QMessageBox.Yes
+    if loadLastState and guiMode:
+      self.loadLastState_gui()
+    elif loadLastState:
+      self.loadLastState()
+
   def loadLayout(self, layoutName: Union[str, Path]):
     layoutName = Path(layoutName)
     if not layoutName.is_absolute():
@@ -317,16 +338,13 @@ class S3A(S3ABase):
   def clearBoundaries_gui(self):
     self.clearBoundaries()
 
-  def requestLoadSavedSettings_gui(self):
-    if not self.appStateEditor.RECENT_STATE_FNAME.exists():
-      return
-    success = QtWidgets.QMessageBox.question(
-      self, 'Load Previous State', 'Do you want to load all previous app'
-                                   ' settings (image, annotations, algorithms, etc.)?',
-      QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.No) == QtWidgets.QMessageBox.Ok
-    if success:
-      with BusyCursor():
-        self.appStateEditor.loadParamState()
+  def loadLastState_gui(self):
+    with pg.BusyCursor():
+      self.loadLastState()
+
+  def loadLastState(self):
+    with FR_SINGLETON.actionStack.group('Load Last Application State'):
+      self.appStateEditor.loadParamState()
 
   def closeEvent(self, ev: QtGui.QCloseEvent):
     # Confirm all components have been saved
@@ -344,6 +362,7 @@ class S3A(S3ABase):
       # Clean up all editor windows, which could potentially be left open
       ev.accept()
       FR_SINGLETON.close()
+      restoreExceptionBehavior()
       self.appStateEditor.saveParamState()
 
   def forceClose(self):
@@ -368,7 +387,7 @@ class S3A(S3ABase):
   def createMenuOptForEditor(self, parentMenu: QtWidgets.QMenu, editor: FRParamEditor,
                              loadFunc=None, overrideName=None):
     def defaultLoadFunc(objForMenu: FRParamEditor, nameToLoad: str) -> Optional[dict]:
-      with BusyCursor():
+      with pg.BusyCursor():
         return objForMenu.loadParamState(nameToLoad)
 
     if overrideName is None:

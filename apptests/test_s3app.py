@@ -177,13 +177,13 @@ def test_quickload_profile(tmpdir):
 
 def test_load_last_settings(tmpdir, sampleComps):
   tmpdir = Path(tmpdir)
-  newApp = S3A(exceptionsAsDialogs=False, loadLastState=False)
+  newApp = S3A(guiMode=False, loadLastState=False)
   newApp.appStateEditor.saveDir = tmpdir
   newApp.setMainImg(SAMPLE_IMG_FNAME, SAMPLE_IMG)
   newApp.add_focusComp(sampleComps)
   newApp.forceClose()
   del newApp
-  newApp = S3A(exceptionsAsDialogs=False, loadLastState=False)
+  newApp = S3A(guiMode=False, loadLastState=False)
   newApp.appStateEditor.saveDir = tmpdir
   newApp.appStateEditor.loadParamState()
   assert np.array_equal(newApp.mainImg.image, SAMPLE_IMG)
