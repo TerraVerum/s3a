@@ -102,6 +102,13 @@ class _FRConsts(FRParamGroup):
                                                              ' to the size of the focused component.'
                                                              ' Otherwise, the padding will be a'
                                                              ' fixed pixel amount.')
+  PROP_ONLY_GROW_MAIN_VB       : FRParam = newParam('Disallow shrink during selection', True,
+                                                    helpText='When selecting components, this'
+                                                             ' parameter determines whether'
+                                                             ' the viewbox shrinks only to'
+                                                             ' the current selection (if *False*)'
+                                                             ' or just ensures teh view contains'
+                                                             ' the selected componetn (if *True*)')
   PROP_FOCUSED_SEED_THRESH     : FRParam = newParam('Seedpoint Threshold in Focused Image', 7.)
   PROP_UNDO_BUF_SZ             : FRParam = newParam('Size of Undo Buffer', 300)
   PROP_STEPS_BW_SAVE           : FRParam = newParam('Operations Between Buffer Saves', 1)

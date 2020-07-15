@@ -51,6 +51,9 @@ class FREditableImgBase(pg.PlotWidget):
     )
     FR_SINGLETON.addDocks(dockGroup)
 
+    cls.compCropMargin, cls.treatMarginAsPct = cls.toolsEditor.registerProps(
+      cls, [FR_CONSTS.PROP_CROP_MARGIN_VAL, FR_CONSTS.PROP_TREAT_MARGIN_AS_PCT])
+
   def __init__(self, parent=None, allowableShapes: Tuple[FRParam,...]=(),
                allowableActions: Tuple[FRParam,...]=(), **kargs):
     super().__init__(parent, viewBox=FRRightPanViewBox(), **kargs)
@@ -185,12 +188,13 @@ class FRMainImage(FREditableImgBase):
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
-    cls.multCompsOnCreate = cls.toolsEditor.registerProp(cls, FR_CONSTS.PROP_MK_MULT_COMPS_ON_ADD)
     (cls.mergeCompsAct, cls.splitCompsAct, cls.overrideCompVertsAct,
      cls.moveCompsAct, cls.copyCompsAct) = cls.toolsEditor.registerProps(
       cls, [FR_CONSTS.TOOL_MERGE_COMPS, FR_CONSTS.TOOL_SPLIT_COMPS,
             FR_CONSTS.TOOL_OVERRIDE_VERTS_ACT, FR_CONSTS.TOOL_MOVE_REGIONS,
             FR_CONSTS.TOOL_COPY_REGIONS], asProperty=False)
+    (cls.multCompsOnCreate, cls.onlyGrowViewbox) = cls.toolsEditor.registerProps(
+      cls, [FR_CONSTS.PROP_MK_MULT_COMPS_ON_ADD, FR_CONSTS.PROP_ONLY_GROW_MAIN_VB])
 
   def __init__(self, parent=None, imgSrc=None, **kargs):
     allowedShapes = (FR_CONSTS.DRAW_SHAPE_RECT, FR_CONSTS.DRAW_SHAPE_POLY)
@@ -328,12 +332,6 @@ class FRMainImage(FREditableImgBase):
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_FOCUSED_IMG_AREA)
 class FRFocusedImage(FREditableImgBase):
-
-  @classmethod
-  def __initEditorParams__(cls):
-    super().__initEditorParams__()
-    cls.compCropMargin, cls.treatMarginAsPct = cls.toolsEditor.registerProps(
-      cls, [FR_CONSTS.PROP_CROP_MARGIN_VAL, FR_CONSTS.PROP_TREAT_MARGIN_AS_PCT])
 
   def __init__(self, parent=None, **kargs):
     allowableShapes = (

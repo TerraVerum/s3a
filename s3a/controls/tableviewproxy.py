@@ -3,6 +3,7 @@ from warnings import warn
 
 import numpy as np
 from pandas import DataFrame as df
+import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 
 from s3a import FR_SINGLETON
@@ -154,7 +155,46 @@ class FRCompDisplayFilter(QtCore.QObject):
   def _reflectTableSelectionChange(self, selectedIds: OneDArr):
     self.selectedIds = selectedIds
     self.regionPlot.selectById(selectedIds)
-    self.sigCompsSelected.emit(self._compMgr.compDf.loc[selectedIds, :])
+    selectedComps = self._compMgr.compDf.loc[selectedIds, :]
+    self.sigCompsSelected.emit(selectedComps)
+    self.scaleViewboxToSelectedIds()
+
+  def scaleViewboxToSelectedIds(self, selectedIds: OneDArr=None, onlyGrow=None,
+                                padding: int=None):
+    """
+    Rescales the main image viewbox to encompass the selection
+
+    :param selectedIds: Ids to scale to. If *None*, this is the current selection
+    :param onlyGrow: If *True*, the viewbox will never shrink to the selection.
+      If *None*, the value is determined from the parameter editor.
+    :param padding: Padding around the selection. If *None*, defaults to pad value
+      in param editor.
+    """
+    if padding is None:
+      padding = self._mainImgArea.compCropMargin
+      if self._mainImgArea.treatMarginAsPct:
+        padding = int(max(self._mainImgArea.image.shape[:2])*padding/100)
+    if selectedIds is None:
+      selectedIds = self.selectedIds
+    if len(selectedIds) == 0: return
+    # Calculate how big the viewbox needs to be
+    selectedVerts = self._compMgr.compDf.loc[selectedIds, REQD_TBL_FIELDS.VERTICES]
+    allVerts = np.vstack([v.stack() for v in selectedVerts])
+    mins = allVerts.min(0) - padding//2
+    maxs = allVerts.max(0) + padding//2
+    vb: pg.ViewBox = self._mainImgArea.getViewBox()
+    curXRange = vb.state['viewRange'][0]
+    curYRange = vb.state['viewRange'][1]
+    if onlyGrow is None:
+      onlyGrow = self._mainImgArea.onlyGrowViewbox
+    if onlyGrow:
+      mins[0] = np.min(curXRange + [mins[0]])
+      maxs[0] = np.max(curXRange + [maxs[0]])
+      mins[1] = np.min(curYRange + [mins[1]])
+      maxs[1] = np.max(curYRange + [maxs[1]])
+    viewRect = QtCore.QRectF(*mins, *(maxs - mins))
+    vb.setRange(viewRect, padding=0)
+
 
   def selectRowsById(self, ids: OneDArr,
                      selectionMode=QtCore.QItemSelectionModel.Rows):
