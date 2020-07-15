@@ -130,6 +130,5 @@ class FRParamEditor(FRParamEditorBase):
     return outDict
 
   def saveParamState_gui(self):
-    paramState = self.params.saveState(filter='user')
     saveName = dialogGetSaveFileName(self, 'Save As', self.lastAppliedName)
-    self.saveParamState(saveName, paramState)
+    self.saveParamState(saveName)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from inspect import isclass
+from pathlib import Path
 from typing import Optional, Dict, List, Callable, Union
 
 from imageprocessing.processing import ImageProcess
@@ -98,17 +99,12 @@ class FRAlgCollectionEditor(FRParamEditor):
     if paramState is None:
       paramDict = self.paramDictWithOpts(addList=['enabled'], addTo=[FRProcGroupParameter],
                                          removeList=['value'])
-      def addEnabledOpt(dictRoot, paramRoot: Parameter, prevRoot=None):
-        for pChild in paramRoot:
-          dChild = dictRoot['children'][pChild.name()]
-          addEnabledOpt(dChild, pChild)
-        if isinstance(paramRoot, FRProcGroupParameter):
-          dictRoot['enabled'] = paramRoot.opts['enabled']
       paramState = {'Selected Algorithm': self.algOpts.value().algName,
                     'Parameters': paramDict}
     return super().saveParamState(saveName, paramState, allowOverwriteDefault, blockWrite)
 
-  def loadParamState(self, stateName: str, stateDict: dict=None, addChildren=False, removeChildren=False):
+  def loadParamState(self, stateName: Union[str, Path], stateDict: dict=None,
+                     addChildren=False, removeChildren=False, applyChanges=True):
     stateDict = self._parseStateDict(stateName, stateDict)
     selectedOpt = stateDict.get('Selected Algorithm', None)
     # Get the impl associated with this option name
