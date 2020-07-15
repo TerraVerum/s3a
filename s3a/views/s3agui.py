@@ -106,6 +106,9 @@ class S3A(S3ABase):
     # ANALYTICS
     self.newCompAnalyticsAct.triggered.connect(self.showNewCompAnalytics)
     self.modCompAnalyticsAct.triggered.connect(self.showModCompAnalytics)
+    
+    # TOOLS
+    self.devConsoleAct.triggered.connect(self.showDevConsole)
 
     self.saveAllEditorDefaults()
 
@@ -179,6 +182,7 @@ class S3A(S3ABase):
     self.menuFile = QtWidgets.QMenu('&File', self.menubar)
     self.menuEdit = QtWidgets.QMenu('&Edit', self.menubar)
     self.menuAnalytics = QtWidgets.QMenu('&Analytics', self.menubar)
+    menuTools = QtWidgets.QMenu('&Tools', self.menubar)
 
     toolbar = self.addToolBar('Parameter Editors')
     toolbar.setObjectName('Parameter Edtor Toolbar')
@@ -188,6 +192,7 @@ class S3A(S3ABase):
     self.menubar.addMenu(self.menuFile)
     self.menubar.addMenu(self.menuEdit)
     self.menubar.addMenu(self.menuAnalytics)
+    self.menubar.addMenu(menuTools)
 
     # File / Image
     self.openImgAct = create_addMenuAct(self, self.menuFile, '&Open Image')
@@ -223,6 +228,10 @@ class S3A(S3ABase):
     self.modCompAnalyticsAct = create_addMenuAct(self, self.menuAnalytics, 'Modified Component')
 
     self.setMenuBar(self.menubar)
+
+    # Tools
+    self.devConsoleAct = create_addMenuAct(self, menuTools, 'Show Developer Console')
+    
 
     # SETTINGS
     for dock in FR_SINGLETON.docks:
@@ -266,11 +275,22 @@ class S3A(S3ABase):
                allowOverwriteDefault=allowOverwriteDefault)
     self.sigLayoutSaved.emit()
 
+  def showDevConsole(self):
+    namespace = dict(app=self, requiredFields=REQD_TBL_FIELDS, singleton=FR_SINGLETON)
+    # "dict" default is to use repr instead of string for internal elements, so expanding
+    # into string here ensures repr is not used
+    nsPrintout = [f"{k}: {v}" for k, v in namespace.items()]
+    text = f'Starting console with variables:\n' \
+           f'{nsPrintout}'
+    console = ConsoleWidget(self, namespace=namespace, text=text)
+    console.setWindowFlags(QtCore.Qt.Window)
+    console.show()
+
   def resetMainImg_gui(self):
     fileFilter = "Image Files (*.png; *.tif; *.jpg; *.jpeg; *.bmp; *.jfif);; All files(*.*)"
     fname = popupFilePicker(self, 'Select Main Image', fileFilter)
     if fname is not None:
-      with BusyCursor():
+      with pg.BusyCursor():
         self.setMainImg(fname)
 
   def startAutosave_gui(self):
@@ -345,6 +365,7 @@ class S3A(S3ABase):
   def loadLastState(self):
     with FR_SINGLETON.actionStack.group('Load Last Application State'):
       self.appStateEditor.loadParamState()
+
 
   def closeEvent(self, ev: QtGui.QCloseEvent):
     # Confirm all components have been saved
