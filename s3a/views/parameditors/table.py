@@ -144,6 +144,19 @@ class FRTableData:
     self.allFields.extend(list(REQD_TBL_FIELDS))
     self.compClasses.append(COMP_CLASS_NA)
 
+  def classFromName(self, name: str):
+    """
+    Helper function to retrieve the FRParam corresponding to the class with this name
+    """
+    return FRParamGroup.fromString(self.compClasses, name)
+
+  def fieldFromName(self, name: str):
+    """
+    Helper function to retrieve the FRParam corresponding to the field with this name
+    """
+    return FRParamGroup.fromString(self.allFields, name)
+
+
 
 NestedIndexer = Union[str, Tuple[str,...]]
 class FRYamlParser:
