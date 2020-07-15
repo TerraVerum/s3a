@@ -95,7 +95,9 @@ class FRShortcutParameter(Parameter):
 class FRActionWithShortcutParameterItem(ActionParameterItem):
   def __init__(self, param: Parameter, depth):
     super().__init__(param, depth)
-    shortcutSeq = param.opts.get('shortcutSeq', '')
+    if param.opts['value'] is None:
+      param.opts['value'] = ''
+    shortcutSeq = param.opts['value']
 
     # shcLabel = QtWidgets.QLabel('Shortcut: ', self.layoutWidget)
     # self.layout.addWidget(shcLabel)
@@ -112,8 +114,10 @@ class FRActionWithShortcutParameterItem(ActionParameterItem):
       button.setToolTip(tip)
     def updateShortcut(newSeq: QtGui.QKeySequence):
       self.shortcut.setKey(newSeq)
-      param.opts['shortcutSeq'] = newSeq.toString()
+      param.opts['value'] = newSeq.toString()
     self.keySeqEdit.keySequenceChanged.connect(updateShortcut)
+
+    self.param.sigValueChanged.connect(lambda _, value: self.keySeqEdit.setKeySequence(value))
 
     # Make sure that when a parameter is removed, the shortcut is also deactivated
     param.sigRemoved.connect(lambda: self.shortcut.setParent(None))

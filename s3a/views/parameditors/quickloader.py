@@ -156,7 +156,7 @@ class FRQuickLoaderEditor(FRParamEditor):
 
   def saveParamState(self, saveName: str=None, paramState: dict=None,
                      allowOverwriteDefault=False, blockWrite=False):
-    stateDict = self.paramDictWithOpts(['type', 'shortcutSeq'], [ActWithShc, GroupParameter])
+    stateDict = self.paramDictWithOpts(['type'], [ActWithShc, GroupParameter])
     super().saveParamState(saveName, stateDict, allowOverwriteDefault, blockWrite)
 
 
