@@ -50,7 +50,6 @@ class S3A(S3ABase):
     self.CUR_COMP_LBL = 'Current Component ID:'
     self.setWindowTitle(self.APP_TITLE)
 
-    self.focusedImg = FRFocusedImage()
     self.curCompIdLbl = QtWidgets.QLabel(self.CUR_COMP_LBL)
     self.clearRegionBtn = QtWidgets.QPushButton('Clear')
     self.resetRegionBtn = QtWidgets.QPushButton('Reset')
@@ -363,8 +362,7 @@ class S3A(S3ABase):
       self.loadLastState()
 
   def loadLastState(self):
-    with FR_SINGLETON.actionStack.group('Load Last Application State'):
-      self.appStateEditor.loadParamState()
+    self.appStateEditor.loadParamState()
 
 
   def closeEvent(self, ev: QtGui.QCloseEvent):

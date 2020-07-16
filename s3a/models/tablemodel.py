@@ -74,7 +74,9 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
 
   @FR_SINGLETON.actionStack.undoable('Alter Component Data')
   def setData(self, index, value, role=QtCore.Qt.EditRole) -> bool:
-    oldVal = self.compDf.iloc[index.row(), index.column()]
+    row = index.row()
+    col = index.column()
+    oldVal = self.compDf.iat[row, col]
     # Try-catch for case of numpy arrays
     noChange = oldVal == value
     try:
@@ -83,7 +85,12 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
     except ValueError:
       # Happens with array comparison
       pass
-    self.compDf.iat[index.row(), index.column()] = value
+    self.compDf.iat[row, col] = value
+    # !!! Serious issue! Using iat sometimes doesn't work and I have no idea why since it is
+    # not easy to replicate. See https://github.com/pandas-dev/pandas/issues/22740
+    # Also, pandas iloc unnecessarily coerces to 2D ndarray when setting, so iloc will fail
+    # when assigning an array to a single location. Not sure how to prevent this...
+    # For now, checking this on export
     toEmit = self.defaultEmitDict.copy()
     toEmit['changed'] = np.array([self.compDf.index[index.row()]])
     self.sigCompsChanged.emit(toEmit)
