@@ -238,9 +238,12 @@ class FRComplexVertices(list):
            f'Max:\t{concatVerts.max(0)}'
 
   def __eq__(self, other: FRComplexVertices):
-    # lstLens = lambda lst: np.array([len(el) for el in lst])
-    cmps = [np.asarray(arr, dtype=object) for arr in (self, other)]
-    return np.array_equal(*cmps)
+    if len(self) != len(other):
+      return False
+    for selfVerts, otherVerts in zip(self, other):
+      if not np.array_equal(selfVerts, otherVerts):
+        return False
+    return True
 
   def __ne__(self, other):
     return not self == other
