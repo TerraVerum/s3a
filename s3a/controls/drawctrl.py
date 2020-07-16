@@ -8,10 +8,10 @@ from s3a.projectvars import FR_CONSTS
 from s3a.structures import FRParam, FRVertices
 from s3a.views.rois import FRExtendedROI, SHAPE_ROI_MAPPING
 
-__all__ = ['FRShapeCollection']
+__all__ = ['FRRoiCollection']
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_ROI_CLCTN)
-class FRShapeCollection(QtCore.QObject):
+class FRRoiCollection(QtCore.QObject):
   # Signal(FRExtendedROI)
   sigShapeFinished = QtCore.Signal(object)
 

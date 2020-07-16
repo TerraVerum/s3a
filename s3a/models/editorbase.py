@@ -93,10 +93,11 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     name
     """
 
-    self.classInstToEditorMapping: Dict[Any, FRParamEditorBase] = {}
+    self.registeredFrParams: List[FRParam] = []
     """
-    For editors that register parameters for *other* editors,
-     this allows parameters to be updated from the correct editor
+    Keeps track of all parameters registerd as properties in this editor. Useful for
+    inspecting which parameters are in an editor without traversing the parameter tree
+    and reconstructing the name, tooltip, etc.
     """
 
     self.instantiatedClassTypes = set()
@@ -375,7 +376,7 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
       paramForCls.addChild(paramForEditor)
 
     self._expandCols()
-
+    self.registeredFrParams.append(constParam)
     if not asProperty:
       return paramForEditor
 

@@ -8,8 +8,8 @@ from s3a.views.rois import SHAPE_ROI_MAPPING
 from s3a.projectvars import FR_CONSTS
 
 shapes = tuple(SHAPE_ROI_MAPPING.keys())
-editableImg = FREditableImgBase(allowableShapes=shapes,
-                                allowableActions=(FR_CONSTS.DRAW_ACT_SELECT,))
+editableImg = FREditableImgBase(drawShapes=shapes,
+                                drawActions=(FR_CONSTS.DRAW_ACT_SELECT,))
 clctn = editableImg.shapeCollection
 
 def leftClick(pt: Tuple[int, int]):

@@ -1,4 +1,4 @@
-from typing import Union, Optional, Tuple
+from typing import Union, Optional, Tuple, Collection, Dict
 
 import cv2 as cv
 import numpy as np
@@ -14,19 +14,19 @@ from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS, MENU_OPTS_DIR
 from s3a.structures import FRParam, FRVertices, FRComplexVertices, FilePath
 from s3a.structures import NChanImg
 from .clickables import FRRightPanViewBox
-from .drawopts import FRDrawOpts
+from .drawopts import FRDrawOpts, FRButtonCollection, btnCallable
 from .parameditors import FRParamEditor, FRParamEditorDockGrouping
 from .procwrapper import FRImgProcWrapper
 from .regions import FRVertexDefinedImg, FRMouseFollowingRegionPlot
 
 __all__ = ['FRMainImage', 'FRFocusedImage', 'FREditableImgBase']
 
-from s3a.controls.drawctrl import FRShapeCollection
+from s3a.controls.drawctrl import FRRoiCollection
 
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
 
-
+# @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_IMG_AREA)
 class FREditableImgBase(pg.PlotWidget):
   sigMousePosChanged = QtCore.Signal(object, object)
   """
@@ -54,8 +54,10 @@ class FREditableImgBase(pg.PlotWidget):
     cls.compCropMargin, cls.treatMarginAsPct = FR_SINGLETON.generalProps.registerProps(
       cls, [FR_CONSTS.PROP_CROP_MARGIN_VAL, FR_CONSTS.PROP_TREAT_MARGIN_AS_PCT])
 
-  def __init__(self, parent=None, allowableShapes: Tuple[FRParam,...]=(),
-               allowableActions: Tuple[FRParam,...]=(), **kargs):
+  def __init__(self, parent=None, drawShapes: Collection[FRParam]=(),
+               drawActions: Collection[FRParam]=(),
+               toolParams: Collection[FRParam]=(), toolFns: Collection[btnCallable]=(),
+               **kargs):
     super().__init__(parent, viewBox=FRRightPanViewBox(), **kargs)
     self.setAspectLocked(True)
     self.getViewBox().invertY()
@@ -73,18 +75,45 @@ class FREditableImgBase(pg.PlotWidget):
     self.regionCopier = FRMouseFollowingRegionPlot(self)
 
     self.drawAction: FRParam = FR_CONSTS.DRAW_ACT_PAN
-    self.shapeCollection = FRShapeCollection(allowableShapes, self)
+    self.shapeCollection = FRRoiCollection(drawShapes, self)
     self.shapeCollection.sigShapeFinished.connect(self.handleShapeFinished)
 
     # Make sure panning is allowed before creating draw widget
-    if FR_CONSTS.DRAW_ACT_PAN not in allowableActions:
-      allowableActions += (FR_CONSTS.DRAW_ACT_PAN,)
-    self.drawOptsWidget = FRDrawOpts(parent, allowableShapes, allowableActions)
-    btnGroups = [self.drawOptsWidget.shapeBtnGroup, self.drawOptsWidget.actionBtnGroup]
-    for group in btnGroups:
-      group.buttonToggled.connect(self._handleBtnToggle)
-    self.drawOptsWidget.selectOpt(self.drawAction)
-    self.drawOptsWidget.selectOpt(self.shapeCollection.curShapeParam)
+    if FR_CONSTS.DRAW_ACT_PAN not in drawActions:
+      drawActions += (FR_CONSTS.DRAW_ACT_PAN,)
+
+    def shapeAssignment(newShapeParam: FRParam):
+      self.shapeCollection.curShapeParam = newShapeParam
+    self.drawShapeGrp = FRButtonCollection(self, "Shapes", drawShapes, shapeAssignment)
+    
+    def actionAssignment(newActionParam: FRParam):
+      self.drawAction = newActionParam
+      if self.regionCopier.active:
+        self.regionCopier.erase()
+    self.drawActGrp = FRButtonCollection(self, "Actions", drawActions, actionAssignment)
+
+    self.drawOptsWidget = FRDrawOpts(self.drawShapeGrp, self.drawActGrp, self)
+
+    # self.toolsGrp = FRButtonCollection(self, btnParams=toolParams, btnTriggerFns=toolFns,
+    #                                    exclusive=False, checkable=False)
+
+    # self.drawOptsWidget = FRDrawOpts(parent, drawShapes, drawActions)
+    # btnGroups = [self.drawOptsWidget.shapeBtnGroup, self.drawOptsWidget.actionBtnGroup]
+    # for group in btnGroups:
+    #   group.buttonToggled.connect(self._handleBtnToggle)
+    # self.drawOptsWidget.selectOpt(self.drawAction)
+    # self.drawOptsWidget.selectOpt(self.shapeCollection.curShapeParam)
+
+    # Initialize draw shape/action buttons
+    self.drawActGrp.callFuncByParam(self.drawAction)
+    self.drawShapeGrp.callFuncByParam(self.shapeCollection.curShapeParam)
+
+  def switchBtnMode(self, newMode: FRParam):
+    # EAFP
+    try:
+      self.drawActGrp.callFuncByParam(newMode)
+    except KeyError:
+      self.drawShapeGrp.callFuncByParam(newMode)
 
   @property
   def image(self) -> Optional[NChanImg]:
@@ -101,33 +130,6 @@ class FREditableImgBase(pg.PlotWidget):
     """
     Overloaded in child classes to process new regions
     """
-
-  def switchBtnMode(self, newMode: FRParam):
-    for curDict in [self.drawOptsWidget.actionBtnParamMap.inv,
-                    self.drawOptsWidget.shapeBtnParamMap.inv]:
-      if newMode in curDict:
-        curDict[newMode].setChecked(True)
-        return
-    # If this is reached, a param was passed in that doesn't correspond to a valid button
-    # TODO: return soemthing else?
-
-  def _handleBtnToggle(self, btn: QtWidgets.QPushButton, isChecked: bool):
-    """
-    This function will be called for each button check and corresponding UNCHECK
-    of the previously selected button. So, only listen for the changes of the
-    checked button, since this is the new action/shape
-    :param btn: the toggled QPushButton
-    :param isChecked: Whether the button was checked or unchecked
-    :return: None
-    """
-    if not isChecked: return
-    if btn in self.drawOptsWidget.actionBtnParamMap:
-      self.drawAction = self.drawOptsWidget.actionBtnParamMap[btn]
-      if self.regionCopier.active:
-        self.regionCopier.erase()
-    else:
-      # Shape toggle
-      self.shapeCollection.curShapeParam = self.drawOptsWidget.shapeBtnParamMap[btn]
 
   def mousePressEvent(self, ev: QtGui.QMouseEvent):
     super().mousePressEvent(ev)
@@ -199,8 +201,8 @@ class FRMainImage(FREditableImgBase):
   def __init__(self, parent=None, imgSrc=None, **kargs):
     allowedShapes = (FR_CONSTS.DRAW_SHAPE_RECT, FR_CONSTS.DRAW_SHAPE_POLY)
     allowedActions = (FR_CONSTS.DRAW_ACT_SELECT,FR_CONSTS.DRAW_ACT_ADD)
-    super().__init__(parent, allowableShapes=allowedShapes,
-                     allowableActions=allowedActions, **kargs)
+    super().__init__(parent, drawShapes=allowedShapes,
+                     drawActions=allowedActions, **kargs)
     # -----
     # Image Item
     # -----

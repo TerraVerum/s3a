@@ -5,7 +5,7 @@ from pyqtgraph.Qt import QtGui, QtCore
 from conftest import NUM_COMPS, app, mgr, dfTester
 from s3a import FR_SINGLETON
 from s3a.views.imageareas import FRFocusedImage
-from s3a.controls.drawctrl import FRShapeCollection
+from s3a.controls.drawctrl import FRRoiCollection
 from s3a.views.rois import FRRectROI
 from s3a.projectvars import FR_CONSTS
 from s3a.structures import FRVertices, FRComplexVertices, FRParam
@@ -37,8 +37,8 @@ def leftClickGen(pos: FRVertices, dbclick=False):
 
 @pytest.fixture
 def roiFactory():
-  clctn = FRShapeCollection((FR_CONSTS.DRAW_SHAPE_POLY, FR_CONSTS.DRAW_SHAPE_RECT),
-                            app.focusedImg)
+  clctn = FRRoiCollection((FR_CONSTS.DRAW_SHAPE_POLY, FR_CONSTS.DRAW_SHAPE_RECT),
+                          app.focusedImg)
   def _polyRoi(pts: FRVertices, shape: FRParam=FR_CONSTS.DRAW_SHAPE_RECT):
     clctn.curShapeParam = shape
     for pt in pts:
