@@ -249,7 +249,7 @@ class S3ABase(QtWidgets.QMainWindow):
       dfCmp = loadedDf[matchingCols].values == self.compIo.compDf[matchingCols].values
       if not np.all(dfCmp):
         problemCells = np.nonzero(~dfCmp)
-        problemIdxs = self.compMgr.compDf.index[problemCells[0]]
+        problemIdxs = self.compIo.compDf.index[problemCells[0]]
         problemCols = matchingCols[problemCells[1]]
         problemMsg = [f'{idx}: {col}' for idx, col in zip(problemIdxs, problemCols)]
         problemMsg = '\n'.join(problemMsg)
