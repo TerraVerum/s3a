@@ -237,11 +237,27 @@ class S3ABase(QtWidgets.QMainWindow):
       # Old comps were cleared, so put them back
       self.compMgr.addComps(oldComps)
 
-  def exportCompList(self, outFname: Union[str, Path], readOnly=True):
+  def exportCompList(self, outFname: Union[str, Path], readOnly=True, verifyIntegrity=True):
     self.compIo.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds,
                           self.srcImgFname)
     self.compIo.exportByFileType(outFname, imShape=self.mainImg.image.shape,
                                  readOnly=readOnly)
+    if verifyIntegrity:
+      matchingCols = np.setdiff1d(self.compMgr.compDf.columns, [REQD_TBL_FIELDS.INST_ID,
+                                                            REQD_TBL_FIELDS.SRC_IMG_FILENAME])
+      loadedDf = self.compIo.buildByFileType(outFname, self.mainImg.image.shape)
+      dfCmp = loadedDf[matchingCols].values == self.compIo.compDf[matchingCols].values
+      if not np.all(dfCmp):
+        problemCells = np.nonzero(~dfCmp)
+        problemIdxs = self.compMgr.compDf.index[problemCells[0]]
+        problemCols = matchingCols[problemCells[1]]
+        problemMsg = [f'{idx}: {col}' for idx, col in zip(problemIdxs, problemCols)]
+        problemMsg = '\n'.join(problemMsg)
+        warn('<b>Warning!</b> Saved components do not match current component'
+                           ' state. This can occur when pandas incorrectly caches some'
+                           ' table values. To rectify this, perform a multi-cell overwrite'
+                           ' for the following cells (shown as <id>: <column>):\n'
+                           + problemMsg, FRS3AWarning)
     self.hasUnsavedChanges = False
 
   def exportLabeledImg(self, outFname: str=None):
