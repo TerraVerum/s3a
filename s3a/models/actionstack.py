@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import contextlib
 import copy
+from _warnings import warn
 from collections import deque
 from functools import wraps
 from typing import Callable, Generator, Deque, Union, Type, Any, List
 
 from typing_extensions import Protocol
 
-from s3a.structures import FRActionStackError
+from s3a.structures import FRActionStackError, FRS3AWarning
 
 __all__ = ['FRActionStack', 'FRAction']
 
@@ -280,7 +281,8 @@ class FRActionStack:
     last undo call.
     """
     if not self.canRedo:
-      raise FRActionStackError('Nothing to redo')
+      warn('Nothing to redo', FRS3AWarning)
+      return
 
     self.actions.rotate(-1)
     with self.ignoreActions():
@@ -293,7 +295,8 @@ class FRActionStack:
     Undo the last action.
     """
     if not self.canUndo:
-      raise FRActionStackError('Nothing to undo')
+      warn('Nothing to undo', FRS3AWarning)
+      return
 
     with self.ignoreActions():
       ret = self.actions[-1].backward()
