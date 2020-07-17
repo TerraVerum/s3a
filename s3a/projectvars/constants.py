@@ -118,37 +118,50 @@ class _FRConsts(FRParamGroup):
   # --------------------------
   # WINDOW TOOLS
   # --------------------------
-  TOOL_MERGE_COMPS            : FRParam = newParam('Merge Selected Components',
-                                                   valType='actionwithshortcut',
+  TOOL_MERGE_COMPS        : FRParam = newParam('Merge Selected',
+                                                   valType='action',
                                                    helpText='Merges the selected components'
                                                    ' into one, keeping all properties of'
                                                    ' the first in the selection')
-  TOOL_SPLIT_COMPS            : FRParam = newParam('Split Selected Components',
-                                                   valType='actionwithshortcut',
+  TOOL_SPLIT_COMPS        : FRParam = newParam('Split Selected', val='1,2,3',
+                                                   valType='action',
                                                    helpText='Makes a separate component for '
                                                             'each distinct boundary of all '
                                                             'selected components.')
-  TOOL_OVERRIDE_VERTS_ACT     : FRParam = newParam('Override Created Boundary',
-                                              valType='actionwithshortcut',
-                                              helpText='Overrides the created bounary'
+  TOOL_OVERRIDE_VERTS_ACT : FRParam = newParam('Override Created Boundary',
+                                              valType='action',
+                                              helpText='Overrides the most recently created bounary'
                                                        ' to be the shape of the ROI, not'
                                                        ' the result of the image processor')
-  TOOL_COPY_REGIONS           : FRParam = newParam('Copy Selected Boundaries', valType='actionwithshortcut',
+  TOOL_COPY_REGIONS       : FRParam = newParam('Copy Selected', valType='action',
                                                    helpText='Copies the selected components.'
                                                             ' They can be pasted by <b>double-clicking</b>'
                                                             ' on the destination location. When done copying,'
                                                             ' press the shortcut for *Clear Draw Shape in Main Image*'
                                                             ' or change the current draw action.')
-  TOOL_MOVE_REGIONS           : FRParam = newParam('Move Selected Boundaries', valType='actionwithshortcut',
+  TOOL_MOVE_REGIONS       : FRParam = newParam('Move Selected', valType='action',
                                                    helpText='Moves the selected components.'
                                                             ' They can be pasted by <b>double-clicking</b>'
                                                             ' on the destination location.')
+  TOOL_CLEAR_FOC_REGION   : FRParam = newParam('Clear', None, 'action',
+                                                 helpText='Clear the focused image'
+                                                          ' by completely clearing the'
+                                                          ' region mask')
+  TOOL_RESET_FOC_REGION   : FRParam = newParam('Reset', None, 'action',
+                                                 helpText='Reset the focused image by restoring'
+                                                          ' the region mask to the last saved state')
+  TOOL_FILL_FOC_REGION    : FRParam = newParam('Fill', None, 'action',
+                                                 helpText='Completely fill the focused region mask')
+  TOOL_ACCEPT_FOC_REGION  : FRParam = newParam('Accept', None, 'action',
+                                                 helpText='Applies the focused image vertices to the'
+                                                          ' corresponding component in the table',
+                                                 shortcut='1')
 
   # --------------------------
   # SHORTCUT PARAMETERS
   # --------------------------
-  SHC_CLEAR_BOUNDARIES      : FRParam = newParam('Clear Boundaries', 'Ctrl+Alt+Shift+C', 'shortcut')
   SHC_ESTIMATE_BOUNDARIES   : FRParam = newParam('Estimate Boundaries', 'Ctrl+Alt+Shift+E', 'shortcut')
+  SHC_CLEAR_BOUNDARIES      : FRParam = newParam('Clear Boundaries', 'Ctrl+Alt+Shift+C', 'shortcut')
   SHC_EXPORT_COMP_LIST      : FRParam = newParam('Export Component List', 'Ctrl+S', 'shortcut')
   SHC_CLEAR_SHAPE_MAIN      : FRParam = newParam('Clear Draw Shape in Main Image', 'Esc', 'shortcut')
   SHC_CLEAR_SHAPE_FOC       : FRParam = newParam('Clear Draw Shape in Focused Image', 'Esc', 'shortcut')
@@ -156,22 +169,6 @@ class _FRConsts(FRParamGroup):
   SHC_TBL_SET_SAME_AS_FIRST : FRParam = newParam('Set Table Rows Same As First', 'Ctrl+D', 'shortcut')
   SHC_TBL_SET_AS            : FRParam = newParam('Set Table Rows As...', 'Ctrl+Shift+D', 'shortcut')
   SHC_TBL_DEL_ROWS          : FRParam = newParam('Delete Table Rows', 'Del', 'shortcut')
-  SHC_UNDO_MOD_REGION       : FRParam = newParam('Undo Modify Region', 'Ctrl+Z', 'shortcut')
-  SHC_REDO_MOD_REGION       : FRParam = newParam('Redo Modify Region', 'Ctrl+Y', 'shortcut')
-  SHC_ACCEPT_REGION         : FRParam = newParam('Accept and Save Focused Image Edits', '1', 'shortcut')
-  SHC_DRAW_FG               : FRParam = newParam('Add to Foreground', 'Alt+D,F', 'shortcut')
-  SHC_DRAW_BG               : FRParam = newParam('Add to Background', 'Alt+D,B', 'shortcut')
-  SHC_DRAW_SELECT           : FRParam = newParam('Enter "Select" Mode', 'Alt+D,S', 'shortcut')
-  SHC_DRAW_PAN              : FRParam = newParam('Enter "Pan" Mode', 'Alt+D,N', 'shortcut')
-  SHC_DRAW_RECT             : FRParam = newParam('Enter Rect Draw Shape', 'Alt+D,R', 'shortcut')
-  SHC_DRAW_POLY             : FRParam = newParam('Enter Polygon Draw Shape', 'Alt+D,Y', 'shortcut')
-  SHC_DRAW_PAINT            : FRParam = newParam('Enter Paint Draw Shape', 'Alt+D,T', 'shortcut')
-
-  # --------------------------
-  # KEYBOARD MODIFIERS DURING CLICK
-  # --------------------------
-  MOD_MODE_SELECT  : FRParam = newParam('Enter Component Creation Mode', 'Ctrl', 'shortcut')
-  MOD_MODE_EDIT    : FRParam = newParam('Enter Component Selection Mode', 'Shift', 'shortcut')
 
   # --------------------------
   # COMPONENT EXPORT PARAMETERS
@@ -190,16 +187,20 @@ class _FRConsts(FRParamGroup):
   # DRAWING
   # -------------------
   # Shapes
-  DRAW_SHAPE_RECT : FRParam = newParam('Rectangle', str(ICON_DIR/'rectangle.svg'), 'icon')
-  DRAW_SHAPE_POLY : FRParam = newParam('Polygon', str(ICON_DIR/'polygon.svg'), 'icon')
-  DRAW_SHAPE_FREE : FRParam = newParam('Freehand')
-  DRAW_SHAPE_PAINT: FRParam = newParam('Paint', str(ICON_DIR/'paint.svg'), 'icon')
+  DRAW_SHAPE_RECT : FRParam = newParam('Activate "Rectangular" draw shape',
+                                       'Alt+D,R', icon=str(ICON_DIR/'rectangle.svg'))
+  DRAW_SHAPE_POLY : FRParam = newParam('Activate "Polygon" draw shape', 'Alt+D,Y',
+                                       icon=str(ICON_DIR/'polygon.svg'))
+  DRAW_SHAPE_FREE : FRParam = newParam('Activate "Freehand" draw shape')
+  DRAW_SHAPE_PAINT: FRParam = newParam('Activate "Paint" draw shape', 'Alt+D,T',
+                                       icon=str(ICON_DIR/'paint.svg'))
   DRAW_SHAPE_NONE : FRParam = newParam('None')
   # Actions
-  DRAW_ACT_ADD    : FRParam = newParam('Add to Foreground', str(ICON_DIR/'foreground.png'), 'icon')
-  DRAW_ACT_REM    : FRParam = newParam('Add to Background', str(ICON_DIR/'background.png'), 'icon')
-  DRAW_ACT_SELECT : FRParam = newParam('Select', str(ICON_DIR/'select.svg'), 'icon')
-  DRAW_ACT_PAN    : FRParam = newParam('Pan', str(ICON_DIR/'pan.svg'), 'icon')
+  DRAW_ACT_ADD    : FRParam = newParam('Activate "Add to Foreground"action', 'Alt+D,F', icon=str(ICON_DIR/'foreground.png'))
+  DRAW_ACT_REM    : FRParam = newParam('Activate "Add to Background"action', 'Alt+D, B', icon=str(ICON_DIR/'background.png'))
+  DRAW_ACT_SELECT : FRParam = newParam('Activate "Select" draw action', 'Alt+D, S', icon=str(ICON_DIR/'select.svg'))
+  DRAW_ACT_PAN    : FRParam = newParam('Activate "Pan" draw action', 'Alt+D,P', valType='action',
+                                       icon=str(ICON_DIR/'pan.svg'))
 FR_CONSTS = _FRConsts()
 
 # from ruamel.yaml import YAML

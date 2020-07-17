@@ -168,7 +168,6 @@ class S3ABase(QtWidgets.QMainWindow):
       return
     self.focusedImg.updateRegionFromVerts(self.focusedImg.compSer[REQD_TBL_FIELDS.VERTICES])
 
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_ACCEPT_REGION)
   @FR_SINGLETON.actionStack.undoable('Accept Focused Region')
   def acceptFocusedRegion(self):
     # If the component was deleted

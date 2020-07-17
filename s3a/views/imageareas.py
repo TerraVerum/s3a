@@ -190,11 +190,11 @@ class FRMainImage(FREditableImgBase):
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
-    (cls.mergeCompsAct, cls.splitCompsAct, cls.overrideCompVertsAct,
-     cls.moveCompsAct, cls.copyCompsAct) = cls.toolsEditor.registerProps(
+    (cls.mergeCompsAct, cls.splitCompsAct, cls.moveCompsAct, cls.copyCompsAct,
+     cls.overrideCompVertsAct) = cls.toolsEditor.registerProps(
       cls, [FR_CONSTS.TOOL_MERGE_COMPS, FR_CONSTS.TOOL_SPLIT_COMPS,
-            FR_CONSTS.TOOL_OVERRIDE_VERTS_ACT, FR_CONSTS.TOOL_MOVE_REGIONS,
-            FR_CONSTS.TOOL_COPY_REGIONS], asProperty=False)
+            FR_CONSTS.TOOL_MOVE_REGIONS, FR_CONSTS.TOOL_COPY_REGIONS,
+            FR_CONSTS.TOOL_OVERRIDE_VERTS_ACT], asProperty=False)
     (cls.multCompsOnCreate, cls.onlyGrowViewbox) = FR_SINGLETON.generalProps.registerProps(
       cls, [FR_CONSTS.PROP_MK_MULT_COMPS_ON_ADD, FR_CONSTS.PROP_ONLY_GROW_MAIN_VB])
 
@@ -275,11 +275,6 @@ class FRMainImage(FREditableImgBase):
     if self.regionCopier.active:
       self.regionCopier.sigCopyStopped.emit()
 
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_FG, [FR_CONSTS.DRAW_ACT_ADD])
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_PAN, [FR_CONSTS.DRAW_ACT_PAN])
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_SELECT, [FR_CONSTS.DRAW_ACT_SELECT])
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_RECT, [FR_CONSTS.DRAW_SHAPE_RECT])
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_POLY, [FR_CONSTS.DRAW_SHAPE_POLY])
   def switchBtnMode(self, newMode: FRParam):
     super().switchBtnMode(newMode)
 
@@ -326,14 +321,22 @@ class FRMainImage(FREditableImgBase):
         self.sigCompsUpdated.emit(comps)
     doOverride()
 
-
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_CLEAR_SHAPE_MAIN)
   def clearCurDrawShape(self):
     super().clearCurDrawShape()
     self.regionCopier.erase()
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_FOCUSED_IMG_AREA)
 class FRFocusedImage(FREditableImgBase):
+
+  @classmethod
+  def __initEditorParams__(cls):
+    super().__initEditorParams__()
+    (cls.resetRegionAct, cls.fillRegionAct,
+     cls.clearRegionAct, cls.acceptRegionAct) = cls.toolsEditor.registerProps(
+      cls, [FR_CONSTS.TOOL_RESET_FOC_REGION, FR_CONSTS.TOOL_FILL_FOC_REGION,
+            FR_CONSTS.TOOL_CLEAR_FOC_REGION, FR_CONSTS.TOOL_ACCEPT_FOC_REGION],
+      asProperty=False)
+
 
   def __init__(self, parent=None, **kargs):
     allowableShapes = (
@@ -343,6 +346,14 @@ class FRFocusedImage(FREditableImgBase):
       FR_CONSTS.DRAW_ACT_ADD, FR_CONSTS.DRAW_ACT_REM
     )
     super().__init__(parent, allowableShapes, allowableActions, **kargs)
+    self.clearRegionAct.sigActivated.connect(lambda: self.updateRegionFromVerts(None))
+    def fillAct():
+      if self.image is None: return
+      filled = np.ones(self.image.shape[:2], bool)
+      self.region.updateFromMask(filled)
+    self.fillRegionAct.sigActivated.connect(fillAct)
+    self.resetRegionAct.sigActivated.connect(
+      lambda: self.updateRegionFromVerts(self.compSer[REQD_TBL_FIELDS.VERTICES]))
     self.region = FRVertexDefinedImg()
 
     self.addItem(self.region)
@@ -357,19 +368,6 @@ class FRFocusedImage(FREditableImgBase):
     self.switchBtnMode(FR_CONSTS.DRAW_SHAPE_PAINT)
     # Disable local cropping on primitive grab cut by default
     self.procCollection.nameToProcMapping['Primitive Grab Cut'].setStageEnabled(['Crop to Local Area'], False)
-
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_BG, [FR_CONSTS.DRAW_ACT_REM])
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_FG, [FR_CONSTS.DRAW_ACT_ADD])
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_PAN, [FR_CONSTS.DRAW_ACT_PAN])
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_RECT, [FR_CONSTS.DRAW_SHAPE_RECT])
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_POLY, [FR_CONSTS.DRAW_SHAPE_POLY])
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_DRAW_PAINT, [FR_CONSTS.DRAW_SHAPE_PAINT])
-  def switchBtnMode(self, newMode: FRParam):
-    super().switchBtnMode(newMode)
-
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_CLEAR_SHAPE_FOC)
-  def clearCurDrawShape(self):
-    super().clearCurDrawShape()
 
   def resetImage(self):
     self.updateAll(None)
@@ -453,7 +451,14 @@ class FRFocusedImage(FREditableImgBase):
 
   @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
   def updateRegionFromVerts(self, newVerts: FRComplexVertices=None, offset: FRVertices=None):
-    # Component vertices are nan-separated regions
+    """
+    Updates the current focused region using the new provided vertices
+    :param newVerts: Verts to use.If *None*, the image will be totally reset and the component
+      will be removed. Otherwise, the provided value will be used.
+    :param offset: Offset of newVerts relative to main image coordinates
+    """
+    if self.image is None:
+      return
     oldVerts = self.region.verts
     oldRegionImg = self.region.image
 

@@ -4,11 +4,13 @@ from inspect import isclass
 from typing import Tuple, Callable, Union, Any, Dict, List
 
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
+from pyqtgraph.parametertree import Parameter
 
 from s3a.graphicsutils import findMainWin
 from s3a.projectvars import SHORTCUTS_DIR
 from s3a.structures import FRParam, FRParamEditorError
 from .genericeditor import FRParamEditor
+from .pgregistered import FRShortcutParameter
 
 
 def _class_fnNamesFromFnQualname(qualname: str) -> (str, str):
@@ -70,7 +72,7 @@ class FRShortcutsEditor(FRParamEditor):
     # needs a global context
     self.mainWinRef = findMainWin()
     self.boundFnsPerGroup: Dict[FRParam, List[FRBoundFnParams]] = {}
-    self._objsWithShortcuts = set()
+    self._hookedUpBoundFns = []
     """Holds the parameters associated with this registered class"""
 
   def registerMethod(self, constParam: FRParam, fnArgs: List[Any]=None):
@@ -82,10 +84,16 @@ class FRShortcutsEditor(FRParamEditor):
     if fnArgs is None:
       fnArgs = []
 
-    def registerMethodDecorator(func: Callable):
+    def registerMethodDecorator(func: Callable, ownerObj: Any=None):
       boundFnParam = FRBoundFnParams(param=constParam, func=func, defaultFnArgs=fnArgs)
-      grouping, _ = _class_fnNamesFromFnQualname(func.__qualname__)
+      if ownerObj is None:
+        grouping, _ = _class_fnNamesFromFnQualname(func.__qualname__)
+      else:
+        grouping = type(ownerObj).__qualname__
       self._addParamToList(grouping, boundFnParam)
+      if ownerObj is not None:
+        groupParam = self.groupingToParamMapping[type(ownerObj)]
+        self._extendedClassInit(ownerObj, groupParam)
       return func
     return registerMethodDecorator
 
@@ -96,9 +104,6 @@ class FRShortcutsEditor(FRParamEditor):
 
   def _extendedClassInit(self, clsObj: Any, groupParam: FRParam):
     grouping = type(clsObj)
-    if clsObj in self._objsWithShortcuts:
-      return
-    self._objsWithShortcuts.add(clsObj)
     try:
       self.addRegisteredFuncsFromGroup(grouping, groupParam)
     except Exception as ex:
@@ -109,16 +114,30 @@ class FRShortcutsEditor(FRParamEditor):
         raise
     boundParamList = self.boundFnsPerGroup.get(grouping.__qualname__, [])
     for boundParam in boundParamList:
-      seqCopy = QtGui.QKeySequence(boundParam.param.value)
-      try:
-        shortcut = FREditableShortcut(seqCopy, clsObj)
-      except TypeError:
-        # Occurs when the requested class is not a widget
-        shortcut = FREditableShortcut(seqCopy, self.mainWinRef)
-      shortcut.paramIdx = (groupParam, boundParam.param)
-      shortcut.activated.connect(partial(boundParam.func, clsObj, *boundParam.defaultFnArgs))
-      shortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
-      self.shortcuts.append(shortcut)
+      self.hookupShortcutForBoundFn(boundParam, clsObj)
+
+  def registerButton(self, btnFunc: Callable[[], Any], btnParam: FRParam, ownerObj: Any,
+                     *funcArgs, **funcKwargs):
+    groupParam = self.groupingToParamMapping[type(ownerObj)]
+    shortcutParam: FRShortcutParameter = Parameter.create(name=btnParam.name,
+                                                          type='shortcut', value=btnParam.value,
+                                                          tip=btnParam.helpText)
+    if groupParam.name in self.params.names:
+      pgParam = self.params.child(groupParam.name)
+    else:
+      pgParam = Parameter.create(name=groupParam.name, type='group')
+      self.params.addChild(pgParam)
+    pgParam.addChild(shortcutParam)
+
+    if ownerObj is None:
+      ownerObj = self.mainWinRef
+    newShortcut = QtWidgets.QShortcut(shortcutParam.seqEdit.keySequence(), ownerObj)
+    newShortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
+    partialFn = partial(btnFunc, *funcArgs, **funcKwargs)
+    newShortcut.activated.connect(partialFn)
+    shortcutParam.sigValueChanged.connect(lambda param: newShortcut.setKey(param.seqEdit.keySequence()))
+    self.shortcuts.append(newShortcut)
+
 
   def addRegisteredFuncsFromGroup(self, grouping: Any, groupParam: FRParam):
     """
@@ -140,39 +159,56 @@ class FRShortcutsEditor(FRParamEditor):
       iterGroupings.append(baseCls.__qualname__)
     boundFns_includingBases = []
 
+    # If this group already exists, append the children to the existing group
+    # instead of adding a new child
+    if groupParam.name in self.params.names:
+      ownerParam = self.params.child(groupParam.name)
+      shouldAdd = False
+    else:
+      ownerParam = Parameter.create(name=groupParam.name, type='group')
+      shouldAdd = True
     for curGrouping in iterGroupings:
       groupParamList = self.boundFnsPerGroup.get(curGrouping, [])
       boundFns_includingBases.extend(groupParamList)
-      # Don't add a category unless at least one list element is present
-      if len(groupParamList) == 0: continue
-      # If a human-readable name was given, replace class name with human name
-      paramChildren = []
-      paramGroup = {'name': groupParam.name, 'type': 'group',
-                    'children': paramChildren}
       for boundFn in groupParamList:
-        paramForTree = {'name' : boundFn.param.name,
-                        'type' : boundFn.param.valType,
-                        'value': boundFn.param.value,
-                        'tip'  : boundFn.param.helpText}
-        paramChildren.append(paramForTree)
-      # If this group already exists, append the children to the existing group
-      # instead of adding a new child
-      if groupParam.name in self.params.names:
-        self.params.child(groupParam.name).addChildren(paramChildren)
-      else:
-        self.params.addChild(paramGroup)
+        self.addBoundFn(boundFn, ownerParam)
+    if shouldAdd and len(ownerParam.children()) > 0:
+      self.params.addChild(ownerParam)
 
     # Now make sure when props are registered for this grouping, they include
     # base class shortcuts too
     self.boundFnsPerGroup[grouping.__qualname__] = boundFns_includingBases
+
+  def addBoundFn(self, boundFn: FRBoundFnParams, parentParam: Parameter):
+    if boundFn.param.name in parentParam.names:
+      # Already registered
+      return
+    paramForTree = {'name' : boundFn.param.name,
+                    'type' : 'shortcut',
+                    'value': boundFn.param.value,
+                    'tip'  : boundFn.param.helpText}
+    parentParam.addChild(paramForTree)
+
+  def hookupShortcutForBoundFn(self, boundFn: FRBoundFnParams, ownerObj: Any):
+    self._hookedUpBoundFns.append(boundFn)
+    if boundFn in self._hookedUpBoundFns:
+      return
+    groupParam = self.groupingToParamMapping[type(ownerObj)]
+    seqCopy = QtGui.QKeySequence(boundFn.param.value)
+    try:
+      shortcut = FREditableShortcut(seqCopy, ownerObj)
+    except TypeError:
+      # Occurs when the requested class is not a widget
+      shortcut = FREditableShortcut(seqCopy, self.mainWinRef)
+    shortcut.paramIdx = (groupParam, boundFn.param)
+    shortcut.activated.connect(partial(boundFn.func, ownerObj, *boundFn.defaultFnArgs))
+    shortcut.activatedAmbiguously.connect(lambda: print('ambiguous'))
+    shortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
+    self.shortcuts.append(shortcut)
+    return shortcut
 
   def registerProp(self, *args, **etxraOpts):
     """
     Properties should never be registered as shortcuts, so make sure this is disallowed
     """
     raise FRParamEditorError('Cannot register property/attribute as a shortcut')
-
-  def applyChanges(self):
-    for shortcut in self.shortcuts: #type: FREditableShortcut
-      shortcut.setKey(self[shortcut.paramIdx])
-    super().applyChanges()

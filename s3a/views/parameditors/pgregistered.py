@@ -61,18 +61,20 @@ class FRShortcutParameterItem(parameterTypes.WidgetParameterItem):
   provide an implementation.
   """
 
-  def __init__(self, param, depth):
-    super().__init__(param, depth)
-    self.item: Optional[QtGui.QKeySequence] = None
-
   def makeWidget(self):
     item = QtWidgets.QKeySequenceEdit()
 
     item.sigChanged = item.editingFinished
     item.value = lambda: item.keySequence().toString()
-    item.setValue = item.setKeySequence
-    self.item = item
-    return self.item
+    def setter(val: QtGui.QKeySequence):
+      if val is None or len(val) == 0:
+        item.clear()
+      else:
+        item.setKeySequence(val)
+    item.setValue = setter
+    self.param.seqEdit = item
+
+    return item
 
   def updateDisplayLabel(self, value=None):
     # Make sure the key sequence is human readable

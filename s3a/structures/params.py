@@ -3,7 +3,7 @@ from __future__ import annotations
 import html
 import weakref
 from dataclasses import dataclass, fields, field
-from typing import Any, Optional, Collection, Union
+from typing import Any, Optional, Collection, Union, Dict
 from warnings import warn
 
 from pyqtgraph.Qt import QtCore
@@ -43,8 +43,12 @@ class FRParam:
   """FRParamGroup to which this parameter belongs, if this parameter is part of
     a group. This is set by the FRParamGroup, not manually
   """
+  opts: Dict[str, Any] = None
+  """Additional options associated with this parameter"""
 
   def __post_init__(self):
+    if self.opts is None:
+      self.opts = {}
     if self.valType is None:
       # Infer from value
       valType = type(self.value).__name__
@@ -140,7 +144,7 @@ class FRParamGroup:
     return None
 
 
-def newParam(name: str, val: Any=None, valType: str=None, helpText=''):
+def newParam(name: str, val: Any=None, valType: str=None, helpText='', **opts):
   """
   Factory for creating new parameters within a :class:`FRParamGroup`.
 
@@ -148,4 +152,4 @@ def newParam(name: str, val: Any=None, valType: str=None, helpText=''):
 
   :return: Field that can be inserted within the :class:`FRParamGroup` dataclass.
   """
-  return field(default_factory=lambda: FRParam(name, val, valType, helpText))
+  return field(default_factory=lambda: FRParam(name, val, valType, helpText, opts=opts))

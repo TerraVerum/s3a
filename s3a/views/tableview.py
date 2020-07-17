@@ -215,7 +215,6 @@ class FRCompTableView(QtWidgets.QTableView):
 
     return menu
 
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_TBL_DEL_ROWS)
   def removeSelectedRows_gui(self):
     if self.minimal: return
 
@@ -232,7 +231,6 @@ class FRCompTableView(QtWidgets.QTableView):
       self.clearSelection()
 
 
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_TBL_SET_SAME_AS_FIRST)
   def overwriteSelectedRows_gui(self):
     if self.minimal: return
 
@@ -290,7 +288,6 @@ class FRCompTableView(QtWidgets.QTableView):
     toOverwrite.iloc[:, colIdxs] = setVals
     self.mgr.addComps(toOverwrite, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
 
-  @FR_SINGLETON.shortcuts.registerMethod(FR_CONSTS.SHC_TBL_SET_AS)
   def setSelectedCellsAs_gui(self, overrideIds: OneDArr=None, overrideColIdxs: OneDArr=None):
     if self.minimal: return
 

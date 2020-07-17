@@ -351,6 +351,7 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
       paramOpts.update(children=constParam.value)
     else:
       paramOpts.update(value=constParam.value)
+    paramOpts.update(frParam=constParam)
     paramOpts.update(etxraOpts)
     paramForEditor = Parameter.create(**paramOpts)
 
@@ -436,6 +437,8 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
         @wraps(oldInit)
         def newInit(clsObj, *args, **kwargs):
           grouping = type(clsObj)
+          # groupParam could be inaccurate when initializing base class
+          groupParam = self.groupingToParamMapping[grouping]
           if grouping not in INITIALIZED_GROUPINGS and issubclass(grouping, ContainsSharedProps):
             INITIALIZED_GROUPINGS.add(grouping)
             clsObj.__initEditorParams__()
