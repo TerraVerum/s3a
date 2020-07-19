@@ -1,15 +1,16 @@
 from functools import partial
-from typing import Optional, List
+from typing import List
 
-from pyqtgraph import TreeWidgetItem
 from pyqtgraph.Qt import QtGui, QtWidgets, QtCore
-from pyqtgraph.parametertree import parameterTypes, Parameter, ParameterTree
+from pyqtgraph.parametertree import parameterTypes, Parameter
 from pyqtgraph.parametertree.Parameter import PARAM_TYPES
 from pyqtgraph.parametertree.parameterTypes import ActionParameterItem, ActionParameter, \
-  TextParameterItem, TextParameter, WidgetParameterItem
+  TextParameterItem, TextParameter
 
-from s3a.graphicsutils import findMainWin
-from s3a.structures import FRS3AException
+from s3a.structures import FRS3AException, FRParam
+from .. import parameditors
+from ...generalutils import helpTextToRichText
+
 
 class FRMonkeyPatchedTextParameterItem(TextParameterItem):
   def makeWidget(self):
@@ -87,12 +88,46 @@ class FRShortcutParameterItem(parameterTypes.WidgetParameterItem):
   #   menu.addAction(delAct)
   #   menu.exec(ev.globalPos())
 
+class FRRegisteredActionParameterItem(ActionParameterItem):
+
+  def __init__(self, param, depth):
+    # Force set title since this will get nullified on changing the button parent for some
+    # reason
+    super().__init__(param, depth)
+    btn: QtWidgets.QPushButton = self.button
+    btn.setToolTip(param.opts['tip'])
+    if param.value() is None: return
+    # Else: shortcut exists to be registered
+
+    shcEditor = parameditors.FR_SINGLETON.shortcuts
+    cls = param.opts.get('ownerObj', type(None))
+    btnParam: FRParam = param.opts['frParam']
+
+    parameditors.FR_SINGLETON.shortcuts.registerMethod_cls(btnParam, forceCreate=True)(
+      lambda *_args: self.buttonClicked(), cls
+    )
+    # Wait until after registing in case group didn't previously exist
+    clsParam = shcEditor.groupingToParamMapping[cls]
+    seqEdit: Parameter = shcEditor[clsParam, btnParam, True]
+
+    # Show the shortcut with the button
+    def shcChanged(_param, newSeq: str):
+      prependText = f'Shortcut: {newSeq}'
+      tip: str = param.opts["tip"]
+      tip = helpTextToRichText(tip, prependText)
+      btn.setToolTip(tip)
+
+    seqEdit.sigValueChanged.connect(shcChanged)
+    # Initialize for first shortcut
+    shcChanged(None, btnParam.value)
+
+
+class FRRegisteredActionParameter(ActionParameter):
+  itemClass = FRRegisteredActionParameterItem
+
 
 class FRShortcutParameter(Parameter):
   itemClass = FRShortcutParameterItem
-
-  def __init__(self, **opts):
-    super().__init__(**opts)
 
 class FRActionWithShortcutParameterItem(ActionParameterItem):
   def __init__(self, param: Parameter, depth):
@@ -108,7 +143,7 @@ class FRActionWithShortcutParameterItem(ActionParameterItem):
     # Without the main window as a parent, the shortcut will not activate when
     # the quickloader is hidden
     # TODO: Maybe it is desirable for shortcuts to only work when quickloader
-    self.shortcut = QtWidgets.QShortcut(shortcutSeq, findMainWin())
+    self.shortcut = QtWidgets.QShortcut(shortcutSeq)
     self.shortcut.activated.connect(self.buttonClicked)
     button: QtWidgets.QPushButton = self.button
     tip = self.param.opts.get('tip', None)
@@ -217,3 +252,4 @@ parameterTypes.registerParameterType('shortcut', FRShortcutParameter)
 parameterTypes.registerParameterType('procgroup', FRProcGroupParameter)
 parameterTypes.registerParameterType('atomicgroup', FRAtomicGroupParameter)
 parameterTypes.registerParameterType('actionwithshortcut', FRActionWithShortcutParameter)
+parameterTypes.registerParameterType('registeredaction', FRRegisteredActionParameter)

@@ -1,7 +1,6 @@
 setuptools
 typing_extensions
 fire
-bidict
 tqdm
 opencv_python>=4.1.2.30
 numpy

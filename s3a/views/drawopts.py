@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import partial
 from typing import Tuple, Collection, Callable, Union, Iterable, Any, Dict
 
-from pyqtgraph.Qt import QtWidgets, QtGui
+from pyqtgraph.Qt import QtWidgets, QtGui, QtCore
 
 from s3a import FR_SINGLETON
 from s3a.projectvars import FR_CONSTS
@@ -75,16 +75,7 @@ class FRButtonCollection(QtWidgets.QGroupBox):
       self.create_addBtn(param, fn, checkable)
 
   def create_addBtn(self, btnParam: FRParam, triggerFn: btnCallable, checkable=True):
-    if 'icon' in btnParam.opts:
-      newBtn = QtWidgets.QPushButton(QtGui.QIcon(btnParam.opts['icon']), '', self)
-      tooltipText = btnParam.name
-    else:
-      newBtn = QtWidgets.QPushButton(btnParam.name, self)
-      tooltipText = ''
-    if len(btnParam.helpText) > 0:
-      if len(tooltipText) > 0: tooltipText += '\n'
-      tooltipText += f'{btnParam.helpText}'
-    newBtn.setToolTip(tooltipText)
+    newBtn = FR_SINGLETON.shortcuts.createRegisteredButton(btnParam, self.parent())
     if checkable:
       newBtn.setCheckable(True)
       oldTriggerFn = triggerFn
@@ -93,15 +84,16 @@ class FRButtonCollection(QtWidgets.QGroupBox):
         if newBtn.isChecked():
           oldTriggerFn(param)
       triggerFn = newTriggerFn
-    newBtn.clicked.connect(lambda: triggerFn(btnParam))
-    FR_SINGLETON.shortcuts.registerButton(self.callFuncByParam, btnParam, self.parent(),
-                                          btnParam)
+    newBtn.clicked.connect(lambda: self.callFuncByParam(btnParam))
+
     self.btnGroup.addButton(newBtn)
     self.uiLayout.addWidget(newBtn)
     self.paramToFuncMapping[btnParam] = triggerFn
     self.paramToBtnMapping[btnParam] = newBtn
 
   def callFuncByParam(self, param: FRParam):
+    if param is None:
+      return
     # Ensure function is called in the event it requires a button to be checked
     btn = self.paramToBtnMapping[param]
     if btn.isCheckable():

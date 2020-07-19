@@ -1,26 +1,25 @@
 import sys
 from pathlib import Path
-from typing import Optional, Union, Callable, Dict, Any, List
+from typing import Optional, Union, Callable, Dict, Any
 from warnings import warn
 
 import numpy as np
 import pandas as pd
-from pyqtgraph.Qt import QtCore, QtWidgets
 from pandas import DataFrame as df
+from pyqtgraph.Qt import QtCore, QtWidgets
 
-from s3a.models.editorbase import SPAWNED_EDITORS
-from s3a.views.parameditors import FR_SINGLETON
-from s3a.views.imageareas import FRMainImage, FRFocusedImage, FREditableImgBase
-from s3a.graphicsutils import addDirItemsToMenu, raiseErrorLater
-from s3a.views.parameditors import FRParamEditor
-from s3a.views.parameditors.appstate import FRAppStateEditor
-from s3a.views.tableview import FRCompTableView
+from s3a.controls.tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
 from s3a.generalutils import resolveAuthorName
-from s3a.projectvars import FR_CONSTS, FR_ENUMS, REQD_TBL_FIELDS, APP_STATE_DIR
+from s3a.graphicsutils import addDirItemsToMenu
+from s3a.models.tablemodel import FRComponentIO, FRComponentMgr
+from s3a.projectvars import FR_CONSTS, FR_ENUMS, REQD_TBL_FIELDS
 from s3a.structures import FRS3AWarning, FRVertices, FilePath, NChanImg, FRAppIOError, \
   FRAlgProcessorError
-from s3a.models.tablemodel import FRComponentIO, FRComponentMgr
-from s3a.controls.tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
+from s3a.views.imageareas import FRMainImage, FRFocusedImage, FREditableImgBase
+from s3a.views.parameditors import FRParamEditor
+from s3a.views.parameditors import FR_SINGLETON
+from s3a.views.parameditors.appstate import FRAppStateEditor
+from s3a.views.tableview import FRCompTableView
 
 __all__ = ['S3ABase']
 

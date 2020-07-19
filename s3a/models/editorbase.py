@@ -311,6 +311,10 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
 
   def registerProps(self, groupingName: Union[type, str], constParams: List[FRParam],
                     parentParamPath:Collection[str]=None, asProperty=True, **extraOpts):
+    """
+    Registers a list of proerties and returns an array of each. For parameter descriptions,
+    see :func:`FRParamEditor.registerProp`.
+    """
     outProps = []
     for param in constParams:
       outProps.append(self.registerProp(groupingName, param, parentParamPath,
@@ -343,10 +347,11 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
       for the new param. Otherwise, returns the param itself. If asProperty is false,
       the returned parameter must be evaluated to obtain a value, e.g.
       x = registerProp(..., asProperty=False); myVal = x.value()
-    :param etxraOpts: Extra options passed directly to the created pyqtgraph.Parameter
+    :param etxraOpts: Extra options passed directly to the created :class:`pyqtgraph.Parameter`
     :return: Property bound to this value in the parameter editor
     """
-    paramOpts = dict(name=constParam.name, type=constParam.valType, tip=constParam.helpText)
+    paramOpts = dict(name=constParam.name, type=constParam.valType, tip=constParam.helpText,
+                     **constParam.opts)
     if constParam.valType == 'group':
       paramOpts.update(children=constParam.value)
     else:
@@ -358,7 +363,7 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     if grouping not in self.groupingToParamMapping:
       warn(f'The provided grouping "{grouping}" was not recognized, perhaps because '
            f' `registerGroup()` was never called with this grouping. Registering now'
-           f' as a top-level grouping.')
+           f' as a top-level grouping.', FRS3AWarning)
       self.registerGroup(None)(grouping)
     groupParam = self.groupingToParamMapping[grouping]
 

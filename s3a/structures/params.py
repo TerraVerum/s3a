@@ -54,9 +54,11 @@ class FRParam:
       valType = type(self.value).__name__
       self.valType = valType
     ht = self.helpText
-    if (ht is not None and len(ht) > 0
-        and not QtCore.Qt.mightBeRichText(self.helpText)):
-      self.helpText = f'<qt>{html.escape(self.helpText)}</qt>'
+    if ht is not None and len(ht) > 0:
+      if not QtCore.Qt.mightBeRichText(ht):
+        ht = html.escape(ht)
+      # Makes sure the label is displayed as rich text
+      self.helpText = f'<qt>{ht}</qt>'
 
   def __str__(self):
     return f'{self.name}'

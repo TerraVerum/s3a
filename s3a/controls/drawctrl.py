@@ -1,4 +1,4 @@
-from typing import Tuple, Dict, Union
+from typing import Tuple, Dict, Union, Collection
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
@@ -20,7 +20,7 @@ class FRRoiCollection(QtCore.QObject):
     cls.roiClr, cls.roiLineWidth = FR_SINGLETON.scheme.registerProps(cls,
                    [FR_CONSTS.SCHEME_ROI_LINE_CLR, FR_CONSTS.SCHEME_ROI_LINE_WIDTH])
 
-  def __init__(self, allowableShapes: Tuple[FRParam,...]=(), parent: pg.GraphicsView=None):
+  def __init__(self, allowableShapes: Collection[FRParam]=(), parent: pg.GraphicsView=None):
     super().__init__(parent)
     if allowableShapes is None:
       allowableShapes = set()

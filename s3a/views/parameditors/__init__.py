@@ -66,8 +66,14 @@ class _FRSingleton(QtCore.QObject):
       docks = [docks]
 
     for dock in docks:
+      if dock in self.docks:
+        continue
       self.docks.append(dock)
       if isinstance(dock, FRParamEditorDockGrouping):
+        for editor in dock.editors:
+          if editor in self.docks:
+            # The editor will be accounted for as a group, so remove it as an individual
+            self.docks.remove(editor)
         self.quickLoader.listModel.addEditors(dock.editors)
       else:
         self.quickLoader.listModel.addEditors([dock])

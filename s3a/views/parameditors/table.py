@@ -59,7 +59,8 @@ class FRTableFilterEditor(FRParamEditor):
     _FILTER_PARAMS = [
       _filterForParam(param) for param in paramList
     ]
-    super().__init__(parent, paramList=_FILTER_PARAMS, saveDir=TABLE_DIR, fileType='filter')
+    super().__init__(parent, paramList=_FILTER_PARAMS, saveDir=TABLE_DIR, fileType='filter',
+                     name='Component Table Filter')
 
   def updateParamList(self, paramList: List[FRParam]):
     newParams = [

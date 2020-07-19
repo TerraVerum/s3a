@@ -5,8 +5,10 @@ from typing import List, Dict, Union, Type, Tuple
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter
 
+from s3a.generalutils import frPascalCaseToTitle
 from s3a.graphicsutils import dialogGetSaveFileName
 from s3a.models.editorbase import FRParamEditorBase
+from s3a.projectvars import MENU_OPTS_DIR
 from s3a.structures import FRParam, FilePath
 
 Signal = QtCore.Signal
@@ -128,6 +130,20 @@ class FRParamEditor(FRParamEditorBase):
       self._stateBeforeEdit = newState
       self.sigParamStateUpdated.emit(outDict)
     return outDict
+
+  @staticmethod
+  def buildClsToolsEditor(cls: type, name=None):
+    groupName = frPascalCaseToTitle(cls.__name__)
+    lowerGroupName = groupName.lower()
+    toolsDir = MENU_OPTS_DIR / lowerGroupName
+    if name is None:
+      name = groupName + ' Tools'
+    toolsEditor = FRParamEditor(
+      saveDir=toolsDir, fileType=lowerGroupName.replace(' ', '') + 'tools',
+      name=name, registerCls=cls, useNewInit=False
+    )
+    return toolsEditor
+
 
   def saveParamState_gui(self):
     saveName = dialogGetSaveFileName(self, 'Save As', self.lastAppliedName)

@@ -14,7 +14,7 @@ from s3a.structures import FRS3AException, FRS3AWarning, OneDArr
 
 __all__ = ['FRCompTableView']
 
-from .parameditors import pgregistered
+from .parameditors import pgregistered, FRParamEditor, FRParamEditorDockGrouping
 
 Signal = QtCore.Signal
 
@@ -118,6 +118,13 @@ class FRCompTableView(QtWidgets.QTableView):
   @classmethod
   def __initEditorParams__(cls):
     cls.showOnCreate = FR_SINGLETON.generalProps.registerProp(cls, FR_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE)
+    cls.toolsEditor = FRParamEditor.buildClsToolsEditor(cls, name='Component Table Tools')
+    (cls.setCellsAsAct, cls.setSameAsFirstAct, cls.removeRowsAct) = cls.toolsEditor.registerProps(
+      cls,[FR_CONSTS.TOOL_TBL_SET_AS, FR_CONSTS.TOOL_TBL_SET_SAME_AS_FIRST,
+           FR_CONSTS.TOOL_TBL_DEL_ROWS], asProperty=False, ownerObj=cls)
+
+    dockGroup = FRParamEditorDockGrouping([cls.toolsEditor, FR_SINGLETON.filter], 'Component Table')
+    FR_SINGLETON.addDocks(dockGroup)
 
   def __init__(self, *args, minimal=False):
     """
@@ -128,7 +135,10 @@ class FRCompTableView(QtWidgets.QTableView):
        Otherwise, only contains minimal features.
     """
     super().__init__(*args)
-    # self.__initEditorParams__()
+    self.setCellsAsAct.sigActivated.connect(self.setSelectedCellsAs_gui)
+    self.setSameAsFirstAct.sigActivated.connect(self.setSelectedSameAsFirst_gui)
+    self.removeRowsAct.sigActivated.connect(self.removeSelectedRows_gui)
+
     self._prevSelRows = np.array([])
     self.setSortingEnabled(True)
 
@@ -206,7 +216,7 @@ class FRCompTableView(QtWidgets.QTableView):
     menu.addAction(remAct)
 
     overwriteAct = QtWidgets.QAction("Set Same As First", menu)
-    overwriteAct.triggered.connect(lambda: self.overwriteSelectedRows_gui())
+    overwriteAct.triggered.connect(lambda: self.setSelectedSameAsFirst_gui())
     menu.addAction(overwriteAct)
 
     setAsAct = QtWidgets.QAction("Set As...", menu)
@@ -230,8 +240,7 @@ class FRCompTableView(QtWidgets.QTableView):
       self.mgr.rmComps(idList)
       self.clearSelection()
 
-
-  def overwriteSelectedRows_gui(self):
+  def setSelectedSameAsFirst_gui(self):
     if self.minimal: return
 
     # Make sure the user actually wants this

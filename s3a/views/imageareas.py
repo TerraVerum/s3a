@@ -10,7 +10,7 @@ from skimage.io import imread
 
 from s3a import FR_SINGLETON
 from s3a.generalutils import getClippedBbox, frPascalCaseToTitle, cornersToFullBoundary
-from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS, MENU_OPTS_DIR
+from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS as FRC, MENU_OPTS_DIR
 from s3a.structures import FRParam, FRVertices, FRComplexVertices, FilePath
 from s3a.structures import NChanImg
 from .clickables import FRRightPanViewBox
@@ -26,7 +26,7 @@ from s3a.controls.drawctrl import FRRoiCollection
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
 
-# @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_IMG_AREA)
+@FR_SINGLETON.registerGroup(FRC.CLS_IMG_AREA)
 class FREditableImgBase(pg.PlotWidget):
   sigMousePosChanged = QtCore.Signal(object, object)
   """
@@ -36,29 +36,29 @@ class FREditableImgBase(pg.PlotWidget):
 
   @classmethod
   def __initEditorParams__(cls):
-    groupName = frPascalCaseToTitle(cls.__name__)
-    lowerGroupName = groupName.lower()
-    cls.toolsDir = MENU_OPTS_DIR / lowerGroupName
-    cls.toolsEditor = FRParamEditor(
-      saveDir=cls.toolsDir, fileType=lowerGroupName.replace(' ', '') + 'tools',
-      name=groupName + ' Tools', registerCls=cls, useNewInit=False
-    )
+    clsName = frPascalCaseToTitle(cls.__name__)
+    cls.toolsEditor = FRParamEditor.buildClsToolsEditor(cls)
     cls.procCollection = FR_SINGLETON.algParamMgr.createProcessorForClass(
-      cls, editorName=groupName + ' Processor'
+      cls, editorName=clsName + ' Processor'
     )
     dockGroup = FRParamEditorDockGrouping(
-      [cls.toolsEditor, cls.procCollection], dockName=groupName
+      [cls.toolsEditor, cls.procCollection], dockName=clsName
     )
     FR_SINGLETON.addDocks(dockGroup)
 
     cls.compCropMargin, cls.treatMarginAsPct = FR_SINGLETON.generalProps.registerProps(
-      cls, [FR_CONSTS.PROP_CROP_MARGIN_VAL, FR_CONSTS.PROP_TREAT_MARGIN_AS_PCT])
+      cls, [FRC.PROP_CROP_MARGIN_VAL, FRC.PROP_TREAT_MARGIN_AS_PCT])
+
+    (cls.clearRoiAct,) = cls.toolsEditor.registerProps(
+      cls, [FRC.TOOL_CLEAR_ROI], asProperty=False, ownerObj=cls
+    )
 
   def __init__(self, parent=None, drawShapes: Collection[FRParam]=(),
                drawActions: Collection[FRParam]=(),
                toolParams: Collection[FRParam]=(), toolFns: Collection[btnCallable]=(),
                **kargs):
     super().__init__(parent, viewBox=FRRightPanViewBox(), **kargs)
+    self.clearRoiAct.sigActivated.connect(lambda: self.clearCurRoi())
     self.setAspectLocked(True)
     self.getViewBox().invertY()
     self.setMouseEnabled(True)
@@ -74,18 +74,18 @@ class FREditableImgBase(pg.PlotWidget):
     # -----
     self.regionCopier = FRMouseFollowingRegionPlot(self)
 
-    self.drawAction: FRParam = FR_CONSTS.DRAW_ACT_PAN
+    self.drawAction: FRParam = FRC.DRAW_ACT_PAN
     self.shapeCollection = FRRoiCollection(drawShapes, self)
     self.shapeCollection.sigShapeFinished.connect(self.handleShapeFinished)
 
     # Make sure panning is allowed before creating draw widget
-    if FR_CONSTS.DRAW_ACT_PAN not in drawActions:
-      drawActions += (FR_CONSTS.DRAW_ACT_PAN,)
+    if FRC.DRAW_ACT_PAN not in drawActions:
+      drawActions += (FRC.DRAW_ACT_PAN,)
 
     def shapeAssignment(newShapeParam: FRParam):
       self.shapeCollection.curShapeParam = newShapeParam
     self.drawShapeGrp = FRButtonCollection(self, "Shapes", drawShapes, shapeAssignment)
-    
+
     def actionAssignment(newActionParam: FRParam):
       self.drawAction = newActionParam
       if self.regionCopier.active:
@@ -135,13 +135,13 @@ class FREditableImgBase(pg.PlotWidget):
     super().mousePressEvent(ev)
     if (ev.buttons() == QtCore.Qt.LeftButton
         and not self.regionCopier.active
-        and self.drawAction != FR_CONSTS.DRAW_ACT_PAN):
+        and self.drawAction != FRC.DRAW_ACT_PAN):
       self.shapeCollection.buildRoi(ev, self.imgItem)
 
   def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent):
     super().mouseDoubleClickEvent(ev)
     if ev.buttons() == QtCore.Qt.LeftButton \
-        and self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
+        and self.drawAction != FRC.DRAW_ACT_PAN:
       self.shapeCollection.buildRoi(ev, self.imgItem)
 
   def mouseMoveEvent(self, ev: QtGui.QMouseEvent):
@@ -150,7 +150,7 @@ class FREditableImgBase(pg.PlotWidget):
     unless we are panning
     """
     super().mouseMoveEvent(ev)
-    if self.drawAction != FR_CONSTS.DRAW_ACT_PAN:
+    if self.drawAction != FRC.DRAW_ACT_PAN:
       self.shapeCollection.buildRoi(ev, self.imgItem)
 
     posRelToImage = self.imgItem.mapFromScene(ev.pos())
@@ -172,14 +172,14 @@ class FREditableImgBase(pg.PlotWidget):
     :return: Whether the mouse release completes the current ROI
     """
     super().mouseReleaseEvent(ev)
-    if (self.drawAction != FR_CONSTS.DRAW_ACT_PAN
+    if (self.drawAction != FRC.DRAW_ACT_PAN
         and ev.button() == QtCore.Qt.LeftButton and not self.regionCopier.active):
       self.shapeCollection.buildRoi(ev, self.imgItem)
 
-  def clearCurDrawShape(self):
+  def clearCurRoi(self):
     self.shapeCollection.clearAllRois()
 
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MAIN_IMG_AREA)
+@FR_SINGLETON.registerGroup(FRC.CLS_MAIN_IMG_AREA)
 class FRMainImage(FREditableImgBase):
   sigCompsCreated = Signal(object) # pd.DataFrame
   sigCompsUpdated = Signal(object) # pd.DataFrame
@@ -192,17 +192,22 @@ class FRMainImage(FREditableImgBase):
     super().__initEditorParams__()
     (cls.mergeCompsAct, cls.splitCompsAct, cls.moveCompsAct, cls.copyCompsAct,
      cls.overrideCompVertsAct) = cls.toolsEditor.registerProps(
-      cls, [FR_CONSTS.TOOL_MERGE_COMPS, FR_CONSTS.TOOL_SPLIT_COMPS,
-            FR_CONSTS.TOOL_MOVE_REGIONS, FR_CONSTS.TOOL_COPY_REGIONS,
-            FR_CONSTS.TOOL_OVERRIDE_VERTS_ACT], asProperty=False)
+      cls, [FRC.TOOL_MERGE_COMPS, FRC.TOOL_SPLIT_COMPS,
+            FRC.TOOL_MOVE_REGIONS, FRC.TOOL_COPY_REGIONS,
+            FRC.TOOL_OVERRIDE_VERTS_ACT], asProperty=False)
     (cls.multCompsOnCreate, cls.onlyGrowViewbox) = FR_SINGLETON.generalProps.registerProps(
-      cls, [FR_CONSTS.PROP_MK_MULT_COMPS_ON_ADD, FR_CONSTS.PROP_ONLY_GROW_MAIN_VB])
+      cls, [FRC.PROP_MK_MULT_COMPS_ON_ADD, FRC.PROP_ONLY_GROW_MAIN_VB])
 
   def __init__(self, parent=None, imgSrc=None, **kargs):
-    allowedShapes = (FR_CONSTS.DRAW_SHAPE_RECT, FR_CONSTS.DRAW_SHAPE_POLY)
-    allowedActions = (FR_CONSTS.DRAW_ACT_SELECT,FR_CONSTS.DRAW_ACT_ADD)
+    allowedShapes = (FRC.DRAW_SHAPE_RECT, FRC.DRAW_SHAPE_POLY)
+    allowedActions = (FRC.DRAW_ACT_SELECT,FRC.DRAW_ACT_ADD)
     super().__init__(parent, drawShapes=allowedShapes,
                      drawActions=allowedActions, **kargs)
+    # plt: pg.PlotItem = self.plotItem
+    # # Make sure grid lines are on top of image
+    # for axDict in plt.axes.values():
+    #   ax = axDict['item']
+    #   ax.setZValue(500)
     # -----
     # Image Item
     # -----
@@ -221,14 +226,14 @@ class FRMainImage(FREditableImgBase):
       copier.sigCopyStarted.emit()
     self.moveCompsAct.sigActivated.connect(startMove)
 
-    self.switchBtnMode(FR_CONSTS.DRAW_ACT_ADD)
+    self.switchBtnMode(FRC.DRAW_ACT_ADD)
 
   def handleShapeFinished(self, roiVerts: FRVertices) -> Optional[np.ndarray]:
     if self.regionCopier.active: return
-    if self.drawAction in [FR_CONSTS.DRAW_ACT_SELECT] and roiVerts.connected:
+    if self.drawAction in [FRC.DRAW_ACT_SELECT] and roiVerts.connected:
       # Selection
       self.sigSelectionBoundsMade.emit(roiVerts)
-    elif self.drawAction == FR_CONSTS.DRAW_ACT_ADD:
+    elif self.drawAction == FRC.DRAW_ACT_ADD:
       # Component modification subject to processor
       # For now assume a single point indicates foreground where multiple indicate
       # background selection
@@ -265,7 +270,7 @@ class FRMainImage(FREditableImgBase):
     pos = self.imgItem.mapFromScene(ev.pos())
     xx, yy, = pos.x(), pos.y()
     pos = FRVertices([[xx, yy]])
-    if self.drawAction == FR_CONSTS.DRAW_ACT_PAN and not self.regionCopier.active:
+    if self.drawAction == FRC.DRAW_ACT_PAN and not self.regionCopier.active:
       # Simulate a click-wide boundary selection so points can be selected in pan mode
       squareCorners = FRVertices([[xx, yy], [xx, yy]], dtype=float)
       self.sigSelectionBoundsMade.emit(squareCorners)
@@ -321,11 +326,11 @@ class FRMainImage(FREditableImgBase):
         self.sigCompsUpdated.emit(comps)
     doOverride()
 
-  def clearCurDrawShape(self):
-    super().clearCurDrawShape()
+  def clearCurRoi(self):
+    super().clearCurRoi()
     self.regionCopier.erase()
 
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_FOCUSED_IMG_AREA)
+@FR_SINGLETON.registerGroup(FRC.CLS_FOCUSED_IMG_AREA)
 class FRFocusedImage(FREditableImgBase):
 
   @classmethod
@@ -333,17 +338,17 @@ class FRFocusedImage(FREditableImgBase):
     super().__initEditorParams__()
     (cls.resetRegionAct, cls.fillRegionAct,
      cls.clearRegionAct, cls.acceptRegionAct) = cls.toolsEditor.registerProps(
-      cls, [FR_CONSTS.TOOL_RESET_FOC_REGION, FR_CONSTS.TOOL_FILL_FOC_REGION,
-            FR_CONSTS.TOOL_CLEAR_FOC_REGION, FR_CONSTS.TOOL_ACCEPT_FOC_REGION],
+      cls, [FRC.TOOL_RESET_FOC_REGION, FRC.TOOL_FILL_FOC_REGION,
+            FRC.TOOL_CLEAR_FOC_REGION, FRC.TOOL_ACCEPT_FOC_REGION],
       asProperty=False)
 
 
   def __init__(self, parent=None, **kargs):
     allowableShapes = (
-      FR_CONSTS.DRAW_SHAPE_RECT, FR_CONSTS.DRAW_SHAPE_POLY, FR_CONSTS.DRAW_SHAPE_PAINT
+      FRC.DRAW_SHAPE_RECT, FRC.DRAW_SHAPE_POLY, FRC.DRAW_SHAPE_PAINT
     )
     allowableActions = (
-      FR_CONSTS.DRAW_ACT_ADD, FR_CONSTS.DRAW_ACT_REM
+      FRC.DRAW_ACT_ADD, FRC.DRAW_ACT_REM
     )
     super().__init__(parent, allowableShapes, allowableActions, **kargs)
     self.clearRegionAct.sigActivated.connect(lambda: self.updateRegionFromVerts(None))
@@ -364,8 +369,8 @@ class FRFocusedImage(FREditableImgBase):
 
     self.firstRun = True
 
-    self.switchBtnMode(FR_CONSTS.DRAW_ACT_ADD)
-    self.switchBtnMode(FR_CONSTS.DRAW_SHAPE_PAINT)
+    self.switchBtnMode(FRC.DRAW_ACT_ADD)
+    self.switchBtnMode(FRC.DRAW_SHAPE_PAINT)
     # Disable local cropping on primitive grab cut by default
     self.procCollection.nameToProcMapping['Primitive Grab Cut'].setStageEnabled(['Crop to Local Area'], False)
 
@@ -373,7 +378,7 @@ class FRFocusedImage(FREditableImgBase):
     self.updateAll(None)
 
   def handleShapeFinished(self, roiVerts: FRVertices) -> Optional[np.ndarray]:
-    if self.drawAction == FR_CONSTS.DRAW_ACT_PAN:
+    if self.drawAction == FRC.DRAW_ACT_PAN:
       return
 
     # Component modification subject to processor
@@ -381,9 +386,9 @@ class FRFocusedImage(FREditableImgBase):
     # background selection
     roiVerts = roiVerts.astype(int)
     vertsDict = {}
-    if self.drawAction == FR_CONSTS.DRAW_ACT_ADD:
+    if self.drawAction == FRC.DRAW_ACT_ADD:
       vertsDict['fgVerts'] = roiVerts
-    elif self.drawAction == FR_CONSTS.DRAW_ACT_REM:
+    elif self.drawAction == FRC.DRAW_ACT_REM:
       vertsDict['bgVerts'] = roiVerts
 
     compMask = self.region.embedMaskInImg(self.image.shape[:2])

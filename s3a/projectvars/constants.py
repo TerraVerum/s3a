@@ -87,28 +87,24 @@ class _FRConsts(FRParamGroup):
   PROP_MIN_COMP_SZ             : FRParam = newParam('Minimum New Component Size (px)', 50)
   PROP_NEW_COMP_SZ             : FRParam = newParam('New Component Side Length (px)', 30)
   PROP_EST_BOUNDS_ON_START     : FRParam = newParam('Estimate Boundaries on Image Load', False)
-  PROP_MK_MULT_COMPS_ON_ADD    : FRParam = newParam('New Component for Each Separate Boundary', False,
-                                                    helpText='When creating a new component in the '
-                                                             'main image, separate boundaries'
-                                                             ' will not be assigned to one single'
-                                                             ' component. Rather, a new compnent'
-                                                             ' will be created for each closed boundary.')
-  PROP_TREAT_MARGIN_AS_PCT     : FRParam = newParam('Treat crop margin as % of image size', True,
-                                                    helpText='See note under *Crop Padding'
-                                                             ' Value*')
-  PROP_CROP_MARGIN_VAL         : FRParam = newParam('Crop Padding Value', 15,
-                                                    helpText='If *Treat as %* is selected, then'
-                                                             ' the padding will be proportionate'
-                                                             ' to the size of the focused component.'
-                                                             ' Otherwise, the padding will be a'
-                                                             ' fixed pixel amount.')
-  PROP_ONLY_GROW_MAIN_VB       : FRParam = newParam('Disallow shrink during selection', True,
-                                                    helpText='When selecting components, this'
-                                                             ' parameter determines whether'
-                                                             ' the viewbox shrinks only to'
-                                                             ' the current selection (if *False*)'
-                                                             ' or just ensures the view contains'
-                                                             ' the selected component (if *True*)')
+  PROP_MK_MULT_COMPS_ON_ADD    : FRParam = newParam(
+    'New Component for Each Separate Boundary', False,
+    helpText='When creating a new component in the main image, separate boundarieswill'
+             ' not be assigned to one single component. Rather, a new compnentwill be '
+             ' created for each closed boundary.')
+  PROP_TREAT_MARGIN_AS_PCT     : FRParam = newParam(
+    'Treat crop margin as % of image size', True,
+    helpText='See note under *Crop Padding Value*')
+  PROP_CROP_MARGIN_VAL         : FRParam = newParam(
+    'Crop Padding Value', 15,
+    helpText='If *Treat as %* is selected, then the padding will be proportionateto'
+             ' the size of the focused component. Otherwise, the padding will be a'
+             ' fixed pixel amount.')
+  PROP_ONLY_GROW_MAIN_VB       : FRParam = newParam(
+    'Disallow shrink during selection', True,
+    helpText='When selecting components, this parameter determines whetherthe viewbox'
+             ' shrinks only to the current selection (if *False*)or just ensures the'
+             ' view contains the selected component (if *True*)')
   PROP_FOCUSED_SEED_THRESH     : FRParam = newParam('Seedpoint Threshold in Focused Image', 7.)
   PROP_UNDO_BUF_SZ             : FRParam = newParam('Size of Undo Buffer', 300)
   PROP_STEPS_BW_SAVE           : FRParam = newParam('Operations Between Buffer Saves', 1)
@@ -116,67 +112,76 @@ class _FRConsts(FRParamGroup):
   PROP_SHOW_TBL_ON_COMP_CREATE : FRParam = newParam('Show popup table when creating component', False)
 
   # --------------------------
-  # WINDOW TOOLS
+  # IMAGE TOOLS
   # --------------------------
-  TOOL_MERGE_COMPS        : FRParam = newParam('Merge Selected',
-                                                   valType='action',
-                                                   helpText='Merges the selected components'
-                                                   ' into one, keeping all properties of'
-                                                   ' the first in the selection')
-  TOOL_SPLIT_COMPS        : FRParam = newParam('Split Selected', val='1,2,3',
-                                                   valType='action',
-                                                   helpText='Makes a separate component for '
-                                                            'each distinct boundary of all '
-                                                            'selected components.')
-  TOOL_OVERRIDE_VERTS_ACT : FRParam = newParam('Override Created Boundary',
-                                              valType='action',
-                                              helpText='Overrides the most recently created bounary'
-                                                       ' to be the shape of the ROI, not'
-                                                       ' the result of the image processor')
-  TOOL_COPY_REGIONS       : FRParam = newParam('Copy Selected', valType='action',
-                                                   helpText='Copies the selected components.'
-                                                            ' They can be pasted by <b>double-clicking</b>'
-                                                            ' on the destination location. When done copying,'
-                                                            ' press the shortcut for *Clear Draw Shape in Main Image*'
-                                                            ' or change the current draw action.')
-  TOOL_MOVE_REGIONS       : FRParam = newParam('Move Selected', valType='action',
-                                                   helpText='Moves the selected components.'
-                                                            ' They can be pasted by <b>double-clicking</b>'
-                                                            ' on the destination location.')
-  TOOL_CLEAR_FOC_REGION   : FRParam = newParam('Clear', None, 'action',
-                                                 helpText='Clear the focused image'
-                                                          ' by completely clearing the'
-                                                          ' region mask')
-  TOOL_RESET_FOC_REGION   : FRParam = newParam('Reset', None, 'action',
-                                                 helpText='Reset the focused image by restoring'
-                                                          ' the region mask to the last saved state')
-  TOOL_FILL_FOC_REGION    : FRParam = newParam('Fill', None, 'action',
-                                                 helpText='Completely fill the focused region mask')
-  TOOL_ACCEPT_FOC_REGION  : FRParam = newParam('Accept', None, 'action',
-                                                 helpText='Applies the focused image vertices to the'
-                                                          ' corresponding component in the table',
-                                                 shortcut='1')
+  TOOL_MERGE_COMPS        : FRParam = newParam(
+    'Merge Selected', 'Ctrl+Alt+G', valType='registeredaction',
+    helpText='Merges the selected components into one, keeping all properties '
+             'of the first in the selection')
+  TOOL_SPLIT_COMPS        : FRParam = newParam(
+    'Split Selected', 'Ctrl+Alt+S', valType='registeredaction',
+    helpText='Makes a separate component for each distinct boundary of all selected components.')
+  TOOL_OVERRIDE_VERTS_ACT : FRParam = newParam(
+    'Override Created Boundary', 'Ctrl+Alt+O', valType='registeredaction',
+    helpText='Overrides the most recently created bounary to be the shape of the ROI, not the result of the image processor')
+  TOOL_COPY_REGIONS       : FRParam = newParam(
+    'Copy Selected', 'Ctrl+Alt+C', valType='registeredaction',
+    helpText='Copies the selected components. They can be pasted by <b>double-clicking</b>'
+             ' on the destination location. When done copying, Click the'
+             ' *Clear ROI* tool change the current draw action.')
+  TOOL_MOVE_REGIONS       : FRParam = newParam(
+    'Move Selected', 'Ctrl+Alt+V', valType='registeredaction',
+    helpText='Moves the selected components. They can be pasted by <b>double-clicking</b>'
+             ' on the destination location.')
+  TOOL_CLEAR_FOC_REGION   : FRParam = newParam(
+    'Clear', 'Ctrl+Shift+C', 'registeredaction',
+    helpText='Clear the focused image')
+  TOOL_RESET_FOC_REGION   : FRParam = newParam(
+    'Reset', 'Ctrl+Shift+R', 'registeredaction',
+    helpText='Reset the focused image by restoring the region mask to the last saved state')
+  TOOL_FILL_FOC_REGION    : FRParam = newParam(
+    'Fill', 'Ctrl+Shift+F', 'registeredaction',
+    helpText='Completely fill the focused region mask')
+  TOOL_ACCEPT_FOC_REGION  : FRParam = newParam(
+    'Accept', 'Ctrl+Shift+A', 'registeredaction',
+    helpText='Applies the focused image vertices to the corresponding component in the table')
+  TOOL_CLEAR_ROI          : FRParam = newParam(
+    'Clear ROI', 'Esc', 'registeredaction', helpText='Clears the current ROI', guibtn=False)
 
   # --------------------------
-  # SHORTCUT PARAMETERS
+  # WINDOW TOOLS
   # --------------------------
-  SHC_ESTIMATE_BOUNDARIES   : FRParam = newParam('Estimate Boundaries', 'Ctrl+Alt+Shift+E', 'shortcut')
-  SHC_CLEAR_BOUNDARIES      : FRParam = newParam('Clear Boundaries', 'Ctrl+Alt+Shift+C', 'shortcut')
-  SHC_EXPORT_COMP_LIST      : FRParam = newParam('Export Component List', 'Ctrl+S', 'shortcut')
-  SHC_CLEAR_SHAPE_MAIN      : FRParam = newParam('Clear Draw Shape in Main Image', 'Esc', 'shortcut')
-  SHC_CLEAR_SHAPE_FOC       : FRParam = newParam('Clear Draw Shape in Focused Image', 'Esc', 'shortcut')
-  SHC_DESEL_ALL_BOUNDARIES  : FRParam = newParam('Deselect All Main Image Boundaries', 'Esc', 'shortcut')
-  SHC_TBL_SET_SAME_AS_FIRST : FRParam = newParam('Set Table Rows Same As First', 'Ctrl+D', 'shortcut')
-  SHC_TBL_SET_AS            : FRParam = newParam('Set Table Rows As...', 'Ctrl+Shift+D', 'shortcut')
-  SHC_TBL_DEL_ROWS          : FRParam = newParam('Delete Table Rows', 'Del', 'shortcut')
+  TOOL_ESTIMATE_BOUNDARIES   : FRParam = newParam(
+    'Estimate Boundaries', 'Ctrl+Alt+Shift+E', 'registeredaction',
+    helpText='Estimates component boundaries for the whole image. This is functionally'
+             ' equivalent to using a square ROI over the whole image while selecting'
+             ' *New component for each separate boundary*=True')
+  TOOL_CLEAR_BOUNDARIES      : FRParam = newParam(
+    'Clear Boundaries', 'Ctrl+Alt+Shift+C', 'registeredaction',
+    helpText='Removes all components from the component table')
+  TOOL_EXPORT_COMP_LIST      : FRParam = newParam(
+    'Export Table', 'Ctrl+S', 'registeredaction',
+    helpText='Saves the component table to a file')
+  TOOL_TBL_SET_SAME_AS_FIRST : FRParam = newParam(
+    'Set Cells as First', 'Ctrl+D', 'registeredaction',
+    helpText='Sets all cells in the selection to be the same as the first row in the selection.'
+             ' See the project wiki for a detailed description')
+  TOOL_TBL_SET_AS            : FRParam = newParam(
+    'Set Table Rows As...', 'Ctrl+Shift+D', 'registeredaction',
+    helpText='Sets all cells in the selection to the values specified in the popup table.'
+             ' See the project wiki for a detailed description')
+  TOOL_TBL_DEL_ROWS          : FRParam = newParam('Delete Table Rows', 'Del', 'registeredaction')
 
   # --------------------------
   # COMPONENT EXPORT PARAMETERS
   # --------------------------
-  EXP_ONLY_VISIBLE   : FRParam = newParam('Only Export Visible Components', False)
+  EXP_ONLY_VISIBLE   : FRParam = newParam(
+    'Only Export Visible Components', False,
+    helpText='If *True*, only components showing on the main image will be included in'
+             ' file exports.')
   INCLUDE_FNAME_PATH : FRParam = newParam('Include full image path on export', False,
-  None, 'Whether to just export the image name with this component group or the '
-        'full absolute filepath')
+  None, 'If *False*, only the image name is included in export information, e.g. <img>.png.'
+        ' Otherwise, the full filepath is included, e.g. "C:/Users/.../<img>.png')
 
   # --------------------------
   # COMPONENT EXPORT PARAMETERS
@@ -187,20 +192,34 @@ class _FRConsts(FRParamGroup):
   # DRAWING
   # -------------------
   # Shapes
-  DRAW_SHAPE_RECT : FRParam = newParam('Activate "Rectangular" draw shape',
-                                       'Alt+D,R', icon=str(ICON_DIR/'rectangle.svg'))
-  DRAW_SHAPE_POLY : FRParam = newParam('Activate "Polygon" draw shape', 'Alt+D,Y',
-                                       icon=str(ICON_DIR/'polygon.svg'))
+  DRAW_SHAPE_RECT : FRParam = newParam(
+    'Activate "Rectangular" draw shape', 'Ctrl+Alt+D,R', 'registeredaction',
+    icon=str(ICON_DIR/'rectangle.svg'))
+  DRAW_SHAPE_POLY : FRParam = newParam(
+    'Activate "Polygon" draw shape', 'Ctrl+Alt+D,Y', 'registeredaction',
+    icon=str(ICON_DIR/'polygon.svg'))
   DRAW_SHAPE_FREE : FRParam = newParam('Activate "Freehand" draw shape')
-  DRAW_SHAPE_PAINT: FRParam = newParam('Activate "Paint" draw shape', 'Alt+D,T',
-                                       icon=str(ICON_DIR/'paint.svg'))
+  DRAW_SHAPE_PAINT: FRParam = newParam(
+    'Activate "Paint" draw shape', 'Ctrl+Alt+D,T', icon=str(ICON_DIR/'paint.svg'))
   DRAW_SHAPE_NONE : FRParam = newParam('None')
   # Actions
-  DRAW_ACT_ADD    : FRParam = newParam('Activate "Add to Foreground"action', 'Alt+D,F', icon=str(ICON_DIR/'foreground.png'))
-  DRAW_ACT_REM    : FRParam = newParam('Activate "Add to Background"action', 'Alt+D, B', icon=str(ICON_DIR/'background.png'))
-  DRAW_ACT_SELECT : FRParam = newParam('Activate "Select" draw action', 'Alt+D, S', icon=str(ICON_DIR/'select.svg'))
-  DRAW_ACT_PAN    : FRParam = newParam('Activate "Pan" draw action', 'Alt+D,P', valType='action',
-                                       icon=str(ICON_DIR/'pan.svg'))
+  DRAW_ACT_ADD    : FRParam = newParam(
+    'Activate "Add to Foreground" action', 'Ctrl+Alt+D,F', 'registeredaction',
+    icon=str(ICON_DIR/'foreground.png'),
+    helpText='When an ROI is created, the image processor will attempt to make a new'
+             ' component at that location. Right-click and drag to pan.')
+  DRAW_ACT_REM    : FRParam = newParam(
+    'Activate "Add to Background" action', 'Ctrl+Alt+D, B', 'registeredaction',
+    icon=str(ICON_DIR/'background.png'),
+    helpText='When an ROI is created, the image processor will attempt to take the enclosed'
+             ' area away from the current component shape. Right-click and drag to pan.')
+  DRAW_ACT_SELECT : FRParam = newParam(
+    'Activate "Select" draw action', 'Ctrl+Alt+D, S', 'registeredaction', icon=str(ICON_DIR/'select.svg'),
+    helpText='When component boundaries are enclosed by this ROI, they will be selected'
+             ' in the component table. Right-click and drag to pan.')
+  DRAW_ACT_PAN    : FRParam = newParam(
+    'Activate "Pan" draw action', 'Ctrl+Alt+D,P', 'registeredaction', icon=str(ICON_DIR/'pan.svg'),
+    helpText='No ROI will be drawn in this mode. Right- or left-click and drag to pan.')
 FR_CONSTS = _FRConsts()
 
 # from ruamel.yaml import YAML

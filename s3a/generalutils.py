@@ -113,6 +113,20 @@ def largestList(verts: List[FRVertices]) -> FRVertices:
   # vertList += cropOffset[0:2]
   return FRVertices(maxLenList)
 
+def helpTextToRichText(helpText: str, prependText='', postfixText=''):
+  # Outside <qt> tags
+  if helpText.startswith('<qt>'):
+    unwrappedHelpText = helpText[4:-5]
+  else:
+    unwrappedHelpText = helpText
+  if len(prependText) > 0 and len(helpText) > 0 or len(postfixText) > 0:
+    prependText += '<br>'
+  curText = prependText + unwrappedHelpText
+  if len(postfixText) > 0:
+    curText += '<br>' + postfixText
+  newHelpText = f'<qt>{curText}</qt>'
+  return newHelpText
+
 
 def resolveAuthorName(providedAuthName: Optional[str]) -> Optional[str]:
   authPath = Path(ANN_AUTH_DIR)

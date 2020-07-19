@@ -7,7 +7,7 @@ from s3a.views.s3agui import S3A
 from testingconsts import SAMPLE_IMG, SAMPLE_IMG_FNAME, NUM_COMPS, \
   SAMPLE_SMALL_IMG, SAMPLE_SMALL_IMG_FNAME
 
-app = S3A(Image=SAMPLE_IMG_FNAME, guiMode=False, loadLastState=False)
+app = S3A(Image=SAMPLE_IMG_FNAME, guiMode=False, loadLastState=False, author='testauthor')
 mgr = app.compMgr
 stack = FR_SINGLETON.actionStack
 

@@ -160,11 +160,6 @@ def create_addMenuAct(mainWin: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, t
     return act
 
 
-def findMainWin():
-  allWidgets = appInst.topLevelWidgets()
-  isGlobalWidget = [isinstance(o, QtWidgets.QMainWindow) for o in allWidgets]
-  return allWidgets[np.argmax(isGlobalWidget)]
-
 class FRPopupLineEditor(QtWidgets.QLineEdit):
   def __init__(self, parent: QtWidgets.QWidget=None, model: QtCore.QAbstractListModel=None):
     super().__init__(parent)

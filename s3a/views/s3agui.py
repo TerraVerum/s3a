@@ -10,7 +10,7 @@ import pyqtgraph as pg
 from pyqtgraph.console import ConsoleWidget
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import Parameter
-from pyqtgraph.parametertree.parameterTypes import ActionParameter
+from pyqtgraph.parametertree.parameterTypes import ActionParameter, ActionParameterItem
 
 from s3a.views.drawopts import FRButtonCollection
 from s3a.views.parameditors import FRParamEditor, FRParamEditorDockGrouping, FR_SINGLETON
@@ -102,7 +102,7 @@ class S3A(S3ABase):
     # ANALYTICS
     self.newCompAnalyticsAct.triggered.connect(self.showNewCompAnalytics)
     self.modCompAnalyticsAct.triggered.connect(self.showModCompAnalytics)
-    
+
     # TOOLS
     self.devConsoleAct.triggered.connect(self.showDevConsole)
 
@@ -224,7 +224,7 @@ class S3A(S3ABase):
 
     # Tools
     self.devConsoleAct = create_addMenuAct(self, menuTools, 'Show Developer Console')
-    
+
 
     # SETTINGS
     for dock in FR_SINGLETON.docks:
@@ -350,6 +350,8 @@ class S3A(S3ABase):
 
   def loadLastState_gui(self):
     with pg.BusyCursor():
+      # TODO: Also show a progress bar, which is the main reason for using a
+      #  separate gui function
       self.loadLastState()
 
   def loadLastState(self):
@@ -383,7 +385,29 @@ class S3A(S3ABase):
     self.hasUnsavedChanges = False
     self.close()
 
-  def _createBtnLayoutForTools(self, editor: FRParamEditor):
+  @staticmethod
+  def _createBtnLayoutForTools(editor: FRParamEditor):
+    """Helper function for adding main window buttons from a given tool editor"""
+    retLayout = QtWidgets.QHBoxLayout()
+    for param in editor.params: # type: Parameter
+      if 'action' in param.opts['type'] and param.opts.get('guibtn', True):
+        param: ActionParameter
+        # Add this button to the group
+        item: ActionParameterItem = next(iter(param.items))
+        actionBtn = item.button
+        retLayout.addWidget(actionBtn)
+        # Since the button was stolen from its layout, no reason to show in param tree
+        # anymore. Set ignoreNameColumnChange to True so that after this button is stolen
+        # the text isn't undesirably altered
+        oldIgnore = item.ignoreNameColumnChange
+        item.ignoreNameColumnChange = True
+        param.hide()
+        # Be kind, please rewind
+        item.ignoreNameColumnChange = oldIgnore
+    return retLayout
+
+
+  def _createBtnLayoutForTools_old(self, editor: FRParamEditor):
     """Helper function for adding main window buttons from a given tool editor"""
     toolParams = []
     toolFns = []
