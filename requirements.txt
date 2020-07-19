@@ -15,7 +15,4 @@ Pillow
 imageprocessing
 qdarkstyle
 ruamel.yaml
-jsonpickle
-seaborn
-cloudpickle
 pytest

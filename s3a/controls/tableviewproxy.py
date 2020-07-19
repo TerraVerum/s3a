@@ -129,7 +129,8 @@ class FRCompDisplayFilter(QtCore.QObject):
 
   def splitSelectedComps(self):
     """See signature for :meth:`FRComponentMgr.splitCompsById`"""
-    selection, _ = self._compTbl.getIds_colsFromSelection(ignoreNoEditCols=True)
+    selection, _ = self._compTbl.getIds_colsFromSelection(excludeNoEditCols=False,
+                                                          warnNoneSelection=False)
     if selection is None:
       return
     changes = self._compMgr.splitCompVertsById(selection)
@@ -137,7 +138,8 @@ class FRCompDisplayFilter(QtCore.QObject):
 
   def mergeSelectedComps(self, keepId: int=None):
     """See signature for :meth:`FRComponentMgr.mergeCompsById`"""
-    selection, _ = self._compTbl.getIds_colsFromSelection(ignoreNoEditCols=True)
+    selection, _ = self._compTbl.getIds_colsFromSelection(excludeNoEditCols=False,
+                                                          warnNoneSelection=False)
 
     if selection is None or len(selection) < 2:
       # Nothing to do
@@ -170,10 +172,15 @@ class FRCompDisplayFilter(QtCore.QObject):
     :param padding: Padding around the selection. If *None*, defaults to pad value
       in param editor.
     """
+    if onlyGrow is None:
+      onlyGrow = self._mainImgArea.onlyGrowViewbox
     if padding is None:
-      padding = self._mainImgArea.compCropMargin
-      if self._mainImgArea.treatMarginAsPct:
-        padding = int(max(self._mainImgArea.image.shape[:2])*padding/100)
+      if onlyGrow:
+        padding = 0
+      else:
+        padding = self._mainImgArea.compCropMargin
+        if self._mainImgArea.treatMarginAsPct:
+          padding = int(max(self._mainImgArea.image.shape[:2])*padding/100)
     if selectedIds is None:
       selectedIds = self.selectedIds
     if len(selectedIds) == 0: return
@@ -185,8 +192,6 @@ class FRCompDisplayFilter(QtCore.QObject):
     vb: pg.ViewBox = self._mainImgArea.getViewBox()
     curXRange = vb.state['viewRange'][0]
     curYRange = vb.state['viewRange'][1]
-    if onlyGrow is None:
-      onlyGrow = self._mainImgArea.onlyGrowViewbox
     if onlyGrow:
       mins[0] = np.min(curXRange + [mins[0]])
       maxs[0] = np.max(curXRange + [maxs[0]])
@@ -217,7 +222,6 @@ class FRCompDisplayFilter(QtCore.QObject):
     #   self.selectedIds = ids
     # else: # Add to selection without clearing old selection
     #   self.selectedIds = np.concatenate([self.selectedIds, ids])
-    self._compTbl.setFocus()
 
 
   def _reflectSelectionBoundsMade(self, selection: Union[OneDArr, FRVertices]):

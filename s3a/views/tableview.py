@@ -228,13 +228,16 @@ class FRCompTableView(QtWidgets.QTableView):
   def removeSelectedRows_gui(self):
     if self.minimal: return
 
+    idList = [idx.siblingAtColumn(self.instIdColIdx).data(QtCore.Qt.EditRole)
+              for idx in self.selectedIndexes()]
+    if len(idList) == 0:
+      return
     # Make sure the user actually wants this
     dlg = QtWidgets.QMessageBox()
     confirm  = dlg.question(self, 'Remove Rows', 'Are you sure you want to remove these rows?',
                  dlg.Yes | dlg.Cancel)
     if confirm == dlg.Yes:
       # Proceed with operation
-      idList = [idx.sibling(idx.row(), self.instIdColIdx).data(QtCore.Qt.EditRole) for idx in self.selectedIndexes()]
       # Since each selection represents a row, remove duplicate row indices
       idList = pd.unique(idList)
       self.mgr.rmComps(idList)
@@ -260,7 +263,8 @@ class FRCompTableView(QtWidgets.QTableView):
     self.mgr.addComps(toOverwrite, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
     self.clearSelection()
 
-  def getIds_colsFromSelection(self, ignoreNoEditCols=False, ignoreNoneSelection=False):
+  def getIds_colsFromSelection(self, excludeNoEditCols=True, warnNoneSelection=True,
+                               onlyUnique=True):
     selectedIdxs = self.selectedIndexes()
     idList = []
     colIdxs = []
@@ -300,8 +304,8 @@ class FRCompTableView(QtWidgets.QTableView):
   def setSelectedCellsAs_gui(self, overrideIds: OneDArr=None, overrideColIdxs: OneDArr=None):
     if self.minimal: return
 
-    idList, _ = self.getIds_colsFromSelection(ignoreNoEditCols=True,
-                                                    ignoreNoneSelection=True)
+    idList, colIdxs = self.getIds_colsFromSelection(warnNoneSelection=False,
+                                                    onlyUnique=False)
     if overrideIds is not None:
       idList = overrideIds
     if overrideColIdxs is not None:

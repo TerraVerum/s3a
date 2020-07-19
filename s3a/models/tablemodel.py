@@ -3,26 +3,22 @@ import sys
 from ast import literal_eval
 from pathlib import Path
 from stat import S_IREAD, S_IRGRP, S_IROTH
-from typing import Union, Any, Optional, List, Tuple
-from typing_extensions import Literal
+from typing import Union, Any, Optional, Tuple
 from warnings import warn
-import re
 
-import cv2 as cv
 import numpy as np
 import pandas as pd
 from pandas import DataFrame as df
-from pyqtgraph.Qt import QtCore
+from pyqtgraph.Qt import QtCore, QtWidgets
 from skimage import io
-from skimage.measure import label
+from typing_extensions import Literal
 
-from s3a.structures import OneDArr, FRParamGroup, FilePath, FRS3AWarning, GrayImg
-from s3a.structures.typeoverloads import TwoDArr, NChanImg
 from s3a import FR_SINGLETON
 from s3a.generalutils import coerceDfTypes, augmentException
 from s3a.projectvars import FR_ENUMS, REQD_TBL_FIELDS
 from s3a.projectvars.constants import FR_CONSTS
-from s3a.structures import FRComplexVertices, FRParam, FRAppIOError
+from s3a.structures import FRComplexVertices, FRParam
+from s3a.structures import OneDArr, FRParamGroup, FilePath, FRS3AWarning, GrayImg
 
 __all__ = ['FRComponentMgr', 'FRComponentIO', 'FRCompTableModel']
 
@@ -373,8 +369,26 @@ class FRComponentIO:
     exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = srcImgFname
     self.compDf = exportDf
 
-  def exportByFileType(self, outFile: Union[str, Path], **exportArgs):
+  def exportByFileType(self, outFile: Union[str, Path], verifyIntegrity=True, **exportArgs):
     self._ioByFileType(outFile, 'export', **exportArgs)
+    if verifyIntegrity:
+      matchingCols = np.setdiff1d(self.compDf.columns, [REQD_TBL_FIELDS.INST_ID,
+                                                                REQD_TBL_FIELDS.SRC_IMG_FILENAME])
+      loadedDf = self.buildByFileType(outFile)
+      dfCmp = loadedDf[matchingCols].values == self.compDf[matchingCols].values
+      if not np.all(dfCmp):
+        problemCells = np.nonzero(~dfCmp)
+        problemIdxs = self.compDf.index[problemCells[0]]
+        problemCols = matchingCols[problemCells[1]]
+        problemMsg = [f'{idx}: {col}' for idx, col in zip(problemIdxs, problemCols)]
+        problemMsg = '\n'.join(problemMsg)
+        # Try to fix the problem with an iloc write
+        warn('<b>Warning!</b> Saved components do not match current component'
+             ' state. This can occur when pandas incorrectly caches some'
+             ' table values. To rectify this, a multi-cell overwrite was performed'
+             ' for the following cells (shown as <id>: <column>):\n'
+             + f'{problemMsg}\n'
+               f'Please try exporting again to confirm the cleanup was successful.', FRS3AWarning)
 
 
   def buildByFileType(self, inFile: Union[str, Path], imShape: Tuple[int]=None, **importArgs):
