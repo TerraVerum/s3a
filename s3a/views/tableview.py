@@ -10,7 +10,7 @@ from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from s3a import FR_SINGLETON
 from s3a.models.tablemodel import FRComponentMgr
 from s3a.projectvars import FR_CONSTS, FR_ENUMS, REQD_TBL_FIELDS
-from s3a.structures import FRS3AException, FRS3AWarning, OneDArr
+from s3a.structures import FRS3AException, FRS3AWarning, OneDArr, TwoDArr
 
 __all__ = ['FRCompTableView']
 
@@ -135,9 +135,9 @@ class FRCompTableView(QtWidgets.QTableView):
        Otherwise, only contains minimal features.
     """
     super().__init__(*args)
-    self.setCellsAsAct.sigActivated.connect(self.setSelectedCellsAs_gui)
-    self.setSameAsFirstAct.sigActivated.connect(self.setSelectedSameAsFirst_gui)
-    self.removeRowsAct.sigActivated.connect(self.removeSelectedRows_gui)
+    self.setCellsAsAct.sigActivated.connect(lambda: self.setSelectedCellsAs_gui())
+    self.setSameAsFirstAct.sigActivated.connect(lambda: self.setSelectedCellsAsFirst())
+    self.removeRowsAct.sigActivated.connect(lambda: self.removeSelectedRows_gui())
 
     self._prevSelRows = np.array([])
     self.setSortingEnabled(True)
@@ -216,7 +216,11 @@ class FRCompTableView(QtWidgets.QTableView):
     menu.addAction(remAct)
 
     overwriteAct = QtWidgets.QAction("Set Same As First", menu)
-    overwriteAct.triggered.connect(lambda: self.setSelectedSameAsFirst_gui())
+    def doOverwrite():
+      selection = self.ids_rows_colsFromSelection()
+      overwriteData = self.mgr.compDf.loc[selection[0,0]]
+      self.setSelectedCellsAs_gui(selection, overwriteData)
+    overwriteAct.triggered.connect(doOverwrite)
     menu.addAction(overwriteAct)
 
     setAsAct = QtWidgets.QAction("Set As...", menu)
@@ -243,84 +247,61 @@ class FRCompTableView(QtWidgets.QTableView):
       self.mgr.rmComps(idList)
       self.clearSelection()
 
-  def setSelectedSameAsFirst_gui(self):
-    if self.minimal: return
-
-    # Make sure the user actually wants this
-    dlg = QtWidgets.QMessageBox()
-    warnMsg = f'This operation will overwrite *ALL* selected columns with the corresponding column values from'\
-              f' the FIRST row in your selection. PLEASE USE CAUTION. Do you wish to proceed?'
-    confirm  = dlg.question(self, 'Overwrite Rows', warnMsg, dlg.Yes | dlg.Cancel)
-    if confirm != dlg.Yes:
-      return
-    idList, colIdxs = self.getIds_colsFromSelection()
-    if idList is None:
-      return
-    toOverwrite = self.mgr.compDf.loc[idList].copy()
-    # Some bug is preventing the single assignment value from broadcasting
-    setVals = [toOverwrite.iloc[0,colIdxs] for _ in range(len(idList)-1)]
-    toOverwrite.iloc[1:, colIdxs] = setVals
-    self.mgr.addComps(toOverwrite, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
-    self.clearSelection()
-
-  def getIds_colsFromSelection(self, excludeNoEditCols=True, warnNoneSelection=True,
-                               onlyUnique=True):
+  def ids_rows_colsFromSelection(self, excludeNoEditCols=True, warnNoneSelection=True):
+    """Returns Nx3 np array of (ids, rows, cols) from current table selection"""
     selectedIdxs = self.selectedIndexes()
-    idList = []
-    colIdxs = []
+    retLists = [] # (Ids, rows, cols)
     for idx in selectedIdxs:
+      row = idx.row()
       # 0th row contains instance ID
       # TODO: If the user is allowed to reorder columns this needs to be revisited
-      idAtIdx = idx.sibling(idx.row(), 0).data(QtCore.Qt.EditRole)
-      idList.append(idAtIdx)
-      colIdxs.append(idx.column())
-    idList = pd.unique(idList)
-    colIdxs = pd.unique(colIdxs)
-    if not ignoreNoEditCols:
-      colIdxs = np.setdiff1d(colIdxs, self.model().sourceModel().noEditColIdxs)
-    if not ignoreNoneSelection and (len(idList) == 0 or len(colIdxs) == 0):
+      idAtIdx = idx.siblingAtColumn(0).data(QtCore.Qt.EditRole)
+      retLists.append([row, idAtIdx, idx.column()])
+    retLists = np.array(retLists)
+    if excludeNoEditCols:
+      # Set diff will eliminate any repeats, so use a slower op that at least preserves
+      # duplicates
+      retLists = retLists[~np.isin(retLists[:,2], self.mgr.noEditColIdxs)]
+    if warnNoneSelection and len(retLists):
       warn('No editable columns selected.', FRS3AWarning)
-      return None, None
-    return idList, colIdxs
+    return retLists
 
-  def setCellsAs(self, idList: Sequence[int], colIdxs: Sequence[int],
-                 overwriteData: df):
-    if colIdxs is None:
-      colIdxs = np.arange(self.mgr.columnCount(), dtype=int)
-      colIdxs = np.setdiff1d(colIdxs, self.mgr.noEditColIdxs)
-    if len(idList) == 0 or len(colIdxs) == 0:
-      warn('No editable cells were specified so no action was performed',
-           FRS3AWarning)
+  def setSelectedCellsAsFirst(self):
+    selection = self.ids_rows_colsFromSelection()
+    overwriteData = self.mgr.compDf.loc[selection[0,0]]
+    self.setSelectedCellsAs(selection, overwriteData)
+
+  def setSelectedCellsAs_gui(self, selectionIdxs: TwoDArr=None):
+    if selectionIdxs is None:
+      selectionIdxs = self.ids_rows_colsFromSelection()
+    overwriteData = self.mgr.compDf.loc[[selectionIdxs[0,0]],:].copy()
+    with FR_SINGLETON.actionStack.ignoreActions():
+      self.popup.setData(overwriteData, pd.unique(selectionIdxs[:,2]))
+      wasAccepted = self.popup.exec()
+    if not wasAccepted or len(self.popup.dirtyColIdxs) > 0:
       return
 
-    toOverwrite = self.mgr.compDf.loc[idList].copy()
-    # Only overwrite dirty columns from popup
+    selectionIdxs = selectionIdxs[np.isin(selectionIdxs[:,2], self.popup.dirtyColIdxs)]
+    self.setCellsAs(selectionIdxs, self.popup.data)
 
-    # Some bug is preventing the single assignment value from broadcasting
-    setVals = [overwriteData.iloc[0, colIdxs] for _ in range(len(idList))]
-    toOverwrite.iloc[:, colIdxs] = setVals
-    self.mgr.addComps(toOverwrite, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
-
-  def setSelectedCellsAs_gui(self, overrideIds: OneDArr=None, overrideColIdxs: OneDArr=None):
+  def setSelectedCellsAs(self, selectionIdxs: TwoDArr, overwriteData: df):
+    """
+    Overwrites the data from rows and cols with the information in *overwriteData*.
+    Each (id, row, col) index is treated as a single index
+    :param selectionIdxs: Selection idxs to overwrite. If *None*, defaults to
+      current selection.
+    :param overwriteData: What to fill in the overwrite locations. If *None*, a popup table
+      is displayed and its data is used.
+    """
     if self.minimal: return
 
-    idList, colIdxs = self.getIds_colsFromSelection(warnNoneSelection=False,
-                                                    onlyUnique=False)
-    if overrideIds is not None:
-      idList = overrideIds
-    if overrideColIdxs is not None:
-      colIdxs = overrideColIdxs
-    else:
-      colIdxs = np.arange(len(FR_SINGLETON.tableData.allFields))
-    colIdxs = np.setdiff1d(colIdxs, self.mgr.noEditColIdxs)
-    if idList is None or len(colIdxs) == 0:
+    if len(selectionIdxs) == 0:
       return
-    dataToSet = self.mgr.compDf.loc[[idList[0]],:].copy()
-    with FR_SINGLETON.actionStack.ignoreActions():
-      self.popup.setData(dataToSet, colIdxs)
-      wasAccepted = self.popup.exec()
-    if wasAccepted and len(self.popup.dirtyColIdxs) > 0:
-      colIdxs = np.intersect1d(colIdxs, self.popup.dirtyColIdxs)
-      # False positive
-      # noinspection PyTypeChecker
-      self.setCellsAs(idList, colIdxs, self.popup.data)
+    overwriteData = overwriteData.squeeze()
+    uniqueIds = pd.unique(selectionIdxs[:,0])
+    newDataDf = self.mgr.compDf.loc[uniqueIds].copy()
+    # New data ilocs will no longer match, fix this using loc + indexed columns
+    colsForLoc = self.mgr.compDf.columns[selectionIdxs[:,2]]
+    for idxTriplet, colForLoc in zip(selectionIdxs, colsForLoc):
+      newDataDf.at[idxTriplet[0], colForLoc] = overwriteData.iat[idxTriplet[2]]
+    self.mgr.addComps(newDataDf, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)

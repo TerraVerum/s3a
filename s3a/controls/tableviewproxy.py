@@ -129,25 +129,25 @@ class FRCompDisplayFilter(QtCore.QObject):
 
   def splitSelectedComps(self):
     """See signature for :meth:`FRComponentMgr.splitCompsById`"""
-    selection, _ = self._compTbl.getIds_colsFromSelection(excludeNoEditCols=False,
-                                                          warnNoneSelection=False)
-    if selection is None:
+    selection = self._compTbl.ids_rows_colsFromSelection(excludeNoEditCols=False,
+                                                            warnNoneSelection=False)
+    if len(selection) == 0:
       return
-    changes = self._compMgr.splitCompVertsById(selection)
+    changes = self._compMgr.splitCompVertsById(np.unique(selection[:,0]))
     self.selectRowsById(changes['added'], QtCore.QItemSelectionModel.ClearAndSelect)
 
   def mergeSelectedComps(self, keepId: int=None):
     """See signature for :meth:`FRComponentMgr.mergeCompsById`"""
-    selection, _ = self._compTbl.getIds_colsFromSelection(excludeNoEditCols=False,
-                                                          warnNoneSelection=False)
+    selection = self._compTbl.ids_rows_colsFromSelection(excludeNoEditCols=False,
+                                                         warnNoneSelection=False)
 
-    if selection is None or len(selection) < 2:
+    if len(selection) < 2:
       # Nothing to do
       return
     if keepId is None:
-      keepId = selection[0]
+      keepId = selection[0,0]
     try:
-      self._compMgr.mergeCompVertsById(selection, keepId)
+      self._compMgr.mergeCompVertsById(np.unique(selection[:,0]), keepId)
     except FRS3AWarning:
       # No merge was performed, don't alter the table selection
       raise

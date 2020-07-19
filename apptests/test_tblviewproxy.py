@@ -48,18 +48,26 @@ def test_set_cells_as():
   if (len(mgr.compDf) % 2) == 1:
     mgr.rmComps(mgr.compDf.index[-1])
   mgr.compDf.loc[:, REQD_TBL_FIELDS.COMP_CLASS] = oldCls
+  # Ensure the overwrite data will be different from what it's overwriting
   newCls = FR_SINGLETON.tableData.compClasses[1]
   newDf = mgr.compDf.loc[[0]]
   compClsIdx = FR_SINGLETON.tableData.allFields.index(REQD_TBL_FIELDS.COMP_CLASS)
   newDf.iat[0, compClsIdx] = newCls
-  app.compTbl.setCellsAs(mgr.compDf.index[::2], [compClsIdx], newDf)
+  oldMode = app.compTbl.selectionMode()
+  app.compTbl.setSelectionMode(app.compTbl.MultiSelection)
+  for row in mgr.compDf.index[::2]:
+    app.compTbl.selectRow(row)
+  app.compTbl.setSelectionMode(oldMode)
+  selection = app.compTbl.ids_rows_colsFromSelection()
+  app.compTbl.setSelectedCellsAs(selection, newDf)
   matchList = np.tile([newCls, oldCls], len(mgr.compDf)//2)
   assert np.array_equal(mgr.compDf[REQD_TBL_FIELDS.COMP_CLASS], matchList)
 
 def test_set_as_gui(sampleComps):
   # Monkeypatch gui for testing
   view = FRCompTableView()
-  view.mgr.addComps(sampleComps)
+  mgr = view.mgr
+  mgr.addComps(sampleComps)
   view.popup.exec = lambda: True
   allCols = np.arange(len(view.mgr.colTitles))
   editCols = np.setdiff1d(allCols, mgr.noEditColIdxs)
@@ -69,9 +77,13 @@ def test_set_as_gui(sampleComps):
     oldSetData(*args, **kwargs)
     view.popup.dirtyColIdxs = editCols
   view.popup.setData = patchedSetData
-  view.setSelectedCellsAs_gui(view.mgr.compDf.index, allCols)
+  numEditCols = len(editCols)
+  selectionIdxs = np.tile(np.arange(len(mgr.compDf))[:,None], (numEditCols,3))
+  selectionIdxs[:,2] = np.tile(editCols, len(mgr.compDf))
+  overwriteData = mgr.compDf.iloc[[0]]
+  view.setSelectedCellsAs(selectionIdxs, overwriteData)
   editableDf = view.mgr.compDf.iloc[:, editCols]
-  cmpDf = pd.concat([view.mgr.compDf.iloc[[0], editCols]]*len(view.mgr.compDf))
+  cmpDf = pd.concat([mgr.compDf.iloc[[0], editCols]]*len(mgr.compDf))
   assert np.array_equal(editableDf.values, cmpDf.values)
 
 @pytest.mark.withcomps

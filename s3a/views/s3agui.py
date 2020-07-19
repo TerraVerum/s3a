@@ -518,6 +518,12 @@ class S3A(S3ABase):
   def add_focusComp(self, newComps: df):
     ret = super().add_focusComp(newComps)
     if self.isVisible() and self.compTbl.showOnCreate:
+      mgr = self.compMgr
+      editCols = np.arange(len(mgr.compDf.columns))
+      editCols = np.setdiff1d(editCols, mgr.noEditColIdxs)
+      numEditCols = len(editCols)
+      selectionIdxs = np.tile(np.arange(len(mgr.compDf))[:,None], (numEditCols,3))
+      selectionIdxs[:,2] = np.tile(editCols, len(mgr.compDf))
       self.compTbl.setSelectedCellsAs_gui(overrideIds=newComps.index)
     return ret
 
