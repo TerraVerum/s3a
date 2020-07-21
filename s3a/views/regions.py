@@ -296,7 +296,10 @@ class FRMouseFollowingRegionPlot(pg.PlotCurveItem):
     connectivity = np.concatenate(allConnctivity)
 
     try:
-      self.dataMin = plotData.min(0)
+      allMin = plotData.min(0)
+      closestPtIdx  = np.argmin(np.sum(np.abs(plotData - allMin), 1))
+      # Guarantees that the mouse will be on the boundary closest to the top left
+      self.dataMin = plotData[closestPtIdx]
       # connectivity[addtnlFalseConnectivityIdxs] = False
     except ValueError:
       # When no elements are in the array
