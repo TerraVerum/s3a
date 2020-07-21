@@ -44,6 +44,7 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
 
     noEditParams = set(REQD_TBL_FIELDS) - {REQD_TBL_FIELDS.COMP_CLASS}
     self.noEditColIdxs = [self.colTitles.index(col.name) for col in noEditParams]
+    self.editColIdxs = np.setdiff1d(np.arange(len(self.colTitles)), self.noEditColIdxs)
 
   # ------
   # Functions required to implement table model
@@ -328,8 +329,20 @@ class FRComponentIO:
 
   @property
   def handledIoTypes(self):
-      return {'csv': 'CSV Files', 'pkl': 'Pickle Files', 'id.png': 'ID Grayscale Image',
-              'class.png': 'Class Grayscale Image'}
+    """Returns a dict of <type, description> for the file types this I/O obejct can handle"""
+    return {'csv': 'CSV Files', 'pkl': 'Pickle Files', 'id.png': 'ID Grayscale Image',
+            'class.png': 'Class Grayscale Image'}
+
+  @property
+  def roundTripIoTypes(self):
+    """
+    Not all IO types can export->import and remain the exact same dataframe afterwards.
+    For instance, exporting a labeled image will discard all additional fields.
+    This property holds export types which can give back the original dataframe after
+    a round trip export->import.
+    """
+    ioTypes = self.handledIoTypes
+    return {k: ioTypes[k] for k in ['csv', 'pkl']}
 
   def handledIoTypes_fileFilter(self, typeFilter='', **extraOpts):
     """
@@ -370,8 +383,9 @@ class FRComponentIO:
     self.compDf = exportDf
 
   def exportByFileType(self, outFile: Union[str, Path], verifyIntegrity=True, **exportArgs):
+    outFile = Path(outFile)
     self._ioByFileType(outFile, 'export', **exportArgs)
-    if verifyIntegrity:
+    if verifyIntegrity and outFile.suffix[1:] in self.roundTripIoTypes:
       matchingCols = np.setdiff1d(self.compDf.columns, [REQD_TBL_FIELDS.INST_ID,
                                                                 REQD_TBL_FIELDS.SRC_IMG_FILENAME])
       loadedDf = self.buildByFileType(outFile)

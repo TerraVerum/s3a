@@ -1,27 +1,28 @@
-from typing import Union, Optional, Tuple, Collection, Dict
+from typing import Union, Optional, Collection
 
-import cv2 as cv
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph import BusyCursor
-from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from pyqtgraph.Qt import QtCore, QtGui
 from skimage.io import imread
 
 from s3a import FR_SINGLETON
 from s3a.generalutils import getClippedBbox, frPascalCaseToTitle, cornersToFullBoundary
-from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS as FRC, MENU_OPTS_DIR
+from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS as FRC
 from s3a.structures import FRParam, FRVertices, FRComplexVertices, FilePath
 from s3a.structures import NChanImg
 from .clickables import FRRightPanViewBox
-from .drawopts import FRDrawOpts, FRButtonCollection, btnCallable
+from .drawopts import FRDrawOpts, FRButtonCollection
 from .parameditors import FRParamEditor, FRParamEditorDockGrouping
 from .procwrapper import FRImgProcWrapper
+from ..processingimpls import _historyMaskHolder
 from .regions import FRVertexDefinedImg, FRMouseFollowingRegionPlot
 
 __all__ = ['FRMainImage', 'FRFocusedImage', 'FREditableImgBase']
 
 from s3a.controls.drawctrl import FRRoiCollection
+from ..graphicsutils import contextMenuFromEditorActions
 
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
@@ -46,18 +47,29 @@ class FREditableImgBase(pg.PlotWidget):
     )
     FR_SINGLETON.addDocks(dockGroup)
 
+
     cls.compCropMargin, cls.treatMarginAsPct = FR_SINGLETON.generalProps.registerProps(
       cls, [FRC.PROP_CROP_MARGIN_VAL, FRC.PROP_TREAT_MARGIN_AS_PCT])
+    cls.showGuiBtns = FR_SINGLETON.generalProps.registerProp(
+      cls, FRC.PROP_SHOW_GUI_TOOL_BTNS, asProperty=False
+    )
 
     (cls.clearRoiAct,) = cls.toolsEditor.registerProps(
       cls, [FRC.TOOL_CLEAR_ROI], asProperty=False, ownerObj=cls
     )
 
   def __init__(self, parent=None, drawShapes: Collection[FRParam]=(),
-               drawActions: Collection[FRParam]=(),
-               toolParams: Collection[FRParam]=(), toolFns: Collection[btnCallable]=(),
-               **kargs):
+               drawActions: Collection[FRParam]=(),**kargs):
     super().__init__(parent, viewBox=FRRightPanViewBox(), **kargs)
+    self.menu = contextMenuFromEditorActions(self.toolsEditor, self.toolsEditor.name,
+                                                          self)
+    vb: pg.ViewBox = self.getViewBox()
+    # Disable default menus
+    self.plotItem.ctrlMenu = None
+    self.sceneObj.contextMenu = None
+    # Set desired menu actions
+    vb.menu = self.menu
+
     self.clearRoiAct.sigActivated.connect(lambda: self.clearCurRoi())
     self.setAspectLocked(True)
     self.getViewBox().invertY()
@@ -84,25 +96,25 @@ class FREditableImgBase(pg.PlotWidget):
 
     def shapeAssignment(newShapeParam: FRParam):
       self.shapeCollection.curShapeParam = newShapeParam
-    self.drawShapeGrp = FRButtonCollection(self, "Shapes", drawShapes, shapeAssignment)
+    self.drawShapeGrp = FRButtonCollection(self, 'Shapes', drawShapes, shapeAssignment)
 
     def actionAssignment(newActionParam: FRParam):
       self.drawAction = newActionParam
       if self.regionCopier.active:
         self.regionCopier.erase()
-    self.drawActGrp = FRButtonCollection(self, "Actions", drawActions, actionAssignment)
+    self.drawActGrp = FRButtonCollection(self, 'Actions', drawActions, actionAssignment)
 
     self.drawOptsWidget = FRDrawOpts(self.drawShapeGrp, self.drawActGrp, self)
 
-    # self.toolsGrp = FRButtonCollection(self, btnParams=toolParams, btnTriggerFns=toolFns,
-    #                                    exclusive=False, checkable=False)
-
-    # self.drawOptsWidget = FRDrawOpts(parent, drawShapes, drawActions)
-    # btnGroups = [self.drawOptsWidget.shapeBtnGroup, self.drawOptsWidget.actionBtnGroup]
-    # for group in btnGroups:
-    #   group.buttonToggled.connect(self._handleBtnToggle)
-    # self.drawOptsWidget.selectOpt(self.drawAction)
-    # self.drawOptsWidget.selectOpt(self.shapeCollection.curShapeParam)
+    toolParams = []
+    toolFns = []
+    for param in self.toolsEditor.params.childs:
+      if 'action' in param.opts['type'] and param.opts.get('guibtn', True):
+        toolParams.append(param.opts['frParam'])
+        toolFns.append(lambda *_args, _param=param: _param.sigActivated.emit(_param))
+    # Don't create shortcuts since this will be done by the tool editor
+    self.toolsGrp = FRButtonCollection(self, title='Tools', btnParams=toolParams,
+                                       btnTriggerFns=toolFns, exclusive=False, checkable=False)
 
     # Initialize draw shape/action buttons
     self.drawActGrp.callFuncByParam(self.drawAction)
@@ -337,10 +349,10 @@ class FRFocusedImage(FREditableImgBase):
   def __initEditorParams__(cls):
     super().__initEditorParams__()
     (cls.resetRegionAct, cls.fillRegionAct,
-     cls.clearRegionAct, cls.acceptRegionAct) = cls.toolsEditor.registerProps(
+     cls.clearRegionAct, cls.acceptRegionAct, cls.clearHistoryAct) = cls.toolsEditor.registerProps(
       cls, [FRC.TOOL_RESET_FOC_REGION, FRC.TOOL_FILL_FOC_REGION,
-            FRC.TOOL_CLEAR_FOC_REGION, FRC.TOOL_ACCEPT_FOC_REGION],
-      asProperty=False)
+            FRC.TOOL_CLEAR_FOC_REGION, FRC.TOOL_ACCEPT_FOC_REGION, FRC.TOOL_CLEAR_HISTORY],
+      asProperty=False, ownerObj=cls)
 
 
   def __init__(self, parent=None, **kargs):
@@ -359,6 +371,10 @@ class FRFocusedImage(FREditableImgBase):
     self.fillRegionAct.sigActivated.connect(fillAct)
     self.resetRegionAct.sigActivated.connect(
       lambda: self.updateRegionFromVerts(self.compSer[REQD_TBL_FIELDS.VERTICES]))
+    self.clearHistoryAct.sigActivated.connect(
+      lambda: _historyMaskHolder[0].fill(0)
+    )
+
     self.region = FRVertexDefinedImg()
 
     self.addItem(self.region)
@@ -376,6 +392,7 @@ class FRFocusedImage(FREditableImgBase):
 
   def resetImage(self):
     self.updateAll(None)
+    self.region.clear()
 
   def handleShapeFinished(self, roiVerts: FRVertices) -> Optional[np.ndarray]:
     if self.drawAction == FRC.DRAW_ACT_PAN:

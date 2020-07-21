@@ -62,7 +62,7 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
   @classmethod
   def __initEditorParams__(cls):
     (cls.focusedBoundClr, cls.selectedBoundClr, cls.boundClr, cls.boundWidth) = \
-      FR_SINGLETON.scheme.registerProps(
+      FR_SINGLETON.generalProps.registerProps(
         cls, [FR_CONSTS.SCHEME_FOC_BRUSH_CLR, FR_CONSTS.SCHEME_SEL_BOUND_CLR,
               FR_CONSTS.SCHEME_BOUND_CLR, FR_CONSTS.SCHEME_BOUND_WIDTH])
 
@@ -196,12 +196,13 @@ class FRVertexDefinedImg(pg.ImageItem):
   sigRegionReverted = Signal(object) # new GrayImg
   @classmethod
   def __initEditorParams__(cls):
-    cls.fillClr, cls.vertClr = FR_SINGLETON.scheme.registerProps(
+    cls.fillClr, cls.vertClr = FR_SINGLETON.generalProps.registerProps(
       cls, [FR_CONSTS.SCHEME_REG_FILL_COLOR, FR_CONSTS.SCHEME_REG_VERT_COLOR])
 
   def __init__(self):
     super().__init__()
     self.verts = FRComplexVertices()
+    FR_SINGLETON.generalProps.sigParamStateUpdated.connect(lambda: self.setImage(lut=self.getLUTFromScheme()))
 
   def embedMaskInImg(self, toEmbedShape: Tuple[int, int]):
     outImg = np.zeros(toEmbedShape, dtype=bool)

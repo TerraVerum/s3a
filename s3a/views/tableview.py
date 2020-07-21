@@ -15,6 +15,7 @@ from s3a.structures import FRS3AException, FRS3AWarning, OneDArr, TwoDArr
 __all__ = ['FRCompTableView']
 
 from .parameditors import pgregistered, FRParamEditor, FRParamEditorDockGrouping
+from ..graphicsutils import contextMenuFromEditorActions
 
 Signal = QtCore.Signal
 
@@ -135,9 +136,6 @@ class FRCompTableView(QtWidgets.QTableView):
        Otherwise, only contains minimal features.
     """
     super().__init__(*args)
-    self.setCellsAsAct.sigActivated.connect(lambda: self.setSelectedCellsAs_gui())
-    self.setSameAsFirstAct.sigActivated.connect(lambda: self.setSelectedCellsAsFirst())
-    self.removeRowsAct.sigActivated.connect(lambda: self.removeSelectedRows_gui())
 
     self._prevSelRows = np.array([])
     self.setSortingEnabled(True)
@@ -153,6 +151,9 @@ class FRCompTableView(QtWidgets.QTableView):
       self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
       cursor = QtGui.QCursor()
       self.customContextMenuRequested.connect(lambda: self.menu.exec_(cursor.pos()))
+      self.setCellsAsAct.sigActivated.connect(lambda: self.setSelectedCellsAs_gui())
+      self.setSameAsFirstAct.sigActivated.connect(lambda: self.setSelectedCellsAsFirst())
+      self.removeRowsAct.sigActivated.connect(lambda: self.removeSelectedRows_gui())
 
     self.instIdColIdx = TBL_FIELDS.index(REQD_TBL_FIELDS.INST_ID)
 
@@ -208,25 +209,7 @@ class FRCompTableView(QtWidgets.QTableView):
     self.sigSelectionChanged.emit(pd.unique(selectedIds))
 
   def createContextMenu(self):
-    menu = QtWidgets.QMenu(self)
-    menu.setTitle('Table Actions')
-
-    remAct = QtWidgets.QAction("Remove", menu)
-    remAct.triggered.connect(lambda: self.removeSelectedRows_gui())
-    menu.addAction(remAct)
-
-    overwriteAct = QtWidgets.QAction("Set Same As First", menu)
-    def doOverwrite():
-      selection = self.ids_rows_colsFromSelection()
-      overwriteData = self.mgr.compDf.loc[selection[0,0]]
-      self.setSelectedCellsAs_gui(selection, overwriteData)
-    overwriteAct.triggered.connect(doOverwrite)
-    menu.addAction(overwriteAct)
-
-    setAsAct = QtWidgets.QAction("Set As...", menu)
-    menu.addAction(setAsAct)
-    setAsAct.triggered.connect(lambda: self.setSelectedCellsAs_gui())
-
+    menu = contextMenuFromEditorActions(self.toolsEditor, 'Table Tools', self)
     return menu
 
   def removeSelectedRows_gui(self):
@@ -255,14 +238,14 @@ class FRCompTableView(QtWidgets.QTableView):
       row = idx.row()
       # 0th row contains instance ID
       # TODO: If the user is allowed to reorder columns this needs to be revisited
-      idAtIdx = idx.siblingAtColumn(0).data(QtCore.Qt.EditRole)
-      retLists.append([row, idAtIdx, idx.column()])
+      idAtIdx = idx.siblingAtColumn(self.instIdColIdx).data(QtCore.Qt.EditRole)
+      retLists.append([idAtIdx, row, idx.column()])
     retLists = np.array(retLists)
     if excludeNoEditCols:
       # Set diff will eliminate any repeats, so use a slower op that at least preserves
       # duplicates
       retLists = retLists[~np.isin(retLists[:,2], self.mgr.noEditColIdxs)]
-    if warnNoneSelection and len(retLists):
+    if warnNoneSelection and len(retLists) == 0:
       warn('No editable columns selected.', FRS3AWarning)
     return retLists
 
@@ -278,11 +261,11 @@ class FRCompTableView(QtWidgets.QTableView):
     with FR_SINGLETON.actionStack.ignoreActions():
       self.popup.setData(overwriteData, pd.unique(selectionIdxs[:,2]))
       wasAccepted = self.popup.exec()
-    if not wasAccepted or len(self.popup.dirtyColIdxs) > 0:
+    if not wasAccepted or len(self.popup.dirtyColIdxs) == 0:
       return
 
     selectionIdxs = selectionIdxs[np.isin(selectionIdxs[:,2], self.popup.dirtyColIdxs)]
-    self.setCellsAs(selectionIdxs, self.popup.data)
+    self.setSelectedCellsAs(selectionIdxs, self.popup.data)
 
   def setSelectedCellsAs(self, selectionIdxs: TwoDArr, overwriteData: df):
     """

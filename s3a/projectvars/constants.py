@@ -106,47 +106,58 @@ class _FRConsts(FRParamGroup):
              ' shrinks only to the current selection (if *False*)or just ensures the'
              ' view contains the selected component (if *True*)')
   PROP_FOCUSED_SEED_THRESH     : FRParam = newParam('Seedpoint Threshold in Focused Image', 7.)
-  PROP_UNDO_BUF_SZ             : FRParam = newParam('Size of Undo Buffer', 300)
+  PROP_UNDO_BUF_SZ             : FRParam = newParam(
+    'Size of Undo Buffer', 300, helpText='Increasing the buffer size will require more memory,'
+                                         'but can save a larger record of past actions.')
   PROP_STEPS_BW_SAVE           : FRParam = newParam('Operations Between Buffer Saves', 1)
   PROP_CHECK_LARGE_CHANGES     : FRParam = newParam('Save buffer during large region changes', True)
   PROP_SHOW_TBL_ON_COMP_CREATE : FRParam = newParam('Show popup table when creating component', False)
+  PROP_SHOW_GUI_TOOL_BTNS      : FRParam = newParam(
+    'Show tool buttons', True, helpText='Since these buttons also have right-click menu options,'
+                                        ' it may be desirable to save space in the main'
+                                        ' window by hiding these buttons.')
 
   # --------------------------
   # IMAGE TOOLS
   # --------------------------
   TOOL_MERGE_COMPS        : FRParam = newParam(
-    'Merge Selected', 'Ctrl+Alt+G', valType='registeredaction',
+    'Merge Selected', 'Ctrl+Alt+G', valType='action',
     helpText='Merges the selected components into one, keeping all properties '
              'of the first in the selection')
   TOOL_SPLIT_COMPS        : FRParam = newParam(
-    'Split Selected', 'Ctrl+Alt+S', valType='registeredaction',
+    'Split Selected', 'Ctrl+Alt+S', valType='action',
     helpText='Makes a separate component for each distinct boundary of all selected components.')
   TOOL_OVERRIDE_VERTS_ACT : FRParam = newParam(
-    'Override Created Boundary', 'Ctrl+Alt+O', valType='registeredaction',
+    'Override Created Boundary', 'Ctrl+Alt+O', valType='action',
     helpText='Overrides the most recently created bounary to be the shape of the ROI, not the result of the image processor')
   TOOL_COPY_REGIONS       : FRParam = newParam(
-    'Copy Selected', 'Ctrl+Alt+C', valType='registeredaction',
+    'Copy Selected', 'Ctrl+Alt+C', valType='action',
     helpText='Copies the selected components. They can be pasted by <b>double-clicking</b>'
              ' on the destination location. When done copying, Click the'
              ' *Clear ROI* tool change the current draw action.')
   TOOL_MOVE_REGIONS       : FRParam = newParam(
-    'Move Selected', 'Ctrl+Alt+V', valType='registeredaction',
+    'Move Selected', 'Ctrl+Alt+V', valType='action',
     helpText='Moves the selected components. They can be pasted by <b>double-clicking</b>'
              ' on the destination location.')
   TOOL_CLEAR_FOC_REGION   : FRParam = newParam(
-    'Clear', 'Ctrl+Shift+C', 'registeredaction',
+    'Clear', 'Ctrl+Shift+C', 'action',
     helpText='Clear the focused image')
   TOOL_RESET_FOC_REGION   : FRParam = newParam(
-    'Reset', 'Ctrl+Shift+R', 'registeredaction',
+    'Reset', 'Ctrl+Shift+R', 'action',
     helpText='Reset the focused image by restoring the region mask to the last saved state')
   TOOL_FILL_FOC_REGION    : FRParam = newParam(
-    'Fill', 'Ctrl+Shift+F', 'registeredaction',
+    'Fill', 'Ctrl+Shift+F', 'action',
     helpText='Completely fill the focused region mask')
   TOOL_ACCEPT_FOC_REGION  : FRParam = newParam(
-    'Accept', 'Ctrl+Shift+A', 'registeredaction',
+    'Accept', 'Ctrl+Shift+A', 'action',
     helpText='Applies the focused image vertices to the corresponding component in the table')
   TOOL_CLEAR_ROI          : FRParam = newParam(
     'Clear ROI', 'Esc', 'registeredaction', helpText='Clears the current ROI', guibtn=False)
+  TOOL_CLEAR_HISTORY      : FRParam = newParam(
+    'Clear Processor History', 'Ctrl+Alt+C,H', 'registeredaction',
+    helpText='Each time an update is made in the processor, it is saved so algorithms'
+             ' can take past edits into account when performing their operations. Clearing'
+             ' that history will erase algorithm knowledge of past edits.', guibtn=False)
 
   # --------------------------
   # WINDOW TOOLS
@@ -155,10 +166,10 @@ class _FRConsts(FRParamGroup):
     'Estimate Boundaries', 'Ctrl+Alt+Shift+E', 'registeredaction',
     helpText='Estimates component boundaries for the whole image. This is functionally'
              ' equivalent to using a square ROI over the whole image while selecting'
-             ' *New component for each separate boundary*=True')
+             ' *New component for each separate boundary*=True', guibtn=False)
   TOOL_CLEAR_BOUNDARIES      : FRParam = newParam(
     'Clear Boundaries', 'Ctrl+Alt+Shift+C', 'registeredaction',
-    helpText='Removes all components from the component table')
+    helpText='Removes all components from the component table', guibtn=False)
   TOOL_EXPORT_COMP_LIST      : FRParam = newParam(
     'Export Table', 'Ctrl+S', 'registeredaction',
     helpText='Saves the component table to a file')

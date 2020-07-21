@@ -67,7 +67,8 @@ class FRShortcutsEditor(FRParamEditor):
     self.shortcuts: List[QtWidgets.QShortcut] = []
     # Unlike other param editors, these children don't get filled in until
     # after the top-level widget is passed to the shortcut editor
-    super().__init__(parent, [], saveDir=SHORTCUTS_DIR, fileType='shortcut')
+    super().__init__(parent, [], saveDir=SHORTCUTS_DIR, fileType='shortcut',
+                     name='Tool Shortcuts')
 
     # If the registered class is not a graphical widget, the shortcut
     # needs a global context
@@ -77,8 +78,8 @@ class FRShortcutsEditor(FRParamEditor):
     """Holds which objects have what shortcuts. Useful for avoiding duplicate shortcuts
     for the same action on one class"""
     # Allow global shortcuts
-    globalParam = FRParam('Global')
-    self.groupingToParamMapping[type(None)] = globalParam
+    self.globalParam = FRParam('Global')
+    self.groupingToParamMapping[type(None)] = self.globalParam
 
   def registerMethod_cls(self, constParam: FRParam, fnArgs: List[Any]=None, forceCreate=False):
     """
@@ -124,17 +125,27 @@ class FRShortcutsEditor(FRParamEditor):
     for boundParam in boundParamList:
       self.hookupShortcutForBoundFn(boundParam, clsObj)
 
-  def createRegisteredButton(self, btnParam: FRParam, ownerObj: Any):
-    if 'icon' in btnParam.opts:
+  def createRegisteredButton(self, btnParam: FRParam, ownerObj: Any, doRegister=True,
+                             baseBtn: QtWidgets.QAbstractButton=None):
+    if baseBtn is not None:
+      newBtn = baseBtn
+      tooltipText = btnParam.helpText
+    elif 'icon' in btnParam.opts:
       newBtn = QtWidgets.QPushButton(QtGui.QIcon(btnParam.opts['icon']), '', self)
       tooltipText = helpTextToRichText(btnParam.helpText, btnParam.name)
     else:
       newBtn = QtWidgets.QPushButton(btnParam.name, self)
       tooltipText = btnParam.helpText
-    if btnParam.value is None:
+    if btnParam.value is None or not doRegister:
       return newBtn
 
-    param = self.registerMethod_obj(newBtn.clicked.emit, btnParam, ownerObj)
+    if isclass(ownerObj):
+      self.registerMethod_cls(btnParam, forceCreate=True)(
+        lambda *args: newBtn.clicked.emit(), ownerObj)
+      clsParam = self.groupingToParamMapping[ownerObj]
+      param = self[clsParam, btnParam, True]
+    else:
+      param = self.registerMethod_obj(lambda *args: newBtn.clicked.emit(), btnParam, ownerObj)
 
     param.opts['tip'] = tooltipText
 
@@ -148,6 +159,7 @@ class FRShortcutsEditor(FRParamEditor):
     shcChanged(None, btnParam.value)
 
     return newBtn
+
   def registerMethod_obj(self, func: Callable[[], Any], funcFrParam: FRParam, ownerObj: Any,
                          *funcArgs, **funcKwargs):
     cls = type(ownerObj)
@@ -159,7 +171,8 @@ class FRShortcutsEditor(FRParamEditor):
                                f' can be reigstered to {ownerObj}')
     shortcutParam: FRShortcutParameter = Parameter.create(name=funcFrParam.name,
                                                           type='shortcut', value=funcFrParam.value,
-                                                          tip=funcFrParam.helpText)
+                                                          tip=funcFrParam.helpText,
+                                                          frParam=funcFrParam)
     if groupParam.name in self.params.names:
       pgParam = self.params.child(groupParam.name)
     else:
@@ -176,6 +189,7 @@ class FRShortcutsEditor(FRParamEditor):
     newShortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
     partialFn = partial(func, *funcArgs, **funcKwargs)
     newShortcut.activated.connect(partialFn)
+    newShortcut.activatedAmbiguously.connect(lambda: print(f'{ownerObj} shc ambiguous: {newShortcut.key().toString()}'))
     shortcutParam.sigValueChanged.connect(lambda param: newShortcut.setKey(param.seqEdit.keySequence()))
     self.shortcuts.append(newShortcut)
     return shortcutParam
@@ -238,7 +252,7 @@ class FRShortcutsEditor(FRParamEditor):
     groupParam = self.groupingToParamMapping[type(ownerObj)]
     seqCopy = QtGui.QKeySequence(boundFn.param.value)
     if ownerObj is None or not isinstance(ownerObj, QtWidgets.QWidget):
-      shortcut = QtWidgets.QShortcut(seqCopy, self)
+      shortcut = QtWidgets.QShortcut(seqCopy, self.parent())
       ctx = QtCore.Qt.ApplicationShortcut
     else:
       shortcut = QtWidgets.QShortcut(seqCopy, ownerObj)

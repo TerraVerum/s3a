@@ -177,16 +177,15 @@ def test_quickload_profile(tmpdir):
 
 def test_load_last_settings(tmpdir, sampleComps):
   tmpdir = Path(tmpdir)
-  newApp = S3A(guiMode=False, loadLastState=False)
-  newApp.appStateEditor.saveDir = tmpdir
-  newApp.setMainImg(SAMPLE_IMG_FNAME, SAMPLE_IMG)
-  newApp.add_focusComp(sampleComps)
-  newApp.forceClose()
-  del newApp
-  newApp = S3A(guiMode=False, loadLastState=False)
-  newApp.appStateEditor.saveDir = tmpdir
-  newApp.appStateEditor.loadParamState()
-  assert np.array_equal(newApp.mainImg.image, SAMPLE_IMG)
+  oldSaveDir = app.appStateEditor.saveDir
+  app.appStateEditor.saveDir = tmpdir
+  app.setMainImg(SAMPLE_IMG_FNAME, SAMPLE_IMG)
+  app.add_focusComp(sampleComps)
+  app.forceClose()
+  app.setMainImg(None, None)
+  app.appStateEditor.loadParamState()
+  app.appStateEditor.saveDir = oldSaveDir
+  assert np.array_equal(app.mainImg.image, SAMPLE_IMG)
   sampleComps[REQD_TBL_FIELDS.SRC_IMG_FILENAME] = SAMPLE_IMG_FNAME.name
-  assert np.array_equal(sampleComps, newApp.compMgr.compDf)
+  assert np.array_equal(sampleComps, app.compMgr.compDf)
 

@@ -76,7 +76,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     mainImg.splitCompsAct.sigActivated.connect(lambda *args: self.splitSelectedComps())
     compMgr.sigCompsChanged.connect(self.redrawComps)
     filterEditor.sigParamStateUpdated.connect(self._updateFilter)
-    FR_SINGLETON.scheme.sigParamStateUpdated.connect(lambda: self._updateFilter(self._filter))
+    FR_SINGLETON.generalProps.sigParamStateUpdated.connect(lambda: self._updateFilter(self._filter))
     compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
 
     mainImg.addItem(self.regionPlot)
@@ -287,7 +287,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     # truncatedCompIds = np.unique(truncatedCompIds)
     if self.regionCopier.inCopyMode:
       self._mainImgArea.sigCompsCreated.emit(newComps)
-      self.activateRegionCopier(newComps.index)
+      self.activateRegionCopier(self.regionCopier.regionIds)
     else: # Move mode
       self._mainImgArea.sigCompsUpdated.emit(newComps)
       self.regionCopier.erase()

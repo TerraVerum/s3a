@@ -13,6 +13,7 @@ from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.parameterTypes import ActionParameter, ActionParameterItem
 
 from s3a.views.drawopts import FRButtonCollection
+from s3a.views.imageareas import FREditableImgBase
 from s3a.views.parameditors import FRParamEditor, FRParamEditorDockGrouping, FR_SINGLETON
 from s3a.models.s3abase import S3ABase
 from s3a.projectvars import LAYOUTS_DIR, FR_CONSTS, FR_ENUMS, APP_STATE_DIR, \
@@ -22,7 +23,7 @@ from s3a.structures import FRS3AWarning, FRVertices
 from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
   autosaveOptsDialog, attemptFileLoad, popupFilePicker, \
   disableAppDuringFunc, saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
-  restoreExceptionBehavior
+  restoreExceptionBehavior, contextMenuFromEditorActions
 from .imageareas import FRFocusedImage
 
 __all__ = ['S3A']
@@ -30,10 +31,16 @@ __all__ = ['S3A']
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_ANNOTATOR)
 class S3A(S3ABase):
   sigLayoutSaved = QtCore.Signal()
+  S3A_INST = None
 
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
+    cls.toolsEditor = FRParamEditor.buildClsToolsEditor(cls, 'Main Window')
+    cls.estBoundsAct, cls.clearBoundsAct = cls.toolsEditor.registerProps(
+      cls, [FR_CONSTS.TOOL_ESTIMATE_BOUNDARIES, FR_CONSTS.TOOL_CLEAR_BOUNDARIES],
+      asProperty=False, ownerObj=cls
+    )
 
   def __init__(self, parent=None, guiMode=True, loadLastState=None,
                **quickLoaderArgs):
@@ -41,6 +48,8 @@ class S3A(S3ABase):
     # customized loading functions also get called
     superLoaderArgs = {'author': quickLoaderArgs.pop('author', None)}
     super().__init__(parent, **superLoaderArgs)
+    self.estBoundsAct.sigActivated.connect(lambda: self.estimateBoundaries_gui())
+    self.clearBoundsAct.sigActivated.connect(lambda: self.clearBoundaries())
     if guiMode:
       warnings.simplefilter('error', FRS3AWarning)
       makeExceptionsShowDialogs(self)
@@ -69,14 +78,15 @@ class S3A(S3ABase):
     if len(quickLoaderArgs) > 0:
       self.appStateEditor.loadParamState(stateDict=quickLoaderArgs)
 
-    QtCore.QTimer.singleShot(0, lambda: self._maybeLoadLastState(guiMode, loadLastState))
+    QtCore.QTimer.singleShot(0, lambda: self._maybeLoadLastState(guiMode, loadLastState,
+                                                                 quickLoaderArgs))
 
   def _hookupSignals(self):
     # Buttons
     self.openImgAct.triggered.connect(lambda: self.resetMainImg_gui())
     self.focusedImg.acceptRegionAct.sigActivated.connect(lambda: self.acceptFocusedRegion())
 
-    FR_SINGLETON.scheme.sigParamStateUpdated.connect(self.updateTheme)
+    FR_SINGLETON.generalProps.sigParamStateUpdated.connect(self.updateTheme)
 
     # Menu options
     # FILE
@@ -107,6 +117,8 @@ class S3A(S3ABase):
     self.devConsoleAct.triggered.connect(self.showDevConsole)
 
     self.saveAllEditorDefaults()
+    for editor in FR_SINGLETON.registerableEditors:
+      editor.setAllExpanded(False)
 
   def _buildGui(self):
     self.setDockNestingEnabled(True)
@@ -114,17 +126,18 @@ class S3A(S3ABase):
 
     centralwidget = QtWidgets.QWidget(self)
     self.mainImg.setParent(centralwidget)
-    toolsLayout = self._createBtnLayoutForTools(self.mainImg.toolsEditor)
     layout = QtWidgets.QVBoxLayout(centralwidget)
 
     self.setCentralWidget(centralwidget)
     layout.addWidget(self.mainImg.drawOptsWidget)
+    layout.addWidget(self.mainImg.toolsGrp)
     layout.addWidget(self.mainImg)
-    layout.addLayout(toolsLayout)
+    # layout.addWidget(mainImgToolsWidget)
 
-    regionBtnLayout = self._createBtnLayoutForTools(self.focusedImg.toolsEditor)
+    # focImgToolsWidget = self._createBtnLayoutForTools(self.focusedImg.toolsEditor)
 
     focusedImgDock = QtWidgets.QDockWidget('Focused Image Window', self)
+    focusedImgDock.setFeatures(focusedImgDock.DockWidgetMovable|focusedImgDock.DockWidgetFloatable)
     focusedImgContents = QtWidgets.QWidget(self)
     self.focusedImg.setParent(focusedImgContents)
     focusedImgDock.setWidget(focusedImgContents)
@@ -134,11 +147,26 @@ class S3A(S3ABase):
 
     focusedLayout = QtWidgets.QVBoxLayout(focusedImgContents)
     focusedLayout.addWidget(self.focusedImg.drawOptsWidget)
+    focusedLayout.addWidget(self.focusedImg.toolsGrp)
     focusedLayout.addWidget(self.curCompIdLbl, 0, QtCore.Qt.AlignHCenter)
     focusedLayout.addWidget(self.focusedImg)
-    focusedLayout.addLayout(regionBtnLayout)
+
+    sharedMenuWidgets = [self.mainImg, self.compTbl]
+    for first, second in zip(sharedMenuWidgets, reversed(sharedMenuWidgets)):
+      first.menu.addMenu(contextMenuFromEditorActions(second.toolsEditor, menuParent=first.menu))
+
+
+    for curImg in (self.mainImg, self.focusedImg): # type: FREditableImgBase
+      def maybeHideBtn(_p, value: bool, _widget):
+        if value:
+          _widget.show()
+        else:
+          _widget.hide()
+      curImg.showGuiBtns.sigValueChanged.connect(partial(maybeHideBtn, _widget=curImg.toolsGrp))
 
     tableDock = QtWidgets.QDockWidget('Component Table Window', self)
+    tableDock.setFeatures(tableDock.DockWidgetMovable|tableDock.DockWidgetFloatable)
+
     tableDock.setObjectName('Component Table Dock')
     tableContents = QtWidgets.QWidget(tableDock)
     tableLayout = QtWidgets.QVBoxLayout(tableContents)
@@ -177,10 +205,10 @@ class S3A(S3ABase):
     self.menuAnalytics = QtWidgets.QMenu('&Analytics', self.menubar)
     menuTools = QtWidgets.QMenu('&Tools', self.menubar)
 
-    toolbar = self.addToolBar('Parameter Editors')
+    toolbar: QtWidgets.QToolBar = self.addToolBar('Parameter Editors')
     toolbar.setObjectName('Parameter Edtor Toolbar')
     self.paramTools = QtWidgets.QMenuBar()
-    toolbar.addWidget(self.paramTools)
+    # toolbar.addWidget(self.paramTools)
 
     self.menubar.addMenu(self.menuFile)
     self.menubar.addMenu(self.menuEdit)
@@ -228,16 +256,20 @@ class S3A(S3ABase):
 
     # SETTINGS
     for dock in FR_SINGLETON.docks:
-      self._createMenuOptForDock(self.paramTools, dock)
-    self._createMenuOptForEditor(self.menuFile, FR_SINGLETON.quickLoader)
+      toolBtn = QtWidgets.QPushButton()
+      self._createMenuOptForDock(toolBtn, dock)
+      toolbar.addWidget(toolBtn)
 
-  def _maybeLoadLastState(self, guiMode: bool, loadLastState: bool=None):
+  def _maybeLoadLastState(self, guiMode: bool, loadLastState: bool=None,
+                          quickLoaderArgs:dict=None):
     """
     Helper function to determine whether the last application state should be loaded,
     and loads the last state if desired.
     :param guiMode: Whether this application is running in gui mode
     :param loadLastState: If *None*, the user will be prompted via dialog for whether
       to load the last application state. Otherwise, its boolean value is used.
+    :param quickLoaderArgs: Additional dict arguments which if supplied will override
+      the default options where applicable.
     """
     if not self.appStateEditor.RECENT_STATE_FNAME.exists():
       return
@@ -247,9 +279,9 @@ class S3A(S3ABase):
                                      ' settings (image, annotations, algorithms, etc.)?',
         QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No) == QtWidgets.QMessageBox.Yes
     if loadLastState and guiMode:
-      self.loadLastState_gui()
+      self.loadLastState_gui(quickLoaderArgs)
     elif loadLastState:
-      self.loadLastState()
+      self.loadLastState(quickLoaderArgs)
 
   def loadLayout(self, layoutName: Union[str, Path]):
     layoutName = Path(layoutName)
@@ -345,17 +377,14 @@ class S3A(S3ABase):
   def estimateBoundaries_gui(self):
     self.estimateBoundaries()
 
-  def clearBoundaries_gui(self):
-    self.clearBoundaries()
-
-  def loadLastState_gui(self):
+  def loadLastState_gui(self, quickLoaderArgs: dict=None):
     with pg.BusyCursor():
       # TODO: Also show a progress bar, which is the main reason for using a
       #  separate gui function
-      self.loadLastState()
+      self.loadLastState(quickLoaderArgs)
 
-  def loadLastState(self):
-    self.appStateEditor.loadParamState()
+  def loadLastState(self, quickLoaderArgs: dict=None):
+    self.appStateEditor.loadParamState(overrideDict=quickLoaderArgs)
 
 
   def closeEvent(self, ev: QtGui.QCloseEvent):
@@ -384,28 +413,6 @@ class S3A(S3ABase):
     """
     self.hasUnsavedChanges = False
     self.close()
-
-  @staticmethod
-  def _createBtnLayoutForTools(editor: FRParamEditor):
-    """Helper function for adding main window buttons from a given tool editor"""
-    retLayout = QtWidgets.QHBoxLayout()
-    for param in editor.params: # type: Parameter
-      if 'action' in param.opts['type'] and param.opts.get('guibtn', True):
-        param: ActionParameter
-        # Add this button to the group
-        item: ActionParameterItem = next(iter(param.items))
-        actionBtn = item.button
-        retLayout.addWidget(actionBtn)
-        # Since the button was stolen from its layout, no reason to show in param tree
-        # anymore. Set ignoreNameColumnChange to True so that after this button is stolen
-        # the text isn't undesirably altered
-        oldIgnore = item.ignoreNameColumnChange
-        item.ignoreNameColumnChange = True
-        param.hide()
-        # Be kind, please rewind
-        item.ignoreNameColumnChange = oldIgnore
-    return retLayout
-
 
   def _createBtnLayoutForTools_old(self, editor: FRParamEditor):
     """Helper function for adding main window buttons from a given tool editor"""
@@ -436,7 +443,7 @@ class S3A(S3ABase):
     for nextEditor in docks[:-1]:
       self.tabifyDockWidget(dock, nextEditor)
 
-  def _createMenuOptForEditor(self, parentMenu: QtWidgets.QMenu, editor: FRParamEditor,
+  def _createMenuOptForEditor(self, editor: FRParamEditor,
                               loadFunc=None, overrideName=None):
     def defaultLoadFunc(objForMenu: FRParamEditor, nameToLoad: str) -> Optional[dict]:
       with pg.BusyCursor():
@@ -466,21 +473,26 @@ class S3A(S3ABase):
     editor.sigParamStateCreated.connect(populateFunc)
     # Initialize default menus
     populateFunc()
-    parentMenu.addMenu(newMenu)
     editor.hasMenuOption = True
+    return newMenu
 
-  def _createMenuOptForDock(self, parentMenu: QtWidgets.QMenu,
+  def _createMenuOptForDock(self, parentBtn: QtWidgets.QPushButton,
                             dockEditor: Union[FRParamEditor, FRParamEditorDockGrouping],
                             loadFunc=None):
     if isinstance(dockEditor, FRParamEditor):
-      self._createMenuOptForEditor(parentMenu, dockEditor, loadFunc)
+      parentBtn.setText(dockEditor.name)
+      parentBtn.setMenu(self._createMenuOptForEditor(dockEditor, loadFunc))
     else:
       # FRParamEditorDockGrouping
-      newMenu = create_addMenuAct(self, parentMenu, dockEditor.name, True)
+      parentBtn.setText(dockEditor.name)
+      menu = QtWidgets.QMenu()
+      parentBtn.setMenu(menu)
+      # newMenu = create_addMenuAct(self, parentBtn, dockEditor.name, True)
       for editor in dockEditor.editors:
         # "Main Image Settings" -> "Settings"
-        nameWithoutBase = editor.name.split(dockEditor.name)[1][1:]
-        self._createMenuOptForEditor(newMenu, editor, loadFunc, overrideName=nameWithoutBase)
+        tabName = dockEditor.getTabName(editor)
+        nameWithoutBase = tabName
+        menu.addMenu(self._createMenuOptForEditor(editor, loadFunc, overrideName=nameWithoutBase))
 
   def _populateLoadLayoutOptions(self):
     layoutGlob = LAYOUTS_DIR.glob('*.dockstate')

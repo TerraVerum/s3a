@@ -17,7 +17,7 @@ class FRRoiCollection(QtCore.QObject):
 
   @classmethod
   def __initEditorParams__(cls):
-    cls.roiClr, cls.roiLineWidth = FR_SINGLETON.scheme.registerProps(cls,
+    cls.roiClr, cls.roiLineWidth = FR_SINGLETON.generalProps.registerProps(cls,
                    [FR_CONSTS.SCHEME_ROI_LINE_CLR, FR_CONSTS.SCHEME_ROI_LINE_WIDTH])
 
   def __init__(self, allowableShapes: Collection[FRParam]=(), parent: pg.GraphicsView=None):
@@ -39,7 +39,8 @@ class FRRoiCollection(QtCore.QObject):
       newRoi.hide()
     self.addRoisToView(parent)
 
-    FR_SINGLETON.scheme.sigParamStateUpdated.connect(lambda: self.clearAllRois())
+    graphicsParam = FR_SINGLETON.generalProps[None, FR_CONSTS.CLS_ROI_CLCTN, True]
+    graphicsParam.sigStateChanged.connect(lambda: self.clearAllRois())
 
   def addRoisToView(self, view: pg.GraphicsView):
     self._parent = view

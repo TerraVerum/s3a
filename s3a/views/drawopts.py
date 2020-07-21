@@ -55,11 +55,13 @@ class FRDrawOpts(QtWidgets.QWidget):
     elif shapeOrAction in self.actionBtnParamMap.inverse:
       self.actionBtnParamMap.inverse[shapeOrAction].setChecked(True)
 
+class _DEFAULT_OWNER: pass
+"""None is a valid owner, so create a sentinel that's not valid"""
 btnCallable = Callable[[FRParam], Any]
 class FRButtonCollection(QtWidgets.QGroupBox):
   def __init__(self, parent=None, title: str=None, btnParams: Collection[FRParam]=(),
                btnTriggerFns: Union[btnCallable, Collection[btnCallable]]=(),
-               exclusive=True, checkable=True):
+               exclusive=True, checkable=True, ownerObj=_DEFAULT_OWNER):
     super().__init__(parent)
     self.uiLayout = QtWidgets.QHBoxLayout(self)
     self.btnGroup = QtWidgets.QButtonGroup(self)
@@ -72,10 +74,13 @@ class FRButtonCollection(QtWidgets.QGroupBox):
     if not isinstance(btnTriggerFns, Iterable):
       btnTriggerFns = [btnTriggerFns]*len(btnParams)
     for param, fn in zip(btnParams, btnTriggerFns):
-      self.create_addBtn(param, fn, checkable)
+      self.create_addBtn(param, fn, checkable, ownerObj)
 
-  def create_addBtn(self, btnParam: FRParam, triggerFn: btnCallable, checkable=True):
-    newBtn = FR_SINGLETON.shortcuts.createRegisteredButton(btnParam, self.parent())
+  def create_addBtn(self, btnParam: FRParam, triggerFn: btnCallable, checkable=True,
+                    ownerObj: Union[type, Any]=_DEFAULT_OWNER):
+    if ownerObj is _DEFAULT_OWNER:
+      ownerObj = self.parent()
+    newBtn = FR_SINGLETON.shortcuts.createRegisteredButton(btnParam, ownerObj)
     if checkable:
       newBtn.setCheckable(True)
       oldTriggerFn = triggerFn
@@ -99,14 +104,3 @@ class FRButtonCollection(QtWidgets.QGroupBox):
     if btn.isCheckable():
       btn.setChecked(True)
     self.paramToFuncMapping[param](param)
-
-def _create_addActionsToToolbar(toolbar: QtWidgets.QToolBar, whichBtns: FR_CONSTS) -> QtWidgets.QActionGroup:
-  uiGroup = QtWidgets.QGroupBox('Test', toolbar)
-  actionGroup = QtWidgets.QActionGroup(uiGroup)
-  actionGroup.setExclusive(True)
-  for btnParam in whichBtns: # type: FRParam
-    # TODO: Use picture instead of name
-    newAction = actionGroup.addAction(btnParam.name)
-    newAction.setCheckable(True)
-  toolbar.addWidget(uiGroup)
-  return actionGroup

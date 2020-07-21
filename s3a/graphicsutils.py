@@ -9,6 +9,7 @@ from typing import Optional, Union, Callable, Generator
 
 import numpy as np
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
+from pyqtgraph.parametertree import Parameter
 from ruamel.yaml import YAML
 
 from s3a import appInst
@@ -441,3 +442,22 @@ class QAwesomeTooltipEventFilter(QtCore.QObject):
 
     # Else, defer to the default superclass handling of this event.
     return super().eventFilter(widget, event)
+
+from .views import parameditors
+def contextMenuFromEditorActions(editor: parameditors.FRParamEditor, title: str=None,
+                                 menuParent: QtWidgets.QWidget=None):
+  if title is None:
+    title = editor.name
+  actions = []
+  paramNames = []
+  def findActions(paramRoot: Parameter):
+    for child in paramRoot.childs:
+      findActions(child)
+    if 'action' in paramRoot.opts['type']:
+      actions.append(paramRoot)
+      paramNames.append(paramRoot.name())
+  findActions(editor.params)
+  menu = QtWidgets.QMenu(title, menuParent)
+  for action, name in zip(actions, paramNames):
+    menu.addAction(name, action.activate)
+  return menu

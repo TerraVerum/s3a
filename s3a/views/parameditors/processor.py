@@ -66,6 +66,8 @@ class FRAlgCollectionEditor(FRParamEditor):
     self.algOpts.sigValueChanged.connect(lambda param, proc: self.switchActiveProcessor(proc))
     super().__init__(parent, saveDir=saveDir, fileType='alg', name=name,
                      topTreeChild=self.algOpts)
+    self.expandAllBtn.hide()
+    self.collapseAllBtn.hide()
 
     self.saveDir.mkdir(parents=True, exist_ok=True)
 

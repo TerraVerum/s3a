@@ -98,29 +98,12 @@ class FRRegisteredActionParameterItem(ActionParameterItem):
     btn.setToolTip(param.opts['tip'])
     if param.value() is None: return
     # Else: shortcut exists to be registered
-
-    shcEditor = parameditors.FR_SINGLETON.shortcuts
     cls = param.opts.get('ownerObj', type(None))
-    btnParam: FRParam = param.opts['frParam']
 
-    parameditors.FR_SINGLETON.shortcuts.registerMethod_cls(btnParam, forceCreate=True)(
-      lambda *_args: self.buttonClicked(), cls
+    self.button = parameditors.FR_SINGLETON.shortcuts.createRegisteredButton(
+      param.opts['frParam'], cls, baseBtn=self.button
     )
-    # Wait until after registing in case group didn't previously exist
-    clsParam = shcEditor.groupingToParamMapping[cls]
-    seqEdit: Parameter = shcEditor[clsParam, btnParam, True]
-
-    # Show the shortcut with the button
-    def shcChanged(_param, newSeq: str):
-      prependText = f'Shortcut: {newSeq}'
-      tip: str = param.opts["tip"]
-      tip = helpTextToRichText(tip, prependText)
-      btn.setToolTip(tip)
-
-    seqEdit.sigValueChanged.connect(shcChanged)
-    # Initialize for first shortcut
-    shcChanged(None, btnParam.value)
-
+    return
 
 class FRRegisteredActionParameter(ActionParameter):
   itemClass = FRRegisteredActionParameterItem
@@ -143,7 +126,7 @@ class FRActionWithShortcutParameterItem(ActionParameterItem):
     # Without the main window as a parent, the shortcut will not activate when
     # the quickloader is hidden
     # TODO: Maybe it is desirable for shortcuts to only work when quickloader
-    self.shortcut = QtWidgets.QShortcut(shortcutSeq)
+    self.shortcut = QtWidgets.QShortcut(shortcutSeq, None)
     self.shortcut.activated.connect(self.buttonClicked)
     button: QtWidgets.QPushButton = self.button
     tip = self.param.opts.get('tip', None)

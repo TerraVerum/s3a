@@ -90,15 +90,20 @@ def area_coord_regionTbl(_image: Image):
   return _regionPropTbl
 
 
-# 0 = unspecified, 1 = background, 2 = foreground
-_historyMask = np.array([[]], 'uint8')
+_historyMaskHolder = [np.array([[]], 'uint8')]
+"""
+0 = unspecified, 1 = background, 2 = foreground. Place inside list so reassignment
+doesn't destroy object reference
+"""
 def format_vertices(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
                     prevCompMask: BlackWhiteImg, firstRun: bool,
                     keepVertHistory=True):
-  global _historyMask
+  global _historyMaskHolder
 
   if firstRun or not keepVertHistory:
     _historyMask = np.zeros(image.shape[:2], 'uint8')
+  else:
+    _historyMask = _historyMaskHolder[0]
 
   asForeground = True
   # 0 = unspecified, 1 = background, 2 = foreground
@@ -116,6 +121,7 @@ def format_vertices(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
                           ])
     fgVerts = cornersToFullBoundary(fgVerts)
     _historyMask[fgVerts.rows, fgVerts.cols] = True
+  _historyMaskHolder[0] = _historyMask
   curHistory = _historyMask.copy()
   if fgVerts.empty:
     # Invert the mask and paint foreground pixels
@@ -139,7 +145,7 @@ def format_vertices(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
                  origCompMask=prevCompMask, boundSlices=boundSlices)
 
 def crop_to_local_area(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
-                       prevCompMask: BlackWhiteImg, margin_pctRoiSize=10):
+                       prevCompMask: BlackWhiteImg, historyMask: GrayImg, margin_pctRoiSize=10):
   allVerts = np.vstack([fgVerts, bgVerts])
   if len(allVerts) == 1:
     # Single point, use image size as reference shape
@@ -155,7 +161,7 @@ def crop_to_local_area(image: Image, fgVerts: FRVertices, bgVerts: FRVertices,
     np.clip(vertList, a_min=[0,0], a_max=bounds[1,:]-1, out=vertList)
   boundSlices = slice(*bounds[:,1]), slice(*bounds[:,0])
   croppedCompMask = prevCompMask[boundSlices]
-  curHistory = _historyMask[boundSlices]
+  curHistory = historyMask[boundSlices]
 
   rectThickness = int(max(1, *image.shape)*0.005)
   toPlot = cv.rectangle(image.copy(), tuple(bounds[0,:]), tuple(bounds[1,:]),

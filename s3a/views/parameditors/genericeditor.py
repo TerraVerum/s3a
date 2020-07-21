@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List, Dict, Union, Type, Tuple
 
 from pyqtgraph.Qt import QtWidgets, QtCore
-from pyqtgraph.parametertree import Parameter
+from pyqtgraph.parametertree import Parameter, ParameterItem
 
 from s3a.generalutils import frPascalCaseToTitle
 from s3a.graphicsutils import dialogGetSaveFileName
@@ -25,22 +25,39 @@ class FRParamEditorDockGrouping(QtWidgets.QDockWidget):
     super().__init__(parent)
     self.tabs = QtWidgets.QTabWidget(self)
     self.hide()
+
+    if dockName is None:
+      dockName = editors[0].name
+    self.name = dockName
+
     for editor in editors:
       # "Main Image Settings" -> "Settings"
-      self.tabs.addTab(editor.dockContentsWidget, editor.name.split(dockName)[1][1:])
+      tabName = self.getTabName(editor)
+      self.tabs.addTab(editor.dockContentsWidget, tabName)
       editor.dock = self
     mainLayout = QtWidgets.QVBoxLayout()
     mainLayout.addWidget(self.tabs)
     centralWidget = QtWidgets.QWidget()
     centralWidget.setLayout(mainLayout)
     self.setWidget(centralWidget)
-    if dockName is None:
-      dockName = editors[0].name
     self.setObjectName(dockName)
     self.setWindowTitle(dockName)
 
-    self.name = dockName
     self.editors = editors
+
+  def setParent(self, parent: QtWidgets.QWidget=None):
+    super().setParent(parent)
+    for editor in self.editors:
+      editor.setParent(parent)
+
+  def getTabName(self, editor: FRParamEditor):
+    if self.name in editor.name:
+      tabName = editor.name.split(self.name)[1][1:]
+      if len(tabName) == 0:
+        tabName = editor.name
+    else:
+      tabName = editor.name
+    return tabName
 
 _childTuple_asValue = Tuple[FRParam,...]
 childTuple_asParam = Tuple[Tuple[FRParam,...], bool]
@@ -67,6 +84,8 @@ class FRParamEditor(FRParamEditorBase):
     # -----------
     # Additional widget buttons
     # -----------
+    self.expandAllBtn = QtWidgets.QPushButton('Expand All')
+    self.collapseAllBtn = QtWidgets.QPushButton('Collapse All')
     self.saveAsBtn = QtWidgets.QPushButton('Save As...')
     self.applyBtn = QtWidgets.QPushButton('Apply')
     self.closeBtn = QtWidgets.QPushButton('Close')
@@ -76,25 +95,39 @@ class FRParamEditor(FRParamEditorBase):
     # -----------
     self.dockContentsWidget = QtWidgets.QWidget(parent)
     self.setWidget(self.dockContentsWidget)
-    btnLayout = QtWidgets.QHBoxLayout()
-    btnLayout.addWidget(self.saveAsBtn)
-    btnLayout.addWidget(self.applyBtn)
-    btnLayout.addWidget(self.closeBtn)
+    expandCollapseBtnLayout = QtWidgets.QHBoxLayout()
+    expandCollapseBtnLayout.addWidget(self.expandAllBtn)
+    expandCollapseBtnLayout.addWidget(self.collapseAllBtn)
+    paramStateBtns = QtWidgets.QHBoxLayout()
+    paramStateBtns.addWidget(self.saveAsBtn)
+    paramStateBtns.addWidget(self.applyBtn)
+    paramStateBtns.addWidget(self.closeBtn)
 
     self.centralLayout = QtWidgets.QVBoxLayout(self.dockContentsWidget)
+    self.centralLayout.addLayout(expandCollapseBtnLayout)
     self.centralLayout.addWidget(self.tree)
-    self.centralLayout.addLayout(btnLayout)
+    self.centralLayout.addLayout(paramStateBtns)
     # self.setLayout(centralLayout)
     self.tree.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
     # -----------
     # UI Element Signals
     # -----------
+    self.expandAllBtn.clicked.connect(lambda: self.setAllExpanded(True))
+    self.collapseAllBtn.clicked.connect(lambda: self.setAllExpanded(False))
     self.saveAsBtn.clicked.connect(self.saveParamState_gui)
     self.closeBtn.clicked.connect(self.close)
     self.applyBtn.clicked.connect(self.applyChanges)
 
     if registerCls is not None:
       self.registerGroup(registerParam)(registerCls)
+
+  def setAllExpanded(self, expandedVal=True):
+    try:
+      topTreeItem: ParameterItem = next(iter(self.params.items))
+    except StopIteration:
+      return
+    for ii in range(topTreeItem.childCount()):
+      topTreeItem.child(ii).setExpanded(expandedVal)
 
   def _expandCols(self):
     # totWidth = 0
@@ -142,6 +175,9 @@ class FRParamEditor(FRParamEditorBase):
       saveDir=toolsDir, fileType=lowerGroupName.replace(' ', '') + 'tools',
       name=name, registerCls=cls, useNewInit=False
     )
+    for btn in (toolsEditor.saveAsBtn, toolsEditor.applyBtn, toolsEditor.expandAllBtn,
+                toolsEditor.collapseAllBtn):
+      btn.hide()
     return toolsEditor
 
 

@@ -38,14 +38,13 @@ class _FRSingleton(QtCore.QObject):
 
 
     self.shortcuts = FRShortcutsEditor()
-    self.scheme = FRColorSchemeEditor()
     self.generalProps = FRGeneralPropertiesEditor()
 
     self.algParamMgr = FRAlgPropsMgr()
-    self.docks: List[FRParamEditor] = [self.scheme, self.generalProps, self.shortcuts,
-        self.filter]
+    self.docks: List[FRParamEditor] = [self.generalProps, self.filter]
     self.quickLoader = FRQuickLoaderEditor(editorList=self.registerableEditors)
-    self.docks.append(self.quickLoader)
+    grouping = FRParamEditorDockGrouping([self.shortcuts, self.quickLoader], 'Shortcuts')
+    self.addDocks(grouping)
     # addFn = self.quickLoader.listModel.addEditors
     # self.algParamMgr.sigProcessorCreated.connect(lambda editor: addFn([editor]))
 
@@ -66,7 +65,8 @@ class _FRSingleton(QtCore.QObject):
       docks = [docks]
 
     for dock in docks:
-      if dock in self.docks:
+      if dock in self.docks or dock is self.quickLoader:
+        # This logic is to add editors to quick loader, checking for it prevents recursion
         continue
       self.docks.append(dock)
       if isinstance(dock, FRParamEditorDockGrouping):

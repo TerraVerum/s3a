@@ -94,7 +94,7 @@ def _addRmOption(param: Parameter):
 class FRQuickLoaderEditor(FRParamEditor):
   def __init__(self, parent=None, editorList: List[FRParamEditor]=None):
     super().__init__(parent, paramList=[],
-                     saveDir=QUICK_LOAD_DIR, fileType='loader')
+                     saveDir=QUICK_LOAD_DIR, fileType='loader', name='Editor State Shortcuts')
     if editorList is None:
       editorList = []
     self.listModel = FREditorListModel(editorList, self)

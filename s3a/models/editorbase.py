@@ -156,7 +156,7 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
           you must first specify the group parent for that parameter:
             >>> margin = FR_SINGLETON.generalProps[FR_CONSTS.CLS_FOCUSED_IMG_AREA,
             >>>   FR_CONSTS.MARGIN]
-        * The second parameter must be a signle :class:`FRParam` objects or a sequence
+        * The second parameter must be a single :class:`FRParam` object or a sequence
           of :class:`FRParam` objects. If a sequence is given, a list of output values
           respecting input order is provided.
         * The third parameter is optional. If provided, the :class:`Parameter<pyqtgraph.Parameter>`
@@ -179,6 +179,8 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
       keys = [keys]
       returnSingle = True
     outVals = []
+    # Account for the case where the child params are all top-level
+    if baseParam is None: baseParam = ()
     extractFunc = lambda name: self.params.child(*baseParam, name)
     if not extractObj:
       oldExtractFunc = extractFunc
@@ -321,8 +323,8 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
                                         asProperty, **extraOpts))
     return outProps
 
-  def _addParamGroup(self, groupName: str):
-    paramForCls = Parameter.create(name=groupName, type='group')
+  def _addParamGroup(self, groupName: str, **opts):
+    paramForCls = Parameter.create(name=groupName, type='group', **opts)
     self.params.addChild(paramForCls)
     return paramForCls
 
@@ -381,7 +383,6 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     if constParam.name not in paramForCls.names:
       paramForCls.addChild(paramForEditor)
 
-    self._expandCols()
     self.registeredFrParams.append(constParam)
     if not asProperty:
       return paramForEditor

@@ -51,6 +51,7 @@ def test_bad_import(tmpdir):
 
 
 def doAndAssertExport(fpath: Path, io: FRComponentIO, failMsg: str):
+  fpath = Path(fpath)
   try:
     io.exportByFileType(fpath)
   except Exception as ex:
