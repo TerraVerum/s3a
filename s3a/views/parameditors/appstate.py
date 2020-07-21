@@ -48,12 +48,15 @@ class FRAppStateEditor(FRParamEditor):
     self.raiseErrMsgIfNeeded(errs)
 
   def loadParamState(self, stateName: Union[str, Path]=None, stateDict: dict = None,
-                     addChildren=False, removeChildren=False, applyChanges=True):
+                     addChildren=False, removeChildren=False, applyChanges=True,
+                     overrideDict: dict=None):
     if stateName is None:
       stateName = self.RECENT_STATE_FNAME
     if isinstance(stateDict, str):
       stateDict = {'quickloader': stateDict}
     stateDict = self._parseStateDict(stateName, stateDict)
+    if overrideDict is not None:
+      stateDict.update(overrideDict)
     paramDict = stateDict.pop('Parameters', {})
     stateDictKeys = list(stateDict.keys())
     legitKeys = self._stateFuncsDf.index.intersection(stateDictKeys)
