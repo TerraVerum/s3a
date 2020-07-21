@@ -310,7 +310,7 @@ def quickshift_seg(image: Image, fgVerts: FRVertices, maxDist=10., kernelSize=5,
 
 def k_means(image: Image, kVal=5, attempts=10):
   # Logic taken from https://docs.opencv.org/master/d1/d5c/tutorial_py_kmeans_opencv.html
-  clrs = image.reshape(-1, image.depth)
+  clrs = image.reshape(-1, image.numChannels)
   clrs = clrs.astype('float32')
   criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 10, 1.0)
   ret, lbls, imgMeans = cv.kmeans(clrs, kVal, None, criteria, attempts,
