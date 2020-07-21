@@ -1,3 +1,6 @@
+[![pipeline status](https://gitlab.com/ficsresearch/s3a/badges/development/pipeline.svg)](https://gitlab.com/ficsresearch/s3a/-/commits/development)
+[![coverage report](https://gitlab.com/ficsresearch/s3a/badges/development/coverage.svg)](https://gitlab.com/ficsresearch/s3a/-/commits/development)
+
 # Semi-Supervised Semantic Annotator (S3A)
 
 A highly adaptable tool for both visualizing and generating semantic annotations for generic images.

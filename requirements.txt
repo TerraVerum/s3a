@@ -1,7 +1,6 @@
 setuptools
 typing_extensions
 fire
-bidict
 tqdm
 opencv_python>=4.1.2.30
 numpy
@@ -10,13 +9,10 @@ scipy
 scikit-image
 scikit-learn
 matplotlib
-PyQt5==5.13
+PyQt5
 pyqtgraph
 Pillow
 imageprocessing
 qdarkstyle
 ruamel.yaml
-jsonpickle
-seaborn
-cloudpickle
 pytest

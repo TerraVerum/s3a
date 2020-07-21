@@ -1,32 +1,39 @@
+import re
 from collections import deque
 from pathlib import Path
-from typing import Any, Optional, List, Collection
+from typing import Any, Optional, List, Collection, Callable, Tuple, Union
 
 import numpy as np
 from pandas import DataFrame as df
 
 from s3a.projectvars import ANN_AUTH_DIR
 from s3a.structures.typeoverloads import TwoDArr
-from .structures import FRVertices, FRParam
+from .structures import FRVertices, FRParam, FRComplexVertices
 
 
-def nanConcatList(vertList) -> FRVertices:
+def stackedVertsPlusConnections(vertList: FRComplexVertices) -> (FRVertices, np.ndarray):
   """
-  Utility for concatenating all vertices within a list while adding
-  NaN entries between each separate list
+  Utility for concatenating all vertices within a list while recording where separations
+  occurred
   """
-  nanSep = np.ones((1,2), dtype=int)*np.nan
   allVerts = [np.zeros((0,2))]
+  separationIdxs = []
+  idxOffset = 0
   for curVerts in vertList:
     allVerts.append(curVerts)
-    if len(curVerts) == 0: continue
+    vertsLen = len(curVerts)
+    if vertsLen == 0: continue
     # Close the current shape
     allVerts.append(curVerts[0,:])
-    allVerts.append(nanSep)
-  # Take away last nan if it exists
-  # if len(allVerts) > 0:
-  #   allVerts.pop()
-  return FRVertices(np.vstack(allVerts), dtype=float)
+    separationIdxs.append(idxOffset + vertsLen)
+    idxOffset += vertsLen + 1
+  # Take away last separator if it exists
+  if len(separationIdxs) > 0:
+    separationIdxs.pop()
+  allVerts = np.vstack(allVerts)
+  isfinite = np.ones(len(allVerts), bool)
+  isfinite[separationIdxs] = False
+  return FRVertices(allVerts, dtype=float), isfinite
   #return FRVertices(dtype=float)
 
 
@@ -44,7 +51,7 @@ def splitListAtNans(concatVerts:FRVertices):
     curIdx = nanEntry+1
   # Account for final grouping of verts
   allVerts.append(concatVerts[curIdx:,:].astype('int'))
-  return allVerts
+  return FRComplexVertices(allVerts, coerceListElements=True)
 
 
 def sliceToArray(keySlice: slice, arrToSlice: np.ndarray):
@@ -106,6 +113,20 @@ def largestList(verts: List[FRVertices]) -> FRVertices:
   # vertList += cropOffset[0:2]
   return FRVertices(maxLenList)
 
+def helpTextToRichText(helpText: str, prependText='', postfixText=''):
+  # Outside <qt> tags
+  if helpText.startswith('<qt>'):
+    unwrappedHelpText = helpText[4:-5]
+  else:
+    unwrappedHelpText = helpText
+  if len(prependText) > 0 and len(helpText) > 0 or len(postfixText) > 0:
+    prependText += '<br>'
+  curText = prependText + unwrappedHelpText
+  if len(postfixText) > 0:
+    curText += '<br>' + postfixText
+  newHelpText = f'<qt>{curText}</qt>'
+  return newHelpText
+
 
 def resolveAuthorName(providedAuthName: Optional[str]) -> Optional[str]:
   authPath = Path(ANN_AUTH_DIR)
@@ -125,7 +146,7 @@ def resolveAuthorName(providedAuthName: Optional[str]) -> Optional[str]:
   return lines[0]
 
 def augmentException(ex: Exception, prependedMsg: str):
-  ex.args = (prependedMsg, *ex.args)
+  ex.args = (prependedMsg + str(ex),)
 
 def makeUniqueBaseClass(obj: Any):
   """
@@ -149,3 +170,72 @@ def makeUniqueBaseClass(obj: Any):
   class mixin(type(obj)): pass
   obj.__class__ = mixin
   return mixin
+
+
+def frPascalCaseToTitle(name: str, addSpaces=True) -> str:
+  """
+  Helper utility to turn a FRPascaleCase name to a 'Title Case' title
+  :param name: camel-cased name
+  :param addSpaces: Whether to add spaces in the final result
+  :return: Space-separated, properly capitalized version of :param:`Name`
+  """
+  if not name:
+    return name
+  if name.startswith('FR'):
+    name = name[2:]
+  if addSpaces:
+    replace = r'\1 \2'
+  else:
+    replace = r'\1\2'
+  name = re.sub(r'(\w)([A-Z])', replace, name)
+  return name.title()
+
+
+def _safeCallFuncList(fnNames: Collection[str], funcLst: List[Callable],
+                      fnArgs: List[tuple]=None):
+  errs = []
+  rets = []
+  if fnArgs is None:
+    fnArgs = [()]*len(fnNames)
+  for key, fn, args in zip(fnNames, funcLst, fnArgs):
+    try:
+      rets.append(fn(*args))
+    except Exception as ex:
+      errs.append(f'{key}: {ex}')
+      rets.append(None)
+  return rets, errs
+
+def cornersToFullBoundary(cornerVerts: Union[FRVertices, FRComplexVertices], sizeLimit: float=np.inf,
+                          fillShape: Tuple[int]=None, stackResult=True) -> Union[FRVertices, FRComplexVertices]:
+  """
+  From a list of corner vertices, returns a list with one vertex for every border pixel.
+  Example:
+  >>> cornerVerts = FRVertices([[0,0], [100,0], [100,100],[0,100]])
+  >>> cornersToFullBoundary(cornerVerts)
+  # [[0,0], [1,0], ..., [100,0], [100,1], ..., [100,100], ..., ..., [0,100]]
+  :param cornerVerts: Corners of the represented polygon
+  :param sizeLimit: The largest number of pixels from the enclosed area allowed before the full boundary is no
+  longer returned. For instance:
+    >>> cornerVerts = FRVertices([[0,0], [1000,0], [1000,1000],[0,1000]])
+    >>> cornersToFullBoundary(cornerVerts, 10e5)
+    will *NOT* return all boundary vertices, since the enclosed area (10e6) is larger than sizeLimit.
+  :param fillShape: Size of mask to create. Useful if verts may extend beyond image dimensions
+    and should be truncated. If None, no truncation will occur except for negative verts.
+  :param stackResult: Whether the result should be FRComplexVertices (if stackResult is False)
+    or a stacked list of exterior verts (if stackResult is True)
+  :return: List with one vertex for every border pixel, unless *sizeLimit* is violated.
+  """
+  if isinstance(cornerVerts, FRVertices):
+    cornerVerts = FRComplexVertices([cornerVerts])
+  if fillShape is not None:
+    fillShape = tuple(fillShape)
+  filledMask = cornerVerts.toMask(fillShape, warnIfTooSmall=False)
+  cornerVerts = FRComplexVertices.fromBwMask(filledMask, simplifyVerts=False)
+  if not stackResult:
+    return cornerVerts
+  cornerVerts = cornerVerts.filledVerts().stack()
+  numCornerVerts = len(cornerVerts)
+  if numCornerVerts > sizeLimit:
+    spacingPerSamp = int(numCornerVerts/sizeLimit)
+    cornerVerts = cornerVerts[::spacingPerSamp]
+  return cornerVerts

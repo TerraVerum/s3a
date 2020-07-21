@@ -6,9 +6,8 @@ import sys
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 
-__all__ = ['appInst', 'S3A', 'FR_SINGLETON']
+__all__ = ['appInst', 'FR_SINGLETON', 'S3A']
 
-# Configure pg to correctly read image dimensions
 pg.setConfigOptions(imageAxisOrder='row-major')
 
 
@@ -22,13 +21,18 @@ pg.mkQApp()
 # Allow selectable text in message boxes
 appInst.setStyleSheet("QMessageBox { messagebox-text-interaction-flags: 5; }")
 
+from . import graphicsutils as gutils
+
+# appInst.installEventFilter(
+#   gutils.QAwesomeTooltipEventFilter(appInst))
+
 # Import here to resolve resolution order
 import s3a.projectvars
 import s3a.structures
 
-from s3a.frgraphics.parameditors import FR_SINGLETON
+from s3a.views.parameditors import FR_SINGLETON
 from s3a.processingimpls import FRTopLevelProcessors
 for name, func in inspect.getmembers(FRTopLevelProcessors, inspect.isfunction):
   FR_SINGLETON.algParamMgr.addProcessCtor(func)
 
-from s3a.s3app import S3A
+from .views.s3agui import S3A

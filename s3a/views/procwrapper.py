@@ -6,17 +6,19 @@ from typing import Tuple, List, Sequence
 from warnings import warn
 
 import numpy as np
+from imageprocessing.processing import ImageIO, ProcessStage, AtomicProcess, Process, \
+  ImageProcess, ProcessIO
 from pyqtgraph.parametertree import Parameter
 
 import s3a
-from imageprocessing.processing import ImageIO, ProcessStage, AtomicProcess, Process, \
-  ImageProcess, ProcessIO
-from .frgraphics.parameditors import genericeditor
-from .frgraphics.parameditors.pgregistered import FRCustomMenuParameter
-from .processingimpls import crop_to_verts, update_area, basicOpsCombo, \
-  return_to_full_size
-from .structures import FRParam, FRComplexVertices, FRAlgProcessorError, FRVertices
+from s3a.generalutils import augmentException
+from s3a.processingimpls import crop_to_local_area, apply_process_result, basicOpsCombo, \
+  return_to_full_size, format_vertices
+from s3a.structures import FRParam, FRComplexVertices, FRAlgProcessorError, FRVertices, \
+  FRS3AWarning
+from s3a.views.parameditors.pgregistered import FRCustomMenuParameter
 
+__all__ = ['FRImgProcWrapper', 'FRGeneralProcWrapper']
 
 def atomicRunWrapper(proc: AtomicProcess, names: List[str], params: List[Parameter]):
   oldRun = proc.run
@@ -36,7 +38,7 @@ def procRunWrapper(proc: Process, groupParam: Parameter):
   return newRun
 
 class FRGeneralProcWrapper(ABC):
-  def __init__(self, processor: ImageProcess, editor: s3a.frgraphics.parameditors.genericeditor.FRParamEditor):
+  def __init__(self, processor: ImageProcess, editor: s3a.views.parameditors.genericeditor.FRParamEditor):
     self.processor = processor
     self.algName = processor.name
     self.algParam = FRParam(self.algName)
@@ -51,7 +53,7 @@ class FRGeneralProcWrapper(ABC):
       params: List[Parameter] = []
       for key, val in stage.input.hyperParams.items():
         curParam = FRParam(name=key, value=val)
-        pgParam = self.editor.registerProp(self.algName, curParam, paramParent, asProperty=False)
+        pgParam = self.editor.registerProp(self.algParam, curParam, paramParent, asProperty=False)
         params.append(pgParam)
       stage.run = atomicRunWrapper(stage, stage.input.hyperParamKeys, params)
       return
@@ -67,45 +69,68 @@ class FRGeneralProcWrapper(ABC):
       valType = 'atomicgroup'
       if isinstance(childStage, Process) and childStage.allowDisable:
         valType = 'procgroup'
-      curGroup = FRParam(name=childStage.name, valType=valType, value=[])
-      self.editor.registerProp(self.algName, curGroup, paramParent, asProperty=False)
+      curGroup = FRParam(name=childStage.name, valType=valType, value=[],)
+      self.editor.registerProp(self.algParam, curGroup, paramParent, asProperty=False,
+                               enabled=not childStage.disabled)
       self.unpackStages(childStage, paramParent=paramParent + (childStage.name,))
+
+  def setStageEnabled(self, stageIdx: Sequence[str], enabled: bool):
+    paramForStage: FRCustomMenuParameter = self.editor.params.child(self.algName, *stageIdx)
+    prevEnabled = paramForStage.opts['enabled']
+    if prevEnabled != enabled:
+      paramForStage.menuActTriggered('Toggle Enable')
 
   def run(self, **kwargs):
     raise NotImplementedError
 
+  def __repr__(self) -> str:
+    selfCls = type(self)
+    oldName: str = super().__repr__()
+    # Remove module name for brevity
+    oldName = oldName.replace(f'{selfCls.__module__}.{selfCls.__name__}',
+                              f'{selfCls.__name__} \'{self.algName}\'')
+    return oldName
+
+  @classmethod
+  def getNestedName(cls, curProc: ProcessStage, nestedName: List[str]):
+    for stage in curProc.stages:
+      if stage.name == nestedName[0]:
+        if len(nestedName) == 1:
+          return stage
+        else:
+          return cls.getNestedName(stage, nestedName[1:])
+
 class FRImgProcWrapper(FRGeneralProcWrapper):
-  def __init__(self, processor: ImageProcess, editor: s3a.frgraphics.parameditors.genericeditor.FRParamEditor):
+  def __init__(self, processor: ImageProcess, editor: s3a.views.parameditors.genericeditor.FRParamEditor):
     # Each processor is encapsulated in processes that crop the image to the region of
     # interest specified by the user, and re-expand the area after processing
-    cropStage = ImageProcess.fromFunction(crop_to_verts, name='Crop to Vertices')
-    cropStage.allowDisable = False
-    updateStage = ImageProcess.fromFunction(update_area, 'Update Cropped Area')
-    updateStage.allowDisable = False
+    formatStage = ImageProcess.fromFunction(format_vertices, name='Format Vertices')
+    formatStage.allowDisable = False
+    cropStage = ImageProcess.fromFunction(crop_to_local_area, name='Crop to Local Area')
+
+    applyStage = ImageProcess.fromFunction(apply_process_result, 'Apply Process Result')
+    applyStage.allowDisable = False
     resizeStage = ImageProcess.fromFunction(return_to_full_size, 'Return to Full Size')
     resizeStage.allowDisable = False
-    processor.stages = [cropStage] + processor.stages + [updateStage, basicOpsCombo(), resizeStage]
+
+    finalStages = [applyStage, basicOpsCombo(), resizeStage]
+    processor.stages = [formatStage, cropStage] + processor.stages + finalStages
+
+    if hasattr(processor, 'disabledStages'):
+      for namePath in processor.disabledStages:
+        proc = self.getNestedName(processor, namePath)
+        proc.disabled = True
     super().__init__(processor, editor)
 
   def run(self, **kwargs):
-    if kwargs.get('image', None) is None:
-      raise FRAlgProcessorError('Cannot run processor without an image')
-    image = kwargs['image']
-    for name in 'fgVerts', 'bgVerts':
-      if kwargs.get(name, None) is None:
-        kwargs[name] = FRVertices()
-    if kwargs.get('prevCompMask', None) is None:
-      noPrevMask = True
-      kwargs['prevCompMask'] = np.zeros(image.shape[:2], bool)
-    else:
-      noPrevMask = False
-    newIo = ImageIO(**kwargs, noPrevMask=noPrevMask)
+    newIo = self._ioDictFromRunKwargs(kwargs)
 
     try:
       result = self.processor.run(newIo, force=True)
     except Exception as ex:
-      warn(f'Exception during processor run:\n{ex}')
+      augmentException(ex, 'Exception during processor run:\n')
       result = ImageIO(image=kwargs['prevCompMask'])
+      warn(str(ex), FRS3AWarning)
 
     outImg = result['image'].astype(bool)
     if outImg.ndim > 2:
@@ -123,8 +148,20 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     else:
       return [initialList]
 
-  def setStageEnabled(self, stageIdx: Sequence[str], enabled: bool):
-    paramForStage: FRCustomMenuParameter = self.editor.params.child(self.algName, *stageIdx)
-    prevEnabled = paramForStage.opts['enabled']
-    if prevEnabled != enabled:
-      paramForStage.menuActTriggered('Toggle Enable')
+  @staticmethod
+  def _ioDictFromRunKwargs(runKwargs):
+    image = runKwargs.get('image', None)
+    if image is None:
+      raise FRAlgProcessorError('Cannot run processor without an image')
+
+    runKwargs.setdefault('firstRun', True)
+    for name in 'fgVerts', 'bgVerts':
+      runKwargs.setdefault(name, FRVertices())
+
+    if runKwargs.get('prevCompMask', None) is None:
+      noPrevMask = True
+      runKwargs['prevCompMask'] = np.zeros(image.shape[:2], bool)
+    else:
+      noPrevMask = False
+
+    return ImageIO(**runKwargs, noPrevMask=noPrevMask)

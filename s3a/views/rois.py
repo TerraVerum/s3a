@@ -8,16 +8,20 @@ from s3a.projectvars import FR_CONSTS
 from s3a.structures import FRParam
 from s3a.structures import FRVertices
 
+__all__ = ['FRRectROI', 'FRPaintFillROI', 'FRPolygonROI', 'SHAPE_ROI_MAPPING',
+           'FRExtendedROI']
+
+from s3a.views.clickables import FRBoundScatterPlot
 
 def _clearPoints(roi: pg.ROI):
   while roi.handles:
     roi.removeHandle(0)
 
-# --------
-# COLLECTION OF OVERLOADED ROIS THAT KNOW HOW TO UPDATE THEMSELEVES AS NEEDED WITHIN
-# THE ANNOTATOR REGIONS
-# --------
 class FRROIExtension:
+  """
+  Collection of overloaded rois that know how to update themseleves as needed within
+  the annotator regions
+  """
   connected = True
 
   def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: FRVertices) -> (bool, Optional[FRVertices]):
@@ -35,6 +39,13 @@ class FRROIExtension:
 
   @property
   def vertices(self): return FRVertices()
+
+  def clear(self: pg.ROI):
+    while self.handles:
+      # TODO: Submit bug request in pyqtgraph. removeHandle of ROI takes handle or
+      #  integer index, removeHandle of PolyLine requires handle object. So,
+      #  even though PolyLine should be able  to handle remove by index, it can't
+      self.removeHandle(self.handles[0]['item'])
 
 class FRExtendedROI(pg.ROI, FRROIExtension):
   """
@@ -96,6 +107,10 @@ class FRRectROI(pg.RectROI, FRROIExtension):
     otherCorners = [sz * [0, 1], sz * [1, 1], sz * [1, 0]]
 
     verts_np = np.vstack([origin, *(origin + otherCorners)])
+
+    # This happens when user clicks -- all verts are in the same spot
+    if np.all(verts_np[0,:] == verts_np[1,:]):
+      verts_np = verts_np[[0]]
     verts = FRVertices(verts_np, connected=self.connected, dtype=float)
     return verts
 
@@ -215,3 +230,11 @@ SHAPE_ROI_MAPPING: Dict[FRParam, Callable[[], FRExtendedROI]] = {
   FR_CONSTS.DRAW_SHAPE_RECT: FRRectROI,
   FR_CONSTS.DRAW_SHAPE_POLY: FRPolygonROI,
 }
+
+# Adapted from https://groups.google.com/forum/#!msg/pyqtgraph/tWtjJOQF5x4/CnQF6IgmDAAJ
+# def boundingRect(_roi: pg.ROI):
+#   pw = 0.5 * _roi.currentPen.width()
+#   return QtCore.QRectF(-0.5 * pw, -0.5 * pw, pw + _roi.state['size'][0], pw + _roi.state['size'][1]).normalized()
+#
+# for roi in SHAPE_ROI_MAPPING.values():
+#   roi.boundingRect = boundingRect

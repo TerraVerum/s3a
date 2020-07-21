@@ -7,22 +7,24 @@ appropriate.
 from __future__ import annotations
 
 import contextlib
-from collections import deque
 import copy
+from _warnings import warn
+from collections import deque
 from functools import wraps
 from typing import Callable, Generator, Deque, Union, Type, Any, List
 
 from typing_extensions import Protocol
 
-from s3a.frgraphics.graphicsutils import raiseErrorLater
-from s3a.structures import FRActionStackError, FRS3AException
+from s3a.structures import FRActionStackError, FRS3AWarning
 
+__all__ = ['FRActionStack', 'FRAction']
 
-class _FRAction:
+# _generatorCallable = Callable[[...], Union[Generator, Any]]
+class FRAction:
   """
   This represents an action which can be done and undone.
   """
-  def __init__(self, generator: Callable[[...], Generator], args:tuple=None,
+  def __init__(self, generator: Callable[[...], Union[Generator, Any]], args:tuple=None,
                kwargs:dict=None, descr: str=None, treatAsUndo=False):
     if args is None:
       args = []
@@ -40,6 +42,24 @@ class _FRAction:
     if treatAsUndo:
       # Need to init runner for when backward is called
       self._runner = self._generator(*args, **kwargs)
+
+  def reassignBackward(self, backwardFn: Callable[[...], Any], backwardArgs=(),
+                       backwardKwargs=None):
+
+    if backwardKwargs is None:
+      backwardKwargs = {}
+    oldGenerator = self._generator
+    def newGenerator(*args, **kwargs):
+      # Keep forward
+      yield next(oldGenerator(*args, **kwargs))
+      # Alter backwards
+      yield backwardFn(*backwardArgs, **backwardKwargs)
+    self._generator = newGenerator
+    if self.treatAsUndo:
+      # Already in current runner, so change it
+      def newRunner():
+        yield backwardFn(*backwardArgs, **backwardKwargs)
+      self._runner = newRunner()
 
   def forward(self, graceful=False):
     """
@@ -114,9 +134,9 @@ class FRActionStack:
   """
 
   def __init__(self, maxlen:int=50):
-    self.actions: Deque[_FRAction] = deque(maxlen=maxlen)
+    self.actions: Deque[FRAction] = deque(maxlen=maxlen)
     self._curReceiver = self.actions
-    self._savepoint: Union[EmptyType, _FRAction] = EMPTY
+    self._savepoint: Union[EmptyType, FRAction] = EMPTY
     self.stackChangedCallbacks: List[Callable] = []
 
   @contextlib.contextmanager
@@ -126,7 +146,7 @@ class FRActionStack:
     All actions which occur within the group will be undone by a single call
     of `stack.undo`.
     """
-    newActBuffer: deque[_FRAction] = deque()
+    newActBuffer: Deque[FRAction] = deque()
     with _FRBufferOverride(self, newActBuffer):
       yield
     def grpAct():
@@ -138,7 +158,7 @@ class FRActionStack:
             act.forward(graceful=True)
         yield
     if self._curReceiver is not None:
-      self._curReceiver.append(_FRAction(grpAct, descr=descr, treatAsUndo=True))
+      self._curReceiver.append(FRAction(grpAct, descr=descr, treatAsUndo=True))
     if flushUnusedRedos:
       self.flushUnusedRedos()
 
@@ -173,7 +193,7 @@ class FRActionStack:
         if copyArgs:
           args = tuple(copy.copy(arg) for arg in args)
           kwargs = {k: copy.copy(v) for k, v in kwargs.items()}
-        action = _FRAction(generatorFn, args, kwargs, descr)
+        action = FRAction(generatorFn, args, kwargs, descr)
         try:
           with self.ignoreActions():
             ret = action.forward()
@@ -226,7 +246,7 @@ class FRActionStack:
   def resizeStack(self, newMaxLen: int):
     if newMaxLen == self.actions.maxlen:
       return
-    newDeque: Deque[_FRAction] = deque(maxlen=newMaxLen)
+    newDeque: Deque[FRAction] = deque(maxlen=newMaxLen)
     newDeque.extend(self.actions)
     receiverNeedsReset = True if self._curReceiver is self.actions else False
     self.actions = newDeque
@@ -261,7 +281,8 @@ class FRActionStack:
     last undo call.
     """
     if not self.canRedo:
-      raise FRActionStackError('Nothing to redo')
+      warn('Nothing to redo', FRS3AWarning)
+      return
 
     self.actions.rotate(-1)
     with self.ignoreActions():
@@ -274,7 +295,8 @@ class FRActionStack:
     Undo the last action.
     """
     if not self.canUndo:
-      raise FRActionStackError('Nothing to undo')
+      warn('Nothing to undo', FRS3AWarning)
+      return
 
     with self.ignoreActions():
       ret = self.actions[-1].backward()

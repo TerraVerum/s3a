@@ -1,12 +1,16 @@
 from __future__ import annotations
-import re
+
+import html
 import weakref
 from dataclasses import dataclass, fields, field
-from typing import Any, Optional, Collection, Union
-from typing_extensions import Protocol, runtime_checkable
+from typing import Any, Optional, Collection, Union, Dict
 from warnings import warn
 
-from .exceptions import FRParamParseError
+from pyqtgraph.Qt import QtCore
+from typing_extensions import Protocol, runtime_checkable
+
+from .exceptions import FRParamEditorError
+
 
 @runtime_checkable
 class ContainsSharedProps(Protocol):
@@ -27,10 +31,10 @@ class FRParam:
   valType: Optional[str] = None
   """
   Type of the variable if not easily inferrable from the value itself. 
-    For instance, class:`FRShortcutParameter<s3a.frgraphics.parameditors.FRShortcutParameter>`
+    For instance, class:`FRShortcutParameter<s3a.views.parameditors.FRShortcutParameter>`
     is indicated with string values (e.g. 'Ctrl+D'), so the user must explicitly specify 
     that such an :class:`FRParam` is of type 'shortcut' (as defined in 
-    :class:`FRShortcutParameter<s3a.frgraphics.parameditors.FRShortcutParameter>`)
+    :class:`FRShortcutParameter<s3a.views.parameditors.FRShortcutParameter>`)
     If the type *is* easily inferrable, this may be left blank.
   """
   helpText: str = ''
@@ -39,12 +43,22 @@ class FRParam:
   """FRParamGroup to which this parameter belongs, if this parameter is part of
     a group. This is set by the FRParamGroup, not manually
   """
+  opts: Dict[str, Any] = None
+  """Additional options associated with this parameter"""
 
   def __post_init__(self):
+    if self.opts is None:
+      self.opts = {}
     if self.valType is None:
       # Infer from value
       valType = type(self.value).__name__
       self.valType = valType
+    ht = self.helpText
+    if ht is not None and len(ht) > 0:
+      if not QtCore.Qt.mightBeRichText(ht):
+        ht = html.escape(ht)
+      # Makes sure the label is displayed as rich text
+      self.helpText = f'<qt>{ht}</qt>'
 
   def __str__(self):
     return f'{self.name}'
@@ -95,6 +109,9 @@ class FRParamGroup:
   def __len__(self):
     return len(fields(self))
 
+  def __str__(self):
+    return f'{[f.name for f in self]}'
+
   def __post_init__(self):
     for param in self:
       param.group = weakref.proxy(self)
@@ -104,7 +121,7 @@ class FRParamGroup:
     """
     Allows user to create a :class:`FRParam` object from its string value
     """
-    paramName = paramName.lower()
+    paramName = str(paramName.lower())
     for param in group:
       if param.name.lower() == paramName:
         return param
@@ -115,7 +132,7 @@ class FRParamGroup:
     baseWarnMsg = f'String representation "{paramName}" was not recognized.\n'
     if defaultParam is None:
       # No default specified, so we have to raise Exception
-      raise FRParamParseError(baseWarnMsg + 'No class default is specified.')
+      raise FRParamEditorError(baseWarnMsg + 'No class default is specified.')
     # No exception needed, since the user specified a default type in the derived class
     warn(baseWarnMsg + f'Defaulting to {defaultParam.name}')
     return defaultParam
@@ -129,7 +146,7 @@ class FRParamGroup:
     return None
 
 
-def newParam(name, val=None, valType=None, helpText=''):
+def newParam(name: str, val: Any=None, valType: str=None, helpText='', **opts):
   """
   Factory for creating new parameters within a :class:`FRParamGroup`.
 
@@ -137,4 +154,4 @@ def newParam(name, val=None, valType=None, helpText=''):
 
   :return: Field that can be inserted within the :class:`FRParamGroup` dataclass.
   """
-  return field(default_factory=lambda: FRParam(name, val, valType, helpText))
+  return field(default_factory=lambda: FRParam(name, val, valType, helpText, opts=opts))

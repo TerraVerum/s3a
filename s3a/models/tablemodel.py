@@ -2,26 +2,27 @@ import pickle
 import sys
 from ast import literal_eval
 from pathlib import Path
-from stat import S_IRGRP
-from typing import Union, Any, Optional, List, Tuple
+from stat import S_IREAD, S_IRGRP, S_IROTH
+from typing import Union, Any, Optional, Tuple
+from warnings import warn
 
-import cv2 as cv
 import numpy as np
 import pandas as pd
 from pandas import DataFrame as df
-from pyqtgraph.Qt import QtCore
+from pyqtgraph.Qt import QtCore, QtWidgets
 from skimage import io
+from typing_extensions import Literal
 
-from s3a.structures import OneDArr, FRParamGroup, FilePath
-from s3a.structures.typeoverloads import TwoDArr, NChanImg
-from . import FR_SINGLETON
-from .generalutils import coerceDfTypes, augmentException
-from .projectvars import FR_ENUMS, REQD_TBL_FIELDS
-from .projectvars.constants import FR_CONSTS
-from .structures import FRComplexVertices, FRParam, FRAppIOError
+from s3a import FR_SINGLETON
+from s3a.generalutils import coerceDfTypes, augmentException
+from s3a.projectvars import FR_ENUMS, REQD_TBL_FIELDS
+from s3a.projectvars.constants import FR_CONSTS
+from s3a.structures import FRComplexVertices, FRParam
+from s3a.structures import OneDArr, FRParamGroup, FilePath, FRS3AWarning, GrayImg
 
-Slot = QtCore.pyqtSlot
-Signal = QtCore.pyqtSignal
+__all__ = ['FRComponentMgr', 'FRComponentIO', 'FRCompTableModel']
+
+Signal = QtCore.Signal
 
 TBL_FIELDS = FR_SINGLETON.tableData.allFields
 
@@ -43,6 +44,7 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
 
     noEditParams = set(REQD_TBL_FIELDS) - {REQD_TBL_FIELDS.COMP_CLASS}
     self.noEditColIdxs = [self.colTitles.index(col.name) for col in noEditParams]
+    self.editColIdxs = np.setdiff1d(np.arange(len(self.colTitles)), self.noEditColIdxs)
 
   # ------
   # Functions required to implement table model
@@ -69,15 +71,27 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
 
   @FR_SINGLETON.actionStack.undoable('Alter Component Data')
   def setData(self, index, value, role=QtCore.Qt.EditRole) -> bool:
-    oldVal = self.compDf.iloc[index.row(), index.column()]
+    row = index.row()
+    col = index.column()
+    oldVal = self.compDf.iat[row, col]
     # Try-catch for case of numpy arrays
     noChange = oldVal == value
     try:
       if noChange:
         return True
     except ValueError:
+      # Happens with array comparison
       pass
-    self.compDf.iloc[index.row(), index.column()] = value
+    self.compDf.iat[row, col] = value
+    # !!! Serious issue! Using iat sometimes doesn't work and I have no idea why since it is
+    # not easy to replicate. See https://github.com/pandas-dev/pandas/issues/22740
+    # Also, pandas iloc unnecessarily coerces to 2D ndarray when setting, so iloc will fail
+    # when assigning an array to a single location. Not sure how to prevent this...
+    # For now, checking this on export
+    if self.compDf.iloc[row, [col, col-1]].values[0] != self.compDf.iat[row, col]:
+      warn('Warning! An error occurred setting this value. Please try again using a'
+           ' <em>multi-cell</em> edit. E.g. do not just set this value, set it along with'
+           ' at least one other selected cell.', FRS3AWarning)
     toEmit = self.defaultEmitDict.copy()
     toEmit['changed'] = np.array([self.compDf.index[index.row()]])
     self.sigCompsChanged.emit(toEmit)
@@ -212,6 +226,66 @@ class FRComponentMgr(FRCompTableModel):
     # Undo code
     self.addComps(removedData, FR_ENUMS.COMP_ADD_AS_MERGE)
 
+  @FR_SINGLETON.actionStack.undoable('Merge Components')
+  def mergeCompVertsById(self, mergeIds: OneDArr=None, keepId: int=None):
+    """
+    Merges the selected components
+
+    :param mergeIds: Ids of components to merge. If *None*, defaults to current user
+      selection.
+    :param keepId: If provided, the selected component with this ID is used as
+      the merged component columns (except for the vertices, of course). Else,
+      this will default to the first component in the selection.
+    """
+    if mergeIds is None or len(mergeIds) < 2:
+      warn(f'Less than two components are selected, so "merge" is a no-op.', FRS3AWarning)
+      return
+    mergeComps: df = self.compDf.loc[mergeIds].copy()
+    if keepId is None:
+      keepId = mergeIds[0]
+
+    keepInfo = mergeComps.loc[keepId].copy()
+    allVerts = [v.stack() for v in mergeComps[REQD_TBL_FIELDS.VERTICES]]
+    maskShape = np.max(np.vstack(allVerts), 0)[::-1]
+    mask = np.zeros(maskShape, bool)
+    for verts in mergeComps[REQD_TBL_FIELDS.VERTICES]: # type: FRComplexVertices
+      mask |= verts.toMask(tuple(maskShape))
+    newVerts = FRComplexVertices.fromBwMask(mask)
+    keepInfo[REQD_TBL_FIELDS.VERTICES] = newVerts
+
+    self.rmComps(mergeComps.index)
+    self.addComps(keepInfo.to_frame().T, FR_ENUMS.COMP_ADD_AS_MERGE)
+    yield
+    self.addComps(mergeComps, FR_ENUMS.COMP_ADD_AS_MERGE)
+
+  @FR_SINGLETON.actionStack.undoable('Split Components')
+  def splitCompVertsById(self, splitIds: OneDArr):
+    """
+    Makes a separate component for each distinct boundary in all selected components.
+    For instance, if two components are selected, and each has two separate circles as
+    vertices, then 4 total components will exist after this operation.
+
+    Each new component will have the table fields of its parent
+
+    :param splitIds: Ids of components to split up
+    """
+    splitComps = self.compDf.loc[splitIds, :].copy()
+    newComps_lst = []
+    for _, comp in splitComps.iterrows():
+      verts = comp[REQD_TBL_FIELDS.VERTICES]
+      childComps = pd.concat([comp.to_frame().T]*len(verts))
+      newVerts = [FRComplexVertices([v]) for v in verts]
+      childComps.loc[:, REQD_TBL_FIELDS.VERTICES] = newVerts
+      newComps_lst.append(childComps)
+    newComps = pd.concat(newComps_lst)
+    # Keep track of which comps were removed and added by this op
+    outDict = self.rmComps(splitComps.index)
+    outDict.update(self.addComps(newComps))
+    yield outDict
+    undoDict = self.rmComps(newComps.index)
+    undoDict.update(self.addComps(splitComps, FR_ENUMS.COMP_ADD_AS_MERGE))
+    return undoDict
+
 def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> pd.Series:
   paramType = type(paramVal)
   # TODO: Move this to a more obvious place?
@@ -224,7 +298,7 @@ def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> pd.Series:
   }
   defaultFunc = lambda strVal: paramType(strVal)
   funcToUse = funcMap.get(paramType, defaultFunc)
-  return strSeries.apply(funcToUse)
+  return strSeries.apply(funcToUse).values
 
 def _paramSerToStrSer(paramSer: pd.Series, paramVal: Any) -> pd.Series:
   # TODO: Move along with above function?
@@ -257,6 +331,39 @@ class FRComponentIO:
   def __init__(self):
     self.compDf: Optional[df] = None
 
+  @property
+  def handledIoTypes(self):
+    """Returns a dict of <type, description> for the file types this I/O obejct can handle"""
+    return {'csv': 'CSV Files', 'pkl': 'Pickle Files', 'id.png': 'ID Grayscale Image',
+            'class.png': 'Class Grayscale Image'}
+
+  @property
+  def roundTripIoTypes(self):
+    """
+    Not all IO types can export->import and remain the exact same dataframe afterwards.
+    For instance, exporting a labeled image will discard all additional fields.
+    This property holds export types which can give back the original dataframe after
+    a round trip export->import.
+    """
+    ioTypes = self.handledIoTypes
+    return {k: ioTypes[k] for k in ['csv', 'pkl']}
+
+  def handledIoTypes_fileFilter(self, typeFilter='', **extraOpts):
+    """
+    Helper for creating a file filter out of the handled IO types. The returned list of
+    strings is suitable for inserting into a QFileDialog.
+
+    :param typeFilter: type filter for handled io types. For instanece, if typ='png', then
+      a file filter list with only 'id.png' and 'class.png' will appear.
+    """
+    if isinstance(typeFilter, str):
+      typeFilter = [typeFilter]
+    fileFilters = []
+    for typ, info in dict(**self.handledIoTypes, **extraOpts).items():
+      if any([t in typ for t in typeFilter]):
+        fileFilters.append(f'{info} (*.{typ})')
+    return ';;'.join(fileFilters)
+
   def prepareDf(self, compDf: df, displayIds: OneDArr=None, srcImgFname: Path=None):
     """
     :param compDf: The component dataframe that came from the component manager
@@ -279,17 +386,54 @@ class FRComponentIO:
     exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = srcImgFname
     self.compDf = exportDf
 
+  def exportByFileType(self, outFile: Union[str, Path], verifyIntegrity=True, **exportArgs):
+    outFile = Path(outFile)
+    self._ioByFileType(outFile, 'export', **exportArgs)
+    if verifyIntegrity and outFile.suffix[1:] in self.roundTripIoTypes:
+      matchingCols = np.setdiff1d(self.compDf.columns, [REQD_TBL_FIELDS.INST_ID,
+                                                                REQD_TBL_FIELDS.SRC_IMG_FILENAME])
+      loadedDf = self.buildByFileType(outFile)
+      dfCmp = loadedDf[matchingCols].values == self.compDf[matchingCols].values
+      if not np.all(dfCmp):
+        problemCells = np.nonzero(~dfCmp)
+        problemIdxs = self.compDf.index[problemCells[0]]
+        problemCols = matchingCols[problemCells[1]]
+        problemMsg = [f'{idx}: {col}' for idx, col in zip(problemIdxs, problemCols)]
+        problemMsg = '\n'.join(problemMsg)
+        # Try to fix the problem with an iloc write
+        warn('<b>Warning!</b> Saved components do not match current component'
+             ' state. This can occur when pandas incorrectly caches some'
+             ' table values. To rectify this, a multi-cell overwrite was performed'
+             ' for the following cells (shown as <id>: <column>):\n'
+             + f'{problemMsg}\n'
+               f'Please try exporting again to confirm the cleanup was successful.', FRS3AWarning)
+
+
+  def buildByFileType(self, inFile: Union[str, Path], imShape: Tuple[int]=None, **importArgs):
+    return self._ioByFileType(inFile, 'buildFrom', imShape=imShape, **importArgs)
+
+  def _ioByFileType(self, fpath: Union[str, Path],
+                    buildOrExport=Literal['buildFrom', 'export'], **ioArgs):
+    fpath = Path(fpath)
+    fname = fpath.name
+    cmpTypes = np.array(list(self.handledIoTypes.keys()))
+    typIdx = [typ in fname for typ in cmpTypes]
+    if not any(typIdx):
+      return
+    fnNameSuffix = cmpTypes[typIdx][0].title().replace('.', '')
+    ioFn = getattr(self, buildOrExport+fnNameSuffix, None)
+    return ioFn(fpath, **ioArgs)
   # -----
   # Export options
   # -----
-  def exportCsv(self, outFile: str=None, **pdExportArgs) -> (Any, str):
+  def exportCsv(self, outFile: Union[str, Path]=None, readOnly=True, **pdExportArgs):
     """
-
     :param outFile: Name of the output file location. If *None*, no file is created. However,
       the export object will still be created and returned.
     :param pdExportArgs: Dictionary of values passed to underlying pandas export function.
       These will overwrite the default options for :func:`exportToFile <FRComponentMgr.exportToFile>`
-    :return: (Export object, Success or failure of the operation) tuple.
+    :param readOnly: Whether this export should be read-only
+    :return: Export version of the component data.
     """
     defaultExportParams = {
       'na_rep': 'NaN',
@@ -297,7 +441,6 @@ class FRComponentIO:
       'index': False
     }
     outPath = Path(outFile)
-    outPath.parent.mkdir(exist_ok=True)
     defaultExportParams.update(pdExportArgs)
     # Make sure no rows are truncated
     pd.set_option('display.max_rows', sys.maxsize)
@@ -310,13 +453,15 @@ class FRComponentIO:
       # Format special columns appropriately
       # Since CSV export significantly modifies the df, make a copy before doing all these
       # operations
+      outPath.parent.mkdir(exist_ok=True, parents=True)
       exportDf = self.compDf.copy(deep=True)
       for col in exportDf:
         if not isinstance(col.value, str):
           exportDf[col] = _paramSerToStrSer(exportDf[col], col.value)
       if outFile is not None:
         exportDf.to_csv(outFile, index=False)
-        outPath.chmod(S_IRGRP)
+        if readOnly:
+          outPath.chmod(S_IREAD|S_IRGRP|S_IROTH)
     except Exception as ex:
       errMsg = f'Error on parsing column "{col.name}"\n'
       augmentException(ex, errMsg)
@@ -328,7 +473,7 @@ class FRComponentIO:
       np.set_printoptions(**oldNpOpts)
     return exportDf
 
-  def exportPkl(self, outFile=None) -> (Any, str):
+  def exportPkl(self, outFile: Union[str, Path]=None) -> (Any, str):
     """
     See the function signature for :func:`exportCsv <FRComponentIO.exportCsv>`
     """
@@ -339,33 +484,38 @@ class FRComponentIO:
       self.compDf.to_pickle(outFile)
     return pklDf
 
-  def exportLabeledImg(self,
-                       mainImgShape: Tuple[int],
-                       outFile: str = None,
-                       types: List[FRParam] = None,
-                       colorPerType: TwoDArr = None,
-                       ) -> (NChanImg, str):
-    # Set up input arguments
-    if types is None:
-      types = [param for param in FR_SINGLETON.tableData.compClasses]
-    if colorPerType is None:
-      colorPerType = np.arange(1, len(types) + 1, dtype=int)[:,None]
-    outShape = mainImgShape[:2]
-    if colorPerType.shape[1] > 1:
-      outShape += (colorPerType.shape[1],)
-    out = np.zeros(outShape, 'uint8')
-
+  def exportClassPng(self, outFile: FilePath = None, imShape: Tuple[int]=None, **kwargs):
     # Create label to output mapping
-    for curType, color in zip(types, colorPerType):
-      outlines = self.compDf.loc[self.compDf[REQD_TBL_FIELDS.COMP_CLASS] == curType, REQD_TBL_FIELDS.VERTICES].values
-      cvFillArg = [arr[0] for arr in outlines]
-      cvClrArg = tuple([int(val) for val in color])
-      cv.fillPoly(out, cvFillArg, cvClrArg)
+    classes = FR_SINGLETON.tableData.compClasses
+    colors = self.compDf[REQD_TBL_FIELDS.COMP_CLASS].apply(classes.index)+1
+    origIdxs = self.compDf.index
+    self.compDf.index = colors
+    ret = self.exportIdPng(outFile, imShape, **kwargs)
+    self.compDf.index = origIdxs
+
+    return ret
+
+  def exportIdPng(self, outFile: FilePath=None,
+                  imShape: Tuple[int]=None, **kwargs):
+    """
+    Creates a 2D grayscale image where each component is colored with its isntance ID + 1.
+    *Note* Since Id 0 would end up not coloring the mask, all IDs must be offest by 1.
+    :param imShape: The size of this output image
+    :param outFile: Where to save the output. If *None*, no export is created.
+    :return:
+    """
+    if imShape is None:
+      vertMax = FRComplexVertices.stackedMax(self.compDf[REQD_TBL_FIELDS.VERTICES])
+      imShape = tuple(vertMax[::-1] + 1)
+    outMask = np.zeros(imShape[:2], 'int32')
+    for idx, comp in self.compDf.iterrows():
+      verts: FRComplexVertices = comp[REQD_TBL_FIELDS.VERTICES]
+      idx: int
+      outMask = verts.toMask(outMask, idx+1, False, False)
 
     if outFile is not None:
-      io.imsave(outFile, out, check_contrast=False)
-
-    return out
+      io.imsave(outFile, outMask.astype('uint16'), check_contrast=False)
+    return outMask
 
   # -----
   # Import options
@@ -384,42 +534,58 @@ class FRComponentIO:
     :param inFile: Name of file to import
     :return: Tuple: DF that will be exported if successful extraction
     """
-    col = None
+    field = FRParam('None', None)
     try:
-      csvDf = pd.read_csv(inFile, keep_default_na=False)
+      csvDf = pd.read_csv(inFile, keep_default_na=False, dtype=object)
+      # Decouple index from instance ID until after transfer from csvDf is complete
+      # This was causing very strange behavior without reset_index()...
+      outDf = FR_SINGLETON.tableData.makeCompDf(len(csvDf)).reset_index(drop=True)
       # Objects in the original frame are represented as strings, so try to convert these
       # as needed
-      csvDf = csvDf[[field.name for field in TBL_FIELDS]]
-      stringCols = csvDf.columns[csvDf.dtypes == object]
-      valToParamMap = {param.name: param.value for param in TBL_FIELDS}
-      for col in stringCols:
-        paramVal = valToParamMap[col]
-        # No need to perform this expensive computation if the values are already strings
-        if not isinstance(paramVal, str):
-          csvDf[col] = _strSerToParamSer(csvDf[col], valToParamMap[col])
-      csvDf.columns = TBL_FIELDS
-      csvDf = csvDf.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
+      for field in TBL_FIELDS:
+        if field.name in csvDf:
+          if isinstance(field.value, str):
+            outDf[field] = csvDf[field.name]
+          else:
+            outDf[field] = _strSerToParamSer(csvDf[field.name], field.value)
+      outDf = outDf.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
 
-      cls.checkVertBounds(csvDf[REQD_TBL_FIELDS.VERTICES], imShape)
+      cls.checkVertBounds(outDf[REQD_TBL_FIELDS.VERTICES], imShape)
     except Exception as ex:
       # Rethrow exception with insight about column number
       # Procedure copied from https://stackoverflow.com/a/6062677/9463643
-      errMsg = f'Error importing column "{col}":\n'
+      errMsg = f'Error importing column "{field.name}":\n'
       augmentException(ex, errMsg)
       raise
     # TODO: Apply this function to individual rows instead of the whole dataframe. This will allow malformed
     #  rows to gracefully fall off the dataframe with some sort of warning message
-    return csvDf
+    return outDf
 
   @classmethod
   def buildFromPkl(cls, inFile: FilePath, imShape: Tuple=None) -> df:
     """
     See docstring for :func:`self.buildFromCsv`
     """
-    pklDf = None
     pklDf = pd.read_pickle(inFile)
     cls.checkVertBounds(pklDf[REQD_TBL_FIELDS.VERTICES], imShape)
     return pklDf
+
+  @classmethod
+  def buildFromIdPng(cls, inFile: FilePath, imShape: Tuple=None) -> df:
+    labelImg = io.imread(inFile, as_gray=True)
+    outDf = cls._idImgToDf(labelImg)
+    cls.checkVertBounds(outDf[REQD_TBL_FIELDS.VERTICES], imShape)
+    return outDf
+
+  @classmethod
+  def buildFromClassPng(cls, inFile: FilePath, imShape: Tuple=None) -> df:
+    outDf = cls.buildFromIdPng(inFile, imShape)
+    # Convert what the ID import treated as an inst id into indices for class
+    clsArray = np.array(FR_SINGLETON.tableData.compClasses)
+    outDf[REQD_TBL_FIELDS.COMP_CLASS] = clsArray[outDf[REQD_TBL_FIELDS.INST_ID]]
+    outDf.reset_index(inplace=True, drop=True)
+    outDf[REQD_TBL_FIELDS.INST_ID] = outDf.index
+    return outDf
 
   @staticmethod
   def checkVertBounds(vertSer: pd.Series, imShape: tuple):
@@ -432,7 +598,7 @@ class FRComponentIO:
     :return: Raises error if offending vertices are present, since this is an indication the component file
       was from a different image
     """
-    if imShape is None:
+    if imShape is None or len(vertSer) == 0:
       # Nothing we can do if no shape is given
       return
     # Image shape from row-col -> x-y
@@ -442,6 +608,20 @@ class FRComponentIO:
     vertMaxs = np.vstack(vertMaxs)
     offendingIds = np.nonzero(np.any(vertMaxs >= imShape, axis=1))[0]
     if len(offendingIds) > 0:
-      raise FRAppIOError(f'Vertices on some components extend beyond image dimensions. '
-                          f'Perhaps this export came from a different image?\n'
-                          f'Offending IDs: {offendingIds}')
+      warn(f'Vertices on some components extend beyond image dimensions. '
+           f'Perhaps this export came from a different image?\n'
+           f'Offending IDs: {offendingIds}', FRS3AWarning)
+
+  @classmethod
+  def _idImgToDf(cls, idImg: GrayImg):
+    # Skip 0 since it's indicative of background
+    regionIds = np.unique(idImg)[1:]
+    allVerts = []
+    for curId in regionIds:
+      verts = FRComplexVertices.fromBwMask(idImg == curId)
+      allVerts.append(verts)
+    outDf = FR_SINGLETON.tableData.makeCompDf(regionIds.size)
+    # Subtract 1 since instance ids are 0-indexed
+    outDf[REQD_TBL_FIELDS.INST_ID] = regionIds-1
+    outDf[REQD_TBL_FIELDS.VERTICES] = allVerts
+    return outDf

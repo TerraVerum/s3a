@@ -1,41 +1,44 @@
 from __future__ import annotations
 
-from os.path import join
+from inspect import isclass
 from pathlib import Path
 from typing import Optional, Dict, List, Callable, Union
 
-import numpy as np
-from pyqtgraph import BusyCursor
+from imageprocessing.processing import ImageProcess
 from pyqtgraph.Qt import QtCore
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.parameterTypes import ListParameter
 
-from s3a.procwrapper import FRImgProcWrapper
 from s3a.projectvars import MENU_OPTS_DIR
-from s3a.structures import FRComplexVertices, FRVertices, NChanImg, FRParam, \
-  FRAlgProcessorError
-from imageprocessing.processing import ImageProcess
-from .genericeditor import FRParamEditor, _frPascalCaseToTitle
+from s3a.structures import FRParam, \
+  FRAlgProcessorError, FRParamEditorError
+from s3a.views.procwrapper import FRImgProcWrapper
+from .genericeditor import FRParamEditor
 from .pgregistered import FRProcGroupParameter
+from ...generalutils import frPascalCaseToTitle
 
-Signal = QtCore.pyqtSignal
+Signal = QtCore.Signal
 
 class FRAlgPropsMgr(FRParamEditor):
-  sigProcessorCreated = Signal(object) # Signal(FRAlgCollectionEditor)
+  # sigProcessorCreated = Signal(object) # Signal(FRAlgCollectionEditor)
   def __init__(self, parent=None):
     super().__init__(parent, fileType='', saveDir='')
     self.processorCtors : List[Callable[[], ImageProcess]] = []
     self.spawnedCollections : List[FRAlgCollectionEditor] = []
 
-  def registerGroup(self, groupParam: FRParam, **opts):
-    # Don't save a default file for this class
-    return super().registerGroup(groupParam, saveDefault=False, **opts)
+  def registerGroup(self, groupParam: FRParam = None, **opts):
+    raise FRParamEditorError("Individual processors shouldn't be registered as groups."
+                             " They should be spawned from an AlgCollectionEditor.")
 
-  def createProcessorForClass(self, clsObj) -> FRAlgCollectionEditor:
-    clsName = type(clsObj).__name__
-    editorDir = join(MENU_OPTS_DIR, clsName, '')
-    # Strip "FR" from class name before retrieving name
-    editorName = _frPascalCaseToTitle(clsName[2:]) + ' Processor'
+  def createProcessorForClass(self, clsObj, editorName=None) -> FRAlgCollectionEditor:
+    if not isclass(clsObj):
+      clsObj = type(clsObj)
+    clsName = clsObj.__name__
+    formattedClsName = frPascalCaseToTitle(clsName)
+    editorDir = MENU_OPTS_DIR/formattedClsName.lower()
+    if editorName is None:
+      # Strip "FR" from class name before retrieving name
+      editorName = formattedClsName + ' Processor'
     newEditor = FRAlgCollectionEditor(editorDir, self.processorCtors, name=editorName)
     self.spawnedCollections.append(newEditor)
     # Wrap in property so changes propagate to the calling class
@@ -44,7 +47,7 @@ class FRAlgPropsMgr(FRParamEditor):
     defaultAlg = lims[defaultKey]
     newEditor.algOpts.setDefault(defaultAlg)
     newEditor.switchActiveProcessor(proc=defaultAlg)
-    self.sigProcessorCreated.emit(newEditor)
+    # self.sigProcessorCreated.emit(newEditor)
     return newEditor
 
   def addProcessCtor(self, procCtor: Callable[[], ImageProcess]):
@@ -62,7 +65,9 @@ class FRAlgCollectionEditor(FRParamEditor):
     self.algOpts: ListParameter = self.treeAlgOpts.children()[0]
     self.algOpts.sigValueChanged.connect(lambda param, proc: self.switchActiveProcessor(proc))
     super().__init__(parent, saveDir=saveDir, fileType='alg', name=name,
-                     childForOverride=self.algOpts)
+                     topTreeChild=self.algOpts)
+    self.expandAllBtn.hide()
+    self.collapseAllBtn.hide()
 
     self.saveDir.mkdir(parents=True, exist_ok=True)
 
@@ -70,9 +75,6 @@ class FRAlgCollectionEditor(FRParamEditor):
     self.nameToProcMapping: Dict[str, FRImgProcWrapper] = {}
 
     self.VERT_LST_NAMES = ['fgVerts', 'bgVerts']
-    self.vertBuffers: Dict[str, FRComplexVertices] = {
-      vType: FRComplexVertices() for vType in self.VERT_LST_NAMES
-    }
 
     wrapped : Optional[FRImgProcWrapper] = None
     for processorCtor in procCtors:
@@ -80,7 +82,7 @@ class FRAlgCollectionEditor(FRParamEditor):
       wrapped = self.addImageProcessor(processorCtor())
     self.algOpts.setDefault(wrapped)
     self.switchActiveProcessor(proc=wrapped)
-    self.saveParamState('Default', allowOverwriteDefault=True)
+    # self.saveParamState('Default', allowOverwriteDefault=True)
 
   def addImageProcessor(self, newProc: ImageProcess):
     processor = FRImgProcWrapper(newProc, self)
@@ -91,24 +93,20 @@ class FRAlgCollectionEditor(FRParamEditor):
     return processor
 
   def saveParamState(self, saveName: str=None, paramState: dict=None,
-                     allowOverwriteDefault=False):
+                     allowOverwriteDefault=False, blockWrite=False):
     """
     The algorithm editor also needs to store information about the selected algorithm, so lump
     this in with the other parameter information before calling default save.
     """
-    paramDict = self.paramDictWithOpts(addList=['enabled'], addTo=[FRProcGroupParameter],
-                                       removeList=['value'])
-    def addEnabledOpt(dictRoot, paramRoot: Parameter, prevRoot=None):
-      for pChild in paramRoot:
-        dChild = dictRoot['children'][pChild.name()]
-        addEnabledOpt(dChild, pChild)
-      if isinstance(paramRoot, FRProcGroupParameter):
-        dictRoot['enabled'] = paramRoot.opts['enabled']
-    paramState = {'Selected Algorithm': self.algOpts.value().algName,
-                  'Parameters': paramDict}
-    return super().saveParamState(saveName, paramState, allowOverwriteDefault)
+    if paramState is None:
+      paramDict = self.paramDictWithOpts(addList=['enabled'], addTo=[FRProcGroupParameter],
+                                         removeList=['value'])
+      paramState = {'Selected Algorithm': self.algOpts.value().algName,
+                    'Parameters': paramDict}
+    return super().saveParamState(saveName, paramState, allowOverwriteDefault, blockWrite)
 
-  def loadParamState(self, stateName: str, stateDict: dict=None, addChildren=False, removeChildren=False):
+  def loadParamState(self, stateName: Union[str, Path], stateDict: dict=None,
+                     addChildren=False, removeChildren=False, applyChanges=True):
     stateDict = self._parseStateDict(stateName, stateDict)
     selectedOpt = stateDict.get('Selected Algorithm', None)
     # Get the impl associated with this option name

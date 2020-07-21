@@ -1,27 +1,27 @@
 from __future__ import annotations
+
 from ast import literal_eval
 from typing import Union, List, Sequence
 from warnings import warn
 
-import numpy as np
 import cv2 as cv
+import numpy as np
 
-from .typeoverloads import BlackWhiteImg
 from .exceptions import FRIllFormedVerticesError
-from s3a.projectvars.enums import FR_ENUMS
+from .typeoverloads import BlackWhiteImg, NChanImg
+from ..projectvars.enums import FR_ENUMS
 
 
 class FRVertices(np.ndarray):
   connected = True
 
-  def __new__(cls, inputArr: Union[list, np.ndarray, tuple]=None, connected=True, **kwargs):
+  def __new__(cls, inputArr: Union[list, np.ndarray, tuple]=None, connected=True, dtype=int,
+              **kwargs):
+    # Default to integer type if not specified, since this is how pixel coordinates will be represented anyway
     # See numpy docs on subclassing ndarray
     if inputArr is None:
       inputArr = np.zeros((0,2))
-    # Default to integer type if not specified, since this is how pixel coordinates will be represented anyway
-    if 'dtype' not in kwargs:
-      kwargs['dtype'] = int
-    arr = np.asarray(inputArr, **kwargs).view(cls)
+    arr = np.asarray(inputArr, dtype=dtype, **kwargs).view(cls)
     arr.connected = connected
     return arr
 
@@ -86,11 +86,14 @@ class FRComplexVertices(list):
   """See cv.findContours for hierarchy explanation. Used in cv.RETR_CCOMP mode."""
 
   def __init__(self, inputArr: Union[List[FRVertices], np.ndarray]=None,
-               hierarchy: Union[np.ndarray, FR_ENUMS]=None):
+               hierarchy: Union[np.ndarray, FR_ENUMS]=None,
+               coerceListElements=False):
     if hierarchy is None:
       hierarchy = FR_ENUMS.HIER_ALL_FILLED
     if inputArr is None:
       inputArr = []
+    if coerceListElements:
+      inputArr = [FRVertices(el) for el in inputArr]
     super().__init__(inputArr)
     # No hierarchy required unless list is longer than length 1
     numInpts = len(inputArr)
@@ -105,14 +108,10 @@ class FRComplexVertices(list):
 
   def append(self, verts:FRVertices=None) -> None:
     if verts is not None:
-      self.append(verts)
+      super().append(verts)
 
   def isEmpty(self):
     return len(self.stack()) == 0
-
-  @property
-  def x_flat(self):
-    return self.stack().x
 
   @property
   def x(self):
@@ -121,10 +120,6 @@ class FRComplexVertices(list):
   def x(self, newX):
     for lst, newLstX in zip(self, newX):
       lst.x = newLstX
-
-  @property
-  def y_flat(self):
-    return self.stack().y
 
   @property
   def y(self):
@@ -149,6 +144,13 @@ class FRComplexVertices(list):
     else:
       return FRVertices(np.vstack(self), dtype=newDtype)
 
+  @classmethod
+  def stackedMax(cls, complexVertList: list):
+    """
+    Returns the max along dimension 0 for a list of complex vertices
+    """
+    return np.vstack([v.stack() for v in complexVertList]).max(0)
+
   def filledVerts(self) -> FRComplexVertices:
     """
     Retrieves all vertex lists corresponding to filled regions in the complex shape
@@ -163,16 +165,43 @@ class FRComplexVertices(list):
     idxs = np.nonzero(self.hierarchy[:,3] != -1)[0]
     return FRComplexVertices([self[ii] for ii in idxs])
 
-  def toBwMask(self, maskShape: Sequence, warnIfTooSmall=True):
-    vertMax = self.stack().max(0)
-    if warnIfTooSmall and vertMax > np.array(maskShape[:2]):
-      warn('Vertices don\'t fit in the provided mask size.\n'
-           f'Vertex shape: {vertMax}, mask shape: {maskShape}')
-    out = np.zeros(maskShape, bool)
+  def toMask(self, maskShape: Union[Sequence, NChanImg]=None,
+             fillColor: Union[int, float, np.ndarray]=None,
+             asBool=True, checkForDisconnectedVerts=False, warnIfTooSmall=True):
+    if maskShape is None:
+      maskShape = tuple(self.stack().max(0)[::-1]+1)
+      # Guaranteed not to be too small
+      warnIfTooSmall = False
+    if warnIfTooSmall:
+      cmpShape = maskShape if isinstance(maskShape, Sequence) else maskShape.shape[:2]
+      # Wait until inside 'if' so max isn't unnecessarily calculated
+      vertMax = self.stack().max(0)[::-1]
+      if np.any(vertMax > np.array(cmpShape[:2])):
+        warn('Vertices don\'t fit in the provided mask size.\n'
+             f'Vertex shape: {vertMax}, mask shape: {cmpShape}')
+    if checkForDisconnectedVerts:
+      fillArg = []
+      for verts in self: # type: FRVertices
+        if verts.connected:
+          fillArg.append(verts)
+        else:
+          # Make sure each point is treated separately, not part of a shape
+          # to fill
+          fillArg.extend(verts)
+    else:
+      fillArg = self
+    if isinstance(maskShape, NChanImg):
+      out = maskShape
+    else:
+      out = np.zeros(maskShape, 'uint16')
     nChans = 1 if out.ndim < 3 else out.shape[2]
-    fillClr = tuple([1 for _ in range(nChans)])
-    cv.fillPoly(out, self, fillClr)
-    return out
+    if fillColor is None:
+      fillColor = tuple([1 for _ in range(nChans)])
+    cv.fillPoly(out, fillArg, fillColor)
+    if asBool:
+      return out > 0
+    else:
+      return out
 
   @staticmethod
   def fromBwMask(bwMask: BlackWhiteImg, simplifyVerts=True, externOnly=False) -> FRComplexVertices:
@@ -186,12 +215,15 @@ class FRComplexVertices(list):
     # outside
     #bwmask = dilation(bwmask, np.ones((3,3), dtype=bool))
     contours, hierarchy = cv.findContours(bwMask.astype('uint8'), retrMethod, approxMethod)
-    compVertices = []
+    compVertices = FRComplexVertices()
     for contour in contours:
       compVertices.append(FRVertices(contour[:,0,:]))
     if hierarchy is None:
       hierarchy = np.ones((0,1,4), int)*-1
-    return FRComplexVertices(compVertices, hierarchy[:,0,:])
+    else:
+      hierarchy = hierarchy[0,:,:]
+    compVertices.hierarchy = hierarchy
+    return compVertices
 
   def __str__(self) -> str:
     """
@@ -206,8 +238,12 @@ class FRComplexVertices(list):
            f'Max:\t{concatVerts.max(0)}'
 
   def __eq__(self, other: FRComplexVertices):
-    # lstLens = lambda lst: np.array([len(el) for el in lst])
-    return np.array_equal(self, other)
+    if len(self) != len(other):
+      return False
+    for selfVerts, otherVerts in zip(self, other):
+      if not np.array_equal(selfVerts, otherVerts):
+        return False
+    return True
 
   def __ne__(self, other):
     return not self == other

@@ -1,9 +1,25 @@
+validated:
+  - 'True'
+  - 'False'
+  - 'Revisit'
+
 opt-tbl-fields:
-  Validated: false
-  Device Text : ''
-  Board Text : ''
-  Logo : ''
-  Notes : ''
+  Validated:
+    value: "False"
+    valType: validated
+  Device Text:
+    value: ''
+    valType: text
+  Board Text:
+    value: ''
+    valType: text
+  Logo:
+    value: ''
+    valType: text
+  Defect: false
+  Notes:
+    value: ''
+    valType: text
 
 classes:
   - Resistor

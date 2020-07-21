@@ -1,17 +1,16 @@
-from collections import defaultdict
-from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Union
+from typing import List, Union
+from warnings import warn
 
 from pyqtgraph.Qt import QtCore, QtWidgets
-from pyqtgraph.parametertree.parameterTypes import ActionParameter, GroupParameter, Parameter
+from pyqtgraph.parametertree.parameterTypes import GroupParameter, Parameter
 
+from s3a.graphicsutils import FRPopupLineEditor, raiseErrorLater
 from s3a.projectvars import QUICK_LOAD_DIR
 from .genericeditor import FRParamEditor
-from ..graphicsutils import FRPopupLineEditor, raiseErrorLater
-from ...structures import FRIllRegisteredPropError
+from .pgregistered import FRActionWithShortcutParameter as ActWithShc
+from ...structures import FRParamEditorError, FRS3AWarning
 
-Slot = QtCore.pyqtSlot
 
 class FREditorListModel(QtCore.QAbstractListModel):
   def __init__(self, editorList: List[FRParamEditor], parent: QtWidgets.QWidget=None):
@@ -95,7 +94,7 @@ def _addRmOption(param: Parameter):
 class FRQuickLoaderEditor(FRParamEditor):
   def __init__(self, parent=None, editorList: List[FRParamEditor]=None):
     super().__init__(parent, paramList=[],
-                     saveDir=QUICK_LOAD_DIR, fileType='loader')
+                     saveDir=QUICK_LOAD_DIR, fileType='loader', name='Editor State Shortcuts')
     if editorList is None:
       editorList = []
     self.listModel = FREditorListModel(editorList, self)
@@ -106,8 +105,10 @@ class FRQuickLoaderEditor(FRParamEditor):
 
     self.addNewParamState.completer().activated.connect(self.addFromLineEdit)
 
-  def loadParamState(self, stateName: str, stateDict: dict=None, addChildren=False, removeChildren=False):
-    ret = super().loadParamState(stateName, stateDict, addChildren=True, removeChildren=True)
+  def loadParamState(self, stateName: Union[str, Path], stateDict: dict=None,
+                     addChildren=False, removeChildren=False, applyChanges=True):
+    ret = super().loadParamState(stateName, stateDict, addChildren=True, removeChildren=True,
+                                 applyChanges=False)
     invalidGrps = []
     editorNames = [e.name for e in self.listModel.uniqueEditors]
     hasInvalidEntries = False
@@ -121,7 +122,7 @@ class FRQuickLoaderEditor(FRParamEditor):
         invalidGrps.append(grp)
         hasInvalidEntries = True
         continue
-      for act in grp: # type: ActionParameter
+      for act in grp: # type: ActWithShc
         self.addActForEditor(editor, act.name(), act)
     for grp in invalidGrps:
       grp.remove()
@@ -130,38 +131,42 @@ class FRQuickLoaderEditor(FRParamEditor):
                f"{[grp.name() for grp in invalidGrps]}\n" \
                f"Must be one of:\n" \
                f"{[e.name for e in self.listModel.uniqueEditors]}"
-      raiseErrorLater(FRIllRegisteredPropError(errMsg))
-    self.applyBtnClicked()
+      raiseErrorLater(FRParamEditorError(errMsg))
+    if applyChanges:
+      self.applyChanges()
     return ret
 
   def buildFromUserProfile(self, profileSrc: dict):
     # If quick loader is given along with other params, use the quick loader as the
     # base and apply other settings on top of it
-    selfStateName = profileSrc.get(self.name, None)
-    if selfStateName is not None:
-      self.loadParamState(selfStateName)
+    errSettings = []
 
-    for editor in self.listModel.uniqueEditors:
-      paramStateName = profileSrc.get(editor.name, None)
+    for editor in [self] + self.listModel.uniqueEditors:
+      paramStateName = profileSrc.get(editor.name.replace(' ', '').lower(), None)
       if paramStateName is not None:
-        editor.loadParamState(paramStateName)
+        try:
+          editor.loadParamState(paramStateName)
+        except Exception as ex:
+          errSettings.append(f'{editor.name}: {ex}')
+    if len(errSettings) > 0:
+      warn('The following settings could not be loaded (shown as <setting>: <exception>)\n'
+           + "\n\n".join(errSettings), FRS3AWarning)
     return profileSrc
 
 
   def saveParamState(self, saveName: str=None, paramState: dict=None,
-                     allowOverwriteDefault=False):
-    stateDict = self.paramDictWithOpts(['type'], [ActionParameter, GroupParameter])
-    super().saveParamState(saveName, stateDict, allowOverwriteDefault)
+                     allowOverwriteDefault=False, blockWrite=False):
+    stateDict = self.paramDictWithOpts(['type'], [ActWithShc, GroupParameter])
+    super().saveParamState(saveName, stateDict, allowOverwriteDefault, blockWrite)
 
 
-  def applyBtnClicked(self):
-    super().applyBtnClicked()
+  def applyChanges(self):
+    super().applyChanges()
     for grp in self.params.childs: # type: GroupParameter
       if grp.hasChildren():
-        act: ActionParameter = next(iter(grp))
-        act.sigActivated.emit(act)
+        act: ActWithShc = next(iter(grp))
+        act.activate()
 
-  @Slot()
   def addFromLineEdit(self):
     completer = self.addNewParamState.completer()
     selection = completer.completionModel()
@@ -174,7 +179,7 @@ class FRQuickLoaderEditor(FRParamEditor):
     self.addActForEditor(editor, paramState)
 
 
-  def addActForEditor(self, editor: FRParamEditor, paramState: str, act: ActionParameter=None):
+  def addActForEditor(self, editor: FRParamEditor, paramState: str, act: ActWithShc=None):
     if editor.name not in self.params.names:
       curGroup = self.params.addChild(dict(name=editor.name, type='group', removable=True))
     else:
@@ -182,18 +187,24 @@ class FRQuickLoaderEditor(FRParamEditor):
       # It is not made possible through the context menu. Fix this
       curGroup = self.params.names[editor.name]
       _addRmOption(curGroup)
+      if act is None:
+        act = curGroup.child(paramState)
 
+    if paramState in curGroup.names and act is not None and act.isActivateConnected:
+      # Duplicate option, no reason to add
+      return
     curGroup.opts['removable'] = True
-    if act is None and paramState not in curGroup.names:
-      act = ActionParameter(name=paramState, removable=True, type='action')
-      curGroup.addChild(act)
-    elif act is not None:
-      act.opts['removable'] = True
-      _addRmOption(act)
-    act.sigActivated.connect(
-      lambda _act: self._safeLoadParamState(_act, editor,paramState))
+    if act is None:
+      act = ActWithShc(name=paramState, removable=True, type='actionwithshortcut')
+    curGroup.addChild(act)
 
-  def _safeLoadParamState(self, action: ActionParameter, editor: FRParamEditor,
+    act.opts['removable'] = True
+    _addRmOption(act)
+    act.sigActivated.connect(
+      lambda _act: self._safeLoadParamState(_act, editor, paramState))
+    act.isActivateConnected = True
+
+  def _safeLoadParamState(self, action: ActWithShc, editor: FRParamEditor,
                           paramState: str):
     """
     It is possible for the quick loader to refer to a param state that no longer
@@ -206,6 +217,6 @@ class FRQuickLoaderEditor(FRParamEditor):
       action.remove()
       # Wait until end of process cycle to raise error
       formattedState = self.listModel.displayFormat.format(editor=editor, stateName=paramState)
-      raiseErrorLater(FRIllRegisteredPropError(
+      raiseErrorLater(FRParamEditorError(
         f'Attempted to load {formattedState} but the setting was not found.'
       ))

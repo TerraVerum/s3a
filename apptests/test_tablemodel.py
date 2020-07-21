@@ -1,17 +1,14 @@
 import numpy as np
 import pytest
+from pyqtgraph.Qt import QtCore
 
-from appsetup import (CompDfTester, makeCompDf, NUM_COMPS, SAMPLE_IMG,
-                      SAMPLE_IMG_FNAME, clearTmpFiles, RND, defaultApp_tester)
-from s3a import S3A, FR_SINGLETON
+from conftest import NUM_COMPS, app, mgr, stack, dfTester
+from helperclasses import makeCompDf, clearTmpFiles
+from testingconsts import RND
+from s3a import FR_SINGLETON
 from s3a.projectvars import FR_ENUMS
 from s3a.projectvars import REQD_TBL_FIELDS
-from s3a.structures import FRComplexVertices
-
-# Construct app outside setUp to drastically reduce loading times
-app, dfTester = defaultApp_tester()
-mgr = app.compMgr
-stack = FR_SINGLETON.actionStack
+from s3a.structures import FRComplexVertices, FRS3AWarning, FRVertices
 
 oldIds = np.arange(NUM_COMPS, dtype=int)
 
@@ -90,6 +87,10 @@ def test_rm_comps(sampleComps):
   changeList = mgr.rmComps(FR_ENUMS.COMP_RM_ALL)
   cmpChangeList(changeList,deleted=prevIds)
 
+  # Remove single
+  mgr.addComps(sampleComps)
+  mgr.rmComps(sampleComps.index[0])
+
 def test_rm_undo(sampleComps):
   ids = np.arange(NUM_COMPS, dtype=int)
 
@@ -99,28 +100,52 @@ def test_rm_undo(sampleComps):
   FR_SINGLETON.actionStack.undo()
   assert mgr.compDf.equals(sampleComps)
 
+def test_merge_comps(sampleComps):
+  mgr.addComps(sampleComps)
+  mgr.mergeCompVertsById(sampleComps.index)
+  assert len(mgr.compDf) == 1
+  FR_SINGLETON.actionStack.undo()
+  assert len(mgr.compDf) == len(sampleComps)
 
-# def test_table_setdata(sampleComps):
-#   mgr.addComps(sampleComps)
-#
-#   _ = REQD_TBL_FIELDS
-#   colVals = {
-#     _.VERTICES: [FRComplexVertices(FRVertices([[1,2], [3,4]]))],
-#     _.COMP_CLASS: FR_SINGLETON.tableData.compClasses[4],
-#     _.ANN_AUTHOR: 'Hi There',
-#     _.ANN_FILENAME: 'newfilename'
-#   }
-#   intColMapping = {FR_SINGLETON.tableData.allFields.index(k):v
-#                    for k, v in colVals.items()}
-#
-#   for col, newVal in intColMapping.items():
-#     row = RND.integers(NUM_COMPS)
-#     idx = app.compTbl.model().index(row, col)
-#     oldVal = mgr.data(idx, QtCore.Qt.EditRole)
-#     mgr.setData(idx, newVal)
-#     assert mgr.compDf.iloc[row, col] == newVal
-#     stack.undo()
-#     assert mgr.compDf.iloc[row, col] == oldVal
+def test_bad_merge(sampleComps):
+  mgr.addComps(sampleComps)
+  with pytest.warns(FRS3AWarning):
+    mgr.mergeCompVertsById([0])
+  with pytest.warns(FRS3AWarning):
+    mgr.mergeCompVertsById([])
+
+
+def test_table_setdata(sampleComps):
+  mgr.addComps(sampleComps)
+
+  _ = REQD_TBL_FIELDS
+  colVals = {
+    _.VERTICES: FRComplexVertices([FRVertices([[1,2], [3,4]])]),
+    _.COMP_CLASS: FR_SINGLETON.tableData.compClasses[4],
+    _.ANN_AUTHOR: 'Hi There',
+    _.SRC_IMG_FILENAME: 'newfilename'
+  }
+  intColMapping = {FR_SINGLETON.tableData.allFields.index(k):v
+                   for k, v in colVals.items()}
+
+  for col, newVal in intColMapping.items():
+    row = RND.integers(NUM_COMPS)
+    idx = app.compTbl.model().index(row, col)
+    oldVal = mgr.data(idx, QtCore.Qt.EditRole)
+    mgr.setData(idx, newVal)
+    # Test with no change
+    mgr.setData(idx, newVal)
+    assert mgr.compDf.iloc[row, col] == newVal
+    stack.undo()
+    assert mgr.compDf.iloc[row, col] == oldVal
+
+def test_table_getdata(sampleComps):
+  mgr.addComps(sampleComps)
+  idx = mgr.index(0, list(REQD_TBL_FIELDS).index(REQD_TBL_FIELDS.COMP_CLASS))
+  dataVal = sampleComps.iat[0, idx.column()]
+  assert mgr.data(idx, QtCore.Qt.EditRole) == dataVal
+  assert mgr.data(idx, QtCore.Qt.DisplayRole) == str(dataVal)
+  assert mgr.data(idx, 854) is None
 
 def cmpChangeList(changeList: dict, added: np.ndarray=None, deleted: np.ndarray=None,
                   changed: np.ndarray=None):

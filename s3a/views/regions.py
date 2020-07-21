@@ -1,6 +1,7 @@
-from typing import Tuple, Sequence, Optional, Any, Dict, Union
+from __future__ import annotations
 
-import cv2 as cv
+from typing import Tuple, Sequence, Optional, Any, List
+
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
@@ -8,106 +9,17 @@ from pandas import DataFrame as df
 from pyqtgraph import arrayToQPath
 from pyqtgraph.Qt import QtGui, QtCore
 
-from s3a import FR_SINGLETON, appInst
-from s3a.generalutils import coerceDfTypes, nanConcatList
+from s3a import FR_SINGLETON
+from s3a.generalutils import coerceDfTypes, stackedVertsPlusConnections
 from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS
 from s3a.structures import FRParam, FRVertices, FRComplexVertices, OneDArr, BlackWhiteImg
 from s3a.structures.typeoverloads import GrayImg
 from .clickables import FRBoundScatterPlot
-from .rois import SHAPE_ROI_MAPPING, FRExtendedROI
+from . import imageareas
 
-Signal = QtCore.pyqtSignal
-Slot = QtCore.pyqtSlot
+__all__ = ['FRMultiRegionPlot', 'FRVertexDefinedImg', 'FRMouseFollowingRegionPlot']
 
-
-class FRShapeCollection(QtCore.QObject):
-  # Signal(FRExtendedROI)
-  sigShapeFinished = Signal(object)
-  def __init__(self, allowableShapes: Tuple[FRParam,...]=None, parent: pg.GraphicsView=None):
-    super().__init__(parent)
-    if allowableShapes is None:
-      allowableShapes = set()
-    self.shapeVerts = FRVertices()
-    # Make a new graphics item for each roi type
-    self.roiForShape: Dict[FRParam, Union[pg.ROI, FRExtendedROI]] = {}
-    self.forceBlockRois = True
-
-    self._curShape = allowableShapes[0]
-    self._allowableShapes = allowableShapes
-    self._parent = parent
-
-    for shape in allowableShapes:
-      newRoi = SHAPE_ROI_MAPPING[shape]()
-      newRoi.setZValue(1000)
-      self.roiForShape[shape] = newRoi
-      newRoi.hide()
-    self.addRoisToView(parent)
-
-  def addRoisToView(self, view: pg.GraphicsView):
-    self._parent = view
-    if view is not None:
-      for roi in self.roiForShape.values():
-        roi.hide()
-        view.addItem(roi)
-
-  def clearAllRois(self):
-    for roi in self.roiForShape.values():
-      while roi.handles:
-        # TODO: Submit bug request in pyqtgraph. removeHandle of ROI takes handle or
-        #  integer index, removeHandle of PolyLine requires handle object. So,
-        #  even though PolyLine should be able  to handle remove by index, it can't
-        roi.removeHandle(roi.handles[0]['item'])
-        roi.hide()
-      self.forceBlockRois = True
-
-
-  def buildRoi(self, ev: QtGui.QMouseEvent, imgItem: pg.ImageItem=None):
-    """
-    Construct the current shape ROI depending on mouse movement and current shape parameters
-    :param imgItem: Image the ROI is drawn upon, used for mapping event coordinates
-      from a scene to pixel coordinates. If *None*, event coordinates are assumed
-      to already be relative to pixel coordinates.
-    :param ev: Mouse event
-    """
-    # Unblock on mouse press
-    # None imgitem is only the case during programmatic calls so allow this case
-    if ((imgItem is None or imgItem.image is not None)
-        and ev.type() == ev.MouseButtonPress
-        and ev.button() == QtCore.Qt.LeftButton):
-      self.forceBlockRois = False
-    if self.forceBlockRois: return
-    if imgItem is not None:
-      posRelToImg = imgItem.mapFromScene(ev.pos())
-    else:
-      posRelToImg = ev.pos()
-    # Form of rate-limiting -- only simulate click if the next pixel is at least one away
-    # from the previous pixel location
-    xyCoord = FRVertices([[posRelToImg.x(), posRelToImg.y()]], dtype=float)
-    curRoi = self.roiForShape[self.curShape]
-    constructingRoi, self.shapeVerts = curRoi.updateShape(ev, xyCoord)
-    if self.shapeVerts is not None:
-      self.sigShapeFinished.emit(self.shapeVerts)
-
-    if not constructingRoi:
-      # Vertices from the completed shape are already stored, so clean up the shapes.
-      curRoi.hide()
-    else:
-      # Still constructing ROI. Show it
-      curRoi.show()
-
-  @property
-  def curShape(self): return self._curShape
-  @curShape.setter
-  def curShape(self, newShape: FRParam):
-    """
-    When the shape is changed, be sure to reset the underlying ROIs
-    :param newShape: New shape
-    :return: None
-    """
-    # Reset the underlying ROIs for a different shape than we currently are using
-    if newShape != self._curShape:
-      self.clearAllRois()
-    self._curShape = newShape
+Signal = QtCore.Signal
 
 def makeMultiRegionDf(numRows=1, whichCols=None, idList=None) -> df:
   df_list = []
@@ -146,37 +58,40 @@ def _makeBoundSymbol(verts: FRVertices):
   return path
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MULT_REG_PLT)
-class FRMultiRegionPlot(QtCore.QObject):
+class FRMultiRegionPlot(FRBoundScatterPlot):
   @classmethod
   def __initEditorParams__(cls):
     (cls.focusedBoundClr, cls.selectedBoundClr, cls.boundClr, cls.boundWidth) = \
-      FR_SINGLETON.scheme.registerProps(
+      FR_SINGLETON.generalProps.registerProps(
         cls, [FR_CONSTS.SCHEME_FOC_BRUSH_CLR, FR_CONSTS.SCHEME_SEL_BOUND_CLR,
               FR_CONSTS.SCHEME_BOUND_CLR, FR_CONSTS.SCHEME_BOUND_WIDTH])
 
 
   def __init__(self, parent=None):
-    super().__init__(parent)
-    self.boundPlt = FRBoundScatterPlot(brush=None, size=1, pxMode=False)
-    self.boundPlt.setZValue(50)
-    self.data = makeMultiRegionDf(0)
+    super().__init__(brush=None, size=1, pxMode=False)
+    self.setParent(parent)
+    self.setZValue(50)
+    self.regionData = makeMultiRegionDf(0)
+    self.selectedIds = np.array([], dtype=int)
+    self.focusedIds = np.array([], dtype=int)
+
 
     # 'pointsAt' is an expensive operation if many points are in the scatterplot. Since
     # this will be called anyway when a selection box is made in the main image, disable
     # mouse click listener to avoid doing all that work for nothing.
     # self.centroidPlts.mouseClickEvent = lambda ev: None
-    self.boundPlt.mouseClickEvent = lambda ev: None
+    self.mouseClickEvent = lambda ev: None
     # Also disable sigClicked. This way, users who try connecting to this signal won't get
     # code that runs but never triggers
     # self.centroidPlts.sigClicked = None
-    self.boundPlt.sigPointsClicked = None
+    self.sigPointsClicked = None
 
   def resetRegionList(self, newIds: Optional[Sequence]=None, newRegionDf: Optional[df]=None):
     if newIds is None:
       newIds = []
     if newRegionDf is None:
       newRegionDf = makeMultiRegionDf(0)
-    self.data = makeMultiRegionDf(0)
+    self.regionData = makeMultiRegionDf(0)
     self[newIds,newRegionDf.columns] = newRegionDf
 
   def selectById(self, selectedIds: OneDArr):
@@ -184,23 +99,29 @@ class FRMultiRegionPlot(QtCore.QObject):
     Marks 'selectedIds' as currently selected by changing their scheme to user-specified
     selection values.
     """
+    if len(self.regionData) == 0:
+      return
+    self.selectedIds = selectedIds
     defaultPen = pg.mkPen(width=self.boundWidth, color=self.boundClr)
-    newPens = np.array([defaultPen]*len(self.data))
+    newPens = np.array([defaultPen]*len(self.regionData))
     selectionPen = pg.mkPen(width=self.boundWidth*2, color=self.selectedBoundClr)
-    newPens[np.isin(self.data.index, selectedIds)] = selectionPen
-    self.boundPlt.setPen(newPens)
-    self.boundPlt.invalidate()
+    newPens[np.isin(self.regionData.index, selectedIds)] = selectionPen
+    self.setPen(newPens)
+    self.invalidate()
 
 
   def focusById(self, focusedIds: OneDArr):
     """
-    Colors 'focusedIds' to indicate they are present in a focused view.
+    Colors 'focusedIds' to indicate they are present in a focused views.
     """
-    brushes = np.array([None]*len(self.data))
+    if len(self.regionData) == 0:
+      return
+    self.focusedIds = focusedIds
+    brushes = np.array([None]*len(self.regionData))
 
-    brushes[np.isin(self.data.index, focusedIds)] = pg.mkBrush(self.focusedBoundClr)
-    self.boundPlt.setBrush(brushes)
-    self.boundPlt.invalidate()
+    brushes[np.isin(self.regionData.index, focusedIds)] = pg.mkBrush(self.focusedBoundClr)
+    self.setBrush(brushes)
+    self.invalidate()
 
 
   def updatePlot(self):
@@ -209,15 +130,15 @@ class FRMultiRegionPlot(QtCore.QObject):
     # -----------
     boundLocs = []
     boundSymbs = []
-    if self.data.empty:
-      self.boundPlt.setData(x=[], y=[], data=[])
+    if self.regionData.empty:
+      self.setData(x=[], y=[], data=[])
       return
 
-    for region, _id in zip(self.data.loc[:, REQD_TBL_FIELDS.VERTICES],
-                           self.data.index):
-      concatRegion = nanConcatList(region)
+    for region, _id in zip(self.regionData.loc[:, REQD_TBL_FIELDS.VERTICES],
+                           self.regionData.index):
+      concatRegion, isfinite = stackedVertsPlusConnections(region)
       boundLoc = np.nanmin(concatRegion, 0, keepdims=True)
-      boundSymbol = pg.arrayToQPath(*(concatRegion-boundLoc).T, connect='finite')
+      boundSymbol = pg.arrayToQPath(*(concatRegion-boundLoc).T, connect=isfinite)
 
       boundLocs.append(boundLoc)
       boundSymbs.append(boundSymbol)
@@ -225,14 +146,16 @@ class FRMultiRegionPlot(QtCore.QObject):
     plotRegions = np.vstack(boundLocs)
     width = self.boundWidth
     boundPen = pg.mkPen(color=self.boundClr, width=width)
-    self.boundPlt.setData(*plotRegions.T, pen=boundPen, symbol=boundSymbs,
-                          data=self.data.index)
+    self.setData(*plotRegions.T, pen=boundPen, symbol=boundSymbs,
+                          data=self.regionData.index)
+    self.selectById(self.selectedIds)
+    self.focusById(self.focusedIds)
 
   def __getitem__(self, keys: Tuple[Any,...]):
     """
     Allows retrieval of vertex/valid list for a given set of IDs
     """
-    return self.data.loc[keys[0], keys[1:]]
+    return self.regionData.loc[keys[0], keys[1:]]
 
   def __setitem__(self, keys: Tuple, vals: Sequence):
     if not isinstance(keys, tuple):
@@ -246,39 +169,40 @@ class FRMultiRegionPlot(QtCore.QObject):
       regionIds = keys[0]
       setVals = keys[1:]
     # First update old entries
-    newEntryIdxs = np.isin(regionIds, self.data.index, invert=True)
+    newEntryIdxs = np.isin(regionIds, self.regionData.index, invert=True)
     keysDf = makeMultiRegionDf(len(regionIds), setVals)
     keysDf = keysDf.set_index(regionIds)
     # Since we may only be resetting one parameter (either valid or regions),
     # Make sure to keep the old parameter value for the unset index
-    keysDf.update(self.data)
+    keysDf.update(self.regionData)
     keysDf.loc[regionIds, setVals] = vals
-    self.data.update(keysDf)
+    self.regionData.update(keysDf)
 
     # Now we can add entries that weren't in our original dataframe
     # If not all set values were provided in the new dataframe, fix this by embedding
     # it into the default dataframe
     newDataDf = makeMultiRegionDf(int(np.sum(newEntryIdxs)), idList=regionIds[newEntryIdxs])
     newDataDf.loc[:, keysDf.columns] = keysDf.loc[newEntryIdxs, :]
-    self.data = pd.concat((self.data, newDataDf))
+    self.regionData = pd.concat((self.regionData, newDataDf))
     # Retain type information
-    coerceDfTypes(self.data, makeMultiRegionDf(0).columns)
+    coerceDfTypes(self.regionData, makeMultiRegionDf(0).columns)
     self.updatePlot()
 
   def drop(self, ids):
-    self.data.drop(index=ids, inplace=True)
+    self.regionData.drop(index=ids, inplace=True)
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_VERT_IMG)
 class FRVertexDefinedImg(pg.ImageItem):
   sigRegionReverted = Signal(object) # new GrayImg
   @classmethod
   def __initEditorParams__(cls):
-    cls.fillClr, cls.vertClr = FR_SINGLETON.scheme.registerProps(
+    cls.fillClr, cls.vertClr = FR_SINGLETON.generalProps.registerProps(
       cls, [FR_CONSTS.SCHEME_REG_FILL_COLOR, FR_CONSTS.SCHEME_REG_VERT_COLOR])
 
   def __init__(self):
     super().__init__()
     self.verts = FRComplexVertices()
+    FR_SINGLETON.generalProps.sigParamStateUpdated.connect(lambda: self.setImage(lut=self.getLUTFromScheme()))
 
   def embedMaskInImg(self, toEmbedShape: Tuple[int, int]):
     outImg = np.zeros(toEmbedShape, dtype=bool)
@@ -292,15 +216,14 @@ class FRVertexDefinedImg(pg.ImageItem):
     oldVerts = self.verts
 
     self.verts = newVerts.copy()
-    if len(newVerts.x_flat) == 0:
+    if len(newVerts) == 0:
       regionData = np.zeros((1, 1), dtype=bool)
     else:
       if srcImg is None:
-        newImgShape = newVerts.stack().max(0)[::-1] + 1
-        regionData = np.zeros(newImgShape, dtype='uint8')
-        cv.fillPoly(regionData, newVerts, 1)
+        stackedVerts = newVerts.stack()
+        regionData = newVerts.toMask(asBool=False)
         # Make vertices full brightness
-        regionData[newVerts.y_flat, newVerts.x_flat] = 2
+        regionData[stackedVerts.rows, stackedVerts.cols] = 2
       else:
         regionData = srcImg.copy()
 
@@ -318,7 +241,8 @@ class FRVertexDefinedImg(pg.ImageItem):
       # Nothing to do
       return
     verts = FRComplexVertices.fromBwMask(newMask)
-    newMask[verts.y_flat, verts.x_flat] = 2
+    stackedVerts = verts.stack()
+    newMask[stackedVerts.rows, stackedVerts.cols] = 2
     self.updateFromVertices(verts, srcImg=newMask)
     return
 
@@ -327,3 +251,66 @@ class FRVertexDefinedImg(pg.ImageItem):
     for clr in self.fillClr, self.vertClr:
       lut.append(clr.getRgb())
     return np.array(lut, dtype='uint8')
+
+class FRMouseFollowingRegionPlot(pg.PlotCurveItem):
+  sigCopyStarted = QtCore.Signal()
+  sigCopyStopped = QtCore.Signal()
+
+  def __init__(self, mainImg: imageareas.FREditableImgBase=None, parent=None):
+    super().__init__(parent)
+    self.active = False
+    self.inCopyMode = True
+    self.baseData = FRVertices()
+    self.regionIds = np.ndarray([])
+    self.dataMin = FRVertices()
+    self.offset = FRVertices([[0,0]])
+
+    self.setShadowPen(color='k', width=2*self.opts['pen'].width())
+    """
+    Instead of a customizeable color palette for the copy shape, it is easier to
+    have a black outline and white inline color for the shape plot which ensures
+    all vertices are visible on any background. However, it is not easy to create
+    a multicolored pen in pyqt -- the much simpler solution is to simply create
+    a shadow pen, where one has a boundary twice as thick as the other.
+    """
+
+    self._connectivity = np.ndarray([], bool)
+    mainImg.sigMousePosChanged.connect(self.mainMouseMoved)
+
+  def mainMouseMoved(self, xyPos: FRVertices, _pxColor: np.ndarray):
+    if not self.active: return
+    newData = self.baseData + xyPos
+    self.setData(newData[:,0], newData[:,1], connect=self._connectivity)
+    self.offset = xyPos - self.dataMin
+
+  def resetBaseData(self, baseData: List[FRComplexVertices], regionIds: OneDArr):
+    allData = FRComplexVertices()
+    allConnctivity = []
+    for verts in baseData: # each list element represents one component
+      plotData, connectivity = stackedVertsPlusConnections(verts)
+      allData.append(plotData)
+      allConnctivity.append(connectivity)
+      if len(connectivity) > 0:
+        connectivity[-1] = False
+    plotData = allData.stack()
+    connectivity = np.concatenate(allConnctivity)
+
+    try:
+      allMin = plotData.min(0)
+      closestPtIdx  = np.argmin(np.sum(np.abs(plotData - allMin), 1))
+      # Guarantees that the mouse will be on the boundary closest to the top left
+      self.dataMin = plotData[closestPtIdx]
+      # connectivity[addtnlFalseConnectivityIdxs] = False
+    except ValueError:
+      # When no elements are in the array
+      self.dataMin = FRVertices([[0,0]])
+    baseData: FRVertices = plotData - self.dataMin
+    self.baseData = baseData
+    self._connectivity = connectivity
+    self.setData(plotData[:,0], plotData[:,1], connect=connectivity)
+
+    self.regionIds = regionIds
+
+  def erase(self):
+    self.resetBaseData([FRComplexVertices()], np.array([]))
+    self.active = False

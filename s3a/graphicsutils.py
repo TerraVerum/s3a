@@ -1,23 +1,24 @@
+import html
 import sys
 from functools import partial
 from functools import wraps
-from glob import glob
 from os.path import basename
 from pathlib import Path
-from traceback import format_exception, format_exception_only
+from traceback import format_exception
 from typing import Optional, Union, Callable, Generator
 
+import numpy as np
+from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
+from pyqtgraph.parametertree import Parameter
 from ruamel.yaml import YAML
 
 from s3a import appInst
-from s3a.structures import FRAppIOError, FRS3AException, FilePath
+from s3a.projectvars import ANN_AUTH_DIR
+from s3a.structures import FRAppIOError, FRS3AException, FilePath, FRS3AWarning
 
 yaml = YAML()
-from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
-from s3a.projectvars import ANN_AUTH_DIR
-
-Signal = QtCore.pyqtSignal
+Signal = QtCore.Signal
 QCursor = QtGui.QCursor
 
 def disableAppDuringFunc(func):
@@ -117,11 +118,6 @@ def dialogGetAuthorName(parent: QtWidgets.QMainWindow) -> str:
     sys.exit(0)
   return name
 
-def raiseErrorLater(err: Exception):
-  def _raise():
-    raise err
-  QtCore.QTimer.singleShot(0, _raise)
-
 def attemptFileLoad(fpath: FilePath , openMode='r') -> Union[dict, bytes]:
   with open(fpath, openMode) as ifile:
     loadObj = yaml.load(ifile)
@@ -179,7 +175,7 @@ class FRPopupLineEditor(QtWidgets.QLineEdit):
     completer.setFilterMode(QtCore.Qt.MatchContains)
     completer.activated.connect(lambda: QtCore.QTimer.singleShot(0, self.clear))
 
-    self.textChanged.connect(self.resetCompleterPrefix)
+    self.textChanged.connect(lambda: self.resetCompleterPrefix())
 
     self.setCompleter(completer)
 
@@ -212,6 +208,7 @@ class FRPopupLineEditor(QtWidgets.QLineEdit):
     if self.text() == '':
       self.completer().setCompletionPrefix('')
 
+old_sys_except_hook = sys.excepthook
 def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
   """
   When a qt application encounters an error, it will generally crash the entire
@@ -222,16 +219,37 @@ def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
   """
   # Procedure taken from https://stackoverflow.com/a/40674244/9463643
   def new_except_hook(etype, evalue, tb):
+    # Allow sigabort to kill the app
+    if etype in [KeyboardInterrupt, SystemExit]:
+      appInst.exit(1)
+      appInst.processEvents()
+      raise
     msgWithTrace = ''.join(format_exception(etype, evalue, tb))
     msgWithoutTrace = str(evalue)
-    dlg = FRScrollableErrorDialog(win, notCritical=issubclass(etype, FRS3AException),
+    dlg = FRScrollableErrorDialog(win, notCritical=issubclass(etype, (FRS3AException,
+                                                                      FRS3AWarning)),
                                   msgWithTrace=msgWithTrace, msgWithoutTrace=msgWithoutTrace)
     dlg.show()
     dlg.exec()
   def patch_excepthook():
     sys.excepthook = new_except_hook
-
   QtCore.QTimer.singleShot(0, patch_excepthook)
+  appInst.processEvents()
+
+def restoreExceptionBehavior():
+  def patch_excepthook():
+    sys.excepthook = old_sys_except_hook
+  QtCore.QTimer.singleShot(0, patch_excepthook)
+  appInst.processEvents()
+
+def raiseErrorLater(err: Exception):
+  # Fire immediately if not in gui mode
+  if sys.excepthook is old_sys_except_hook:
+    raise err
+  # else
+  def _raise():
+    raise err
+  QtCore.QTimer.singleShot(0, _raise)
 
 
 class FRScrollableErrorDialog(QtWidgets.QDialog):
@@ -239,6 +257,7 @@ class FRScrollableErrorDialog(QtWidgets.QDialog):
                msgWithTrace='', msgWithoutTrace=''):
     super().__init__(parent)
     style = self.style()
+    self.setModal(True)
 
     if notCritical:
       icon = style.standardIcon(style.SP_MessageBoxInformation)
@@ -286,10 +305,159 @@ class FRScrollableErrorDialog(QtWidgets.QDialog):
         newText = msgWithoutTrace
       showTrace = not showTrace
       scrollMsg.setText(newText)
-
     toggleTrace.clicked.connect(lambda: updateTxt())
 
     btnLayout.addItem(spacerItem)
     verticalLayout.addLayout(btnLayout)
     ok.setFocus()
     updateTxt()
+
+def autosaveOptsDialog(parent):
+  dlg = QtWidgets.QDialog(parent)
+  layout = QtWidgets.QGridLayout(dlg)
+  dlg.setLayout(layout)
+
+  fileBtn = QtWidgets.QPushButton('Select Output Folder')
+  folderNameDisplay = QtWidgets.QLabel('', dlg)
+  def retrieveFolderName():
+    folderDlg = QtWidgets.QFileDialog(dlg)
+    folderDlg.setModal(True)
+    folderName = folderDlg.getExistingDirectory(dlg, 'Select Output Folder')
+
+    dlg.folderName = folderName
+    folderNameDisplay.setText(folderName)
+  fileBtn.clicked.connect(retrieveFolderName)
+
+  layout.addWidget(folderNameDisplay, 0, 0)
+  layout.addWidget(fileBtn, 0, 1)
+
+  saveLbl = QtWidgets.QLabel('Save Name:', dlg)
+  baseFileNameEdit = QtWidgets.QLineEdit(dlg)
+  dlg.baseFileNameEdit = baseFileNameEdit
+
+  layout.addWidget(saveLbl, 1, 0)
+  layout.addWidget(baseFileNameEdit, 1, 1)
+
+  intervalLbl = QtWidgets.QLabel('Save Interval (mins):', dlg)
+  intervalEdit = QtWidgets.QSpinBox(dlg)
+  intervalEdit.setMinimum(1)
+  dlg.intervalEdit = intervalEdit
+
+  layout.addWidget(intervalLbl, 2, 0)
+  layout.addWidget(intervalEdit, 2, 1)
+
+  saveDescr = QtWidgets.QLabel('Every <em>interval</em> minutes, a new autosave is'
+                               ' created from the component list. Its name is'
+                               ' [Parent Folder]/[base name]_[counter].csv, where'
+                               ' counter is the current save file number.', dlg)
+  saveDescr.setWordWrap(True)
+  layout.addWidget(saveDescr, 3, 0, 1, 2)
+
+
+  okBtn = QtWidgets.QPushButton('Ok')
+  cancelBtn = QtWidgets.QPushButton('Cancel')
+  cancelBtn.clicked.connect(dlg.reject)
+  okBtn.clicked.connect(dlg.accept)
+  dlg.okBtn = okBtn
+
+  layout.addWidget(okBtn, 4, 0)
+  layout.addWidget(cancelBtn, 4, 1)
+  return dlg
+
+# Taken directly from https://stackoverflow.com/a/46212292/9463643
+class QAwesomeTooltipEventFilter(QtCore.QObject):
+  """
+  Tooltip-specific event filter dramatically improving the tooltips of all
+  widgets for which this filter is installed.
+
+  Motivation
+  ----------
+  **Rich text tooltips** (i.e., tooltips containing one or more HTML-like
+  tags) are implicitly wrapped by Qt to the width of their parent windows and
+  hence typically behave as expected.
+
+  **Plaintext tooltips** (i.e., tooltips containing no such tags), however,
+  are not. For unclear reasons, plaintext tooltips are implicitly truncated to
+  the width of their parent windows. The only means of circumventing this
+  obscure constraint is to manually inject newlines at the appropriate
+  80-character boundaries of such tooltips -- which has the distinct
+  disadvantage of failing to scale to edge-case display and device
+  environments (e.g., high-DPI). Such tooltips *cannot* be guaranteed to be
+  legible in the general case and hence are blatantly broken under *all* Qt
+  versions to date. This is a `well-known long-standing issue <issue_>`__ for
+  which no official resolution exists.
+
+  This filter globally addresses this issue by implicitly converting *all*
+  intercepted plaintext tooltips into rich text tooltips in a general-purpose
+  manner, thus wrapping the former exactly like the latter. To do so, this
+  filter (in order):
+
+  #. Auto-detects whether the:
+
+     * Current event is a :class:`QEvent.ToolTipChange` event.
+     * Current widget has a **non-empty plaintext tooltip**.
+
+  #. When these conditions are satisfied:
+
+     #. Escapes all HTML syntax in this tooltip (e.g., converting all ``&``
+        characters to ``&amp;`` substrings).
+     #. Embeds this tooltip in the Qt-specific ``<qt>...</qt>`` tag, thus
+        implicitly converting this plaintext tooltip into a rich text tooltip.
+
+  .. _issue:
+      https://bugreports.qt.io/browse/QTBUG-41051
+  """
+
+
+  def eventFilter(self, widget: QtCore.QObject, event: QtCore.QEvent) -> bool:
+    """
+    Tooltip-specific event filter handling the passed Qt object and event.
+    """
+
+    # If this is a tooltip event...
+    if event.type() == QtCore.QEvent.ToolTipChange:
+      # If the target Qt object containing this tooltip is *NOT* a widget,
+      # raise a human-readable exception. While this should *NEVER* be the
+      # case, edge cases are edge cases because they sometimes happen.
+      if not isinstance(widget, QtWidgets.QWidget):
+        raise ValueError('QObject "{}" not a widget.'.format(widget))
+
+      # Tooltip for this widget if any *OR* the empty string otherwise.
+      tooltip = widget.toolTip()
+
+      # If this tooltip is both non-empty and not already rich text...
+      if tooltip and not QtCore.Qt.mightBeRichText(tooltip):
+        # Convert this plaintext tooltip into a rich text tooltip by:
+        #
+        #* Escaping all HTML syntax in this tooltip.
+        #* Embedding this tooltip in the Qt-specific "<qt>...</qt>" tag.
+        tooltip = '<qt>{}</qt>'.format(html.escape(tooltip))
+
+        # Replace this widget's non-working plaintext tooltip with this
+        # working rich text tooltip.
+        widget.setToolTip(tooltip)
+
+        # Notify the parent event handler this event has been handled.
+        return True
+
+    # Else, defer to the default superclass handling of this event.
+    return super().eventFilter(widget, event)
+
+from .views import parameditors
+def contextMenuFromEditorActions(editor: parameditors.FRParamEditor, title: str=None,
+                                 menuParent: QtWidgets.QWidget=None):
+  if title is None:
+    title = editor.name
+  actions = []
+  paramNames = []
+  def findActions(paramRoot: Parameter):
+    for child in paramRoot.childs:
+      findActions(child)
+    if 'action' in paramRoot.opts['type']:
+      actions.append(paramRoot)
+      paramNames.append(paramRoot.name())
+  findActions(editor.params)
+  menu = QtWidgets.QMenu(title, menuParent)
+  for action, name in zip(actions, paramNames):
+    menu.addAction(name, action.activate)
+  return menu

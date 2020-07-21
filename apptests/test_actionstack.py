@@ -1,10 +1,8 @@
-from typing import List, Any, Callable
-
-from s3a.actionstack import FRActionStack
 import numpy as np
 import pytest
 
-from s3a.structures import FRActionStackError
+from s3a.models.actionstack import FRActionStack
+from s3a.structures import FRActionStackError, FRS3AWarning
 
 COUNT = 10
 
@@ -46,6 +44,10 @@ class StackForTesting(FRActionStack):
     self.op = op
 
     self.lst = []
+
+  def clear(self):
+    super().clear()
+    self.lst.clear()
 
 def test_group():
   stack = StackForTesting()
@@ -96,15 +98,15 @@ def test_bad_undo():
     stack.op()
   for _ii in range(4):
     stack.undo()
-  with pytest.raises(FRActionStackError):
+  with pytest.warns(FRS3AWarning):
     stack.undo()
 
 def test_bad_redo():
   stack = StackForTesting()
-  with pytest.raises(FRActionStackError):
+  with pytest.warns(FRS3AWarning):
     stack.redo()
   stack.op()
-  with pytest.raises(FRActionStackError):
+  with pytest.warns(FRS3AWarning):
     stack.undo()
     stack.redo()
     stack.redo()
@@ -125,7 +127,7 @@ def test_invalidate_redos():
 
   stack.op(1)
   # New action should flush old ones
-  with pytest.raises(FRActionStackError):
+  with pytest.warns(FRS3AWarning):
     stack.redo()
   stack.undo()
   assert len(stack.actions) == numRemainingEntries+1
@@ -140,7 +142,7 @@ def test_ignore_acts():
     for _ in range(COUNT):
       stack.op()
   assert len(stack.actions) == 0
-  with pytest.raises(FRActionStackError):
+  with pytest.warns(FRS3AWarning):
     stack.undo()
 
 def test_max_len():
@@ -149,7 +151,7 @@ def test_max_len():
   for ii in range(cnt):
     stack.op()
 
-  with pytest.raises(FRActionStackError):
+  with pytest.warns(FRS3AWarning):
     for ii in range(cnt):
       stack.undo()
 
@@ -188,3 +190,39 @@ def test_savepoint():
 
   stack.revertToSavepoint()
   assert stack.lst == list(range(COUNT))
+
+def test_reassign_backward():
+  stack = StackForTesting()
+  newlst = []
+  newAppend = lambda: newlst.append(5)
+  # Test in forward state
+  for _ in range(COUNT):
+    stack.op()
+    stack.actions[-1].reassignBackward(newAppend)
+  for _ in range(COUNT):
+    stack.undo()
+  assert len(stack.actions) == COUNT
+  assert newlst == [5]*COUNT
+
+  # Make sure it works going backward
+  for _ in range(COUNT):
+    stack.redo()
+  assert len(stack.lst) == 2*COUNT
+  for _ in range(COUNT):
+    stack.undo()
+  assert newlst == [5]*COUNT*2
+
+  # Make sure doing reassign after undo works too
+  stack.clear()
+  newlst.clear()
+  for _ in range(COUNT):
+    stack.op()
+  for _ in range(COUNT):
+    stack.undo()
+  for ii in range(COUNT):
+    stack.actions[ii].reassignBackward(newAppend)
+  for _ in range(COUNT):
+    stack.redo()
+  for _ in range(COUNT):
+    stack.undo()
+  assert newlst == [5]*COUNT
