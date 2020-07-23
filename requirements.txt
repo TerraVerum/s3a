@@ -1,4 +1,5 @@
 setuptools
+imageprocessing@git+https://gitlab.com/ficsresearch/imageprocessing.git
 typing_extensions
 fire
 tqdm
@@ -12,7 +13,6 @@ matplotlib
 PyQt5
 pyqtgraph
 Pillow
-imageprocessing
 qdarkstyle
 ruamel.yaml
 pytest
