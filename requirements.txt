@@ -1,5 +1,5 @@
 setuptools
-imageprocessing@git+https://gitlab.com/ficsresearch/imageprocessing.git
+imageprocessing@git+https://gitlab.com/ficsresearch/imageprocessing.git@master
 typing_extensions
 fire
 tqdm
