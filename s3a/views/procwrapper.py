@@ -10,13 +10,13 @@ from imageprocessing.processing import ImageIO, ProcessStage, AtomicProcess, Pro
   ImageProcess, ProcessIO
 from pyqtgraph.parametertree import Parameter
 
-import s3a
 from s3a.generalutils import augmentException
 from s3a.processingimpls import crop_to_local_area, apply_process_result, basicOpsCombo, \
   return_to_full_size, format_vertices
 from s3a.structures import FRParam, FRComplexVertices, FRAlgProcessorError, FRVertices, \
   FRS3AWarning
 from s3a.views.parameditors.pgregistered import FRCustomMenuParameter
+from s3a.views.parameditors import genericeditor
 
 __all__ = ['FRImgProcWrapper', 'FRGeneralProcWrapper']
 
@@ -38,7 +38,7 @@ def procRunWrapper(proc: Process, groupParam: Parameter):
   return newRun
 
 class FRGeneralProcWrapper(ABC):
-  def __init__(self, processor: ImageProcess, editor: s3a.views.parameditors.genericeditor.FRParamEditor):
+  def __init__(self, processor: ImageProcess, editor: genericeditor.FRParamEditor):
     self.processor = processor
     self.algName = processor.name
     self.algParam = FRParam(self.algName)
@@ -93,6 +93,8 @@ class FRGeneralProcWrapper(ABC):
 
   @classmethod
   def getNestedName(cls, curProc: ProcessStage, nestedName: List[str]):
+    if len(nestedName) == 0:
+      return curProc
     for stage in curProc.stages:
       if stage.name == nestedName[0]:
         if len(nestedName) == 1:
@@ -101,7 +103,8 @@ class FRGeneralProcWrapper(ABC):
           return cls.getNestedName(stage, nestedName[1:])
 
 class FRImgProcWrapper(FRGeneralProcWrapper):
-  def __init__(self, processor: ImageProcess, editor: s3a.views.parameditors.genericeditor.FRParamEditor):
+  def __init__(self, processor: ImageProcess, editor: genericeditor.FRParamEditor,
+               excludedStages: List[List[str]]=None, disabledStages: List[List[str]]=None ):
     # Each processor is encapsulated in processes that crop the image to the region of
     # interest specified by the user, and re-expand the area after processing
     formatStage = ImageProcess.fromFunction(format_vertices, name='Format Vertices')
@@ -115,11 +118,22 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
 
     finalStages = [applyStage, basicOpsCombo(), resizeStage]
     processor.stages = [formatStage, cropStage] + processor.stages + finalStages
-
+    if disabledStages is None:
+      disabledStages = []
     if hasattr(processor, 'disabledStages'):
-      for namePath in processor.disabledStages:
-        proc = self.getNestedName(processor, namePath)
-        proc.disabled = True
+      disabledStages.extend(processor.disabledStages)
+
+    if excludedStages is None:
+      excludedStages = []
+    if hasattr(processor, 'excludedStages'):
+      excludedStages.extend(processor.excludedStages)
+
+    for namePath in disabledStages: # type: List[str]
+      proc = self.getNestedName(processor, namePath)
+      proc.disabled = True
+    for namePath in excludedStages: # type: List[str]
+      parentProc = self.getNestedName(processor, namePath[:-1])
+      parentProc.stages.remove(self.getNestedName(parentProc, [namePath[-1]]))
     super().__init__(processor, editor)
 
   def run(self, **kwargs):
