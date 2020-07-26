@@ -2,14 +2,14 @@ import copy
 import sys
 from datetime import datetime
 from functools import lru_cache
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Any
 
 import numpy as np
 from pandas import DataFrame as df
 from ruamel.yaml import YAML
 
 from s3a.graphicsutils import raiseErrorLater
-from s3a.projectvars import TABLE_DIR, REQD_TBL_FIELDS, COMP_CLASS_NA, DATE_FORMAT, \
+from s3a.projectvars import TABLE_DIR, REQD_TBL_FIELDS, DATE_FORMAT, \
   FR_CONSTS
 from s3a.structures import FRParam, FilePath, FRParamGroup, FRParamEditorError
 from s3a.views.parameditors import FRParamEditor
@@ -31,11 +31,13 @@ def _filterForParam(param: FRParam):
     retVal[1]['value'] = sys.maxsize
     children.extend(retVal)
     return paramWithChildren
-  elif valType in ['FRParam', 'Enum']:
+  elif valType in ['FRParam', 'Enum', 'list']:
     if valType == 'FRParam':
       iterGroup = [param.name for param in param.value.group]
-    else:
+    elif valType == 'Enum':
       iterGroup = [param for param in param.value]
+    else: # valType == 'list'
+      iterGroup = param.opts['limits']
     children.extend(_genList(iterGroup, 'bool', True))
     return paramWithChildren
   elif valType == 'FRComplexVertices':
@@ -89,9 +91,10 @@ class FRTableData:
 
     self.annAuthor = annAuthor
 
-    self.allFields: List[FRParam] = list(REQD_TBL_FIELDS)
-    self.compClasses = [COMP_CLASS_NA]
-    COMP_CLASS_NA.group = self.compClasses
+    self.allFields: List[FRParam] = []
+    self.compClasses: List[str] = []
+    self.resetLists()
+    # COMP_CLASS_NA.group = self.compClasses
 
   def makeCompDf(self, numRows=1) -> df:
     """
@@ -128,7 +131,8 @@ class FRTableData:
 
     self.resetLists()
     if 'classes' in cfg:
-      self.compClasses.extend(paramParser.parseList('classes',self.compClasses))
+      self.compClasses.extend(cfg['classes'])
+      REQD_TBL_FIELDS.COMP_CLASS.opts['limits'] = self.compClasses
     # for compCls in cfg.get('classes', []):
     #   newParam = FRParam(compCls, group=self.compClasses)
     #   self.compClasses.append(newParam)
@@ -143,13 +147,7 @@ class FRTableData:
     for lst in self.allFields, self.compClasses:
       lst.clear()
     self.allFields.extend(list(REQD_TBL_FIELDS))
-    self.compClasses.append(COMP_CLASS_NA)
-
-  def classFromName(self, name: str):
-    """
-    Helper function to retrieve the FRParam corresponding to the class with this name
-    """
-    return FRParamGroup.fromString(self.compClasses, name)
+    self.compClasses.extend(REQD_TBL_FIELDS.COMP_CLASS.opts['limits'])
 
   def fieldFromName(self, name: str):
     """
@@ -159,55 +157,66 @@ class FRTableData:
 
 
 
-NestedIndexer = Union[str, Tuple[str,...]]
+NestedIndexer = Union[str, Tuple[Union[str,int],...]]
 class FRYamlParser:
   def __init__(self, cfg: dict):
     self.cfg = cfg
 
-  def parseList(self, listName: NestedIndexer, groupOwner: Union[List, FRParamGroup]=None):
-    paramList = self.getNestedDict(listName)
+  def parseParamList(self, listName: NestedIndexer, groupOwner: Union[List, FRParamGroup]=None):
+    """
+    A simple list is only a list of strings. A complex list is a dict, where each
+    (key, val) pair is a list element. See the structural setup in pg.ListParameter.
+    """
+    if not isinstance(listName, tuple):
+      listName = (listName,)
+    paramList = self.getNestedCfgName(listName)
     outList = []
     if groupOwner is None:
       groupOwner = outList
-    for paramName in paramList:
-      curParam = FRParam(paramName)
+    for ii in range(len(paramList)):
+      # Default to list of string values
+      accessor = listName + (ii,)
+      curParam = self[accessor]
       curParam.group = groupOwner
       outList.append(curParam)
     return outList
 
   @lru_cache(maxsize=None)
   def __getitem__(self, paramName: NestedIndexer):
-    value = self.getNestedDict(paramName)
-    if isinstance(paramName, tuple):
-      paramName = paramName[-1]
-    parsedParam = FRParam(paramName, value)
-    # Handle parameters that are changed by ruamel into SimpleParameter
+    value = self.getNestedCfgName(paramName)
+    if not isinstance(paramName, tuple):
+      paramName = (paramName,)
+    leafName = paramName[-1]
+    # Assume leaf until proven otherwise since most mechanics are still applicable
+    if not isinstance(value, dict):
+      parsedParam = self.parseLeaf(leafName, value)
+    else:
+      # Format nicely for FRParam creation
+      nameArgs = {'value': value.pop('value'),
+                  'valType': value.pop('valType', 'NoneType'),
+                  'helpText': value.pop('helpText', '')}
+      # Forward additional args if they exist
+      if len(value) > 0:
+        nameArgs['opts'] = value
+      parsedParam = FRParam(leafName, **nameArgs)
+    return parsedParam
+
+  def parseLeaf(self, paramName: str, value: Any):
+    leafParam = FRParam(paramName, value)
+    value = leafParam.value
     if isinstance(value, bool):
       pass
       # Keeps 'int' from triggering
     elif isinstance(value, float):
-      parsedParam.valType = 'float'
+      leafParam.valType = 'float'
     elif isinstance(value, int):
-      parsedParam.valType = 'int'
+      leafParam.valType = 'int'
 
     elif isinstance(value, list):
-      parsedParam = self.parseList(paramName[-1])[0]
+      leafParam = self.parseParamList(leafParam.name)[0]
+    return leafParam
 
-    # User-specified cases
-    elif isinstance(value, dict):
-      trueType = value.setdefault('valType', 'NoneType')
-      trueValue = value['value']
-      if trueType in self.cfg:
-        # Just handle lists as the non-general case for now
-        # TODO: Extend?
-        lst = self.parseList(trueType)
-        parsedParam.value = FRParamGroup.fromString(lst, trueValue)
-        parsedParam.valType = 'FRParam'
-      else:
-        parsedParam = FRParam(paramName, **value)
-    return parsedParam
-
-  def getNestedDict(self, namePath: NestedIndexer):
+  def getNestedCfgName(self, namePath: NestedIndexer):
     if isinstance(namePath, str):
       namePath = (namePath,)
     out = self.cfg

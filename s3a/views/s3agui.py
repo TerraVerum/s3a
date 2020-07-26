@@ -301,7 +301,7 @@ class S3A(S3ABase):
     self.sigLayoutSaved.emit()
 
   def showDevConsole(self):
-    namespace = dict(app=self, requiredFields=REQD_TBL_FIELDS, singleton=FR_SINGLETON)
+    namespace = dict(app=self, rtf=REQD_TBL_FIELDS, singleton=FR_SINGLETON)
     # "dict" default is to use repr instead of string for internal elements, so expanding
     # into string here ensures repr is not used
     nsPrintout = [f"{k}: {v}" for k, v in namespace.items()]

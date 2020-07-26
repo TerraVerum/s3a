@@ -337,11 +337,15 @@ class FRCompDisplayFilter(QtCore.QObject):
         compDf = compDf.loc[~validList, :]
       if not allowFalse:
         compDf = compDf.loc[validList, :]
-    elif valType == 'FRParam':
+    elif valType in ['FRParam', 'list']:
       existingParams = np.array(dfAtParam)
       allowedParams = []
-      for groupSubParam in param.value.group:
-        isAllowed = curFilterParam[groupSubParam.name][0]
+      if valType == 'FRParam':
+        groupSubParams = [p.name for p in param.value.group]
+      else:
+        groupSubParams = param.opts['limits']
+      for groupSubParam in groupSubParams:
+        isAllowed = curFilterParam[groupSubParam][0]
         if isAllowed:
           allowedParams.append(groupSubParam)
       compDf = compDf.loc[np.isin(existingParams, allowedParams),:]

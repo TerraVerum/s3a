@@ -409,8 +409,12 @@ class FRComponentIO:
                f'Please try exporting again to confirm the cleanup was successful.', FRS3AWarning)
 
 
-  def buildByFileType(self, inFile: Union[str, Path], imShape: Tuple[int]=None, **importArgs):
-    return self._ioByFileType(inFile, 'buildFrom', imShape=imShape, **importArgs)
+  def buildByFileType(self, inFile: Union[str, Path], imShape: Tuple[int]=None,
+                      strColumns=False, **importArgs):
+    outDf = self._ioByFileType(inFile, 'buildFrom', imShape=imShape, **importArgs)
+    if strColumns:
+      outDf.columns = list(map(str, outDf.columns))
+    return outDf
 
   def _ioByFileType(self, fpath: Union[str, Path],
                     buildOrExport=Literal['buildFrom', 'export'], **ioArgs):

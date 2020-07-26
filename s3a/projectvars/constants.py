@@ -42,7 +42,7 @@ class _ReqdTableFields(FRParamGroup):
   ANN_AUTHOR       : FRParam = newParam('Author', "")
   SRC_IMG_FILENAME : FRParam = newParam('Source Image Filename', "")
   ANN_TIMESTAMP    : FRParam = newParam('Timestamp', "")
-  COMP_CLASS       : FRParam = newParam('Class', COMP_CLASS_NA)
+  COMP_CLASS       : FRParam = newParam('Class', COMP_CLASS_NA.name, 'list', limits=[COMP_CLASS_NA.name])
 REQD_TBL_FIELDS = _ReqdTableFields()
 
 

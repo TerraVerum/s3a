@@ -1,12 +1,12 @@
-validated:
-  - 'True'
-  - 'False'
-  - 'Revisit'
-
 opt-tbl-fields:
   Validated:
     value: "False"
-    valType: validated
+    valType: 'list'
+    limits:
+      - 'True'
+      - 'False'
+      - 'Revisit'
+
   Device Text:
     value: ''
     valType: text

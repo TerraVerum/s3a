@@ -160,7 +160,7 @@ class FRCompTableView(QtWidgets.QTableView):
     for ii, field in enumerate(TBL_FIELDS):
       curType = field.valType
       curval = field.value
-      paramDict = dict(type=curType, default=curval)
+      paramDict = dict(type=curType, default=curval, **field.opts)
       if curType == 'Enum':
         paramDict['type'] = 'list'
         paramDict.update(values=list(type(curval)))
