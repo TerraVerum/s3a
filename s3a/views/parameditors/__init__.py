@@ -17,7 +17,7 @@ Signal = QtCore.Signal
 
 __all__ = ['FR_SINGLETON', 'FRParamEditor', 'FRParamEditorDockGrouping']
 
-class FRGeneralPropertiesEditor(FRParamEditor):
+class FRAppSettingsEditor(FRParamEditor):
   def __init__(self, parent=None):
     super().__init__(parent, paramList=[], saveDir=GEN_PROPS_DIR, fileType='genprops')
 
@@ -38,11 +38,14 @@ class _FRSingleton(QtCore.QObject):
 
 
     self.shortcuts = FRShortcutsEditor()
-    self.generalProps = FRGeneralPropertiesEditor()
+    self.generalProps = FRAppSettingsEditor()
+    self.colorScheme = FRColorSchemeEditor()
 
     self.algParamMgr = FRAlgPropsMgr()
-    self.docks: List[FRParamEditor] = [self.generalProps, self.filter]
+    self.docks: List[FRParamEditor] = [self.filter]
     self.quickLoader = FRQuickLoaderEditor(editorList=self.registerableEditors)
+    grouping = FRParamEditorDockGrouping([self.generalProps, self.colorScheme], 'General Properties')
+    self.addDocks(grouping)
     grouping = FRParamEditorDockGrouping([self.shortcuts, self.quickLoader], 'Shortcuts')
     self.addDocks(grouping)
     # addFn = self.quickLoader.listModel.addEditors

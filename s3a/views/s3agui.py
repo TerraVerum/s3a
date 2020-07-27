@@ -88,7 +88,7 @@ class S3A(S3ABase):
     self.openImgAct.triggered.connect(lambda: self.resetMainImg_gui())
     self.focusedImg.acceptRegionAct.sigActivated.connect(lambda: self.acceptFocusedRegion())
 
-    FR_SINGLETON.generalProps.sigParamStateUpdated.connect(self.updateTheme)
+    FR_SINGLETON.colorScheme.sigParamStateUpdated.connect(self.updateTheme)
 
     # Menu options
     # FILE
@@ -498,7 +498,15 @@ class S3A(S3ABase):
   def setInfo(self, xyPos: FRVertices, pxColor: np.ndarray):
     if pxColor is None: return
     authorName = FR_SINGLETON.tableData.annAuthor
-    self.mouseCoords.setText(f'Author: {authorName} | Mouse (x,y): {xyPos[0]}, {xyPos[1]} | Pixel Color: ')
+    if self.srcImgFname is not None:
+      fname = self.srcImgFname.name
+    else:
+      fname = 'None'
+
+    self.mouseCoords.setText(f'Author: {authorName}'
+                             f' | Image: {fname}'
+                             f' | Mouse (x,y): {xyPos[0]}, {xyPos[1]}'
+                             f' | Pixel Color: ')
     self.pxColor.setText(f'{pxColor}')
     if pxColor.dtype == float:
       # Turn to uint
