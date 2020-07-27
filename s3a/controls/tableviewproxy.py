@@ -202,12 +202,19 @@ class FRCompDisplayFilter(QtCore.QObject):
 
 
   def selectRowsById(self, ids: OneDArr,
-                     selectionMode=QtCore.QItemSelectionModel.Rows):
+                     selectionMode=QtCore.QItemSelectionModel.Rows,
+                     onlyEditableRetList=True):
     selectionModel = self._compTbl.selectionModel()
     sortModel = self._compTbl.model()
     isFirst = True
     shouldScroll = len(ids) > 0
     selectionList = QtCore.QItemSelection()
+    retLists = [] # See tableview ids_rows_colsFromSelection
+    if onlyEditableRetList:
+      selectedCols = self._compMgr.editColIdxs
+    else:
+      selectedCols = np.arange(len(self._compMgr.colTitles))
+    numCols = len(self._compMgr.colTitles)
     for curId in ids:
       idRow = np.nonzero(self._compMgr.compDf.index == curId)[0][0]
       # Map this ID to its sorted position in the list
@@ -216,8 +223,11 @@ class FRCompDisplayFilter(QtCore.QObject):
       if isFirst and shouldScroll:
         self._compTbl.scrollTo(idxForId, self._compTbl.PositionAtCenter)
         isFirst = False
+      tblRow = idxForId.row()
+      retLists.extend([[curId, tblRow, col] for col in selectedCols])
     # noinspection PyTypeChecker
     selectionModel.select(selectionList, selectionMode)
+    return np.array(retLists)
     # if int(selectionMode & QtCore.QItemSelectionModel.ClearAndSelect) > 0:
     #   self.selectedIds = ids
     # else: # Add to selection without clearing old selection

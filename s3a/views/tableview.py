@@ -91,6 +91,8 @@ class FRPopupTableDialog(QtWidgets.QDialog):
     for ii in range(len(self.titles)):
       if ii not in colIdxs:
         self.tbl.hideColumn(ii)
+      else:
+        self.tbl.showColumn(ii)
     self.tbl.mgr.rmComps()
     self.tbl.mgr.addComps(compDf, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
     self.updateWarnMsg([])
@@ -241,7 +243,7 @@ class FRCompTableView(QtWidgets.QTableView):
       idAtIdx = idx.siblingAtColumn(self.instIdColIdx).data(QtCore.Qt.EditRole)
       retLists.append([idAtIdx, row, idx.column()])
     retLists = np.array(retLists)
-    if excludeNoEditCols:
+    if excludeNoEditCols and len(retLists) > 0:
       # Set diff will eliminate any repeats, so use a slower op that at least preserves
       # duplicates
       retLists = retLists[~np.isin(retLists[:,2], self.mgr.noEditColIdxs)]

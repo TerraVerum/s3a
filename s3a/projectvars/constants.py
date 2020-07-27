@@ -116,6 +116,7 @@ class _FRConsts(FRParamGroup):
     'Show tool buttons', True, helpText='Since these buttons also have right-click menu options,'
                                         ' it may be desirable to save space in the main'
                                         ' window by hiding these buttons.')
+  PROP_COLS_TO_SHOW            : FRParam = newParam('Show popup table when creating component', False)
 
   # --------------------------
   # IMAGE TOOLS
@@ -178,7 +179,7 @@ class _FRConsts(FRParamGroup):
     helpText='Sets all cells in the selection to be the same as the first row in the selection.'
              ' See the project wiki for a detailed description')
   TOOL_TBL_SET_AS            : FRParam = newParam(
-    'Set Table Rows As...', 'Ctrl+Shift+D', 'registeredaction',
+    'Set Cells As...', 'Ctrl+Shift+D', 'registeredaction',
     helpText='Sets all cells in the selection to the values specified in the popup table.'
              ' See the project wiki for a detailed description')
   TOOL_TBL_DEL_ROWS          : FRParam = newParam('Delete Table Rows', 'Del', 'registeredaction')
