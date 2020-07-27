@@ -16,7 +16,7 @@ from s3a.views.parameditors import FRParamEditor
 
 yaml = YAML()
 
-def _genList(nameIter, paramType, defaultVal, defaultParam='value'):
+def genParamList(nameIter, paramType, defaultVal, defaultParam='value'):
   """Helper for generating children elements"""
   return [{'name': name, 'type': paramType, defaultParam: defaultVal} for name in nameIter]
 
@@ -27,7 +27,7 @@ def _filterForParam(param: FRParam):
   paramWithChildren = {'name': param.name, 'type': 'group', 'children': children}
   paramWithoutChild = {'name': param.name, 'type': valType, 'value': None}
   if valType in ['int', 'float']:
-    retVal = _genList(['min', 'max'], valType, 0)
+    retVal = genParamList(['min', 'max'], valType, 0)
     retVal[1]['value'] = sys.maxsize
     children.extend(retVal)
     return paramWithChildren
@@ -38,15 +38,15 @@ def _filterForParam(param: FRParam):
       iterGroup = [param for param in param.value]
     else: # valType == 'list'
       iterGroup = param.opts['limits']
-    children.extend(_genList(iterGroup, 'bool', True))
+    children.extend(genParamList(iterGroup, 'bool', True))
     return paramWithChildren
   elif valType == 'FRComplexVertices':
     minMax = _filterForParam(FRParam('', 5))['children']
-    xyVerts = _genList(['X Bounds', 'Y Bounds'], 'group', minMax, 'children')
+    xyVerts = genParamList(['X Bounds', 'Y Bounds'], 'group', minMax, 'children')
     children.extend(xyVerts)
     return paramWithChildren
   elif valType == 'bool':
-    children.extend(_genList([f'{param.name}', f'Not {param.name}'], valType, True))
+    children.extend(genParamList([f'{param.name}', f'Not {param.name}'], valType, True))
     return paramWithChildren
   else:
     # Assumes string

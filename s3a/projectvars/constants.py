@@ -116,7 +116,7 @@ class _FRConsts(FRParamGroup):
     'Show tool buttons', True, helpText='Since these buttons also have right-click menu options,'
                                         ' it may be desirable to save space in the main'
                                         ' window by hiding these buttons.')
-  PROP_COLS_TO_SHOW            : FRParam = newParam('Show popup table when creating component', False)
+  PROP_COLS_TO_SHOW            : FRParam = newParam('Visible Table Columns', valType='group')
 
   # --------------------------
   # IMAGE TOOLS
