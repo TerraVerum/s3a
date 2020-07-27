@@ -126,7 +126,10 @@ class FRCompTableView(QtWidgets.QTableView):
     (cls.setCellsAsAct, cls.setSameAsFirstAct, cls.removeRowsAct) = cls.toolsEditor.registerProps(
       cls,[FR_CONSTS.TOOL_TBL_SET_AS, FR_CONSTS.TOOL_TBL_SET_SAME_AS_FIRST,
            FR_CONSTS.TOOL_TBL_DEL_ROWS], asProperty=False, ownerObj=cls)
-    nameFilters = genParamList(map(str, FR_SINGLETON.tableData.allFields), 'bool', True)
+    nameFilters = []
+    for field in FR_SINGLETON.tableData.allFields:
+      show = not field.opts.get('colHidden', False)
+      nameFilters.append(dict(name=field.name, type='bool', value=show))
     FR_CONSTS.PROP_COLS_TO_SHOW.value = nameFilters
     cls.colsVisibleProps = FR_SINGLETON.generalProps.registerProp(
       cls, FR_CONSTS.PROP_COLS_TO_SHOW, asProperty=False)
@@ -163,6 +166,8 @@ class FRCompTableView(QtWidgets.QTableView):
       self.removeRowsAct.sigActivated.connect(lambda: self.removeSelectedRows_gui())
       for ii, child in enumerate(self.colsVisibleProps):
         child.sigValueChanged.connect(lambda param, value, idx=ii: self.setColumnHidden(idx, not value))
+        # Trigger initial hide/show
+        child.sigValueChanged.emit(child, child.value())
 
 
     self.instIdColIdx = TBL_FIELDS.index(REQD_TBL_FIELDS.INST_ID)

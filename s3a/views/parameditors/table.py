@@ -11,7 +11,8 @@ from ruamel.yaml import YAML
 from s3a.graphicsutils import raiseErrorLater
 from s3a.projectvars import TABLE_DIR, REQD_TBL_FIELDS, DATE_FORMAT, \
   FR_CONSTS
-from s3a.structures import FRParam, FilePath, FRParamGroup, FRParamEditorError
+from s3a.structures import FRParam, FilePath, FRParamGroup, FRParamEditorError, \
+  FRS3AException
 from s3a.views.parameditors import FRParamEditor
 
 yaml = YAML()
@@ -140,6 +141,13 @@ class FRTableData:
       param = paramParser['opt-tbl-fields', field]
       param.group = self.allFields
       self.allFields.append(param)
+
+    for field in cfg.get('hidden-cols', []):
+      try:
+        FRParamGroup.fromString(self.allFields, field).opts['colHidden'] = True
+      except FRS3AException:
+        # Specified field to hide isn't in all table fields
+        pass
 
     self.filter.updateParamList(self.allFields)
 

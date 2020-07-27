@@ -28,3 +28,9 @@ classes:
   - Transistor
   - IC
   - Other
+
+hidden-cols:
+  - Vertices
+  - Author
+  - Source Image Filename
+  - Timestamp
