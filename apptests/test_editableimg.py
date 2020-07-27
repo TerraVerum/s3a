@@ -1,14 +1,17 @@
+from pathlib import Path
+
 import numpy as np
 import pytest
 from pyqtgraph.Qt import QtGui, QtCore
 
 from conftest import NUM_COMPS, app, mgr, dfTester
+from imageprocessing.common import Image
+from imageprocessing.processing import ImageIO, ImageProcess
 from s3a import FR_SINGLETON
-from s3a.views.imageareas import FRFocusedImage
 from s3a.controls.drawctrl import FRRoiCollection
-from s3a.views.rois import FRRectROI
-from s3a.projectvars import FR_CONSTS
-from s3a.structures import FRVertices, FRComplexVertices, FRParam
+from s3a.projectvars import FR_CONSTS, REQD_TBL_FIELDS as RTF
+from s3a.structures import FRVertices, FRComplexVertices, FRParam, FRS3AWarning
+from s3a.views.parameditors.processor import FRAlgCollectionEditor
 from testingconsts import FIMG_SER_COLS
 
 # Construct app outside setUp to drastically reduce loading times
@@ -126,3 +129,33 @@ def test_selectionbounds_none():
   # Selection in negative area ensures no comps will be selected
   app.mainImg.sigSelectionBoundsMade.emit(FRVertices([[-100,-100]]))
   assert len(app.compDisplay.selectedIds) == 0
+
+def test_override_comp():
+  mImg = app.mainImg
+  mImg.procCollection.switchActiveProcessor('Basic Shapes')
+  rmSmallCompsParam = mImg.procCollection.params.child(
+    'Basic Shapes', 'Basic Region Operations', 'Rm Small Comps', 'minSzThreshold')
+  # Make sure the drawn comp is deleted
+  imShape = np.asarray(mImg.image.shape[:2])
+  rmSmallCompsParam.setValue(np.prod(imShape))
+  newVerts = FRVertices([
+    [0, 0], [1, 0], [1, 1], [0, 1]
+  ])*imShape//2
+  mImg.handleShapeFinished(newVerts)
+  assert len(mgr.compDf) == 0
+  mImg.overrideCompVertsAct.activate()
+  assert len(mgr.compDf) == 1
+  assert mgr.compDf.at[0, RTF.VERTICES] == FRComplexVertices([newVerts])
+
+  stack.undo()
+  assert len(mgr.compDf) == 0
+
+def test_proc_err(tmpdir):
+  def badProc(image: Image):
+    return ImageIO(image=image, extra=1/0)
+  newCtor = lambda: ImageProcess.fromFunction(badProc, 'Bad')
+  newClctn = FRAlgCollectionEditor(Path(tmpdir),[newCtor])
+
+  newClctn.switchActiveProcessor('Bad')
+  with pytest.warns(FRS3AWarning):
+    newClctn.curProcessor.run(image=np.array([[True]], dtype=bool), fgVerts=FRVertices([[0,0]]))

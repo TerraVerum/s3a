@@ -11,11 +11,9 @@ from s3a.projectvars import REQD_TBL_FIELDS
 from s3a.structures import FRComplexVertices
 from testingconsts import RND, IMG_DIR
 
-makeCompDf = FR_SINGLETON.tableData.makeCompDf
-
 class CompDfTester:
   def __init__(self, numComps):
-    self.compDf = makeCompDf(numComps)
+    self.compDf = FR_SINGLETON.tableData.makeCompDf(numComps)
     self.compDf.set_index(np.arange(numComps, dtype=int), inplace=True)
     self.numComps = numComps
     self.fillRandomClasses()

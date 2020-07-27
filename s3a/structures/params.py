@@ -9,7 +9,7 @@ from warnings import warn
 from pyqtgraph.Qt import QtCore
 from typing_extensions import Protocol, runtime_checkable
 
-from .exceptions import FRParamEditorError
+from .exceptions import FRParamEditorError, FRS3AWarning
 
 
 @runtime_checkable
@@ -117,7 +117,8 @@ class FRParamGroup:
       param.group = weakref.proxy(self)
 
   @staticmethod
-  def fromString(group: Union[Collection[FRParam], FRParamGroup], paramName: str):
+  def fromString(group: Union[Collection[FRParam], FRParamGroup], paramName: str,
+                 default: FRParam=None):
     """
     Allows user to create a :class:`FRParam` object from its string value
     """
@@ -126,16 +127,15 @@ class FRParamGroup:
       if param.name.lower() == paramName:
         return param
     # If we reach here the value didn't match any FRComponentTypes values. Throw an error
-    defaultParam = None
-    if hasattr(group, 'getDefault'):
-      defaultParam = group.getDefault()
+    if default is None and hasattr(group, 'getDefault'):
+      default = group.getDefault()
     baseWarnMsg = f'String representation "{paramName}" was not recognized.\n'
-    if defaultParam is None:
+    if default is None:
       # No default specified, so we have to raise Exception
       raise FRParamEditorError(baseWarnMsg + 'No class default is specified.')
     # No exception needed, since the user specified a default type in the derived class
-    warn(baseWarnMsg + f'Defaulting to {defaultParam.name}')
-    return defaultParam
+    warn(baseWarnMsg + f'Defaulting to {default.name}', FRS3AWarning)
+    return default
 
   @classmethod
   def getDefault(cls) -> Optional[FRParam]:

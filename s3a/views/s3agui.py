@@ -78,8 +78,10 @@ class S3A(S3ABase):
     if len(quickLoaderArgs) > 0:
       self.appStateEditor.loadParamState(stateDict=quickLoaderArgs)
 
-    QtCore.QTimer.singleShot(0, lambda: self._maybeLoadLastState(guiMode, loadLastState,
-                                                                 quickLoaderArgs))
+    if guiMode:
+      QtCore.QTimer.singleShot(0, lambda: self._maybeLoadLastState_gui(loadLastState, quickLoaderArgs))
+    elif loadLastState:
+      self.loadLastState(quickLoaderArgs)
 
   def _hookupSignals(self):
     # Buttons
@@ -260,12 +262,11 @@ class S3A(S3ABase):
       self._createMenuOptForDock(toolBtn, dock)
       toolbar.addWidget(toolBtn)
 
-  def _maybeLoadLastState(self, guiMode: bool, loadLastState: bool=None,
-                          quickLoaderArgs:dict=None):
+  def _maybeLoadLastState_gui(self, loadLastState: bool=None,
+                              quickLoaderArgs:dict=None):
     """
     Helper function to determine whether the last application state should be loaded,
     and loads the last state if desired.
-    :param guiMode: Whether this application is running in gui mode
     :param loadLastState: If *None*, the user will be prompted via dialog for whether
       to load the last application state. Otherwise, its boolean value is used.
     :param quickLoaderArgs: Additional dict arguments which if supplied will override
@@ -273,15 +274,13 @@ class S3A(S3ABase):
     """
     if not self.appStateEditor.RECENT_STATE_FNAME.exists():
       return
-    if loadLastState is None and guiMode:
+    if loadLastState is None:
       loadLastState = QtWidgets.QMessageBox.question(
         self, 'Load Previous State', 'Do you want to load all previous app'
                                      ' settings (image, annotations, algorithms, etc.)?',
         QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No) == QtWidgets.QMessageBox.Yes
-    if loadLastState and guiMode:
+    if loadLastState:
       self.loadLastState_gui(quickLoaderArgs)
-    elif loadLastState:
-      self.loadLastState(quickLoaderArgs)
 
   def loadLayout(self, layoutName: Union[str, Path]):
     layoutName = Path(layoutName)
@@ -451,8 +450,6 @@ class S3A(S3ABase):
 
     if overrideName is None:
       overrideName = editor.name
-    if editor.hasMenuOption:
-      return
     if loadFunc is None:
       loadFunc = partial(defaultLoadFunc, editor)
     newMenu = QtWidgets.QMenu(overrideName, self)

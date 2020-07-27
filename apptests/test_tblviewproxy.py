@@ -1,12 +1,16 @@
+from io import StringIO
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import cv2 as cv
 import pytest
 
 from conftest import app, mgr, stack
-from s3a import appInst, FR_SINGLETON
+from helperclasses import CompDfTester
+from s3a import appInst, FR_SINGLETON, S3A
 from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS
-from s3a.structures import FRComplexVertices, FRParam, FRVertices
+from s3a.structures import FRComplexVertices, FRParam, FRVertices, FRS3AWarning
 from s3a.views.tableview import FRCompTableView
 
 
@@ -102,6 +106,21 @@ def test_copy_comps():
   assert len(mgr.compDf) == 2*len(oldComps)
   compCopiedCompDfs(oldComps, mgr.compDf, newStartIdx=len(oldComps))
 
+def test_impossible_filter(tmpdir):
+  tmpFile = Path(tmpdir)/'testCfg.yml'
+  dummyCfgStr = '''
+  opt-tbl-fields:
+    dummy:
+      value: {}
+      valType: nopossiblefilter
+  '''
+  tmpFile.write_text(dummyCfgStr)
+  FR_SINGLETON.tableData.loadCfg(tmpFile)
+  dftester = CompDfTester(3)
+
+  with pytest.warns(FRS3AWarning):
+    newApp = S3A(guiMode=False, loadLastState=False)
+    newApp.compMgr.addComps(dftester.compDf)
 
 def compCopiedCompDfs(old: pd.DataFrame, new: pd.DataFrame, newStartIdx=0):
   for ii in range(len(old)):

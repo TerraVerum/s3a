@@ -450,7 +450,10 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
             clsObj.__initEditorParams__()
           oldInit(clsObj, *args, **kwargs)
           for editor in SPAWNED_EDITORS:
-            editor._extendedClassInit(clsObj, groupParam)
+            try:
+              editor._extendedClassInit(clsObj, groupParam)
+            except ReferenceError:
+              pass
         grouping.__init__ = newInit
 
       self._extendedGroupingDecorator(grouping, groupParam, **opts)

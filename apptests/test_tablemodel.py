@@ -3,7 +3,7 @@ import pytest
 from pyqtgraph.Qt import QtCore
 
 from conftest import NUM_COMPS, app, mgr, stack, dfTester
-from helperclasses import makeCompDf, clearTmpFiles
+from helperclasses import clearTmpFiles
 from testingconsts import RND
 from s3a import FR_SINGLETON
 from s3a.projectvars import FR_ENUMS
@@ -31,7 +31,7 @@ def test_undo_add(sampleComps):
   assert mgr.compDf.equals(sampleComps)
 
 def test_empty_add():
-  changeList = mgr.addComps(makeCompDf(0))
+  changeList = mgr.addComps(FR_SINGLETON.tableData.makeCompDf(0))
   cmpChangeList(changeList)
 
 def test_rm_by_empty_vert_add(sampleComps):

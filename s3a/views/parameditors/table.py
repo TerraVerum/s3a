@@ -132,7 +132,7 @@ class FRTableData:
     self.resetLists()
     if 'classes' in cfg:
       self.compClasses.extend(cfg['classes'])
-      REQD_TBL_FIELDS.COMP_CLASS.opts['limits'] = self.compClasses
+      REQD_TBL_FIELDS.COMP_CLASS.opts['limits'] = self.compClasses.copy()
     # for compCls in cfg.get('classes', []):
     #   newParam = FRParam(compCls, group=self.compClasses)
     #   self.compClasses.append(newParam)
@@ -147,7 +147,7 @@ class FRTableData:
     for lst in self.allFields, self.compClasses:
       lst.clear()
     self.allFields.extend(list(REQD_TBL_FIELDS))
-    self.compClasses.extend(REQD_TBL_FIELDS.COMP_CLASS.opts['limits'])
+    self.compClasses.append(REQD_TBL_FIELDS.COMP_CLASS.value)
 
   def fieldFromName(self, name: str):
     """
