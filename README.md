@@ -15,14 +15,7 @@ ___
 
 ## Installation
 
-Clone and install the dependent `imageprocessing` repository:
-
-```bash
-git clone https://gitlab.com/ficsresearch/imageprocessing
-pip install -e ./imageprocessing
-```
-
-Next, clone and install `s3a`:
+The easiest method for installing `s3a` is via `pip` after cloning the repository:
 
 ```bash
 git clone https://gitlab.com/ficsresearch/s3a
