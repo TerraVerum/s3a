@@ -88,7 +88,6 @@ class FRParamEditor(FRParamEditorBase):
     self.collapseAllBtn = QtWidgets.QPushButton('Collapse All')
     self.saveAsBtn = QtWidgets.QPushButton('Save As...')
     self.applyBtn = QtWidgets.QPushButton('Apply')
-    self.closeBtn = QtWidgets.QPushButton('Close')
 
     # -----------
     # Widget layout
@@ -101,7 +100,6 @@ class FRParamEditor(FRParamEditorBase):
     paramStateBtns = QtWidgets.QHBoxLayout()
     paramStateBtns.addWidget(self.saveAsBtn)
     paramStateBtns.addWidget(self.applyBtn)
-    paramStateBtns.addWidget(self.closeBtn)
 
     self.centralLayout = QtWidgets.QVBoxLayout(self.dockContentsWidget)
     self.centralLayout.addLayout(expandCollapseBtnLayout)
@@ -115,7 +113,6 @@ class FRParamEditor(FRParamEditorBase):
     self.expandAllBtn.clicked.connect(lambda: self.setAllExpanded(True))
     self.collapseAllBtn.clicked.connect(lambda: self.setAllExpanded(False))
     self.saveAsBtn.clicked.connect(self.saveParamState_gui)
-    self.closeBtn.clicked.connect(self.close)
     self.applyBtn.clicked.connect(self.applyChanges)
 
     if registerCls is not None:
