@@ -9,7 +9,7 @@ from s3a import FR_SINGLETON
 from s3a.projectvars import FR_CONSTS
 from s3a.structures import FRParam
 
-__all__ = ['FRDrawOpts']
+__all__ = ['FRDrawOpts', 'FRButtonCollection']
 
 class FRDrawOpts(QtWidgets.QWidget):
   def __init__(self, shapeGrp: FRButtonCollection, actGrp: FRButtonCollection,

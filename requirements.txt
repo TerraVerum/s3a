@@ -10,7 +10,7 @@ scipy
 scikit-image
 scikit-learn
 matplotlib
-PyQt5
+PyQt5>=5.11
 pyqtgraph
 Pillow
 qdarkstyle
