@@ -58,3 +58,5 @@ def doAndAssertExport(fpath: Path, io: FRComponentIO, failMsg: str):
     augmentException(ex, f'{failMsg}\n')
     raise
   assert fpath.exists(), 'File doesn\'t exist despite export'
+  inDf = io.buildByFileType(fpath, app.mainImg.image.shape[:2])
+  assert len(inDf) > 0

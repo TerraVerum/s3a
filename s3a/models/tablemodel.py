@@ -10,12 +10,12 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
-from skimage import io
+from skimage import io, measure
 from typing_extensions import Literal
 
 from s3a import FR_SINGLETON
-from s3a.generalutils import coerceDfTypes, augmentException
-from s3a.projectvars import FR_ENUMS, REQD_TBL_FIELDS
+from s3a.generalutils import coerceDfTypes, augmentException, getCroppedImg
+from s3a.projectvars import FR_ENUMS, REQD_TBL_FIELDS as RTF
 from s3a.projectvars.constants import FR_CONSTS
 from s3a.structures import FRComplexVertices, FRParam
 from s3a.structures import OneDArr, FRParamGroup, FilePath, FRS3AWarning, GrayImg
@@ -26,6 +26,7 @@ Signal = QtCore.Signal
 
 TBL_FIELDS = FR_SINGLETON.tableData.allFields
 
+FilePathOrDf = Union[FilePath, pd.DataFrame]
 class FRCompTableModel(QtCore.QAbstractTableModel):
   # Emits 3-element dict: Deleted comp ids, changed comp ids, added comp ids
   defaultEmitDict = {'deleted': np.array([]), 'changed': np.array([]), 'added': np.array([])}
@@ -42,7 +43,7 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
 
     self.compDf = FR_SINGLETON.tableData.makeCompDf(0)
 
-    noEditParams = set(REQD_TBL_FIELDS) - {REQD_TBL_FIELDS.COMP_CLASS}
+    noEditParams = set(RTF) - {RTF.COMP_CLASS}
     self.noEditColIdxs = [self.colTitles.index(col.name) for col in noEditParams]
     self.editColIdxs = np.setdiff1d(np.arange(len(self.colTitles)), self.noEditColIdxs)
 
@@ -123,7 +124,7 @@ class FRComponentMgr(FRCompTableModel):
 
     # Delete entries with no vertices, since they make work within the app difficult.
     # TODO: Is this the appropriate response?
-    verts = newCompsDf[REQD_TBL_FIELDS.VERTICES]
+    verts = newCompsDf[RTF.VERTICES]
     dropIds = newCompsDf.index[verts.map(FRComplexVertices.isEmpty)]
     newCompsDf.drop(index=dropIds, inplace=True)
 
@@ -131,7 +132,7 @@ class FRComponentMgr(FRCompTableModel):
     if addtype == FR_ENUMS.COMP_ADD_AS_NEW:
       # Treat all comps as new -> set their IDs to guaranteed new values
       newIds = np.arange(self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int)
-      newCompsDf.loc[:,REQD_TBL_FIELDS.INST_ID] = newIds
+      newCompsDf.loc[:,RTF.INST_ID] = newIds
       newCompsDf.set_index(newIds, inplace=True)
       dropIds = np.array([], dtype=int)
 
@@ -245,13 +246,13 @@ class FRComponentMgr(FRCompTableModel):
       keepId = mergeIds[0]
 
     keepInfo = mergeComps.loc[keepId].copy()
-    allVerts = [v.stack() for v in mergeComps[REQD_TBL_FIELDS.VERTICES]]
+    allVerts = [v.stack() for v in mergeComps[RTF.VERTICES]]
     maskShape = np.max(np.vstack(allVerts), 0)[::-1]
     mask = np.zeros(maskShape, bool)
-    for verts in mergeComps[REQD_TBL_FIELDS.VERTICES]: # type: FRComplexVertices
+    for verts in mergeComps[RTF.VERTICES]: # type: FRComplexVertices
       mask |= verts.toMask(tuple(maskShape))
     newVerts = FRComplexVertices.fromBwMask(mask)
-    keepInfo[REQD_TBL_FIELDS.VERTICES] = newVerts
+    keepInfo[RTF.VERTICES] = newVerts
 
     self.rmComps(mergeComps.index)
     self.addComps(keepInfo.to_frame().T, FR_ENUMS.COMP_ADD_AS_MERGE)
@@ -272,10 +273,10 @@ class FRComponentMgr(FRCompTableModel):
     splitComps = self.compDf.loc[splitIds, :].copy()
     newComps_lst = []
     for _, comp in splitComps.iterrows():
-      verts = comp[REQD_TBL_FIELDS.VERTICES]
+      verts = comp[RTF.VERTICES]
       childComps = pd.concat([comp.to_frame().T]*len(verts))
       newVerts = [FRComplexVertices([v]) for v in verts]
-      childComps.loc[:, REQD_TBL_FIELDS.VERTICES] = newVerts
+      childComps.loc[:, RTF.VERTICES] = newVerts
       newComps_lst.append(childComps)
     newComps = pd.concat(newComps_lst)
     # Keep track of which comps were removed and added by this op
@@ -330,12 +331,13 @@ class FRComponentIO:
 
   def __init__(self):
     self.compDf: Optional[df] = None
+    self.fullSrcImgFname: Optional[Path] = None
 
   @property
   def handledIoTypes(self):
     """Returns a dict of <type, description> for the file types this I/O obejct can handle"""
-    return {'csv': 'CSV Files', 'pkl': 'Pickle Files', 'id.png': 'ID Grayscale Image',
-            'class.png': 'Class Grayscale Image'}
+    return {'csv': 'CSV Files', 'pkl': 'Pickle Files',
+            'id.png': 'ID Grayscale Image', 'class.png': 'Class Grayscale Image'}
 
   @property
   def roundTripIoTypes(self):
@@ -372,6 +374,7 @@ class FRComponentIO:
     :param srcImgFname: Main image filename. This associates each new annotation
       to this main image where they came from
     """
+    self.fullSrcImgFname = srcImgFname
     if self.exportOnlyVis and displayIds is not None:
       exportIds = displayIds
     else:
@@ -380,18 +383,20 @@ class FRComponentIO:
     if not self.includeFullSourceImgName and srcImgFname is not None:
       # Only use the file name, not the whole path
       srcImgFname = srcImgFname.name
+    elif srcImgFname is not None:
+      srcImgFname = str(srcImgFname)
     # Assign correct export name for only new components
-    overwriteIdxs = exportDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME] == FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
+    overwriteIdxs = exportDf[RTF.SRC_IMG_FILENAME] == FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
     # TODO: Maybe the current filename will match the current file indicator. What happens then?
-    exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = srcImgFname
+    exportDf.loc[overwriteIdxs, RTF.SRC_IMG_FILENAME] = srcImgFname
     self.compDf = exportDf
 
   def exportByFileType(self, outFile: Union[str, Path], verifyIntegrity=True, **exportArgs):
     outFile = Path(outFile)
     self._ioByFileType(outFile, 'export', **exportArgs)
     if verifyIntegrity and outFile.suffix[1:] in self.roundTripIoTypes:
-      matchingCols = np.setdiff1d(self.compDf.columns, [REQD_TBL_FIELDS.INST_ID,
-                                                                REQD_TBL_FIELDS.SRC_IMG_FILENAME])
+      matchingCols = np.setdiff1d(self.compDf.columns, [RTF.INST_ID,
+                                                                RTF.SRC_IMG_FILENAME])
       loadedDf = self.buildByFileType(outFile)
       dfCmp = loadedDf[matchingCols].values == self.compDf[matchingCols].values
       if not np.all(dfCmp):
@@ -424,9 +429,35 @@ class FRComponentIO:
     typIdx = [typ in fname for typ in cmpTypes]
     if not any(typIdx):
       return
-    fnNameSuffix = cmpTypes[typIdx][0].title().replace('.', '')
+    fnNameSuffix = cmpTypes[typIdx][-1].title().replace('.', '')
     ioFn = getattr(self, buildOrExport+fnNameSuffix, None)
     return ioFn(fpath, **ioArgs)
+
+  @staticmethod
+  def _strToNpArray(array_string: str, **opts):
+    # Adapted from https://stackoverflow.com/a/42756309/9463643
+    array_string = ','.join(array_string.replace('[ ', '[').split())
+    return np.array(literal_eval(array_string), **opts)
+
+  def _pandasCsvExport(self, exportDf: pd.DataFrame, outFile: Union[str, Path]=None,
+                       readOnly=True, **pdExportArgs):
+    if outFile is None:
+      return
+
+    defaultExportParams = {
+      'na_rep': 'NaN',
+      'float_format': '{:0.10n}',
+      'index': False,
+    }
+    outPath = Path(outFile)
+    outPath.parent.mkdir(exist_ok=True, parents=True)
+
+    defaultExportParams.update(pdExportArgs)
+    with np.printoptions(threshold=sys.maxsize):
+      exportDf.to_csv(outFile, index=False)
+    if readOnly:
+      outPath.chmod(S_IREAD|S_IRGRP|S_IROTH)
+
   # -----
   # Export options
   # -----
@@ -439,17 +470,7 @@ class FRComponentIO:
     :param readOnly: Whether this export should be read-only
     :return: Export version of the component data.
     """
-    defaultExportParams = {
-      'na_rep': 'NaN',
-      'float_format': '{:0.10n}',
-      'index': False
-    }
-    outPath = Path(outFile)
-    defaultExportParams.update(pdExportArgs)
     # Make sure no rows are truncated
-    pd.set_option('display.max_rows', sys.maxsize)
-    oldNpOpts = np.get_printoptions()
-    np.set_printoptions(threshold=sys.maxsize)
     col = None
     try:
       # TODO: Currently the additional options are causing errors. Find out why and fix
@@ -457,25 +478,82 @@ class FRComponentIO:
       # Format special columns appropriately
       # Since CSV export significantly modifies the df, make a copy before doing all these
       # operations
-      outPath.parent.mkdir(exist_ok=True, parents=True)
       exportDf = self.compDf.copy(deep=True)
       for col in exportDf:
         if not isinstance(col.value, str):
           exportDf[col] = _paramSerToStrSer(exportDf[col], col.value)
-      if outFile is not None:
-        exportDf.to_csv(outFile, index=False)
-        if readOnly:
-          outPath.chmod(S_IREAD|S_IRGRP|S_IROTH)
+      self._pandasCsvExport(exportDf, outFile, readOnly, **pdExportArgs)
     except Exception as ex:
       errMsg = f'Error on parsing column "{col.name}"\n'
       augmentException(ex, errMsg)
       raise
-    finally:
-      pd.reset_option('display.max_rows')
-      # False positive checker warning for some reason
-      # noinspection PyTypeChecker
-      np.set_printoptions(**oldNpOpts)
     return exportDf
+
+  def exportCompimgsDf(self, outFile: Union[str, Path]=None, imgDir: FilePath=None, margin=0,
+                       readOnly=True, **pdExportArgs):
+    """
+    Creates a dataframe consisting of extracted images around each component
+    :param outFile: Where to save the result, if it should be saved. Caution -- this
+      is currently a time-consuming process!
+    :param imgDir: Where images corresponding to this dataframe are kept. Source image
+      filenames are interpreted relative to this directory if they are not absolute.
+    :param margin: How much padding to give around each component
+    :param readOnly: Whether the export should be readOnly. This is only meaningful when
+      outFile is not None.
+    :param pdExportArgs: Additional export arguments for pandas. Only meaninfgul when
+      outFile is not None.
+    :return: Dataframe with the following keys:
+      - img: The (MxNxC) image corresponding to the component vertices, where MxN are
+        the padded row sizes and C is the number of image channels
+      - semanticMask: Binary mask representing the component vertices
+      - bboxMask: Square box representing (min)->(max) component vertices. This is useful
+        for excluding the margin when a semantic mask is not desired and the margin was > 0.
+      - instId: The component's Instance ID
+      - offset: Image (x,y) coordinate of the min component vertex.
+    """
+    _imgCache = {}
+    compDf = self.compDf
+    if imgDir is None and self.fullSrcImgFname is not None:
+      imgDir = self.fullSrcImgFname.parent
+    elif imgDir is None:
+      imgDir = Path('.')
+    else:
+      imgDir = Path(imgDir)
+    uniqueImgs = np.unique(compDf[RTF.SRC_IMG_FILENAME])
+    for imgName in uniqueImgs:
+      imgName = Path(imgName)
+      if not imgName.is_absolute():
+        imgName = imgDir/imgName
+      if imgName not in _imgCache:
+        _imgCache[imgName] = io.imread(imgName)
+    dfGroupingsByImg = []
+    for imgName in uniqueImgs:
+      dfGroupingsByImg.append(compDf[compDf[RTF.SRC_IMG_FILENAME] == imgName])
+    outDf = dict(img=[], semanticMask=[], bboxMask=[], compClass=[], instId=[], offset=[])
+    for miniDf, imgName in zip(dfGroupingsByImg, uniqueImgs):
+      imgName = imgDir/imgName
+      img = _imgCache[imgName]
+      for idx, row in miniDf.iterrows():
+        allVerts = row[RTF.VERTICES].stack()
+        compImg, bounds = getCroppedImg(img, allVerts, margin, coordsAsSlices=False)
+        outDf['img'].append(compImg)
+        outDf['compClass'].append(str(row[RTF.COMP_CLASS]))
+        maskVerts: FRComplexVertices = row[RTF.VERTICES].copy()
+        for verts in maskVerts:
+          verts -= bounds[0,:]
+        allVerts = maskVerts.stack()
+        mask = maskVerts.toMask(compImg.shape[:2])
+        outDf['semanticMask'].append(mask)
+        bboxMask = np.zeros_like(mask)
+        bboxBounds = np.r_[allVerts.min(0, keepdims=True), allVerts.max(0, keepdims=True)]
+        bboxMask[bboxBounds[0,1]:bboxBounds[1,1], bboxBounds[0,0]:bboxBounds[1,0]] = True
+        outDf['bboxMask'].append(bboxMask)
+        outDf['instId'].append(row.name)
+        outDf['offset'].append(bounds[0,:])
+    outDf = pd.DataFrame(outDf)
+    if outFile is not None:
+      self.compDf.to_pickle(outFile)
+    return outDf
 
   def exportPkl(self, outFile: Union[str, Path]=None) -> (Any, str):
     """
@@ -491,7 +569,7 @@ class FRComponentIO:
   def exportClassPng(self, outFile: FilePath = None, imShape: Tuple[int]=None, **kwargs):
     # Create label to output mapping
     classes = FR_SINGLETON.tableData.compClasses
-    colors = self.compDf[REQD_TBL_FIELDS.COMP_CLASS].apply(classes.index)+1
+    colors = self.compDf[RTF.COMP_CLASS].apply(classes.index)
     origIdxs = self.compDf.index
     self.compDf.index = colors
     ret = self.exportIdPng(outFile, imShape, **kwargs)
@@ -509,11 +587,11 @@ class FRComponentIO:
     :return:
     """
     if imShape is None:
-      vertMax = FRComplexVertices.stackedMax(self.compDf[REQD_TBL_FIELDS.VERTICES])
+      vertMax = FRComplexVertices.stackedMax(self.compDf[RTF.VERTICES])
       imShape = tuple(vertMax[::-1] + 1)
     outMask = np.zeros(imShape[:2], 'int32')
     for idx, comp in self.compDf.iterrows():
-      verts: FRComplexVertices = comp[REQD_TBL_FIELDS.VERTICES]
+      verts: FRComplexVertices = comp[RTF.VERTICES]
       idx: int
       outMask = verts.toMask(outMask, idx+1, False, False)
 
@@ -526,7 +604,7 @@ class FRComponentIO:
   # -----
 
   @classmethod
-  def buildFromCsv(cls, inFile: FilePath, imShape: Tuple=None) -> df:
+  def buildFromCsv(cls, inFileOrDf: FilePathOrDf, imShape: Tuple=None) -> df:
     """
     Deserializes data from a csv file to create a Component :class:`DataFrame`.
     The input .csv should be the same format as one exported by
@@ -535,12 +613,17 @@ class FRComponentIO:
     :param imShape: If included, this ensures all imported components lie within imSize
            boundaries. If any components do not, an error is thrown since this is
            indicative of components that actually came from a different reference image.
-    :param inFile: Name of file to import
+    :param inFileOrDf: Name of file to import, or dataframe if it was already read from this
+      file type. Useful if several csv's were concatenated into one dataframe and *that* is
+      being imported.
     :return: Tuple: DF that will be exported if successful extraction
     """
     field = FRParam('None', None)
     try:
-      csvDf = pd.read_csv(inFile, keep_default_na=False, dtype=object)
+      if isinstance(inFileOrDf, df):
+        csvDf = inFileOrDf
+      else:
+        csvDf = pd.read_csv(inFileOrDf, keep_default_na=False, dtype=object)
       # Decouple index from instance ID until after transfer from csvDf is complete
       # This was causing very strange behavior without reset_index()...
       outDf = FR_SINGLETON.tableData.makeCompDf(len(csvDf)).reset_index(drop=True)
@@ -552,9 +635,9 @@ class FRComponentIO:
             outDf[field] = csvDf[field.name]
           else:
             outDf[field] = _strSerToParamSer(csvDf[field.name], field.value)
-      outDf = outDf.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
+      outDf = outDf.set_index(RTF.INST_ID, drop=False)
 
-      cls.checkVertBounds(outDf[REQD_TBL_FIELDS.VERTICES], imShape)
+      cls.checkVertBounds(outDf[RTF.VERTICES], imShape)
     except Exception as ex:
       # Rethrow exception with insight about column number
       # Procedure copied from https://stackoverflow.com/a/6062677/9463643
@@ -565,30 +648,64 @@ class FRComponentIO:
     #  rows to gracefully fall off the dataframe with some sort of warning message
     return outDf
 
+  # TODO: Fix this up. Currently lots of hassle writing it to a csv without any modification.
+  #  This is probably not even a good idea to have, since exports *should* just be in the
+  #  full csv form anyway. This format is designed for analysis outside of s3a.
+  # @classmethod
+  # def buildFromCompimgsDf(cls, inFile: FilePath, imShape: Tuple=None):
+  #   csvDf = pd.read_csv(inFile)
+  #   outDf = FR_SINGLETON.tableData.makeCompDf(len(csvDf))
+  #   outDf[RTF.INST_ID] = csvDf['instId']
+  #   allVerts = []
+  #
+  #   for idx, row in csvDf.iterrows():
+  #     mask = cls._strToNpArray(row.semanticMask, dtype=bool)
+  #     verts = FRComplexVertices.fromBwMask(mask)
+  #     offset = cls._strToNpArray(row.offset)
+  #     for v in verts: v += offset
+  #     allVerts.append(verts)
+  #   outDf[RTF.VERTICES] = allVerts
+  #   outDf[RTF.COMP_CLASS] = csvDf.compClass
+  #   cls.checkVertBounds(outDf[RTF.VERTICES], imShape)
+  #   return outDf
+
   @classmethod
   def buildFromPkl(cls, inFile: FilePath, imShape: Tuple=None) -> df:
     """
     See docstring for :func:`self.buildFromCsv`
     """
     pklDf = pd.read_pickle(inFile)
-    cls.checkVertBounds(pklDf[REQD_TBL_FIELDS.VERTICES], imShape)
+    cls.checkVertBounds(pklDf[RTF.VERTICES], imShape)
     return pklDf
 
   @classmethod
-  def buildFromIdPng(cls, inFile: FilePath, imShape: Tuple=None) -> df:
-    labelImg = io.imread(inFile, as_gray=True)
+  def buildFromIdPng(cls, inFileOrImg: Union[FilePath, GrayImg], imShape: Tuple=None) -> df:
+    if isinstance(inFileOrImg, GrayImg):
+      labelImg = inFileOrImg
+    else:
+      labelImg = io.imread(inFileOrImg, as_gray=True)
     outDf = cls._idImgToDf(labelImg)
-    cls.checkVertBounds(outDf[REQD_TBL_FIELDS.VERTICES], imShape)
+    cls.checkVertBounds(outDf[RTF.VERTICES], imShape)
     return outDf
 
   @classmethod
-  def buildFromClassPng(cls, inFile: FilePath, imShape: Tuple=None) -> df:
-    outDf = cls.buildFromIdPng(inFile, imShape)
-    # Convert what the ID import treated as an inst id into indices for class
+  def buildFromClassPng(cls, inFileOrImg: Union[FilePath, GrayImg], imShape: Tuple=None) -> df:
+    if isinstance(inFileOrImg, GrayImg):
+      clsImg = inFileOrImg
+    else:
+      clsImg = io.imread(inFileOrImg)
+
     clsArray = np.array(FR_SINGLETON.tableData.compClasses)
-    outDf[REQD_TBL_FIELDS.COMP_CLASS] = clsArray[outDf[REQD_TBL_FIELDS.INST_ID]]
+    idImg = measure.label(clsImg)
+    outDf = cls.buildFromIdPng(idImg, imShape)
+    outClasses = []
+    for curId in outDf[RTF.INST_ID]:
+      # All ID pixels should be the same class, so any representative will do
+      curCls = clsImg[idImg == curId][0]
+      outClasses.append(curCls)
+    outDf[RTF.COMP_CLASS] = clsArray[outClasses]
     outDf.reset_index(inplace=True, drop=True)
-    outDf[REQD_TBL_FIELDS.INST_ID] = outDf.index
+    outDf[RTF.INST_ID] = outDf.index
     return outDf
 
   @staticmethod
@@ -619,13 +736,14 @@ class FRComponentIO:
   @classmethod
   def _idImgToDf(cls, idImg: GrayImg):
     # Skip 0 since it's indicative of background
-    regionIds = np.unique(idImg)[1:]
+    regionIds = np.unique(idImg)
+    regionIds = regionIds[regionIds != 0]
     allVerts = []
     for curId in regionIds:
       verts = FRComplexVertices.fromBwMask(idImg == curId)
       allVerts.append(verts)
     outDf = FR_SINGLETON.tableData.makeCompDf(regionIds.size)
     # Subtract 1 since instance ids are 0-indexed
-    outDf[REQD_TBL_FIELDS.INST_ID] = regionIds-1
-    outDf[REQD_TBL_FIELDS.VERTICES] = allVerts
+    outDf[RTF.INST_ID] = regionIds-1
+    outDf[RTF.VERTICES] = allVerts
     return outDf
