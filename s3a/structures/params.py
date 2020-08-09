@@ -55,8 +55,9 @@ class FRParam:
       self.valType = valType
     ht = self.helpText
     if ht is not None and len(ht) > 0:
-      if not QtCore.Qt.mightBeRichText(ht):
-        ht = html.escape(ht)
+      # TODO: Checking for mightBeRichText fails on pyside2? Even though the function
+      # is supposed to exist?
+      ht = html.escape(ht)
       # Makes sure the label is displayed as rich text
       self.helpText = f'<qt>{ht}</qt>'
 

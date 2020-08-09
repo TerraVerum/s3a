@@ -11,30 +11,10 @@ from skimage.measure import regionprops, label, regionprops_table
 from skimage.morphology import flood
 from skimage.segmentation import quickshift
 
-from s3a.generalutils import splitListAtNans, getClippedBbox, cornersToFullBoundary
+from s3a.generalutils import splitListAtNans, cornersToFullBoundary, \
+  getCroppedImg
 from s3a.structures import BlackWhiteImg, FRVertices, NChanImg, GrayImg, RgbImg, FRAlgProcessorError
 
-
-def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int,
-                  *otherBboxes: np.ndarray,
-                  coordsAsSlices=False) -> (np.ndarray, np.ndarray):
-  verts = np.vstack(verts)
-  img_np = image
-  compCoords = np.vstack([verts.min(0), verts.max(0)])
-  if len(otherBboxes) > 0:
-    for dim in range(2):
-      for ii, cmpFunc in zip(range(2), [min, max]):
-        otherCmpVals = [curBbox[ii, dim] for curBbox in otherBboxes]
-        compCoords[ii,dim] = cmpFunc(compCoords[ii,dim], *otherCmpVals)
-  compCoords = getClippedBbox(img_np.shape, compCoords, margin)
-  coordSlices = (slice(compCoords[0,1], compCoords[1,1]),
-                 slice(compCoords[0,0],compCoords[1,0]))
-  # Verts are x-y, index into image with row-col
-  croppedImg = image[coordSlices + (slice(None),)]
-  if coordsAsSlices:
-    return croppedImg, coordSlices
-  else:
-    return croppedImg, compCoords
 
 def growSeedpoint(img: NChanImg, seeds: FRVertices, thresh: float) -> BlackWhiteImg:
   shape = np.array(img.shape[0:2])

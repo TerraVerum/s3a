@@ -8,7 +8,7 @@ from pandas import DataFrame as df
 
 from s3a.projectvars import ANN_AUTH_DIR
 from s3a.structures.typeoverloads import TwoDArr
-from .structures import FRVertices, FRParam, FRComplexVertices
+from .structures import FRVertices, FRParam, FRComplexVertices, NChanImg
 
 
 def stackedVertsPlusConnections(vertList: FRComplexVertices) -> (FRVertices, np.ndarray):
@@ -223,3 +223,28 @@ def cornersToFullBoundary(cornerVerts: Union[FRVertices, FRComplexVertices], siz
     spacingPerSamp = int(numCornerVerts/sizeLimit)
     cornerVerts = cornerVerts[::spacingPerSamp]
   return cornerVerts
+
+
+def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int,
+                  *otherBboxes: np.ndarray,
+                  coordsAsSlices=False) -> (np.ndarray, np.ndarray):
+  verts = np.vstack(verts)
+  img_np = image
+  compCoords = np.vstack([verts.min(0), verts.max(0)])
+  if len(otherBboxes) > 0:
+    for dim in range(2):
+      for ii, cmpFunc in zip(range(2), [min, max]):
+        otherCmpVals = [curBbox[ii, dim] for curBbox in otherBboxes]
+        compCoords[ii,dim] = cmpFunc(compCoords[ii,dim], *otherCmpVals)
+  compCoords = getClippedBbox(img_np.shape, compCoords, margin)
+  coordSlices = (slice(compCoords[0,1], compCoords[1,1]),
+                 slice(compCoords[0,0],compCoords[1,0]))
+  # Verts are x-y, index into image with row-col
+  indexer = coordSlices
+  if image.ndim > 2:
+    indexer += (slice(None),)
+  croppedImg = image[indexer]
+  if coordsAsSlices:
+    return croppedImg, coordSlices
+  else:
+    return croppedImg, compCoords
