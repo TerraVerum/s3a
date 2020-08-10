@@ -702,8 +702,8 @@ class FRComponentIO:
     for curId in outDf[RTF.INST_ID]+1:
       # All ID pixels should be the same class, so any representative will do
       curCls = clsImg[idImg == curId][0]
-      outClasses.append(clsArray[curCls]-1)
-    outDf[RTF.COMP_CLASS] = clsArray[outClasses]
+      outClasses.append(clsArray[curCls-1])
+    outDf[RTF.COMP_CLASS] = outClasses
     outDf.reset_index(inplace=True, drop=True)
     outDf[RTF.INST_ID] = outDf.index
     return outDf
