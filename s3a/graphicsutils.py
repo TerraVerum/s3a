@@ -162,8 +162,11 @@ def create_addMenuAct(mainWin: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, t
 
 
 class FRPopupLineEditor(QtWidgets.QLineEdit):
-  def __init__(self, parent: QtWidgets.QWidget=None, model: QtCore.QAbstractListModel=None):
+  def __init__(self, parent: QtWidgets.QWidget=None, model: QtCore.QAbstractListModel=None,
+               placeholderText='Press Tab or type...', clearOnComplete=True):
     super().__init__(parent)
+    self.setPlaceholderText(placeholderText)
+    self.clearOnComplete = clearOnComplete
 
     if model is not None:
       self.setModel(model)
@@ -173,7 +176,8 @@ class FRPopupLineEditor(QtWidgets.QLineEdit):
     completer.setCaseSensitivity(QtCore.Qt.CaseInsensitive)
     completer.setCompletionRole(QtCore.Qt.DisplayRole)
     completer.setFilterMode(QtCore.Qt.MatchContains)
-    completer.activated.connect(lambda: QtCore.QTimer.singleShot(0, self.clear))
+    if self.clearOnComplete:
+      completer.activated.connect(lambda: QtCore.QTimer.singleShot(0, self.clear))
 
     self.textChanged.connect(lambda: self.resetCompleterPrefix())
 

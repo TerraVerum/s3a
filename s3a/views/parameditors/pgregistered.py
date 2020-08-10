@@ -6,6 +6,7 @@ from pyqtgraph.parametertree import parameterTypes, Parameter
 from pyqtgraph.parametertree.Parameter import PARAM_TYPES
 from pyqtgraph.parametertree.parameterTypes import ActionParameterItem, ActionParameter, \
   TextParameterItem, TextParameter
+from s3a.graphicsutils import FRPopupLineEditor
 
 from s3a.structures import FRS3AException, FRParam
 from .. import parameditors
@@ -178,6 +179,29 @@ class FRCustomMenuParameter(parameterTypes.GroupParameter):
   def setOpts(self, **opts):
     super().setOpts()
 
+class FRPopupLineEditorParameterItem(parameterTypes.WidgetParameterItem):
+  def __init__(self, param, depth):
+    strings = param.opts.get('limits', [])
+    self.model = QtCore.QStringListModel(strings)
+    param.sigLimitsChanged.connect(
+      lambda _param, limits: self.model.setStringList(limits)
+    )
+    super().__init__(param, depth)
+
+  def makeWidget(self):
+    editor = FRPopupLineEditor(model=self.model, clearOnComplete=False)
+    editor.setValue = editor.setText
+    editor.value = editor.text
+    editor.sigChanged = editor.editingFinished
+    return editor
+
+  def widgetEventFilter(self, obj, ev):
+    # Prevent tab from leaving widget
+    return False
+
+class FRPopupLineEditorParameter(Parameter):
+  itemClass = FRPopupLineEditorParameterItem
+
 _toggleName = 'Toggle Enable'
 class FRProcGroupParameter(FRCustomMenuParameter):
   def __init__(self, **opts):
@@ -222,6 +246,37 @@ class FRAtomicGroupParameter(parameterTypes.GroupParameter):
     item.setFont(0, font)
     return item
 
+class _DummySignal:
+  def connect(self, *args): pass
+  def disconnect(self, *args): pass
+
+class FRFilePickerParameterItem(parameterTypes.WidgetParameterItem):
+
+  def makeWidget(self):
+    param = self.param
+    if param.opts['value'] is None:
+      param.opts['value'] = ''
+    fpath = param.opts['value']
+    button = QtWidgets.QPushButton()
+    param.sigValueChanged.connect(lambda param, val: button.setText(val))
+    button.setValue = button.setText
+    button.value = button.text
+    button.sigChanged = _DummySignal()
+    button.setText(fpath)
+    button.clicked.connect(self._retrieveFolderName_gui)
+
+    return button
+
+  def _retrieveFolderName_gui(self):
+    folderDlg = QtWidgets.QFileDialog()
+    folderDlg.setModal(True)
+    fname, _ = folderDlg.getOpenFileName(caption='Select Data File')
+
+    if len(fname) > 0:
+      self.param.setValue(fname)
+
+class FRFilePickerParameter(Parameter):
+  itemClass = FRFilePickerParameterItem
 
 class FRNoneParameter(parameterTypes.SimpleParameter):
 
@@ -236,3 +291,5 @@ parameterTypes.registerParameterType('procgroup', FRProcGroupParameter)
 parameterTypes.registerParameterType('atomicgroup', FRAtomicGroupParameter)
 parameterTypes.registerParameterType('actionwithshortcut', FRActionWithShortcutParameter)
 parameterTypes.registerParameterType('registeredaction', FRRegisteredActionParameter)
+parameterTypes.registerParameterType('popuplineeditor', FRPopupLineEditorParameter)
+parameterTypes.registerParameterType('filepicker', FRFilePickerParameter)

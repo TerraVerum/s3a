@@ -100,7 +100,6 @@ class FRQuickLoaderEditor(FRParamEditor):
     self.listModel = FREditorListModel(editorList, self)
 
     self.addNewParamState = FRPopupLineEditor(self, self.listModel)
-    self.addNewParamState.setPlaceholderText('Press Tab or type...')
     self.centralLayout.insertWidget(0, self.addNewParamState)
 
     self.addNewParamState.completer().activated.connect(self.addFromLineEdit)
