@@ -209,8 +209,7 @@ class S3A(S3ABase):
 
     toolbar: QtWidgets.QToolBar = self.addToolBar('Parameter Editors')
     toolbar.setObjectName('Parameter Edtor Toolbar')
-    self.paramTools = QtWidgets.QMenuBar()
-    # toolbar.addWidget(self.paramTools)
+    self.paramToolbar = toolbar
 
     self.menubar.addMenu(self.menuFile)
     self.menubar.addMenu(self.menuEdit)
@@ -258,9 +257,7 @@ class S3A(S3ABase):
 
     # SETTINGS
     for dock in FR_SINGLETON.docks:
-      toolBtn = QtWidgets.QPushButton()
-      self._createMenuOptForDock(toolBtn, dock)
-      toolbar.addWidget(toolBtn)
+      self.createMenuOptForDock(dock, parentToolbar=toolbar)
 
   def _maybeLoadLastState_gui(self, loadLastState: bool=None,
                               quickLoaderArgs:dict=None):
@@ -473,9 +470,12 @@ class S3A(S3ABase):
     editor.hasMenuOption = True
     return newMenu
 
-  def _createMenuOptForDock(self, parentBtn: QtWidgets.QPushButton,
-                            dockEditor: Union[FRParamEditor, FRParamEditorDockGrouping],
-                            loadFunc=None):
+  def createMenuOptForDock(self,
+                           dockEditor: Union[FRParamEditor, FRParamEditorDockGrouping],
+                           loadFunc=None, parentBtn: QtWidgets.QPushButton=None,
+                           parentToolbar=None):
+    if parentBtn is None:
+      parentBtn = QtWidgets.QPushButton()
     if isinstance(dockEditor, FRParamEditor):
       parentBtn.setText(dockEditor.name)
       parentBtn.setMenu(self._createMenuOptForEditor(dockEditor, loadFunc))
@@ -490,6 +490,8 @@ class S3A(S3ABase):
         tabName = dockEditor.getTabName(editor)
         nameWithoutBase = tabName
         menu.addMenu(self._createMenuOptForEditor(editor, loadFunc, overrideName=nameWithoutBase))
+    if parentToolbar is not None:
+      parentToolbar.addWidget(parentBtn)
 
   def _populateLoadLayoutOptions(self):
     layoutGlob = LAYOUTS_DIR.glob('*.dockstate')
