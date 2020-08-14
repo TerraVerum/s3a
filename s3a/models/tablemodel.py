@@ -489,8 +489,7 @@ class FRComponentIO:
       raise
     return exportDf
 
-  def exportCompimgsDf(self, outFile: Union[str, Path]=None, imgDir: FilePath=None, margin=0,
-                       readOnly=True, **pdExportArgs):
+  def exportCompimgsDf(self, outFile: Union[str, Path]=None, imgDir: FilePath=None, margin=0):
     """
     Creates a dataframe consisting of extracted images around each component
     :param outFile: Where to save the result, if it should be saved. Caution -- this
@@ -498,10 +497,6 @@ class FRComponentIO:
     :param imgDir: Where images corresponding to this dataframe are kept. Source image
       filenames are interpreted relative to this directory if they are not absolute.
     :param margin: How much padding to give around each component
-    :param readOnly: Whether the export should be readOnly. This is only meaningful when
-      outFile is not None.
-    :param pdExportArgs: Additional export arguments for pandas. Only meaninfgul when
-      outFile is not None.
     :return: Dataframe with the following keys:
       - img: The (MxNxC) image corresponding to the component vertices, where MxN are
         the padded row sizes and C is the number of image channels
@@ -648,26 +643,23 @@ class FRComponentIO:
     #  rows to gracefully fall off the dataframe with some sort of warning message
     return outDf
 
-  # TODO: Fix this up. Currently lots of hassle writing it to a csv without any modification.
-  #  This is probably not even a good idea to have, since exports *should* just be in the
-  #  full csv form anyway. This format is designed for analysis outside of s3a.
-  # @classmethod
-  # def buildFromCompimgsDf(cls, inFile: FilePath, imShape: Tuple=None):
-  #   csvDf = pd.read_csv(inFile)
-  #   outDf = FR_SINGLETON.tableData.makeCompDf(len(csvDf))
-  #   outDf[RTF.INST_ID] = csvDf['instId']
-  #   allVerts = []
-  #
-  #   for idx, row in csvDf.iterrows():
-  #     mask = cls._strToNpArray(row.semanticMask, dtype=bool)
-  #     verts = FRComplexVertices.fromBwMask(mask)
-  #     offset = cls._strToNpArray(row.offset)
-  #     for v in verts: v += offset
-  #     allVerts.append(verts)
-  #   outDf[RTF.VERTICES] = allVerts
-  #   outDf[RTF.COMP_CLASS] = csvDf.compClass
-  #   cls.checkVertBounds(outDf[RTF.VERTICES], imShape)
-  #   return outDf
+  @classmethod
+  def buildFromCompimgsDf(cls, inFile: FilePath, imShape: Tuple=None):
+    inDf = pd.read_pickle(inFile)
+    outDf = FR_SINGLETON.tableData.makeCompDf(len(inDf))
+    outDf[RTF.INST_ID] = inDf['instId']
+    allVerts = []
+
+    for idx, row in inDf.iterrows():
+      mask = cls._strToNpArray(row.semanticMask, dtype=bool)
+      verts = FRComplexVertices.fromBwMask(mask)
+      offset = cls._strToNpArray(row.offset)
+      for v in verts: v += offset
+      allVerts.append(verts)
+    outDf[RTF.VERTICES] = allVerts
+    outDf[RTF.COMP_CLASS] = inDf.compClass
+    cls.checkVertBounds(outDf[RTF.VERTICES], imShape)
+    return outDf
 
   @classmethod
   def buildFromPkl(cls, inFile: FilePath, imShape: Tuple=None) -> df:
