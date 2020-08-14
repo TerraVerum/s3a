@@ -275,7 +275,7 @@ class FRCompTableView(QtWidgets.QTableView):
     overwriteData = self.mgr.compDf.loc[[selectionIdxs[0,0]],:].copy()
     with FR_SINGLETON.actionStack.ignoreActions():
       self.popup.setData(overwriteData, pd.unique(selectionIdxs[:,2]))
-      wasAccepted = self.popup.exec()
+      wasAccepted = self.popup.exec_()
     if not wasAccepted or len(self.popup.dirtyColIdxs) == 0:
       return
 

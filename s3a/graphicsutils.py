@@ -234,7 +234,7 @@ def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
                                                                       FRS3AWarning)),
                                   msgWithTrace=msgWithTrace, msgWithoutTrace=msgWithoutTrace)
     dlg.show()
-    dlg.exec()
+    dlg.exec_()
   def patch_excepthook():
     sys.excepthook = new_except_hook
   QtCore.QTimer.singleShot(0, patch_excepthook)

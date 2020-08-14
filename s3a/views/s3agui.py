@@ -316,7 +316,7 @@ class S3A(S3ABase):
 
   def startAutosave_gui(self):
     saveDlg = autosaveOptsDialog(self)
-    success = saveDlg.exec()
+    success = saveDlg.exec_()
     if success:
       try:
         interval = saveDlg.intervalEdit.value()
