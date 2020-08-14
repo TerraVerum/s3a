@@ -28,14 +28,14 @@ class FRParam:
   Initial value of the parameter.
     This is used within the program to infer parameter type, shape, comparison methods, etc.
   """
-  valType: Optional[str] = None
+  pType: Optional[str] = None
   """
   Type of the variable if not easily inferrable from the value itself. 
-    For instance, class:`FRShortcutParameter<s3a.views.parameditors.FRShortcutParameter>`
-    is indicated with string values (e.g. 'Ctrl+D'), so the user must explicitly specify 
-    that such an :class:`FRParam` is of type 'shortcut' (as defined in 
-    :class:`FRShortcutParameter<s3a.views.parameditors.FRShortcutParameter>`)
-    If the type *is* easily inferrable, this may be left blank.
+  For instance, class:`FRShortcutParameter<s3a.views.parameditors.FRShortcutParameter>`
+  is indicated with string values (e.g. 'Ctrl+D'), so the user must explicitly specify 
+  that such an :class:`FRParam` is of type 'shortcut' (as defined in 
+  :class:`FRShortcutParameter<s3a.views.parameditors.FRShortcutParameter>`)
+  If the type *is* easily inferrable, this may be left blank.
   """
   helpText: str = ''
   """Additional documentation for this parameter."""
@@ -49,10 +49,10 @@ class FRParam:
   def __post_init__(self):
     if self.opts is None:
       self.opts = {}
-    if self.valType is None:
+    if self.pType is None:
       # Infer from value
-      valType = type(self.value).__name__
-      self.valType = valType
+      pType = type(self.value).__name__
+      self.pType = pType
     ht = self.helpText
     if ht is not None and len(ht) > 0:
       # TODO: Checking for mightBeRichText fails on pyside2? Even though the function
@@ -66,7 +66,7 @@ class FRParam:
 
   def __repr__(self):
     return f'FRParam(name=\'{self.name}\', value=\'{self.value}\', ' \
-           f'valType=\'{self.valType}\', helpText=\'{self.helpText}\', ' \
+           f'pType=\'{self.pType}\', helpText=\'{self.helpText}\', ' \
            f'group=FRParamGroup(...))'
 
   def __lt__(self, other):
@@ -147,7 +147,7 @@ class FRParamGroup:
     return None
 
 
-def newParam(name: str, val: Any=None, valType: str=None, helpText='', **opts):
+def newParam(name: str, val: Any=None, pType: str=None, helpText='', **opts):
   """
   Factory for creating new parameters within a :class:`FRParamGroup`.
 
@@ -155,4 +155,4 @@ def newParam(name: str, val: Any=None, valType: str=None, helpText='', **opts):
 
   :return: Field that can be inserted within the :class:`FRParamGroup` dataclass.
   """
-  return field(default_factory=lambda: FRParam(name, val, valType, helpText, opts=opts))
+  return field(default_factory=lambda: FRParam(name, val, pType, helpText, opts=opts))

@@ -112,7 +112,7 @@ def test_impossible_filter(tmpdir):
   opt-tbl-fields:
     dummy:
       value: {}
-      valType: nopossiblefilter
+      pType: nopossiblefilter
   '''
   tmpFile.write_text(dummyCfgStr)
   FR_SINGLETON.tableData.loadCfg(tmpFile)

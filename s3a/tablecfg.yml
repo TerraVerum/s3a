@@ -1,7 +1,7 @@
 opt-tbl-fields:
   Validated:
     value: "False"
-    valType: 'list'
+    pType: 'list'
     limits:
       - 'True'
       - 'False'
@@ -9,17 +9,17 @@ opt-tbl-fields:
 
   Device Text:
     value: ''
-    valType: text
+    pType: text
   Board Text:
     value: ''
-    valType: text
+    pType: text
   Logo:
     value: ''
-    valType: text
+    pType: text
   Defect: false
   Notes:
     value: ''
-    valType: text
+    pType: text
 
 classes:
   - Resistor
@@ -28,6 +28,7 @@ classes:
   - Transistor
   - IC
   - Other
+  - Unassigned
 
 hidden-cols:
   - Vertices

@@ -173,7 +173,7 @@ class FRCompTableView(QtWidgets.QTableView):
     self.instIdColIdx = TBL_FIELDS.index(REQD_TBL_FIELDS.INST_ID)
 
     for ii, field in enumerate(TBL_FIELDS):
-      curType = field.valType
+      curType = field.pType
       curval = field.value
       paramDict = dict(type=curType, default=curval, **field.opts)
       if curType == 'Enum':

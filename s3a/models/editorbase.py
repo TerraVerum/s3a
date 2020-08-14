@@ -349,9 +349,9 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     :param etxraOpts: Extra options passed directly to the created :class:`pyqtgraph.Parameter`
     :return: Property bound to this value in the parameter editor
     """
-    paramOpts = dict(name=constParam.name, type=constParam.valType, tip=constParam.helpText,
+    paramOpts = dict(name=constParam.name, type=constParam.pType, tip=constParam.helpText,
                      **constParam.opts)
-    if constParam.valType == 'group':
+    if constParam.pType == 'group':
       paramOpts.update(children=constParam.value)
     else:
       paramOpts.update(value=constParam.value)

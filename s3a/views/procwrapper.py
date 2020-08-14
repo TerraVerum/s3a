@@ -66,10 +66,10 @@ class FRGeneralProcWrapper(ABC):
       self.unpackStages(stage.stages[0], paramParent=paramParent)
       return
     for childStage in stage.stages:
-      valType = 'atomicgroup'
+      pType = 'atomicgroup'
       if isinstance(childStage, Process) and childStage.allowDisable:
-        valType = 'procgroup'
-      curGroup = FRParam(name=childStage.name, valType=valType, value=[],)
+        pType = 'procgroup'
+      curGroup = FRParam(name=childStage.name, pType=pType, value=[],)
       self.editor.registerProp(self.algParam, curGroup, paramParent, asProperty=False,
                                enabled=not childStage.disabled)
       self.unpackStages(childStage, paramParent=paramParent + (childStage.name,))

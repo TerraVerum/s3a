@@ -316,7 +316,7 @@ class FRCompDisplayFilter(QtCore.QObject):
       except FRParamEditorError:
         badCols.append(param)
     if len(badCols) > 0:
-      badTypes = np.unique([f'"{col.valType}"' for col in badCols])
+      badTypes = np.unique([f'"{col.pType}"' for col in badCols])
       badCols = map(lambda val: f'"{val}"', badCols)
       warn(f'The table filter does not know how to handle'
            f' columns {", ".join(badCols)} since no'
@@ -329,16 +329,16 @@ class FRCompDisplayFilter(QtCore.QObject):
     #  find some way of keeping this logic from just being an if/else tree...
     if param.name not in self._filter:
       return compDf
-    valType = param.valType
+    pType = param.pType
     # idx 0 = value, 1 = children
     curFilterParam = self._filter[param.name][1]
     dfAtParam = compDf.loc[:, param]
 
-    if valType in ['int', 'float']:
+    if pType in ['int', 'float']:
       curmin, curmax = [curFilterParam[name][0] for name in ['min', 'max']]
 
       compDf = compDf.loc[(dfAtParam >= curmin) & (dfAtParam <= curmax),:]
-    elif valType == 'bool':
+    elif pType == 'bool':
       allowTrue, allowFalse = [curFilterParam[name][0] for name in
                                [f'{param.name}', f'Not {param.name}']]
 
@@ -347,10 +347,10 @@ class FRCompDisplayFilter(QtCore.QObject):
         compDf = compDf.loc[~validList, :]
       if not allowFalse:
         compDf = compDf.loc[validList, :]
-    elif valType in ['FRParam', 'list']:
+    elif pType in ['FRParam', 'list']:
       existingParams = np.array(dfAtParam)
       allowedParams = []
-      if valType == 'FRParam':
+      if pType == 'FRParam':
         groupSubParams = [p.name for p in param.value.group]
       else:
         groupSubParams = param.opts['limits']
@@ -359,11 +359,11 @@ class FRCompDisplayFilter(QtCore.QObject):
         if isAllowed:
           allowedParams.append(groupSubParam)
       compDf = compDf.loc[np.isin(existingParams, allowedParams),:]
-    elif valType in ['str', 'text']:
+    elif pType in ['str', 'text']:
       allowedRegex = self._filter[param.name][0]
       isCompAllowed = dfAtParam.str.contains(allowedRegex, regex=True, case=False)
       compDf = compDf.loc[isCompAllowed,:]
-    elif valType == 'FRComplexVertices':
+    elif pType == 'FRComplexVertices':
       vertsAllowed = np.ones(len(dfAtParam), dtype=bool)
 
       xParam = curFilterParam['X Bounds'][1]
@@ -378,7 +378,7 @@ class FRCompDisplayFilter(QtCore.QObject):
         vertsAllowed[vertIdx] = isAllowed
       compDf = compDf.loc[vertsAllowed,:]
     else:
-      warn('No filter type exists for parameters of type ' f'{valType}.'
+      warn('No filter type exists for parameters of type ' f'{pType}.'
            f' Did not filter column {param.name}.',
            FRS3AWarning)
     return compDf

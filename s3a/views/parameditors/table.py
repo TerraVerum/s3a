@@ -24,30 +24,30 @@ def genParamList(nameIter, paramType, defaultVal, defaultParam='value'):
 def _filterForParam(param: FRParam):
   """Constructs a filter for the parameter based on its type"""
   children = []
-  valType = param.valType
+  pType = param.pType
   paramWithChildren = {'name': param.name, 'type': 'group', 'children': children}
-  paramWithoutChild = {'name': param.name, 'type': valType, 'value': None}
-  if valType in ['int', 'float']:
-    retVal = genParamList(['min', 'max'], valType, 0)
+  paramWithoutChild = {'name': param.name, 'type': pType, 'value': None}
+  if pType in ['int', 'float']:
+    retVal = genParamList(['min', 'max'], pType, 0)
     retVal[1]['value'] = sys.maxsize
     children.extend(retVal)
     return paramWithChildren
-  elif valType in ['FRParam', 'Enum', 'list']:
-    if valType == 'FRParam':
+  elif pType in ['FRParam', 'Enum', 'list']:
+    if pType == 'FRParam':
       iterGroup = [param.name for param in param.value.group]
-    elif valType == 'Enum':
+    elif pType == 'Enum':
       iterGroup = [param for param in param.value]
-    else: # valType == 'list'
+    else: # pType == 'list'
       iterGroup = param.opts['limits']
     children.extend(genParamList(iterGroup, 'bool', True))
     return paramWithChildren
-  elif valType == 'FRComplexVertices':
+  elif pType == 'FRComplexVertices':
     minMax = _filterForParam(FRParam('', 5))['children']
     xyVerts = genParamList(['X Bounds', 'Y Bounds'], 'group', minMax, 'children')
     children.extend(xyVerts)
     return paramWithChildren
-  elif valType == 'bool':
-    children.extend(genParamList([f'{param.name}', f'Not {param.name}'], valType, True))
+  elif pType == 'bool':
+    children.extend(genParamList([f'{param.name}', f'Not {param.name}'], pType, True))
     return paramWithChildren
   else:
     # Assumes string
@@ -78,7 +78,7 @@ class FRTableFilterEditor(FRParamEditor):
         badCols.append(paramList[ii])
     if len(badCols) > 0:
       colNames = [f'"{col}"' for col in badCols]
-      colTypes = np.unique([f'"{col.valType}"' for col in badCols])
+      colTypes = np.unique([f'"{col.pType}"' for col in badCols])
       raiseErrorLater(FRParamEditorError(f'The table does not know how to create a'
                                         f' filter for fields {", ".join(colNames)}'
                                         f' since types {", ".join(colTypes)} do not'
@@ -201,7 +201,7 @@ class FRYamlParser:
     else:
       # Format nicely for FRParam creation
       nameArgs = {'value': value.pop('value'),
-                  'valType': value.pop('valType', 'NoneType'),
+                  'pType': value.pop('pType', 'NoneType'),
                   'helpText': value.pop('helpText', '')}
       # Forward additional args if they exist
       if len(value) > 0:
@@ -216,9 +216,9 @@ class FRYamlParser:
       pass
       # Keeps 'int' from triggering
     elif isinstance(value, float):
-      leafParam.valType = 'float'
+      leafParam.pType = 'float'
     elif isinstance(value, int):
-      leafParam.valType = 'int'
+      leafParam.pType = 'int'
 
     elif isinstance(value, list):
       leafParam = self.parseParamList(leafParam.name)[0]

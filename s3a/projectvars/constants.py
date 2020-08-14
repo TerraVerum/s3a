@@ -116,28 +116,28 @@ class _FRConsts(FRParamGroup):
     'Show tool buttons', True, helpText='Since these buttons also have right-click menu options,'
                                         ' it may be desirable to save space in the main'
                                         ' window by hiding these buttons.')
-  PROP_COLS_TO_SHOW            : FRParam = newParam('Visible Table Columns', valType='group')
+  PROP_COLS_TO_SHOW            : FRParam = newParam('Visible Table Columns', pType='group')
 
   # --------------------------
   # IMAGE TOOLS
   # --------------------------
   TOOL_MERGE_COMPS        : FRParam = newParam(
-    'Merge Selected', 'Ctrl+Alt+G', valType='action',
+    'Merge Selected', 'Ctrl+Alt+G', pType='action',
     helpText='Merges the selected components into one, keeping all properties '
              'of the first in the selection')
   TOOL_SPLIT_COMPS        : FRParam = newParam(
-    'Split Selected', 'Ctrl+Alt+S', valType='action',
+    'Split Selected', 'Ctrl+Alt+S', pType='action',
     helpText='Makes a separate component for each distinct boundary of all selected components.')
   TOOL_OVERRIDE_VERTS_ACT : FRParam = newParam(
-    'Override Created Boundary', 'Ctrl+Alt+O', valType='action',
+    'Override Created Boundary', 'Ctrl+Alt+O', pType='action',
     helpText='Overrides the most recently created bounary to be the shape of the ROI, not the result of the image processor')
   TOOL_COPY_REGIONS       : FRParam = newParam(
-    'Copy Selected', 'Ctrl+Alt+C', valType='action',
+    'Copy Selected', 'Ctrl+Alt+C', pType='action',
     helpText='Copies the selected components. They can be pasted by <b>double-clicking</b>'
              ' on the destination location. When done copying, Click the'
              ' *Clear ROI* tool change the current draw action.')
   TOOL_MOVE_REGIONS       : FRParam = newParam(
-    'Move Selected', 'Ctrl+Alt+V', valType='action',
+    'Move Selected', 'Ctrl+Alt+V', pType='action',
     helpText='Moves the selected components. They can be pasted by <b>double-clicking</b>'
              ' on the destination location.')
   TOOL_CLEAR_FOC_REGION   : FRParam = newParam(
