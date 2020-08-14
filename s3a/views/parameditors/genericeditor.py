@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import List, Dict, Union, Type, Tuple
 
 from pyqtgraph.Qt import QtWidgets, QtCore
@@ -18,46 +16,6 @@ def clearUnwantedParamVals(paramState: dict):
     clearUnwantedParamVals(child)
   if paramState.get('value', True) is None:
     paramState.pop('value')
-
-class FRParamEditorDockGrouping(QtWidgets.QDockWidget):
-
-  def __init__(self, editors: List[FRParamEditor], dockName, parent=None):
-    super().__init__(parent)
-    self.tabs = QtWidgets.QTabWidget(self)
-    self.hide()
-
-    if dockName is None:
-      dockName = editors[0].name
-    self.name = dockName
-
-    for editor in editors:
-      # "Main Image Settings" -> "Settings"
-      tabName = self.getTabName(editor)
-      self.tabs.addTab(editor.dockContentsWidget, tabName)
-      editor.dock = self
-    mainLayout = QtWidgets.QVBoxLayout()
-    mainLayout.addWidget(self.tabs)
-    centralWidget = QtWidgets.QWidget()
-    centralWidget.setLayout(mainLayout)
-    self.setWidget(centralWidget)
-    self.setObjectName(dockName)
-    self.setWindowTitle(dockName)
-
-    self.editors = editors
-
-  def setParent(self, parent: QtWidgets.QWidget=None):
-    super().setParent(parent)
-    for editor in self.editors:
-      editor.setParent(parent)
-
-  def getTabName(self, editor: FRParamEditor):
-    if self.name in editor.name:
-      tabName = editor.name.split(self.name)[1][1:]
-      if len(tabName) == 0:
-        tabName = editor.name
-    else:
-      tabName = editor.name
-    return tabName
 
 _childTuple_asValue = Tuple[FRParam,...]
 childTuple_asParam = Tuple[Tuple[FRParam,...], bool]
@@ -181,3 +139,43 @@ class FRParamEditor(FRParamEditorBase):
   def saveParamState_gui(self):
     saveName = dialogGetSaveFileName(self, 'Save As', self.lastAppliedName)
     self.saveParamState(saveName)
+
+class FRParamEditorDockGrouping(QtWidgets.QDockWidget):
+
+  def __init__(self, editors: List[FRParamEditor], dockName, parent=None):
+    super().__init__(parent)
+    self.tabs = QtWidgets.QTabWidget(self)
+    self.hide()
+
+    if dockName is None:
+      dockName = editors[0].name
+    self.name = dockName
+
+    for editor in editors:
+      # "Main Image Settings" -> "Settings"
+      tabName = self.getTabName(editor)
+      self.tabs.addTab(editor.dockContentsWidget, tabName)
+      editor.dock = self
+    mainLayout = QtWidgets.QVBoxLayout()
+    mainLayout.addWidget(self.tabs)
+    centralWidget = QtWidgets.QWidget()
+    centralWidget.setLayout(mainLayout)
+    self.setWidget(centralWidget)
+    self.setObjectName(dockName)
+    self.setWindowTitle(dockName)
+
+    self.editors = editors
+
+  def setParent(self, parent: QtWidgets.QWidget=None):
+    super().setParent(parent)
+    for editor in self.editors:
+      editor.setParent(parent)
+
+  def getTabName(self, editor: FRParamEditor):
+    if self.name in editor.name:
+      tabName = editor.name.split(self.name)[1][1:]
+      if len(tabName) == 0:
+        tabName = editor.name
+    else:
+      tabName = editor.name
+    return tabName

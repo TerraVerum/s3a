@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from functools import partial
 from typing import Tuple, Collection, Callable, Union, Iterable, Any, Dict
 
@@ -10,50 +8,6 @@ from s3a.projectvars import FR_CONSTS
 from s3a.structures import FRParam
 
 __all__ = ['FRDrawOpts', 'FRButtonCollection']
-
-class FRDrawOpts(QtWidgets.QWidget):
-  def __init__(self, shapeGrp: FRButtonCollection, actGrp: FRButtonCollection,
-               parent: QtWidgets.QWidget=None):
-    """
-    Creates a draw options widget hosting both shape and action selection buttons.
-    :param parent: UI widget whose destruction will also destroy these widgets
-    :param shapeGrp: Shape options that will appear in the widget
-    :param actGrp: Action optiosn that will appear in the widget
-    """
-    super().__init__(parent)
-    # Create 2 layout versions so on resize the group boxes can 'wrap'
-    self.topLayout = QtWidgets.QHBoxLayout()
-    self.setLayout(self.topLayout)
-
-    # SHAPES
-
-    self.topLayout.addWidget(shapeGrp)
-    # ACTIONS
-    self.topLayout.addWidget(actGrp)
-    self.topLayout.setDirection(self.topLayout.LeftToRight)
-    self.horizWidth = self.layout().minimumSize().width()
-
-  def resizeEvent(self, ev: QtGui.QResizeEvent) -> None:
-    if self.width() < self.horizWidth + 30:
-      self.topLayout.setDirection(self.topLayout.TopToBottom)
-    else:
-      self.topLayout.setDirection(self.topLayout.LeftToRight)
-    super().resizeEvent(ev)
-
-  def selectOpt(self, shapeOrAction: FRParam):
-    """
-    Programmatically selects a shape or action from the existing button group.
-    Whether a shape or action is passed in is inferred from which button group
-    :param:`shapeOrAction` belongs to
-
-    :param shapeOrAction: The button to select
-    :return: None
-    """
-    # TODO: This should probably be more robust
-    if shapeOrAction in self.shapeBtnParamMap.inverse:
-      self.shapeBtnParamMap.inverse[shapeOrAction].setChecked(True)
-    elif shapeOrAction in self.actionBtnParamMap.inverse:
-      self.actionBtnParamMap.inverse[shapeOrAction].setChecked(True)
 
 class _DEFAULT_OWNER: pass
 """None is a valid owner, so create a sentinel that's not valid"""
@@ -104,3 +58,47 @@ class FRButtonCollection(QtWidgets.QGroupBox):
     if btn.isCheckable():
       btn.setChecked(True)
     self.paramToFuncMapping[param](param)
+
+class FRDrawOpts(QtWidgets.QWidget):
+  def __init__(self, shapeGrp: FRButtonCollection, actGrp: FRButtonCollection,
+               parent: QtWidgets.QWidget=None):
+    """
+    Creates a draw options widget hosting both shape and action selection buttons.
+    :param parent: UI widget whose destruction will also destroy these widgets
+    :param shapeGrp: Shape options that will appear in the widget
+    :param actGrp: Action optiosn that will appear in the widget
+    """
+    super().__init__(parent)
+    # Create 2 layout versions so on resize the group boxes can 'wrap'
+    self.topLayout = QtWidgets.QHBoxLayout()
+    self.setLayout(self.topLayout)
+
+    # SHAPES
+
+    self.topLayout.addWidget(shapeGrp)
+    # ACTIONS
+    self.topLayout.addWidget(actGrp)
+    self.topLayout.setDirection(self.topLayout.LeftToRight)
+    self.horizWidth = self.layout().minimumSize().width()
+
+  def resizeEvent(self, ev: QtGui.QResizeEvent) -> None:
+    if self.width() < self.horizWidth + 30:
+      self.topLayout.setDirection(self.topLayout.TopToBottom)
+    else:
+      self.topLayout.setDirection(self.topLayout.LeftToRight)
+    super().resizeEvent(ev)
+
+  def selectOpt(self, shapeOrAction: FRParam):
+    """
+    Programmatically selects a shape or action from the existing button group.
+    Whether a shape or action is passed in is inferred from which button group
+    :param:`shapeOrAction` belongs to
+
+    :param shapeOrAction: The button to select
+    :return: None
+    """
+    # TODO: This should probably be more robust
+    if shapeOrAction in self.shapeBtnParamMap.inverse:
+      self.shapeBtnParamMap.inverse[shapeOrAction].setChecked(True)
+    elif shapeOrAction in self.actionBtnParamMap.inverse:
+      self.actionBtnParamMap.inverse[shapeOrAction].setChecked(True)

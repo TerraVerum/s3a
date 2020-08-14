@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import weakref
 from functools import wraps
 from inspect import isclass
@@ -31,7 +29,6 @@ _childTuple_asValue = Tuple[FRParam, oneOrMultChildren]
 childTuple_asParam = Tuple[FRParam, oneOrMultChildren, bool]
 _keyType = Union[_childTuple_asValue, childTuple_asParam]
 
-SPAWNED_EDITORS: List[FRParamEditorBase] = []
 """
 Eventually, it would be nice to implemenet a global search bar that can find/modify
 any action, shortcut, etc. from any parameter. This tracker is an easy way to fascilitate
@@ -483,3 +480,4 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
 
 INITIALIZED_GROUPINGS = set()
 REGISTERED_GROUPINGS = set()
+SPAWNED_EDITORS: List[FRParamEditorBase] = []

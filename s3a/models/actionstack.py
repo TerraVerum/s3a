@@ -4,8 +4,6 @@ but there are many flaws and the project is not under active development. It is
 also less pythonic than it could be, using functions where properties are more
 appropriate.
 """
-from __future__ import annotations
-
 import contextlib
 import copy
 from _warnings import warn
@@ -24,7 +22,7 @@ class FRAction:
   """
   This represents an action which can be done and undone.
   """
-  def __init__(self, generator: Callable[[...], Union[Generator, Any]], args:tuple=None,
+  def __init__(self, generator: Callable[..., Union[Generator, Any]], args:tuple=None,
                kwargs:dict=None, descr: str=None, treatAsUndo=False):
     if args is None:
       args = []
@@ -43,7 +41,7 @@ class FRAction:
       # Need to init runner for when backward is called
       self._runner = self._generator(*args, **kwargs)
 
-  def reassignBackward(self, backwardFn: Callable[[...], Any], backwardArgs=(),
+  def reassignBackward(self, backwardFn: Callable[..., Any], backwardArgs=(),
                        backwardKwargs=None):
 
     if backwardKwargs is None:
@@ -95,24 +93,6 @@ _BACK = 0
 class Appendable(Protocol):
   def append(self):
     raise NotImplementedError
-
-class _FRBufferOverride:
-  def __init__(self, stack: FRActionStack, newActQueue: deque=None):
-    self.newActQueue = newActQueue
-    self.stack = stack
-
-    self.oldStackActions = None
-
-  def __enter__(self):
-    stack = self.stack
-    # Deisgned for internal use, so OK to use protected member
-    # noinspection PyProtectedMember
-    self.oldStackActions = stack._curReceiver
-    stack._curReceiver = self.newActQueue
-    return self
-
-  def __exit__(self, exc_type, exc_val, exc_tb):
-    self.stack._curReceiver = self.oldStackActions
 
 def gracefulNext(generator: Generator):
   try:
@@ -176,7 +156,7 @@ class FRActionStack:
       function. This is useful for functions where the input argument is modified
       during the function call. WARNING: UNTESTED
     """
-    def decorator(generatorFn: Callable[[...], Generator]):
+    def decorator(generatorFn: Callable[..., Generator]):
       nonlocal descr
       if descr is None:
         descr = generatorFn.__name__
@@ -319,8 +299,8 @@ class FRActionStack:
 
   @property
   def changedSinceLastSave(self):
-    """ Return *True* if the state has changed since the savepoint. 
-    
+    """ Return *True* if the state has changed since the savepoint.
+
     This will always return *True* if the savepoint has not been set.
     """
     if self._savepoint is EMPTY: return False
@@ -332,3 +312,21 @@ class FRActionStack:
 
   def ignoreActions(self):
     return _FRBufferOverride(self)
+
+class _FRBufferOverride:
+  def __init__(self, stack: FRActionStack, newActQueue: deque=None):
+    self.newActQueue = newActQueue
+    self.stack = stack
+
+    self.oldStackActions = None
+
+  def __enter__(self):
+    stack = self.stack
+    # Deisgned for internal use, so OK to use protected member
+    # noinspection PyProtectedMember
+    self.oldStackActions = stack._curReceiver
+    stack._curReceiver = self.newActQueue
+    return self
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    self.stack._curReceiver = self.oldStackActions

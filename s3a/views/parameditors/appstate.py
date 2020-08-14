@@ -44,8 +44,9 @@ class FRAppStateEditor(FRParamEditor):
     else:
       errs = []
 
-    super().saveParamState(saveName, paramState, allowOverwriteDefault, blockWrite)
+    ret = super().saveParamState(saveName, paramState, allowOverwriteDefault, blockWrite)
     self.raiseErrMsgIfNeeded(errs)
+    return ret
 
   def loadParamState(self, stateName: Union[str, Path]=None, stateDict: dict = None,
                      addChildren=False, removeChildren=False, applyChanges=True,
