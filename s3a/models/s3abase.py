@@ -64,7 +64,7 @@ class S3ABase(QtWidgets.QMainWindow):
     def saveExistingComps():
       if self.mainImg.image is None:
         return None
-      saveName = self.appStateEditor.saveDir / 'savedState.csv'
+      saveName = self.appStateEditor.saveDir / 'savedState.pkl'
       self.exportCompList(saveName, readOnly=False)
       return str(saveName)
     loadExistingComps = lambda infile: self.loadCompList(infile, FR_ENUMS.COMP_ADD_AS_MERGE)
