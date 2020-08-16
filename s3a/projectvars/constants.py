@@ -7,7 +7,7 @@ from s3a.structures import FRComplexVertices, FRParam, FRParamGroup, newParam
 __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR', 'QUICK_LOAD_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'TABLE_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
            'MAIN_IMG_DIR', 'FOC_IMG_DIR', 'APP_STATE_DIR',
-           'DATE_FORMAT', 'REQD_TBL_FIELDS', 'COMP_CLASS_NA', 'FR_CONSTS']
+           'DATE_FORMAT', 'REQD_TBL_FIELDS', 'FR_CONSTS']
 BASE_DIR = Path(__file__).parent.parent
 MENU_OPTS_DIR = BASE_DIR/'menuopts'
 ICON_DIR = BASE_DIR/'icons'
@@ -32,8 +32,6 @@ APP_STATE_DIR = Path.home()/'.s3a'
 # Ensure menuopts and layouts directories exist
 LAYOUTS_DIR.mkdir(parents=True, exist_ok=True)
 
-COMP_CLASS_NA = FRParam('Unassigned')
-
 
 @dataclass
 class _ReqdTableFields(FRParamGroup):
@@ -42,7 +40,7 @@ class _ReqdTableFields(FRParamGroup):
   ANN_AUTHOR       : FRParam = newParam('Author', "")
   SRC_IMG_FILENAME : FRParam = newParam('Source Image Filename', "")
   ANN_TIMESTAMP    : FRParam = newParam('Timestamp', "")
-  COMP_CLASS       : FRParam = newParam('Class', COMP_CLASS_NA.name, 'list', limits=[COMP_CLASS_NA.name])
+  COMP_CLASS       : FRParam = newParam('Class', 'Unassigned', 'list')
 REQD_TBL_FIELDS = _ReqdTableFields()
 
 

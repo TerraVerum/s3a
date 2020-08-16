@@ -10,7 +10,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets
 
 from s3a.controls.tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
 from s3a.generalutils import resolveAuthorName
-from s3a.graphicsutils import addDirItemsToMenu
+from s3a.graphicsutils import addDirItemsToMenu, saveToFile
 from s3a.models.tablemodel import FRComponentIO, FRComponentMgr
 from s3a.projectvars import FR_CONSTS, FR_ENUMS, REQD_TBL_FIELDS
 from s3a.structures import FRS3AWarning, FRVertices, FilePath, NChanImg, FRAppIOError, \
@@ -57,6 +57,20 @@ class S3ABase(QtWidgets.QMainWindow):
     # INTERFACE WITH QUICK LOADER
     # -----
     self.appStateEditor = FRAppStateEditor(self, name='App State Editor')
+
+    def loadCfg(_fname: str):
+      FR_SINGLETON.tableData.loadCfg(_fname)
+      self.resetTblFields()
+
+    def saveCfg():
+      td = FR_SINGLETON.tableData
+      saveFpath = td.cfgFname
+      if not saveFpath.exists():
+        saveFpath = self.appStateEditor.saveDir/td.cfgFname.name
+        saveToFile(td.cfg, saveFpath, allowOverwriteDefault=True)
+      return str(saveFpath)
+    self.appStateEditor.addImportExportOpts('tablecfg', loadCfg, saveCfg)
+
     self.appStateEditor.addImportExportOpts(
       'image', lambda fname: self.setMainImg(fname, clearExistingComps=False),
       lambda: str(self.srcImgFname)
@@ -110,6 +124,23 @@ class S3ABase(QtWidgets.QMainWindow):
                '"python -m s3a --author=<Author Name>"')
     FR_SINGLETON.tableData.annAuthor = authorName
     self.saveAllEditorDefaults()
+
+  def resetTblFields(self):
+    """
+    When table fields change, the displayed columns must change and the view
+    must be made aware. Ensure this occurs here
+    """
+    # Make sure this is necessary, first
+    if self.compMgr.colTitles == list([f.name for f in FR_SINGLETON.tableData.allFields]):
+      # Fields haven't changed since last reset. Types could be different, but nothing
+      # will break. So, the table doesn't have to be completely reset
+      return
+    self.compMgr.beginResetModel()
+    self.compMgr.resetFields()
+    self.compMgr.rmComps()
+    self.compMgr.endResetModel()
+    self.compTbl.setColDelegates()
+    self.compTbl.popup.tbl.setColDelegates()
 
   @staticmethod
   def saveAllEditorDefaults():

@@ -151,8 +151,6 @@ class FRCompTableView(QtWidgets.QTableView):
     self.setSortingEnabled(True)
 
     self.mgr = FRComponentMgr()
-    self.setModel(self.mgr)
-
     self.minimal = minimal
     if not minimal:
       self.popup = FRPopupTableDialog(*args)
@@ -168,10 +166,12 @@ class FRCompTableView(QtWidgets.QTableView):
         child.sigValueChanged.connect(lambda param, value, idx=ii: self.setColumnHidden(idx, not value))
         # Trigger initial hide/show
         child.sigValueChanged.emit(child, child.value())
-
+    self.setModel(self.mgr)
+    self.setColDelegates()
 
     self.instIdColIdx = TBL_FIELDS.index(REQD_TBL_FIELDS.INST_ID)
 
+  def setColDelegates(self):
     for ii, field in enumerate(TBL_FIELDS):
       curType = field.pType
       curval = field.value
@@ -206,6 +206,8 @@ class FRCompTableView(QtWidgets.QTableView):
       self.mgr = modelOrProxy.sourceModel()
     except AttributeError:
       self.mgr = modelOrProxy
+    if not self.minimal:
+      self.popup.tbl.setModel(modelOrProxy)
 
   def selectionChanged(self, curSel: QtCore.QItemSelection, prevSel: QtCore.QItemSelection):
     """

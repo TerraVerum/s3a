@@ -75,6 +75,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     mainImg.mergeCompsAct.sigActivated.connect(lambda *args: self.mergeSelectedComps())
     mainImg.splitCompsAct.sigActivated.connect(lambda *args: self.splitSelectedComps())
     compMgr.sigCompsChanged.connect(self.redrawComps)
+    compMgr.sigFieldsChanged.connect(lambda: self._reflectFieldsChanged())
     filterEditor.sigParamStateUpdated.connect(self._updateFilter)
     FR_SINGLETON.colorScheme.sigParamStateUpdated.connect(lambda: self._updateFilter(self._filter))
     compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
@@ -153,6 +154,10 @@ class FRCompDisplayFilter(QtCore.QObject):
       raise
     else:
       self.selectRowsById(np.array([keepId]), QtCore.QItemSelectionModel.ClearAndSelect)
+
+  def _reflectFieldsChanged(self):
+    self.filterableCols = self.findFilterableCols()
+    self.redrawComps()
 
   def _reflectTableSelectionChange(self, selectedIds: OneDArr):
     self.selectedIds = selectedIds
@@ -347,7 +352,7 @@ class FRCompDisplayFilter(QtCore.QObject):
         compDf = compDf.loc[~validList, :]
       if not allowFalse:
         compDf = compDf.loc[validList, :]
-    elif pType in ['FRParam', 'list']:
+    elif pType in ['FRParam', 'list', 'popuplineeditor']:
       existingParams = np.array(dfAtParam)
       allowedParams = []
       if pType == 'FRParam':

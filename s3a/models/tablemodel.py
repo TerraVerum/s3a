@@ -31,6 +31,7 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
   # Emits 3-element dict: Deleted comp ids, changed comp ids, added comp ids
   defaultEmitDict = {'deleted': np.array([]), 'changed': np.array([]), 'added': np.array([])}
   sigCompsChanged = Signal(dict)
+  sigFieldsChanged = Signal()
 
   # Used for efficient deletion, where deleting non-contiguous rows takes 1 operation
   # Instead of N operations
@@ -39,13 +40,7 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
     super().__init__()
     # Create component dataframe and remove created row. This is to
     # ensure datatypes are correct
-    self.colTitles =   colTitles = [f.name for f in TBL_FIELDS]
-
-    self.compDf = FR_SINGLETON.tableData.makeCompDf(0)
-
-    noEditParams = set(RTF) - {RTF.COMP_CLASS}
-    self.noEditColIdxs = [self.colTitles.index(col.name) for col in noEditParams]
-    self.editColIdxs = np.setdiff1d(np.arange(len(self.colTitles)), self.noEditColIdxs)
+    self.resetFields()
 
   # ------
   # Functions required to implement table model
@@ -106,12 +101,27 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
     else:
       return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
 
+  # noinspection PyAttributeOutsideInit
+  def resetFields(self):
+    self.colTitles = [f.name for f in TBL_FIELDS]
+
+    self.compDf = FR_SINGLETON.tableData.makeCompDf(0)
+
+    noEditParams = set(RTF) - {RTF.COMP_CLASS}
+    self.noEditColIdxs = [self.colTitles.index(col.name) for col in noEditParams]
+    self.editColIdxs = np.setdiff1d(np.arange(len(self.colTitles)), self.noEditColIdxs)
+    self.sigFieldsChanged.emit()
+
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_MGR)
 class FRComponentMgr(FRCompTableModel):
   _nextCompId = 0
 
   def __init__(self):
     super().__init__()
+
+  def resetFields(self):
+    super().resetFields()
+    self._nextCompId = 0
 
   @FR_SINGLETON.actionStack.undoable('Add Components')
   def addComps(self, newCompsDf: df, addtype: FR_ENUMS = FR_ENUMS.COMP_ADD_AS_NEW, emitChange=True):
@@ -550,7 +560,7 @@ class FRComponentIO:
       self.compDf.to_pickle(outFile)
     return outDf
 
-  def exportPkl(self, outFile: Union[str, Path]=None) -> (Any, str):
+  def exportPkl(self, outFile: Union[str, Path]=None, **exportArgs) -> (Any, str):
     """
     See the function signature for :func:`exportCsv <FRComponentIO.exportCsv>`
     """

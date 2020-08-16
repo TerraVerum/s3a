@@ -9,7 +9,7 @@ from . import appInst, FR_SINGLETON
 from .views.s3agui import S3A
 
 
-def main(guiMode=True, tableCfg: FilePath=None, loadLastState=None, **profileArgs) -> Optional[S3A]:
+def main(guiMode=True, loadLastState=None, **profileArgs) -> Optional[S3A]:
   """
   Calling code for the S3A application.
 
@@ -31,10 +31,11 @@ def main(guiMode=True, tableCfg: FilePath=None, loadLastState=None, **profileArg
   :key Image: Optional initial image to be annotated
   :key Annotations: Optional initial annotation file loaded.
   """
-  # Parameter editors are named in title-case, so ensure this is how keys are formatted
+  profileArgs = {k.replace(' ', '').lower(): v for k, v in profileArgs.items()}
+  # Handle here for faster bootup
+  tableCfg = profileArgs.pop('tablecfg', None)
   if tableCfg is not None:
     FR_SINGLETON.tableData.loadCfg(tableCfg)
-  profileArgs = {k.replace(' ', '').lower(): v for k, v in profileArgs.items()}
   win = S3A(guiMode=guiMode, loadLastState=loadLastState, **profileArgs)
   if guiMode:
     QtCore.QTimer.singleShot(0, win.showMaximized)

@@ -2,7 +2,8 @@ import copy
 import sys
 from datetime import datetime
 from functools import lru_cache
-from typing import List, Union, Tuple, Any
+from pathlib import Path
+from typing import List, Union, Tuple, Any, Optional
 
 import numpy as np
 from pandas import DataFrame as df
@@ -32,12 +33,12 @@ def _filterForParam(param: FRParam):
     retVal[1]['value'] = sys.maxsize
     children.extend(retVal)
     return paramWithChildren
-  elif pType in ['FRParam', 'Enum', 'list']:
+  elif pType in ['FRParam', 'Enum', 'list', 'popuplineeditor']:
     if pType == 'FRParam':
       iterGroup = [param.name for param in param.value.group]
     elif pType == 'Enum':
       iterGroup = [param for param in param.value]
-    else: # pType == 'list'
+    else: # pType == 'list' or 'popuplineeditor'
       iterGroup = param.opts['limits']
     children.extend(genParamList(iterGroup, 'bool', True))
     return paramWithChildren
@@ -83,6 +84,7 @@ class FRTableFilterEditor(FRParamEditor):
                                         f' filter for fields {", ".join(colNames)}'
                                         f' since types {", ".join(colTypes)} do not'
                                         f' have corresponding filters'))
+    self.applyChanges()
 
 
 class FRTableData:
@@ -91,11 +93,12 @@ class FRTableData:
     self.filter = FRTableFilterEditor()
 
     self.annAuthor = annAuthor
+    self.cfgFname: Optional[Path] = None
+    self.cfg: Optional[dict] = None
 
     self.allFields: List[FRParam] = []
     self.compClasses: List[str] = []
     self.resetLists()
-    # COMP_CLASS_NA.group = self.compClasses
 
   def makeCompDf(self, numRows=1) -> df:
     """
@@ -125,14 +128,42 @@ class FRTableData:
   def makeCompSer(self):
     return self.makeCompDf().squeeze()
 
-  def loadCfg(self, cfgFname: FilePath):
-    with open(cfgFname, 'r') as ifile:
-      cfg: dict = yaml.load(ifile)
+  def loadCfg(self, cfgFname: FilePath, cfgDict: dict=None):
+    """
+    Lodas the specified table configuration file for S3A. Alternatively, a name
+    and dict pair can be supplied instead.
+    :param cfgFname: If *cfgDict* is *None*, this is treated as the file containaing
+      a YAML-compatible table configuration dictionary. Otherwise, this is the
+      configuration name assiciated with the given dictionary.
+    :param cfgDict: If not *None*, this is the config data used instad of
+      reading *cfgFname* as a file.
+    """
+    if cfgDict is not None:
+      cfg = cfgDict
+    else:
+      with open(cfgFname, 'r') as ifile:
+        cfg: dict = yaml.load(ifile)
+    self.cfgFname = Path(cfgFname)
+    if cfg == self.cfg:
+      # No need to update things
+      return
+    self.cfg = cfg
     paramParser = FRYamlParser(cfg)
 
     self.resetLists()
     if 'classes' in cfg:
-      self.compClasses.extend(cfg['classes'])
+      classParam = paramParser['classes']
+      if isinstance(classParam, FRParam):
+        if classParam.value is not None:
+          REQD_TBL_FIELDS.COMP_CLASS.value = classParam.value
+        if classParam.pType is not None:
+          REQD_TBL_FIELDS.COMP_CLASS.pType = classParam.pType
+        classParam = classParam.opts['limits']
+      else:
+        REQD_TBL_FIELDS.COMP_CLASS.pType = 'list'
+      if REQD_TBL_FIELDS.COMP_CLASS.value in classParam:
+        classParam.remove(REQD_TBL_FIELDS.COMP_CLASS.value)
+      self.compClasses.extend(classParam)
       REQD_TBL_FIELDS.COMP_CLASS.opts['limits'] = self.compClasses.copy()
     # for compCls in cfg.get('classes', []):
     #   newParam = FRParam(compCls, group=self.compClasses)
@@ -199,8 +230,9 @@ class FRYamlParser:
     if not isinstance(value, dict):
       parsedParam = self.parseLeaf(leafName, value)
     else:
+      value = value.copy()
       # Format nicely for FRParam creation
-      nameArgs = {'value': value.pop('value'),
+      nameArgs = {'value': value.pop('value', None),
                   'pType': value.pop('pType', 'NoneType'),
                   'helpText': value.pop('helpText', '')}
       # Forward additional args if they exist
@@ -221,7 +253,14 @@ class FRYamlParser:
       leafParam.pType = 'int'
 
     elif isinstance(value, list):
-      leafParam = self.parseParamList(leafParam.name)[0]
+      # If inner values are dicts, it could be a complex list. Otherwise,
+      # it is a primitive list
+      testVal = value[0]
+      if isinstance(testVal, dict):
+        leafParam = self.parseParamList(leafParam.name)[0]
+      else:
+        # List of primitive values
+        leafParam = value
     return leafParam
 
   def getNestedCfgName(self, namePath: NestedIndexer):

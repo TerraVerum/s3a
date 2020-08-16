@@ -85,7 +85,8 @@ class S3A(S3ABase):
 
   def _hookupSignals(self):
     # Buttons
-    self.openImgAct.triggered.connect(lambda: self.resetMainImg_gui())
+    self.openImgAct.triggered.connect(lambda: self.setMainImg_gui())
+    self.resetTblConfigAct.triggered.connect(lambda: self.resetTblFields_gui())
     self.focusedImg.acceptRegionAct.sigActivated.connect(lambda: self.acceptFocusedRegion())
 
     FR_SINGLETON.colorScheme.sigParamStateUpdated.connect(self.updateTheme)
@@ -196,6 +197,14 @@ class S3A(S3ABase):
     FR_SINGLETON.sigDocksAdded.connect(lambda newDocks: self._addEditorDocks(newDocks))
     self._addEditorDocks()
 
+  def resetTblFields_gui(self):
+    fileDlg = QtWidgets.QFileDialog()
+    outFname, _ = fileDlg.getOpenFileName(self, 'Select Table Config File', '',
+                                          'All Files (*.*);; Config Files (*.yml)')
+    if len(outFname) > 0:
+      FR_SINGLETON.tableData.loadCfg(outFname)
+      self.resetTblFields()
+
   def _buildMenu(self):
     # -----
     # MENU BAR
@@ -218,6 +227,9 @@ class S3A(S3ABase):
 
     # File / Image
     self.openImgAct = create_addMenuAct(self, self.menuFile, '&Open Image')
+
+    # File / Config
+    self.resetTblConfigAct = create_addMenuAct(self, self.menuFile, 'Select &Table Configuration')
 
     # File / layout
     self.menuLayout = create_addMenuAct(self, self.menuFile, '&Layout', True)
@@ -307,8 +319,8 @@ class S3A(S3ABase):
     console.setWindowFlags(QtCore.Qt.Window)
     console.show()
 
-  def resetMainImg_gui(self):
-    fileFilter = "Image Files (*.png; *.tif; *.jpg; *.jpeg; *.bmp; *.jfif);; All files(*.*)"
+  def setMainImg_gui(self):
+    fileFilter = "Image Files (*.png *.tif *.jpg *.jpeg *.bmp *.jfif);;All files(*.*)"
     fname = popupFilePicker(self, 'Select Main Image', fileFilter)
     if fname is not None:
       with pg.BusyCursor():
@@ -329,8 +341,6 @@ class S3A(S3ABase):
 
   def exportCompList_gui(self):
     fileDlg = QtWidgets.QFileDialog()
-    # TODO: Delegate this to the exporter. Make a function that makes the right file filter,
-    #   and calls the right exporter function after the filename is retrieved.
     fileFilter = self.compIo.handledIoTypes_fileFilter()
     outFname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilter)
     if len(outFname) > 0:
