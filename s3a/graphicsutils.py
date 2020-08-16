@@ -163,10 +163,12 @@ def create_addMenuAct(mainWin: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, t
 
 class FRPopupLineEditor(QtWidgets.QLineEdit):
   def __init__(self, parent: QtWidgets.QWidget=None, model: QtCore.QAbstractListModel=None,
-               placeholderText='Press Tab or type...', clearOnComplete=True):
+               placeholderText='Press Tab or type...', clearOnComplete=True,
+               forceMatch=True):
     super().__init__(parent)
     self.setPlaceholderText(placeholderText)
     self.clearOnComplete = clearOnComplete
+    self.forceMatch = forceMatch
 
     if model is not None:
       self.setModel(model)
@@ -183,9 +185,18 @@ class FRPopupLineEditor(QtWidgets.QLineEdit):
 
     self.setCompleter(completer)
 
+  # TODO: Get working with next prev focusing for smoother logic
+  # def focusNextPrevChild(self, nextChild: bool):
+  #   if self.forceMatch and self.text() not in self.completer().model().stringList():
+  #     dummyFocusEv = QtGui.QFocusEvent(QtCore.QEvent.FocusOut)
+  #     self.focusOutEvent(dummyFocusEv)
+  #     return False
+  #   return super().focusNextPrevChild(nextChild)
+
   def focusOutEvent(self, ev: QtGui.QFocusEvent):
     reason = ev.reason()
-    if reason == QtCore.Qt.TabFocusReason or reason == QtCore.Qt.BacktabFocusReason:
+    if reason in [QtCore.Qt.TabFocusReason, QtCore.Qt.BacktabFocusReason,
+                  QtCore.Qt.OtherFocusReason]:
       # Simulate tabbing through completer options instead of losing focus
       self.setFocus()
       completer = self.completer()
@@ -201,6 +212,7 @@ class FRPopupLineEditor(QtWidgets.QLineEdit):
       popup.show()
       popup.setCurrentIndex(completer.currentIndex())
       popup.setFocus()
+      ev.accept()
       return
     else:
       super().focusOutEvent(ev)

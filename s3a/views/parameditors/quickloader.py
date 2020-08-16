@@ -61,6 +61,9 @@ class FREditorListModel(QtCore.QAbstractListModel):
     else:
       return
 
+  def stringList(self):
+    return self.displayedData
+
   @property
   def displayedData(self):
     return [self.displayFormat.format(stateName=stng, editor=edtr)
