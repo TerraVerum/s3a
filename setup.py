@@ -28,7 +28,17 @@ setup(
   install_requires=required,
   include_package_data=True,
   url='https://gitlab.com/ficsresearch/s3a',
-  license='',
+  download_url='https://gitlab.com/ficsresearch/s3a',
+  license='MIT',
+  description='Application to facilitate semantic labeling of image data',
   author='Nathan Jessurun',
   author_email='njessurun@ufl.edu',
+  classifiers=[
+    'Development Status :: 3 - Alpha',      # Chose either "3 - Alpha", "4 - Beta" or "5 - Production/Stable" as the current state of your package
+    'Intended Audience :: Developers',      # Define that your audience are developers
+    'Topic :: Software Development :: Build Tools',
+    'License :: OSI Approved :: MIT License',   # Again, pick a license
+    'Programming Language :: Python :: 3',      #Specify which python versions that you want to support
+  ],
+  python_requires='>=3.7.*',
 )

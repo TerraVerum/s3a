@@ -20,6 +20,7 @@ def sampleComps():
 
 
 def test_normal_add(sampleComps):
+  mgr.rmComps()
   changeList = mgr.addComps(sampleComps)
   cmpChangeList(changeList, oldIds)
 

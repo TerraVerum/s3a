@@ -30,10 +30,10 @@ from . import graphicsutils as gutils
 import s3a.projectvars
 import s3a.structures
 
-from s3a.views.parameditors import FR_SINGLETON
+from s3a.views.parameditors import FR_SINGLETON, FRParamEditor
 from s3a.models.tablemodel import FRComponentIO
 from s3a.processingimpls import FRTopLevelProcessors
-from s3a.structures import FRVertices, FRComplexVertices
+from s3a.structures import FRVertices, FRComplexVertices, FRParam
 from s3a.projectvars import REQD_TBL_FIELDS
 
 for name, func in inspect.getmembers(FRTopLevelProcessors, inspect.isfunction):

@@ -26,7 +26,7 @@ class CompDfTester:
     mask = np.zeros(imShape[:2], 'uint8')
 
     retVal = []
-    for ii in range(self.numComps):
+    for ii in range(len(compDf)):
       radius = RND.integers(5, max(imShape) // 5)
       o_x = RND.integers(0, imShape[1])
       o_y = RND.integers(0, imShape[0])
