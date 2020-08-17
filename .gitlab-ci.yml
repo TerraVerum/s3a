@@ -8,6 +8,7 @@ before_script:
   - pip install --upgrade pyqt5==5.13
   - pip install -e .
   - pip install pytest-cov
+  - pip install pytest-qt
 
 stages:
   - Test
