@@ -31,6 +31,7 @@ APP_STATE_DIR = Path.home()/'.s3a'
 
 # Ensure menuopts and layouts directories exist
 LAYOUTS_DIR.mkdir(parents=True, exist_ok=True)
+APP_STATE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @dataclass
