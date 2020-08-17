@@ -149,8 +149,7 @@ class FRTableData:
       return
     self.cfg = cfg
     paramParser = FRYamlParser(cfg)
-
-    self.resetLists()
+    newClasses = []
     if 'classes' in cfg:
       classParam = paramParser['classes']
       if isinstance(classParam, FRParam):
@@ -161,13 +160,14 @@ class FRTableData:
         classParam = classParam.opts['limits']
       else:
         REQD_TBL_FIELDS.COMP_CLASS.pType = 'list'
-      if REQD_TBL_FIELDS.COMP_CLASS.value in classParam:
-        classParam.remove(REQD_TBL_FIELDS.COMP_CLASS.value)
-      self.compClasses.extend(classParam)
-      REQD_TBL_FIELDS.COMP_CLASS.opts['limits'] = self.compClasses.copy()
+      newClasses.extend(classParam)
+    if REQD_TBL_FIELDS.COMP_CLASS.value not in newClasses:
+      newClasses.append(REQD_TBL_FIELDS.COMP_CLASS.value)
+    REQD_TBL_FIELDS.COMP_CLASS.opts['limits'] = newClasses.copy()
     # for compCls in cfg.get('classes', []):
     #   newParam = FRParam(compCls, group=self.compClasses)
     #   self.compClasses.append(newParam)
+    self.resetLists()
     for field in cfg.get('opt-tbl-fields', {}):
       param = paramParser['opt-tbl-fields', field]
       param.group = self.allFields
@@ -186,7 +186,7 @@ class FRTableData:
     for lst in self.allFields, self.compClasses:
       lst.clear()
     self.allFields.extend(list(REQD_TBL_FIELDS))
-    self.compClasses.append(REQD_TBL_FIELDS.COMP_CLASS.value)
+    self.compClasses.extend(REQD_TBL_FIELDS.COMP_CLASS.opts['limits'])
 
   def fieldFromName(self, name: str):
     """

@@ -41,14 +41,14 @@ class FREditorListModel(QtCore.QAbstractListModel):
     self.editorList.append(editor)
     self.layoutChanged.emit()
 
-  def updateEditorOpts(self, editor: FRParamEditor):
-    self.layoutAboutToBeChanged.emit()
-    for ii in range(len(self.paramStatesLst) - 1, -1, -1):
-      if self.editorList[ii] is editor:
-        del self.paramStatesLst[ii]
-        del self.editorList[ii]
-    self.addEditors([editor])
-    self.layoutChanged.emit()
+  # def updateEditorOpts(self, editor: FRParamEditor):
+  #   self.layoutAboutToBeChanged.emit()
+  #   for ii in range(len(self.paramStatesLst) - 1, -1, -1):
+  #     if self.editorList[ii] is editor:
+  #       del self.paramStatesLst[ii]
+  #       del self.editorList[ii]
+  #   self.addEditors([editor])
+  #   self.layoutChanged.emit()
 
   def data(self, index: QtCore.QModelIndex, role: int=QtCore.Qt.DisplayRole):
     row = index.row()
@@ -102,10 +102,11 @@ class FRQuickLoaderEditor(FRParamEditor):
       editorList = []
     self.listModel = FREditorListModel(editorList, self)
 
-    self.addNewParamState = FRPopupLineEditor(self, self.listModel)
+    self.addNewParamState = FRPopupLineEditor(self, self.listModel, clearOnComplete=False)
     self.centralLayout.insertWidget(0, self.addNewParamState)
 
-    self.addNewParamState.completer().activated.connect(self.addFromLineEdit)
+    # self.addNewParamState.completer().activated.connect(self.addFromLineEdit)
+    self.addNewParamState.editingFinished.connect(self.addFromLineEdit)
 
   def loadParamState(self, stateName: Union[str, Path], stateDict: dict=None,
                      addChildren=False, removeChildren=False, applyChanges=True):
@@ -133,7 +134,7 @@ class FRQuickLoaderEditor(FRParamEditor):
                f"{[grp.name() for grp in invalidGrps]}\n" \
                f"Must be one of:\n" \
                f"{[e.name for e in self.listModel.uniqueEditors]}"
-      raiseErrorLater(FRParamEditorError(errMsg))
+      warn(errMsg, FRS3AWarning)
     if applyChanges:
       self.applyChanges()
     return ret
@@ -172,13 +173,19 @@ class FRQuickLoaderEditor(FRParamEditor):
   def addFromLineEdit(self):
     completer = self.addNewParamState.completer()
     selection = completer.completionModel()
-    if self.addNewParamState.text() not in self.listModel.displayedData:
+    try:
+      selectionIdx = self.listModel.displayedData.index(self.addNewParamState.text())
+    except ValueError:
+      selectionIdx = None
+    if selectionIdx is None:
       return
-    selectionIdx = completer.popup().currentIndex()
-    if not selectionIdx.isValid():
-      selectionIdx = completer.currentIndex()
-    paramState, editor = selection.data(selectionIdx, QtCore.Qt.EditRole)
+    qtSelectionIdx = self.listModel.index(selectionIdx)
+    # selectionIdx = completer.popup().currentIndex()
+    # if not selectionIdx.isValid():
+    #   selectionIdx = completer.currentIndex()
+    paramState, editor = selection.data(qtSelectionIdx, QtCore.Qt.EditRole)
     self.addActForEditor(editor, paramState)
+    self.addNewParamState.clear()
 
 
   def addActForEditor(self, editor: FRParamEditor, paramState: str, act: ActWithShc=None):
@@ -189,7 +196,7 @@ class FRQuickLoaderEditor(FRParamEditor):
       # It is not made possible through the context menu. Fix this
       curGroup = self.params.names[editor.name]
       _addRmOption(curGroup)
-      if act is None:
+      if act is None and paramState in curGroup.names:
         act = curGroup.child(paramState)
 
     if paramState in curGroup.names and act is not None and act.isActivateConnected:

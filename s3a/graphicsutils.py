@@ -225,6 +225,7 @@ class FRPopupLineEditor(QtWidgets.QLineEdit):
       self.completer().setCompletionPrefix('')
 
 old_sys_except_hook = sys.excepthook
+usingPostponedErrors = False
 def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
   """
   When a qt application encounters an error, it will generally crash the entire
@@ -248,7 +249,9 @@ def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
     dlg.show()
     dlg.exec_()
   def patch_excepthook():
+    global usingPostponedErrors
     sys.excepthook = new_except_hook
+    usingPostponedErrors = True
   QtCore.QTimer.singleShot(0, patch_excepthook)
   appInst.processEvents()
 
@@ -260,7 +263,7 @@ def restoreExceptionBehavior():
 
 def raiseErrorLater(err: Exception):
   # Fire immediately if not in gui mode
-  if sys.excepthook is old_sys_except_hook:
+  if not usingPostponedErrors:
     raise err
   # else
   def _raise():

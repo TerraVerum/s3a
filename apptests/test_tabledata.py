@@ -33,6 +33,15 @@ def test_no_classes_no_opt_fields():
     app.add_focusComp(newComps)
     assert len(app.compMgr.compDf) == 3
 
+def test_params_for_class():
+  cfgDict = {'classes': {
+    'value': 'test',
+    'valType': 'popuplineeditor',
+    'limits': ['test', 'this', 'out']
+  }}
+  with newCfg('testcfg', cfgDict):
+    assert FR_SINGLETON.tableData.compClasses == cfgDict['classes']['limits']
+
 @pytest.mark.withcomps
 def test_no_change():
   with newCfg(td.cfgFname, td.cfg):
