@@ -206,8 +206,6 @@ class FRCompTableView(QtWidgets.QTableView):
       self.mgr = modelOrProxy.sourceModel()
     except AttributeError:
       self.mgr = modelOrProxy
-    if not self.minimal:
-      self.popup.tbl.setModel(modelOrProxy)
 
   def selectionChanged(self, curSel: QtCore.QItemSelection, prevSel: QtCore.QItemSelection):
     """
