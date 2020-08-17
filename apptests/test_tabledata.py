@@ -36,7 +36,7 @@ def test_no_classes_no_opt_fields():
 def test_params_for_class():
   cfgDict = {'classes': {
     'value': 'test',
-    'valType': 'popuplineeditor',
+    'pType': 'popuplineeditor',
     'limits': ['test', 'this', 'out']
   }}
   with newCfg('testcfg', cfgDict):
