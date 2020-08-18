@@ -609,7 +609,8 @@ class FRComponentIO:
   # -----
 
   @classmethod
-  def buildFromCsv(cls, inFileOrDf: FilePathOrDf, imShape: Tuple=None) -> df:
+  def buildFromCsv(cls, inFileOrDf: FilePathOrDf, imShape: Tuple=None,
+                   reindex=False) -> df:
     """
     Deserializes data from a csv file to create a Component :class:`DataFrame`.
     The input .csv should be the same format as one exported by
@@ -621,6 +622,9 @@ class FRComponentIO:
     :param inFileOrDf: Name of file to import, or dataframe if it was already read from this
       file type. Useful if several csv's were concatenated into one dataframe and *that* is
       being imported.
+    :param reindex: Whether to disregard the index of the incoming dataframe or file.
+      This is useful when *inFileOrDf* is actually a conacatenated df of multiple files, and
+      the index doesn't need to be retained.
     :return: Tuple: DF that will be exported if successful extraction
     """
     field = FRParam('None', None)
@@ -628,7 +632,10 @@ class FRComponentIO:
       if isinstance(inFileOrDf, df):
         csvDf = inFileOrDf
       else:
-        csvDf = pd.read_csv(inFileOrDf, keep_default_na=False, dtype=object)
+        csvDf = pd.read_csv(inFileOrDf, keep_default_na=False)
+      if reindex:
+        csvDf[RTF.INST_ID.name] = np.arange(len(csvDf), dtype=int)
+        csvDf = csvDf.set_index(RTF.INST_ID.name, drop=False)
       # Decouple index from instance ID until after transfer from csvDf is complete
       # This was causing very strange behavior without reset_index()...
       outDf = FR_SINGLETON.tableData.makeCompDf(len(csvDf)).reset_index(drop=True)
@@ -636,10 +643,16 @@ class FRComponentIO:
       # as needed
       for field in TBL_FIELDS:
         if field.name in csvDf:
-          if isinstance(field.value, str):
+          matchingCol = csvDf[field.name]
+          # 'Object' type results in false positives
+          if matchingCol.dtype != object and type(field.value) == matchingCol.dtype:
             outDf[field] = csvDf[field.name]
           else:
-            outDf[field] = _strSerToParamSer(csvDf[field.name], field.value)
+            # Parsing functions only know how to convert from strings to themselves.
+            # So, assume the exting types can first convert themselves to strings
+            with np.printoptions(threshold=sys.maxsize):
+              matchingCol = matchingCol.apply(str)
+            outDf[field] = _strSerToParamSer(matchingCol, field.value)
       outDf = outDf.set_index(RTF.INST_ID, drop=False)
 
       cls.checkVertBounds(outDf[RTF.VERTICES], imShape)
