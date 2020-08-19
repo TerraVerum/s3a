@@ -9,14 +9,14 @@ from warnings import warn
 import numpy as np
 import pandas as pd
 from pandas import DataFrame as df
-from pyqtgraph.Qt import QtCore, QtWidgets
+from pyqtgraph.Qt import QtCore
 from skimage import io, measure
 from typing_extensions import Literal
 
 from s3a import FR_SINGLETON
 from s3a.generalutils import coerceDfTypes, augmentException, getCroppedImg
-from s3a.projectvars import FR_ENUMS, REQD_TBL_FIELDS as RTF
-from s3a.projectvars.constants import FR_CONSTS
+from s3a.constants import REQD_TBL_FIELDS as RTF
+from s3a.constants import FR_CONSTS, FR_ENUMS
 from s3a.structures import FRComplexVertices, FRParam
 from s3a.structures import OneDArr, FRParamGroup, FilePath, FRS3AWarning, GrayImg
 

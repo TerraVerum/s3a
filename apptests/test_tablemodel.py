@@ -6,8 +6,8 @@ from conftest import NUM_COMPS, app, mgr, stack, dfTester
 from helperclasses import clearTmpFiles
 from testingconsts import RND
 from s3a import FR_SINGLETON
-from s3a.projectvars import FR_ENUMS
-from s3a.projectvars import REQD_TBL_FIELDS
+from s3a.constants import FR_ENUMS
+from s3a.constants import REQD_TBL_FIELDS
 from s3a.structures import FRComplexVertices, FRS3AWarning, FRVertices
 
 oldIds = np.arange(NUM_COMPS, dtype=int)

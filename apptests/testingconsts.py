@@ -4,7 +4,7 @@ from numpy import VisibleDeprecationWarning
 from skimage import data
 from skimage import io
 
-from s3a.projectvars import BASE_DIR, REQD_TBL_FIELDS
+from s3a.constants import BASE_DIR, REQD_TBL_FIELDS
 from s3a.structures import FRS3AWarning
 
 NUM_COMPS = 15

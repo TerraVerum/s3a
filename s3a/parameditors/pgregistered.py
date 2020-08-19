@@ -8,9 +8,8 @@ from pyqtgraph.parametertree.parameterTypes import ActionParameterItem, ActionPa
   TextParameterItem, TextParameter
 from s3a.graphicsutils import FRPopupLineEditor
 
-from s3a.structures import FRS3AException, FRParam
-from .. import parameditors
-from ...generalutils import helpTextToRichText
+from s3a.structures import FRS3AException
+from s3a import parameditors
 
 
 class FRMonkeyPatchedTextParameterItem(TextParameterItem):

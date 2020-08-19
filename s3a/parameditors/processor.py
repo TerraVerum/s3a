@@ -9,13 +9,13 @@ from pyqtgraph.Qt import QtCore
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.parameterTypes import ListParameter
 
-from s3a.projectvars import MENU_OPTS_DIR
+from s3a.constants import MENU_OPTS_DIR
 from s3a.structures import FRParam, \
   FRAlgProcessorError, FRParamEditorError
 from s3a.views.procwrapper import FRImgProcWrapper
 from .genericeditor import FRParamEditor
 from .pgregistered import FRProcGroupParameter
-from ...generalutils import frPascalCaseToTitle
+from s3a.generalutils import frPascalCaseToTitle
 
 Signal = QtCore.Signal
 

@@ -5,7 +5,7 @@ import numpy as np
 
 from s3a.views.imageareas import FREditableImgBase
 from s3a.views.rois import SHAPE_ROI_MAPPING
-from s3a.projectvars import FR_CONSTS
+from s3a.constants import FR_CONSTS
 
 shapes = tuple(SHAPE_ROI_MAPPING.keys())
 editableImg = FREditableImgBase(drawShapes=shapes,

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Dict, Type, Union, Callable, Any, Tuple
+from typing import List, Dict, Type, Union, Callable, Any
 
 import pandas as pd
 import numpy as np
@@ -7,9 +7,9 @@ from pyqtgraph.parametertree import Parameter
 
 from s3a.generalutils import _safeCallFuncList
 from s3a.graphicsutils import raiseErrorLater
-from s3a.projectvars import APP_STATE_DIR
+from s3a.constants import APP_STATE_DIR
 from s3a.structures import FilePath, FRParam, FRAppIOError
-from s3a.views.parameditors import FRParamEditor
+from s3a.parameditors import FRParamEditor
 from s3a import FR_SINGLETON
 
 

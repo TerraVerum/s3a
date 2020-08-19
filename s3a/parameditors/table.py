@@ -10,11 +10,11 @@ from pandas import DataFrame as df
 from ruamel.yaml import YAML
 
 from s3a.graphicsutils import raiseErrorLater
-from s3a.projectvars import TABLE_DIR, REQD_TBL_FIELDS, DATE_FORMAT, \
+from s3a.constants import TABLE_DIR, REQD_TBL_FIELDS, DATE_FORMAT, \
   FR_CONSTS
 from s3a.structures import FRParam, FilePath, FRParamGroup, FRParamEditorError, \
   FRS3AException
-from s3a.views.parameditors import FRParamEditor
+from s3a.parameditors import FRParamEditor
 
 yaml = YAML()
 

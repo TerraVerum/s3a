@@ -1,3 +1,4 @@
+from __future__ import annotations
 import html
 import sys
 from functools import partial
@@ -7,13 +8,12 @@ from pathlib import Path
 from traceback import format_exception
 from typing import Optional, Union, Callable, Generator
 
-import numpy as np
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import Parameter
 from ruamel.yaml import YAML
 
-from s3a import appInst
-from s3a.projectvars import ANN_AUTH_DIR
+import s3a
+from s3a.constants import ANN_AUTH_DIR
 from s3a.structures import FRAppIOError, FRS3AException, FilePath, FRS3AWarning
 
 yaml = YAML()
@@ -238,8 +238,8 @@ def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
   def new_except_hook(etype, evalue, tb):
     # Allow sigabort to kill the app
     if etype in [KeyboardInterrupt, SystemExit]:
-      appInst.exit(1)
-      appInst.processEvents()
+      s3a.appInst.exit(1)
+      s3a.appInst.processEvents()
       raise
     msgWithTrace = ''.join(format_exception(etype, evalue, tb))
     msgWithoutTrace = str(evalue)
@@ -253,13 +253,13 @@ def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
     sys.excepthook = new_except_hook
     usingPostponedErrors = True
   QtCore.QTimer.singleShot(0, patch_excepthook)
-  appInst.processEvents()
+  s3a.appInst.processEvents()
 
 def restoreExceptionBehavior():
   def patch_excepthook():
     sys.excepthook = old_sys_except_hook
   QtCore.QTimer.singleShot(0, patch_excepthook)
-  appInst.processEvents()
+  s3a.appInst.processEvents()
 
 def raiseErrorLater(err: Exception):
   # Fire immediately if not in gui mode
@@ -420,10 +420,10 @@ class QAwesomeTooltipEventFilter(QtCore.QObject):
 
      #. Escapes all HTML syntax in this tooltip (e.g., converting all ``&``
         characters to ``&amp;`` substrings).
-     #. Embeds this tooltip in the Qt-specific ``<qt>...</qt>`` tag, thus
+     #. Embeds this tooltip in the Qt-specific ``<qt>..</qt>`` tag, thus
         implicitly converting this plaintext tooltip into a rich text tooltip.
 
-  .. _issue:
+  . _issue:
       https://bugreports.qt.io/browse/QTBUG-41051
   """
 
@@ -462,8 +462,8 @@ class QAwesomeTooltipEventFilter(QtCore.QObject):
     # Else, defer to the default superclass handling of this event.
     return super().eventFilter(widget, event)
 
-from .views import parameditors
-def contextMenuFromEditorActions(editor: parameditors.FRParamEditor, title: str=None,
+
+def contextMenuFromEditorActions(editor: s3a.FRParamEditor, title: str=None,
                                  menuParent: QtWidgets.QWidget=None):
   if title is None:
     title = editor.name

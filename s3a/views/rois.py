@@ -4,7 +4,7 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
-from s3a.projectvars import FR_CONSTS
+from s3a.constants import FR_CONSTS
 from s3a.structures import FRParam
 from s3a.structures import FRVertices
 

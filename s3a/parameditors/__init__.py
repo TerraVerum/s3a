@@ -1,12 +1,10 @@
-from typing import List, Union, Tuple
+from typing import List, Union
 
 from pyqtgraph.Qt import QtWidgets, QtCore
-from pyqtgraph.parametertree import Parameter
 
+from s3a.constants import GEN_PROPS_DIR, SCHEMES_DIR, BASE_DIR
 from s3a.models.actionstack import FRActionStack
-from s3a.projectvars import GEN_PROPS_DIR, SCHEMES_DIR, BASE_DIR
 from s3a.structures import FRParam
-from . import pgregistered
 from .genericeditor import FRParamEditor, FRParamEditorDockGrouping
 from .processor import FRAlgPropsMgr
 from .quickloader import FRQuickLoaderEditor

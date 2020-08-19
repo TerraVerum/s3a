@@ -9,7 +9,7 @@ import pytest
 from conftest import app, mgr, stack
 from helperclasses import CompDfTester
 from s3a import appInst, FR_SINGLETON, S3A
-from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS
+from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS
 from s3a.structures import FRComplexVertices, FRParam, FRVertices, FRS3AWarning
 from s3a.views.tableview import FRCompTableView
 

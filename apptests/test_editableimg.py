@@ -9,9 +9,9 @@ from imageprocessing.common import Image
 from imageprocessing.processing import ImageIO, ImageProcess
 from s3a import FR_SINGLETON
 from s3a.controls.drawctrl import FRRoiCollection
-from s3a.projectvars import FR_CONSTS, REQD_TBL_FIELDS as RTF
+from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS as RTF
 from s3a.structures import FRVertices, FRComplexVertices, FRParam, FRS3AWarning
-from s3a.views.parameditors.processor import FRAlgCollectionEditor
+from s3a.parameditors.processor import FRAlgCollectionEditor
 from testingconsts import FIMG_SER_COLS
 
 # Construct app outside setUp to drastically reduce loading times

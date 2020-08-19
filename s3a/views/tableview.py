@@ -9,13 +9,13 @@ from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
 from s3a import FR_SINGLETON
 from s3a.models.tablemodel import FRComponentMgr
-from s3a.projectvars import FR_CONSTS, FR_ENUMS, REQD_TBL_FIELDS
-from s3a.structures import FRS3AException, FRS3AWarning, OneDArr, TwoDArr
+from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS
+from s3a.constants import FR_ENUMS
+from s3a.structures import FRS3AException, FRS3AWarning, TwoDArr
 
 __all__ = ['FRCompTableView']
 
-from .parameditors import pgregistered, FRParamEditor, FRParamEditorDockGrouping
-from .parameditors.table import genParamList
+from ..parameditors import pgregistered, FRParamEditor, FRParamEditorDockGrouping
 from ..graphicsutils import contextMenuFromEditorActions
 
 Signal = QtCore.Signal

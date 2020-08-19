@@ -4,7 +4,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 
 from s3a import FR_SINGLETON
-from s3a.projectvars import FR_CONSTS
+from s3a.constants import FR_CONSTS
 from s3a.structures import FRParam, FRVertices
 from s3a.views.rois import FRExtendedROI, SHAPE_ROI_MAPPING
 

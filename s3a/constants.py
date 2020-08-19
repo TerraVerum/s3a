@@ -1,14 +1,12 @@
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
-
-# Preference directories
-from s3a.structures import FRComplexVertices, FRParam, FRParamGroup, newParam
 
 __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR', 'QUICK_LOAD_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'TABLE_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
            'MAIN_IMG_DIR', 'FOC_IMG_DIR', 'APP_STATE_DIR',
-           'DATE_FORMAT', 'REQD_TBL_FIELDS', 'FR_CONSTS']
-BASE_DIR = Path(__file__).parent.parent
+           'DATE_FORMAT', 'REQD_TBL_FIELDS', 'FR_CONSTS', 'FR_ENUMS']
+BASE_DIR = Path(__file__).parent
 MENU_OPTS_DIR = BASE_DIR/'menuopts'
 ICON_DIR = BASE_DIR/'icons'
 ANN_AUTH_DIR = Path(MENU_OPTS_DIR)
@@ -33,6 +31,29 @@ APP_STATE_DIR = Path.home()/'.s3a'
 LAYOUTS_DIR.mkdir(parents=True, exist_ok=True)
 APP_STATE_DIR.mkdir(parents=True, exist_ok=True)
 
+class _FREnums(Enum):
+  # --------------------------
+  # COMPONENTS
+  # --------------------------
+  COMP_ADD_AS_MERGE = 'Add as Merge'
+  COMP_ADD_AS_NEW   = 'Add as New'
+  COMP_EXPORT_ALL   = 'Export All Components'
+  COMP_RM_ALL       = "Remove All"
+
+  # --------------------------
+  # REGION CREATION
+  # --------------------------
+  BUFFER_UNDO       = 'Undo'
+  BUFFER_REDO       = 'Redo'
+
+  # --------------------------
+  # VERTICES
+  # --------------------------
+  HIER_ALL_FILLED  = 'All Filled'
+
+FR_ENUMS = _FREnums
+
+from s3a.structures import FRComplexVertices, FRParam, FRParamGroup, newParam
 
 @dataclass
 class _ReqdTableFields(FRParamGroup):

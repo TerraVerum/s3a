@@ -1,13 +1,7 @@
 import pytest
 
-from s3a import appInst
-from s3a import graphicsutils
 from s3a.structures import FRS3AWarning, FRS3AException
-from s3a.views.parameditors import *
-
-from conftest import app
-from pathlib import Path
-from pyqtgraph.Qt import QtCore
+from s3a.parameditors import *
 
 ql = FR_SINGLETON.quickLoader
 editor = FR_SINGLETON.colorScheme

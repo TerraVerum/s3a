@@ -9,7 +9,7 @@ from conftest import NUM_COMPS, _block_pltShow, app, mgr, dfTester
 from s3a import FR_SINGLETON, appInst, S3A
 from s3a.models.s3abase import S3ABase
 from s3a.generalutils import resolveAuthorName
-from s3a.projectvars import REQD_TBL_FIELDS, LAYOUTS_DIR, ANN_AUTH_DIR
+from s3a.constants import REQD_TBL_FIELDS, LAYOUTS_DIR, ANN_AUTH_DIR
 from s3a.structures import FRAlgProcessorError, FRS3AException, FRVertices, \
   FRComplexVertices, FRS3AWarning
 from testingconsts import FIMG_SER_COLS, RND, SAMPLE_IMG, SAMPLE_IMG_FNAME

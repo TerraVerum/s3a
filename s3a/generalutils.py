@@ -6,7 +6,7 @@ from typing import Any, Optional, List, Collection, Callable, Tuple, Union
 import numpy as np
 from pandas import DataFrame as df
 
-from s3a.projectvars import ANN_AUTH_DIR
+from s3a.constants import ANN_AUTH_DIR
 from s3a.structures.typeoverloads import TwoDArr
 from .structures import FRVertices, FRParam, FRComplexVertices, NChanImg
 

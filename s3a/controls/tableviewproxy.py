@@ -8,7 +8,7 @@ from pyqtgraph.Qt import QtCore, QtGui
 
 from s3a import FR_SINGLETON
 from s3a.models.tablemodel import FRComponentMgr
-from s3a.projectvars import FR_CONSTS, REQD_TBL_FIELDS
+from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS
 from s3a.structures import FRVertices, FRParam, FRParamEditorError, FRS3AWarning, \
   FRComplexVertices
 from s3a.structures.typeoverloads import OneDArr

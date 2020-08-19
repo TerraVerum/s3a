@@ -7,7 +7,7 @@ import pytest
 
 from s3a import FR_SINGLETON, REQD_TBL_FIELDS
 from conftest import app, dfTester
-from s3a.projectvars import FR_CONSTS
+from s3a.constants import FR_CONSTS
 
 td = FR_SINGLETON.tableData
 

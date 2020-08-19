@@ -6,7 +6,7 @@ from pyqtgraph.parametertree import Parameter, ParameterItem
 from s3a.generalutils import frPascalCaseToTitle
 from s3a.graphicsutils import dialogGetSaveFileName
 from s3a.models.editorbase import FRParamEditorBase
-from s3a.projectvars import MENU_OPTS_DIR
+from s3a.constants import MENU_OPTS_DIR
 from s3a.structures import FRParam, FilePath
 
 Signal = QtCore.Signal

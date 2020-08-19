@@ -7,11 +7,11 @@ from typing import Tuple, Callable, Any, Dict, List, DefaultDict
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from pyqtgraph.parametertree import Parameter
 
-from s3a.projectvars import SHORTCUTS_DIR
+from s3a.constants import SHORTCUTS_DIR
 from s3a.structures import FRParam, FRParamEditorError
 from .genericeditor import FRParamEditor
 from .pgregistered import FRShortcutParameter
-from ...generalutils import helpTextToRichText
+from s3a.generalutils import helpTextToRichText
 
 
 def _class_fnNamesFromFnQualname(qualname: str) -> (str, str):

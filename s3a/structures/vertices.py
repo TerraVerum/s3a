@@ -9,8 +9,6 @@ import numpy as np
 
 from .exceptions import FRIllFormedVerticesError
 from .typeoverloads import BlackWhiteImg, NChanImg
-from ..projectvars.enums import FR_ENUMS
-
 
 class FRVertices(np.ndarray):
   connected = True
@@ -86,10 +84,8 @@ class FRComplexVertices(list):
   """See cv.findContours for hierarchy explanation. Used in cv.RETR_CCOMP mode."""
 
   def __init__(self, inputArr: Union[List[FRVertices], np.ndarray]=None,
-               hierarchy: Union[np.ndarray, FR_ENUMS]=None,
+               hierarchy:np.ndarray=None,
                coerceListElements=False):
-    if hierarchy is None:
-      hierarchy = FR_ENUMS.HIER_ALL_FILLED
     if inputArr is None:
       inputArr = []
     if coerceListElements:
@@ -101,7 +97,7 @@ class FRComplexVertices(list):
       raise FRIllFormedVerticesError(f'Must pass a hierarchy with any complex vertices of more than one vertex list, '
                                 f'received vertex list of length {numInpts}')
     elif (hierarchy is None and numInpts <= 1) \
-        or hierarchy is FR_ENUMS.HIER_ALL_FILLED:
+        or hierarchy is None:
       # Default hierarchy for a one- or zero-object contour list
       hierarchy = np.ones((numInpts, 4), dtype=int)*-1
     self.hierarchy = hierarchy

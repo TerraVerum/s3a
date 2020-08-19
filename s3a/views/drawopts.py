@@ -4,7 +4,7 @@ from typing import Tuple, Collection, Callable, Union, Iterable, Any, Dict
 from pyqtgraph.Qt import QtWidgets, QtGui, QtCore
 
 from s3a import FR_SINGLETON
-from s3a.projectvars import FR_CONSTS
+from s3a.constants import FR_CONSTS
 from s3a.structures import FRParam
 
 __all__ = ['FRDrawOpts', 'FRButtonCollection']

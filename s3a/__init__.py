@@ -6,7 +6,8 @@ import sys
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 
-__all__ = ['appInst', 'FR_SINGLETON', 'S3A']
+__all__ = ['appInst', 'FR_SINGLETON', 'S3A', 'FRParamEditor', 'FRParam', 'REQD_TBL_FIELDS',
+           'FRComplexVertices', 'FRVertices', 'FRComponentIO']
 
 pg.setConfigOptions(imageAxisOrder='row-major')
 
@@ -27,14 +28,14 @@ from . import graphicsutils as gutils
 #   gutils.QAwesomeTooltipEventFilter(appInst))
 
 # Import here to resolve resolution order
-import s3a.projectvars
+import s3a.constants
 import s3a.structures
 
-from s3a.views.parameditors import FR_SINGLETON, FRParamEditor
+from s3a.parameditors import FR_SINGLETON, FRParamEditor
 from s3a.models.tablemodel import FRComponentIO
 from s3a.processingimpls import FRTopLevelProcessors
 from s3a.structures import FRVertices, FRComplexVertices, FRParam
-from s3a.projectvars import REQD_TBL_FIELDS
+from s3a.constants import REQD_TBL_FIELDS
 
 for name, func in inspect.getmembers(FRTopLevelProcessors, inspect.isfunction):
   FR_SINGLETON.algParamMgr.addProcessCtor(func)

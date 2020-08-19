@@ -9,15 +9,15 @@ from skimage.io import imread
 
 from s3a import FR_SINGLETON
 from s3a.generalutils import getClippedBbox, frPascalCaseToTitle, cornersToFullBoundary
-from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS as FRC
+from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS as FRC
 from s3a.structures import FRParam, FRVertices, FRComplexVertices, FilePath
 from s3a.structures import NChanImg
 from .clickables import FRRightPanViewBox
 from .drawopts import FRDrawOpts, FRButtonCollection
-from .parameditors import FRParamEditor, FRParamEditorDockGrouping
 from .procwrapper import FRImgProcWrapper
-from ..processingimpls import _historyMaskHolder
 from .regions import FRVertexDefinedImg, FRMouseFollowingRegionPlot
+from ..parameditors import FRParamEditor, FRParamEditorDockGrouping
+from ..processingimpls import _historyMaskHolder
 
 __all__ = ['FRMainImage', 'FRFocusedImage', 'FREditableImgBase']
 

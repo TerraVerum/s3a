@@ -11,7 +11,7 @@ from pyqtgraph.Qt import QtGui, QtCore
 
 from s3a import FR_SINGLETON
 from s3a.generalutils import coerceDfTypes, stackedVertsPlusConnections
-from s3a.projectvars import REQD_TBL_FIELDS, FR_CONSTS
+from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS
 from s3a.structures import FRParam, FRVertices, FRComplexVertices, OneDArr, BlackWhiteImg
 from s3a.structures.typeoverloads import GrayImg
 from .clickables import FRBoundScatterPlot

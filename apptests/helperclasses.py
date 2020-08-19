@@ -7,7 +7,7 @@ import numpy as np
 from pandas import DataFrame as df
 
 from s3a import FR_SINGLETON
-from s3a.projectvars import REQD_TBL_FIELDS
+from s3a.constants import REQD_TBL_FIELDS
 from s3a.structures import FRComplexVertices
 from testingconsts import RND, IMG_DIR
 

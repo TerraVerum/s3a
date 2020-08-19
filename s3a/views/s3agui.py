@@ -1,7 +1,7 @@
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Optional, Union, Tuple, Dict, Any, List
+from typing import Optional, Union, Dict, Any
 
 import numpy as np
 import qdarkstyle
@@ -10,21 +10,19 @@ import pyqtgraph as pg
 from pyqtgraph.console import ConsoleWidget
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import Parameter
-from pyqtgraph.parametertree.parameterTypes import ActionParameter, ActionParameterItem
+from pyqtgraph.parametertree.parameterTypes import ActionParameter
 
 from s3a.views.drawopts import FRButtonCollection
 from s3a.views.imageareas import FREditableImgBase
-from s3a.views.parameditors import FRParamEditor, FRParamEditorDockGrouping, FR_SINGLETON
+from s3a.parameditors import FRParamEditor, FRParamEditorDockGrouping, FR_SINGLETON
 from s3a.models.s3abase import S3ABase
-from s3a.projectvars import LAYOUTS_DIR, FR_CONSTS, FR_ENUMS, APP_STATE_DIR, \
-  REQD_TBL_FIELDS
-from s3a.projectvars.enums import _FREnums
+from s3a.constants import LAYOUTS_DIR, FR_CONSTS, REQD_TBL_FIELDS
+from s3a.constants import _FREnums, FR_ENUMS
 from s3a.structures import FRS3AWarning, FRVertices
 from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
   autosaveOptsDialog, attemptFileLoad, popupFilePicker, \
   disableAppDuringFunc, saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
   restoreExceptionBehavior, contextMenuFromEditorActions
-from .imageareas import FRFocusedImage
 
 __all__ = ['S3A']
 

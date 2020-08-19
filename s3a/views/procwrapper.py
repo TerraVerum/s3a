@@ -15,8 +15,8 @@ from s3a.processingimpls import crop_to_local_area, apply_process_result, basicO
   return_to_full_size, format_vertices
 from s3a.structures import FRParam, FRComplexVertices, FRAlgProcessorError, FRVertices, \
   FRS3AWarning
-from s3a.views.parameditors.pgregistered import FRCustomMenuParameter
-from s3a.views.parameditors import genericeditor
+from s3a.parameditors.pgregistered import FRCustomMenuParameter
+from s3a.parameditors import genericeditor
 
 __all__ = ['FRImgProcWrapper', 'FRGeneralProcWrapper']
 
@@ -104,7 +104,7 @@ class FRGeneralProcWrapper(ABC):
 
 class FRImgProcWrapper(FRGeneralProcWrapper):
   def __init__(self, processor: ImageProcess, editor: genericeditor.FRParamEditor,
-               excludedStages: List[List[str]]=None, disabledStages: List[List[str]]=None ):
+               excludedStages: List[List[str]]=None, disabledStages: List[List[str]]=None):
     # Each processor is encapsulated in processes that crop the image to the region of
     # interest specified by the user, and re-expand the area after processing
     formatStage = ImageProcess.fromFunction(format_vertices, name='Format Vertices')

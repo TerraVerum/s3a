@@ -12,13 +12,14 @@ from s3a.controls.tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
 from s3a.generalutils import resolveAuthorName
 from s3a.graphicsutils import addDirItemsToMenu, saveToFile
 from s3a.models.tablemodel import FRComponentIO, FRComponentMgr
-from s3a.projectvars import FR_CONSTS, FR_ENUMS, REQD_TBL_FIELDS
+from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS
+from s3a.constants import FR_ENUMS
 from s3a.structures import FRS3AWarning, FRVertices, FilePath, NChanImg, FRAppIOError, \
   FRAlgProcessorError
 from s3a.views.imageareas import FRMainImage, FRFocusedImage, FREditableImgBase
-from s3a.views.parameditors import FRParamEditor
-from s3a.views.parameditors import FR_SINGLETON
-from s3a.views.parameditors.appstate import FRAppStateEditor
+from s3a.parameditors import FRParamEditor
+from s3a.parameditors import FR_SINGLETON
+from s3a.parameditors.appstate import FRAppStateEditor
 from s3a.views.tableview import FRCompTableView
 
 __all__ = ['S3ABase']
