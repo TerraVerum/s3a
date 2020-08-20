@@ -86,20 +86,16 @@ class FRComplexVertices(list):
   def __init__(self, inputArr: Union[List[FRVertices], np.ndarray]=None,
                hierarchy:np.ndarray=None,
                coerceListElements=False):
+
     if inputArr is None:
       inputArr = []
+    numInpts = len(inputArr)
     if coerceListElements:
       inputArr = [FRVertices(el) for el in inputArr]
+    if hierarchy is None:
+      hierarchy = np.ones((numInpts, 4), dtype=int)*-1
     super().__init__(inputArr)
     # No hierarchy required unless list is longer than length 1
-    numInpts = len(inputArr)
-    if numInpts > 1 and hierarchy is None:
-      raise FRIllFormedVerticesError(f'Must pass a hierarchy with any complex vertices of more than one vertex list, '
-                                f'received vertex list of length {numInpts}')
-    elif (hierarchy is None and numInpts <= 1) \
-        or hierarchy is None:
-      # Default hierarchy for a one- or zero-object contour list
-      hierarchy = np.ones((numInpts, 4), dtype=int)*-1
     self.hierarchy = hierarchy
 
   def append(self, verts:FRVertices=None) -> None:
