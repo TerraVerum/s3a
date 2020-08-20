@@ -557,7 +557,7 @@ class FRComponentIO:
         outDf['offset'].append(bounds[0,:])
     outDf = pd.DataFrame(outDf)
     if outFile is not None:
-      self.compDf.to_pickle(outFile)
+      outDf.to_pickle(outFile)
     return outDf
 
   def exportPkl(self, outFile: Union[str, Path]=None, **exportArgs) -> (Any, str):
