@@ -23,7 +23,7 @@ from s3a.structures import FRS3AWarning, FRVertices
 from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
   autosaveOptsDialog, attemptFileLoad, popupFilePicker, \
   disableAppDuringFunc, saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
-  restoreExceptionBehavior, contextMenuFromEditorActions
+  restoreExceptionBehavior, contextMenuFromEditorActions, FRScrollableErrorDialog
 
 __all__ = ['S3A']
 
@@ -101,6 +101,9 @@ class S3A(S3ABase):
     self.loadCompsAct_new.triggered.connect(lambda: self.loadCompList_gui(FR_ENUMS.COMP_ADD_AS_NEW))
     self.startAutosaveAct.triggered.connect(self.startAutosave_gui)
     self.stopAutosaveAct.triggered.connect(self.stopAutosave)
+    self.aboutAct.triggered.connect(self.showAboutText_gui)
+    self.userGuideAct.triggered.connect(
+      lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl('https://gitlab.com/ficsresearch/s3a/-/wikis/home')))
 
     # EDIT
     stack = FR_SINGLETON.actionStack
@@ -213,6 +216,7 @@ class S3A(S3ABase):
     self.menuFile = QtWidgets.QMenu('&File', self.menubar)
     self.menuEdit = QtWidgets.QMenu('&Edit', self.menubar)
     self.menuAnalytics = QtWidgets.QMenu('&Analytics', self.menubar)
+    self.menuHelp = QtWidgets.QMenu('&Help', self.menubar)
     menuTools = QtWidgets.QMenu('&Tools', self.menubar)
 
     toolbar: QtWidgets.QToolBar = self.addToolBar('Parameter Editors')
@@ -226,6 +230,7 @@ class S3A(S3ABase):
     self.menubar.addMenu(self.menuFile)
     self.menubar.addMenu(self.menuEdit)
     self.menubar.addMenu(self.menuAnalytics)
+    self.menubar.addMenu(self.menuHelp)
     self.menubar.addMenu(menuTools)
 
     # File / Image
@@ -264,11 +269,14 @@ class S3A(S3ABase):
     self.newCompAnalyticsAct = create_addMenuAct(self, self.menuAnalytics, 'Newest Added Component')
     self.modCompAnalyticsAct = create_addMenuAct(self, self.menuAnalytics, 'Modified Component')
 
-    self.setMenuBar(self.menubar)
-
     # Tools
     self.devConsoleAct = create_addMenuAct(self, menuTools, 'Show Developer Console')
 
+    # Help
+    self.aboutAct = create_addMenuAct(self, self.menuHelp, 'About')
+    self.userGuideAct = create_addMenuAct(self, self.menuHelp, 'Online User Guide')
+
+    self.setMenuBar(self.menubar)
 
     pluginDocks = [p.toolsEditor for p in FR_SINGLETON.plugins]
     # SETTINGS
@@ -345,6 +353,14 @@ class S3A(S3ABase):
         warnings.warn('Some information was not provided -- autosave not started.', FRS3AWarning)
       else:
         self.startAutosave(interval, folderName, baseName)
+
+  def showAboutText_gui(self):
+    text = 'This application was developed by the FICS Research Lab at the University of Florida.\n\
+    Makes strong use of the pyqtgraph library (http://www.pyqtgraph.org) and Qt5 widgets.'
+    msgBox = FRScrollableErrorDialog(self, True, text, text)
+    msgBox.toggleTrace.hide()
+    msgBox.show()
+    msgBox.exec_()
 
   def exportCompList_gui(self):
     fileDlg = QtWidgets.QFileDialog()

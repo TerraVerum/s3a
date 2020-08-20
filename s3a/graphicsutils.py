@@ -328,6 +328,7 @@ class FRScrollableErrorDialog(QtWidgets.QDialog):
 
     btnLayout.addItem(spacerItem)
     verticalLayout.addLayout(btnLayout)
+    self.toggleTrace = toggleTrace
     ok.setFocus()
     updateTxt()
 
