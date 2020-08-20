@@ -1,7 +1,7 @@
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Optional, Union, Dict, Any
+from typing import Optional, Union, Dict, Any, Type
 
 import numpy as np
 import qdarkstyle
@@ -12,6 +12,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.parameterTypes import ActionParameter
 
+from s3a.parameditors.genericeditor import FRParamEditorPlugin
 from s3a.views.drawopts import FRButtonCollection
 from s3a.views.imageareas import FREditableImgBase
 from s3a.parameditors import FRParamEditor, FRParamEditorDockGrouping, FR_SINGLETON
@@ -550,6 +551,10 @@ class S3A(S3ABase):
       # directly forward the selection here
       self.compTbl.setSelectedCellsAs_gui(selection)
     return ret
+
+  def addPlugin(self, pluginCls: Type[FRParamEditorPlugin], *args, **kwargs):
+    plugin = super().addPlugin(pluginCls, *args, **kwargs)
+    self.createMenuOptForDock(plugin.toolsEditor, parentToolbar=self.paramToolbar)
 
 
 if __name__ == '__main__':

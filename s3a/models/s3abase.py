@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from typing import Optional, Union, Callable, Dict, Any
+from typing import Optional, Union, Callable, Dict, Any, Type
 from warnings import warn
 
 import numpy as np
@@ -8,16 +8,18 @@ import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
 
+from s3a import FRParam
 from s3a.controls.tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
-from s3a.generalutils import resolveAuthorName
+from s3a.generalutils import resolveAuthorName, frPascalCaseToTitle
 from s3a.graphicsutils import addDirItemsToMenu, saveToFile
 from s3a.models.tablemodel import FRComponentIO, FRComponentMgr
 from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS
 from s3a.constants import FR_ENUMS
+from s3a.parameditors.genericeditor import FRParamEditorPlugin
 from s3a.structures import FRS3AWarning, FRVertices, FilePath, NChanImg, FRAppIOError, \
   FRAlgProcessorError
 from s3a.views.imageareas import FRMainImage, FRFocusedImage, FREditableImgBase
-from s3a.parameditors import FRParamEditor
+from s3a.parameditors import FRParamEditor, FRParamEditorDockGrouping
 from s3a.parameditors import FR_SINGLETON
 from s3a.parameditors.appstate import FRAppStateEditor
 from s3a.views.tableview import FRCompTableView
@@ -294,6 +296,25 @@ class S3ABase(QtWidgets.QMainWindow):
 
   def showModCompAnalytics(self):
     self._check_plotStages(self.focusedImg)
+
+  def addPlugin(self, pluginCls: Type[FRParamEditorPlugin], *args, **kwargs):
+    """
+    From a class inheriting the *FRParamEditorPlugin*, creates a plugin object
+    that will appear in the S3A toolbar. An entry is created with dropdown options
+    for each editor in *pluginCls*'s *editors* attribute.
+
+    :param pluginCls: Class containing plugin actions
+    :param args: Passed to class constructor
+    :param kwargs: Passed to class constructor
+    """
+    nameToUse = pluginCls.name
+    if nameToUse is None:
+      nameToUse = frPascalCaseToTitle(pluginCls.__name__)
+    deco = FR_SINGLETON.registerGroup(FRParam(nameToUse))
+    plugin: FRParamEditorPlugin = deco(pluginCls)(*args, **kwargs)
+    plugin.s3a = self
+    FR_SINGLETON.addDocks([plugin.toolsEditor])
+    return plugin
 
   @FR_SINGLETON.actionStack.undoable('Create New Comp', asGroup=True)
   def add_focusComp(self, newComps: df):

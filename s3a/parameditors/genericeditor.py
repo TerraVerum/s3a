@@ -1,4 +1,6 @@
-from typing import List, Dict, Union, Type, Tuple
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from typing import List, Dict, Union, Type, Tuple, Optional
 
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter, ParameterItem
@@ -7,6 +9,7 @@ from s3a.generalutils import frPascalCaseToTitle
 from s3a.graphicsutils import dialogGetSaveFileName
 from s3a.models.editorbase import FRParamEditorBase
 from s3a.constants import MENU_OPTS_DIR
+from s3a import models
 from s3a.structures import FRParam, FilePath
 
 Signal = QtCore.Signal
@@ -179,3 +182,13 @@ class FRParamEditorDockGrouping(QtWidgets.QDockWidget):
     else:
       tabName = editor.name
     return tabName
+
+
+class FRParamEditorPlugin(ABC):
+  name: str=None
+  s3a: Optional[models.s3abase.S3ABase]=None
+  toolsEditor: FRParamEditor
+
+  @classmethod
+  def __initEditorParams__(cls):
+    cls.toolsEditor = FRParamEditor.buildClsToolsEditor(cls, cls.name)

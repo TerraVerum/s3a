@@ -40,7 +40,7 @@ class _FRSingleton(QtCore.QObject):
     self.colorScheme = FRColorSchemeEditor()
 
     self.algParamMgr = FRAlgPropsMgr()
-    self.docks: List[FRParamEditor] = [self.filter]
+    self.docks: List[QtWidgets.QDockWidget] = [self.filter]
     self.quickLoader = FRQuickLoaderEditor(editorList=self.registerableEditors)
     grouping = FRParamEditorDockGrouping([self.generalProps, self.colorScheme], 'General Properties')
     self.addDocks(grouping)
