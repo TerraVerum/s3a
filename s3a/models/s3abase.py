@@ -61,6 +61,9 @@ class S3ABase(QtWidgets.QMainWindow):
     # -----
     self.appStateEditor = FRAppStateEditor(self, name='App State Editor')
 
+    for plugin in FR_SINGLETON.plugins:
+      plugin.s3a = self
+
     def loadCfg(_fname: str):
       FR_SINGLETON.tableData.loadCfg(_fname)
       self.resetTblFields()
@@ -296,25 +299,6 @@ class S3ABase(QtWidgets.QMainWindow):
 
   def showModCompAnalytics(self):
     self._check_plotStages(self.focusedImg)
-
-  def addPlugin(self, pluginCls: Type[FRParamEditorPlugin], *args, **kwargs):
-    """
-    From a class inheriting the *FRParamEditorPlugin*, creates a plugin object
-    that will appear in the S3A toolbar. An entry is created with dropdown options
-    for each editor in *pluginCls*'s *editors* attribute.
-
-    :param pluginCls: Class containing plugin actions
-    :param args: Passed to class constructor
-    :param kwargs: Passed to class constructor
-    """
-    nameToUse = pluginCls.name
-    if nameToUse is None:
-      nameToUse = frPascalCaseToTitle(pluginCls.__name__)
-    deco = FR_SINGLETON.registerGroup(FRParam(nameToUse))
-    plugin: FRParamEditorPlugin = deco(pluginCls)(*args, **kwargs)
-    plugin.s3a = self
-    FR_SINGLETON.addDocks([plugin.toolsEditor])
-    return plugin
 
   @FR_SINGLETON.actionStack.undoable('Create New Comp', asGroup=True)
   def add_focusComp(self, newComps: df):

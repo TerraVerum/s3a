@@ -219,6 +219,10 @@ class S3A(S3ABase):
     toolbar.setObjectName('Parameter Edtor Toolbar')
     self.paramToolbar = toolbar
 
+    pluginToolbar = self.addToolBar('Plugin Editors')
+    toolbar.setObjectName('Plugin Editor Toolbar')
+    self.pluginToolbar = pluginToolbar
+
     self.menubar.addMenu(self.menuFile)
     self.menubar.addMenu(self.menuEdit)
     self.menubar.addMenu(self.menuAnalytics)
@@ -266,9 +270,13 @@ class S3A(S3ABase):
     self.devConsoleAct = create_addMenuAct(self, menuTools, 'Show Developer Console')
 
 
+    pluginDocks = [p.toolsEditor for p in FR_SINGLETON.plugins]
     # SETTINGS
     for dock in FR_SINGLETON.docks:
-      self.createMenuOptForDock(dock, parentToolbar=toolbar)
+      if dock not in pluginDocks:
+        self.createMenuOptForDock(dock, parentToolbar=toolbar)
+    for dock in pluginDocks:
+      self.createMenuOptForDock(dock, parentToolbar=pluginToolbar)
 
   def _maybeLoadLastState_gui(self, loadLastState: bool=None,
                               quickLoaderArgs:dict=None):
@@ -551,11 +559,6 @@ class S3A(S3ABase):
       # directly forward the selection here
       self.compTbl.setSelectedCellsAs_gui(selection)
     return ret
-
-  def addPlugin(self, pluginCls: Type[FRParamEditorPlugin], *args, **kwargs):
-    plugin = super().addPlugin(pluginCls, *args, **kwargs)
-    self.createMenuOptForDock(plugin.toolsEditor, parentToolbar=self.paramToolbar)
-
 
 if __name__ == '__main__':
   import sys
