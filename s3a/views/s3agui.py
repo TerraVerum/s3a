@@ -230,8 +230,8 @@ class S3A(S3ABase):
     self.menubar.addMenu(self.menuFile)
     self.menubar.addMenu(self.menuEdit)
     self.menubar.addMenu(self.menuAnalytics)
-    self.menubar.addMenu(self.menuHelp)
     self.menubar.addMenu(menuTools)
+    self.menubar.addMenu(self.menuHelp)
 
     # File / Image
     self.openImgAct = create_addMenuAct(self, self.menuFile, '&Open Image')
@@ -355,8 +355,8 @@ class S3A(S3ABase):
         self.startAutosave(interval, folderName, baseName)
 
   def showAboutText_gui(self):
-    text = 'This application was developed by the FICS Research Lab at the University of Florida.\n\
-    Makes strong use of the pyqtgraph library (http://www.pyqtgraph.org) and Qt5 widgets.'
+    text = 'This application was developed by the FICS Research Lab at the University of Florida.\n' \
+           'Makes strong use of the pyqtgraph library (http://www.pyqtgraph.org) and Qt5 widgets. (https://www.qt.io/)'
     msgBox = FRScrollableErrorDialog(self, True, text, text)
     msgBox.toggleTrace.hide()
     msgBox.show()
