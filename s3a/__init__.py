@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import sys
+import os
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
@@ -14,9 +15,13 @@ pg.setConfigOptions(imageAxisOrder='row-major')
 
 # Makes sure that when the folder is run as a module, the app exists in the outermost
 # scope of the application
+customPlatform = os.environ.get('S3A_PLATFORM')
 appInst = QtWidgets.QApplication.instance()
 if appInst is None:
-  appInst = QtWidgets.QApplication(sys.argv)
+  args = list(sys.argv)
+  if customPlatform is not None:
+    args += ['-platform', customPlatform]
+  appInst = QtWidgets.QApplication(args)
 # Now that the app was created with sys args, populate pg instance
 pg.mkQApp()
 # Allow selectable text in message boxes
@@ -40,4 +45,9 @@ from s3a.constants import REQD_TBL_FIELDS
 for name, func in inspect.getmembers(FRTopLevelProcessors, inspect.isfunction):
   FR_SINGLETON.algParamMgr.addProcessCtor(func)
 
-from .views.s3agui import S3A
+# Minimal means no GUI is needed. Things work faster when they don't have to be
+# shown through the comp display filter
+if customPlatform is not None:
+  from .models.s3abase import S3ABase as S3A
+else:
+  from .views.s3agui import S3A
