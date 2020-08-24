@@ -156,7 +156,7 @@ class S3A(S3ABase):
 
 
     self.mainImg.showGuiBtns.sigValueChanged.connect(
-      lambda _p, val: self.focusedImg.toolsGrp.setVisible(val))
+      lambda _p, val: self.mainImg.toolsGrp.setVisible(val))
 
     tableDock = QtWidgets.QDockWidget('Component Table Window', self)
     tableDock.setFeatures(tableDock.DockWidgetMovable|tableDock.DockWidgetFloatable)
@@ -272,7 +272,7 @@ class S3A(S3ABase):
 
     self.setMenuBar(self.menubar)
 
-    pluginDocks = [p.toolsEditor for p in FR_SINGLETON.plugins]
+    pluginDocks = [p.docks for p in FR_SINGLETON.plugins]
     # SETTINGS
     for dock in FR_SINGLETON.docks:
       if dock not in pluginDocks:
@@ -509,7 +509,7 @@ class S3A(S3ABase):
     else:
       # FRParamEditorDockGrouping
       parentBtn.setText(dockEditor.name)
-      menu = QtWidgets.QMenu()
+      menu = QtWidgets.QMenu(self)
       parentBtn.setMenu(menu)
       # newMenu = create_addMenuAct(self, parentBtn, dockEditor.name, True)
       for editor in dockEditor.editors:

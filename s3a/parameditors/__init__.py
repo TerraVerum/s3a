@@ -109,7 +109,8 @@ class _FRSingleton(QtCore.QObject):
     plugin: FRParamEditorPlugin = deco(pluginCls)(*args, **kwargs)
     if isinstance(plugin, FRTableFieldAssistant):
       plugin.makeWidget()
-    self.addDocks([plugin.toolsEditor])
+    if plugin.docks is not None:
+      self.addDocks(plugin.docks)
     self.plugins.append(plugin)
     return plugin
 

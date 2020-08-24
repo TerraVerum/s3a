@@ -38,8 +38,6 @@ class FREditableImgBase(pg.PlotWidget):
   @classmethod
   def __initEditorParams__(cls):
     cls.toolsEditor = FRParamEditor.buildClsToolsEditor(cls)
-    FR_SINGLETON.addDocks(cls.toolsEditor)
-
 
     cls.compCropMargin, cls.treatMarginAsPct = FR_SINGLETON.generalProps.registerProps(
       cls, [FRC.PROP_CROP_MARGIN_VAL, FRC.PROP_TREAT_MARGIN_AS_PCT])
@@ -192,6 +190,7 @@ class FRMainImage(FREditableImgBase):
             FRC.TOOL_MOVE_REGIONS, FRC.TOOL_COPY_REGIONS], asProperty=False)
     (cls.minCompSize, cls.onlyGrowViewbox) = FR_SINGLETON.generalProps.registerProps(
       cls, [FRC.PROP_MIN_COMP_SZ, FRC.PROP_ONLY_GROW_MAIN_VB])
+    FR_SINGLETON.addDocks(cls.toolsEditor)
 
   def __init__(self, parent=None, imgSrc=None, **kargs):
     allowedShapes = (FRC.DRAW_SHAPE_RECT, FRC.DRAW_SHAPE_POLY)

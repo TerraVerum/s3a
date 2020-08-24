@@ -191,9 +191,12 @@ class FRParamEditorPlugin(ABC):
   s3a: Optional[models.s3abase.S3ABase]=None
   toolsEditor: FRParamEditor
 
+  docks: Union[FRParamEditorDockGrouping, FRParamEditor] = None
+
+
   @classmethod
   def __initEditorParams__(cls):
-    cls.toolsEditor = FRParamEditor.buildClsToolsEditor(cls, cls.name)
+    pass
 
 class FRTableFieldAssistant(FRParamEditorPlugin):
   widget: Optional[QtWidgets.QWidget] = None
