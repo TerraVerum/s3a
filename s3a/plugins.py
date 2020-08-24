@@ -18,6 +18,8 @@ class FRTableVertsPlugin(FRTableFieldAssistant):
   def __initEditorParams__(cls):
     FRFocusedImage.__initEditorParams__()
     cls.toolsEditor = FRFocusedImage.toolsEditor
+    cls.toolsEditor.name = 'Tools'
+    FRFocusedImage.procCollection.name = 'Processor'
     dockGroup = FRParamEditorDockGrouping([cls.toolsEditor, FRFocusedImage.procCollection],
                                           frPascalCaseToTitle(cls.name))
     cls.docks = dockGroup
