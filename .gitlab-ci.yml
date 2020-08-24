@@ -2,7 +2,6 @@ image: "python:latest"
 
 before_script:
   - apt-get update
-  - apt-get install -y libgl1-mesa-glx xvfb
   - apt-get install -y python3-pyqt5
   - python --version
   - pip install --upgrade pyqt5==5.13
@@ -16,4 +15,4 @@ stages:
 pytest:
   stage: Test
   script:
-    - xvfb-run -a pytest -l ./apptests --cov-report term --cov=.
+    - pytest -l ./apptests --cov-report term --cov=.
