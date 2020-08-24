@@ -17,20 +17,31 @@ for line in lines:
   if not line.startswith('#'):
     required.append(line.strip('\n'))
 
+# Get the long description from the README file
+long_description = (here / 'README.md').read_text(encoding='utf-8')
 
 setup(
   name='s3a',
-  version='0.1.0',
+  version='0.1.3',
   package_dir={'s3a':'s3a'},
   packages=find_packages(),
   data_files=[('s3a/s3a/icons', _mltGlob('s3a/icons', '*.svg', '*.png')),
   ('s3a/s3a', _mltGlob('s3a/', '*.yml'))],
+  entry_points={
+    'console_scripts': [
+      's3a-gui = s3a.__main__:main',
+    ]
+  },
+
   install_requires=required,
   include_package_data=True,
   url='https://gitlab.com/ficsresearch/s3a',
   download_url='https://gitlab.com/ficsresearch/s3a',
   license='MIT',
   description='Application to facilitate semantic labeling of image data',
+  long_description=long_description,
+  long_description_content_type='text/markdown',
+  keywords='semantic, labeling, image, annotation',
   author='Nathan Jessurun',
   author_email='njessurun@ufl.edu',
   classifiers=[

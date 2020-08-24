@@ -1,14 +1,10 @@
-setuptools
 typing_extensions
 fire
-tqdm
 opencv_python>=4.1.2.30
 numpy
 pandas
 scipy
 scikit-image
-scikit-learn
-matplotlib
 PyQt5>=5.11
 pyqtgraph
 Pillow
