@@ -5,10 +5,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from conftest import NUM_COMPS, _block_pltShow, app, mgr, dfTester
+from conftest import NUM_COMPS, app, mgr, dfTester
 from s3a import FR_SINGLETON, appInst, S3A
 from s3a.models.s3abase import S3ABase
-from s3a.generalutils import resolveAuthorName
+from s3a.generalutils import resolveAuthorName, imgCornerVertices
 from s3a.constants import REQD_TBL_FIELDS, LAYOUTS_DIR, ANN_AUTH_DIR
 from s3a.structures import FRAlgProcessorError, FRS3AException, FRVertices, \
   FRComplexVertices, FRS3AWarning
@@ -36,7 +36,7 @@ def test_est_bounds_no_img():
 
 def test_est_clear_bounds():
   # Change to easy processor first for speed
-  clctn = app.mainImg.procCollection
+  clctn = app.focusedImg.procCollection
   prevProc = clctn.curProcessor
   clctn.switchActiveProcessor('Basic Shapes')
   app.estimateBoundaries()
@@ -118,24 +118,20 @@ def test_autosave(tmpdir):
   assert len(savedFiles) >= 3, 'Not enough autosaves generated'
 
 def test_stage_plotting():
-  for editableImg in app.mainImg, app.focusedImg:
-    editableImg.procCollection = FR_SINGLETON.algParamMgr.createProcessorForClass(editableImg)
-  with _block_pltShow():
-    with pytest.raises(FRAlgProcessorError):
-      app.showModCompAnalytics()
-    with pytest.raises(FRAlgProcessorError):
-      app.showNewCompAnalytics()
-    # Make a component so modofications can be tested
-    mainImg = app.mainImg
-    mainImg.procCollection.switchActiveProcessor('Basic Shapes')
-    mainImg.handleShapeFinished(FRVertices())
-    app.showNewCompAnalytics()
-    assert app.focusedImg.compSer.loc[REQD_TBL_FIELDS.INST_ID] >= 0
-
-    focImg = app.focusedImg
-    focImg.procCollection.switchActiveProcessor('Basic Shapes')
-    focImg.handleShapeFinished(FRVertices())
+  app.mainImg.handleShapeFinished(imgCornerVertices(app.mainImg.image))
+  app.focusedImg.procCollection = FR_SINGLETON.algParamMgr.createProcessorForClass(app.focusedImg)
+  with pytest.raises(FRAlgProcessorError):
     app.showModCompAnalytics()
+  # Make a component so modofications can be tested
+  focImg = app.focusedImg
+  focImg.procCollection.switchActiveProcessor('Basic Shapes')
+  focImg.handleShapeFinished(FRVertices())
+  assert app.focusedImg.compSer.loc[REQD_TBL_FIELDS.INST_ID] >= 0
+
+  focImg = app.focusedImg
+  focImg.procCollection.switchActiveProcessor('Basic Shapes')
+  focImg.handleShapeFinished(FRVertices())
+  app.showModCompAnalytics()
 
 def test_no_author():
   p = Path(ANN_AUTH_DIR/'defaultAuthor.txt')

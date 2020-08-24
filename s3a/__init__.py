@@ -33,7 +33,7 @@ import s3a.structures
 
 from s3a.parameditors import FR_SINGLETON, FRParamEditor
 from s3a.models.tablemodel import FRComponentIO
-from s3a.processingimpls import FRTopLevelProcessors
+from s3a.processing.algorithms import FRTopLevelProcessors
 from s3a.structures import FRVertices, FRComplexVertices, FRParam
 from s3a.constants import REQD_TBL_FIELDS
 

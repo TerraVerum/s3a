@@ -17,7 +17,7 @@ from s3a.structures.typeoverloads import GrayImg
 from .clickables import FRBoundScatterPlot
 from . import imageareas
 
-__all__ = ['FRMultiRegionPlot', 'FRVertexDefinedImg', 'FRMouseFollowingRegionPlot']
+__all__ = ['FRMultiRegionPlot', 'FRVertexDefinedImg', 'FRRegionCopierPlot']
 
 Signal = QtCore.Signal
 
@@ -253,7 +253,7 @@ class FRVertexDefinedImg(pg.ImageItem):
       lut.append(clr.getRgb())
     return np.array(lut, dtype='uint8')
 
-class FRMouseFollowingRegionPlot(pg.PlotCurveItem):
+class FRRegionCopierPlot(pg.PlotCurveItem):
   sigCopyStarted = QtCore.Signal()
   sigCopyStopped = QtCore.Signal()
 

@@ -13,7 +13,7 @@ from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.parameterTypes import ActionParameter
 
 from s3a.parameditors.genericeditor import FRParamEditorPlugin
-from s3a.views.drawopts import FRButtonCollection
+from s3a.views.buttons import FRButtonCollection
 from s3a.views.imageareas import FREditableImgBase
 from s3a.parameditors import FRParamEditor, FRParamEditorDockGrouping, FR_SINGLETON
 from s3a.models.s3abase import S3ABase
@@ -115,7 +115,6 @@ class S3A(S3ABase):
     stack.stackChangedCallbacks.append(updateUndoRedoTxts)
 
     # ANALYTICS
-    self.newCompAnalyticsAct.triggered.connect(self.showNewCompAnalytics)
     self.modCompAnalyticsAct.triggered.connect(self.showModCompAnalytics)
 
     # TOOLS
@@ -224,7 +223,7 @@ class S3A(S3ABase):
     self.paramToolbar = toolbar
 
     pluginToolbar = self.addToolBar('Plugin Editors')
-    toolbar.setObjectName('Plugin Editor Toolbar')
+    pluginToolbar.setObjectName('Plugin Editor Toolbar')
     self.pluginToolbar = pluginToolbar
 
     self.menubar.addMenu(self.menuFile)
@@ -568,7 +567,7 @@ class S3A(S3ABase):
       opts.horizWidth = opts.layout().minimumSize().width()
 
   def add_focusComp(self, newComps: df):
-    ret = super().add_focusComp(newComps)
+    ret = super().add_focusComps(newComps)
     if self.isVisible() and self.compTbl.showOnCreate:
       selection = self.compDisplay.selectRowsById(newComps.loc[:, REQD_TBL_FIELDS.INST_ID])
       # For some reason sometimes the actual table selection doesn't propagate in time, so

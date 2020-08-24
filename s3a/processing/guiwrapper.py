@@ -6,12 +6,11 @@ from typing import Tuple, List, Sequence
 from warnings import warn
 
 import numpy as np
-from imageprocessing.processing import ImageIO, ProcessStage, AtomicProcess, Process, \
-  ImageProcess, ProcessIO
+from ..processing.processing import *
 from pyqtgraph.parametertree import Parameter
 
 from s3a.generalutils import augmentException
-from s3a.processingimpls import crop_to_local_area, apply_process_result, basicOpsCombo, \
+from s3a.processing.algorithms import crop_to_local_area, apply_process_result, basicOpsCombo, \
   return_to_full_size, format_vertices
 from s3a.structures import FRParam, FRComplexVertices, FRAlgProcessorError, FRVertices, \
   FRS3AWarning
@@ -20,25 +19,25 @@ from s3a.parameditors import genericeditor
 
 __all__ = ['FRImgProcWrapper', 'FRGeneralProcWrapper']
 
-def atomicRunWrapper(proc: AtomicProcess, names: List[str], params: List[Parameter]):
+def atomicRunWrapper(proc: FRAtomicProcess, names: Sequence[str], params: Sequence[Parameter]):
   oldRun = proc.run
   @wraps(oldRun)
-  def newRun(io: ProcessIO = None, force=False, disable=False, verbose=False) -> ProcessIO:
+  def newRun(io: FRProcessIO = None, disable=False) -> FRProcessIO:
     newIo = {name: param.value() for name, param in zip(names, params)}
-    proc.updateParams(**newIo)
-    return oldRun(io, force, disable, verbose)
+    proc.input.update(**newIo)
+    return oldRun(io, disable)
   return newRun
 
-def procRunWrapper(proc: Process, groupParam: Parameter):
+def procRunWrapper(proc: FRGeneralProcess, groupParam: Parameter):
   oldRun = proc.run
   @wraps(oldRun)
-  def newRun(io: ProcessIO = None, force=False, disable=False, verbose=False):
+  def newRun(io: FRProcessIO = None, disable=False):
     proc.disabled = not groupParam.opts['enabled']
-    return oldRun(io, force=force, disable=disable, verbose=verbose)
+    return oldRun(io, disable=disable)
   return newRun
 
 class FRGeneralProcWrapper(ABC):
-  def __init__(self, processor: ImageProcess, editor: genericeditor.FRParamEditor):
+  def __init__(self, processor: FRGeneralProcess, editor: genericeditor.FRParamEditor):
     self.processor = processor
     self.algName = processor.name
     self.algParam = FRParam(self.algName)
@@ -48,26 +47,27 @@ class FRGeneralProcWrapper(ABC):
     editor.registerGroup(self.algParam, nameFromParam=True, forceCreate=True)
     self.unpackStages(self.processor)
 
-  def unpackStages(self, stage: ProcessStage, paramParent: Tuple[str,...]=()):
-    if isinstance(stage, AtomicProcess):
+  def unpackStages(self, stage: FRProcessStage, paramParent: Tuple[str, ...]=()):
+    if isinstance(stage, FRAtomicProcess):
       params: List[Parameter] = []
-      for key, val in stage.input.hyperParams.items():
+      for key in stage.input.hyperParamKeys:
+        val = stage.input[key]
         curParam = FRParam(name=key, value=val)
         pgParam = self.editor.registerProp(self.algParam, curParam, paramParent, asProperty=False)
         params.append(pgParam)
       stage.run = atomicRunWrapper(stage, stage.input.hyperParamKeys, params)
       return
     # else: # Process
-    stage: Process
+    stage: FRGeneralProcess
     curGroup = self.editor.params.child(self.algName, *paramParent)
     stage.run = procRunWrapper(stage, curGroup)
     # Special case of a process comprised of just one atomic function
-    if len(stage.stages) == 1 and isinstance(stage.stages[0], AtomicProcess):
+    if len(stage.stages) == 1 and isinstance(stage.stages[0], FRAtomicProcess):
       self.unpackStages(stage.stages[0], paramParent=paramParent)
       return
     for childStage in stage.stages:
       pType = 'atomicgroup'
-      if isinstance(childStage, Process) and childStage.allowDisable:
+      if isinstance(childStage, FRGeneralProcess) and childStage.allowDisable:
         pType = 'procgroup'
       curGroup = FRParam(name=childStage.name, pType=pType, value=[],)
       self.editor.registerProp(self.algParam, curGroup, paramParent, asProperty=False,
@@ -92,9 +92,10 @@ class FRGeneralProcWrapper(ABC):
     return oldName
 
   @classmethod
-  def getNestedName(cls, curProc: ProcessStage, nestedName: List[str]):
-    if len(nestedName) == 0:
+  def getNestedName(cls, curProc: FRProcessStage, nestedName: List[str]):
+    if len(nestedName) == 0 or isinstance(curProc, FRAtomicProcess):
       return curProc
+    # noinspection PyUnresolvedReferences
     for stage in curProc.stages:
       if stage.name == nestedName[0]:
         if len(nestedName) == 1:
@@ -103,17 +104,18 @@ class FRGeneralProcWrapper(ABC):
           return cls.getNestedName(stage, nestedName[1:])
 
 class FRImgProcWrapper(FRGeneralProcWrapper):
-  def __init__(self, processor: ImageProcess, editor: genericeditor.FRParamEditor,
+  def __init__(self, processor: FRImageProcess, editor: genericeditor.FRParamEditor,
                excludedStages: List[List[str]]=None, disabledStages: List[List[str]]=None):
     # Each processor is encapsulated in processes that crop the image to the region of
     # interest specified by the user, and re-expand the area after processing
-    formatStage = ImageProcess.fromFunction(format_vertices, name='Format Vertices')
+    formatStage = FRImageProcess()
+    formatStage.addFunction(format_vertices)
     formatStage.allowDisable = False
-    cropStage = ImageProcess.fromFunction(crop_to_local_area, name='Crop to Local Area')
+    cropStage = FRImageProcess.fromFunction(crop_to_local_area)
 
-    applyStage = ImageProcess.fromFunction(apply_process_result, 'Apply Process Result')
+    applyStage = FRImageProcess.fromFunction(apply_process_result)
     applyStage.allowDisable = False
-    resizeStage = ImageProcess.fromFunction(return_to_full_size, 'Return to Full Size')
+    resizeStage = FRImageProcess.fromFunction(return_to_full_size)
     resizeStage.allowDisable = False
 
     finalStages = [applyStage, basicOpsCombo(), resizeStage]
@@ -140,10 +142,10 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     newIo = self._ioDictFromRunKwargs(kwargs)
 
     try:
-      result = self.processor.run(newIo, force=True)
+      result = self.processor.run(newIo)
     except Exception as ex:
       augmentException(ex, 'Exception during processor run:\n')
-      result = ImageIO(image=kwargs['prevCompMask'])
+      result = FRProcessIO(image=kwargs['prevCompMask'])
       warn(str(ex), FRS3AWarning)
 
     outImg = result['image'].astype(bool)
@@ -178,4 +180,4 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
     else:
       noPrevMask = False
 
-    return ImageIO(**runKwargs, noPrevMask=noPrevMask)
+    return FRProcessIO(**runKwargs, noPrevMask=noPrevMask)

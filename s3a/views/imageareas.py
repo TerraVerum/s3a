@@ -1,23 +1,23 @@
 from typing import Union, Optional, Collection
 
 import numpy as np
+import cv2 as cv
 import pandas as pd
 import pyqtgraph as pg
-from pyqtgraph import BusyCursor
 from pyqtgraph.Qt import QtCore, QtGui
 from skimage.io import imread
 
 from s3a import FR_SINGLETON
-from s3a.generalutils import getClippedBbox, frPascalCaseToTitle, cornersToFullBoundary
+from s3a.generalutils import getClippedBbox, frPascalCaseToTitle
 from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS as FRC
 from s3a.structures import FRParam, FRVertices, FRComplexVertices, FilePath
 from s3a.structures import NChanImg
 from .clickables import FRRightPanViewBox
-from .drawopts import FRDrawOpts, FRButtonCollection
-from .procwrapper import FRImgProcWrapper
-from .regions import FRVertexDefinedImg, FRMouseFollowingRegionPlot
+from .buttons import FRDrawOpts, FRButtonCollection
+from s3a.processing import FRImgProcWrapper
+from .regions import FRVertexDefinedImg, FRRegionCopierPlot
 from ..parameditors import FRParamEditor, FRParamEditorDockGrouping
-from ..processingimpls import _historyMaskHolder
+from s3a.processing.algorithms import _historyMaskHolder
 
 __all__ = ['FRMainImage', 'FRFocusedImage', 'FREditableImgBase']
 
@@ -84,7 +84,7 @@ class FREditableImgBase(pg.PlotWidget):
     # -----
     # DRAWING OPTIONS
     # -----
-    self.regionCopier = FRMouseFollowingRegionPlot(self)
+    self.regionCopier = FRRegionCopierPlot(self)
 
     self.drawAction: FRParam = FRC.DRAW_ACT_PAN
     self.shapeCollection = FRRoiCollection(drawShapes, self)
@@ -194,8 +194,6 @@ class FREditableImgBase(pg.PlotWidget):
 @FR_SINGLETON.registerGroup(FRC.CLS_MAIN_IMG_AREA)
 class FRMainImage(FREditableImgBase):
   sigCompsCreated = Signal(object) # pd.DataFrame
-  sigCompsUpdated = Signal(object) # pd.DataFrame
-  sigCompsRemoved = Signal(object) # OneDArr
   # Hooked up during __init__
   sigSelectionBoundsMade = Signal(object) # FRVertices
 
@@ -203,12 +201,11 @@ class FRMainImage(FREditableImgBase):
   def __initEditorParams__(cls):
     super().__initEditorParams__()
     (cls.mergeCompsAct, cls.splitCompsAct, cls.moveCompsAct, cls.copyCompsAct,
-     cls.overrideCompVertsAct) = cls.toolsEditor.registerProps(
+     ) = cls.toolsEditor.registerProps(
       cls, [FRC.TOOL_MERGE_COMPS, FRC.TOOL_SPLIT_COMPS,
-            FRC.TOOL_MOVE_REGIONS, FRC.TOOL_COPY_REGIONS,
-            FRC.TOOL_OVERRIDE_VERTS_ACT], asProperty=False)
-    (cls.multCompsOnCreate, cls.onlyGrowViewbox) = FR_SINGLETON.generalProps.registerProps(
-      cls, [FRC.PROP_MK_MULT_COMPS_ON_ADD, FRC.PROP_ONLY_GROW_MAIN_VB])
+            FRC.TOOL_MOVE_REGIONS, FRC.TOOL_COPY_REGIONS], asProperty=False)
+    (cls.minCompSize, cls.onlyGrowViewbox) = FR_SINGLETON.generalProps.registerProps(
+      cls, [FRC.PROP_MIN_COMP_SZ, FRC.PROP_ONLY_GROW_MAIN_VB])
 
   def __init__(self, parent=None, imgSrc=None, **kargs):
     allowedShapes = (FRC.DRAW_SHAPE_RECT, FRC.DRAW_SHAPE_POLY)
@@ -226,7 +223,6 @@ class FRMainImage(FREditableImgBase):
     self.setImage(imgSrc)
     self.compFromLastProcResult: Optional[pd.DataFrame] = None
     self.lastProcVerts: Optional[FRVertices] = None
-    self.overrideCompVertsAct.sigActivated.connect(lambda: self.overrideLastProcResult())
     copier = self.regionCopier
     def startCopy():
       copier.inCopyMode = True
@@ -249,31 +245,19 @@ class FRMainImage(FREditableImgBase):
       # Component modification subject to processor
       # For now assume a single point indicates foreground where multiple indicate
       # background selection
-      verts = roiVerts.astype(int)
+      # False positive from type checker
+      verts = np.clip(roiVerts.astype(int), 0, self.image.shape[:2])
+      self.compFromLastProcResult = FR_SINGLETON.tableData.makeCompDf()
 
-      globalEstimate = self.multCompsOnCreate or roiVerts.empty
-      namePath = ['Basic Region Operations', 'Keep Largest Comp']
-      oldState = None
-      if globalEstimate:
-        oldState = self.curProcessor.setStageEnabled(namePath, False)
+      if cv.contourArea(verts) < self.minCompSize:
+        return
 
-      with BusyCursor():
-        self.curProcessor.run(image=self.image, fgVerts=verts.copy())
-      newVerts = self.curProcessor.resultAsVerts(not globalEstimate)
-
-      # Reset keep_largest_comp if necessary
-      if globalEstimate:
-        self.curProcessor.setStageEnabled(namePath, oldState)
-
-      # Discard entries with no real vertices
-      newComps = FR_SINGLETON.tableData.makeCompDf(len(newVerts))
-      newComps[REQD_TBL_FIELDS.VERTICES] = newVerts
+      # noinspection PyTypeChecker
+      verts = FRComplexVertices([verts])
+      newComps = FR_SINGLETON.tableData.makeCompDf()
+      newComps[REQD_TBL_FIELDS.VERTICES] = [verts]
       self.compFromLastProcResult = newComps
       self.lastProcVerts = verts
-      if len(newComps) == 0:
-        self.compFromLastProcResult = FR_SINGLETON.tableData.makeCompDf()
-        return
-      # TODO: Determine more robust solution for separated vertices. For now use largest component
       self.sigCompsCreated.emit(newComps)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
@@ -310,33 +294,6 @@ class FRMainImage(FREditableImgBase):
       self.imgItem.clear()
     else:
       self.imgItem.setImage(imgSrc)
-
-  def overrideLastProcResult(self):
-    # Nest work function so undo isn't influenced by currently selected component
-    @FR_SINGLETON.actionStack.undoable('Override Last Process Result')
-    def doOverride(comps=self.compFromLastProcResult, verts=self.lastProcVerts):
-      if comps is None: return
-      # Trim verts to image boundaries if necessary
-      vMin = verts.min(0)
-      if np.any(vMin < 0) or np.any(verts.max(0) > self.image.shape[:2][::-1]):
-        newVerts = cornersToFullBoundary(verts, stackResult=False)
-      else:
-        newVerts = FRComplexVertices([verts])
-
-      newComp = comps.iloc[[0],:].copy()
-      compId = newComp.index[0]
-      newComp.at[compId, REQD_TBL_FIELDS.VERTICES] = newVerts
-      self.sigCompsRemoved.emit(comps.loc[:, REQD_TBL_FIELDS.INST_ID])
-      if compId == -1:
-        self.sigCompsCreated.emit(newComp)
-      else:
-        self.sigCompsUpdated.emit(newComp)
-      yield
-      if compId == -1:
-        self.sigCompsRemoved.emit(newComp.index)
-      else:
-        self.sigCompsUpdated.emit(comps)
-    doOverride()
 
   def clearCurRoi(self):
     super().clearCurRoi()
@@ -388,7 +345,7 @@ class FRFocusedImage(FREditableImgBase):
     self.switchBtnMode(FRC.DRAW_ACT_ADD)
     self.switchBtnMode(FRC.DRAW_SHAPE_PAINT)
     # Disable local cropping on primitive grab cut by default
-    self.procCollection.nameToProcMapping['Primitive Grab Cut'].setStageEnabled(['Crop to Local Area'], False)
+    self.procCollection.nameToProcMapping['Primitive Grab Cut'].setStageEnabled(['Crop To Local Area'], False)
 
   def resetImage(self):
     self.updateAll(None)

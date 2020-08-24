@@ -10,7 +10,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets
 
 from s3a import FRParam
 from s3a.controls.tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
-from s3a.generalutils import resolveAuthorName, frPascalCaseToTitle
+from s3a.generalutils import resolveAuthorName, frPascalCaseToTitle, imgCornerVertices
 from s3a.graphicsutils import addDirItemsToMenu, saveToFile
 from s3a.models.tablemodel import FRComponentIO, FRComponentMgr
 from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS
@@ -103,20 +103,20 @@ class S3ABase(QtWidgets.QMainWindow):
     # MAIN IMAGE
     # -----
     self.mainImg.imgItem.sigImageChanged.connect(lambda: self.clearBoundaries())
-    self.mainImg.sigCompsCreated.connect(self.add_focusComp)
-    self.mainImg.sigCompsRemoved.connect(
-      lambda compIds: self.compMgr.rmComps(compIds)
-    )
+    self.mainImg.sigCompsCreated.connect(self.add_focusComps)
+
+    def handleCompsChanged(changedDict: dict):
+      focusedId = self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]
+      if focusedId in changedDict['deleted']:
+        self.focusedImg.resetImage()
+      elif focusedId in changedDict['changed']:
+        self.changeFocusedComp(self.compMgr.compDf.loc[[focusedId]])
+    self.compMgr.sigCompsChanged.connect(handleCompsChanged)
 
     # -----
     # COMPONENT TABLE
     # -----
     self.compDisplay.sigCompsSelected.connect(lambda newComps: self.changeFocusedComp(newComps))
-
-    def handleUpdate(comps):
-      self.compMgr.addComps(comps, FR_ENUMS.COMP_ADD_AS_MERGE)
-      self.changeFocusedComp(comps)
-    self.mainImg.sigCompsUpdated.connect(handleUpdate)
 
     # -----
     # MISC
@@ -226,7 +226,15 @@ class S3ABase(QtWidgets.QMainWindow):
     oldAct = self.mainImg.drawAction
     try:
       self.mainImg.drawAction = FR_CONSTS.DRAW_ACT_ADD
-      self.mainImg.handleShapeFinished(FRVertices())
+      proc = self.focusedImg.curProcessor
+      proc.run(image=self.mainImg.image, fgVerts=FRVertices())
+      verts = proc.resultAsVerts(False)
+      if len(verts) == 0:
+        return
+      newComps = FR_SINGLETON.tableData.makeCompDf(len(verts))
+      newComps[REQD_TBL_FIELDS.VERTICES] = verts
+      self.add_focusComps(newComps)
+
     except Exception as ex:
       raise
     finally:
@@ -294,14 +302,11 @@ class S3ABase(QtWidgets.QMainWindow):
     newComps = self.compIo.buildByFileType(inFname, self.mainImg.image.shape)
     self.compMgr.addComps(newComps, loadType)
 
-  def showNewCompAnalytics(self):
-    self._check_plotStages(self.mainImg)
-
   def showModCompAnalytics(self):
     self._check_plotStages(self.focusedImg)
 
   @FR_SINGLETON.actionStack.undoable('Create New Comp', asGroup=True)
-  def add_focusComp(self, newComps: df):
+  def add_focusComps(self, newComps: df):
     self.compMgr.addComps(newComps)
     # Make sure index matches ID before updating current component
     newComps = newComps.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
@@ -314,7 +319,13 @@ class S3ABase(QtWidgets.QMainWindow):
     if proc.result is None:
       raise FRAlgProcessorError('Analytics can only be shown after the algorithm'
                                 ' was run.')
-    proc.plotStages(ignoreDuplicateResults=True)
+    outGrid = proc.stageSummary_gui()
+    outGrid.showMaximized()
+    def fixedShow():
+      for item in outGrid.ci.items:
+        item.getViewBox().autoRange()
+    QtCore.QTimer.singleShot(0, fixedShow)
+
 
   @FR_SINGLETON.actionStack.undoable('Change Focused Component')
   def changeFocusedComp(self, newComps: df, forceKeepLastChange=False):

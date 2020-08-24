@@ -172,6 +172,7 @@ def frPascalCaseToTitle(name: str, addSpaces=True) -> str:
   else:
     replace = r'\1\2'
   name = re.sub(r'(\w)([A-Z])', replace, name)
+  name = name.replace('_', ' ')
   return name.title()
 
 
@@ -248,3 +249,12 @@ def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int,
     return croppedImg, coordSlices
   else:
     return croppedImg, compCoords
+
+def imgCornerVertices(img: NChanImg):
+  """Returns [x,y] vertices for each corner of the input image"""
+  fullImShape_xy = img.shape[:2][::-1]
+  return FRVertices([[0,                   0],
+              [0,                   fullImShape_xy[1]-1],
+              [fullImShape_xy[0]-1, fullImShape_xy[1]-1],
+              [fullImShape_xy[0]-1, 0]
+              ])

@@ -6,7 +6,7 @@ from s3a.constants import GEN_PROPS_DIR, SCHEMES_DIR, BASE_DIR
 from s3a.models.actionstack import FRActionStack
 from s3a.structures import FRParam
 from .genericeditor import FRParamEditor, FRParamEditorDockGrouping, FRParamEditorPlugin
-from .processor import FRAlgPropsMgr
+from .algcollection import FRAlgPropsMgr
 from .quickloader import FRQuickLoaderEditor
 from .shortcut import FRShortcutsEditor
 from .table import FRTableFilterEditor, FRTableData

@@ -1,11 +1,12 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import List, Dict, Union, Type, Tuple, Optional
 
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter, ParameterItem
 
 from s3a.generalutils import frPascalCaseToTitle
+from s3a import parameditors
 from s3a.graphicsutils import dialogGetSaveFileName
 from s3a.models.editorbase import FRParamEditorBase
 from s3a.constants import MENU_OPTS_DIR

@@ -4,7 +4,6 @@ from inspect import isclass
 from pathlib import Path
 from typing import Optional, Dict, List, Callable, Union
 
-from imageprocessing.processing import ImageProcess
 from pyqtgraph.Qt import QtCore
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.parameterTypes import ListParameter
@@ -12,10 +11,11 @@ from pyqtgraph.parametertree.parameterTypes import ListParameter
 from s3a.constants import MENU_OPTS_DIR
 from s3a.structures import FRParam, \
   FRAlgProcessorError, FRParamEditorError
-from s3a.views.procwrapper import FRImgProcWrapper
+from s3a.processing.guiwrapper import FRImgProcWrapper
 from .genericeditor import FRParamEditor
 from .pgregistered import FRProcGroupParameter
 from s3a.generalutils import frPascalCaseToTitle
+from ..processing.processing import FRImageProcess
 
 Signal = QtCore.Signal
 
@@ -23,7 +23,7 @@ class FRAlgPropsMgr(FRParamEditor):
   # sigProcessorCreated = Signal(object) # Signal(FRAlgCollectionEditor)
   def __init__(self, parent=None):
     super().__init__(parent, fileType='', saveDir='')
-    self.processorCtors : List[Callable[[], ImageProcess]] = []
+    self.processorCtors : List[Callable[[], FRImageProcess]] = []
     self.spawnedCollections : List[FRAlgCollectionEditor] = []
 
   def registerGroup(self, groupParam: FRParam = None, **opts):
@@ -50,13 +50,13 @@ class FRAlgPropsMgr(FRParamEditor):
     # self.sigProcessorCreated.emit(newEditor)
     return newEditor
 
-  def addProcessCtor(self, procCtor: Callable[[], ImageProcess]):
+  def addProcessCtor(self, procCtor: Callable[[], FRImageProcess]):
     self.processorCtors.append(procCtor)
     for algCollection in self.spawnedCollections:
       algCollection.addImageProcessor(procCtor())
 
 class FRAlgCollectionEditor(FRParamEditor):
-  def __init__(self, saveDir, procCtors: List[Callable[[], ImageProcess]],
+  def __init__(self, saveDir, procCtors: List[Callable[[], FRImageProcess]],
                name=None, parent=None):
     algOptDict = {
       'name': 'Algorithm', 'type':  'list', 'values': [], 'value': 'N/A'
@@ -74,8 +74,6 @@ class FRAlgCollectionEditor(FRParamEditor):
     self.curProcessor: Optional[FRImgProcWrapper] = None
     self.nameToProcMapping: Dict[str, FRImgProcWrapper] = {}
 
-    self.VERT_LST_NAMES = ['fgVerts', 'bgVerts']
-
     wrapped : Optional[FRImgProcWrapper] = None
     for processorCtor in procCtors:
       # Retrieve proc so default can be set after
@@ -84,7 +82,7 @@ class FRAlgCollectionEditor(FRParamEditor):
     self.switchActiveProcessor(proc=wrapped)
     # self.saveParamState('Default', allowOverwriteDefault=True)
 
-  def addImageProcessor(self, newProc: ImageProcess):
+  def addImageProcessor(self, newProc: FRImageProcess):
     processor = FRImgProcWrapper(newProc, self)
     self.tree.addParameters(self.params.child(processor.algName))
 

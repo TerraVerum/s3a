@@ -1,6 +1,6 @@
-import matplotlib.pyplot as plt
 import pytest
-
+import os
+os.environ['S3A_PLATFORM'] = 'minimal'
 from helperclasses import CompDfTester
 from s3a import FR_SINGLETON
 from s3a.views.s3agui import S3A
@@ -48,15 +48,3 @@ def resetApp_tester(request):
   yield
   stack.clear()
   app.clearBoundaries()
-
-
-class _block_pltShow:
-  def __init__(self):
-    self.oldShow = None
-
-  def __enter__(self):
-    self.oldShow = plt.show
-    plt.show = lambda: None
-
-  def __exit__(self, exc_type, exc_val, exc_tb):
-    plt.show = self.oldShow
