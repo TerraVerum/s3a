@@ -315,9 +315,10 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     see :func:`FRParamEditor.registerProp`.
     """
     outProps = []
-    for param in constParams:
-      outProps.append(self.registerProp(groupingName, param, parentParamPath,
-                                        asProperty, **extraOpts))
+    with self.params.treeChangeBlocker():
+      for param in constParams:
+        outProps.append(self.registerProp(groupingName, param, parentParamPath,
+                                          asProperty, **extraOpts))
     return outProps
 
   def _addParamGroup(self, groupName: str, **opts):
