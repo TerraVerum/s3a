@@ -16,6 +16,7 @@ from s3a.models.tablemodel import FRComponentIO, FRComponentMgr
 from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS
 from s3a.constants import FR_ENUMS
 from s3a.parameditors.genericeditor import FRParamEditorPlugin
+from s3a.plugins import FRTableVertsPlugin
 from s3a.structures import FRS3AWarning, FRVertices, FilePath, NChanImg, FRAppIOError, \
   FRAlgProcessorError
 from s3a.views.imageareas import FRMainImage, FRFocusedImage, FREditableImgBase
@@ -40,7 +41,8 @@ class S3ABase(QtWidgets.QMainWindow):
   def __init__(self, parent=None, **quickLoaderArgs):
     super().__init__(parent)
     self.mainImg = FRMainImage()
-    self.focusedImg = FRFocusedImage()
+    self.vertsPlugin: FRTableVertsPlugin = FR_SINGLETON.addPlugin(FRTableVertsPlugin)
+    self.focusedImg = self.vertsPlugin.focusedImg
     self.compMgr = FRComponentMgr()
     self.compIo = FRComponentIO()
     self.compTbl = FRCompTableView()
@@ -342,7 +344,6 @@ class S3ABase(QtWidgets.QMainWindow):
     self.compDisplay.regionPlot.focusById([newCompId])
     mainImg = self.mainImg.image
     self.focusedImg.updateAll(mainImg, newComp)
-    self.curCompIdLbl.setText(f'Component ID: {newCompId}')
     # Nothing happened since the last component change, so just replace it instead of
     # adding a distinct action to the buffer queue
     stack = FR_SINGLETON.actionStack

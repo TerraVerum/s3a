@@ -4,6 +4,7 @@ from typing import List, Dict, Union, Type, Tuple, Optional
 
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter, ParameterItem
+import pandas as pd
 
 from s3a.generalutils import frPascalCaseToTitle
 from s3a import parameditors
@@ -193,3 +194,12 @@ class FRParamEditorPlugin(ABC):
   @classmethod
   def __initEditorParams__(cls):
     cls.toolsEditor = FRParamEditor.buildClsToolsEditor(cls, cls.name)
+
+class FRTableFieldAssistant(FRParamEditorPlugin):
+  widget: Optional[QtWidgets.QWidget] = None
+  processors: List[parameditors.algcollection.FRAlgCollectionEditor] = []
+  compSer: pd.Series = None
+
+  def makeWidget(self):
+    raise NotImplementedError
+

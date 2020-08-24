@@ -5,12 +5,11 @@ import pytest
 from pyqtgraph.Qt import QtGui, QtCore
 
 from conftest import NUM_COMPS, app, mgr, dfTester
-from imageprocessing.common import Image
-from imageprocessing.processing import ImageIO, ImageProcess
 from s3a import FR_SINGLETON
 from s3a.controls.drawctrl import FRRoiCollection
 from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS as RTF
-from s3a.structures import FRVertices, FRComplexVertices, FRParam, FRS3AWarning
+from s3a.processing import FRProcessIO, FRImageProcess
+from s3a.structures import FRVertices, FRComplexVertices, FRParam, FRS3AWarning, NChanImg
 from s3a.parameditors.algcollection import FRAlgCollectionEditor
 from testingconsts import FIMG_SER_COLS
 
@@ -151,9 +150,9 @@ def test_selectionbounds_none():
 #   assert len(mgr.compDf) == 0
 
 def test_proc_err(tmpdir):
-  def badProc(image: Image):
-    return ImageIO(image=image, extra=1/0)
-  newCtor = lambda: ImageProcess.fromFunction(badProc, 'Bad')
+  def badProc(image: NChanImg):
+    return FRProcessIO(image=image, extra=1/0)
+  newCtor = lambda: FRImageProcess.fromFunction(badProc, 'Bad')
   newClctn = FRAlgCollectionEditor(Path(tmpdir),[newCtor])
 
   newClctn.switchActiveProcessor('Bad')

@@ -13,6 +13,7 @@ from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.parameterTypes import ActionParameter
 
 from s3a.parameditors.genericeditor import FRParamEditorPlugin
+from s3a.plugins import FRTableVertsPlugin
 from s3a.views.buttons import FRButtonCollection
 from s3a.views.imageareas import FREditableImgBase
 from s3a.parameditors import FRParamEditor, FRParamEditorDockGrouping, FR_SINGLETON
@@ -61,7 +62,8 @@ class S3A(S3ABase):
     self.CUR_COMP_LBL = 'Current Component ID:'
     self.setWindowTitle(self.APP_TITLE)
 
-    self.curCompIdLbl = QtWidgets.QLabel(self.CUR_COMP_LBL)
+
+    self.curCompIdLbl = self.vertsPlugin.curCompIdLbl
 
     # Dummy editor for layout options since it doesn't really have editable settings
     # Maybe later this can be elevated to have more options
@@ -142,31 +144,19 @@ class S3A(S3ABase):
 
     focusedImgDock = QtWidgets.QDockWidget('Focused Image Window', self)
     focusedImgDock.setFeatures(focusedImgDock.DockWidgetMovable|focusedImgDock.DockWidgetFloatable)
-    focusedImgContents = QtWidgets.QWidget(self)
+    focusedImgContents = self.vertsPlugin.widget
     self.focusedImg.setParent(focusedImgContents)
     focusedImgDock.setWidget(focusedImgContents)
     focusedImgDock.setObjectName('Focused Image Dock')
     self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, focusedImgDock)
-
-
-    focusedLayout = QtWidgets.QVBoxLayout(focusedImgContents)
-    focusedLayout.addWidget(self.focusedImg.drawOptsWidget)
-    focusedLayout.addWidget(self.focusedImg.toolsGrp)
-    focusedLayout.addWidget(self.curCompIdLbl, 0, QtCore.Qt.AlignHCenter)
-    focusedLayout.addWidget(self.focusedImg)
 
     sharedMenuWidgets = [self.mainImg, self.compTbl]
     for first, second in zip(sharedMenuWidgets, reversed(sharedMenuWidgets)):
       first.menu.addMenu(contextMenuFromEditorActions(second.toolsEditor, menuParent=first.menu))
 
 
-    for curImg in (self.mainImg, self.focusedImg): # type: FREditableImgBase
-      def maybeHideBtn(_p, value: bool, _widget):
-        if value:
-          _widget.show()
-        else:
-          _widget.hide()
-      curImg.showGuiBtns.sigValueChanged.connect(partial(maybeHideBtn, _widget=curImg.toolsGrp))
+    self.mainImg.showGuiBtns.sigValueChanged.connect(
+      lambda _p, val: self.focusedImg.toolsGrp.setVisible(val))
 
     tableDock = QtWidgets.QDockWidget('Component Table Window', self)
     tableDock.setFeatures(tableDock.DockWidgetMovable|tableDock.DockWidgetFloatable)
@@ -197,6 +187,11 @@ class S3A(S3ABase):
     # EDITORS
     FR_SINGLETON.sigDocksAdded.connect(lambda newDocks: self._addEditorDocks(newDocks))
     self._addEditorDocks()
+
+  def changeFocusedComp(self, newComps: df, forceKeepLastChange=False):
+    ret = super().changeFocusedComp(newComps, forceKeepLastChange)
+    self.curCompIdLbl.setText(f'Component ID: {self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]}')
+    return ret
 
   def resetTblFields_gui(self):
     fileDlg = QtWidgets.QFileDialog()

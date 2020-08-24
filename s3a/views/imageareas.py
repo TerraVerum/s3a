@@ -37,15 +37,8 @@ class FREditableImgBase(pg.PlotWidget):
 
   @classmethod
   def __initEditorParams__(cls):
-    clsName = frPascalCaseToTitle(cls.__name__)
     cls.toolsEditor = FRParamEditor.buildClsToolsEditor(cls)
-    cls.procCollection = FR_SINGLETON.algParamMgr.createProcessorForClass(
-      cls, editorName=clsName + ' Processor'
-    )
-    dockGroup = FRParamEditorDockGrouping(
-      [cls.toolsEditor, cls.procCollection], dockName=clsName
-    )
-    FR_SINGLETON.addDocks(dockGroup)
+    FR_SINGLETON.addDocks(cls.toolsEditor)
 
 
     cls.compCropMargin, cls.treatMarginAsPct = FR_SINGLETON.generalProps.registerProps(
@@ -130,13 +123,6 @@ class FREditableImgBase(pg.PlotWidget):
   @property
   def image(self) -> Optional[NChanImg]:
     return self.imgItem.image
-
-  @property
-  def curProcessor(self):
-      return self.procCollection.curProcessor
-  @curProcessor.setter
-  def curProcessor(self, newProcessor: Union[str, FRImgProcWrapper]):
-    self.procCollection.switchActiveProcessor(newProcessor)
 
   def handleShapeFinished(self, roiVerts: FRVertices) -> Optional[np.ndarray]:
     """
@@ -246,7 +232,7 @@ class FRMainImage(FREditableImgBase):
       # For now assume a single point indicates foreground where multiple indicate
       # background selection
       # False positive from type checker
-      verts = np.clip(roiVerts.astype(int), 0, self.image.shape[:2])
+      verts = np.clip(roiVerts.astype(int), 0, self.image.shape[:2][::-1])
       self.compFromLastProcResult = FR_SINGLETON.tableData.makeCompDf()
 
       if cv.contourArea(verts) < self.minCompSize:
@@ -305,12 +291,15 @@ class FRFocusedImage(FREditableImgBase):
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
+    clsName = frPascalCaseToTitle(cls.__name__)
+    cls.procCollection = FR_SINGLETON.algParamMgr.createProcessorForClass(
+      cls, editorName=clsName + ' Processor'
+    )
     (cls.resetRegionAct, cls.fillRegionAct,
      cls.clearRegionAct, cls.acceptRegionAct, cls.clearHistoryAct) = cls.toolsEditor.registerProps(
       cls, [FRC.TOOL_RESET_FOC_REGION, FRC.TOOL_FILL_FOC_REGION,
             FRC.TOOL_CLEAR_FOC_REGION, FRC.TOOL_ACCEPT_FOC_REGION, FRC.TOOL_CLEAR_HISTORY],
       asProperty=False, ownerObj=cls)
-
 
   def __init__(self, parent=None, **kargs):
     allowableShapes = (
@@ -371,6 +360,13 @@ class FRFocusedImage(FREditableImgBase):
     self.firstRun = False
     if not np.array_equal(newMask,compMask):
       self.region.updateFromMask(newMask)
+
+  @property
+  def curProcessor(self):
+    return self.procCollection.curProcessor
+  @curProcessor.setter
+  def curProcessor(self, newProcessor: Union[str, FRImgProcWrapper]):
+    self.procCollection.switchActiveProcessor(newProcessor)
 
   @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
   def updateAll(self, mainImg: Optional[NChanImg], newComp:Optional[pd.Series]=None,
