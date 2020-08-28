@@ -1,18 +1,21 @@
 from __future__ import annotations
+
 from abc import ABC
 from typing import List, Dict, Union, Type, Tuple, Optional
 
+import pandas as pd
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter, ParameterItem
-import pandas as pd
 
-from s3a.generalutils import frPascalCaseToTitle
-from s3a import parameditors
-from s3a.graphicsutils import dialogGetSaveFileName
-from s3a.models.editorbase import FRParamEditorBase
-from s3a.constants import MENU_OPTS_DIR
 from s3a import models
-from s3a.structures import FRParam, FilePath
+from s3a.constants import MENU_OPTS_DIR
+from s3a.generalutils import frPascalCaseToTitle
+from s3a.graphicsutils import dialogGetSaveFileName, contextMenuFromEditorActions
+from s3a.models.editorbase import FRParamEditorBase
+from s3a import parameditors
+from s3a.processing import FRImgProcWrapper
+from s3a.structures import FRParam, FilePath, NChanImg, FRVertices
+from s3a.views.buttons import FRButtonCollection
 
 Signal = QtCore.Signal
 
@@ -188,21 +191,54 @@ class FRParamEditorDockGrouping(QtWidgets.QDockWidget):
 
 class FRParamEditorPlugin(ABC):
   name: str=None
-  s3a: Optional[models.s3abase.S3ABase]=None
   toolsEditor: FRParamEditor
+  toolsGrp: FRButtonCollection
+  s3a: models.s3abase.S3ABase=None
 
   docks: Union[FRParamEditorDockGrouping, FRParamEditor] = None
-
 
   @classmethod
   def __initEditorParams__(cls):
     pass
 
-class FRTableFieldAssistant(FRParamEditorPlugin):
-  widget: Optional[QtWidgets.QWidget] = None
-  processors: List[parameditors.algcollection.FRAlgCollectionEditor] = []
-  compSer: pd.Series = None
+  def attachS3aRef(self, s3a: models.s3abase.S3ABase):
+    self.s3a = s3a
+    self.toolsGrp = FRButtonCollection.fromToolsEditor(self.toolsEditor, s3a)
 
-  def makeWidget(self):
+
+class FRTableFieldPlugin(FRParamEditorPlugin):
+  procCollection: parameditors.algcollection.FRAlgParamEditor= []
+  active=False
+
+  def updateAll(self, mainImg: Optional[NChanImg], newComp: Optional[pd.Series] = None):
     raise NotImplementedError
 
+  def handleShapeFinished(self, roiVerts: FRVertices):
+    raise NotImplementedError
+
+  def acceptChanges(self):
+    raise NotImplementedError
+
+  def activate(self):
+    fImg = self.s3a.focusedImg
+    curPlugin = fImg.currentPlugin
+    if curPlugin is self:
+      return
+    if curPlugin is not None:
+      curPlugin.deactivate()
+    self.s3a.changeFocusedImgTools(self.toolsGrp)
+    fImg.menu = contextMenuFromEditorActions([fImg.toolsEditor, self.toolsEditor],
+                                             menuParent=fImg)
+    fImg.getViewBox().menu = fImg.menu
+    fImg.currentPlugin = self
+    self.active = True
+
+  def deactivate(self):
+    self.active = False
+
+  @property
+  def curProcessor(self):
+    return self.procCollection.curProcessor
+  @curProcessor.setter
+  def curProcessor(self, newProcessor: Union[str, FRImgProcWrapper]):
+    self.procCollection.switchActiveProcessor(newProcessor)

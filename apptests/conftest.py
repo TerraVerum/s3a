@@ -1,14 +1,24 @@
 import pytest
 import os
+
+from s3a.structures import FRS3AException
+
 os.environ['S3A_PLATFORM'] = 'minimal'
 from helperclasses import CompDfTester
-from s3a import FR_SINGLETON
+from s3a import FR_SINGLETON, FRTableVertsPlugin
 from s3a.views.s3agui import S3A
 from testingconsts import SAMPLE_IMG, SAMPLE_IMG_FNAME, NUM_COMPS, \
   SAMPLE_SMALL_IMG, SAMPLE_SMALL_IMG_FNAME
 
 app = S3A(Image=SAMPLE_IMG_FNAME, guiMode=False, loadLastState=False, author='testauthor')
 mgr = app.compMgr
+vertsPlugin = None
+for plugin in FR_SINGLETON.tableFieldPlugins:
+  if isinstance(plugin, FRTableVertsPlugin):
+    vertsPlugin = plugin
+    break
+if vertsPlugin is None:
+  raise FRS3AException('Vertices plugin was not provided. Some tests are guaranteed to fail.')
 stack = FR_SINGLETON.actionStack
 
 dfTester = CompDfTester(NUM_COMPS)

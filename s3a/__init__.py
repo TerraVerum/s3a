@@ -8,7 +8,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 
 __all__ = ['appInst', 'FR_SINGLETON', 'S3A', 'FRParamEditor', 'FRParam', 'REQD_TBL_FIELDS',
-           'FRComplexVertices', 'FRVertices', 'FRComponentIO']
+           'FRComplexVertices', 'FRVertices', 'FRComponentIO', 'FR_CONSTS']
 
 pg.setConfigOptions(imageAxisOrder='row-major')
 
@@ -40,10 +40,13 @@ from s3a.parameditors import FR_SINGLETON, FRParamEditor
 from s3a.models.tablemodel import FRComponentIO
 from s3a.processing.algorithms import FRTopLevelProcessors
 from s3a.structures import FRVertices, FRComplexVertices, FRParam
-from s3a.constants import REQD_TBL_FIELDS
+from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS
 
 for name, func in inspect.getmembers(FRTopLevelProcessors, inspect.isfunction):
-  FR_SINGLETON.algParamMgr.addProcessCtor(func)
+  FR_SINGLETON.imgProcClctn.addProcessCtor(func)
+
+from s3a.plugins import FRTableVertsPlugin
+FR_SINGLETON.addPlugin(FRTableVertsPlugin)
 
 # Minimal means no GUI is needed. Things work faster when they don't have to be
 # shown through the comp display filter

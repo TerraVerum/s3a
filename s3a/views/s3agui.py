@@ -62,8 +62,7 @@ class S3A(S3ABase):
     self.CUR_COMP_LBL = 'Current Component ID:'
     self.setWindowTitle(self.APP_TITLE)
 
-
-    self.curCompIdLbl = self.vertsPlugin.curCompIdLbl
+    self.curCompIdLbl = QtWidgets.QLabel(self.CUR_COMP_LBL)
 
     # Dummy editor for layout options since it doesn't really have editable settings
     # Maybe later this can be elevated to have more options
@@ -88,7 +87,6 @@ class S3A(S3ABase):
     # Buttons
     self.openImgAct.triggered.connect(lambda: self.setMainImg_gui())
     self.resetTblConfigAct.triggered.connect(lambda: self.resetTblFields_gui())
-    self.focusedImg.acceptRegionAct.sigActivated.connect(lambda: self.acceptFocusedRegion())
 
     FR_SINGLETON.colorScheme.sigParamStateUpdated.connect(self.updateTheme)
 
@@ -138,25 +136,26 @@ class S3A(S3ABase):
     layout.addWidget(self.mainImg.drawOptsWidget)
     layout.addWidget(self.mainImg.toolsGrp)
     layout.addWidget(self.mainImg)
-    # layout.addWidget(mainImgToolsWidget)
-
-    # focImgToolsWidget = self._createBtnLayoutForTools(self.focusedImg.toolsEditor)
 
     focusedImgDock = QtWidgets.QDockWidget('Focused Image Window', self)
     focusedImgDock.setFeatures(focusedImgDock.DockWidgetMovable|focusedImgDock.DockWidgetFloatable)
-    focusedImgContents = self.vertsPlugin.widget
+    focusedImgContents = QtWidgets.QWidget(self)
     self.focusedImg.setParent(focusedImgContents)
     focusedImgDock.setWidget(focusedImgContents)
     focusedImgDock.setObjectName('Focused Image Dock')
     self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, focusedImgDock)
 
+
+    focusedLayout = QtWidgets.QVBoxLayout(focusedImgContents)
+    focusedLayout.addWidget(self.focusedImg.drawOptsWidget)
+    focusedLayout.addWidget(self.focusedImg.toolsGrp)
+    focusedLayout.addWidget(self.curCompIdLbl, 0, QtCore.Qt.AlignHCenter)
+    focusedLayout.addWidget(self.focusedImg)
+    self._focusedLayout = focusedLayout
+
     sharedMenuWidgets = [self.mainImg, self.compTbl]
     for first, second in zip(sharedMenuWidgets, reversed(sharedMenuWidgets)):
       first.menu.addMenu(contextMenuFromEditorActions(second.toolsEditor, menuParent=first.menu))
-
-
-    self.mainImg.showGuiBtns.sigValueChanged.connect(
-      lambda _p, val: self.mainImg.toolsGrp.setVisible(val))
 
     tableDock = QtWidgets.QDockWidget('Component Table Window', self)
     tableDock.setFeatures(tableDock.DockWidgetMovable|tableDock.DockWidgetFloatable)
@@ -192,6 +191,16 @@ class S3A(S3ABase):
     ret = super().changeFocusedComp(newComps, forceKeepLastChange)
     self.curCompIdLbl.setText(f'Component ID: {self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]}')
     return ret
+
+  def changeFocusedImgTools(self, newTools: FRButtonCollection):
+    try:
+      self._focusedLayout.replaceWidget(self.focusedImg.toolsGrp, newTools)
+    except AttributeError:
+      # Fails when window is not yet constructed
+      pass
+    if len(newTools.paramToBtnMapping) == 0:
+      newTools.hide()
+    super().changeFocusedImgTools(newTools)
 
   def resetTblFields_gui(self):
     fileDlg = QtWidgets.QFileDialog()
@@ -272,14 +281,18 @@ class S3A(S3ABase):
 
     self.setMenuBar(self.menubar)
 
-    pluginDocks = [p.docks for p in FR_SINGLETON.plugins]
+    pluginDocks = {p.docks: p for p in FR_SINGLETON.plugins if p is not None}
     # SETTINGS
     for dock in FR_SINGLETON.docks:
       if dock not in pluginDocks:
         self.createMenuOptForDock(dock, parentToolbar=toolbar)
-    for dock in pluginDocks:
-      self.createMenuOptForDock(dock, parentToolbar=pluginToolbar)
-
+    for dock, plugin in pluginDocks.items():
+      menu = self.createMenuOptForDock(dock, parentToolbar=pluginToolbar)
+      if plugin in FR_SINGLETON.tableFieldPlugins:
+        beforeAct = menu.actions()[0]
+        newAct = QtWidgets.QAction('&Activate', self)
+        newAct.triggered.connect(plugin.activate)
+        menu.insertAction(beforeAct, newAct)
   def _maybeLoadLastState_gui(self, loadLastState: bool=None,
                               quickLoaderArgs:dict=None):
     """
@@ -505,7 +518,8 @@ class S3A(S3ABase):
       parentBtn = QtWidgets.QPushButton()
     if isinstance(dockEditor, FRParamEditor):
       parentBtn.setText(dockEditor.name)
-      parentBtn.setMenu(self._createMenuOptForEditor(dockEditor, loadFunc))
+      menu = self._createMenuOptForEditor(dockEditor, loadFunc)
+      parentBtn.setMenu(menu)
     else:
       # FRParamEditorDockGrouping
       parentBtn.setText(dockEditor.name)
@@ -519,6 +533,7 @@ class S3A(S3ABase):
         menu.addMenu(self._createMenuOptForEditor(editor, loadFunc, overrideName=nameWithoutBase))
     if parentToolbar is not None:
       parentToolbar.addWidget(parentBtn)
+    return menu
 
   def _populateLoadLayoutOptions(self):
     layoutGlob = LAYOUTS_DIR.glob('*.dockstate')

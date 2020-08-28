@@ -1,23 +1,21 @@
 from typing import Union, Optional, Collection
 
-import numpy as np
 import cv2 as cv
+import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 from skimage.io import imread
 
 from s3a import FR_SINGLETON
-from s3a.generalutils import getClippedBbox, frPascalCaseToTitle
 from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS as FRC
+from s3a.generalutils import getClippedBbox
 from s3a.structures import FRParam, FRVertices, FRComplexVertices, FilePath
 from s3a.structures import NChanImg
-from .clickables import FRRightPanViewBox
 from .buttons import FRDrawOpts, FRButtonCollection
-from s3a.processing import FRImgProcWrapper
-from .regions import FRVertexDefinedImg, FRRegionCopierPlot
-from ..parameditors import FRParamEditor, FRParamEditorDockGrouping
-from s3a.processing.algorithms import _historyMaskHolder
+from .clickables import FRRightPanViewBox
+from .regions import FRRegionCopierPlot
+from ..parameditors import FRParamEditor, FRTableFieldPlugin
 
 __all__ = ['FRMainImage', 'FRFocusedImage', 'FREditableImgBase']
 
@@ -29,7 +27,7 @@ QCursor = QtGui.QCursor
 
 @FR_SINGLETON.registerGroup(FRC.CLS_IMG_AREA)
 class FREditableImgBase(pg.PlotWidget):
-  sigMousePosChanged = QtCore.Signal(object, object)
+  sigMousePosChanged = Signal(object, object)
   """
   FRVertices() coords, [[[img pixel]]] np.ndarray. If the mouse pos is outside
   image bounds, the second param will be *None*.
@@ -45,15 +43,14 @@ class FREditableImgBase(pg.PlotWidget):
       cls, FRC.PROP_SHOW_GUI_TOOL_BTNS, asProperty=False
     )
 
-    (cls.clearRoiAct,) = cls.toolsEditor.registerProps(
-      cls, [FRC.TOOL_CLEAR_ROI], asProperty=False, ownerObj=cls
+    (cls.clearRoiAct, cls.acceptRegionAct) = cls.toolsEditor.registerProps(
+      cls, [FRC.TOOL_CLEAR_ROI, FRC.TOOL_ACCEPT_FOC_REGION], asProperty=False, ownerObj=cls
     )
 
   def __init__(self, parent=None, drawShapes: Collection[FRParam]=(),
                drawActions: Collection[FRParam]=(),**kargs):
     super().__init__(parent, viewBox=FRRightPanViewBox(), **kargs)
-    self.menu = contextMenuFromEditorActions(self.toolsEditor, self.toolsEditor.name,
-                                                          self)
+    self.menu = contextMenuFromEditorActions(self.toolsEditor, self.toolsEditor.name, self)
     vb: pg.ViewBox = self.getViewBox()
     # Disable default menus
     self.plotItem.ctrlMenu = None
@@ -97,15 +94,9 @@ class FREditableImgBase(pg.PlotWidget):
 
     self.drawOptsWidget = FRDrawOpts(self.drawShapeGrp, self.drawActGrp, self)
 
-    toolParams = []
-    toolFns = []
-    for param in self.toolsEditor.params.childs:
-      if 'action' in param.opts['type'] and param.opts.get('guibtn', True):
-        toolParams.append(param.opts['frParam'])
-        toolFns.append(lambda *_args, _param=param: _param.sigActivated.emit(_param))
     # Don't create shortcuts since this will be done by the tool editor
-    self.toolsGrp = FRButtonCollection(self, title='Tools', btnParams=toolParams,
-                                       btnTriggerFns=toolFns, exclusive=False, checkable=False)
+    self.toolsGrp = FRButtonCollection.fromToolsEditor(self.toolsEditor, self)
+    self.showGuiBtns.sigValueChanged.connect(lambda _p, val: self.toolsGrp.setVisible(val))
 
     # Initialize draw shape/action buttons
     self.drawActGrp.callFuncByParam(self.drawAction)
@@ -148,7 +139,6 @@ class FREditableImgBase(pg.PlotWidget):
     super().mouseMoveEvent(ev)
     if self.drawAction != FRC.DRAW_ACT_PAN:
       self.shapeCollection.buildRoi(ev, self.imgItem)
-
     posRelToImage = self.imgItem.mapFromScene(ev.pos())
     pxY = int(posRelToImage.y())
     pxX = int(posRelToImage.x())
@@ -250,7 +240,6 @@ class FRMainImage(FREditableImgBase):
     if self.image is None: return
     pos = self.imgItem.mapFromScene(ev.pos())
     xx, yy, = pos.x(), pos.y()
-    pos = FRVertices([[xx, yy]])
     if self.drawAction == FRC.DRAW_ACT_PAN and not self.regionCopier.active:
       # Simulate a click-wide boundary selection so points can be selected in pan mode
       squareCorners = FRVertices([[xx, yy], [xx, yy]], dtype=float)
@@ -271,9 +260,10 @@ class FRMainImage(FREditableImgBase):
     if isinstance(imgSrc, FilePath.__args__):
       # TODO: Handle alpha channel images. For now, discard that data
       imgSrc = imread(imgSrc)
-      if imgSrc.ndim < 3:
-        imgSrc = imgSrc[:,:,None]
-      imgSrc = imgSrc[:,:,0:3]
+      if imgSrc.ndim == 3:
+        # Alpha channels cause unexpected results for most image processors. Avoid this
+        # by chopping it off until otherwise needed
+        imgSrc = imgSrc[:,:,0:3]
 
     if imgSrc is None:
       self.imgItem.clear()
@@ -287,19 +277,6 @@ class FRMainImage(FREditableImgBase):
 @FR_SINGLETON.registerGroup(FRC.CLS_FOCUSED_IMG_AREA)
 class FRFocusedImage(FREditableImgBase):
 
-  @classmethod
-  def __initEditorParams__(cls):
-    super().__initEditorParams__()
-    clsName = frPascalCaseToTitle(cls.__name__)
-    cls.procCollection = FR_SINGLETON.algParamMgr.createProcessorForClass(
-      cls, editorName=clsName + ' Processor'
-    )
-    (cls.resetRegionAct, cls.fillRegionAct,
-     cls.clearRegionAct, cls.acceptRegionAct, cls.clearHistoryAct) = cls.toolsEditor.registerProps(
-      cls, [FRC.TOOL_RESET_FOC_REGION, FRC.TOOL_FILL_FOC_REGION,
-            FRC.TOOL_CLEAR_FOC_REGION, FRC.TOOL_ACCEPT_FOC_REGION, FRC.TOOL_CLEAR_HISTORY],
-      asProperty=False, ownerObj=cls)
-
   def __init__(self, parent=None, **kargs):
     allowableShapes = (
       FRC.DRAW_SHAPE_RECT, FRC.DRAW_SHAPE_POLY, FRC.DRAW_SHAPE_PAINT
@@ -308,67 +285,24 @@ class FRFocusedImage(FREditableImgBase):
       FRC.DRAW_ACT_ADD, FRC.DRAW_ACT_REM
     )
     super().__init__(parent, allowableShapes, allowableActions, **kargs)
-    self.clearRegionAct.sigActivated.connect(lambda: self.updateRegionFromVerts(None))
-    def fillAct():
-      if self.image is None: return
-      filled = np.ones(self.image.shape[:2], bool)
-      self.region.updateFromMask(filled)
-    self.fillRegionAct.sigActivated.connect(fillAct)
-    self.resetRegionAct.sigActivated.connect(
-      lambda: self.updateRegionFromVerts(self.compSer[REQD_TBL_FIELDS.VERTICES]))
-    self.clearHistoryAct.sigActivated.connect(
-      lambda: _historyMaskHolder[0].fill(0)
-    )
-
-    self.region = FRVertexDefinedImg()
-
-    self.addItem(self.region)
 
     self.compSer: pd.Series = FR_SINGLETON.tableData.makeCompSer()
-
     self.bbox = np.zeros((2, 2), dtype='int32')
 
-    self.firstRun = True
+    self.currentPlugin: Optional[FRTableFieldPlugin] = None
 
     self.switchBtnMode(FRC.DRAW_ACT_ADD)
     self.switchBtnMode(FRC.DRAW_SHAPE_PAINT)
-    # Disable local cropping on primitive grab cut by default
-    self.procCollection.nameToProcMapping['Primitive Grab Cut'].setStageEnabled(['Crop To Local Area'], False)
-
-  def resetImage(self):
-    self.updateAll(None)
-    self.region.clear()
 
   def handleShapeFinished(self, roiVerts: FRVertices) -> Optional[np.ndarray]:
     if self.drawAction == FRC.DRAW_ACT_PAN:
       return
-
-    # Component modification subject to processor
-    # For now assume a single point indicates foreground where multiple indicate
-    # background selection
-    roiVerts = roiVerts.astype(int)
-    vertsDict = {}
-    if self.drawAction == FRC.DRAW_ACT_ADD:
-      vertsDict['fgVerts'] = roiVerts
-    elif self.drawAction == FRC.DRAW_ACT_REM:
-      vertsDict['bgVerts'] = roiVerts
-
-    compMask = self.region.embedMaskInImg(self.image.shape[:2])
-    newMask = self.curProcessor.run(image=self.image, prevCompMask=compMask, **vertsDict,
-                                    firstRun=self.firstRun)
-    self.firstRun = False
-    if not np.array_equal(newMask,compMask):
-      self.region.updateFromMask(newMask)
-
-  @property
-  def curProcessor(self):
-    return self.procCollection.curProcessor
-  @curProcessor.setter
-  def curProcessor(self, newProcessor: Union[str, FRImgProcWrapper]):
-    self.procCollection.switchActiveProcessor(newProcessor)
+    for plugin in FR_SINGLETON.tableFieldPlugins:
+      if plugin.active:
+        plugin.handleShapeFinished(roiVerts)
 
   @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
-  def updateAll(self, mainImg: Optional[NChanImg], newComp:Optional[pd.Series]=None,
+  def updateAll(self, mainImg: NChanImg=None, newComp:Optional[pd.Series]=None,
                 isAlreadyTrimmed=False):
     oldImg = self.image
     if oldImg is not None:
@@ -377,7 +311,7 @@ class FRFocusedImage(FREditableImgBase):
 
     if mainImg is None:
       self.imgItem.clear()
-      self.updateRegionFromVerts(None)
+      self.shapeCollection.clearAllRois()
       self.shapeCollection.clearAllRois()
       self.compSer = FR_SINGLETON.tableData.makeCompSer()
     else:
@@ -397,9 +331,9 @@ class FRFocusedImage(FREditableImgBase):
         bboxToUse = FRVertices([[0,0], mainImg.shape[:2]])
         self.bbox = bboxToUse
       self.updateCompImg(mainImg, bboxToUse)
-      self.updateRegionFromVerts(newVerts, bboxToUse[0,:])
       self.autoRange()
-      self.firstRun = True
+    for plugin in FR_SINGLETON.tableFieldPlugins:
+      plugin.updateAll(mainImg, newComp)
     yield
     self.updateAll(oldImg, oldComp, True)
 
@@ -422,50 +356,3 @@ class FRFocusedImage(FREditableImgBase):
                          bbox[0,0]:bbox[1,0],
                          :]
     self.imgItem.setImage(newCompImg)
-
-  @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
-  def updateRegionFromVerts(self, newVerts: FRComplexVertices=None, offset: FRVertices=None):
-    """
-    Updates the current focused region using the new provided vertices
-    :param newVerts: Verts to use.If *None*, the image will be totally reset and the component
-      will be removed. Otherwise, the provided value will be used.
-    :param offset: Offset of newVerts relative to main image coordinates
-    """
-    if self.image is None:
-      return
-    oldVerts = self.region.verts
-    oldRegionImg = self.region.image
-
-    oldSelfImg = self.image
-    oldSer = self.compSer
-
-    if offset is None:
-      offset = self.bbox[0,:]
-    if newVerts is None:
-      newVerts = FRComplexVertices()
-    # 0-center new vertices relative to FRFocusedImage image
-    # Make a copy of each list first so we aren't modifying the
-    # original data
-    centeredVerts = newVerts.copy()
-    for vertList in centeredVerts:
-      vertList -= offset
-    if self.region.verts != centeredVerts:
-      self.region.updateFromVertices(centeredVerts)
-      yield
-    else:
-      return
-    if (self.compSer.loc[REQD_TBL_FIELDS.INST_ID] != oldSer.loc[REQD_TBL_FIELDS.INST_ID]
-        or self.image is None):
-      self.updateAll(oldSelfImg, oldSer, isAlreadyTrimmed=True)
-    self.region.updateFromVertices(oldVerts, oldRegionImg)
-
-
-  def saveNewVerts(self, overrideVerts: FRComplexVertices=None):
-    # Add in offset from main image to FRVertexRegion vertices
-    if overrideVerts is not None:
-      self.compSer.loc[REQD_TBL_FIELDS.VERTICES] = overrideVerts
-      return
-    newVerts = self.region.verts.copy()
-    for vertList in newVerts:
-      vertList += self.bbox[0,:]
-    self.compSer.loc[REQD_TBL_FIELDS.VERTICES] = newVerts

@@ -1,0 +1,8 @@
+[run]
+# Mostly graphics helpers, so they can't really be tested
+omit =
+    s3a/graphicsutils.py
+
+[report]
+exclude_lines =
+    def .*_gui

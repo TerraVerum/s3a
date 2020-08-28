@@ -1,3 +1,4 @@
+import weakref
 from typing import List, Union, Type
 
 from pyqtgraph.Qt import QtWidgets, QtCore
@@ -6,16 +7,18 @@ from s3a.constants import GEN_PROPS_DIR, SCHEMES_DIR, BASE_DIR
 from s3a.models.actionstack import FRActionStack
 from s3a.structures import FRParam
 from .genericeditor import FRParamEditor, FRParamEditorDockGrouping, FRParamEditorPlugin, \
-  FRTableFieldAssistant
-from .algcollection import FRAlgPropsMgr
+  FRTableFieldPlugin
+from .algcollection import FRAlgCtorCollection
 from .quickloader import FRQuickLoaderEditor
 from .shortcut import FRShortcutsEditor
 from .table import FRTableFilterEditor, FRTableData
 from ..generalutils import frPascalCaseToTitle
+from ..processing import FRImgProcWrapper
 
 Signal = QtCore.Signal
 
-__all__ = ['FR_SINGLETON', 'FRParamEditor', 'FRParamEditorDockGrouping']
+__all__ = ['FR_SINGLETON', 'FRParamEditor', 'FRParamEditorDockGrouping', 'FRTableFieldPlugin',
+           'FRParamEditorPlugin']
 
 class FRAppSettingsEditor(FRParamEditor):
   def __init__(self, parent=None):
@@ -34,6 +37,7 @@ class _FRSingleton(QtCore.QObject):
     super().__init__(parent)
     self.actionStack = FRActionStack()
     self.plugins: List[FRParamEditorPlugin] = []
+    self.tableFieldPlugins: List[FRTableFieldPlugin] = []
 
     self.tableData = FRTableData()
     self.tableData.loadCfg(BASE_DIR/'tablecfg.yml')
@@ -43,7 +47,7 @@ class _FRSingleton(QtCore.QObject):
     self.shortcuts = FRShortcutsEditor()
     self.generalProps = FRAppSettingsEditor()
     self.colorScheme = FRColorSchemeEditor()
-    self.algParamMgr = FRAlgPropsMgr()
+    self.imgProcClctn = FRAlgCtorCollection(FRImgProcWrapper)
     self.quickLoader = FRQuickLoaderEditor()
 
     self.docks: List[QtWidgets.QDockWidget] = []
@@ -107,8 +111,8 @@ class _FRSingleton(QtCore.QObject):
       nameToUse = frPascalCaseToTitle(pluginCls.__name__)
     deco = self.registerGroup(FRParam(nameToUse))
     plugin: FRParamEditorPlugin = deco(pluginCls)(*args, **kwargs)
-    if isinstance(plugin, FRTableFieldAssistant):
-      plugin.makeWidget()
+    if isinstance(plugin, FRTableFieldPlugin):
+      self.tableFieldPlugins.append(weakref.proxy(plugin))
     if plugin.docks is not None:
       self.addDocks(plugin.docks)
     self.plugins.append(plugin)

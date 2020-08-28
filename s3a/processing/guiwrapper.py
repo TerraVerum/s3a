@@ -108,8 +108,7 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
                excludedStages: List[List[str]]=None, disabledStages: List[List[str]]=None):
     # Each processor is encapsulated in processes that crop the image to the region of
     # interest specified by the user, and re-expand the area after processing
-    formatStage = FRImageProcess()
-    formatStage.addFunction(format_vertices)
+    formatStage = FRImageProcess.fromFunction(format_vertices)
     formatStage.allowDisable = False
     cropStage = FRImageProcess.fromFunction(crop_to_local_area)
 

@@ -1,6 +1,6 @@
 import pytest
 
-from conftest import app
+from conftest import app, vertsPlugin
 from s3a.generalutils import imgCornerVertices
 from s3a.processing import FRImageProcess
 from s3a.structures import FRVertices
@@ -10,7 +10,7 @@ from testingconsts import SAMPLE_SMALL_IMG_FNAME, SAMPLE_SMALL_IMG
 
 mImg = app.mainImg
 fImg = app.focusedImg
-pc = app.focusedImg.procCollection
+pc = vertsPlugin.procCollection
 
 allAlgs = pc.nameToProcMapping.keys()
 

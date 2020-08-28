@@ -156,33 +156,6 @@ class FRCompDisplayFilter(QtCore.QObject):
     else:
       self.selectRowsById(np.array([keepId]), QtCore.QItemSelectionModel.ClearAndSelect)
 
-  @FR_SINGLETON.actionStack.undoable('Override Last Process Result', copyArgs=True)
-  def overrideLastProcResult(self, comps=None, verts=None):
-    if comps is None:
-      return
-    if verts is None:
-      verts = self._mainImgArea.lastProcVerts
-    # Trim verts to image boundaries if necessary
-    vMin = verts.min(0)
-    if np.any(vMin < 0) or np.any(verts.max(0) > self._mainImgArea.shape[:2][::-1]):
-      newVerts = cornersToFullBoundary(verts, stackResult=False)
-    else:
-      newVerts = FRComplexVertices([verts])
-
-    newComp = comps.iloc[[0],:].copy()
-    compId = newComp.index[0]
-    newComp.at[compId, REQD_TBL_FIELDS.VERTICES] = newVerts
-    self._compMgr.rmComps(comps[REQD_TBL_FIELDS.INST_ID].to_numpy())
-    addMode = FR_ENUMS.COMP_ADD_AS_NEW
-    if compId != -1:
-      addMode = FR_ENUMS.COMP_ADD_AS_MERGE
-    self._compMgr.addComps(newComp, addMode)
-    yield
-    if compId == -1:
-      self._compMgr.rmComps(newComp.index)
-    else:
-      self._compMgr.addComps(comps, FR_ENUMS.COMP_ADD_AS_MERGE)
-
   def _reflectFieldsChanged(self):
     self.filterableCols = self.findFilterableCols()
     self.redrawComps()
