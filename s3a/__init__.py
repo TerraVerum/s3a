@@ -45,8 +45,8 @@ from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS
 for name, func in inspect.getmembers(FRTopLevelProcessors, inspect.isfunction):
   FR_SINGLETON.imgProcClctn.addProcessCtor(func)
 
-from s3a.plugins import FRTableVertsPlugin
-FR_SINGLETON.addPlugin(FRTableVertsPlugin)
+from s3a.plugins import FRVerticesPlugin
+FR_SINGLETON.addPlugin(FRVerticesPlugin)
 
 # Minimal means no GUI is needed. Things work faster when they don't have to be
 # shown through the comp display filter
