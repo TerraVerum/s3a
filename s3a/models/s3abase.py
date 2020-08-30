@@ -19,7 +19,6 @@ from s3a.parameditors import FRParamEditor
 from s3a.parameditors import FRParamEditorPlugin
 from s3a.parameditors import FR_SINGLETON
 from s3a.parameditors.appstate import FRAppStateEditor
-from s3a import plugins
 from s3a.structures import FilePath, NChanImg, FRAppIOError, \
   FRAlgProcessorError, FRS3AWarning
 from s3a.views.imageareas import FRMainImage, FRFocusedImage
@@ -66,10 +65,6 @@ class S3ABase(QtWidgets.QMainWindow):
 
     for plugin in FR_SINGLETON.plugins: # type: FRParamEditorPlugin
       plugin.attachS3aRef(self)
-      if isinstance(plugin, plugins.FRVerticesPlugin):
-        # TODO: Config option for which plugin to load by default?
-        self.focusedImg.changeCurrentPlugin(plugin)
-
 
     def loadCfg(_fname: str):
       FR_SINGLETON.tableData.loadCfg(_fname)

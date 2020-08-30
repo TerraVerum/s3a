@@ -9,9 +9,8 @@ import qdarkstyle
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.console import ConsoleWidget
-from pyqtgraph.parametertree import Parameter
-from pyqtgraph.parametertree.parameterTypes import ActionParameter
 
+from s3a import plugins
 from s3a.constants import LAYOUTS_DIR, FR_CONSTS, REQD_TBL_FIELDS
 from s3a.constants import _FREnums, FR_ENUMS
 from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
@@ -70,6 +69,11 @@ class S3A(S3ABase):
     self._hookupSignals()
 
     self.focusedImg.sigPluginChanged.connect(lambda: self.updateFocusedToolsGrp())
+    for plugin in FR_SINGLETON.tableFieldPlugins:
+      if isinstance(plugin, plugins.FRVerticesPlugin):
+        # TODO: Config option for which plugin to load by default?
+        self.focusedImg.changeCurrentPlugin(plugin)
+        break
 
     # Load layout options
     self.saveLayout('Default', allowOverwriteDefault=True)
@@ -192,10 +196,11 @@ class S3A(S3ABase):
     return ret
 
   def updateFocusedToolsGrp(self):
-    newTools = FRButtonCollection.fromToolsEditors(
-      [w.toolsEditor for w in [self.focusedImg, self.focusedImg.currentPlugin]],
-      self.focusedImg
-    )
+    newPlugin = self.focusedImg.currentPlugin
+    newEditors = [self.focusedImg.toolsEditor]
+    if newPlugin is not None:
+      newEditors.append(newPlugin.toolsEditor)
+    newTools = FRButtonCollection.fromToolsEditors(newEditors, self.focusedImg)
     try:
       self._focusedLayout.replaceWidget(self.focusedImg.toolsGrp, newTools)
       self.focusedImg.toolsGrp.deleteLater()
