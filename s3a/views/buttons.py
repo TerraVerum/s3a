@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Tuple, Collection, Callable, Union, Iterable, Any, Dict
+from typing import Tuple, Collection, Callable, Union, Iterable, Any, Dict, Sequence
 
 from pyqtgraph.Qt import QtWidgets, QtGui, QtCore
 
@@ -59,13 +59,19 @@ class FRButtonCollection(QtWidgets.QGroupBox):
     self.paramToFuncMapping[param](param)
 
   @classmethod
-  def fromToolsEditor(cls, toolsEditor: parameditors.FRParamEditor, parent=None):
+  def fromToolsEditors(cls,
+                       toolsEditors: Union[parameditors.FRParamEditor,
+                       Sequence[parameditors.FRParamEditor]],
+                       parent=None):
     toolParams = []
     toolFns = []
-    for param in toolsEditor.params.childs:
-      if 'action' in param.opts['type'] and param.opts.get('guibtn', True):
-        toolParams.append(param.opts['frParam'])
-        toolFns.append(lambda *_args, _param=param: _param.sigActivated.emit(_param))
+    if not isinstance(toolsEditors, Sequence):
+      toolsEditors = [toolsEditors]
+    for toolsEditor in toolsEditors:
+      for param in toolsEditor.params.childs:
+        if 'action' in param.opts['type'] and param.opts.get('guibtn', True):
+          toolParams.append(param.opts['frParam'])
+          toolFns.append(lambda *_args, _param=param: _param.sigActivated.emit(_param))
     # Don't create shortcuts since this will be done by the tool editor
     return FRButtonCollection(parent, title='Tools', btnParams=toolParams,
                                        btnTriggerFns=toolFns, exclusive=False, checkable=False)

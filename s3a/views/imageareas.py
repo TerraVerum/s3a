@@ -43,8 +43,8 @@ class FREditableImgBase(pg.PlotWidget):
       cls, FRC.PROP_SHOW_GUI_TOOL_BTNS, asProperty=False
     )
 
-    (cls.clearRoiAct, cls.acceptRegionAct) = cls.toolsEditor.registerProps(
-      cls, [FRC.TOOL_CLEAR_ROI, FRC.TOOL_ACCEPT_FOC_REGION], asProperty=False, ownerObj=cls
+    (cls.clearRoiAct, ) = cls.toolsEditor.registerProps(
+      cls, [FRC.TOOL_CLEAR_ROI], asProperty=False, ownerObj=cls
     )
 
   def __init__(self, parent=None, drawShapes: Collection[FRParam]=(),
@@ -95,7 +95,7 @@ class FREditableImgBase(pg.PlotWidget):
     self.drawOptsWidget = FRDrawOpts(self.drawShapeGrp, self.drawActGrp, self)
 
     # Don't create shortcuts since this will be done by the tool editor
-    self.toolsGrp = FRButtonCollection.fromToolsEditor(self.toolsEditor, self)
+    self.toolsGrp = FRButtonCollection.fromToolsEditors(self.toolsEditor, self)
     self.showGuiBtns.sigValueChanged.connect(lambda _p, val: self.toolsGrp.setVisible(val))
 
     # Initialize draw shape/action buttons
@@ -276,6 +276,14 @@ class FRMainImage(FREditableImgBase):
 
 @FR_SINGLETON.registerGroup(FRC.CLS_FOCUSED_IMG_AREA)
 class FRFocusedImage(FREditableImgBase):
+  sigPluginChanged = Signal()
+
+  @classmethod
+  def __initEditorParams__(cls):
+    super().__initEditorParams__()
+    (cls.acceptRegionAct, ) = cls.toolsEditor.registerProps(
+      cls, [FRC.TOOL_ACCEPT_FOC_REGION], asProperty=False, ownerObj=cls
+    )
 
   def __init__(self, parent=None, **kargs):
     allowableShapes = (
@@ -303,7 +311,16 @@ class FRFocusedImage(FREditableImgBase):
 
   @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
   def updateAll(self, mainImg: NChanImg=None, newComp:Optional[pd.Series]=None,
-                isAlreadyTrimmed=False):
+                _isAlreadyTrimmed=False):
+    """
+    Updates focused image and component from provided information. Useful for creating
+    a 'zoomed-in' view that allows much faster processing than applying image processing
+    algorithms to the entire image each iteration.
+    :param mainImg: Image from the main view
+    :param newComp: New component to edit using various plugins (See :class:`FRTableFieldPlugin`)
+    :param _isAlreadyTrimmed: Used internally during undo. Generally shouldn't be set by the
+      user
+    """
     oldImg = self.image
     if oldImg is not None:
       oldImg = oldImg.copy()
@@ -324,20 +341,23 @@ class FRFocusedImage(FREditableImgBase):
       self.compSer = self.compSer[keepCols]
 
       # Propagate all resultant changes
-      if not isAlreadyTrimmed:
-        self.updateBbox(mainImg.shape, newVerts)
+      if not _isAlreadyTrimmed:
+        self._updateBbox(mainImg.shape, newVerts)
         bboxToUse = self.bbox
       else:
         bboxToUse = FRVertices([[0,0], mainImg.shape[:2]])
         self.bbox = bboxToUse
-      self.updateCompImg(mainImg, bboxToUse)
-      self.autoRange()
+      newCompImg = mainImg[bboxToUse[0,1]:bboxToUse[1,1],
+                   bboxToUse[0,0]:bboxToUse[1,0],
+                   :]
+      self.imgItem.setImage(newCompImg)
+      QtCore.QTimer.singleShot(0, self.autoRange)
     for plugin in FR_SINGLETON.tableFieldPlugins:
       plugin.updateAll(mainImg, newComp)
     yield
     self.updateAll(oldImg, oldComp, True)
 
-  def updateBbox(self, mainImgShape, newVerts: FRComplexVertices):
+  def _updateBbox(self, mainImgShape, newVerts: FRComplexVertices):
     concatVerts = newVerts.stack()
     # Ignore NAN entries during computation
     bbox = np.vstack([concatVerts.min(0),
@@ -348,11 +368,17 @@ class FRFocusedImage(FREditableImgBase):
       padVal = max((bbox[1,:] - bbox[0,:])*self.compCropMargin/2/100)
     self.bbox = getClippedBbox(mainImgShape, bbox, int(padVal))
 
-  def updateCompImg(self, mainImg, bbox: FRVertices=None):
-    if bbox is None:
-      bbox = self.bbox
-    # Account for nan entries
-    newCompImg = mainImg[bbox[0,1]:bbox[1,1],
-                         bbox[0,0]:bbox[1,0],
-                         :]
-    self.imgItem.setImage(newCompImg)
+  def changeCurrentPlugin(self, newPlugin: FRTableFieldPlugin, forceActivate=True):
+    if newPlugin is self.currentPlugin:
+      return
+    if self.currentPlugin is not None:
+      self.currentPlugin.active = False
+    newEditors = [self.toolsEditor]
+    if newPlugin is not None:
+      newEditors.append(newPlugin.toolsEditor)
+    self.menu = contextMenuFromEditorActions(newEditors, menuParent=self)
+    self.getViewBox().menu = self.menu
+    self.currentPlugin = newPlugin
+    if forceActivate and newPlugin is not None and not newPlugin.active:
+      newPlugin.active = True
+    self.sigPluginChanged.emit()

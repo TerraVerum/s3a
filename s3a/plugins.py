@@ -17,14 +17,13 @@ from s3a.views.regions import FRVertexDefinedImg
 from s3a.processing.algorithms import _historyMaskHolder
 
 
-class FRTableVertsPlugin(FRTableFieldPlugin):
+class FRVerticesPlugin(FRTableFieldPlugin):
   name = 'Vertices'
   focusedImg=None
 
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
-    cls.toolsEditor = FRParamEditor.buildClsToolsEditor(cls, 'Tools')
     cls.procCollection = FR_SINGLETON.imgProcClctn.createProcessorForClass(cls)
     (cls.resetRegionAct, cls.fillRegionAct,
      cls.clearRegionAct, cls.clearHistoryAct) = cls.toolsEditor.registerProps(
@@ -37,6 +36,7 @@ class FRTableVertsPlugin(FRTableFieldPlugin):
 
   def __init__(self):
     self.region = FRVertexDefinedImg()
+    self.region.hide()
     self.firstRun = True
 
     # Disable local cropping on primitive grab cut by default
@@ -46,7 +46,6 @@ class FRTableVertsPlugin(FRTableFieldPlugin):
     super().attachS3aRef(s3a)
     self.focusedImg = s3a.focusedImg
     s3a.focusedImg.addItem(self.region)
-
 
     self.clearRegionAct.sigActivated.connect(lambda: self.updateRegionFromVerts(None))
     def fillAct():
@@ -148,13 +147,19 @@ class FRTableVertsPlugin(FRTableFieldPlugin):
       return
     self.updateRegionFromVerts(self.focusedImg.compSer[RTF.VERTICES])
 
-  def activate(self):
-    super().activate()
+  def _onActivate(self):
     self.region.show()
 
-  def deactivate(self):
-    super().deactivate()
+  def _onDeactivate(self):
     self.region.hide()
 
+class Dummy(FRTableFieldPlugin):
+  name = 'Dummy'
+  def updateAll(self, mainImg: Optional[NChanImg], newComp: Optional[pd.Series] = None):
+    pass
 
+  def handleShapeFinished(self, roiVerts: FRVertices):
+    pass
 
+  def acceptChanges(self):
+    pass

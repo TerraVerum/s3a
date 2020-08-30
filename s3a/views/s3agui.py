@@ -1,30 +1,27 @@
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Optional, Union, Dict, Any, Type
+from typing import Optional, Union, Dict, Any
 
 import numpy as np
+import pyqtgraph as pg
 import qdarkstyle
 from pandas import DataFrame as df
-import pyqtgraph as pg
-from pyqtgraph.console import ConsoleWidget
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
+from pyqtgraph.console import ConsoleWidget
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.parameterTypes import ActionParameter
 
-from s3a.parameditors.genericeditor import FRParamEditorPlugin
-from s3a.plugins import FRTableVertsPlugin
-from s3a.views.buttons import FRButtonCollection
-from s3a.views.imageareas import FREditableImgBase
-from s3a.parameditors import FRParamEditor, FRParamEditorDockGrouping, FR_SINGLETON
-from s3a.models.s3abase import S3ABase
 from s3a.constants import LAYOUTS_DIR, FR_CONSTS, REQD_TBL_FIELDS
 from s3a.constants import _FREnums, FR_ENUMS
-from s3a.structures import FRS3AWarning, FRVertices
 from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
   autosaveOptsDialog, attemptFileLoad, popupFilePicker, \
   disableAppDuringFunc, saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
   restoreExceptionBehavior, contextMenuFromEditorActions, FRScrollableErrorDialog
+from s3a.models.s3abase import S3ABase
+from s3a.parameditors import FRParamEditor, FRParamEditorDockGrouping, FR_SINGLETON
+from s3a.structures import FRS3AWarning, FRVertices
+from s3a.views.buttons import FRButtonCollection
 
 __all__ = ['S3A']
 
@@ -71,6 +68,8 @@ class S3A(S3ABase):
     self._buildGui()
     self._buildMenu()
     self._hookupSignals()
+
+    self.focusedImg.sigPluginChanged.connect(lambda: self.updateFocusedToolsGrp())
 
     # Load layout options
     self.saveLayout('Default', allowOverwriteDefault=True)
@@ -192,15 +191,20 @@ class S3A(S3ABase):
     self.curCompIdLbl.setText(f'Component ID: {self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]}')
     return ret
 
-  def changeFocusedImgTools(self, newTools: FRButtonCollection):
+  def updateFocusedToolsGrp(self):
+    newTools = FRButtonCollection.fromToolsEditors(
+      [w.toolsEditor for w in [self.focusedImg, self.focusedImg.currentPlugin]],
+      self.focusedImg
+    )
     try:
       self._focusedLayout.replaceWidget(self.focusedImg.toolsGrp, newTools)
+      self.focusedImg.toolsGrp.deleteLater()
+      self.focusedImg.toolsGrp = newTools
     except AttributeError:
       # Fails when window is not yet constructed
       pass
     if len(newTools.paramToBtnMapping) == 0:
       newTools.hide()
-    super().changeFocusedImgTools(newTools)
 
   def resetTblFields_gui(self):
     fileDlg = QtWidgets.QFileDialog()
@@ -281,18 +285,36 @@ class S3A(S3ABase):
 
     self.setMenuBar(self.menubar)
 
-    pluginDocks = {p.docks: p for p in FR_SINGLETON.plugins if p is not None}
+    pluginDocks = {p.docks: p for p in FR_SINGLETON.plugins}
     # SETTINGS
-    for dock in FR_SINGLETON.docks:
-      if dock not in pluginDocks:
-        self.createMenuOptForDock(dock, parentToolbar=toolbar)
-    for dock, plugin in pluginDocks.items():
-      menu = self.createMenuOptForDock(dock, parentToolbar=pluginToolbar)
+    for docks in FR_SINGLETON.docks:
+      if docks not in pluginDocks:
+        self.createMenuOptForDock(docks, parentToolbar=toolbar)
+
+    # This is a bit tricky. If default args are left unfilled, qt slots will fill
+    # with 'false's which breaks the function call. However, lambdas can't be used
+    # inside a for-loop since the bound variable value won't be correct. To
+    # fix this, make a function that generates a function taking no arguments.
+    # This ensures (1) bound scope at eval time is correct for lambda and (2)
+    # extra args aren't populated with False by qt
+    def activator(_plugin):
+      def inner():
+        self.focusedImg.changeCurrentPlugin(_plugin)
+      return inner
+
+    for docks, plugin in pluginDocks.items():
+      if docks is None:
+        docks = FRParamEditorDockGrouping([plugin.toolsEditor], plugin.name)
+      menu = self.createMenuOptForDock(docks, parentToolbar=pluginToolbar)
       if plugin in FR_SINGLETON.tableFieldPlugins:
-        beforeAct = menu.actions()[0]
+        allActs = menu.actions()
+        beforeAct = allActs[0] if len(allActs) > 0 else None
         newAct = QtWidgets.QAction('&Activate', self)
-        newAct.triggered.connect(plugin.activate)
+        activatePlugin = partial(self.focusedImg.changeCurrentPlugin, plugin)
+        # Need to define separate lambda so that function call forces no args
+        newAct.triggered.connect(activator(plugin))
         menu.insertAction(beforeAct, newAct)
+
   def _maybeLoadLastState_gui(self, loadLastState: bool=None,
                               quickLoaderArgs:dict=None):
     """
@@ -449,24 +471,6 @@ class S3A(S3ABase):
     """
     self.hasUnsavedChanges = False
     self.close()
-
-  def _createBtnLayoutForTools_old(self, editor: FRParamEditor):
-    """Helper function for adding main window buttons from a given tool editor"""
-    toolParams = []
-    toolFns = []
-    for param in editor.params: # type: Parameter
-      if 'action' in param.opts['type']:
-        param: ActionParameter
-        # Add this button to the group
-        frParam = param.opts['frParam']
-        toolParams.append(frParam)
-        triggerFn = lambda *args, _p=param: _p.activate()
-        toolFns.append(triggerFn)
-    btnGrp = FRButtonCollection(self, 'Tools', toolParams, toolFns, False, False)
-    retLayout = QtWidgets.QHBoxLayout()
-    for btn in btnGrp.paramToBtnMapping.values():
-      retLayout.addWidget(btn)
-    return retLayout
 
   def _addEditorDocks(self, docks=None):
     if docks is None:

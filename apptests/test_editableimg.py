@@ -5,12 +5,12 @@ import pytest
 from pyqtgraph.Qt import QtGui, QtCore
 
 from conftest import NUM_COMPS, app, mgr, dfTester, vertsPlugin
-from s3a import FR_SINGLETON, FRTableVertsPlugin
+from s3a import FR_SINGLETON
+from s3a.constants import FR_CONSTS
 from s3a.controls.drawctrl import FRRoiCollection
-from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS as RTF
+from s3a.parameditors.algcollection import FRAlgParamEditor
 from s3a.processing import FRProcessIO, FRImageProcess, FRImgProcWrapper
 from s3a.structures import FRVertices, FRComplexVertices, FRParam, FRS3AWarning, NChanImg
-from s3a.parameditors.algcollection import FRAlgParamEditor
 from testingconsts import FIMG_SER_COLS
 
 # Construct app outside setUp to drastically reduce loading times
@@ -53,7 +53,7 @@ def roiFactory():
 @pytest.mark.withcomps
 def test_update():
   oldPlugin = fImg.currentPlugin
-  vertsPlugin.activate()
+  fImg.changeCurrentPlugin(vertsPlugin)
   assert fImg.image is None
   focusedId = NUM_COMPS-1
   newCompSer = mgr.compDf.loc[focusedId]
@@ -77,7 +77,7 @@ def test_update():
   assert fImg.compSer.equals(newCompSer)
   FR_SINGLETON.actionStack.redo()
   assert fImg.compSer.equals(newerSer[FIMG_SER_COLS])
-  oldPlugin.activate()
+  fImg.changeCurrentPlugin(oldPlugin)
 
 def test_region_modify(sampleComps):
   app.add_focusComp(sampleComps)
