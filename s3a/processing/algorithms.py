@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from scipy.ndimage import binary_fill_holes
 from skimage.measure import regionprops, label, regionprops_table
-from skimage.morphology import flood
+from skimage.morphology import flood, disk
 from skimage.segmentation import quickshift
 
 from s3a.generalutils import splitListAtNans, cornersToFullBoundary, \
@@ -195,7 +195,7 @@ def openClose():
   proc.addFunction(cvt_to_uint)
   def morphFactory(op):
     def morph(image: NChanImg, ksize=5):
-      outImg = cv.morphologyEx(image, op, (ksize,))
+      outImg = cv.morphologyEx(image.copy(), op, disk(ksize//2))
       return FRProcessIO(image=outImg)
     return morph
   inner = FRImageProcess.fromFunction(morphFactory(cv.MORPH_OPEN), 'Opening')
