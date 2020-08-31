@@ -226,6 +226,16 @@ class FRGeneralProcess(FRProcessStage):
   def _stageSummaryWidget(self):
     raise NotImplementedError
 
+  def _nonDisabledStages_flattened(self):
+    out = []
+    for stage in self.stages:
+      if isinstance(stage, FRAtomicProcess):
+        out.append(stage)
+      elif not stage.disabled:
+        stage: FRGeneralProcess
+        out.extend(stage._nonDisabledStages_flattened())
+    return out
+
   def stageSummary_gui(self):
     if self.result is None:
       raise FRAlgProcessorError('Analytics can only be shown after the algorithmwas run.')
@@ -238,7 +248,9 @@ class FRGeneralProcess(FRProcessStage):
 
   def getStageInfos(self, ignoreDuplicates=True):
     allInfos: t.List[t.Union[t.List, t.Dict[str, t.Any]]] = []
-    for stage in self.stages_flattened:
+    for stage in self._nonDisabledStages_flattened():
+      if stage.disabled:
+        continue
       res = stage.result
       if 'summaryInfo' not in res:
         defaultSummaryInfo = {k: res[k] for k in self.mainResultKeys}

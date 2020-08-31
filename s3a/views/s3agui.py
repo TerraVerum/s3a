@@ -278,7 +278,6 @@ class S3A(S3ABase):
     self.redoAct.setShortcut('Ctrl+Y')
 
     # Analytics
-    self.newCompAnalyticsAct = create_addMenuAct(self, self.menuAnalytics, 'Newest Added Component')
     self.modCompAnalyticsAct = create_addMenuAct(self, self.menuAnalytics, 'Modified Component')
 
     # Tools
