@@ -65,7 +65,13 @@ class FRShortcutsEditor(FRParamEditor):
 
   def __init__(self, parent=None):
 
-    self.paramToShortcutMapping: Dict[FRParam, QtWidgets.QShortcut] = {}
+    self.paramToShortcutMapping: Dict[Tuple[FRParam, Any], QtWidgets.QShortcut] = {}
+    """
+    Each shortcut must have a unique name, otherwise the registration process will
+    leave hanging, untriggerable shortcuts. However, shortcuts with the same name
+    under a *different* parent are fine. To catch these cases, the unique key for
+    each shortcut is a combination of its FRParam and parent/ownerObj.
+    """
     # Unlike other param editors, these children don't get filled in until
     # after the top-level widget is passed to the shortcut editor
     super().__init__(parent, [], saveDir=SHORTCUTS_DIR, fileType='shortcut',
@@ -198,10 +204,10 @@ class FRShortcutsEditor(FRParamEditor):
     newShortcut.activated.connect(partialFn)
     newShortcut.activatedAmbiguously.connect(lambda: self.ambigWarning(ownerObj, newShortcut))
     shortcutParam.sigValueChanged.connect(lambda param: newShortcut.setKey(param.seqEdit.keySequence()))
-    if funcFrParam in self.paramToShortcutMapping:
+    if (funcFrParam, ownerObj) in self.paramToShortcutMapping:
       # Already found this value before, make sure to remove it
-      self.paramToShortcutMapping[funcFrParam].deleteLater()
-    self.paramToShortcutMapping[funcFrParam] = newShortcut
+      self.paramToShortcutMapping[funcFrParam, ownerObj].deleteLater()
+    self.paramToShortcutMapping[funcFrParam, ownerObj] = newShortcut
     return shortcutParam
 
   @staticmethod
@@ -280,7 +286,7 @@ class FRShortcutsEditor(FRParamEditor):
     shortcut.activatedAmbiguously.connect(lambda: self.ambigWarning(ownerObj, shortcut))
     shortcut.setContext(ctx)
     keySeqParam.sigValueChanged.connect(lambda item, value: shortcut.setKey(value))
-    self.paramToShortcutMapping[boundFn.param] = shortcut
+    self.paramToShortcutMapping[boundFn.param, ownerObj] = shortcut
     return shortcut
 
   def setParent(self, parent: QtWidgets.QWidget, *args):
