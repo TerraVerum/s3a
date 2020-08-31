@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from warnings import warn
 import copy
 import pyqtgraph as pg
+from pyqtgraph.Qt import QtCore
 import numpy as np
 
 from s3a.generalutils import frPascalCaseToTitle
@@ -222,12 +223,34 @@ class FRGeneralProcess(FRProcessStage):
       outStages.extend(stage.stages_flattened)
     return outStages
 
-  def stageSummary_gui(self, ignoreDuplicates=True):
+  def _stageSummaryWidget(self):
     raise NotImplementedError
+
+  def _nonDisabledStages_flattened(self):
+    out = []
+    for stage in self.stages:
+      if isinstance(stage, FRAtomicProcess):
+        out.append(stage)
+      elif not stage.disabled:
+        stage: FRGeneralProcess
+        out.extend(stage._nonDisabledStages_flattened())
+    return out
+
+  def stageSummary_gui(self):
+    if self.result is None:
+      raise FRAlgProcessorError('Analytics can only be shown after the algorithmwas run.')
+    outGrid = self._stageSummaryWidget()
+    outGrid.showMaximized()
+    def fixedShow():
+      for item in outGrid.ci.items:
+        item.getViewBox().autoRange()
+    QtCore.QTimer.singleShot(0, fixedShow)
 
   def getStageInfos(self, ignoreDuplicates=True):
     allInfos: t.List[t.Union[t.List, t.Dict[str, t.Any]]] = []
-    for stage in self.stages_flattened:
+    for stage in self._nonDisabledStages_flattened():
+      if stage.disabled:
+        continue
       res = stage.result
       if 'summaryInfo' not in res:
         defaultSummaryInfo = {k: res[k] for k in self.mainResultKeys}
@@ -252,8 +275,8 @@ class FRGeneralProcess(FRProcessStage):
 class FRImageProcess(FRGeneralProcess):
   mainResultKeys = ['image']
 
-  def stageSummary_gui(self, ignoreDuplicates=True):
-    infoToDisplay = self.getStageInfos(ignoreDuplicates=ignoreDuplicates)
+  def _stageSummaryWidget(self):
+    infoToDisplay = self.getStageInfos()
 
     numStages = len(infoToDisplay)
     nrows = np.sqrt(numStages).astype(int)
@@ -263,7 +286,6 @@ class FRImageProcess(FRGeneralProcess):
     for ii, info in enumerate(infoToDisplay):
       pltItem: pg.PlotItem = outGrid.addPlot(title=info.get('name', None))
       pltItem.getViewBox().invertY(True)
-      pltItem.getViewBox().setAspectLocked(True)
       npImg = info['image']
       sameSizePlt = sizeToAxMapping.get(npImg.shape[:2], None)
       if sameSizePlt is not None:
@@ -275,6 +297,10 @@ class FRImageProcess(FRGeneralProcess):
 
       if ii % ncols == ncols-1:
         outGrid.nextRow()
+    # See https://github.com/pyqtgraph/pyqtgraph/issues/1348. strange zooming occurs
+    # if aspect is locked on all figures
+    for ax in sizeToAxMapping.values():
+      ax.getViewBox().setAspectLocked(True)
     oldClose = outGrid.closeEvent
     def newClose(ev):
       del _winRefs[outGrid]

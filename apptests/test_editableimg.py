@@ -4,20 +4,19 @@ import numpy as np
 import pytest
 from pyqtgraph.Qt import QtGui, QtCore
 
-from conftest import NUM_COMPS, app, mgr, dfTester
-from imageprocessing.common import Image
-from imageprocessing.processing import ImageIO, ImageProcess
+from conftest import NUM_COMPS, app, mgr, dfTester, vertsPlugin
 from s3a import FR_SINGLETON
+from s3a.constants import FR_CONSTS
 from s3a.controls.drawctrl import FRRoiCollection
-from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS as RTF
-from s3a.structures import FRVertices, FRComplexVertices, FRParam, FRS3AWarning
-from s3a.parameditors.algcollection import FRAlgCollectionEditor
+from s3a.parameditors.algcollection import FRAlgParamEditor
+from s3a.processing import FRProcessIO, FRImageProcess, FRImgProcWrapper
+from s3a.structures import FRVertices, FRComplexVertices, FRParam, FRS3AWarning, NChanImg
 from testingconsts import FIMG_SER_COLS
 
 # Construct app outside setUp to drastically reduce loading times
 # Make the processor wellformed
-app.focusedImg.procCollection.switchActiveProcessor('Basic Shapes')
-proc = app.focusedImg.curProcessor
+vertsPlugin.procCollection.switchActiveProcessor('Basic Shapes')
+proc = vertsPlugin.curProcessor
 for stage in proc.processor.stages:
   if stage.allowDisable:
     proc.setStageEnabled([stage.name], False)
@@ -53,6 +52,8 @@ def roiFactory():
 
 @pytest.mark.withcomps
 def test_update():
+  oldPlugin = fImg.currentPlugin
+  fImg.changeCurrentPlugin(vertsPlugin)
   assert fImg.image is None
   focusedId = NUM_COMPS-1
   newCompSer = mgr.compDf.loc[focusedId]
@@ -76,18 +77,19 @@ def test_update():
   assert fImg.compSer.equals(newCompSer)
   FR_SINGLETON.actionStack.redo()
   assert fImg.compSer.equals(newerSer[FIMG_SER_COLS])
+  fImg.changeCurrentPlugin(oldPlugin)
 
 def test_region_modify(sampleComps):
   app.add_focusComp(sampleComps)
   shapeBnds = fImg.image.shape[:2]
   reach = np.min(shapeBnds)
-  oldVerts = fImg.region.verts
+  oldVerts = vertsPlugin.region.verts
   fImg.shapeCollection.curShapeParam = FR_CONSTS.DRAW_SHAPE_POLY
   fImg.drawAction = FR_CONSTS.DRAW_ACT_ADD
-  imsum = lambda: fImg.region.image.sum()
+  imsum = lambda: vertsPlugin.region.image.sum()
 
   # 1st action
-  fImg.updateRegionFromVerts(None)
+  vertsPlugin.updateRegionFromVerts(None)
   assert imsum() == 0
 
   newVerts = FRVertices([[5,5], [reach, reach], [reach, 5], [5,5]])
@@ -97,19 +99,19 @@ def test_region_modify(sampleComps):
 
   # 2nd action
   fImg.handleShapeFinished(newVerts)
-  assert np.array_equal(fImg.region.embedMaskInImg(shapeBnds), newMask)
+  assert np.array_equal(vertsPlugin.region.embedMaskInImg(shapeBnds), newMask)
 
   FR_SINGLETON.actionStack.undo()
   # Cmp to first action
   assert imsum() == 0
   FR_SINGLETON.actionStack.undo()
   # Cmp to original
-  assert fImg.region.verts == oldVerts
+  assert vertsPlugin.region.verts == oldVerts
 
   FR_SINGLETON.actionStack.redo()
   assert imsum() == 0
   FR_SINGLETON.actionStack.redo()
-  assert np.array_equal(fImg.region.embedMaskInImg(shapeBnds), newMask)
+  assert np.array_equal(vertsPlugin.region.embedMaskInImg(shapeBnds), newMask)
 
 
 @pytest.mark.withcomps
@@ -130,31 +132,11 @@ def test_selectionbounds_none():
   app.mainImg.sigSelectionBoundsMade.emit(FRVertices([[-100,-100]]))
   assert len(app.compDisplay.selectedIds) == 0
 
-# def test_override_comp():
-#   mImg = app.mainImg
-#   mImg.procCollection.switchActiveProcessor('Basic Shapes')
-#   rmSmallCompsParam = mImg.procCollection.params.child(
-#     'Basic Shapes', 'Basic Region Operations', 'Rm Small Comps', 'minSzThreshold')
-#   # Make sure the drawn comp is deleted
-#   imShape = np.asarray(mImg.image.shape[:2])
-#   rmSmallCompsParam.setValue(np.prod(imShape))
-#   newVerts = FRVertices([
-#     [0, 0], [1, 0], [1, 1], [0, 1]
-#   ])*imShape//2
-#   mImg.handleShapeFinished(newVerts)
-#   assert len(mgr.compDf) == 0
-#   mImg.overrideCompVertsAct.activate()
-#   assert len(mgr.compDf) == 1
-#   assert mgr.compDf.at[0, RTF.VERTICES] == FRComplexVertices([newVerts])
-#
-#   stack.undo()
-#   assert len(mgr.compDf) == 0
-
 def test_proc_err(tmpdir):
-  def badProc(image: Image):
-    return ImageIO(image=image, extra=1/0)
-  newCtor = lambda: ImageProcess.fromFunction(badProc, 'Bad')
-  newClctn = FRAlgCollectionEditor(Path(tmpdir),[newCtor])
+  def badProc(image: NChanImg):
+    return FRProcessIO(image=image, extra=1/0)
+  newCtor = lambda: FRImageProcess.fromFunction(badProc, 'Bad')
+  newClctn = FRAlgParamEditor(Path(tmpdir), [newCtor], FRImgProcWrapper)
 
   newClctn.switchActiveProcessor('Bad')
   with pytest.warns(FRS3AWarning):

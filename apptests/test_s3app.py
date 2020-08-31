@@ -1,12 +1,14 @@
 import re
 from ast import literal_eval
+from copy import copy
 from pathlib import Path
 
 import numpy as np
 import pytest
+from pyqtgraph.Qt import QtCore, QtGui
 
-from conftest import NUM_COMPS, app, mgr, dfTester
-from s3a import FR_SINGLETON, appInst, S3A
+from conftest import NUM_COMPS, app, mgr, dfTester, vertsPlugin
+from s3a import FR_SINGLETON, appInst, S3A, FR_CONSTS, FRParam
 from s3a.models.s3abase import S3ABase
 from s3a.generalutils import resolveAuthorName, imgCornerVertices
 from s3a.constants import REQD_TBL_FIELDS, LAYOUTS_DIR, ANN_AUTH_DIR
@@ -34,9 +36,25 @@ def test_est_bounds_no_img():
   with pytest.raises(FRAlgProcessorError):
     app.estimateBoundaries()
 
+"""For some reason, the test below works if performed manually. However, I can't
+seem to get the programmatically allocated keystrokes to work."""
+# def test_ambig_shc(qtbot):
+#   param = FRParam('Dummy', 'T', 'registeredaction')
+#
+#   p2 = copy(param)
+#   p2.name = 'dummy2'
+#   FR_SINGLETON.shortcuts.createRegisteredButton(param, app.mainImg)
+#   FR_SINGLETON.shortcuts.createRegisteredButton(p2, app.mainImg)
+#   keypress = QtGui.QKeyEvent(QtGui.QKeyEvent.KeyPress, QtCore.Qt.Key_T, QtCore.Qt.NoModifier, "T")
+#   with pytest.warns(FRS3AWarning):
+#     QtGui.QGuiApplication.sendEvent(app.mainImg, keypress)
+#     appInst.processEvents()
+
+
+
 def test_est_clear_bounds():
   # Change to easy processor first for speed
-  clctn = app.focusedImg.procCollection
+  clctn = vertsPlugin.procCollection
   prevProc = clctn.curProcessor
   clctn.switchActiveProcessor('Basic Shapes')
   app.estimateBoundaries()
@@ -117,21 +135,29 @@ def test_autosave(tmpdir):
   savedFiles = list(tmpdir.glob('autosave*.csv'))
   assert len(savedFiles) >= 3, 'Not enough autosaves generated'
 
-def test_stage_plotting():
+def test_stage_plotting(monkeypatch):
   app.mainImg.handleShapeFinished(imgCornerVertices(app.mainImg.image))
-  app.focusedImg.procCollection = FR_SINGLETON.algParamMgr.createProcessorForClass(app.focusedImg)
+  app.focusedImg.currentPlugin.procCollection = FR_SINGLETON.imgProcClctn.createProcessorForClass(app.focusedImg)
   with pytest.raises(FRAlgProcessorError):
     app.showModCompAnalytics()
   # Make a component so modofications can be tested
   focImg = app.focusedImg
-  focImg.procCollection.switchActiveProcessor('Basic Shapes')
+  vertsPlugin.procCollection.switchActiveProcessor('Basic Shapes')
   focImg.handleShapeFinished(FRVertices())
   assert app.focusedImg.compSer.loc[REQD_TBL_FIELDS.INST_ID] >= 0
 
   focImg = app.focusedImg
-  focImg.procCollection.switchActiveProcessor('Basic Shapes')
+  vertsPlugin.procCollection.switchActiveProcessor('Basic Shapes')
   focImg.handleShapeFinished(FRVertices())
-  app.showModCompAnalytics()
+  proc = focImg.currentPlugin.curProcessor.processor
+  oldMakeWidget = proc._stageSummaryWidget
+  def patchedWidget():
+    widget = oldMakeWidget()
+    widget.showMaximized = lambda: None
+    return widget
+  with monkeypatch.context() as m:
+    m.setattr(proc, '_stageSummaryWidget', patchedWidget)
+    app.showModCompAnalytics()
 
 def test_no_author():
   p = Path(ANN_AUTH_DIR/'defaultAuthor.txt')

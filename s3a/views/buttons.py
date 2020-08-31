@@ -1,11 +1,10 @@
-from functools import partial
-from typing import Tuple, Collection, Callable, Union, Iterable, Any, Dict
+from __future__ import annotations
+from typing import Tuple, Collection, Callable, Union, Iterable, Any, Dict, Sequence
 
 from pyqtgraph.Qt import QtWidgets, QtGui, QtCore
 
-from s3a import FR_SINGLETON
-from s3a.constants import FR_CONSTS
 from s3a.structures import FRParam
+from s3a import parameditors
 
 __all__ = ['FRDrawOpts', 'FRButtonCollection']
 
@@ -34,7 +33,7 @@ class FRButtonCollection(QtWidgets.QGroupBox):
                     ownerObj: Union[type, Any]=_DEFAULT_OWNER):
     if ownerObj is _DEFAULT_OWNER:
       ownerObj = self.parent()
-    newBtn = FR_SINGLETON.shortcuts.createRegisteredButton(btnParam, ownerObj)
+    newBtn = parameditors.FR_SINGLETON.shortcuts.createRegisteredButton(btnParam, ownerObj)
     if checkable:
       newBtn.setCheckable(True)
       oldTriggerFn = triggerFn
@@ -58,6 +57,24 @@ class FRButtonCollection(QtWidgets.QGroupBox):
     if btn.isCheckable():
       btn.setChecked(True)
     self.paramToFuncMapping[param](param)
+
+  @classmethod
+  def fromToolsEditors(cls,
+                       toolsEditors: Union[parameditors.FRParamEditor,
+                       Sequence[parameditors.FRParamEditor]],
+                       parent=None):
+    toolParams = []
+    toolFns = []
+    if not isinstance(toolsEditors, Sequence):
+      toolsEditors = [toolsEditors]
+    for toolsEditor in toolsEditors:
+      for param in toolsEditor.params.childs:
+        if 'action' in param.opts['type'] and param.opts.get('guibtn', True):
+          toolParams.append(param.opts['frParam'])
+          toolFns.append(lambda *_args, _param=param: _param.sigActivated.emit(_param))
+    # Don't create shortcuts since this will be done by the tool editor
+    return FRButtonCollection(parent, title='Tools', btnParams=toolParams,
+                                       btnTriggerFns=toolFns, exclusive=False, checkable=False)
 
 class FRDrawOpts(QtWidgets.QWidget):
   def __init__(self, shapeGrp: FRButtonCollection, actGrp: FRButtonCollection,

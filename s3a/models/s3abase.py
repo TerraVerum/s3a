@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from typing import Optional, Union, Callable, Dict, Any, Type
+from typing import Optional, Union, Callable, Dict, Any
 from warnings import warn
 
 import numpy as np
@@ -8,20 +8,20 @@ import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
 
-from s3a import FRParam
-from s3a.controls.tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
-from s3a.generalutils import resolveAuthorName, frPascalCaseToTitle, imgCornerVertices
-from s3a.graphicsutils import addDirItemsToMenu, saveToFile
-from s3a.models.tablemodel import FRComponentIO, FRComponentMgr
+from s3a import FRComplexVertices
 from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS
 from s3a.constants import FR_ENUMS
-from s3a.parameditors.genericeditor import FRParamEditorPlugin
-from s3a.structures import FRS3AWarning, FRVertices, FilePath, NChanImg, FRAppIOError, \
-  FRAlgProcessorError
-from s3a.views.imageareas import FRMainImage, FRFocusedImage, FREditableImgBase
-from s3a.parameditors import FRParamEditor, FRParamEditorDockGrouping
+from s3a.controls.tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
+from s3a.generalutils import resolveAuthorName, imgCornerVertices
+from s3a.graphicsutils import addDirItemsToMenu, saveToFile
+from s3a.models.tablemodel import FRComponentIO, FRComponentMgr
+from s3a.parameditors import FRParamEditor
+from s3a.parameditors import FRParamEditorPlugin
 from s3a.parameditors import FR_SINGLETON
 from s3a.parameditors.appstate import FRAppStateEditor
+from s3a.structures import FilePath, NChanImg, FRAppIOError, \
+  FRAlgProcessorError, FRS3AWarning
+from s3a.views.imageareas import FRMainImage, FRFocusedImage
 from s3a.views.tableview import FRCompTableView
 
 __all__ = ['S3ABase']
@@ -41,6 +41,8 @@ class S3ABase(QtWidgets.QMainWindow):
     super().__init__(parent)
     self.mainImg = FRMainImage()
     self.focusedImg = FRFocusedImage()
+    self.focusedImg.acceptRegionAct.sigActivated.connect(lambda: self.acceptFocusedRegion())
+
     self.compMgr = FRComponentMgr()
     self.compIo = FRComponentIO()
     self.compTbl = FRCompTableView()
@@ -61,8 +63,8 @@ class S3ABase(QtWidgets.QMainWindow):
     # -----
     self.appStateEditor = FRAppStateEditor(self, name='App State Editor')
 
-    for plugin in FR_SINGLETON.plugins:
-      plugin.s3a = self
+    for plugin in FR_SINGLETON.plugins: # type: FRParamEditorPlugin
+      plugin.attachS3aRef(self)
 
     def loadCfg(_fname: str):
       FR_SINGLETON.tableData.loadCfg(_fname)
@@ -108,7 +110,7 @@ class S3ABase(QtWidgets.QMainWindow):
     def handleCompsChanged(changedDict: dict):
       focusedId = self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]
       if focusedId in changedDict['deleted']:
-        self.focusedImg.resetImage()
+        self.focusedImg.updateAll()
       elif focusedId in changedDict['changed']:
         self.changeFocusedComp(self.compMgr.compDf.loc[[focusedId]])
     self.compMgr.sigCompsChanged.connect(handleCompsChanged)
@@ -190,55 +192,42 @@ class S3ABase(QtWidgets.QMainWindow):
   def updateUndoBuffSz(self, _genProps: Dict[str, Any]):
     FR_SINGLETON.actionStack.resizeStack(self.undoBuffSz)
 
-  def clearFocusedRegion(self):
-    # Reset drawn comp vertices to nothing
-    # Only perform action if image currently exists
-    if self.focusedImg.image is None:
-      return
-    self.focusedImg.updateRegionFromVerts(None)
-
-  def resetFocusedRegion(self):
-    # Reset drawn comp vertices to nothing
-    # Only perform action if image currently exists
-    if self.focusedImg.image is None:
-      return
-    self.focusedImg.updateRegionFromVerts(self.focusedImg.compSer[REQD_TBL_FIELDS.VERTICES])
-
-  @FR_SINGLETON.actionStack.undoable('Accept Focused Region')
-  def acceptFocusedRegion(self):
-    # If the component was deleted
-    focusedId = self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]
-    if focusedId not in self.compMgr.compDf.index:
-      warn('Cannot accept region as this component was deleted.', FRS3AWarning)
-      return
-    oldSer = self.compMgr.compDf.loc[focusedId].copy()
-
-    self.focusedImg.saveNewVerts()
-    modifiedComp = self.focusedImg.compSer
-    modified_df = modifiedComp.to_frame().T
-    self.compMgr.addComps(modified_df, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
-    self.compDisplay.regionPlot.focusById([modifiedComp[REQD_TBL_FIELDS.INST_ID]])
-    yield
-    self.focusedImg.saveNewVerts(oldSer[REQD_TBL_FIELDS.VERTICES])
-    self.compMgr.addComps(oldSer.to_frame().T, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
-
   def estimateBoundaries(self):
     oldAct = self.mainImg.drawAction
     try:
       self.mainImg.drawAction = FR_CONSTS.DRAW_ACT_ADD
-      proc = self.focusedImg.curProcessor
-      proc.run(image=self.mainImg.image, fgVerts=FRVertices())
-      verts = proc.resultAsVerts(False)
-      if len(verts) == 0:
-        return
-      newComps = FR_SINGLETON.tableData.makeCompDf(len(verts))
-      newComps[REQD_TBL_FIELDS.VERTICES] = verts
-      self.add_focusComps(newComps)
+      verts = imgCornerVertices(self.mainImg.image)
+      newComp = FR_SINGLETON.tableData.makeCompDf(1)
+      newComp.at[REQD_TBL_FIELDS.INST_ID.value, REQD_TBL_FIELDS.VERTICES] = FRComplexVertices([verts])
+      self.compMgr.addComps(newComp, emitChange=False)
+      self.focusedImg.updateAll(self.mainImg.image, newComp.squeeze())
+      for plugin in FR_SINGLETON.tableFieldPlugins:
+        plugin.handleShapeFinished(verts)
 
-    except Exception as ex:
-      raise
+      self.acceptFocusedRegion()
     finally:
       self.mainImg.drawAction = oldAct
+
+  @FR_SINGLETON.actionStack.undoable('Accept Focused Region')
+  def acceptFocusedRegion(self):
+    # If the component was deleted
+    mgr = self.compMgr
+    focusedId = self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]
+    if focusedId not in mgr.compDf.index:
+      warn('Cannot accept region as this component was deleted.', FRS3AWarning)
+      return
+    oldSer = mgr.compDf.loc[focusedId].copy()
+
+    for plugin in FR_SINGLETON.tableFieldPlugins:
+      plugin.acceptChanges()
+
+    modifiedComp = self.focusedImg.compSer
+    modified_df = modifiedComp.to_frame().T
+    mgr.addComps(modified_df, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.compDisplay.regionPlot.focusById([modifiedComp[REQD_TBL_FIELDS.INST_ID]])
+    yield
+    self.focusedImg.updateAll(self.mainImg.image, oldSer)
+    mgr.addComps(oldSer.to_frame().T, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
 
   def clearBoundaries(self):
     self.compMgr.rmComps()
@@ -270,7 +259,7 @@ class S3ABase(QtWidgets.QMainWindow):
     else:
       self.mainImg.setImage(fileName)
     self.srcImgFname = fileName
-    self.focusedImg.resetImage()
+    self.focusedImg.updateAll()
     self.mainImg.plotItem.vb.autoRange()
     if self.estBoundsOnStart:
       self.estimateBoundaries()
@@ -303,7 +292,13 @@ class S3ABase(QtWidgets.QMainWindow):
     self.compMgr.addComps(newComps, loadType)
 
   def showModCompAnalytics(self):
-    self._check_plotStages(self.focusedImg)
+    try:
+      proc = self.focusedImg.currentPlugin.curProcessor
+      proc.processor.stageSummary_gui()
+    except AttributeError:
+      # Processor or proc collection not set
+      raise FRAlgProcessorError('Either no plugin is activated or the activated plugin'
+                                ' has no processors')
 
   @FR_SINGLETON.actionStack.undoable('Create New Comp', asGroup=True)
   def add_focusComps(self, newComps: df):
@@ -312,20 +307,6 @@ class S3ABase(QtWidgets.QMainWindow):
     newComps = newComps.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
     # Focus is performed by comp table
     self.changeFocusedComp(newComps)
-
-  @staticmethod
-  def _check_plotStages(img: FREditableImgBase):
-    proc = img.curProcessor.processor
-    if proc.result is None:
-      raise FRAlgProcessorError('Analytics can only be shown after the algorithm'
-                                ' was run.')
-    outGrid = proc.stageSummary_gui()
-    outGrid.showMaximized()
-    def fixedShow():
-      for item in outGrid.ci.items:
-        item.getViewBox().autoRange()
-    QtCore.QTimer.singleShot(0, fixedShow)
-
 
   @FR_SINGLETON.actionStack.undoable('Change Focused Component')
   def changeFocusedComp(self, newComps: df, forceKeepLastChange=False):
@@ -342,7 +323,6 @@ class S3ABase(QtWidgets.QMainWindow):
     self.compDisplay.regionPlot.focusById([newCompId])
     mainImg = self.mainImg.image
     self.focusedImg.updateAll(mainImg, newComp)
-    self.curCompIdLbl.setText(f'Component ID: {newCompId}')
     # Nothing happened since the last component change, so just replace it instead of
     # adding a distinct action to the buffer queue
     stack = FR_SINGLETON.actionStack
@@ -352,4 +332,4 @@ class S3ABase(QtWidgets.QMainWindow):
     if oldImg is not None and len(oldSer.loc[REQD_TBL_FIELDS.VERTICES]) > 0:
       self.changeFocusedComp(oldSer.to_frame().T, forceKeepLastChange=True)
     else:
-      self.focusedImg.resetImage()
+      self.focusedImg.updateAll()

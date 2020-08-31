@@ -1,4 +1,5 @@
 from functools import partial
+from pathlib import Path
 from typing import List
 
 from pyqtgraph.Qt import QtGui, QtWidgets, QtCore
@@ -256,6 +257,7 @@ class FRFilePickerParameterItem(parameterTypes.WidgetParameterItem):
     if param.opts['value'] is None:
       param.opts['value'] = ''
     fpath = param.opts['value']
+    param.opts.setdefault('asFolder', False)
     button = QtWidgets.QPushButton()
     param.sigValueChanged.connect(lambda param, val: button.setText(val))
     button.setValue = button.setText
@@ -269,10 +271,17 @@ class FRFilePickerParameterItem(parameterTypes.WidgetParameterItem):
   def _retrieveFolderName_gui(self):
     folderDlg = QtWidgets.QFileDialog()
     folderDlg.setModal(True)
-    fname, _ = folderDlg.getOpenFileName(caption='Select Data File')
-
-    if len(fname) > 0:
-      self.param.setValue(fname)
+    curVal = self.param.value()
+    if len(curVal) > 0:
+      dir = curVal
+    else:
+      dir = None
+    fname, _ = folderDlg.getOpenFileName(caption='Select Data File', dir=dir)
+    if len(fname) == 0:
+      return
+    if self.param.opts['asFolder']:
+      fname = str(Path(fname).parent)
+    self.param.setValue(fname)
 
 class FRFilePickerParameter(Parameter):
   itemClass = FRFilePickerParameterItem

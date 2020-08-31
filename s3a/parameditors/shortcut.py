@@ -3,12 +3,13 @@ from dataclasses import dataclass
 from functools import partial
 from inspect import isclass
 from typing import Tuple, Callable, Any, Dict, List, DefaultDict
+from warnings import warn
 
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from pyqtgraph.parametertree import Parameter
 
 from s3a.constants import SHORTCUTS_DIR
-from s3a.structures import FRParam, FRParamEditorError
+from s3a.structures import FRParam, FRParamEditorError, FRS3AWarning
 from .genericeditor import FRParamEditor
 from .pgregistered import FRShortcutParameter
 from s3a.generalutils import helpTextToRichText
@@ -64,7 +65,13 @@ class FRShortcutsEditor(FRParamEditor):
 
   def __init__(self, parent=None):
 
-    self.shortcuts: List[QtWidgets.QShortcut] = []
+    self.paramToShortcutMapping: Dict[Tuple[FRParam, Any], QtWidgets.QShortcut] = {}
+    """
+    Each shortcut must have a unique name, otherwise the registration process will
+    leave hanging, untriggerable shortcuts. However, shortcuts with the same name
+    under a *different* parent are fine. To catch these cases, the unique key for
+    each shortcut is a combination of its FRParam and parent/ownerObj.
+    """
     # Unlike other param editors, these children don't get filled in until
     # after the top-level widget is passed to the shortcut editor
     super().__init__(parent, [], saveDir=SHORTCUTS_DIR, fileType='shortcut',
@@ -137,6 +144,7 @@ class FRShortcutsEditor(FRParamEditor):
       newBtn = QtWidgets.QPushButton(btnParam.name, self)
       tooltipText = btnParam.helpText
     if btnParam.value is None or not doRegister:
+      # Either the shortcut wasn't given a value or wasn't requested, or already exists
       return newBtn
 
     if isclass(ownerObj):
@@ -183,16 +191,31 @@ class FRShortcutsEditor(FRParamEditor):
     else:
       shortcutParam = pgParam.child(shortcutParam.name())
 
-    if ownerObj is None:
-      ownerObj = self.mainWinRef
-    newShortcut = QtWidgets.QShortcut(shortcutParam.seqEdit.keySequence(), ownerObj)
-    newShortcut.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
+    seq = shortcutParam.seqEdit.keySequence()
+    if ownerObj is None or not isinstance(ownerObj, QtWidgets.QWidget):
+      newShortcut = QtWidgets.QShortcut(seq, self.parent())
+      ctx = QtCore.Qt.ApplicationShortcut
+    else:
+      newShortcut = QtWidgets.QShortcut(seq, ownerObj)
+      ctx = QtCore.Qt.WidgetWithChildrenShortcut
+
+    newShortcut.setContext(ctx)
     partialFn = partial(func, *funcArgs, **funcKwargs)
     newShortcut.activated.connect(partialFn)
-    newShortcut.activatedAmbiguously.connect(lambda: print(f'{ownerObj} shc ambiguous: {newShortcut.key().toString()}'))
+    newShortcut.activatedAmbiguously.connect(lambda: self.ambigWarning(ownerObj, newShortcut))
     shortcutParam.sigValueChanged.connect(lambda param: newShortcut.setKey(param.seqEdit.keySequence()))
-    self.shortcuts.append(newShortcut)
+    if (funcFrParam, ownerObj) in self.paramToShortcutMapping:
+      # Already found this value before, make sure to remove it
+      self.paramToShortcutMapping[funcFrParam, ownerObj].deleteLater()
+    self.paramToShortcutMapping[funcFrParam, ownerObj] = newShortcut
     return shortcutParam
+
+  @staticmethod
+  def ambigWarning(ownerObj: QtWidgets.QWidget, shc: QtWidgets.QShortcut):
+    warn(f'{ownerObj} shortcut ambiguously activated: {shc.key().toString()}\n'
+         f'Perhaps multiple shortcuts are assigned the same key sequence?',
+         FRS3AWarning)
+
 
 
   def addRegisteredFuncsFromCls(self, grouping: Any, groupParam: FRParam):
@@ -260,16 +283,16 @@ class FRShortcutsEditor(FRParamEditor):
     keySeqParam: FRShortcutParameter = self[groupParam, boundFn.param, True]
     shortcut.paramIdx = (groupParam, boundFn.param)
     shortcut.activated.connect(partial(boundFn.func, ownerObj, *boundFn.defaultFnArgs))
-    shortcut.activatedAmbiguously.connect(lambda: print('ambiguous'))
+    shortcut.activatedAmbiguously.connect(lambda: self.ambigWarning(ownerObj, shortcut))
     shortcut.setContext(ctx)
     keySeqParam.sigValueChanged.connect(lambda item, value: shortcut.setKey(value))
-    self.shortcuts.append(shortcut)
+    self.paramToShortcutMapping[boundFn.param, ownerObj] = shortcut
     return shortcut
 
   def setParent(self, parent: QtWidgets.QWidget, *args):
     super().setParent(parent, *args)
     # When this parent is set, make sure application-level shortcuts have that parent
-    for shortcut in self.shortcuts:
+    for shortcut in self.paramToShortcutMapping.values():
       if shortcut.context() == QtCore.Qt.ApplicationShortcut:
         shortcut.setParent(parent)
 

@@ -250,8 +250,10 @@ def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int,
   else:
     return croppedImg, compCoords
 
-def imgCornerVertices(img: NChanImg):
+def imgCornerVertices(img: NChanImg=None):
   """Returns [x,y] vertices for each corner of the input image"""
+  if img is None:
+    return FRVertices()
   fullImShape_xy = img.shape[:2][::-1]
   return FRVertices([[0,                   0],
               [0,                   fullImShape_xy[1]-1],

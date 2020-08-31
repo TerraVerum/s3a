@@ -43,4 +43,5 @@ def main(guiMode=True, loadLastState=None, **profileArgs) -> Optional[S3A]:
   else:
     return win
 
-fire.Fire(main)
+if __name__ == '__main__':
+    fire.Fire(main)

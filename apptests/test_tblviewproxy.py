@@ -25,6 +25,10 @@ def test_merge_selected_comps():
   stack.undo()
   stack.undo()
   assert len(mgr.compDf) == oldLen
+  app.compTbl.clearSelection()
+  # Nothing should happen
+  app.compDisplay.mergeSelectedComps()
+
 
 def test_split_selected_comps():
   compMask = np.zeros((100,100), 'uint8')
@@ -44,6 +48,8 @@ def test_split_selected_comps():
   stack.undo()
   stack.undo()
   assert len(mgr.compDf) == 1
+  # Nothing should happen
+  app.compDisplay.splitSelectedComps()
 
 @pytest.mark.withcomps
 def test_set_cells_as():
