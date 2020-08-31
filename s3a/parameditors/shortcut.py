@@ -3,12 +3,13 @@ from dataclasses import dataclass
 from functools import partial
 from inspect import isclass
 from typing import Tuple, Callable, Any, Dict, List, DefaultDict
+from warnings import warn
 
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from pyqtgraph.parametertree import Parameter
 
 from s3a.constants import SHORTCUTS_DIR
-from s3a.structures import FRParam, FRParamEditorError
+from s3a.structures import FRParam, FRParamEditorError, FRS3AWarning
 from .genericeditor import FRParamEditor
 from .pgregistered import FRShortcutParameter
 from s3a.generalutils import helpTextToRichText
@@ -195,7 +196,7 @@ class FRShortcutsEditor(FRParamEditor):
     newShortcut.setContext(ctx)
     partialFn = partial(func, *funcArgs, **funcKwargs)
     newShortcut.activated.connect(partialFn)
-    # newShortcut.activatedAmbiguously.connect(lambda: print(f'{ownerObj} shc ambiguous: {newShortcut.key().toString()}'))
+    newShortcut.activatedAmbiguously.connect(lambda: self.ambigWarning(ownerObj, newShortcut))
     shortcutParam.sigValueChanged.connect(lambda param: newShortcut.setKey(param.seqEdit.keySequence()))
     if funcFrParam in self.paramToShortcutMapping:
       # Already found this value before, make sure to remove it
@@ -203,8 +204,12 @@ class FRShortcutsEditor(FRParamEditor):
     self.paramToShortcutMapping[funcFrParam] = newShortcut
     return shortcutParam
 
-  def deleteShortcut(self, shortcutFrParam: FRParam):
-    shc = self.mappin
+  @staticmethod
+  def ambigWarning(ownerObj: QtWidgets.QWidget, shc: QtWidgets.QShortcut):
+    warn(f'{ownerObj} shortcut ambiguously activated: {shc.key().toString()}\n'
+         f'Perhaps multiple shortcuts are assigned the same key sequence?',
+         FRS3AWarning)
+
 
 
   def addRegisteredFuncsFromCls(self, grouping: Any, groupParam: FRParam):
@@ -272,7 +277,7 @@ class FRShortcutsEditor(FRParamEditor):
     keySeqParam: FRShortcutParameter = self[groupParam, boundFn.param, True]
     shortcut.paramIdx = (groupParam, boundFn.param)
     shortcut.activated.connect(partial(boundFn.func, ownerObj, *boundFn.defaultFnArgs))
-    shortcut.activatedAmbiguously.connect(lambda: print('ambiguous'))
+    shortcut.activatedAmbiguously.connect(lambda: self.ambigWarning(ownerObj, shortcut))
     shortcut.setContext(ctx)
     keySeqParam.sigValueChanged.connect(lambda item, value: shortcut.setKey(value))
     self.paramToShortcutMapping[boundFn.param] = shortcut
