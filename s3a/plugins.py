@@ -19,7 +19,6 @@ from s3a.processing.algorithms import _historyMaskHolder
 
 class FRVerticesPlugin(FRTableFieldPlugin):
   name = 'Vertices'
-  focusedImg=None
 
   @classmethod
   def __initEditorParams__(cls):
@@ -44,7 +43,6 @@ class FRVerticesPlugin(FRTableFieldPlugin):
 
   def attachS3aRef(self, s3a: S3ABase):
     super().attachS3aRef(s3a)
-    self.focusedImg = s3a.focusedImg
     s3a.focusedImg.addItem(self.region)
 
     self.clearRegionAct.sigActivated.connect(lambda: self.updateRegionFromVerts(None))
@@ -96,6 +94,7 @@ class FRVerticesPlugin(FRTableFieldPlugin):
     """
     fImg = self.focusedImg
     if fImg.image is None:
+      self.region.clear()
       return
     oldVerts = self.region.verts
     oldRegionImg = self.region.image

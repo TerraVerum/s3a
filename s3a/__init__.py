@@ -38,11 +38,11 @@ import s3a.structures
 
 from s3a.parameditors import FR_SINGLETON, FRParamEditor
 from s3a.models.tablemodel import FRComponentIO
-from s3a.processing.algorithms import FRTopLevelProcessors
+from s3a.processing.algorithms import FRTopLevelImageProcessors
 from s3a.structures import FRVertices, FRComplexVertices, FRParam
 from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS
 
-for name, func in inspect.getmembers(FRTopLevelProcessors, inspect.isfunction):
+for name, func in inspect.getmembers(FRTopLevelImageProcessors, inspect.isfunction):
   FR_SINGLETON.imgProcClctn.addProcessCtor(func)
 
 from s3a.plugins import FRVerticesPlugin

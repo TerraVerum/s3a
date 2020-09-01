@@ -296,10 +296,10 @@ class FRScrollableErrorDialog(QtWidgets.QDialog):
     scrollLayout = QtWidgets.QVBoxLayout(scrollAreaWidgetContents)
 
     # Set to message with trace first so sizing is correct
-    scrollMsg = QtWidgets.QLabel(msgWithTrace, scrollAreaWidgetContents)
-    scrollMsg.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse
+    msgLbl = QtWidgets.QLabel(msgWithTrace, scrollAreaWidgetContents)
+    msgLbl.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse
                                       | QtCore.Qt.TextSelectableByKeyboard)
-    scrollLayout.addWidget(scrollMsg, 0, QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
+    scrollLayout.addWidget(msgLbl, 0, QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
     scrollArea.setWidget(scrollAreaWidgetContents)
     verticalLayout.addWidget(scrollArea)
 
@@ -323,7 +323,8 @@ class FRScrollableErrorDialog(QtWidgets.QDialog):
       else:
         newText = msgWithoutTrace
       showTrace = not showTrace
-      scrollMsg.setText(newText)
+      msgLbl.setText(newText)
+    self.msgLbl = msgLbl
     toggleTrace.clicked.connect(lambda: updateTxt())
 
     btnLayout.addItem(spacerItem)

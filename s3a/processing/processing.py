@@ -14,6 +14,9 @@ from s3a.structures import FRS3AWarning, FRAlgProcessorError
 __all__ = ['FRProcessIO', 'FRProcessStage', 'FRGeneralProcess', 'FRImageProcess',
            'FRAtomicProcess']
 
+_infoType = t.List[t.Union[t.List, t.Dict[str, t.Any]]]
+class _DUPLICATE_INFO: pass
+
 class FRProcessIO(dict):
   """
   The object through which the processor pipeline communicates data. Inputs to one process
@@ -247,10 +250,9 @@ class FRGeneralProcess(FRProcessStage):
     QtCore.QTimer.singleShot(0, fixedShow)
 
   def getStageInfos(self, ignoreDuplicates=True):
-    allInfos: t.List[t.Union[t.List, t.Dict[str, t.Any]]] = []
+    allInfos: _infoType = []
+    lastInfos = []
     for stage in self._nonDisabledStages_flattened():
-      if stage.disabled:
-        continue
       res = stage.result
       if 'summaryInfo' not in res:
         defaultSummaryInfo = {k: res[k] for k in self.mainResultKeys}
@@ -261,7 +263,12 @@ class FRGeneralProcess(FRProcessStage):
       infos = stage.result['summaryInfo']
       if not isinstance(infos, t.Sequence):
         infos = [infos]
-      for info in infos:
+      if not ignoreDuplicates:
+        validInfos = infos
+      else:
+        validInfos = self._cmpPrevCurInfos(lastInfos, infos)
+      lastInfos = infos
+      for info in validInfos:
         stageNameCount = 0
         if info.get('name', None) is None:
           newName = stage.name
@@ -269,11 +276,42 @@ class FRGeneralProcess(FRProcessStage):
             newName = f'{newName}#{stageNameCount}'
           info['name'] = newName
         stageNameCount += 1
-      allInfos.extend(infos)
+      allInfos.extend(validInfos)
     return allInfos
+
+  @classmethod
+  def _cmpPrevCurInfos(cls, prevInfos: t.List[dict], infos: t.List[dict]):
+    """
+    This comparison allows keys from the last result which exactly match keyts from the
+    current result to be discarded for brevity.
+    """
+    validInfos = []
+    for info in infos:
+      validInfo = copy.copy(info)
+      for lastInfo in prevInfos:
+        for key in set(info.keys()).intersection(lastInfo.keys()) - {'name'}:
+          if np.array_equal(info[key], lastInfo[key]):
+            validInfo[key] = _DUPLICATE_INFO
+      validInfos.append(validInfo)
+    return validInfos
 
 class FRImageProcess(FRGeneralProcess):
   mainResultKeys = ['image']
+
+  @classmethod
+  def _cmpPrevCurInfos(cls, prevInfos: t.List[dict], infos: t.List[dict]):
+    validInfos = super()._cmpPrevCurInfos(prevInfos, infos)
+    # Iterate backwards to facilitate entry deletion
+    for ii in range(len(validInfos)-1,-1,-1):
+      info = validInfos[ii]
+      duplicateKeys = {'name'}
+      for k, v in info.items():
+        if v is _DUPLICATE_INFO:
+          duplicateKeys.add(k)
+      if len(info.keys() - duplicateKeys) == 0:
+        del validInfos[ii]
+    return validInfos
+
 
   def _stageSummaryWidget(self):
     infoToDisplay = self.getStageInfos()
@@ -313,11 +351,15 @@ class FRImageProcess(FRGeneralProcess):
 
   def getStageInfos(self, ignoreDuplicates=True):
     infos = super().getStageInfos(ignoreDuplicates)
-    keepInfos = [{'name': 'Initial Image', 'image': self.input['image']}]
-    if ignoreDuplicates:
-      for info in infos:
-        if not np.array_equal(info['image'], keepInfos[-1]['image']):
-          keepInfos.append(info)
-    return keepInfos
+    # Add entry for initial image since it will be missed when just searching for
+    # stage outputs
+    infos.insert(0, {'name': 'Initial Image', 'image': self.input['image']})
+    return infos
 
 _winRefs = {}
+
+class FRCategoricalProcess(FRGeneralProcess):
+  def _stageSummaryWidget(self):
+    pass
+
+  mainResultKeys = ['categories', 'confidences']

@@ -356,7 +356,7 @@ def region_grow(image: NChanImg, fgVerts: FRVertices, seedThresh=10):
 
   return FRProcessIO(image=outMask)
 
-class FRTopLevelProcessors:
+class FRTopLevelImageProcessors:
   @staticmethod
   def b_regionGrowProcessor():
     return FRImageProcess.fromFunction(region_grow, name='Region Growing')
@@ -384,3 +384,6 @@ class FRTopLevelProcessors:
 #   @classmethod
 #   def __initEditorParams__(cls):
 #     super().__initEditorParams__()
+
+class FRTopLevelCategoricalProcessors:
+  pass

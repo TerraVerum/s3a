@@ -226,12 +226,21 @@ class FRTableFieldPlugin(FRParamEditorPlugin):
   instance, the :class:`FRVerticesPlugin` class can refine initial bounding
   box estimates of component vertices using custom image processing algorithms.
   """
+
   procCollection: parameditors.algcollection.FRAlgParamEditor= None
   """
   Most table field plugins will use some sort of processor to infer field data.
   This property holds spawned collections. See :class:`FRVerticesPlugin` for
   an example.
   """
+
+  focusedImg = None
+  """
+  Holds a reference to the focused image and set when the s3a reference is set. This
+  is useful for most table field plugins, since focusedImg will hold a reference to the
+  component series that is modified by the plugins.
+  """
+
   _active=False
 
   @classmethod
@@ -242,6 +251,10 @@ class FRTableFieldPlugin(FRParamEditorPlugin):
     """
     super().__initEditorParams__()
     cls.toolsEditor = FRParamEditor.buildClsToolsEditor(cls, 'Tools')
+
+  def attachS3aRef(self, s3a: models.s3abase.S3ABase):
+    super().attachS3aRef(s3a)
+    self.focusedImg = s3a.focusedImg
 
 
   def updateAll(self, mainImg: Optional[NChanImg], newComp: Optional[pd.Series] = None):
