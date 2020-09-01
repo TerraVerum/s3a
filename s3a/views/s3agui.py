@@ -104,9 +104,9 @@ class S3A(S3ABase):
     self.loadCompsAct_new.triggered.connect(lambda: self.loadCompList_gui(FR_ENUMS.COMP_ADD_AS_NEW))
     self.startAutosaveAct.triggered.connect(self.startAutosave_gui)
     self.stopAutosaveAct.triggered.connect(self.stopAutosave)
-    self.aboutAct.triggered.connect(self.showAboutText_gui)
     self.userGuideAct.triggered.connect(
       lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl('https://gitlab.com/ficsresearch/s3a/-/wikis/home')))
+    self.aboutQtAct.triggered.connect(lambda: QtWidgets.QMessageBox.aboutQt(self, 'About Qt'))
 
     # EDIT
     stack = FR_SINGLETON.actionStack
@@ -284,8 +284,8 @@ class S3A(S3ABase):
     self.devConsoleAct = create_addMenuAct(self, menuTools, 'Show Developer Console')
 
     # Help
-    self.aboutAct = create_addMenuAct(self, self.menuHelp, 'About')
     self.userGuideAct = create_addMenuAct(self, self.menuHelp, 'Online User Guide')
+    self.aboutQtAct = create_addMenuAct(self, self.menuHelp, 'Qt Version Info')
 
     self.setMenuBar(self.menubar)
 
@@ -386,14 +386,6 @@ class S3A(S3ABase):
         warnings.warn('Some information was not provided -- autosave not started.', FRS3AWarning)
       else:
         self.startAutosave(interval, folderName, baseName)
-
-  def showAboutText_gui(self):
-    text = 'This application was developed by the FICS Research Lab at the University of Florida.\n' \
-           'Makes strong use of the pyqtgraph library (http://www.pyqtgraph.org) and Qt5 widgets. (https://www.qt.io/)'
-    msgBox = FRScrollableErrorDialog(self, True, text, text)
-    msgBox.toggleTrace.hide()
-    msgBox.show()
-    msgBox.exec_()
 
   def exportCompList_gui(self):
     fileDlg = QtWidgets.QFileDialog()
