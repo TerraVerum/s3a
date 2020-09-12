@@ -29,7 +29,7 @@ def test_undo_add(sampleComps):
   stack.undo()
   assert len(mgr.compDf) == 0
   stack.redo()
-  assert mgr.compDf.equals(sampleComps)
+  assert np.array_equal(mgr.compDf, sampleComps)
 
 def test_empty_add():
   changeList = mgr.addComps(FR_SINGLETON.tableData.makeCompDf(0))
@@ -122,7 +122,7 @@ def test_table_setdata(sampleComps):
   _ = REQD_TBL_FIELDS
   colVals = {
     _.VERTICES: FRComplexVertices([FRVertices([[1,2], [3,4]])]),
-    _.COMP_CLASS: FR_SINGLETON.tableData.compClasses[4],
+    _.COMP_CLASS: 'bogus',
     _.ANN_AUTHOR: 'Hi There',
     _.SRC_IMG_FILENAME: 'newfilename'
   }

@@ -8,13 +8,13 @@ import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
 
-from s3a import FRComplexVertices
+from s3a import FRComplexVertices, FRComponentIO
 from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS
 from s3a.constants import FR_ENUMS
 from s3a.controls.tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
 from s3a.generalutils import resolveAuthorName, imgCornerVertices
 from s3a.graphicsutils import addDirItemsToMenu, saveToFile
-from s3a.models.tablemodel import FRComponentIO, FRComponentMgr
+from s3a.models.tablemodel import FRComponentMgr
 from s3a.parameditors import FRParamEditor
 from s3a.parameditors import FRParamEditorPlugin
 from s3a.parameditors import FR_SINGLETON
@@ -44,7 +44,14 @@ class S3ABase(QtWidgets.QMainWindow):
     self.focusedImg.acceptRegionAct.sigActivated.connect(lambda: self.acceptFocusedRegion())
 
     self.compMgr = FRComponentMgr()
-    self.compIo = FRComponentIO()
+    # Register exporter to allow user parameters
+    ioCls = FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_EXPORTER)(FRComponentIO)
+    ioCls.exportOnlyVis, ioCls.includeFullSourceImgName = \
+      FR_SINGLETON.generalProps.registerProps(ioCls,
+                                              [FR_CONSTS.EXP_ONLY_VISIBLE, FR_CONSTS.INCLUDE_FNAME_PATH]
+                                              )
+    self.compIo: FRComponentIO = ioCls()
+
     self.compTbl = FRCompTableView()
     self.compDisplay = FRCompDisplayFilter(self.compMgr, self.mainImg, self.compTbl)
 
@@ -270,15 +277,36 @@ class S3ABase(QtWidgets.QMainWindow):
       self.compMgr.addComps(oldComps)
 
   def exportCompList(self, outFname: Union[str, Path], readOnly=True, verifyIntegrity=True):
-    self.compIo.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds,
-                          self.srcImgFname)
-    self.compIo.exportByFileType(outFname, imShape=self.mainImg.image.shape,
+    self.compIo.exportByFileType(self.exportableDf, outFname, imShape=self.mainImg.image.shape,
                                  readOnly=readOnly, verifyIntegrity=verifyIntegrity)
     self.hasUnsavedChanges = False
 
   def exportLabeledImg(self, outFname: str=None):
-    self.compIo.prepareDf(self.compMgr.compDf, self.compDisplay.displayedIds)
-    return self.compIo.exportByFileType(outFname, imShape=self.mainImg.image.shape)
+    return self.compIo.exportByFileType(self.exportableDf, outFname, imShape=self.mainImg.image.shape)
+
+  @property
+  def exportableDf(self):
+    """
+    Dataframe from manager with populated information for main image name and
+    potentially filtered to only visible components (if requested by the user)
+    """
+    displayIds = self.compDisplay.displayedIds
+    srcImgFname = self.srcImgFname
+    if self.compIo.exportOnlyVis and displayIds is not None:
+      exportIds = displayIds
+    else:
+      exportIds = self.compMgr.compDf.index
+    exportDf: df = self.compMgr.compDf.loc[exportIds].copy()
+    if not self.compIo.includeFullSourceImgName and srcImgFname is not None:
+      # Only use the file name, not the whole path
+      srcImgFname = srcImgFname.name
+    elif srcImgFname is not None:
+      srcImgFname = str(srcImgFname)
+    # Assign correct export name for only new components
+    overwriteIdxs = exportDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME] == FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
+    # TODO: Maybe the current filename will match the current file indicator. What happens then?
+    exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = srcImgFname
+    return exportDf
 
   def loadCompList(self, inFname: str, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
     pathFname = Path(inFname)
@@ -302,11 +330,13 @@ class S3ABase(QtWidgets.QMainWindow):
 
   @FR_SINGLETON.actionStack.undoable('Create New Comp', asGroup=True)
   def add_focusComps(self, newComps: df):
-    self.compMgr.addComps(newComps)
-    # Make sure index matches ID before updating current component
-    newComps = newComps.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
+    changeDict = self.compMgr.addComps(newComps)
     # Focus is performed by comp table
-    self.changeFocusedComp(newComps)
+    # Arbitrarily choose the last possible component
+    changeList = np.concatenate([changeDict['added'], changeDict['changed']])
+    if len(changeList) == 0:
+      return
+    self.changeFocusedComp(self.compMgr.compDf.loc[[changeList[-1]]])
 
   @FR_SINGLETON.actionStack.undoable('Change Focused Component')
   def changeFocusedComp(self, newComps: df, forceKeepLastChange=False):

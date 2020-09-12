@@ -85,6 +85,9 @@ class S3A(S3ABase):
       QtCore.QTimer.singleShot(0, lambda: self._maybeLoadLastState_gui(loadLastState, quickLoaderArgs))
     elif loadLastState:
       self.loadLastState(quickLoaderArgs)
+    # Needs to be reset if loading last state also added new components, but no user changes
+    # were made
+    self.hasUnsavedChanges = False
 
   def _hookupSignals(self):
     # Buttons
@@ -389,8 +392,8 @@ class S3A(S3ABase):
 
   def exportCompList_gui(self):
     fileDlg = QtWidgets.QFileDialog()
-    fileFilter = self.compIo.handledIoTypes_fileFilter()
-    outFname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilter)
+    fileFilters = self.compIo.handledIoTypes_fileFilter('csv', **{'*': 'All Files'})
+    outFname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilters)
     if len(outFname) > 0:
       super().exportCompList(outFname)
 
@@ -557,7 +560,8 @@ class S3A(S3ABase):
       pxColor = (pxColor*255).astype('uint8')
     # Regardless of the number of image channels, display as RGBA color
     if pxColor.size == 1:
-      pxColor = np.array([pxColor[0]]*3 + [255])
+      # noinspection PyTypeChecker
+      pxColor = np.array(pxColor.tolist()*3 + [255])
     elif pxColor.size == 3:
       pxColor = np.concatenate([pxColor, [255]])
     # Else: assume already RGBA

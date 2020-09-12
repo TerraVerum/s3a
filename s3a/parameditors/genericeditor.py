@@ -10,12 +10,11 @@ from pyqtgraph.parametertree import Parameter, ParameterItem
 from s3a import models
 from s3a.constants import MENU_OPTS_DIR
 from s3a.generalutils import frPascalCaseToTitle
-from s3a.graphicsutils import dialogGetSaveFileName, contextMenuFromEditorActions
+from s3a.graphicsutils import dialogGetSaveFileName
 from s3a.models.editorbase import FRParamEditorBase
 from s3a import parameditors
 from s3a.processing import FRImgProcWrapper
 from s3a.structures import FRParam, FilePath, NChanImg, FRVertices
-from s3a.views.buttons import FRButtonCollection
 
 Signal = QtCore.Signal
 

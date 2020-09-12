@@ -1,44 +1,49 @@
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from conftest import app
 from s3a.generalutils import augmentException
-from s3a.models.tablemodel import FRComponentIO
+from s3a import FRComponentIO
+
 
 def test_normal_export(sampleComps, tmpdir):
   io = app.compIo
   io.exportOnlyVis = False
-  io.prepareDf(sampleComps)
   for ftype in io.handledIoTypes:
     curPath = tmpdir / f'normalExport - All IDs.{ftype}'
-    doAndAssertExport(curPath, io, 'Normal export with all IDs not successful.')
+    doAndAssertExport(curPath, io, sampleComps.copy(), 'Normal export with all IDs not successful.')
 
-
-
-def test_filter_export(sampleComps, tmpdir):
+@pytest.mark.withcomps
+def test_filter_export(tmpdir, monkeypatch):
   io = app.compIo
 
   curPath = tmpdir / 'normalExport - Filtered IDs export all.csv'
   filterIds = np.array([0,3,2])
-  io.exportOnlyVis = False
-  io.prepareDf(sampleComps, filterIds)
-  np.testing.assert_array_equal(io.compDf.index, sampleComps.index,
+  sampleComps = app.compMgr.compDf
+  with monkeypatch.context() as m:
+    m.setattr(io, 'exportOnlyVis', False)
+    m.setattr(app.compDisplay, 'displayedIds', filterIds)
+    exportDf = app.exportableDf
+  np.testing.assert_array_equal(exportDf.index, sampleComps.index,
                                 'Export DF should not use only filtered IDs'
                                 ' when not exporting only visible, but'
                                 ' ID lists don\'t match.')
   # With export only visible false, should still export whole frame
-  doAndAssertExport(curPath, io, 'Normal export with filter ids passed not successful.')
+  doAndAssertExport(curPath, io, exportDf, 'Normal export with filter ids passed not successful.')
 
   curPath = tmpdir / 'normalExport - Filtered IDs export filtered.csv'
-  io.exportOnlyVis = True
-  io.prepareDf(sampleComps, filterIds)
-  np.testing.assert_array_equal(io.compDf.index, filterIds,
+  with monkeypatch.context() as m:
+    m.setattr(io, 'exportOnlyVis', True)
+    m.setattr(app.compDisplay, 'displayedIds', filterIds)
+    exportDf = app.exportableDf
+  np.testing.assert_array_equal(exportDf.index, filterIds,
                                 'Export DF should use only filtered IDs when exporting only '
                                 'visible, but ID lists don\'t match.')
   # With export only visible false, should still export whole frame
-  doAndAssertExport(curPath, io, 'Export with filtered ids not successful.')
+  doAndAssertExport(curPath, io, exportDf, 'Export with filtered ids not successful.')
 
 def test_bad_import(tmpdir):
   io = app.compIo
@@ -50,10 +55,10 @@ def test_bad_import(tmpdir):
       io.buildFromCsv(tmpdir/f'junkfile.{ext}')
 
 
-def doAndAssertExport(fpath: Path, io: FRComponentIO, failMsg: str):
+def doAndAssertExport(fpath: Path, io: FRComponentIO, compDf: pd.DataFrame, failMsg: str):
   fpath = Path(fpath)
   try:
-    io.exportByFileType(fpath)
+    io.exportByFileType(compDf, fpath)
   except Exception as ex:
     augmentException(ex, f'{failMsg}\n')
     raise

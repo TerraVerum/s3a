@@ -65,6 +65,7 @@ def test_est_clear_bounds():
   # Restore state
   clctn.switchActiveProcessor(prevProc)
 
+@pytest.mark.withcomps
 def test_export_all_comps(tmpdir):
   compFile = tmpdir/'tmp.csv'
   app.exportCompList(str(compFile))
@@ -88,8 +89,7 @@ def test_import_large_verts(sampleComps, tmpdir):
   sampleComps.loc[:, REQD_TBL_FIELDS.INST_ID] = np.arange(len(sampleComps))
   sampleComps.at[0, REQD_TBL_FIELDS.VERTICES] = FRComplexVertices([FRVertices([[50e3, 50e3]])])
   io = app.compIo
-  io.prepareDf(sampleComps)
-  io.exportCsv(tmpdir/'Bad Verts.csv')
+  io.exportCsv(sampleComps, tmpdir/'Bad Verts.csv')
   with pytest.warns(FRS3AWarning):
     io.buildFromCsv(tmpdir/'Bad Verts.csv', app.mainImg.image.shape)
 

@@ -147,6 +147,8 @@ class FREditableImgBase(pg.PlotWidget):
         and 0 < pxX < self.imgItem.image.shape[1]
         and 0 < pxY < self.imgItem.image.shape[0]):
       pxColor = self.imgItem.image[pxY, pxX]
+      if pxColor.ndim == 0:
+        pxColor = np.array([pxColor])
       # pos = ev.pos()
     pos = FRVertices([pxX, pxY])
     self.sigMousePosChanged.emit(pos, pxColor)
@@ -350,8 +352,12 @@ class FRFocusedImage(FREditableImgBase):
       newCompImg = mainImg[bboxToUse[0,1]:bboxToUse[1,1],
                    bboxToUse[0,0]:bboxToUse[1,0],
                    :]
-      self.imgItem.setImage(newCompImg)
-      QtCore.QTimer.singleShot(0, self.autoRange)
+      if newCompImg.size == 0:
+        # Empty slice
+        self.imgItem.clear()
+      else:
+        self.imgItem.setImage(newCompImg)
+        QtCore.QTimer.singleShot(0, self.autoRange)
     for plugin in FR_SINGLETON.tableFieldPlugins:
       plugin.updateAll(mainImg, newComp)
     yield

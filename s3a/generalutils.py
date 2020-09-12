@@ -70,10 +70,12 @@ def getClippedBbox(arrShape: tuple, bbox: TwoDArr, margin: int):
      Offset from bounding box coords. This will not fully be added to the bounding box
      if the new margin causes coordinates to fall off either end of the reference array shape.
   """
-  for ii in range(2):
-    bbox[0,ii] = max(0, min(bbox[0,ii]-margin, arrShape[1-ii]))
-    bbox[1,ii] = min(arrShape[1-ii], max(0, bbox[1,ii]+margin+1))
-  return bbox.astype(int)
+  bbox = bbox.astype(int)
+  bbox[0] -= margin
+  # Add extra 1 since python slicing stops before last index
+  bbox[1] += margin+1
+  arrShape = arrShape[:2]
+  return np.clip(bbox, 0, arrShape[::-1])
 
 def coerceDfTypes(dataframe: df, constParams: Collection[FRParam]=None):
   """
