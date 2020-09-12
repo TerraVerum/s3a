@@ -193,7 +193,7 @@ class FRShortcutsEditor(FRParamEditor):
 
     seq = shortcutParam.seqEdit.keySequence()
     if ownerObj is None or not isinstance(ownerObj, QtWidgets.QWidget):
-      newShortcut = QtWidgets.QShortcut(seq, self.parent())
+      newShortcut = QtWidgets.QShortcut(seq, QtWidgets.QApplication.desktop())
       ctx = QtCore.Qt.ApplicationShortcut
     else:
       newShortcut = QtWidgets.QShortcut(seq, ownerObj)
@@ -275,7 +275,7 @@ class FRShortcutsEditor(FRParamEditor):
     groupParam = self.groupingToParamMapping[type(ownerObj)]
     seqCopy = QtGui.QKeySequence(boundFn.param.value)
     if ownerObj is None or not isinstance(ownerObj, QtWidgets.QWidget):
-      shortcut = QtWidgets.QShortcut(seqCopy, self.parent())
+      shortcut = QtWidgets.QShortcut(seqCopy, QtWidgets.QApplication.desktop())
       ctx = QtCore.Qt.ApplicationShortcut
     else:
       shortcut = QtWidgets.QShortcut(seqCopy, ownerObj)
