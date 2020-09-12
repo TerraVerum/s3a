@@ -1,12 +1,15 @@
 from __future__ import annotations
-import typing as t
-import inspect
-from abc import ABC, abstractmethod
-from warnings import warn
+
 import copy
+import inspect
+import typing as t
+from abc import ABC, abstractmethod
+from functools import wraps
+from warnings import warn
+
+import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
-import numpy as np
 
 from s3a.generalutils import frPascalCaseToTitle
 from s3a.structures import FRS3AWarning, FRAlgProcessorError
@@ -81,7 +84,6 @@ class FRProcessIO(dict):
       outDict[k] = formattedV
     return cls(hyperParamKeys, **outDict)
 
-
 class FRProcessStage(ABC):
   name: str
   input: FRProcessIO = None
@@ -133,20 +135,48 @@ class FRAtomicProcess(FRProcessStage):
   be assigned to that result.
   """
 
-  def __init__(self, func: t.Callable, name:str=None, **overriddenDefaults):
+  def __init__(self, func: t.Callable, name:str=None, needsWrap=False, **overriddenDefaults):
     """
     :param func: Function to wrap
     :param name: Name of this process. If `None`, defaults to the function name with
       camel case or underscores converted to title case.
+    :param needsWrap: For functions not defined by the user, it is often inconvenient if they have
+    to be redefined just to return a FRProcessIO object. If `func` does not return a `FRProcessIO`
+    object, `needsWrap` can be set to `True`. In this case, `func` is assumed to
+    returns either one result or a list of results. It is converted into a function
+    returning a FRProcessIO object instead. Each `mainResultKey` is assigned to each output
+    of the function in order. If only one main result key exists, then the output of the
+    function is assumed to be that key. I.e. in the case where `len(cls.mainResultKeys) == 1`,
+    the output is expected to be the direct result, not a sequence of results per key.
     :param overriddenDefaults: Passed directly to ProcessIO when creating this function's
       input specifications.
     """
     if name is None:
       name = frPascalCaseToTitle(func.__name__)
     self.name = name
-    self.func = func
     self.input = FRProcessIO.fromFunction(func, **overriddenDefaults)
     self.result: t.Optional[FRProcessIO] = None
+
+    if needsWrap:
+      func = self._wrappedFunc(func)
+    self.func = func
+
+  @classmethod
+  def _wrappedFunc(cls, func):
+    """
+    Wraps a function returining either a result or list of results, instead making the
+    return value an `FRProcessIO` object where each `cls.mainResultkey` corresponds
+    to a returned value
+    """
+    if len(cls.mainResultKeys) == 1:
+      @wraps(func)
+      def newFunc(*args, **kwargs):
+        return FRProcessIO(**{cls.mainResultKeys[0]: func(*args, **kwargs)})
+    else:
+      @wraps(func)
+      def newFunc(*args, **kwargs):
+        return FRProcessIO(**{k: val for k, val in zip(cls.mainResultKeys, func(*args, **kwargs))})
+    return newFunc
 
   @property
   def keysFromPrevIO(self):
@@ -163,6 +193,7 @@ class FRAtomicProcess(FRProcessStage):
   @property
   def stages_flattened(self):
     return [self]
+
 
 class FRGeneralProcess(FRProcessStage):
 
