@@ -28,8 +28,10 @@ def main(guiMode=True, loadLastState=None, **profileArgs) -> Optional[S3A]:
 
   :key author: Required if no default author exists for the application.
     The default author is updated every time an author name is given.
-  :key Image: Optional initial image to be annotated
-  :key Annotations: Optional initial annotation file loaded.
+  :key image: Optional initial image to be annotated
+  :key annotations: Optional initial annotation file loaded.
+  :key `param editor name`: Name of the parameter editor within S3A with a loadable state.
+    This can be e.g. `colorscheme`, `shortcuts`, etc.
   """
   profileArgs = {k.replace(' ', '').lower(): v for k, v in profileArgs.items()}
   # Handle here for faster bootup
