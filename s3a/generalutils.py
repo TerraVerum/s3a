@@ -5,6 +5,7 @@ from typing import Any, Optional, List, Collection, Callable, Tuple, Union
 
 import numpy as np
 from pandas import DataFrame as df
+import cv2 as cv
 
 from s3a.constants import ANN_AUTH_DIR
 from s3a.structures.typeoverloads import TwoDArr
@@ -262,3 +263,41 @@ def imgCornerVertices(img: NChanImg=None):
               [fullImShape_xy[0]-1, fullImShape_xy[1]-1],
               [fullImShape_xy[0]-1, 0]
               ])
+
+def resize_pad(img: NChanImg, newSize: Tuple[int, int], interp=cv.INTER_NEAREST, padVal=0):
+  """
+  Resizes image to the requested size using the specified interpolation method.
+  :param img: Image to resize
+  :param newSize: New size for image. Since aspect ratio is maintained, the portion of the
+    image which couldn't be resized fully is padded with a constant value of `padVal`.
+    For instance, if the original image is 5x10 and the requested new size is 10x15, then
+    after resizing the image will be 7x15 to preserve aspect ratio. 2 pixels of padding
+    will be added on the left and 1 pixel of padding will be added on the right so the final
+    output is 10x15.
+  :param padVal: Value to pad dimension that couldn't be fully resized
+  :param interp: Interpolation method to use during resizing
+  :param padVal: Constant value to use during padding
+  :return: Resized and padded image
+  """
+  needsRotate = False
+  # Make sure largest dimension is along rows for easier treatment and rotate back after
+  newSize = np.array(newSize)
+  resizeRatio = min(newSize/np.array(img.shape[:2]))
+  paddedImg = cv.resize(img, (0, 0), fx = resizeRatio, fy = resizeRatio, interpolation=interp)
+  padDimension = np.argmax(newSize - np.array(paddedImg.shape[:2]))
+  if padDimension != 1:
+    paddedImg = cv.rotate(paddedImg, cv.ROTATE_90_CLOCKWISE)
+    newSize = newSize[::-1]
+    needsRotate = True
+  # Now pad dimension is guaranteed to be index 1
+  padDimension = 1
+  padding = (newSize[padDimension] - paddedImg.shape[padDimension]) // 2
+  if padding > 0:
+    paddedImg = cv.copyMakeBorder(paddedImg, 0, 0, padding, padding, cv.BORDER_CONSTANT, value=padVal)
+  # Happens during off-by-one truncated division
+  remainingPadding = newSize[padDimension] - paddedImg.shape[padDimension]
+  if remainingPadding > 0:
+    paddedImg = cv.copyMakeBorder(paddedImg, 0, 0, remainingPadding, 0, cv.BORDER_CONSTANT, value=padVal)
+  if needsRotate:
+    paddedImg = cv.rotate(paddedImg, cv.ROTATE_90_COUNTERCLOCKWISE)
+  return paddedImg

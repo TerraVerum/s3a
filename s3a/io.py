@@ -3,7 +3,7 @@ import sys
 from ast import literal_eval
 from pathlib import Path
 from stat import S_IREAD, S_IRGRP, S_IROTH
-from typing import Any, Optional, Union, Tuple
+from typing import Any, Optional, Union, Tuple, Callable, Sequence
 from warnings import warn
 
 import numpy as np
@@ -13,7 +13,7 @@ from skimage import io, measure
 from typing_extensions import Literal
 
 from s3a.constants import REQD_TBL_FIELDS as RTF
-from s3a.generalutils import augmentException, getCroppedImg
+from s3a.generalutils import augmentException, getCroppedImg, resize_pad
 from s3a.parameditors import FR_SINGLETON
 from s3a.structures import FRParamGroup, FRS3AWarning, FilePath, GrayImg, \
   FRComplexVertices, FRParam
@@ -89,7 +89,8 @@ class FRComponentIO:
   @classmethod
   def exportByFileType(cls, compDf: df, outFile: Union[str, Path], verifyIntegrity=True, **exportArgs):
     outFile = Path(outFile)
-    ret: df = cls._ioByFileType(outFile, 'export', compDf, **exportArgs)
+    outFn = cls._ioFnFromFileType(outFile, 'export')
+    ret = outFn(compDf, outFile, **exportArgs)
     if verifyIntegrity and outFile.suffix[1:] in cls.roundTripIoTypes:
       matchingCols = np.setdiff1d(compDf.columns, [RTF.INST_ID,
                                                    RTF.SRC_IMG_FILENAME])
@@ -113,15 +114,15 @@ class FRComponentIO:
   @classmethod
   def buildByFileType(cls, inFile: Union[str, Path], imShape: Tuple[int]=None,
                       strColumns=False, **importArgs):
-    outDf = cls._ioByFileType(inFile, buildOrExport='buildFrom', imShape=imShape, **importArgs)
+    buildFn = cls._ioFnFromFileType(inFile, 'buildFrom')
+    outDf = buildFn(inFile, imShape=imShape, **importArgs)
     if strColumns:
       outDf.columns = list(map(str, outDf.columns))
     return outDf
 
   @classmethod
-  def _ioByFileType(cls, fpath: Union[str, Path],
-                    buildOrExport=Literal['buildFrom', 'export'], compDf: df=None,
-                    **ioArgs) -> Optional[df]:
+  def _ioFnFromFileType(cls, fpath: Union[str, Path],
+                        buildOrExport=Literal['buildFrom', 'export']) -> Optional[Callable]:
     fpath = Path(fpath)
     fname = fpath.name
     cmpTypes = np.array(list(cls.handledIoTypes.keys()))
@@ -129,11 +130,7 @@ class FRComponentIO:
     if not any(typIdx):
       return
     fnNameSuffix = cmpTypes[typIdx][-1].title().replace('.', '')
-    ioFn = getattr(cls, buildOrExport+fnNameSuffix, None)
-    if 'build' in buildOrExport:
-      return ioFn(fpath, **ioArgs)
-    else: # 'export
-      return ioFn(compDf, fpath, **ioArgs)
+    return getattr(cls, buildOrExport+fnNameSuffix, None)
 
   @staticmethod
   def _strToNpArray(array_string: str, **opts):
@@ -195,7 +192,8 @@ class FRComponentIO:
     return exportDf
 
   @classmethod
-  def exportCompimgsDf(cls, compDf: df, outFile: Union[str, Path]=None, imgDir: FilePath=None, margin=0,
+  def exportCompimgsDf(cls, compDf: df, outFile: Union[str, Path]=None,
+                       imgDir: FilePath=None, margin=0, colorMaskByClass=False,
                        excludeCols=()):
     """
     Creates a dataframe consisting of extracted images around each component
@@ -205,6 +203,8 @@ class FRComponentIO:
     :param imgDir: Where images corresponding to this dataframe are kept. Source image
       filenames are interpreted relative to this directory if they are not absolute.
     :param margin: How much padding to give around each component
+    :param colorMaskByClass: If `True`, masks are given the int value of their associated
+      class instead of being boolean.
     :param excludeCols: Which columns to exclude from the export list (see 'return' list
       for returned parameters)
     :return: Dataframe with the following keys:
@@ -234,6 +234,8 @@ class FRComponentIO:
       dfGroupingsByImg.append(compDf[compDf[RTF.SRC_IMG_FILENAME] == imgName])
     useKeys = {'img', 'semanticMask', 'bboxMask', 'compClass', 'instId', 'offset'} - set(excludeCols)
     outDf = {k: [] for k in useKeys}
+    # Cache index per class for faster access
+    classToIdxMapping = {compCls: ii for ii, compCls in enumerate(FR_SINGLETON.tableData.compClasses, 1)}
     for miniDf, imgName in zip(dfGroupingsByImg, uniqueImgs):
       imgName = imgDir/imgName
       img = _imgCache[imgName]
@@ -242,19 +244,29 @@ class FRComponentIO:
         compImg, bounds = getCroppedImg(img, allVerts, margin, coordsAsSlices=False)
         if 'img' in useKeys:
           outDf['img'].append(compImg)
+        compCls = str(row[RTF.COMP_CLASS])
         if 'compClass' in useKeys:
-          outDf['compClass'].append(str(row[RTF.COMP_CLASS]))
+          outDf['compClass'].append(compCls)
         maskVerts: FRComplexVertices = row[RTF.VERTICES].copy()
         for verts in maskVerts:
           verts -= bounds[0,:]
         allVerts = maskVerts.stack()
-        mask = maskVerts.toMask(compImg.shape[:2])
+        if colorMaskByClass:
+          bboxFillClr = classToIdxMapping[compCls]
+          bboxMaskType = 'uint16'
+          asBool = False
+        else:
+          bboxMaskType = bool
+          bboxFillClr = 1
+          asBool = True
         if 'semanticMask' in useKeys:
+          mask = maskVerts.toMask(compImg.shape[:2], fillColor=bboxFillClr,
+                                  asBool=asBool)
           outDf['semanticMask'].append(mask)
-        bboxMask = np.zeros_like(mask)
-        bboxBounds = np.r_[allVerts.min(0, keepdims=True), allVerts.max(0, keepdims=True)]
-        bboxMask[bboxBounds[0,1]:bboxBounds[1,1], bboxBounds[0,0]:bboxBounds[1,0]] = True
         if 'bboxMask' in useKeys:
+          bboxMask = np.zeros(compImg.shape[:2], dtype=bboxMaskType)
+          bboxBounds = np.r_[allVerts.min(0, keepdims=True), allVerts.max(0, keepdims=True)]
+          bboxMask[bboxBounds[0,1]:bboxBounds[1,1], bboxBounds[0,0]:bboxBounds[1,0]] = bboxFillClr
           outDf['bboxMask'].append(bboxMask)
         if 'instId' in useKeys:
           outDf['instId'].append(row.name)
@@ -313,6 +325,58 @@ class FRComponentIO:
       io.imsave(outFile, outMask.astype('uint16'), check_contrast=False)
     return outMask
 
+  @classmethod
+  def exportCompimgsFolders(cls, compDf: df, imgDir: FilePath=None, margin=0,
+                            colorMaskByClass=True, outDir: FilePath=None, dataDir='data',
+                            semanticDir='masks_semantic', bboxDir: str=None,
+                            resizeShape: Sequence[int]=None):
+    """
+    From a component dataframe, creates output directories for component images and masks.
+    This is useful for many neural networks etc. to read individual component images.
+
+    :param compDf: Dataframe to export
+    :param imgDir: Passed to `exportCompimgsDf`
+    :param margin: Passed to `exportCompimgsDf`
+    :param colorMaskByClass: Passed to `exportCompimgsDf`
+    :param outDir: Where to make the output directories. If `None`, defaults to current
+      directory>compimgs_<margin>_margin
+    :param dataDir: Where to export the component images
+    :param semanticDir: Where to export semantic masks. If `None`, no semantic masks
+      are exported.
+    :param bboxDir: Where to export bounding box masks. If `None`, no bounding box masks
+      are exported.
+    :param resizeShape: If provided, it is the shape that all images will be resized to before
+      being saved. This is useful for neural networks with a fixed input size which forces all
+      inputs to be e.g. 100x100 pixels.
+    """
+    if outDir is None:
+      outDir = Path('.')/f'compimgs_{margin}_margin'
+      (outDir/dataDir).mkdir(exist_ok=True, parents=True)
+    excludeCols = []
+    if semanticDir is None:
+      excludeCols.append('semanticMask')
+    else:
+      (outDir/semanticDir).mkdir(exist_ok=True)
+    if bboxDir is None:
+      excludeCols.append('bboxMask')
+    else:
+      (outDir/bboxDir).mkdir(exist_ok=True)
+
+    saveFn = lambda fname, img: io.imsave(fname, img, check_contrast=False)
+    if resizeShape is not None:
+      saveFn = lambda fname, img: io.imsave(fname, resize_pad(img, resizeShape),
+                                            check_contrast=False)
+
+    extractedImgs = cls.exportCompimgsDf(compDf, None, imgDir, margin, colorMaskByClass,
+                                         excludeCols)
+    for idx, row in extractedImgs.iterrows():
+      saveName = f'{row.instId}.png'
+      saveFn(outDir/dataDir/saveName, row.img)
+      if semanticDir is not None:
+        saveFn(outDir/semanticDir/saveName, row.semanticMask)
+      if bboxDir is not None:
+        saveFn(outDir/bboxDir/saveName, row.bboxMask)
+
   # -----
   # Import options
   # -----
@@ -322,8 +386,10 @@ class FRComponentIO:
               exportArgs: dict=None):
     if not isinstance(fromData, df):
       fromData = cls.buildByFileType(fromData, **importArgs)
-    return cls.exportByFileType(fromData, toFile, **exportArgs)
-
+    toFn = cls._ioFnFromFileType(toFile, 'export')
+    if not doExport:
+      toFile = None
+    return toFn(toFile, fromData, **exportArgs)
 
   @classmethod
   def buildFromCsv(cls, inFileOrDf: FilePathOrDf, imShape: Tuple=None,
