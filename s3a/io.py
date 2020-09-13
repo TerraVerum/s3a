@@ -15,7 +15,7 @@ from typing_extensions import Literal
 from s3a.constants import REQD_TBL_FIELDS as RTF
 from s3a.generalutils import augmentException, getCroppedImg, resize_pad
 from s3a.parameditors import FR_SINGLETON
-from s3a.structures import FRParamGroup, FRS3AWarning, FilePath, GrayImg, \
+from s3a.structures import FRParamGroup, FRS3AWarning, FRAppIOError, FilePath, GrayImg, \
   FRComplexVertices, FRParam
 
 FilePathOrDf = Union[FilePath, pd.DataFrame]
@@ -128,10 +128,10 @@ class FRComponentIO:
     cmpTypes = np.array(list(cls.handledIoTypes.keys()))
     typIdx = [typ in fname for typ in cmpTypes]
     if not any(typIdx):
-      return
+      raise FRAppIOError(f'Not sure how to handle file {fpath.stem}')
     fnNameSuffix = cmpTypes[typIdx][-1].title().replace('.', '')
     return getattr(cls, buildOrExport+fnNameSuffix, None)
-
+    
   @staticmethod
   def _strToNpArray(array_string: str, **opts):
     # Adapted from https://stackoverflow.com/a/42756309/9463643
@@ -193,8 +193,8 @@ class FRComponentIO:
 
   @classmethod
   def exportCompimgsDf(cls, compDf: df, outFile: Union[str, Path]=None,
-                       imgDir: FilePath=None, margin=0, colorMaskByClass=False,
-                       excludeCols=()):
+                       imgDir: FilePath=None, margin=0, marginAsPct=False,
+                       colorMaskByClass=False, excludeCols=()):
     """
     Creates a dataframe consisting of extracted images around each component
     :param compDf: Dataframe to export
@@ -203,6 +203,8 @@ class FRComponentIO:
     :param imgDir: Where images corresponding to this dataframe are kept. Source image
       filenames are interpreted relative to this directory if they are not absolute.
     :param margin: How much padding to give around each component
+    :param marginAsPct: Whether the margin should be a percentage of the component size or
+      a raw pixel value.
     :param colorMaskByClass: If `True`, masks are given the int value of their associated
       class instead of being boolean.
     :param excludeCols: Which columns to exclude from the export list (see 'return' list
@@ -241,7 +243,12 @@ class FRComponentIO:
       img = _imgCache[imgName]
       for idx, row in miniDf.iterrows():
         allVerts = row[RTF.VERTICES].stack()
-        compImg, bounds = getCroppedImg(img, allVerts, margin, coordsAsSlices=False)
+        if marginAsPct:
+          compImgSz = allVerts.max(0) - allVerts.min(0)
+          marginToUse = (compImgSz*(margin/100)).astype(int)
+        else:
+          marginToUse = margin
+        compImg, bounds = getCroppedImg(img, allVerts, marginToUse, coordsAsSlices=False)
         if 'img' in useKeys:
           outDf['img'].append(compImg)
         compCls = str(row[RTF.COMP_CLASS])
@@ -326,7 +333,7 @@ class FRComponentIO:
     return outMask
 
   @classmethod
-  def exportCompimgsFolders(cls, compDf: df, imgDir: FilePath=None, margin=0,
+  def exportCompimgsFolders(cls, compDf: df, imgDir: FilePath=None, margin=0, marginAsPct=False,
                             colorMaskByClass=True, outDir: FilePath=None, dataDir='data',
                             semanticDir='masks_semantic', bboxDir: str=None,
                             resizeShape: Sequence[int]=None):
@@ -337,6 +344,7 @@ class FRComponentIO:
     :param compDf: Dataframe to export
     :param imgDir: Passed to `exportCompimgsDf`
     :param margin: Passed to `exportCompimgsDf`
+    :param marginAsPct: Passed to `exportCompimgsDf`
     :param colorMaskByClass: Passed to `exportCompimgsDf`
     :param outDir: Where to make the output directories. If `None`, defaults to current
       directory>compimgs_<margin>_margin

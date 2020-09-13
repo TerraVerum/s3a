@@ -7,6 +7,7 @@ import pytest
 from conftest import app
 from s3a.generalutils import augmentException
 from s3a import FRComponentIO
+from s3a.structures import FRAppIOError
 
 
 def test_normal_export(sampleComps, tmpdir):
@@ -65,3 +66,10 @@ def doAndAssertExport(fpath: Path, io: FRComponentIO, compDf: pd.DataFrame, fail
   assert fpath.exists(), 'File doesn\'t exist despite export'
   inDf = io.buildByFileType(fpath, app.mainImg.image.shape[:2])
   assert len(inDf) > 0
+
+def test_impossible_io(tmpdir, sampleComps):
+  io = app.compIo
+  with pytest.raises(FRAppIOError):
+    io.exportByFileType(sampleComps, './nopossible.exporttype$')
+  with pytest.raises(FRAppIOError):
+    io.buildByFileType('./nopossible.importtype$')
