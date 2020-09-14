@@ -14,7 +14,7 @@ from ruamel.yaml import YAML
 
 import s3a
 from s3a.constants import ANN_AUTH_DIR
-from s3a.structures import FRAppIOError, FRS3AException, FilePath, FRS3AWarning
+from s3a.structures import FRIOError, FRS3AException, FilePath, FRS3AWarning
 
 yaml = YAML()
 
@@ -68,7 +68,7 @@ def saveToFile(saveObj, savePath: Path, allowOverwriteDefault=False):
   if not allowOverwriteDefault and savePath.stem.lower() == 'default':
     errMsg = 'Cannot overwrite default setting.\n\'Default\' is automatically' \
              ' generated, so it should not be modified.'
-    raise FRAppIOError(errMsg)
+    raise FRIOError(errMsg)
   else:
     # Known pycharm bug
     # noinspection PyTypeChecker

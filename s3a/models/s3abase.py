@@ -19,7 +19,7 @@ from s3a.parameditors import FRParamEditor
 from s3a.parameditors import FRParamEditorPlugin
 from s3a.parameditors import FR_SINGLETON
 from s3a.parameditors.appstate import FRAppStateEditor
-from s3a.structures import FilePath, NChanImg, FRAppIOError, \
+from s3a.structures import FilePath, NChanImg, FRIOError, \
   FRAlgProcessorError, FRS3AWarning
 from s3a.views.imageareas import FRMainImage, FRFocusedImage
 from s3a.views.tableview import FRCompTableView
@@ -311,11 +311,11 @@ class S3ABase(QtWidgets.QMainWindow):
   def loadCompList(self, inFname: str, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
     pathFname = Path(inFname)
     if self.mainImg.image is None:
-      raise FRAppIOError('Cannot load components when no main image is set.')
+      raise FRIOError('Cannot load components when no main image is set.')
     fType = pathFname.suffix[1:]
     if not any(fType in typ for typ in self.compIo.handledIoTypes):
-      raise FRAppIOError(f'Extension {fType} is not recognized. Must be one of:\n'
-                         + self.compIo.handledIoTypes_fileFilter())
+      raise FRIOError(f'Extension {fType} is not recognized. Must be one of:\n'
+                      + self.compIo.handledIoTypes_fileFilter())
     newComps = self.compIo.buildByFileType(inFname, self.mainImg.image.shape)
     self.compMgr.addComps(newComps, loadType)
 

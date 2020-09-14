@@ -7,7 +7,7 @@ import pytest
 from conftest import app
 from s3a.generalutils import augmentException
 from s3a import FRComponentIO
-from s3a.structures import FRAppIOError
+from s3a.structures import FRIOError
 
 
 def test_normal_export(sampleComps, tmpdir):
@@ -69,7 +69,7 @@ def doAndAssertExport(fpath: Path, io: FRComponentIO, compDf: pd.DataFrame, fail
 
 def test_impossible_io(tmpdir, sampleComps):
   io = app.compIo
-  with pytest.raises(FRAppIOError):
+  with pytest.raises(FRIOError):
     io.exportByFileType(sampleComps, './nopossible.exporttype$')
-  with pytest.raises(FRAppIOError):
+  with pytest.raises(FRIOError):
     io.buildByFileType('./nopossible.importtype$')

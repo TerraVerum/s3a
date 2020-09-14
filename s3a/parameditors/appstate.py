@@ -8,7 +8,7 @@ from pyqtgraph.parametertree import Parameter
 from s3a.generalutils import _safeCallFuncList
 from s3a.graphicsutils import raiseErrorLater
 from s3a.constants import APP_STATE_DIR
-from s3a.structures import FilePath, FRParam, FRAppIOError
+from s3a.structures import FilePath, FRParam, FRIOError
 from s3a.parameditors import FRParamEditor
 from s3a import FR_SINGLETON
 
@@ -75,9 +75,9 @@ class FRAppStateEditor(FRParamEditor):
   @staticmethod
   def raiseErrMsgIfNeeded(errMsgs: List[str]):
     if len(errMsgs) > 0:
-      err = FRAppIOError('Errors were encountered for the following parameters'
+      err = FRIOError('Errors were encountered for the following parameters'
                          ' (shown as <parameter>: <exception>)\n'
-                         + "\n\n".join(errMsgs))
+                      + "\n\n".join(errMsgs))
       raiseErrorLater(err)
 
 

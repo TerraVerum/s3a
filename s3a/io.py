@@ -15,7 +15,7 @@ from typing_extensions import Literal
 from s3a.constants import REQD_TBL_FIELDS as RTF
 from s3a.generalutils import augmentException, getCroppedImg, resize_pad
 from s3a.parameditors import FR_SINGLETON
-from s3a.structures import FRParamGroup, FRS3AWarning, FRAppIOError, FilePath, GrayImg, \
+from s3a.structures import FRParamGroup, FRS3AWarning, FRIOError, FilePath, GrayImg, \
   FRComplexVertices, FRParam
 
 FilePathOrDf = Union[FilePath, pd.DataFrame]
@@ -128,10 +128,10 @@ class FRComponentIO:
     cmpTypes = np.array(list(cls.handledIoTypes.keys()))
     typIdx = [typ in fname for typ in cmpTypes]
     if not any(typIdx):
-      raise FRAppIOError(f'Not sure how to handle file {fpath.stem}')
+      raise FRIOError(f'Not sure how to handle file {fpath.stem}')
     fnNameSuffix = cmpTypes[typIdx][-1].title().replace('.', '')
     return getattr(cls, buildOrExport+fnNameSuffix, None)
-    
+
   @staticmethod
   def _strToNpArray(array_string: str, **opts):
     # Adapted from https://stackoverflow.com/a/42756309/9463643
