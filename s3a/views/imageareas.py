@@ -349,9 +349,11 @@ class FRFocusedImage(FREditableImgBase):
       else:
         bboxToUse = FRVertices([[0,0], mainImg.shape[:2]])
         self.bbox = bboxToUse
-      newCompImg = mainImg[bboxToUse[0,1]:bboxToUse[1,1],
-                   bboxToUse[0,0]:bboxToUse[1,0],
-                   :]
+      slices = [slice(bboxToUse[0,1], bboxToUse[1,1]),
+                slice(bboxToUse[0,0], bboxToUse[1,0])]
+      if mainImg.ndim > 2:
+        slices.append(...)
+      newCompImg = mainImg[tuple(slices)]
       if newCompImg.size == 0:
         # Empty slice
         self.imgItem.clear()
