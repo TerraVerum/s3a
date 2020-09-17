@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
+from copy import deepcopy
 from functools import wraps
 from typing import Tuple, List, Sequence
 from warnings import warn
@@ -103,22 +104,33 @@ class FRGeneralProcWrapper(ABC):
         else:
           return cls.getNestedName(stage, nestedName[1:])
 
+def _prependFuncs():
+  formatStage = FRImageProcess.fromFunction(format_vertices)
+  formatStage.allowDisable = False
+  cropStage = FRImageProcess.fromFunction(crop_to_local_area)
+  return [formatStage, cropStage]
+
+def _appendFuncs():
+  applyStage = FRImageProcess.fromFunction(apply_process_result)
+  applyStage.allowDisable = False
+  resizeStage = FRImageProcess.fromFunction(return_to_full_size)
+  resizeStage.allowDisable = False
+
+  return [applyStage, basicOpsCombo(), resizeStage]
+
 class FRImgProcWrapper(FRGeneralProcWrapper):
+  prependProcs = _prependFuncs()
+  appendedProcs = _appendFuncs()
+
   def __init__(self, processor: FRImageProcess, editor: genericeditor.FRParamEditor,
                excludedStages: List[List[str]]=None, disabledStages: List[List[str]]=None):
     # Each processor is encapsulated in processes that crop the image to the region of
     # interest specified by the user, and re-expand the area after processing
-    formatStage = FRImageProcess.fromFunction(format_vertices)
-    formatStage.allowDisable = False
-    cropStage = FRImageProcess.fromFunction(crop_to_local_area)
 
-    applyStage = FRImageProcess.fromFunction(apply_process_result)
-    applyStage.allowDisable = False
-    resizeStage = FRImageProcess.fromFunction(return_to_full_size)
-    resizeStage.allowDisable = False
+    preStages = [*map(deepcopy, self.prependProcs)]
+    finalStages = [*map(deepcopy, self.appendedProcs)]
+    processor.stages = preStages + processor.stages + finalStages
 
-    finalStages = [applyStage, basicOpsCombo(), resizeStage]
-    processor.stages = [formatStage, cropStage] + processor.stages + finalStages
     if disabledStages is None:
       disabledStages = []
     if hasattr(processor, 'disabledStages'):

@@ -135,7 +135,8 @@ class FRAtomicProcess(FRProcessStage):
   be assigned to that result.
   """
 
-  def __init__(self, func: t.Callable, name:str=None, needsWrap=False, **overriddenDefaults):
+  def __init__(self, func: t.Callable, name:str=None, needsWrap=False,
+               mainResultKeys: t.List[str]=None, **overriddenDefaults):
     """
     :param func: Function to wrap
     :param name: Name of this process. If `None`, defaults to the function name with
@@ -148,34 +149,40 @@ class FRAtomicProcess(FRProcessStage):
     of the function in order. If only one main result key exists, then the output of the
     function is assumed to be that key. I.e. in the case where `len(cls.mainResultKeys) == 1`,
     the output is expected to be the direct result, not a sequence of results per key.
+    :param mainResultKeys: Set by parent process as needed
     :param overriddenDefaults: Passed directly to ProcessIO when creating this function's
       input specifications.
     """
     if name is None:
       name = frPascalCaseToTitle(func.__name__)
+    if mainResultKeys is not None:
+      self.mainResultKeys = mainResultKeys
+
     self.name = name
     self.input = FRProcessIO.fromFunction(func, **overriddenDefaults)
     self.result: t.Optional[FRProcessIO] = None
 
     if needsWrap:
-      func = self._wrappedFunc(func)
+      func = self._wrappedFunc(func, self.mainResultKeys)
     self.func = func
 
   @classmethod
-  def _wrappedFunc(cls, func):
+  def _wrappedFunc(cls, func, mainResultKeys: t.List[str]=None):
     """
     Wraps a function returining either a result or list of results, instead making the
     return value an `FRProcessIO` object where each `cls.mainResultkey` corresponds
     to a returned value
     """
-    if len(cls.mainResultKeys) == 1:
+    if mainResultKeys is None:
+      mainResultKeys = cls.mainResultKeys
+    if len(mainResultKeys) == 1:
       @wraps(func)
       def newFunc(*args, **kwargs):
-        return FRProcessIO(**{cls.mainResultKeys[0]: func(*args, **kwargs)})
+        return FRProcessIO(**{mainResultKeys[0]: func(*args, **kwargs)})
     else:
       @wraps(func)
       def newFunc(*args, **kwargs):
-        return FRProcessIO(**{k: val for k, val in zip(cls.mainResultKeys, func(*args, **kwargs))})
+        return FRProcessIO(**{k: val for k, val in zip(mainResultKeys, func(*args, **kwargs))})
     return newFunc
 
   @property
@@ -202,10 +209,9 @@ class FRGeneralProcess(FRProcessStage):
     self.name = name
     self.allowDisable = True
 
-  def addFunction(self, func: t.Callable, name: str=None, **overriddenDefaults):
+  def addFunction(self, func: t.Callable, name: str=None, needsWrap=False, **overriddenDefaults):
     """See function signature for AtomicProcess for input explanation"""
-    atomic = FRAtomicProcess(func, name, **overriddenDefaults)
-    atomic.mainResultKeys = self.mainResultKeys
+    atomic = FRAtomicProcess(func, name, needsWrap, self.mainResultKeys, **overriddenDefaults)
     numSameNames = 0
     for stage in self.stages:
       if atomic.name == stage.name.split('#')[0]:
@@ -218,10 +224,17 @@ class FRGeneralProcess(FRProcessStage):
     return atomic
 
   @classmethod
-  def fromFunction(cls, func: t.Callable, name: str=None, **overriddenDefaults):
+  def fromFunction(cls, func: t.Callable, name: str=None, needsWrap=False,
+                   **overriddenDefaults):
     out = cls(name)
-    out.addFunction(func, name, **overriddenDefaults)
+    out.addFunction(func, name, needsWrap, **overriddenDefaults)
     return out
+
+  @classmethod
+  def wrap(cls, name: str=None, needsAdditionalWrap=False, **overriddenDefaults):
+    def _innerDeco(func: t.Callable):
+      return FRImageProcess.fromFunction(func, name, needsAdditionalWrap, **overriddenDefaults)
+    return _innerDeco
 
   def addProcess(self, process: FRGeneralProcess):
     if self.name is None:

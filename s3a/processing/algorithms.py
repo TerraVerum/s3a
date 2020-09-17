@@ -323,8 +323,7 @@ def binarize_kmeans(image: NChanImg, fgVerts: FRVertices, imgMeans: np.ndarray,
   out[keepMembership] = True
   return FRProcessIO(image=out)
 
-
-def region_grow(image: NChanImg, fgVerts: FRVertices, seedThresh=10):
+def region_growing(image: NChanImg, fgVerts: FRVertices, seedThresh=10):
   if image.size == 0:
     return FRProcessIO(image=np.zeros(image.shape[:2], bool))
   if np.all(fgVerts == fgVerts[0, :]):
@@ -359,7 +358,7 @@ def region_grow(image: NChanImg, fgVerts: FRVertices, seedThresh=10):
 class FRTopLevelImageProcessors:
   @staticmethod
   def b_regionGrowProcessor():
-    return FRImageProcess.fromFunction(region_grow, name='Region Growing')
+    return FRImageProcess.fromFunction(region_growing)
 
   @staticmethod
   def c_kMeansProcessor():
