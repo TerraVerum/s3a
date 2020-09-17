@@ -3,12 +3,16 @@ from __future__ import annotations
 from abc import ABC
 from copy import deepcopy
 from functools import wraps
+from io import StringIO
 from typing import Tuple, List, Sequence
 from warnings import warn
 
 import numpy as np
 from ..processing.processing import *
 from pyqtgraph.parametertree import Parameter
+import docstring_parser as dp
+from ruamel.yaml import YAML
+yaml = YAML()
 
 from s3a.generalutils import augmentException
 from s3a.processing.algorithms import crop_to_local_area, apply_process_result, basicOpsCombo, \
@@ -19,6 +23,27 @@ from s3a.parameditors.pgregistered import FRCustomMenuParameter
 from s3a.parameditors import genericeditor
 
 __all__ = ['FRImgProcWrapper', 'FRGeneralProcWrapper']
+
+def docParser(docstring: str):
+  """
+  From a function docstring, extracts relevant information for how to create smarter
+    parameter boxes.
+
+  :param docstring: Function docstring
+  """
+  parsed = dp.parse(docstring)
+  out = {}
+  for param in parsed.params:
+    stream = StringIO(param.description)
+    paramDoc = yaml.load(stream)
+    if isinstance(paramDoc, str):
+      paramDoc = {'helpText': paramDoc}
+    out[param.arg_name] = FRParam(name=param.arg_name, **paramDoc)
+    if 'pType' not in paramDoc:
+      out[param.arg_name].pType = None
+  return out
+
+
 
 def atomicRunWrapper(proc: FRAtomicProcess, names: Sequence[str], params: Sequence[Parameter]):
   oldRun = proc.run
@@ -51,9 +76,17 @@ class FRGeneralProcWrapper(ABC):
   def unpackStages(self, stage: FRProcessStage, paramParent: Tuple[str, ...]=()):
     if isinstance(stage, FRAtomicProcess):
       params: List[Parameter] = []
+      docParams = docParser(stage.func.__doc__)
       for key in stage.input.hyperParamKeys:
         val = stage.input[key]
-        curParam = FRParam(name=key, value=val)
+        curParam = docParams.get(key, None)
+        if curParam is None:
+          curParam = FRParam(name=key, value=val)
+        else:
+          # Default value should be overridden by func signature
+          curParam.value = val
+          if curParam.pType is None:
+            curParam.pType = type(val).__name__
         pgParam = self.editor.registerProp(self.algParam, curParam, paramParent, asProperty=False)
         params.append(pgParam)
       stage.run = atomicRunWrapper(stage, stage.input.hyperParamKeys, params)

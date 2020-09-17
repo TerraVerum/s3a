@@ -8,10 +8,10 @@ from skimage.measure import regionprops, label, regionprops_table
 from skimage.morphology import flood, disk
 from skimage.segmentation import quickshift
 
-from s3a.generalutils import splitListAtNans, cornersToFullBoundary, \
-  getCroppedImg, imgCornerVertices
+from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices
 from s3a.processing.processing import FRProcessIO, FRImageProcess
-from s3a.structures import BlackWhiteImg, FRVertices, NChanImg, GrayImg, RgbImg, FRAlgProcessorError
+from s3a.structures import BlackWhiteImg, FRVertices, FRComplexVertices, NChanImg,\
+  GrayImg, RgbImg, FRAlgProcessorError
 
 
 def growSeedpoint(img: NChanImg, seeds: FRVertices, thresh: float) -> BlackWhiteImg:
@@ -223,12 +223,34 @@ def rm_small_comps(image: NChanImg, minSzThreshold=30):
   out[coords[:,0], coords[:,1]] = True
   return FRProcessIO(image=out)
 
-def get_basic_shapes(image: NChanImg, fgVerts: FRVertices):
-  # Convert indices into boolean index masks
-  verts = splitListAtNans(fgVerts)
-  mask = verts.toMask(image.shape[0:2])
-  # Foreground is additive, bg is subtractive. If both fg and bg are present, default to keeping old value
-  return FRProcessIO(image=mask)
+def basic_shapes(image: NChanImg, fgVerts: FRVertices, penSize=1, penShape='circle'):
+  """
+  Draws basic shapes with minimal pre- or post-processing.
+
+  :param penSize: Size of the drawing pen
+  :param penShape:
+    helpText: Shape of the drawing pen
+    pType: list
+    limits:
+      - circle
+      - rectangle
+  """
+  out = np.zeros(image.shape[:2], dtype='uint8')
+  drawFns = {
+    'circle': lambda pt: cv.circle(out, tuple(pt), penSize//2, 1, -1),
+    'rectangle': lambda pt: cv.rectangle(out, tuple(pt-penSize//2), tuple(pt+penSize//2), 1, -1)
+  }
+  try:
+    drawFn = drawFns[penShape]
+  except KeyError:
+    raise FRAlgProcessorError(f"Can't understand shape {penShape}. Must be one of:\n"
+                              f"{','.join(drawFns)}")
+  if len(fgVerts) > 1:
+    FRComplexVertices([fgVerts]).toMask(out, 1, False, warnIfTooSmall=False)
+  else:
+    for vert in fgVerts:
+      drawFn(vert)
+  return FRProcessIO(image=out > 0)
 
 def convert_to_squares(image: NChanImg):
   outMask = np.zeros(image.shape, dtype=bool)
@@ -373,7 +395,7 @@ class FRTopLevelImageProcessors:
 
   @staticmethod
   def w_basicShapesProcessor():
-    proc = FRImageProcess.fromFunction(get_basic_shapes, name='Basic Shapes')
+    proc = FRImageProcess.fromFunction(basic_shapes)
     proc.disabledStages = [['Basic Region Operations', 'Open -> Close']]
     return proc
 

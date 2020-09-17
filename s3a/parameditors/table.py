@@ -236,9 +236,7 @@ class FRYamlParser:
                   'pType': value.pop('pType', 'NoneType'),
                   'helpText': value.pop('helpText', '')}
       # Forward additional args if they exist
-      if len(value) > 0:
-        nameArgs['opts'] = value
-      parsedParam = FRParam(leafName, **nameArgs)
+      parsedParam = FRParam(leafName, **nameArgs, **value)
     return parsedParam
 
   def parseLeaf(self, paramName: str, value: Any):

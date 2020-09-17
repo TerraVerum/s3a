@@ -19,47 +19,48 @@ class ContainsSharedProps(Protocol):
     return
 
 
-@dataclass
 class FRParam:
-  name: str
-  """Display name of the parameter"""
-  value: Any = None
-  """
-  Initial value of the parameter.
-    This is used within the program to infer parameter type, shape, comparison methods, etc.
-  """
-  pType: Optional[str] = None
-  """
-  Type of the variable if not easily inferrable from the value itself. 
-  For instance, class:`FRShortcutParameter<s3a.views.parameditors.FRShortcutParameter>`
-  is indicated with string values (e.g. 'Ctrl+D'), so the user must explicitly specify 
-  that such an :class:`FRParam` is of type 'shortcut' (as defined in 
-  :class:`FRShortcutParameter<s3a.views.parameditors.FRShortcutParameter>`)
-  If the type *is* easily inferrable, this may be left blank.
-  """
-  helpText: str = ''
-  """Additional documentation for this parameter."""
-  group: Collection[FRParam] = None
-  """FRParamGroup to which this parameter belongs, if this parameter is part of
-    a group. This is set by the FRParamGroup, not manually
-  """
-  opts: Dict[str, Any] = None
-  """Additional options associated with this parameter"""
+  def __init__(self, name: str, value=None, pType: Optional[str]=None, helpText='',
+               **opts: Dict[str, Any]):
+    """
+    Encapsulates parameter information use within the S3A application
 
-  def __post_init__(self):
-    if self.opts is None:
-      self.opts = {}
-    if self.pType is None:
+    :param name: Display name of the parameter
+    :param value: Initial value of the parameter. This is used within the program
+      to infer parameter type, shape, comparison methods, etc.
+    :param pType: Type of the variable if not easily inferrable from the value itself.
+      For instance, class:`FRShortcutParameter<s3a.views.parameditors.FRShortcutParameter>`
+      is indicated with string values (e.g. 'Ctrl+D'), so the user must explicitly specify
+      that such an :class:`FRParam` is of type 'shortcut' (as defined in
+      :class:`FRShortcutParameter<s3a.views.parameditors.FRShortcutParameter>`)
+      If the type *is* easily inferrable, this may be left blank.
+    :param helpText: Additional documentation for this parameter.
+    :param opts: Additional options associated with this parameter
+    """
+    if opts is None:
+      opts = {}
+    if pType is None:
       # Infer from value
-      pType = type(self.value).__name__
-      self.pType = pType
-    ht = self.helpText
+      pType = type(value).__name__
+      pType = pType
+    ht = helpText
     if ht is not None and len(ht) > 0:
       # TODO: Checking for mightBeRichText fails on pyside2? Even though the function
       # is supposed to exist?
       ht = html.escape(ht)
       # Makes sure the label is displayed as rich text
-      self.helpText = f'<qt>{ht}</qt>'
+      helpText = f'<qt>{ht}</qt>'
+    self.name = name
+    self.value = value
+    self.pType = pType
+    self.helpText = helpText
+    self.opts = opts
+
+    self.group: Optional[Collection[FRParam]] = None
+    """
+    FRParamGroup to which this parameter belongs, if this parameter is part of
+      a group. This is set by the FRParamGroup, not manually
+    """
 
   def __str__(self):
     return f'{self.name}'
@@ -155,4 +156,4 @@ def newParam(name: str, val: Any=None, pType: str=None, helpText='', **opts):
 
   :return: Field that can be inserted within the :class:`FRParamGroup` dataclass.
   """
-  return field(default_factory=lambda: FRParam(name, val, pType, helpText, opts=opts))
+  return field(default_factory=lambda: FRParam(name, val, pType, helpText, **opts))

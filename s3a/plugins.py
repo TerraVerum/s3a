@@ -2,7 +2,6 @@ from functools import partial
 from functools import partial
 from typing import Optional
 
-import cv2 as cv
 import numpy as np
 import pandas as pd
 from pyqtgraph.Qt import QtWidgets
@@ -13,14 +12,10 @@ from s3a.generalutils import frPascalCaseToTitle
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import FRParamEditorDockGrouping
 from s3a.parameditors.genericeditor import FRTableFieldPlugin
-from s3a.processing import FRImageProcess
 from s3a.processing.algorithms import _historyMaskHolder
-from s3a.structures import NChanImg, FRAlgProcessorError
+from s3a.structures import NChanImg
 from s3a.views.regions import FRVertexDefinedImg
 
-
-class FREEHAND_OPTS:
-  ROI_SZ = FRParam('ROI Size (px)', 5, helpText='Area filled by the draw tool')
 
 class FRVerticesPlugin(FRTableFieldPlugin):
   name = 'Vertices'
@@ -40,8 +35,6 @@ class FRVerticesPlugin(FRTableFieldPlugin):
     cls.docks = dockGroup
 
   def __init__(self):
-    self._addFreehandProcessor()
-
     self.region = FRVertexDefinedImg()
     self.region.hide()
     self.firstRun = True
@@ -90,34 +83,6 @@ class FRVerticesPlugin(FRTableFieldPlugin):
     self.firstRun = False
     if not np.array_equal(newMask,compMask):
       self.region.updateFromMask(newMask)
-
-  def _addFreehandProcessor(self):
-    def freehand(image: NChanImg, fgVerts: FRVertices, penSize=1, penShape='circle'):
-      self.focusedImg.shapeCollection.curShape.handleSize = penSize
-
-      out = np.zeros(image.shape[:2], dtype='uint8')
-      drawFns = {
-        'circle': lambda pt: cv.circle(out, tuple(pt), penSize//2, 1, -1),
-        'rectangle': lambda pt: cv.rectangle(out, tuple(pt-penSize//2), tuple(pt+penSize//2), 1, -1)
-      }
-      try:
-        drawFn = drawFns[penShape]
-      except KeyError:
-        raise FRAlgProcessorError(f"Can't understand shape {penShape}. Must be one of:\n"
-                                  f"{','.join(drawFns)}")
-      if len(fgVerts) > 1:
-        FRComplexVertices([fgVerts]).toMask(out, 1, False, warnIfTooSmall=False)
-      else:
-        for vert in fgVerts:
-          drawFn(vert)
-      return out > 0
-
-    def makeProc():
-      proc = FRImageProcess.fromFunction(freehand, needsWrap=True)
-      proc.excludedStages = [['Basic Region Operations']]
-      return proc
-
-    FR_SINGLETON.imgProcClctn.addProcessCtor(makeProc)
 
 
   @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
