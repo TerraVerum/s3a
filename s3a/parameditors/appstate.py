@@ -32,7 +32,9 @@ class FRAppStateEditor(FRParamEditor):
       # TODO: May be good in the future to be able to choose which should be saved
       legitKeys = self._stateFuncsDf.index
       exportFuncs = self._stateFuncsDf.exportFuncs
-      rets, errs = _safeCallFuncList(legitKeys, exportFuncs)
+      saveOnExitDir = self.saveDir/'saved_on_exit'
+      saveOnExitDir.mkdir(exist_ok=True)
+      rets, errs = _safeCallFuncList(legitKeys, exportFuncs, [[saveOnExitDir]]*len(legitKeys))
       updateDict = {k: ret for k, ret in zip(legitKeys, rets) if ret is not None}
       paramState = dict(Parameters=paramState, **updateDict)
       for editor in FR_SINGLETON.quickLoader.listModel.uniqueEditors:
@@ -82,7 +84,19 @@ class FRAppStateEditor(FRParamEditor):
 
 
   def addImportExportOpts(self, optName: str, importFunc: Callable[[str], Any],
-                          exportFunc: Callable[[], str]):
+                          exportFunc: Callable[[Path], str]):
+    """
+    Main interface to the app state editor. By providing import and export functions,
+    various aspects of the program state can be loaded and saved on demand.
+
+    :param optName: What should this save option be called? E.g. when providing a
+      load and save for annotation data, this is 'annotations'.
+    :param importFunc: Function called when importing saved data. Takes in a
+      full file path
+    :param exportFunc: Function to save the app data. Input is a full folder path. Expects
+      the output to be a full file path of the saved file. This file is then passed to
+      'importFunc' on loading a param state
+    """
     newRow = pd.Series([importFunc, exportFunc], name=optName,
                        index=self._stateFuncsDf.columns)
     self._stateFuncsDf: pd.DataFrame = self._stateFuncsDf.append(newRow)

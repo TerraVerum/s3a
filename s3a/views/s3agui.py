@@ -49,8 +49,8 @@ class S3A(S3ABase):
     if guiMode:
       warnings.simplefilter('error', FRS3AWarning)
       makeExceptionsShowDialogs(self)
-    def saveRecentLayout():
-      outFile = self.appStateEditor.saveDir/'savedLayout'
+    def saveRecentLayout(_folderName: Path):
+      outFile = _folderName/'savedLayout'
       self.saveLayout(outFile)
       return str(outFile)
     self.appStateEditor.addImportExportOpts('layout', self.loadLayout, saveRecentLayout)

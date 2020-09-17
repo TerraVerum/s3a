@@ -1,7 +1,7 @@
 import re
 from collections import deque
 from pathlib import Path
-from typing import Any, Optional, List, Collection, Callable, Tuple, Union
+from typing import Any, Optional, List, Collection, Callable, Tuple, Union, Sequence
 
 import numpy as np
 from pandas import DataFrame as df
@@ -180,7 +180,7 @@ def frPascalCaseToTitle(name: str, addSpaces=True) -> str:
 
 
 def _safeCallFuncList(fnNames: Collection[str], funcLst: List[Callable],
-                      fnArgs: List[tuple]=None):
+                      fnArgs: List[Sequence]=None):
   errs = []
   rets = []
   if fnArgs is None:

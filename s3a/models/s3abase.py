@@ -77,23 +77,23 @@ class S3ABase(QtWidgets.QMainWindow):
       FR_SINGLETON.tableData.loadCfg(_fname)
       self.resetTblFields()
 
-    def saveCfg():
+    def saveCfg(_folderName: Path):
       td = FR_SINGLETON.tableData
       saveFpath = td.cfgFname
       if not saveFpath.exists():
-        saveFpath = self.appStateEditor.saveDir/td.cfgFname.name
+        saveFpath = _folderName/td.cfgFname.name
         saveToFile(td.cfg, saveFpath, allowOverwriteDefault=True)
       return str(saveFpath)
     self.appStateEditor.addImportExportOpts('tablecfg', loadCfg, saveCfg)
 
     self.appStateEditor.addImportExportOpts(
       'image', lambda fname: self.setMainImg(fname, clearExistingComps=False),
-      lambda: str(self.srcImgFname)
+      lambda _folderName: str(self.srcImgFname)
     )
-    def saveExistingComps():
+    def saveExistingComps(_folderName: Path):
       if self.mainImg.image is None:
         return None
-      saveName = self.appStateEditor.saveDir / 'savedState.pkl'
+      saveName = _folderName / 'savedState.pkl'
       self.exportCompList(saveName, readOnly=False)
       return str(saveName)
     loadExistingComps = lambda infile: self.loadCompList(infile, FR_ENUMS.COMP_ADD_AS_MERGE)
