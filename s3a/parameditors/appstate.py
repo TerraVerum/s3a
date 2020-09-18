@@ -39,7 +39,7 @@ class FRAppStateEditor(FRParamEditor):
       paramState = dict(Parameters=paramState, **updateDict)
       for editor in FR_SINGLETON.quickLoader.listModel.uniqueEditors:
         editor.applyChanges()
-        curSaveName = str(self.saveDir/editor.name)
+        curSaveName = str(saveOnExitDir/editor.name)
         formattedName = editor.name.replace(' ', '').lower()
         editor.saveParamState(curSaveName, blockWrite=False)
         paramState.update({formattedName: curSaveName})
