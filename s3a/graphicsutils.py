@@ -257,7 +257,9 @@ def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
 
 def restoreExceptionBehavior():
   def patch_excepthook():
+    global usingPostponedErrors
     sys.excepthook = old_sys_except_hook
+    usingPostponedErrors = False
   QtCore.QTimer.singleShot(0, patch_excepthook)
   s3a.appInst.processEvents()
 

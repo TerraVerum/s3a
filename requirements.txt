@@ -10,4 +10,5 @@ pyqtgraph
 Pillow
 qdarkstyle
 ruamel.yaml
+docstring_parser
 pytest
