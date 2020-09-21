@@ -352,7 +352,7 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     """
     paramOpts = dict(name=constParam.name, type=constParam.pType, tip=constParam.helpText,
                      **constParam.opts)
-    if constParam.pType == 'group':
+    if constParam.pType == 'group' and constParam.value is not None:
       paramOpts.update(children=constParam.value)
     else:
       paramOpts.update(value=constParam.value)
@@ -386,13 +386,25 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
       return paramForEditor
 
     # Else, create a property and return that instead
+    def getAccessorPath():
+      parentGrp = self.groupingToParamMapping[grouping]
+      accessPath = []
+      if parentGrp is not None:
+        accessPath.append(parentGrp.name)
+      if parentParamPath is not None:
+        accessPath.extend(parentParamPath)
+      accessPath.append(constParam.name)
+      return accessPath
+
     @property
     def paramAccessor(clsObj):
-      return self[self.groupingToParamMapping[grouping], constParam]
+      accessPath = getAccessorPath()
+      return self.params.child(*accessPath).value()
 
     @paramAccessor.setter
     def paramAccessor(clsObj, newVal):
-      param = self[self.groupingToParamMapping[grouping], constParam, True]
+      accessPath = getAccessorPath()
+      param = self.params.child(*accessPath)
       param.setValue(newVal)
 
     return paramAccessor

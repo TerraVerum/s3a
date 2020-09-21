@@ -32,15 +32,22 @@ def docParser(docstring: str):
   :param docstring: Function docstring
   """
   parsed = dp.parse(docstring)
+  descr = ''
+  for parseDescr in parsed.short_description, parsed.long_description:
+    if parseDescr is not None:
+      descr += parseDescr
   out = {}
   for param in parsed.params:
     stream = StringIO(param.description)
     paramDoc = yaml.load(stream)
     if isinstance(paramDoc, str):
       paramDoc = {'helpText': paramDoc}
+    if paramDoc is None:
+      continue
     out[param.arg_name] = FRParam(name=param.arg_name, **paramDoc)
     if 'pType' not in paramDoc:
       out[param.arg_name].pType = None
+  out['top-descr'] = descr
   return out
 
 
@@ -63,7 +70,7 @@ def procRunWrapper(proc: FRGeneralProcess, groupParam: Parameter):
   return newRun
 
 class FRGeneralProcWrapper(ABC):
-  def __init__(self, processor: FRGeneralProcess, editor: genericeditor.FRParamEditor):
+  def __init__(self, processor: FRProcessStage, editor: genericeditor.FRParamEditor):
     self.processor = processor
     self.algName = processor.name
     self.algParam = FRParam(self.algName)
@@ -75,8 +82,8 @@ class FRGeneralProcWrapper(ABC):
 
   def unpackStages(self, stage: FRProcessStage, paramParent: Tuple[str, ...]=()):
     if isinstance(stage, FRAtomicProcess):
-      params: List[Parameter] = []
       docParams = docParser(stage.func.__doc__)
+      params: List[Parameter] = []
       for key in stage.input.hyperParamKeys:
         val = stage.input[key]
         curParam = docParams.get(key, None)
@@ -101,7 +108,7 @@ class FRGeneralProcWrapper(ABC):
       return
     for childStage in stage.stages:
       pType = 'atomicgroup'
-      if isinstance(childStage, FRGeneralProcess) and childStage.allowDisable:
+      if childStage.allowDisable:
         pType = 'procgroup'
       curGroup = FRParam(name=childStage.name, pType=pType, value=[],)
       self.editor.registerProp(self.algParam, curGroup, paramParent, asProperty=False,

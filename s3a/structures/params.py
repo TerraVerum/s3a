@@ -21,7 +21,7 @@ class ContainsSharedProps(Protocol):
 
 class FRParam:
   def __init__(self, name: str, value=None, pType: Optional[str]=None, helpText='',
-               **opts: Dict[str, Any]):
+               **opts):
     """
     Encapsulates parameter information use within the S3A application
 

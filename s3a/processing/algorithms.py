@@ -6,6 +6,7 @@ import pandas as pd
 from scipy.ndimage import binary_fill_holes
 from skimage.measure import regionprops, label, regionprops_table
 from skimage.morphology import flood, disk
+from skimage import morphology as morph
 from skimage.segmentation import quickshift
 
 from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices
@@ -69,6 +70,7 @@ def area_coord_regionTbl(_image: NChanImg):
 
 
 _historyMaskHolder = [np.array([[]], 'uint8')]
+
 """
 0 = unspecified, 1 = background, 2 = foreground. Place inside list so reassignment
 doesn't destroy object reference
@@ -193,15 +195,26 @@ def disallow_paint_tool(_image: NChanImg, fgVerts: FRVertices, bgVerts: FRVertic
 def openClose():
   proc = FRImageProcess('Open -> Close')
   proc.addFunction(cvt_to_uint)
-  def morphFactory(op):
-    def morph(image: NChanImg, ksize=5):
-      outImg = cv.morphologyEx(image.copy(), op, disk(ksize//2))
-      return FRProcessIO(image=outImg)
-    return morph
-  inner = FRImageProcess.fromFunction(morphFactory(cv.MORPH_OPEN), 'Opening')
-  proc.addProcess(inner)
-  inner = FRImageProcess.fromFunction(morphFactory(cv.MORPH_CLOSE), 'Closing')
-  proc.addProcess(inner)
+  def perform_op(image: NChanImg, radius=1, shape='rectangle'):
+    """
+    :param radius: Radius of the structuring element. Note that the total side length
+      of the structuring element will be (2*radius)+1.
+    :param shape:
+      helpText: Structuring element shape
+      pType: list
+      limits:
+        - rectangle
+        - disk
+        - diamond
+    """
+    ksize = [radius]
+    if shape == 'rectangle':
+      ksize = [ksize[0]*2+1]*2
+    strel = getattr(morph, shape)(*ksize)
+    outImg = cv.morphologyEx(image.copy(), cv.MORPH_OPEN, strel)
+    outImg = cv.morphologyEx(outImg, cv.MORPH_CLOSE, strel)
+    return outImg
+  proc.addFunction(perform_op, needsWrap=True)
   return proc
 
 def keep_largest_comp(image: NChanImg):
@@ -212,6 +225,9 @@ def keep_largest_comp(image: NChanImg):
     return FRProcessIO(image=out)
   out[coords[:,0], coords[:,1]] = True
   return FRProcessIO(image=out)
+
+a = keep_largest_comp.__code__
+a.co_varnames
 
 def rm_small_comps(image: NChanImg, minSzThreshold=30):
   regionPropTbl = area_coord_regionTbl(image)
@@ -299,7 +315,7 @@ def cv_grabcut(image: NChanImg, fgVerts: FRVertices, bgVerts: FRVertices,
     mode = cv.GC_INIT_WITH_MASK
   cv.grabCut(img, mask, cvRect, bgdModel, fgdModel, iters, mode=mode)
   outMask = np.where((mask==2)|(mask==0), False, True)
-  return FRProcessIO(image=outMask, grabcutDisplay=mask, display='grabcutDisplay')
+  return FRProcessIO(image=outMask, summaryInfo={'image': mask})
 
 def quickshift_seg(image: NChanImg, fgVerts: FRVertices, maxDist=10., kernelSize=5,
                sigma=0.0):

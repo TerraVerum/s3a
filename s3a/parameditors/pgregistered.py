@@ -273,14 +273,15 @@ class FRFilePickerParameterItem(parameterTypes.WidgetParameterItem):
     folderDlg.setModal(True)
     curVal = self.param.value()
     if len(curVal) > 0:
-      dir = curVal
+      useDir = curVal
     else:
-      dir = None
-    fname, _ = folderDlg.getOpenFileName(caption='Select Data File', dir=dir)
+      useDir = None
+    if self.param.opts['asFolder']:
+      fname = folderDlg.getExistingDirectory(caption='Select File', directory=useDir)
+    else:
+      fname, _ = folderDlg.getOpenFileName(caption='Select File', directory=useDir)
     if len(fname) == 0:
       return
-    if self.param.opts['asFolder']:
-      fname = str(Path(fname).parent)
     self.param.setValue(fname)
 
 class FRFilePickerParameter(Parameter):

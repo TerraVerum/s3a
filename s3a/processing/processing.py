@@ -189,8 +189,9 @@ class FRAtomicProcess(FRProcessStage):
   def keysFromPrevIO(self):
     return self.input.keysFromPrevIO
 
-  def run(self, prevIO: FRProcessIO, disable=False):
-    self.updateInput(prevIO)
+  def run(self, prevIO: FRProcessIO=None, disable=False):
+    if prevIO is not None:
+      self.updateInput(prevIO)
     if not disable:
       self.result = self.func(**self.input)
     else:
