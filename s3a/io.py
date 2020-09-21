@@ -359,7 +359,7 @@ class FRComponentIO:
     """
     if outDir is None:
       outDir = Path('.')/f'compimgs_{margin}_margin'
-      (outDir/dataDir).mkdir(exist_ok=True, parents=True)
+    (outDir/dataDir).mkdir(exist_ok=True, parents=True)
     excludeCols = []
     if semanticDir is None:
       excludeCols.append('semanticMask')
