@@ -1,10 +1,10 @@
-from typing import Union, Optional, Collection
+from typing import Union, Optional, Collection, Sequence
 
 import cv2 as cv
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtGui
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from skimage.io import imread
 
 from s3a import FR_SINGLETON
@@ -50,13 +50,11 @@ class FREditableImgBase(pg.PlotWidget):
   def __init__(self, parent=None, drawShapes: Collection[FRParam]=(),
                drawActions: Collection[FRParam]=(),**kargs):
     super().__init__(parent, viewBox=FRRightPanViewBox(), **kargs)
-    self.menu = contextMenuFromEditorActions(self.toolsEditor, self.toolsEditor.name, self)
-    vb: pg.ViewBox = self.getViewBox()
+    self.menu: QtWidgets.QMenu = self.getViewBox().menu
+    self.setMenuFromEditors([self.toolsEditor])
     # Disable default menus
     self.plotItem.ctrlMenu = None
     self.sceneObj.contextMenu = None
-    # Set desired menu actions
-    vb.menu = self.menu
 
     self.clearRoiAct.sigActivated.connect(lambda: self.clearCurRoi())
     self.setAspectLocked(True)
@@ -101,6 +99,15 @@ class FREditableImgBase(pg.PlotWidget):
     # Initialize draw shape/action buttons
     self.drawActGrp.callFuncByParam(self.drawAction)
     self.drawShapeGrp.callFuncByParam(self.shapeCollection.curShapeParam)
+
+  def setMenuFromEditors(self, editors: Sequence[FRParamEditor]):
+    vb: pg.ViewBox = self.getViewBox()
+    menu = contextMenuFromEditorActions(editors)
+    autoRangeAct = QtWidgets.QAction('Auto Range')
+    autoRangeAct.triggered.connect(lambda: vb.autoRange())
+    menu.insertAction(None, autoRangeAct)
+    vb.menu = menu
+    self.menu = menu
 
   def switchBtnMode(self, newMode: FRParam):
     # EAFP
@@ -182,6 +189,9 @@ class FRMainImage(FREditableImgBase):
             FRC.TOOL_MOVE_REGIONS, FRC.TOOL_COPY_REGIONS], asProperty=False)
     (cls.minCompSize, cls.onlyGrowViewbox) = FR_SINGLETON.generalProps.registerProps(
       cls, [FRC.PROP_MIN_COMP_SZ, FRC.PROP_ONLY_GROW_MAIN_VB])
+    (cls.gridClr, cls.gridWidth, cls.showGrid) = FR_SINGLETON.colorScheme.registerProps(
+      cls, [FRC.SCHEME_GRID_CLR, FRC.SCHEME_GRID_LINE_WIDTH, FRC.SCHEME_SHOW_GRID]
+    )
     FR_SINGLETON.addDocks(cls.toolsEditor)
 
   def __init__(self, parent=None, imgSrc=None, **kargs):
@@ -189,6 +199,10 @@ class FRMainImage(FREditableImgBase):
     allowedActions = (FRC.DRAW_ACT_SELECT,FRC.DRAW_ACT_ADD)
     super().__init__(parent, drawShapes=allowedShapes,
                      drawActions=allowedActions, **kargs)
+    self._initGrid()
+    FR_SINGLETON.colorScheme.sigParamStateUpdated.connect(
+      lambda: self.updateGridColor()
+    )
     # plt: pg.PlotItem = self.plotItem
     # # Make sure grid lines are on top of image
     # for axDict in plt.axes.values():
@@ -212,6 +226,27 @@ class FRMainImage(FREditableImgBase):
     self.moveCompsAct.sigActivated.connect(startMove)
 
     self.switchBtnMode(FRC.DRAW_ACT_ADD)
+
+  def _initGrid(self):
+    pi: pg.PlotItem = self.plotItem
+    pi.showGrid(alpha=1.0)
+    axs = [pi.getAxis(ax) for ax in ['top', 'bottom', 'left', 'right']]
+    for ax in axs: # type: pg.AxisItem
+      ax.setZValue(1e9)
+      # ax.setTickSpacing(5, 1)
+      for evFn in 'mouseMoveEvent', 'mousePressEvent', 'mouseReleaseEvent', \
+                  'mouseDoubleClickEvent', 'mouseDragEvent', 'wheelEvent':
+        newEvFn = lambda ev: ev.ignore()
+        setattr(ax, evFn, newEvFn)
+
+  def updateGridColor(self):
+    pi: pg.PlotItem = self.plotItem
+    pi.showGrid(self.showGrid, self.showGrid)
+    axs = [pi.getAxis(ax) for ax in ['top', 'bottom', 'left', 'right']]
+    newPen = pg.mkPen(width=self.gridWidth, color=self.gridClr)
+    for ax in axs:
+      ax.setPen(newPen)
+
 
   def handleShapeFinished(self, roiVerts: FRVertices) -> Optional[np.ndarray]:
     if self.regionCopier.active: return
