@@ -217,7 +217,6 @@ class FRShortcutsEditor(FRParamEditor):
          FRS3AWarning)
 
 
-
   def addRegisteredFuncsFromCls(self, grouping: Any, groupParam: FRParam):
     """
     For a given class, adds the registered parameters from that class to the respective
@@ -258,7 +257,8 @@ class FRShortcutsEditor(FRParamEditor):
     # base class shortcuts too
     self.boundFnsPerQualname[grouping.__qualname__] = boundFns_includingBases
 
-  def addBoundFn(self, boundFn: FRBoundFnParams, parentParam: Parameter):
+  @classmethod
+  def addBoundFn(cls, boundFn: FRBoundFnParams, parentParam: Parameter):
     if boundFn.param.name in parentParam.names:
       # Already registered
       return
@@ -272,22 +272,7 @@ class FRShortcutsEditor(FRParamEditor):
     if boundFn.param in self.objToShortcutParamMapping[ownerObj]:
       return
     self.objToShortcutParamMapping[ownerObj].append(boundFn.param)
-    groupParam = self.groupingToParamMapping[type(ownerObj)]
-    seqCopy = QtGui.QKeySequence(boundFn.param.value)
-    if ownerObj is None or not isinstance(ownerObj, QtWidgets.QWidget):
-      shortcut = QtWidgets.QShortcut(seqCopy, QtWidgets.QApplication.desktop())
-      ctx = QtCore.Qt.ApplicationShortcut
-    else:
-      shortcut = QtWidgets.QShortcut(seqCopy, ownerObj)
-      ctx = QtCore.Qt.WidgetWithChildrenShortcut
-    keySeqParam: FRShortcutParameter = self[groupParam, boundFn.param, True]
-    shortcut.paramIdx = (groupParam, boundFn.param)
-    shortcut.activated.connect(partial(boundFn.func, ownerObj, *boundFn.defaultFnArgs))
-    shortcut.activatedAmbiguously.connect(lambda: self.ambigWarning(ownerObj, shortcut))
-    shortcut.setContext(ctx)
-    keySeqParam.sigValueChanged.connect(lambda item, value: shortcut.setKey(value))
-    self.paramToShortcutMapping[boundFn.param, ownerObj] = shortcut
-    return shortcut
+    self.registerMethod_obj(boundFn.func, boundFn.param, ownerObj, *boundFn.defaultFnArgs)
 
   def setParent(self, parent: QtWidgets.QWidget, *args):
     super().setParent(parent, *args)
