@@ -101,7 +101,7 @@ class _FRConsts(FRParamGroup):
   SCHEME_ROI_LINE_WIDTH  : FRParam = newParam('ROI Line Width', 1)
   SCHEME_GRID_LINE_WIDTH : FRParam = newParam('Grid Line Width', 1)
   SCHEME_GRID_CLR        : FRParam = newParam('Grid Line Color', 'fff', 'color')
-  SCHEME_SHOW_GRID       : FRParam = newParam('Show Grid', True)
+  SCHEME_SHOW_GRID       : FRParam = newParam('Show Grid', False)
 
   # --------------------------
   # REGION-CREATION PARAMETERS
