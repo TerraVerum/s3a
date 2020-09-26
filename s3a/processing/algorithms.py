@@ -128,7 +128,7 @@ def crop_to_local_area(image: NChanImg, fgVerts: FRVertices, bgVerts: FRVertices
   else:
     # Lots of points, use their bounded area
     vertArea_rowCol = (allVerts.max(0)-allVerts.min(0))[::-1]
-  margin = round(max(vertArea_rowCol) * (margin_pctRoiSize / 100))
+  margin = int(round(max(vertArea_rowCol) * (margin_pctRoiSize / 100)))
   cropped, bounds = getCroppedImg(image, allVerts, margin)
   vertOffset = bounds.min(0)
   for vertList in fgVerts, bgVerts:
