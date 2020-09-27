@@ -475,10 +475,18 @@ class S3A(S3ABase):
     if docks is None:
       docks = FR_SINGLETON.docks
     # Define out here to retain scope
+    def fixDWFactory(_dock):
+      # Necessary since defining func in loop will cause problems otherwise
+      def doFix(tabIdx):
+        self._fixDockWidth(_dock, tabIdx)
+      return doFix
+
     dock = None
     for dock in docks:
       dock.setParent(self)
       self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
+      if isinstance(dock, FRParamEditorDockGrouping):
+        dock.tabs.currentChanged.connect(fixDWFactory(dock))
     for nextEditor in docks[:-1]:
       self.tabifyDockWidget(dock, nextEditor)
 
@@ -497,14 +505,15 @@ class S3A(S3ABase):
     newMenu.addAction(editAct)
     newMenu.addSeparator()
     def showFunc(_editor=editor):
-      _editor.dock.show()
-      # "Show" twice forces 1) window to exist and 2) it is currently raised and focused
-      # These guarantees are not met if "show" is only called once
-      _editor.dock.raise_()
       if isinstance(_editor.dock, FRParamEditorDockGrouping):
         tabs: QtWidgets.QTabWidget = _editor.dock.tabs
         dockIdx = tabs.indexOf(_editor.dockContentsWidget)
         tabs.setCurrentIndex(dockIdx)
+      self._fixDockWidth(_editor.dock)
+      _editor.dock.show()
+      # "Show" twice forces 1) window to exist and 2) it is currently raised and focused
+      # These guarantees are not met if "show" is only called once
+      _editor.dock.raise_()
     editAct.triggered.connect(lambda: showFunc())
     populateFunc = partial(self.populateParamEditorMenuOpts, editor, newMenu, loadFunc)
     editor.sigParamStateCreated.connect(populateFunc)
@@ -512,6 +521,15 @@ class S3A(S3ABase):
     populateFunc()
     editor.hasMenuOption = True
     return newMenu
+
+  def _fixDockWidth(self, dock: FRParamEditorDockGrouping, tabIdx: int=None):
+    if tabIdx is None:
+      tabIdx = dock.tabs.currentIndex()
+    curParamEditor = dock.editors[tabIdx]
+    curParamEditor.tree.resizeColumnToContents(0)
+    minWidth = curParamEditor.width() + 100
+    if dock.width() < minWidth:
+      self.resizeDocks([dock], [curParamEditor.width()+100], QtCore.Qt.Horizontal)
 
   def createMenuOptForDock(self,
                            dockEditor: Union[FRParamEditor, FRParamEditorDockGrouping],

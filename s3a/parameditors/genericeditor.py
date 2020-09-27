@@ -90,20 +90,12 @@ class FRParamEditor(FRParamEditorBase):
       return
     for ii in range(topTreeItem.childCount()):
       topTreeItem.child(ii).setExpanded(expandedVal)
-
-  def _expandCols(self):
-    # totWidth = 0
-    for colIdx in range(2):
-      self.tree.resizeColumnToContents(colIdx)
-    #   totWidth += self.tree.columnWidth(colIdx) + self.tree.margin
-    # appInst.processEvents()
-    # self.dockContentsWidget.setMinimumWidth(totWidth)
-    self.tree.setColumnWidth(0, self.width()//2)
-    self.resize(self.tree.width(), self.height())
+    self.tree.resizeColumnToContents(0)
 
   def show(self):
-    self.setWindowState(QtCore.Qt.WindowActive)
+    self.tree.resizeColumnToContents(0)
     # Necessary on MacOS
+    self.setWindowState(QtCore.Qt.WindowActive)
     self.raise_()
     # Necessary on Windows
     self.activateWindow()
