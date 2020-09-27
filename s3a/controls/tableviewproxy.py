@@ -21,6 +21,7 @@ __all__ = ['FRCompSortFilter', 'FRCompDisplayFilter']
 
 Signal = QtCore.Signal
 TBL_FIELDS = FR_SINGLETON.tableData.allFields
+QISM = QtCore.QItemSelectionModel
 
 class FRCompSortFilter(QtCore.QSortFilterProxyModel):
   colTitles = [f.name for f in TBL_FIELDS]
@@ -136,7 +137,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     if len(selection) == 0:
       return
     changes = self._compMgr.splitCompVertsById(np.unique(selection[:,0]))
-    self.selectRowsById(changes['added'], QtCore.QItemSelectionModel.ClearAndSelect)
+    self.selectRowsById(changes['added'], QISM.ClearAndSelect)
 
   def mergeSelectedComps(self, keepId: int=None):
     """See signature for :meth:`FRComponentMgr.mergeCompsById`"""
@@ -154,7 +155,7 @@ class FRCompDisplayFilter(QtCore.QObject):
       # No merge was performed, don't alter the table selection
       raise
     else:
-      self.selectRowsById(np.array([keepId]), QtCore.QItemSelectionModel.ClearAndSelect)
+      self.selectRowsById(np.array([keepId]), QISM.ClearAndSelect)
 
   def _reflectFieldsChanged(self):
     self.filterableCols = self.findFilterableCols()
@@ -208,7 +209,7 @@ class FRCompDisplayFilter(QtCore.QObject):
 
 
   def selectRowsById(self, ids: OneDArr,
-                     selectionMode=QtCore.QItemSelectionModel.Rows,
+                     selectionMode=QISM.Rows|QISM.ClearAndSelect,
                      onlyEditableRetList=True):
     selectionModel = self._compTbl.selectionModel()
     sortModel = self._compTbl.model()
@@ -234,7 +235,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     # noinspection PyTypeChecker
     selectionModel.select(selectionList, selectionMode)
     return np.array(retLists)
-    # if int(selectionMode & QtCore.QItemSelectionModel.ClearAndSelect) > 0:
+    # if int(selectionMode & QISM.ClearAndSelect) > 0:
     #   self.selectedIds = ids
     # else: # Add to selection without clearing old selection
     #   self.selectedIds = np.concatenate([self.selectedIds, ids])
@@ -257,11 +258,11 @@ class FRCompDisplayFilter(QtCore.QObject):
     # Obtain table idxs corresponding to ids so rows can be highlighted
     # -----
     # Add to current selection depending on modifiers
-    mode = QtCore.QItemSelectionModel.Rows
+    mode = QISM.Rows
     if QtGui.QGuiApplication.keyboardModifiers() == QtCore.Qt.ControlModifier:
-      mode |= QtCore.QItemSelectionModel.Select
+      mode |= QISM.Select
     else:
-      mode |= QtCore.QItemSelectionModel.ClearAndSelect
+      mode |= QISM.ClearAndSelect
     if not self.regionCopier.active:
       self.selectRowsById(selectedIds, mode)
     # TODO: Better management of widget focus here

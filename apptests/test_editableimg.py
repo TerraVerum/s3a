@@ -80,7 +80,7 @@ def test_update():
   fImg.changeCurrentPlugin(oldPlugin)
 
 def test_region_modify(sampleComps):
-  app.add_focusComp(sampleComps)
+  app.add_focusComps(sampleComps)
   shapeBnds = fImg.image.shape[:2]
   reach = np.min(shapeBnds)
   oldVerts = vertsPlugin.region.verts

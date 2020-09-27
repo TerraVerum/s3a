@@ -570,7 +570,7 @@ class S3A(S3ABase):
       fontColor = 'black'
     else:
       fontColor = 'white'
-    self.pxColor.setStyleSheet(f'background:rgba{tuple(pxColor)}; color:{fontColor}; font-weight: 16px')
+    self.pxColor.setStyleSheet(f'background:rgba{tuple(pxColor)}; color:{fontColor}')
 
   def updateTheme(self, _newScheme: Dict[str, Any]):
     style = ''
@@ -580,10 +580,10 @@ class S3A(S3ABase):
     for opts in self.focusedImg.drawOptsWidget, self.mainImg.drawOptsWidget:
       opts.horizWidth = opts.layout().minimumSize().width()
 
-  def add_focusComp(self, newComps: df):
+  def add_focusComps(self, newComps: df):
     ret = super().add_focusComps(newComps)
+    selection = self.compDisplay.selectRowsById(newComps[REQD_TBL_FIELDS.INST_ID])
     if self.isVisible() and self.compTbl.showOnCreate:
-      selection = self.compDisplay.selectRowsById(newComps.loc[:, REQD_TBL_FIELDS.INST_ID])
       # For some reason sometimes the actual table selection doesn't propagate in time, so
       # directly forward the selection here
       self.compTbl.setSelectedCellsAs_gui(selection)

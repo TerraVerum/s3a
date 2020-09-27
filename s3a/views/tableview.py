@@ -147,6 +147,7 @@ class FRCompTableView(QtWidgets.QTableView):
     """
     super().__init__(*args)
 
+    self.setStyleSheet("QTableView { selection-color: white; selection-background-color: #0078d7; }")
     self._prevSelRows = np.array([])
     self.setSortingEnabled(True)
 

@@ -39,7 +39,7 @@ def test_split_selected_comps():
   verts = FRComplexVertices.fromBwMask(compMask > 0)
   comp = FR_SINGLETON.tableData.makeCompDf()
   comp.at[comp.index[0], REQD_TBL_FIELDS.VERTICES] = verts
-  app.add_focusComp(comp)
+  app.add_focusComps(comp)
 
   app.compTbl.selectAll()
   app.compDisplay.splitSelectedComps()
