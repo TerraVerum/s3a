@@ -183,7 +183,7 @@ class FRQuickLoaderEditor(FRParamEditor):
     # selectionIdx = completer.popup().currentIndex()
     # if not selectionIdx.isValid():
     #   selectionIdx = completer.currentIndex()
-    paramState, editor = selection.data(qtSelectionIdx, QtCore.Qt.EditRole)
+    paramState, editor = qtSelectionIdx.data(QtCore.Qt.EditRole)
     self.addActForEditor(editor, paramState)
     self.addNewParamState.clear()
 
