@@ -301,3 +301,27 @@ def resize_pad(img: NChanImg, newSize: Tuple[int, int], interp=cv.INTER_NEAREST,
   if needsRotate:
     paddedImg = cv.rotate(paddedImg, cv.ROTATE_90_COUNTERCLOCKWISE)
   return paddedImg
+
+def dynamicDocstring(**kwargs):
+  """
+  Docstrings must be known at compile time. However this prevents expressions like
+
+  ```
+  x = ['dog', 'cat', 'squirrel']
+  def a(animal: str):
+    \"\"\"
+    :param animal: must be one of {x}
+    \"\"\"
+  ```
+
+  from compiling. This can make some featurs of s3a difficult, like dynamically generating
+  limits for a docstring list. `dynamicDocstring` wrapps a docstring and provides kwargs
+  for string formatting.
+  Retrieved from https://stackoverflow.com/a/10308363/9463643
+
+  :param kwargs: List of kwargs to pass to formatted docstring
+  """
+  def wrapper(obj):
+    obj.__doc__ = obj.__doc__.format(**kwargs)
+    return obj
+  return wrapper
