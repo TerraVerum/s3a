@@ -233,7 +233,8 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
       # if self.tree.itemWidget(item, 0) is None:
       #   lbl = QtWidgets.QLabel(item.text(0))
       #   self.tree.setItemWidget(item, 0, lbl)
-      if ('tip' in item.param.opts
+      if (hasattr(item, 'param')
+          and 'tip' in item.param.opts
           and len(item.toolTip(0)) == 0
           and self.tree.itemWidget(item, 0) is None):
         item.setToolTip(0, item.param.opts['tip'])
