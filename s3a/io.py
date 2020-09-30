@@ -392,12 +392,16 @@ class FRComponentIO:
   @classmethod
   def convert(cls, fromData: FilePathOrDf, toFile: FilePath, doExport=True, importArgs: dict=None,
               exportArgs: dict=None):
+    if importArgs is None:
+      importArgs = {}
+    if exportArgs is None:
+      exportArgs = {}
     if not isinstance(fromData, df):
       fromData = cls.buildByFileType(fromData, **importArgs)
-    toFn = cls._ioFnFromFileType(toFile, 'export')
+    exportFn = cls._ioFnFromFileType(toFile, 'export')
     if not doExport:
       toFile = None
-    return toFn(toFile, fromData, **exportArgs)
+    return exportFn(fromData, toFile, **exportArgs)
 
   @classmethod
   def buildFromCsv(cls, inFileOrDf: FilePathOrDf, imShape: Tuple=None,
