@@ -109,13 +109,14 @@ class FRProcessStage(ABC):
     Helper function to update current inputs from previous ones while ignoring leading
     underscores.
     """
-    selfFmtToUnfmt = {k.lstrip('_'): k for k in self.input.keysFromPrevIO}
+    selfFmtToUnfmt = {k.lstrip('_'): k for k in self.input}
+    requiredKeyFmt = {k: v for k, v in selfFmtToUnfmt.items() if v in self.input.keysFromPrevIO}
     prevIoKeyToFmt = {k.lstrip('_'): k for k in prevIo}
     missingKeys = []
     for fmtK, trueK in selfFmtToUnfmt.items():
       if fmtK in prevIoKeyToFmt:
         self.input[trueK] = prevIo[prevIoKeyToFmt[fmtK]]
-      else:
+      elif fmtK in requiredKeyFmt:
         missingKeys.append(fmtK)
     if len(missingKeys) > 0:
       raise FRAlgProcessorError(f'Missing Following keys from {self}: {missingKeys}')
