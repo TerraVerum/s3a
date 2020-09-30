@@ -83,15 +83,6 @@ class FRParamEditor(FRParamEditorBase):
     if registerCls is not None:
       self.registerGroup(registerParam)(registerCls)
 
-  def setAllExpanded(self, expandedVal=True):
-    try:
-      topTreeItem: ParameterItem = next(iter(self.params.items))
-    except StopIteration:
-      return
-    for ii in range(topTreeItem.childCount()):
-      topTreeItem.child(ii).setExpanded(expandedVal)
-    self.tree.resizeColumnToContents(0)
-
   def show(self):
     self.tree.resizeColumnToContents(0)
     # Necessary on MacOS

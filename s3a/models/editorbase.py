@@ -222,6 +222,9 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
 
   def saveCurStateAsDefault(self):
     self.saveParamState('Default', allowOverwriteDefault=True)
+    self.setParamTooltips()
+
+  def setParamTooltips(self, expandNameCol=True):
     iterator = QtWidgets.QTreeWidgetItemIterator(self.tree)
     item: QtWidgets.QTreeWidgetItem = iterator.value()
     while item is not None:
@@ -236,6 +239,17 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
         item.setToolTip(0, item.param.opts['tip'])
       iterator += 1
       item = iterator.value()
+    if expandNameCol:
+      self.setAllExpanded(True)
+
+  def setAllExpanded(self, expandedVal=True):
+    try:
+      topTreeItem: ParameterItem = next(iter(self.params.items))
+    except StopIteration:
+      return
+    for ii in range(topTreeItem.childCount()):
+      topTreeItem.child(ii).setExpanded(expandedVal)
+    self.tree.resizeColumnToContents(0)
 
   def paramDictWithOpts(self, addList: List[str]=None, addTo: List[type(Parameter)]=None,
                         removeList: List[str]=None, paramDict: Dict[str, Any]=None):
