@@ -10,6 +10,7 @@ from skimage import morphology as morph
 from skimage.segmentation import quickshift
 
 from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices
+from s3a.processing import FRGeneralProcess
 from s3a.processing.processing import FRProcessIO, FRImageProcess
 from s3a.structures import BlackWhiteImg, FRVertices, FRComplexVertices, NChanImg,\
   GrayImg, RgbImg, FRAlgProcessorError
@@ -181,11 +182,6 @@ def return_to_full_size(image: NChanImg, origCompMask: BlackWhiteImg,
 def fill_holes(image: NChanImg):
   return FRProcessIO(image=binary_fill_holes(image))
 
-def cvt_to_uint(image: NChanImg):
-  if image.ndim > 2:
-    image = image.asGrayScale()
-  return FRProcessIO(image = image.astype('uint8'), summaryInfo=None)
-
 def disallow_paint_tool(_image: NChanImg, fgVerts: FRVertices, bgVerts: FRVertices):
   if len(np.vstack([fgVerts, bgVerts])) < 2:
     raise FRAlgProcessorError('This algorithm requires an enclosed area to work.'
@@ -194,7 +190,6 @@ def disallow_paint_tool(_image: NChanImg, fgVerts: FRVertices, bgVerts: FRVertic
 
 def openClose():
   proc = FRImageProcess('Open -> Close')
-  proc.addFunction(cvt_to_uint)
   def perform_op(image: NChanImg, radius=1, shape='rectangle'):
     """
     :param radius: Radius of the structuring element. Note that the total side length
@@ -207,6 +202,9 @@ def openClose():
         - disk
         - diamond
     """
+    if image.ndim > 2:
+      image = image.mean(2)
+    image = image.astype('uint8')
     ksize = [radius]
     if shape == 'rectangle':
       ksize = [ksize[0]*2+1]*2
@@ -340,15 +338,26 @@ def k_means(image: NChanImg, kVal=5, attempts=10):
   return FRProcessIO(image=lbls, imgMeans=imgMeans, summaryInfo={'image': imgMeans[lbls]})
 
 def binarize_kmeans(image: NChanImg, fgVerts: FRVertices, imgMeans: np.ndarray,
-                    removeBoundaryLbls=True,
-                    discardLargesetLbl=False):
-  if removeBoundaryLbls == discardLargesetLbl:
-    raise FRAlgProcessorError('Exactly one of *removeBoundaryLbls* or'
-                              ' *discardLargesetLbl* must be *True*.')
+                    decisionMetric='Remove Boundary Labels'):
+  """
+
+  :param image:
+  :param fgVerts:
+  :param imgMeans:
+  :param decisionMetric:
+    helpText: "How to binarize the result of a k-means process. If `Remove Boundary Labels`,
+      the binary foreground is whatever *didn't* intersect the ROI vertices for a polygon
+      and whatever *did* intersect for a point. If `Discard Largest Label`, the largest
+      label by area is removed."
+    pType: list
+    limits:
+      - Discard Largest Label
+      - Remove Boundary Labels
+  """
   # Binarize by turning all boundary labels into background and keeping forground
   out = np.zeros(image.shape, bool)
   numLbls = imgMeans.shape[0]
-  if removeBoundaryLbls:
+  if decisionMetric == 'Remove Boundary Labels':
     discardLbls = np.unique(image[fgVerts.rows, fgVerts.cols])\
     # For a single point vertex, invert this rule
     if fgVerts.shape[0] == 1:
