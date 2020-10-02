@@ -3,6 +3,7 @@ from warnings import warn
 
 import numpy as np
 import pandas as pd
+import cv2 as cv
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 
@@ -276,9 +277,13 @@ class FRComponentMgr(FRCompTableModel):
     splitComps = self.compDf.loc[splitIds, :].copy()
     newComps_lst = []
     for _, comp in splitComps.iterrows():
-      verts = comp[RTF.VERTICES]
-      childComps = pd.concat([comp.to_frame().T]*len(verts))
-      newVerts = [FRComplexVertices([v]) for v in verts]
+      verts: FRComplexVertices = comp[RTF.VERTICES]
+      tmpMask = verts.toMask(asBool=False).astype('uint8')
+      nComps, ccompImg = cv.connectedComponents(tmpMask)
+      newVerts = []
+      for ii in range(1, nComps):
+        newVerts.append(FRComplexVertices.fromBwMask(ccompImg == ii))
+      childComps = pd.concat([comp.to_frame().T]*(nComps-1))
       childComps.loc[:, RTF.VERTICES] = newVerts
       newComps_lst.append(childComps)
     newComps = pd.concat(newComps_lst)
