@@ -113,7 +113,7 @@ class FRVerticesPlugin(FRTableFieldPlugin):
     centeredVerts = newVerts.copy()
     for vertList in centeredVerts:
       vertList -= offset
-    if self.region.verts != centeredVerts:
+    if np.any(fImg.bbox[:,0] != offset) or self.region.verts != centeredVerts:
       self.region.updateFromVertices(centeredVerts)
       yield
     else:
