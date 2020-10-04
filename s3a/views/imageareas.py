@@ -100,6 +100,15 @@ class FREditableImgBase(pg.PlotWidget):
     self.drawActGrp.callFuncByParam(self.drawAction)
     self.drawShapeGrp.callFuncByParam(self.shapeCollection.curShapeParam)
 
+  def maybeBuildRoi(self, ev: QtGui.QMouseEvent):
+    if (QtCore.Qt.LeftButton not in [ev.buttons(), ev.button()]
+        or self.drawAction == FRC.DRAW_ACT_PAN
+        or self.regionCopier.active):
+      return
+    self.shapeCollection.buildRoi(ev, self.imgItem)
+    ev.accept()
+
+
   def setMenuFromEditors(self, editors: Sequence[FRParamEditor]):
     vb: pg.ViewBox = self.getViewBox()
     menu = contextMenuFromEditorActions(editors)
@@ -126,17 +135,12 @@ class FREditableImgBase(pg.PlotWidget):
     """
 
   def mousePressEvent(self, ev: QtGui.QMouseEvent):
+    self.maybeBuildRoi(ev)
     super().mousePressEvent(ev)
-    if (ev.buttons() == QtCore.Qt.LeftButton
-        and not self.regionCopier.active
-        and self.drawAction != FRC.DRAW_ACT_PAN):
-      self.shapeCollection.buildRoi(ev, self.imgItem)
 
   def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent):
+    self.maybeBuildRoi(ev)
     super().mouseDoubleClickEvent(ev)
-    if ev.buttons() == QtCore.Qt.LeftButton \
-        and self.drawAction != FRC.DRAW_ACT_PAN:
-      self.shapeCollection.buildRoi(ev, self.imgItem)
 
   def mouseMoveEvent(self, ev: QtGui.QMouseEvent):
     """
@@ -144,8 +148,7 @@ class FREditableImgBase(pg.PlotWidget):
     unless we are panning
     """
     super().mouseMoveEvent(ev)
-    if self.drawAction != FRC.DRAW_ACT_PAN:
-      self.shapeCollection.buildRoi(ev, self.imgItem)
+    self.maybeBuildRoi(ev)
     posRelToImage = self.imgItem.mapFromScene(ev.pos())
     pxY = int(posRelToImage.y())
     pxX = int(posRelToImage.x())
@@ -156,20 +159,12 @@ class FREditableImgBase(pg.PlotWidget):
       pxColor = self.imgItem.image[pxY, pxX]
       if pxColor.ndim == 0:
         pxColor = np.array([pxColor])
-      # pos = ev.pos()
     pos = FRVertices([pxX, pxY])
     self.sigMousePosChanged.emit(pos, pxColor)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
-    """
-    Perform a processing method depending on what the current draw action is
-
-    :return: Whether the mouse release completes the current ROI
-    """
+    self.maybeBuildRoi(ev)
     super().mouseReleaseEvent(ev)
-    if (self.drawAction != FRC.DRAW_ACT_PAN
-        and ev.button() == QtCore.Qt.LeftButton and not self.regionCopier.active):
-      self.shapeCollection.buildRoi(ev, self.imgItem)
 
   def clearCurRoi(self):
     self.shapeCollection.clearAllRois()
@@ -195,7 +190,7 @@ class FRMainImage(FREditableImgBase):
     FR_SINGLETON.addDocks(cls.toolsEditor)
 
   def __init__(self, parent=None, imgSrc=None, **kargs):
-    allowedShapes = (FRC.DRAW_SHAPE_RECT, FRC.DRAW_SHAPE_POLY)
+    allowedShapes = (FRC.DRAW_SHAPE_RECT, FRC.DRAW_SHAPE_POLY, FRC.DRAW_SHAPE_ELLIPSE)
     allowedActions = (FRC.DRAW_ACT_SELECT,FRC.DRAW_ACT_ADD)
     super().__init__(parent, drawShapes=allowedShapes,
                      drawActions=allowedActions, **kargs)
@@ -249,7 +244,7 @@ class FRMainImage(FREditableImgBase):
 
 
   def handleShapeFinished(self, roiVerts: FRVertices) -> Optional[np.ndarray]:
-    if self.regionCopier.active: return
+    if self.regionCopier.active or self.shapeCollection.locked: return
     if self.drawAction in [FRC.DRAW_ACT_SELECT] and roiVerts.connected:
       # Selection
       self.sigSelectionBoundsMade.emit(roiVerts)
@@ -281,11 +276,14 @@ class FRMainImage(FREditableImgBase):
       # Simulate a click-wide boundary selection so points can be selected in pan mode
       squareCorners = FRVertices([[xx, yy], [xx, yy]], dtype=float)
       self.sigSelectionBoundsMade.emit(squareCorners)
+    self.shapeCollection.removeLock(self)
 
   def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent):
-    super().mouseDoubleClickEvent(ev)
     if self.regionCopier.active:
       self.regionCopier.sigCopyStopped.emit()
+      ev.accept()
+      self.shapeCollection.addLock(self)
+    super().mouseDoubleClickEvent(ev)
 
   def switchBtnMode(self, newMode: FRParam):
     super().switchBtnMode(newMode)
@@ -324,7 +322,7 @@ class FRFocusedImage(FREditableImgBase):
 
   def __init__(self, parent=None, **kargs):
     allowableShapes = (
-      FRC.DRAW_SHAPE_RECT, FRC.DRAW_SHAPE_POLY, FRC.DRAW_SHAPE_PAINT
+      FRC.DRAW_SHAPE_RECT, FRC.DRAW_SHAPE_POLY, FRC.DRAW_SHAPE_PAINT, FRC.DRAW_SHAPE_ELLIPSE
     )
     allowableActions = (
       FRC.DRAW_ACT_ADD, FRC.DRAW_ACT_REM

@@ -47,8 +47,8 @@ def mouseDragFactory(qtbot):
 def test_simple_click():
   # For now just make sure no errors occur when dragging one vertex, since
   # this is a legal and expected op for every one
+  editableImg.shapeCollection.forceUnlock()
   pt = (0,0)
-  clctn.forceBlockRois = False
   editableImg.drawAction = FR_CONSTS.DRAW_ACT_SELECT
   for curShape in shapes:
     clctn.curShapeParam = curShape
@@ -59,7 +59,6 @@ def test_drag_pt(mouseDragFactory):
   editableImg.drawAction = FR_CONSTS.DRAW_ACT_SELECT
   for curShape in shapes:
     clctn.curShapeParam = curShape
-    clctn.forceBlockRois = False
     mouseDragFactory(editableImg, QtCore.QPoint(10,10), QtCore.QPoint(100,100))
     # Shapes need real mouse events to properly form, so all this can really do is
     # ensure nothing breaks

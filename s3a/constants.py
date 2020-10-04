@@ -233,6 +233,9 @@ class _FRConsts(FRParamGroup):
   DRAW_SHAPE_POLY : FRParam = newParam(
     'Activate "Polygon" draw shape', 'Ctrl+Alt+D,Y', 'registeredaction',
     icon=str(ICON_DIR/'polygon.svg'))
+  DRAW_SHAPE_ELLIPSE : FRParam = newParam(
+    'Activate "Ellipse" draw shape', 'Ctrl+Alt+D,E', 'registeredaction',
+    icon=str(ICON_DIR/'ellipse.svg'))
   DRAW_SHAPE_FREE : FRParam = newParam('Activate "Freehand" draw shape')
   DRAW_SHAPE_PAINT: FRParam = newParam(
     'Activate "Paint" draw shape', 'Ctrl+Alt+D,T', icon=str(ICON_DIR/'paint.svg'))

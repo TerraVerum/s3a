@@ -1,9 +1,11 @@
-from typing import Optional, Callable, Dict
+from typing import Optional, Callable, Dict, Union, Type
 
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
+import cv2 as cv
 
+from s3a import FRComplexVertices
 from s3a.constants import FR_CONSTS
 from s3a.structures import FRParam
 from s3a.structures import FRVertices
@@ -23,6 +25,7 @@ class FRROIExtension:
   the annotator regions
   """
   connected = True
+  shadowPen: Optional[QtGui.QPen] = pg.mkBrush(0, 0, 0, 100, width=2)
 
   def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: FRVertices) -> (bool, Optional[FRVertices]):
     """
@@ -47,14 +50,14 @@ class FRROIExtension:
       #  even though PolyLine should be able  to handle remove by index, it can't
       self.removeHandle(self.handles[0]['item'])
 
-class FRExtendedROI(pg.ROI, FRROIExtension):
+class FRExtendedROI(FRROIExtension, pg.ROI):
   """
   Purely for specifying the interface provided by the following classes. This is mainly
   so PyCharm knows what methds and signatures are provided by the ROIs below.
   """
 
 
-class FRRectROI(pg.RectROI, FRROIExtension):
+class FRRectROI(FRROIExtension, pg.RectROI):
   connected = True
 
   def __init__(self):
@@ -114,7 +117,71 @@ class FRRectROI(pg.RectROI, FRROIExtension):
     verts = FRVertices(verts_np, connected=self.connected, dtype=float)
     return verts
 
-class FRPolygonROI(pg.PolyLineROI, FRROIExtension):
+class FREllipseROI(FRROIExtension, pg.EllipseROI):
+  connected = True
+  constructingROI = False
+
+  def __init__(self, *args, **kwargs):
+    super().__init__([0,0], [1,1], invertible=True, **kwargs)
+
+  def paint(self, p, opt, widget):
+    try:
+      super().paint(p, opt, widget)
+    except ZeroDivisionError:
+      return
+
+  @property
+  def vertices(self):
+    br = self.boundingRect()
+    if not br:
+      # point selection intsead of full shape
+      return FRVertices([[*self.pos()]])
+    w_h = np.array([br.height(), br.width()])
+    mask = self.renderShapeMask(*(w_h+2)) > 0
+    offsetVerts = FRComplexVertices.fromBwMask(mask).stack() + [*self.pos()]
+    # If shape is inverted, must be offset even more to put verts in the right place
+    invertedOffset = np.clip(np.array([br.x(), br.y()]), -np.inf, 0)
+    return (offsetVerts + invertedOffset).astype(int)
+
+
+  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: FRVertices) -> (
+      bool, Optional[FRVertices]):
+    """
+    See function signature for :func:`FRExtendedROI.updateShape`
+    """
+    success = True
+    verts = None
+    constructingRoi = False
+    # If not left click, do nothing
+    if (int(ev.buttons()) & QtCore.Qt.LeftButton) == 0 \
+        and ev.button() != QtCore.Qt.LeftButton:
+      return constructingRoi, verts
+
+    evType = ev.type()
+    if evType == QtCore.QEvent.MouseButtonPress:
+      # Need to start a new shape
+      self.setPos(xyEvCoords.asPoint())
+      self.setSize(0)
+      self.addScaleHandle([1, 1], [0, 0])
+      constructingRoi = True
+    elif evType == QtCore.QEvent.MouseMove:
+      # ROI handle will change the shape as needed, no action required
+      constructingRoi = True
+    elif evType == QtCore.QEvent.MouseButtonRelease:
+      # Done drawing the ROI, complete shape, get vertices
+      verts = self.vertices
+      constructingRoi = False
+    else:
+      success = False
+      # Unable to process this event
+
+    if success:
+      ev.accept()
+
+    return constructingRoi, verts
+
+
+class FRPolygonROI(FRROIExtension, pg.PolyLineROI):
   connected = True
   constructingRoi = False
 
@@ -229,7 +296,43 @@ SHAPE_ROI_MAPPING: Dict[FRParam, Callable[[], FRExtendedROI]] = {
   FR_CONSTS.DRAW_SHAPE_PAINT: FRPaintFillROI,
   FR_CONSTS.DRAW_SHAPE_RECT: FRRectROI,
   FR_CONSTS.DRAW_SHAPE_POLY: FRPolygonROI,
+  FR_CONSTS.DRAW_SHAPE_ELLIPSE: FREllipseROI,
 }
+
+def addShadowToPaint(roi: Type[FRExtendedROI]):
+  oldPaint = roi.paint
+  def newPaint(self: FRExtendedROI, p, opt, widget):
+    if self.shadowPen not in [None, QtCore.Qt.NoPen]:
+      prevPen = self.pen
+      p.setBrush(self.shadowPen)
+    oldPaint(self, p, opt, widget)
+      # self.setPen(prevPen)
+    # oldPaint(self, p, opt, widget)
+
+  oldBoundingRect = roi.boundingRect
+  def newBR(self: FRExtendedROI):
+    br = oldBoundingRect(self)
+    # Logic adapted for invertible shapes and resizable handles from
+    # https://groups.google.com/g/pyqtgraph/c/tWtjJOQF5x4/m/CnQF6IgmDAAJ
+    penAdjust = self.pen.width()*0.5
+    handleAdjust = self.handleSize
+    whAdjust = np.tile(penAdjust+handleAdjust, 2)
+    xyAdjust = whAdjust.copy()
+
+    x_y = np.array([br.x(), br.y()])
+    w_h = np.array([br.width(), br.height()])
+
+    # Account for 'backwards' shape
+    inversion = np.sign(x_y)
+    xyAdjust *= inversion
+
+    newBr = QtCore.QRectF(*(x_y + xyAdjust), *(w_h + whAdjust))
+    return newBr
+  # roi.boundingRect = newBR
+  roi.paint = newPaint
+
+for shape in SHAPE_ROI_MAPPING.values():
+  addShadowToPaint(shape)
 
 # Adapted from https://groups.google.com/forum/#!msg/pyqtgraph/tWtjJOQF5x4/CnQF6IgmDAAJ
 # def boundingRect(_roi: pg.ROI):

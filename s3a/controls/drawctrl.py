@@ -15,11 +15,6 @@ class FRRoiCollection(QtCore.QObject):
   # Signal(FRExtendedROI)
   sigShapeFinished = QtCore.Signal(object)
 
-  @classmethod
-  def __initEditorParams__(cls):
-    cls.roiClr, cls.roiLineWidth = FR_SINGLETON.colorScheme.registerProps(cls,
-                   [FR_CONSTS.SCHEME_ROI_LINE_CLR, FR_CONSTS.SCHEME_ROI_LINE_WIDTH])
-
   def __init__(self, allowableShapes: Collection[FRParam]=(), parent: pg.GraphicsView=None):
     super().__init__(parent)
     if allowableShapes is None:
@@ -27,9 +22,10 @@ class FRRoiCollection(QtCore.QObject):
     self.shapeVerts = FRVertices()
     # Make a new graphics item for each roi type
     self.roiForShape: Dict[FRParam, Union[pg.ROI, FRExtendedROI]] = {}
-    self.forceBlockRois = True
-
     self._curShape = allowableShapes[0] if len(allowableShapes) > 0 else None
+
+    self._locks = set()
+    self.addLock(self)
     self._parent = parent
 
     for shape in allowableShapes:
@@ -38,9 +34,6 @@ class FRRoiCollection(QtCore.QObject):
       self.roiForShape[shape] = newRoi
       newRoi.hide()
     self.addRoisToView(parent)
-
-    graphicsParam = FR_SINGLETON.colorScheme[None, FR_CONSTS.CLS_ROI_CLCTN, True]
-    graphicsParam.sigStateChanged.connect(lambda: self.clearAllRois())
 
   def addRoisToView(self, view: pg.GraphicsView):
     self._parent = view
@@ -53,10 +46,30 @@ class FRRoiCollection(QtCore.QObject):
     for roi in self.roiForShape.values(): # type: FRExtendedROI
       roi.clear()
       roi.hide()
-      roi.pen.setColor(self.roiClr)
-      roi.pen.setWidth(self.roiLineWidth)
-      self.forceBlockRois = True
+      self.addLock(self)
 
+  def addLock(self, lock):
+    """
+    Allows this shape collection to be `locked`, preventing shapes from being drawn.
+    Multiple locks can be applied; ROIs can only be drawn when all locks are removed.
+
+    :param lock: Anything used as a lock. This will have to be manually removed later
+      using `FRRoiCollection.removeLock`
+    """
+    self._locks.add(lock)
+
+  def removeLock(self, lock):
+    try:
+      self._locks.remove(lock)
+    except KeyError:
+      pass
+
+  def forceUnlock(self):
+    self._locks.clear()
+
+  @property
+  def locked(self):
+    return len(self._locks) > 0
 
   def buildRoi(self, ev: QtGui.QMouseEvent, imgItem: pg.ImageItem=None):
     """
@@ -71,8 +84,8 @@ class FRRoiCollection(QtCore.QObject):
     if ((imgItem is None or imgItem.image is not None)
         and ev.type() == ev.MouseButtonPress
         and ev.button() == QtCore.Qt.LeftButton):
-      self.forceBlockRois = False
-    if self.forceBlockRois: return
+      self.removeLock(self)
+    if self.locked: return
     if imgItem is not None:
       posRelToImg = imgItem.mapFromScene(ev.pos())
     else:
@@ -80,8 +93,8 @@ class FRRoiCollection(QtCore.QObject):
     # Form of rate-limiting -- only simulate click if the next pixel is at least one away
     # from the previous pixel location
     xyCoord = FRVertices([[posRelToImg.x(), posRelToImg.y()]], dtype=float)
-    curRoi = self.roiForShape[self.curShapeParam]
-    constructingRoi, self.shapeVerts = curRoi.updateShape(ev, xyCoord)
+    curRoi = self.curShape
+    constructingRoi, self.shapeVerts = self.curShape.updateShape(ev, xyCoord)
     if self.shapeVerts is not None:
       self.sigShapeFinished.emit(self.shapeVerts)
 
