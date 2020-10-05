@@ -144,68 +144,26 @@ class _FRConsts(FRParamGroup):
   # --------------------------
   # IMAGE TOOLS
   # --------------------------
-  TOOL_MERGE_COMPS        : FRParam = newParam(
-    'Merge Selected', 'Ctrl+Alt+G', pType='action',
-    helpText='Merges the selected components into one, keeping all properties '
-             'of the first in the selection')
-  TOOL_SPLIT_COMPS        : FRParam = newParam(
-    'Split Selected', 'Ctrl+Alt+S', pType='action',
-    helpText='Makes a separate component for each distinct boundary of all selected components.')
-  TOOL_OVERRIDE_VERTS_ACT : FRParam = newParam(
-    'Override Created Boundary', 'Ctrl+Alt+O', pType='action',
-    helpText='Overrides the most recently created bounary to be the shape of the ROI, not the result of the image processor')
-  TOOL_COPY_REGIONS       : FRParam = newParam(
-    'Copy Selected', 'Ctrl+Alt+C', pType='action',
-    helpText='Copies the selected components. They can be pasted by <b>double-clicking</b>'
-             ' on the destination location. When done copying, Click the'
-             ' *Clear ROI* tool change the current draw action.')
-  TOOL_MOVE_REGIONS       : FRParam = newParam(
-    'Move Selected', 'Ctrl+Alt+V', pType='action',
-    helpText='Moves the selected components. They can be pasted by <b>double-clicking</b>'
-             ' on the destination location.')
-  TOOL_CLEAR_FOC_REGION   : FRParam = newParam(
-    'Clear', 'Ctrl+Shift+C', 'action',
-    helpText='Clear the focused image')
-  TOOL_RESET_FOC_REGION   : FRParam = newParam(
-    'Reset', 'Ctrl+Shift+R', 'action',
-    helpText='Reset the focused image by restoring the region mask to the last saved state')
-  TOOL_FILL_FOC_REGION    : FRParam = newParam(
-    'Fill', 'Ctrl+Shift+F', 'action',
-    helpText='Completely fill the focused region mask')
-  TOOL_ACCEPT_FOC_REGION  : FRParam = newParam(
-    'Accept', 'Ctrl+Shift+A', 'action',
-    helpText='Applies the focused image vertices to the corresponding component in the table')
-  TOOL_CLEAR_ROI          : FRParam = newParam(
-    'Clear ROI', 'Esc', 'registeredaction', helpText='Clears the current ROI', guibtn=False)
-  TOOL_CLEAR_HISTORY      : FRParam = newParam(
-    'Clear Processor History', 'Ctrl+Alt+C,H', 'registeredaction',
-    helpText='Each time an update is made in the processor, it is saved so algorithms'
-             ' can take past edits into account when performing their operations. Clearing'
-             ' that history will erase algorithm knowledge of past edits.', guibtn=False)
+  TOOL_MERGE_COMPS        : FRParam = newParam('Merge Selected', 'Ctrl+Alt+G')
+  TOOL_SPLIT_COMPS        : FRParam = newParam('Split Selected', 'Ctrl+Alt+S')
+  TOOL_COPY_REGIONS       : FRParam = newParam('Copy Selected', 'Ctrl+Alt+C')
+  TOOL_MOVE_REGIONS       : FRParam = newParam('Move Selected', 'Ctrl+Alt+V')
+  TOOL_CLEAR_FOC_REGION   : FRParam = newParam('Clear', 'Ctrl+Shift+C')
+  TOOL_RESET_FOC_REGION   : FRParam = newParam('Reset', 'Ctrl+Shift+R')
+  TOOL_FILL_FOC_REGION    : FRParam = newParam('Fill', 'Ctrl+Shift+F')
+  TOOL_ACCEPT_FOC_REGION  : FRParam = newParam('Accept', 'Ctrl+Shift+A')
+  TOOL_CLEAR_ROI          : FRParam = newParam('Clear ROI', 'Esc', guibtn=False)
+  TOOL_CLEAR_HISTORY      : FRParam = newParam('Clear Processor History', 'Ctrl+Alt+C,H', guibtn=False)
 
   # --------------------------
   # WINDOW TOOLS
   # --------------------------
-  TOOL_ESTIMATE_BOUNDARIES   : FRParam = newParam(
-    'Estimate Boundaries', 'Ctrl+Alt+Shift+E', 'registeredaction',
-    helpText='Estimates component boundaries for the whole image. This is functionally'
-             ' equivalent to using a square ROI over the whole image while selecting'
-             ' *New component for each separate boundary*=True', guibtn=False)
-  TOOL_CLEAR_BOUNDARIES      : FRParam = newParam(
-    'Clear Boundaries', 'Ctrl+Alt+Shift+C', 'registeredaction',
-    helpText='Removes all components from the component table', guibtn=False)
-  TOOL_EXPORT_COMP_LIST      : FRParam = newParam(
-    'Export Table', 'Ctrl+S', 'registeredaction',
-    helpText='Saves the component table to a file')
-  TOOL_TBL_SET_SAME_AS_FIRST : FRParam = newParam(
-    'Set Cells as First', 'Ctrl+D', 'registeredaction',
-    helpText='Sets all cells in the selection to be the same as the first row in the selection.'
-             ' See the project wiki for a detailed description')
-  TOOL_TBL_SET_AS            : FRParam = newParam(
-    'Set Cells As...', 'Ctrl+Shift+D', 'registeredaction',
-    helpText='Sets all cells in the selection to the values specified in the popup table.'
-             ' See the project wiki for a detailed description')
-  TOOL_TBL_DEL_ROWS          : FRParam = newParam('Delete Table Rows', 'Del', 'registeredaction')
+  TOOL_ESTIMATE_BOUNDARIES   : FRParam = newParam('Estimate Boundaries', 'Ctrl+Alt+Shift+E', guibtn=False)
+  TOOL_CLEAR_BOUNDARIES      : FRParam = newParam('Clear Boundaries', 'Ctrl+Alt+Shift+C', guibtn=False)
+  TOOL_EXPORT_COMP_LIST      : FRParam = newParam('Export Table', 'Ctrl+S')
+  TOOL_TBL_SET_SAME_AS_FIRST : FRParam = newParam('Set Cells as First', 'Ctrl+D')
+  TOOL_TBL_SET_AS            : FRParam = newParam('Set Cells As...', 'Ctrl+Shift+D')
+  TOOL_TBL_DEL_ROWS          : FRParam = newParam('Delete Table Rows', 'Del')
 
   # --------------------------
   # COMPONENT EXPORT PARAMETERS

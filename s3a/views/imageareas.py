@@ -9,7 +9,7 @@ from skimage.io import imread
 
 from s3a import FR_SINGLETON
 from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS as FRC
-from s3a.generalutils import getClippedBbox
+from s3a.generalutils import getClippedBbox, dynamicDocstring
 from s3a.structures import FRParam, FRVertices, FRComplexVertices, FilePath
 from s3a.structures import NChanImg
 from .buttons import FRDrawOpts, FRButtonCollection
@@ -43,20 +43,16 @@ class FREditableImgBase(pg.PlotWidget):
       cls, FRC.PROP_SHOW_GUI_TOOL_BTNS, asProperty=False
     )
 
-    (cls.clearRoiAct, ) = cls.toolsEditor.registerProps(
-      cls, [FRC.TOOL_CLEAR_ROI], asProperty=False, ownerObj=cls
-    )
-
   def __init__(self, parent=None, drawShapes: Collection[FRParam]=(),
                drawActions: Collection[FRParam]=(),**kargs):
     super().__init__(parent, viewBox=FRRightPanViewBox(), **kargs)
     self.menu: QtWidgets.QMenu = self.getViewBox().menu
-    self.setMenuFromEditors([self.toolsEditor])
     # Disable default menus
     self.plotItem.ctrlMenu = None
     self.sceneObj.contextMenu = None
 
-    self.clearRoiAct.sigActivated.connect(lambda: self.clearCurRoi())
+    self.toolsEditor.registerFunc(self.clearCurRoi, btnOpts=FRC.TOOL_CLEAR_ROI)
+    self.setMenuFromEditors([self.toolsEditor])
     self.setAspectLocked(True)
     self.getViewBox().invertY()
     self.setMouseEnabled(True)
@@ -112,9 +108,6 @@ class FREditableImgBase(pg.PlotWidget):
   def setMenuFromEditors(self, editors: Sequence[FRParamEditor]):
     vb: pg.ViewBox = self.getViewBox()
     menu = contextMenuFromEditorActions(editors)
-    autoRangeAct = QtWidgets.QAction('Auto Range')
-    autoRangeAct.triggered.connect(lambda: vb.autoRange())
-    menu.insertAction(None, autoRangeAct)
     vb.menu = menu
     self.menu = menu
 
@@ -167,6 +160,7 @@ class FREditableImgBase(pg.PlotWidget):
     super().mouseReleaseEvent(ev)
 
   def clearCurRoi(self):
+    """Clears the current ROI shape"""
     self.shapeCollection.clearAllRois()
 
 @FR_SINGLETON.registerGroup(FRC.CLS_MAIN_IMG_AREA)
@@ -178,10 +172,6 @@ class FRMainImage(FREditableImgBase):
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
-    (cls.mergeCompsAct, cls.splitCompsAct, cls.moveCompsAct, cls.copyCompsAct,
-     ) = cls.toolsEditor.registerProps(
-      cls, [FRC.TOOL_MERGE_COMPS, FRC.TOOL_SPLIT_COMPS,
-            FRC.TOOL_MOVE_REGIONS, FRC.TOOL_COPY_REGIONS], asProperty=False)
     (cls.minCompSize, cls.onlyGrowViewbox) = FR_SINGLETON.generalProps.registerProps(
       cls, [FRC.PROP_MIN_COMP_SZ, FRC.PROP_ONLY_GROW_MAIN_VB])
     (cls.gridClr, cls.gridWidth, cls.showGrid) = FR_SINGLETON.colorScheme.registerProps(
@@ -211,17 +201,33 @@ class FRMainImage(FREditableImgBase):
     self.lastProcVerts: Optional[FRVertices] = None
     copier = self.regionCopier
     def startCopy():
+      """
+      Copies the selected components. They can be pasted by <b>double-clicking</b>
+      on the destination location. When done copying, Click the *Clear ROI* tool change
+      the current draw action.
+      """
       copier.inCopyMode = True
       copier.sigCopyStarted.emit()
-    self.copyCompsAct.sigActivated.connect(startCopy)
+    self.registerToolFunc(startCopy, btnOpts=FRC.TOOL_COPY_REGIONS)
 
     def startMove():
+      """
+      Moves the selected components. They can be pasted by <b>double-clicking</b>
+      on the destination location.
+      """
       copier.inCopyMode = False
       copier.sigCopyStarted.emit()
-    self.moveCompsAct.sigActivated.connect(startMove)
+    self.registerToolFunc(startMove, btnOpts=FRC.TOOL_MOVE_REGIONS)
 
     self.switchBtnMode(FRC.DRAW_ACT_ADD)
 
+  def registerToolFunc(self, *args, **kwargs):
+    """See function signature for `FRParamEditor.registerFunc`"""
+    origOpts = kwargs.get('btnOpts')
+    proc = self.toolsEditor.registerFunc(*args, **kwargs)
+    self.toolsGrp.create_addBtn(origOpts,
+                                triggerFn=lambda *_args, **_kwargs: proc.run(),
+                                checkable=False, ownerObj=self)
   def _initGrid(self):
     pi: pg.PlotItem = self.plotItem
     pi.showGrid(alpha=1.0)
@@ -305,20 +311,15 @@ class FRMainImage(FREditableImgBase):
     else:
       self.imgItem.setImage(imgSrc)
 
+  @dynamicDocstring(superDoc=FREditableImgBase.clearCurRoi.__doc__)
   def clearCurRoi(self):
+    """{superDoc}"""
     super().clearCurRoi()
     self.regionCopier.erase()
 
 @FR_SINGLETON.registerGroup(FRC.CLS_FOCUSED_IMG_AREA)
 class FRFocusedImage(FREditableImgBase):
   sigPluginChanged = Signal()
-
-  @classmethod
-  def __initEditorParams__(cls):
-    super().__initEditorParams__()
-    (cls.acceptRegionAct, ) = cls.toolsEditor.registerProps(
-      cls, [FRC.TOOL_ACCEPT_FOC_REGION], asProperty=False, ownerObj=cls
-    )
 
   def __init__(self, parent=None, **kargs):
     allowableShapes = (

@@ -123,9 +123,6 @@ class FRCompTableView(QtWidgets.QTableView):
   def __initEditorParams__(cls):
     cls.showOnCreate = FR_SINGLETON.generalProps.registerProp(cls, FR_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE)
     cls.toolsEditor = FRParamEditor.buildClsToolsEditor(cls, name='Component Table Tools')
-    (cls.setCellsAsAct, cls.setSameAsFirstAct, cls.removeRowsAct) = cls.toolsEditor.registerProps(
-      cls,[FR_CONSTS.TOOL_TBL_SET_AS, FR_CONSTS.TOOL_TBL_SET_SAME_AS_FIRST,
-           FR_CONSTS.TOOL_TBL_DEL_ROWS], asProperty=False, ownerObj=cls)
     nameFilters = []
     for field in FR_SINGLETON.tableData.allFields:
       show = not field.opts.get('colHidden', False)
@@ -156,13 +153,14 @@ class FRCompTableView(QtWidgets.QTableView):
     if not minimal:
       self.popup = FRPopupTableDialog(*args)
       # Create context menu for changing table rows
-      self.menu = self.createContextMenu()
       self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
       cursor = QtGui.QCursor()
+      for func, param in zip(
+          [lambda: self.setSelectedCellsAs_gui(), self.removeSelectedRows_gui, self.setSelectedCellsAsFirst],
+          [FR_CONSTS.TOOL_TBL_SET_AS, FR_CONSTS.TOOL_TBL_DEL_ROWS, FR_CONSTS.TOOL_TBL_SET_SAME_AS_FIRST]):
+        self.toolsEditor.registerFunc(func, btnOpts=param)
+      self.menu = self.createContextMenu()
       self.customContextMenuRequested.connect(lambda: self.menu.exec_(cursor.pos()))
-      self.setCellsAsAct.sigActivated.connect(lambda: self.setSelectedCellsAs_gui())
-      self.setSameAsFirstAct.sigActivated.connect(lambda: self.setSelectedCellsAsFirst())
-      self.removeRowsAct.sigActivated.connect(lambda: self.removeSelectedRows_gui())
       for ii, child in enumerate(self.colsVisibleProps):
         child.sigValueChanged.connect(lambda param, value, idx=ii: self.setColumnHidden(idx, not value))
         # Trigger initial hide/show
@@ -266,11 +264,19 @@ class FRCompTableView(QtWidgets.QTableView):
     return retLists
 
   def setSelectedCellsAsFirst(self):
+    """
+    Sets all cells in the selection to be the same as the first row in the selection.
+    See the project wiki for a detailed description
+    """
     selection = self.ids_rows_colsFromSelection()
     overwriteData = self.mgr.compDf.loc[selection[0,0]]
     self.setSelectedCellsAs(selection, overwriteData)
 
   def setSelectedCellsAs_gui(self, selectionIdxs: TwoDArr=None):
+    """
+    Sets all cells in the selection to the values specified in the popup table. See
+    the project wiki for a detailed description
+    """
     if selectionIdxs is None:
       selectionIdxs = self.ids_rows_colsFromSelection()
     overwriteData = self.mgr.compDf.loc[[selectionIdxs[0,0]],:].copy()

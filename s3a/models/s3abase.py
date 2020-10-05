@@ -41,7 +41,8 @@ class S3ABase(QtWidgets.QMainWindow):
     super().__init__(parent)
     self.mainImg = FRMainImage()
     self.focusedImg = FRFocusedImage()
-    self.focusedImg.acceptRegionAct.sigActivated.connect(lambda: self.acceptFocusedRegion())
+    self.focusedImg.toolsEditor.registerFunc(self.acceptFocusedRegion,
+                                             btnOpts=FR_CONSTS.TOOL_ACCEPT_FOC_REGION)
 
     self.compMgr = FRComponentMgr()
     # Register exporter to allow user parameters
@@ -217,6 +218,7 @@ class S3ABase(QtWidgets.QMainWindow):
 
   @FR_SINGLETON.actionStack.undoable('Accept Focused Region')
   def acceptFocusedRegion(self):
+    """Applies the focused image vertices to the corresponding component in the table"""
     # If the component was deleted
     mgr = self.compMgr
     focusedId = self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]
@@ -237,6 +239,7 @@ class S3ABase(QtWidgets.QMainWindow):
     mgr.addComps(oldSer.to_frame().T, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
 
   def clearBoundaries(self):
+    """Removes all components from the component table"""
     self.compMgr.rmComps()
 
   @FR_SINGLETON.actionStack.undoable('Change Main Image')

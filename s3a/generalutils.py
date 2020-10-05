@@ -325,3 +325,19 @@ def dynamicDocstring(**kwargs):
     obj.__doc__ = obj.__doc__.format(**kwargs)
     return obj
   return wrapper
+
+def frParamToPgParamDict(param: FRParam):
+  """
+  Simple conversion function from FRParams used internally to the dictionary form expected
+  by pyqtgraph parameters
+  """
+  paramOpts = dict(name=param.name, type=param.pType,
+                   **param.opts)
+  if len(param.helpText) > 0:
+    paramOpts['tip'] = param.helpText
+  if param.pType == 'group' and param.value is not None:
+    paramOpts.update(children=param.value)
+  else:
+    paramOpts.update(value=param.value)
+  paramOpts.update(frParam=param)
+  return paramOpts

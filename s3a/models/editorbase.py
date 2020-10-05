@@ -10,7 +10,7 @@ from enum import Flag, auto
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter, ParameterTree, ParameterItem
 
-from s3a.generalutils import frPascalCaseToTitle
+from s3a.generalutils import frPascalCaseToTitle, frParamToPgParamDict
 from s3a.graphicsutils import saveToFile, attemptFileLoad
 from s3a.processing import FRAtomicProcess, FRProcessIO, FRGeneralProcWrapper
 from s3a.processing.guiwrapper import docParser
@@ -33,6 +33,23 @@ def clearUnwantedParamVals(paramState: dict):
     clearUnwantedParamVals(child)
   if paramState.get('value', True) is None:
     paramState.pop('value')
+
+def _mkRunBtn(proc: FRAtomicProcess, btnOpts: Union[FRParam, dict]):
+  defaultBtnOpts = dict(name=proc.name, type='registeredaction')
+  if isinstance(btnOpts, FRParam):
+    # Replace falsy helptext with func signature
+    if not btnOpts.helpText:
+      btnOpts.helpText = docParser(proc.func.__doc__)['top-descr']
+    btnOpts = frParamToPgParamDict(btnOpts)
+    # Make sure param type is not overridden
+    btnOpts.pop('type', None)
+  defaultBtnOpts.update(btnOpts)
+  if len(proc.input.hyperParamKeys) > 0:
+    # In this case, a descriptive name isn't needed since the func name will be
+    # present in the parameter group
+    defaultBtnOpts['name'] = 'Run'
+  runBtn = Parameter.create(**defaultBtnOpts)
+  return runBtn
 
 oneOrMultChildren = Union[Sequence[FRParam], FRParam]
 _childTuple_asValue = Tuple[FRParam, oneOrMultChildren]
@@ -385,13 +402,7 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     :param etxraOpts: Extra options passed directly to the created :class:`pyqtgraph.Parameter`
     :return: Property bound to this value in the parameter editor
     """
-    paramOpts = dict(name=constParam.name, type=constParam.pType, tip=constParam.helpText,
-                     **constParam.opts)
-    if constParam.pType == 'group' and constParam.value is not None:
-      paramOpts.update(children=constParam.value)
-    else:
-      paramOpts.update(value=constParam.value)
-    paramOpts.update(frParam=constParam)
+    paramOpts = frParamToPgParamDict(constParam)
     paramOpts.update(etxraOpts)
     paramForEditor = Parameter.create(**paramOpts)
 
@@ -448,7 +459,7 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
 
   def registerFunc(self, func: Callable, name:str=None, runOpts=RunOpts.BTN,
                    paramPath:Tuple[str,...]=(),
-                   funcShortcut: str=None):
+                   btnOpts: Union[FRParam, dict]=None):
     """
     Like `registerProp`, but for functions instead along with interactive parameters
     for each argument. A button is added for the user to force run this function as
@@ -465,8 +476,8 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
           finished being changed by the user
         * If RunOpts.ON_CHANGING, the function is run every time a value is altered,
           even if the value isn't finished changing.
-    :param funcShortcut: If provided, it is the default shortcut allocated to this
-      function
+    :param btnOpts: Overrides defaults for button used to run this function. If
+      `RunOpts.BTN` is not in `RunOpts`, these values are ignored.
     """
     proc = FRAtomicProcess(func, name)
     self.interactiveProcs[proc.name] = proc
@@ -479,30 +490,31 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
       forwardedOpts = FRProcessIO(**{_param.name(): newVal})
       return proc.run(forwardedOpts)
 
-    if len(proc.input.hyperParamKeys) == 0:
-      # Rather than nesting the 'run' button inside a group with the function
-      # name, just create a button with the function name directly
-      dummyParam = FRParam(proc.name, )
-      runBtn = Parameter.create(name=proc.name, type='registeredaction', value=funcShortcut,
-                                tip=docParser(func.__doc__)['top-descr'])
-      self.params.addChild(runBtn)
-      runBtn.sigActivated.connect(runProc)
-      return
-    FRGeneralProcWrapper(proc, self, paramPath)
-    createdParam = self.params.child(proc.name)
-    for param in createdParam:
-      if runOpts & RunOpts.ON_CHANGED:
-        param.sigValueChanged.connect(runProc)
-      if runOpts & RunOpts.ON_CHANGING:
-        param.sigValueChanging.connect(runpProc_changing)
+    if len(proc.input.hyperParamKeys) > 0:
+      topParam = self.params if len(paramPath) == 0 else self.params.child(*paramPath)
+      # Check if proc params already exist from a previous addition
+      if proc.name not in topParam.names:
+        FRGeneralProcWrapper(proc, self, paramPath)
+      parentParam = topParam.child(proc.name)
+      for param in parentParam:
+        if runOpts & RunOpts.ON_CHANGED:
+          param.sigValueChanged.connect(runProc)
+        if runOpts & RunOpts.ON_CHANGING:
+          param.sigValueChanging.connect(runpProc_changing)
+    else:
+      parentParam = self.params
     if runOpts & RunOpts.BTN:
-      runBtn = Parameter.create(name='Run', type='registeredaction', value=funcShortcut)
+      runBtn = _mkRunBtn(proc, btnOpts)
+      if runBtn.name() in parentParam.names:
+        # Bind to existing button intsead
+        runBtn = parentParam.child(runBtn.name())
       runBtn.sigActivated.connect(runProc)
-      createdParam.addChild(runBtn)
+      parentParam.addChild(runBtn)
     try:
       self.setParamTooltips(False)
     except AttributeError:
       pass
+    return proc
 
   def registerGroup(self, groupParam: FRParam=None, **opts):
     """

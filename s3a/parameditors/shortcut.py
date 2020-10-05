@@ -134,6 +134,11 @@ class FRShortcutsEditor(FRParamEditor):
 
   def createRegisteredButton(self, btnParam: FRParam, ownerObj: Any, doRegister=True,
                              baseBtn: QtWidgets.QAbstractButton=None):
+    """Check if this shortcut was already made globally or for this owner"""
+    doRegister = (doRegister
+                  and (btnParam, ownerObj) not in self.paramToShortcutMapping
+                  and (btnParam, None) not in self.paramToShortcutMapping
+                  )
     if baseBtn is not None:
       newBtn = baseBtn
       tooltipText = btnParam.helpText

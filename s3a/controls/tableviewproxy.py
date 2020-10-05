@@ -74,8 +74,10 @@ class FRCompDisplayFilter(QtCore.QObject):
     self.regionCopier.sigCopyStarted.connect(lambda *args: self.activateRegionCopier())
     self.regionCopier.sigCopyStopped.connect(lambda *args: self.finishRegionCopier())
 
-    mainImg.mergeCompsAct.sigActivated.connect(lambda *args: self.mergeSelectedComps())
-    mainImg.splitCompsAct.sigActivated.connect(lambda *args: self.splitSelectedComps())
+    mainImg.registerToolFunc(lambda: self.mergeSelectedComps(), btnOpts=FR_CONSTS.TOOL_MERGE_COMPS)
+    mainImg.registerToolFunc(self.splitSelectedComps, btnOpts=FR_CONSTS.TOOL_SPLIT_COMPS)
+    mainImg.setMenuFromEditors([mainImg.toolsEditor])
+
     compMgr.sigCompsChanged.connect(self.redrawComps)
     compMgr.sigFieldsChanged.connect(lambda: self._reflectFieldsChanged())
     filterEditor.sigParamStateUpdated.connect(self._updateFilter)
@@ -99,7 +101,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     # Update and add changed/new components
     # TODO: Find out why this isn't working. For now, just reset the whole comp list
     #  each time components are changed, since the overhead isn't too terrible.
-    regCols = (REQD_TBL_FIELDS.VERTICES,)
+    regCols = (REQD_TBL_FIELDS.VERTICES,REQD_TBL_FIELDS.COMP_CLASS)
     # changedIds = np.concatenate((idLists['added'], idLists['changed']))
     # self._regionPlots[changedIds, regCols] = compDf.loc[changedIds, compCols]
 
@@ -131,7 +133,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     self.redrawComps(self._compMgr.defaultEmitDict)
 
   def splitSelectedComps(self):
-    """See signature for :meth:`FRComponentMgr.splitCompsById`"""
+    """Makes a separate component for each distinct boundary of all selected components"""
     selection = self._compTbl.ids_rows_colsFromSelection(excludeNoEditCols=False,
                                                             warnNoneSelection=False)
     if len(selection) == 0:
@@ -140,7 +142,9 @@ class FRCompDisplayFilter(QtCore.QObject):
     self.selectRowsById(changes['added'], QISM.ClearAndSelect)
 
   def mergeSelectedComps(self, keepId: int=None):
-    """See signature for :meth:`FRComponentMgr.mergeCompsById`"""
+    """
+    Merges the selected components into one, keeping all properties of the first in the selection
+    """
     selection = self._compTbl.ids_rows_colsFromSelection(excludeNoEditCols=False,
                                                          warnNoneSelection=False)
 

@@ -96,7 +96,7 @@ class FRRegisteredActionParameterItem(ActionParameterItem):
     # reason
     super().__init__(param, depth)
     btn: QtWidgets.QPushButton = self.button
-    btn.setToolTip(param.opts['tip'])
+    btn.setToolTip(param.opts.get('tip', ''))
     if param.value() is None: return
     # Else: shortcut exists to be registered
     cls = param.opts.get('ownerObj', type(None))

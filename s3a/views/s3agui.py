@@ -33,10 +33,6 @@ class S3A(S3ABase):
   def __initEditorParams__(cls):
     super().__initEditorParams__()
     cls.toolsEditor = FRParamEditor.buildClsToolsEditor(cls, 'Main Window')
-    cls.estBoundsAct, cls.clearBoundsAct = cls.toolsEditor.registerProps(
-      cls, [FR_CONSTS.TOOL_ESTIMATE_BOUNDARIES, FR_CONSTS.TOOL_CLEAR_BOUNDARIES],
-      asProperty=False, ownerObj=cls
-    )
 
   def __init__(self, parent=None, guiMode=True, loadLastState=None,
                **quickLoaderArgs):
@@ -44,8 +40,9 @@ class S3A(S3ABase):
     # customized loading functions also get called
     superLoaderArgs = {'author': quickLoaderArgs.pop('author', None)}
     super().__init__(parent, **superLoaderArgs)
-    self.estBoundsAct.sigActivated.connect(lambda: self.estimateBoundaries_gui())
-    self.clearBoundsAct.sigActivated.connect(lambda: self.clearBoundaries())
+    self.toolsEditor.registerFunc(self.estimateBoundaries_gui, btnOpts=FR_CONSTS.TOOL_ESTIMATE_BOUNDARIES)
+    self.toolsEditor.registerFunc(self.clearBoundaries, btnOpts=FR_CONSTS.TOOL_CLEAR_BOUNDARIES)
+    self.toolsEditor.registerFunc(self.exportCompList_gui, btnOpts=FR_CONSTS.TOOL_EXPORT_COMP_LIST)
     if guiMode:
       warnings.simplefilter('error', FRS3AWarning)
       makeExceptionsShowDialogs(self)
@@ -391,6 +388,7 @@ class S3A(S3ABase):
         self.startAutosave(interval, folderName, baseName)
 
   def exportCompList_gui(self):
+    """Saves the component table to a file"""
     fileDlg = QtWidgets.QFileDialog()
     fileFilters = self.compIo.handledIoTypes_fileFilter('csv', **{'*': 'All Files'})
     outFname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilters)
@@ -432,6 +430,11 @@ class S3A(S3ABase):
   # ---------------
   @disableAppDuringFunc
   def estimateBoundaries_gui(self):
+    """
+    Estimates component boundaries for the whole image. This is functionally
+    equivalent to using a square ROI over the whole image while selecting *New
+    component for each separate boundary*=True
+    """
     self.estimateBoundaries()
 
   def loadLastState_gui(self, quickLoaderArgs: dict=None):
@@ -522,10 +525,13 @@ class S3A(S3ABase):
     editor.hasMenuOption = True
     return newMenu
 
-  def _fixDockWidth(self, dock: FRParamEditorDockGrouping, tabIdx: int=None):
-    if tabIdx is None:
-      tabIdx = dock.tabs.currentIndex()
-    curParamEditor = dock.editors[tabIdx]
+  def _fixDockWidth(self, dock: Union[FRParamEditorDockGrouping, FRParamEditor], tabIdx: int=None):
+    if isinstance(dock, FRParamEditorDockGrouping):
+      if tabIdx is None:
+        tabIdx = dock.tabs.currentIndex()
+      curParamEditor = dock.editors[tabIdx]
+    else:
+      curParamEditor = dock
     curParamEditor.tree.resizeColumnToContents(0)
     minWidth = curParamEditor.width() + 100
     if dock.width() < minWidth:
