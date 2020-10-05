@@ -20,7 +20,7 @@ from s3a.processing.algorithms import crop_to_local_area, apply_process_result, 
 from s3a.structures import FRParam, FRComplexVertices, FRAlgProcessorError, FRVertices, \
   FRS3AWarning
 from s3a.parameditors.pgregistered import FRCustomMenuParameter
-from s3a.parameditors import genericeditor
+from s3a.models import editorbase
 
 __all__ = ['FRImgProcWrapper', 'FRGeneralProcWrapper']
 
@@ -70,15 +70,16 @@ def procRunWrapper(proc: FRGeneralProcess, groupParam: Parameter):
   return newRun
 
 class FRGeneralProcWrapper(ABC):
-  def __init__(self, processor: FRProcessStage, editor: genericeditor.FRParamEditor):
+  def __init__(self, processor: FRProcessStage, editor: editorbase.FRParamEditorBase,
+               paramPath: Tuple[str, ...]=()):
     self.processor = processor
     self.algName = processor.name
     self.algParam = FRParam(self.algName)
     self.output = np.zeros((0,0), bool)
 
     self.editor = editor
-    editor.registerGroup(self.algParam, nameFromParam=True, forceCreate=True)
-    self.unpackStages(self.processor)
+    editor.registerGroup(self.algParam, nameFromParam=True, forceCreate=True, parentPath=paramPath)
+    self.unpackStages(self.processor, paramPath)
 
   def unpackStages(self, stage: FRProcessStage, paramParent: Tuple[str, ...]=()):
     if isinstance(stage, FRAtomicProcess):
@@ -162,7 +163,7 @@ class FRImgProcWrapper(FRGeneralProcWrapper):
   prependProcs = _prependFuncs()
   appendedProcs = _appendFuncs()
 
-  def __init__(self, processor: FRImageProcess, editor: genericeditor.FRParamEditor,
+  def __init__(self, processor: FRImageProcess, editor: editorbase.FRParamEditorBase,
                excludedStages: List[List[str]]=None, disabledStages: List[List[str]]=None):
     # Each processor is encapsulated in processes that crop the image to the region of
     # interest specified by the user, and re-expand the area after processing

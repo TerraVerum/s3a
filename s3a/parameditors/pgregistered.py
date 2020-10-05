@@ -9,7 +9,7 @@ from pyqtgraph.parametertree.parameterTypes import ActionParameterItem, ActionPa
   TextParameterItem, TextParameter
 from s3a.graphicsutils import FRPopupLineEditor
 
-from s3a.structures import FRS3AException
+from s3a.structures import FRS3AException, FRParam
 from s3a import parameditors
 
 
@@ -100,9 +100,12 @@ class FRRegisteredActionParameterItem(ActionParameterItem):
     if param.value() is None: return
     # Else: shortcut exists to be registered
     cls = param.opts.get('ownerObj', type(None))
-
+    frParam = param.opts.get('frParam', None)
+    if frParam is None:
+      frParam = FRParam(param.name(), param.value(), param.type(), param.opts['tip'])
+      param.opts['frParam'] = frParam
     self.button = parameditors.FR_SINGLETON.shortcuts.createRegisteredButton(
-      param.opts['frParam'], cls, baseBtn=self.button
+      frParam, cls, baseBtn=self.button
     )
     return
 

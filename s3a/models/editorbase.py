@@ -2,21 +2,31 @@ import weakref
 from functools import wraps
 from inspect import isclass
 from pathlib import Path
-from typing import List, Dict, Any, Union, Collection, Type, Tuple, Sequence, Optional
+from typing import List, Dict, Any, Union, Collection, Type, Tuple, Sequence, Optional, \
+  Callable
 from warnings import warn
+from enum import Flag, auto
 
 from pyqtgraph.Qt import QtWidgets, QtCore
-from pyqtgraph.parametertree import Parameter, ParameterTree
+from pyqtgraph.parametertree import Parameter, ParameterTree, ParameterItem
 
 from s3a.generalutils import frPascalCaseToTitle
-from s3a.graphicsutils import saveToFile, \
-  attemptFileLoad
+from s3a.graphicsutils import saveToFile, attemptFileLoad
+from s3a.processing import FRAtomicProcess, FRProcessIO, FRGeneralProcWrapper
+from s3a.processing.guiwrapper import docParser
 from s3a.structures import FRParam, ContainsSharedProps, FilePath, FRParamEditorError, \
   FRS3AWarning
 
 __all__ = ['FRParamEditorBase']
 
 Signal = QtCore.Signal
+
+
+class RunOpts(Flag):
+  NONE = 0
+  BTN = auto()
+  ON_CHANGED = auto()
+  ON_CHANGING = auto()
 
 def clearUnwantedParamVals(paramState: dict):
   for _k, child in paramState.get('children', {}).items():
@@ -95,6 +105,12 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     Keeps track of all parameters registerd as properties in this editor. Useful for
     inspecting which parameters are in an editor without traversing the parameter tree
     and reconstructing the name, tooltip, etc.
+    """
+
+    self.interactiveProcs: Dict[str, FRAtomicProcess] = {}
+    """
+    Keeps track of registered functions which have been converted to processes so their
+    arguments can be exposed to the user
     """
 
     self.instantiatedClassTypes = set()
@@ -336,9 +352,13 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
                                           asProperty, **extraOpts))
     return outProps
 
-  def _addParamGroup(self, groupName: str, **opts):
+  def _addParamGroup(self, groupName: str, paramPath: Sequence[str]=(), **opts):
     paramForCls = Parameter.create(name=groupName, type='group', **opts)
-    self.params.addChild(paramForCls)
+    if len(paramPath) == 0:
+      parent = self.params
+    else:
+      parent = self.params.child(*paramPath)
+    parent.addChild(paramForCls)
     return paramForCls
 
   def registerProp(self, grouping: Union[type, Any], constParam: FRParam,
@@ -386,10 +406,12 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
       paramForCls = self.params
     else:
       paramName = groupParam.name
-      if paramName in self.params.names:
-        paramForCls = self.params.child(paramName)
-      else:
-        paramForCls = self._addParamGroup(paramName)
+      paramPath = groupParam.opts.get('parentPath', ()) + (paramName,)
+      try:
+        paramForCls = self.params.child(*paramPath)
+      except KeyError:
+        # Parameter wasn't constructed yet
+        paramForCls = self._addParamGroup(paramName, paramPath[:-1])
 
     if parentParamPath is not None and len(parentParamPath) > 0:
       paramForCls = paramForCls.param(*parentParamPath)
@@ -424,6 +446,64 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
 
     return paramAccessor
 
+  def registerFunc(self, func: Callable, name:str=None, runOpts=RunOpts.BTN,
+                   paramPath:Tuple[str,...]=(),
+                   funcShortcut: str=None):
+    """
+    Like `registerProp`, but for functions instead along with interactive parameters
+    for each argument. A button is added for the user to force run this function as
+    well. In the case of a function with no parameters, the button will be named
+    the same as the function itself for simplicity
+
+    :param paramPath:  See `registerProp`
+    :param func: Function to make interactive
+    :param name: See `FRAtomicProcess.name`
+    :param runOpts: Combination of ways this function can be run. Multiple of these
+      options can be selected at the same time using the `|` operator.
+        * If RunOpts.BTN, a button is present as described.
+        * If RunOpts.ON_CHANGE, the function is run when parameter values are
+          finished being changed by the user
+        * If RunOpts.ON_CHANGING, the function is run every time a value is altered,
+          even if the value isn't finished changing.
+    :param funcShortcut: If provided, it is the default shortcut allocated to this
+      function
+    """
+    proc = FRAtomicProcess(func, name)
+    self.interactiveProcs[proc.name] = proc
+    # Define caller out here that takes no params so qt signal binding doesn't
+    # screw up auto parameter population
+    def runProc():
+      return proc.run()
+
+    def runpProc_changing(_param: Parameter, newVal: Any):
+      forwardedOpts = FRProcessIO(**{_param.name(): newVal})
+      return proc.run(forwardedOpts)
+
+    if len(proc.input.hyperParamKeys) == 0:
+      # Rather than nesting the 'run' button inside a group with the function
+      # name, just create a button with the function name directly
+      dummyParam = FRParam(proc.name, )
+      runBtn = Parameter.create(name=proc.name, type='registeredaction', value=funcShortcut,
+                                tip=docParser(func.__doc__)['top-descr'])
+      self.params.addChild(runBtn)
+      runBtn.sigActivated.connect(runProc)
+      return
+    FRGeneralProcWrapper(proc, self, paramPath)
+    createdParam = self.params.child(proc.name)
+    for param in createdParam:
+      if runOpts & RunOpts.ON_CHANGED:
+        param.sigValueChanged.connect(runProc)
+      if runOpts & RunOpts.ON_CHANGING:
+        param.sigValueChanging.connect(runpProc_changing)
+    if runOpts & RunOpts.BTN:
+      runBtn = Parameter.create(name='Run', type='registeredaction', value=funcShortcut)
+      runBtn.sigActivated.connect(runProc)
+      createdParam.addChild(runBtn)
+    try:
+      self.setParamTooltips(False)
+    except AttributeError:
+      pass
+
   def registerGroup(self, groupParam: FRParam=None, **opts):
     """
     Intended for use as a class decorator. Registers a class as able to hold
@@ -434,19 +514,21 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
       If *None*, params will be shown at the top-level of the parameter tree
     :param opts: Additional registration options. Accepted values:
       :key nameFromParam: This is available so objects without a dedicated class can
-      also be registered. In that case, a spoof class is registered under the name
-      'groupParam.name' instead of '[decorated class].__qualname__'.
+        also be registered. In that case, a spoof class is registered under the name
+        'groupParam.name' instead of '[decorated class].__qualname__'.
       :key forceCreate: Normally, the class is not registered until at least one property
-      (or method) is registered to it. That way, classes registered for other editors
-      don't erroneously appear. *forceCreate* will override this rule, creating this
-      parameter immediately.
+        (or method) is registered to it. That way, classes registered for other editors
+        don't erroneously appear. *forceCreate* will override this rule, creating this
+        parameter immediately.
       :key useNewInit: When a class is passed in as a group to register, it is often
-      beneficial to ensure its __initEditorParams__ method is called (if it exists) and
-      other setup procedures are followed. However, if a param editor is created *inside*
-      __initEditorParams__ (or in other circumstances where the class is already initialized
-      but an editor is created dynamically), this is an unnecessary and even harmful step.
-      Passing *useNewInit*=False will ensure the __init__ method for the registered class
-      is *not* altered.
+        beneficial to ensure its __initEditorParams__ method is called (if it exists) and
+        other setup procedures are followed. However, if a param editor is created *inside*
+        __initEditorParams__ (or in other circumstances where the class is already initialized
+        but an editor is created dynamically), this is an unnecessary and even harmful step.
+        Passing *useNewInit*=False will ensure the __init__ method for the registered class
+        is *not* altered.
+      :key parentPath: If provided, the new group will be created as a child of this
+        specified parameter instead of being created as a top level group.
     :return: Undecorated class, but with a new __init__ method which initializes
       all shared properties contained in the '__initEditorParams__' method, if it exists
       in the class. For exceptions to this rule see `key:useNewInit`.
@@ -483,8 +565,12 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
 
       self._extendedGroupingDecorator(grouping, groupParam, **opts)
 
-      if opts.get('forceCreate', False):
-        self._addParamGroup(groupParam.name)
+      parentPath = opts.get('parentPath', ())
+      if groupParam is not None:
+        groupParam.opts['parentPath'] = parentPath
+      if (opts.get('forceCreate', False)
+          or len(parentPath) > 0):
+        self._addParamGroup(groupParam.name, parentPath)
 
       return grouping
     if opts['nameFromParam']:
