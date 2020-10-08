@@ -132,6 +132,11 @@ class _FRConsts(FRParamGroup):
   PROP_UNDO_BUF_SZ             : FRParam = newParam(
     'Size of Undo Buffer', 300, helpText='Increasing the buffer size will require more memory,'
                                          'but can save a larger record of past actions.')
+  PROP_COMP_SEL_BHV            : FRParam = newParam(
+    'Component Selection Behavior', 'Entire Component', 'list', limits=['Boundary Only', 'Entire Component'],
+    helpText='When `Boundary Only`, points are selected when clicking on the boundary of each'
+             ' component.\nWhen `Entire Component`, clicking anywhere within the component'
+             ' will select the component')
   PROP_STEPS_BW_SAVE           : FRParam = newParam('Operations Between Buffer Saves', 1)
   PROP_CHECK_LARGE_CHANGES     : FRParam = newParam('Save buffer during large region changes', True)
   PROP_SHOW_TBL_ON_COMP_CREATE : FRParam = newParam('Show popup table when creating component', False)

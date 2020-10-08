@@ -50,9 +50,14 @@ class FRCompSortFilter(QtCore.QSortFilterProxyModel):
       # If that doesn't work, default to stringified comparison
       return str(leftObj) < str(rightObj)
 
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_TBL)
+@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MAIN_IMG_AREA)
 class FRCompDisplayFilter(QtCore.QObject):
   sigCompsSelected = Signal(object)
+
+  @classmethod
+  def __initEditorParams__(cls):
+    cls.pltClickBehav: str = FR_SINGLETON.generalProps.registerProp(
+      cls, FR_CONSTS.PROP_COMP_SEL_BHV)
 
   def __init__(self, compMgr: FRComponentMgr, mainImg: FRMainImage,
                compTbl: tableview.FRCompTableView, parent=None):
@@ -252,7 +257,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     # If min and max are the same, just check for points at mouse position
     if len(selection) == 1 or np.abs(selection[0] - selection[1]).sum() < 0.01:
       qtPoint = QtCore.QPointF(*selection[0])
-      selectedSpots = self.regionPlot.pointsAt(qtPoint)
+      selectedSpots = self.regionPlot.pointsAt(qtPoint, self.pltClickBehav=='Boundary Only')
       selectedIds = [spot.data() for spot in selectedSpots]
     else:
       selectedIds = self.regionPlot.boundsWithin(selection)

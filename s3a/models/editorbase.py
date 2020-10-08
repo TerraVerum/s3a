@@ -43,7 +43,8 @@ def _mkRunBtn(proc: FRAtomicProcess, btnOpts: Union[FRParam, dict]):
     btnOpts = frParamToPgParamDict(btnOpts)
     # Make sure param type is not overridden
     btnOpts.pop('type', None)
-  defaultBtnOpts.update(btnOpts)
+  if btnOpts is not None:
+    defaultBtnOpts.update(btnOpts)
   if len(proc.input.hyperParamKeys) > 0:
     # In this case, a descriptive name isn't needed since the func name will be
     # present in the parameter group

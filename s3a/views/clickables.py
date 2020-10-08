@@ -41,12 +41,16 @@ class FRBoundScatterPlot(pg.ScatterPlotItem):
     #                             for row in pointLocs], dtype=bool)
     return np.array([point.data() for point in self.points()[tfIsInSelection]])
 
-  def pointsAt(self, pos: QtCore.QPointF):
+  def pointsAt(self, pos: QtCore.QPointF, boundaryOnly=True):
     """
     The default implementation only checks a square around each spot. However, this is not
     precise enough for my needs. The overloaded pointsAt checks any polygonal area as defined
     by the spot boundary. It also triggers when clicking *inside* the spot boundary,
     which I don't want.
+
+    :param pos: Where to search for points
+    :param boundaryOnly: If `True`, only locates points whose boundary is on the pos.
+      Otherwise, any points containing pos will be returned.
     """
     pts = []
     spots = self.points()
@@ -58,9 +62,12 @@ class FRBoundScatterPlot(pg.ScatterPlotItem):
       symb.translate(spot.pos())
       stroker = QtGui.QPainterPathStroker()
       stroker.setWidth(strokerWidth)
-      mousePath = stroker.createStroke(symb)
+      checkSymb = symb
+      if boundaryOnly:
+        mousePath = stroker.createStroke(symb)
+        checkSymb = mousePath
       # Only trigger when clicking a boundary, not the inside of the shape
-      if mousePath.contains(pos):
+      if checkSymb.contains(pos):
         pts.append(spot)
     return pts[::-1]
 
