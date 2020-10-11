@@ -13,7 +13,7 @@ from s3a.models.s3abase import S3ABase
 from s3a.parameditors import FRParamEditorDockGrouping
 from s3a.parameditors.genericeditor import FRTableFieldPlugin
 from s3a.processing.algorithms import _historyMaskHolder
-from s3a.structures import NChanImg, BlackWhiteImg
+from s3a.structures import NChanImg, GrayImg
 from s3a.views.regions import FRMultiRegionPlot, makeMultiRegionDf
 
 
@@ -44,11 +44,9 @@ class FRVerticesPlugin(FRTableFieldPlugin):
     def fill():
       """Completely fill the focused region mask"""
       if self.focusedImg.image is None: return
-      # clsIdx = compClassToIndex(self.focusedImg.compSer[RTF.COMP_CLASS])
-      # FR_SINGLETON.tableData.compClasses.index(self.focusedImg.compSer[RTF.INST_ID])
-      filledImg = np.ones(self.focusedImg.image.shape[:2], bool)
-      # filledImg = np.ones(self.focusedImg.image.shape[:2], dtype='uint16')*clsIdx
-      self.updateRegionFromMask(filledImg)
+      clsIdx = self.focusedImg.classIdx
+      filledImg = np.ones(self.focusedImg.image.shape[:2], dtype='uint16')*(clsIdx+1)
+      self.updateRegionFromClsImg(filledImg)
     def clear():
       """
       Clear the vertices in the focused image
@@ -87,14 +85,19 @@ class FRVerticesPlugin(FRTableFieldPlugin):
       vertsDict['bgVerts'] = roiVerts
 
     if img is None:
+      compGrayscale = None
       compMask = None
     else:
-      compMask = self.region.toGrayImg(img.shape[:2]) > 0
-    newMask = self.curProcessor.run(image=img, prevCompMask=compMask, **vertsDict,
-                                    firstRun=self.firstRun)
+      compGrayscale = self.region.toGrayImg(img.shape[:2])
+      compMask = compGrayscale > 0
+    # TODO: When multiple classes can be represented within focused image, this is where
+    #  change will have to occur
+    newGrayscale = self.curProcessor.run(image=img, prevCompMask=compMask, **vertsDict,
+                                    firstRun=self.firstRun).astype('uint16')
+    newGrayscale *= (self.focusedImg.classIdx+1)
     self.firstRun = False
-    if not np.array_equal(newMask,compMask):
-      self.updateRegionFromDf(frio.buildFromClassPng(newMask), offset=FRVertices([0,0]))
+    if not np.array_equal(newGrayscale, compGrayscale):
+      self.updateRegionFromClsImg(newGrayscale)
 
 
   @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
@@ -140,8 +143,8 @@ class FRVerticesPlugin(FRTableFieldPlugin):
       fImg.updateAll(oldSelfImg, oldSer)
     self.region.resetRegionList(oldVerts)
 
-  def updateRegionFromMask(self, mask: BlackWhiteImg):
-    df = frio.buildFromClassPng(mask)
+  def updateRegionFromClsImg(self, clsImg: GrayImg):
+    df = frio.buildFromClassPng(clsImg)
     self.updateRegionFromDf(df, offset=FRVertices([0, 0]))
     pass
 

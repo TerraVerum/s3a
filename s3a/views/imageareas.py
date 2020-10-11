@@ -420,3 +420,12 @@ class FRFocusedImage(FREditableImgBase):
     if forceActivate and newPlugin is not None and not newPlugin.active:
       newPlugin.active = True
     self.sigPluginChanged.emit()
+
+  @property
+  def classIdx(self):
+    """
+    Helper property to determine the index into all component classes of the current
+    component. E.g. if all possible classes are ['resistor', 'capacitor'] and the current
+    focused component is 'resistor', this function will return 0.
+    """
+    return FR_SINGLETON.tableData.compClasses.index(self.compSer[REQD_TBL_FIELDS.COMP_CLASS])

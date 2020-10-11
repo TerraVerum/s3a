@@ -93,8 +93,7 @@ def test_region_modify(sampleComps):
 
   newVerts = FRVertices([[5,5], [reach, reach], [reach, 5], [5,5]])
   cplxVerts = FRComplexVertices([newVerts])
-  newMask = cplxVerts.toMask(shapeBnds)
-  newMask = newMask > 0
+  newMask = cplxVerts.toMask(shapeBnds, asBool=False, fillColor=fImg.classIdx+1)
 
   # 2nd action
   fImg.handleShapeFinished(newVerts)
@@ -110,7 +109,7 @@ def test_region_modify(sampleComps):
   FR_SINGLETON.actionStack.redo()
   assert imsum() == 0
   FR_SINGLETON.actionStack.redo()
-  pluginMask = vertsPlugin.region.toGrayImg(shapeBnds) > 0
+  pluginMask = vertsPlugin.region.toGrayImg(shapeBnds)
   assert np.array_equal(pluginMask, newMask)
 
 
