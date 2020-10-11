@@ -4,7 +4,7 @@ from abc import ABC
 from copy import deepcopy
 from functools import wraps
 from io import StringIO
-from typing import Tuple, List, Sequence
+from typing import Tuple, List, Sequence, Union
 from warnings import warn
 
 import numpy as np
@@ -14,7 +14,7 @@ import docstring_parser as dp
 from ruamel.yaml import YAML
 yaml = YAML()
 
-from s3a.generalutils import augmentException
+from s3a.generalutils import augmentException, frParamToPgParamDict
 from s3a.processing.algorithms import crop_to_local_area, apply_process_result, basicOpsCombo, \
   return_to_full_size, format_vertices
 from s3a.structures import FRParam, FRComplexVertices, FRAlgProcessorError, FRVertices, \
@@ -50,7 +50,14 @@ def docParser(docstring: str):
   out['top-descr'] = descr
   return out
 
-
+def _attemptCreateChild(parent: Parameter, child: Union[Parameter, dict]):
+  try:
+    cname = child.opts['name']
+  except AttributeError:
+    cname = child['name']
+  if cname not in parent.names:
+    parent.addChild(child)
+  return parent.child(cname)
 
 def atomicRunWrapper(proc: FRAtomicProcess, names: Sequence[str], params: Sequence[Parameter]):
   oldRun = proc.run
@@ -78,11 +85,16 @@ class FRGeneralProcWrapper(ABC):
     self.output = np.zeros((0,0), bool)
 
     self.editor = editor
-    editor.registerGroup(self.algParam, nameFromParam=True, forceCreate=True, parentPath=paramPath)
+    parentParam = editor.params
+    if len(paramPath) > 0:
+      parentParam = parentParam.child(*paramPath)
+    _attemptCreateChild(parentParam, dict(name=self.algName, type='group'))
     self.unpackStages(self.processor, paramPath)
 
-  def unpackStages(self, stage: FRProcessStage, paramParent: Tuple[str, ...]=()):
+  def unpackStages(self, stage: FRProcessStage, parentPath: Tuple[str, ...]=()):
+    paramParent: Parameter = self.editor.params.child(self.algName, *parentPath)
     if isinstance(stage, FRAtomicProcess):
+      stage: FRAtomicProcess
       docParams = docParser(stage.func.__doc__)
       params: List[Parameter] = []
       for key in stage.input.hyperParamKeys:
@@ -95,26 +107,27 @@ class FRGeneralProcWrapper(ABC):
           curParam.value = val
           if curParam.pType is None:
             curParam.pType = type(val).__name__
-        pgParam = self.editor.registerProp(self.algParam, curParam, paramParent, asProperty=False)
+        paramDict = frParamToPgParamDict(curParam)
+        pgParam = _attemptCreateChild(paramParent, paramDict)
         params.append(pgParam)
       stage.run = atomicRunWrapper(stage, stage.input.hyperParamKeys, params)
       return
     # else: # Process
     stage: FRGeneralProcess
-    curGroup = self.editor.params.child(self.algName, *paramParent)
-    stage.run = procRunWrapper(stage, curGroup)
+    stage.run = procRunWrapper(stage, paramParent)
     # Special case of a process comprised of just one atomic function
     if len(stage.stages) == 1 and isinstance(stage.stages[0], FRAtomicProcess):
-      self.unpackStages(stage.stages[0], paramParent=paramParent)
+      self.unpackStages(stage.stages[0], parentPath=parentPath)
       return
     for childStage in stage.stages:
       pType = 'atomicgroup'
       if childStage.allowDisable:
         pType = 'procgroup'
       curGroup = FRParam(name=childStage.name, pType=pType, value=[],)
-      self.editor.registerProp(self.algParam, curGroup, paramParent, asProperty=False,
-                               enabled=not childStage.disabled)
-      self.unpackStages(childStage, paramParent=paramParent + (childStage.name,))
+      paramDict = frParamToPgParamDict(curGroup)
+      paramDict['enabled'] = not childStage.disabled
+      _attemptCreateChild(paramParent, paramDict)
+      self.unpackStages(childStage, parentPath=parentPath + (childStage.name,))
 
   def setStageEnabled(self, stageIdx: Sequence[str], enabled: bool):
     paramForStage: FRCustomMenuParameter = self.editor.params.child(self.algName, *stageIdx)
