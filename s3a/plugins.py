@@ -7,14 +7,16 @@ import pandas as pd
 from pyqtgraph.Qt import QtWidgets
 
 from s3a import FR_SINGLETON, FR_CONSTS as FRC, REQD_TBL_FIELDS as RTF, FRComplexVertices, \
-  FRVertices, FRParam
-from s3a.generalutils import frPascalCaseToTitle, dynamicDocstring, frParamToPgParamDict
+  FRVertices, FRParam, FRComponentIO as frio
+from s3a.generalutils import frPascalCaseToTitle, dynamicDocstring, frParamToPgParamDict, \
+  imgCornerVertices
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import FRParamEditorDockGrouping
 from s3a.parameditors.genericeditor import FRTableFieldPlugin
 from s3a.processing.algorithms import _historyMaskHolder
-from s3a.structures import NChanImg
-from s3a.views.regions import FRVertexDefinedImg
+from s3a.structures import NChanImg, BlackWhiteImg
+from s3a.views.regions import FRVertexDefinedImg, FRMultiRegionPlot, makeMultiRegionDf, \
+  compClassToIndex
 
 
 class FRVerticesPlugin(FRTableFieldPlugin):
@@ -30,7 +32,7 @@ class FRVerticesPlugin(FRTableFieldPlugin):
     cls.docks = dockGroup
 
   def __init__(self):
-    self.region = FRVertexDefinedImg()
+    self.region = FRMultiRegionPlot()
     self.region.hide()
     self.firstRun = True
 
@@ -44,13 +46,16 @@ class FRVerticesPlugin(FRTableFieldPlugin):
     def fill():
       """Completely fill the focused region mask"""
       if self.focusedImg.image is None: return
-      filled = np.ones(self.focusedImg.image.shape[:2], bool)
-      self.region.updateFromMask(filled)
+      # clsIdx = compClassToIndex(self.focusedImg.compSer[RTF.COMP_CLASS])
+      # FR_SINGLETON.tableData.compClasses.index(self.focusedImg.compSer[RTF.INST_ID])
+      filledImg = np.ones(self.focusedImg.image.shape[:2], bool)
+      # filledImg = np.ones(self.focusedImg.image.shape[:2], dtype='uint16')*clsIdx
+      self.updateRegionFromMask(filledImg)
     def clear():
       """
       Clear the vertices in the focused image
       """
-      self.updateRegionFromVerts(None)
+      self.updateRegionFromDf(None)
     def clearProcessorHistory():
       """
       Each time an update is made in the processor, it is saved so algorithmscan take
@@ -67,9 +72,9 @@ class FRVerticesPlugin(FRTableFieldPlugin):
 
   def updateAll(self, mainImg: Optional[NChanImg], newComp: Optional[pd.Series] = None):
     if self.focusedImg.image is None:
-      self.updateRegionFromVerts(None)
+      self.updateRegionFromDf(None)
       return
-    self.updateRegionFromVerts(self.focusedImg.compSer[RTF.VERTICES], self.focusedImg.bbox[0,:])
+    self.updateRegionFromDf(self.focusedImg.compSer.to_frame().T, self.focusedImg.bbox[0, :])
     self.firstRun = True
 
   def handleShapeFinished(self, roiVerts: FRVertices):
@@ -83,74 +88,91 @@ class FRVerticesPlugin(FRTableFieldPlugin):
     elif act == FRC.DRAW_ACT_REM:
       vertsDict['bgVerts'] = roiVerts
 
-    compMask = None if img is None else self.region.embedMaskInImg(img.shape[:2])
+    if img is None:
+      compMask = None
+    else:
+      compMask = frio.exportClassPng(self.region.regionData, imShape=img.shape[:2]) > 0
     newMask = self.curProcessor.run(image=img, prevCompMask=compMask, **vertsDict,
                                     firstRun=self.firstRun)
     self.firstRun = False
     if not np.array_equal(newMask,compMask):
-      self.region.updateFromMask(newMask)
+      self.updateRegionFromDf(frio.buildFromClassPng(newMask), offset=FRVertices([0,0]))
 
 
   @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
-  def updateRegionFromVerts(self, newVerts: FRComplexVertices=None, offset: FRVertices=None):
+  def updateRegionFromDf(self, newData: pd.DataFrame=None, offset: FRVertices=None):
     """
     Updates the current focused region using the new provided vertices
-    :param newVerts: Verts to use.If *None*, the image will be totally reset and the component
-      will be removed. Otherwise, the provided value will be used.
+    :param newData: Dataframe to use.If *None*, the image will be totally reset and the component
+      will be removed. Otherwise, the provided value will be used. For column information,
+      see `makeMultiRegionDf`
     :param offset: Offset of newVerts relative to main image coordinates
     """
     fImg = self.focusedImg
     if fImg.image is None:
       self.region.clear()
       return
-    oldVerts = self.region.verts
-    oldRegionImg = self.region.image
+    oldVerts = self.region.regionData[[RTF.VERTICES]]
 
     oldSelfImg = fImg.image
     oldSer = fImg.compSer
 
     if offset is None:
       offset = fImg.bbox[0,:]
-    if newVerts is None:
-      newVerts = FRComplexVertices()
+    if newData is None:
+      newData = makeMultiRegionDf(0)
     # 0-center new vertices relative to FRFocusedImage image
     # Make a copy of each list first so we aren't modifying the
     # original data
-    centeredVerts = newVerts.copy()
-    for vertList in centeredVerts:
-      vertList -= offset
-    if np.any(fImg.bbox[:,0] != offset) or self.region.verts != centeredVerts:
-      self.region.updateFromVertices(centeredVerts)
+    centeredData = newData.copy()
+    centeredVerts = []
+    for complexVerts in centeredData[RTF.VERTICES]:
+      newVertList = FRComplexVertices()
+      for vertList in complexVerts:
+        newVertList.append(vertList-offset)
+      centeredVerts.append(newVertList)
+    centeredData[RTF.VERTICES] = centeredVerts
+    if np.any(fImg.bbox[0,:] != offset) or not oldVerts[RTF.VERTICES].equals(centeredData[RTF.VERTICES]):
+      self.region.resetRegionList(newRegionDf=centeredData)
       yield
     else:
       return
     if (fImg.compSer.loc[RTF.INST_ID] != oldSer.loc[RTF.INST_ID]
         or fImg.image is None):
       fImg.updateAll(oldSelfImg, oldSer)
-    self.region.updateFromVertices(oldVerts, oldRegionImg)
+    self.region.resetRegionList(oldVerts)
+
+  def updateRegionFromMask(self, mask: BlackWhiteImg):
+    df = frio.buildFromClassPng(mask)
+    self.updateRegionFromDf(df, offset=FRVertices([0, 0]))
+    pass
 
   def acceptChanges(self, overrideVerts: FRComplexVertices=None):
     # Add in offset from main image to FRVertexRegion vertices
+    ser = self.focusedImg.compSer
     if overrideVerts is not None:
-      self.focusedImg.compSer.loc[RTF.VERTICES] = overrideVerts
+      ser.loc[RTF.VERTICES] = overrideVerts
       return
-    newVerts = self.region.verts.copy()
+    newVerts_lst = self.region.regionData[RTF.VERTICES].copy()
+    newVerts = FRComplexVertices()
+    for verts in newVerts_lst:
+      newVerts.extend(verts.copy())
     for vertList in newVerts:
       vertList += self.focusedImg.bbox[0,:]
-    self.focusedImg.compSer.at[RTF.VERTICES] = newVerts
+    ser.at[RTF.VERTICES] = newVerts
 
   def clearFocusedRegion(self):
     # Reset drawn comp vertices to nothing
     # Only perform action if image currently exists
     if self.focusedImg.image is None:
       return
-    self.updateRegionFromVerts(None)
+    self.updateRegionFromDf(None)
 
   def resetFocusedRegion(self):
     """Reset the focused image by restoring the region mask to the last saved state"""
     if self.focusedImg.image is None:
       return
-    self.updateRegionFromVerts(self.focusedImg.compSer[RTF.VERTICES])
+    self.updateRegionFromDf(self.focusedImg.compSer.to_frame().T)
 
   def _onActivate(self):
     self.region.show()

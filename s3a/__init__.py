@@ -8,7 +8,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 
 __all__ = ['appInst', 'FR_SINGLETON', 'S3A', 'FRParamEditor', 'FRParam', 'REQD_TBL_FIELDS',
-           'FRComplexVertices', 'FRVertices', 'FR_CONSTS', 'FRComponentIO']
+           'FRComplexVertices', 'FRVertices', 'FR_CONSTS', 'FRComponentIO', 'RunOpts']
 
 pg.setConfigOptions(imageAxisOrder='row-major')
 
@@ -37,6 +37,7 @@ import s3a.constants
 import s3a.structures
 
 from s3a.parameditors import FR_SINGLETON, FRParamEditor
+from s3a.models.editorbase import RunOpts
 from .io import FRComponentIO
 from s3a.processing.algorithms import FRTopLevelImageProcessors
 from s3a.structures import FRVertices, FRComplexVertices, FRParam

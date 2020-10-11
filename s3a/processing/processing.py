@@ -82,6 +82,14 @@ class FRProcessIO(dict):
       else:
         hyperParamKeys.append(k)
       outDict[k] = formattedV
+    # Make sure to avoid 'init got multiple values' error
+    initSig = inspect.signature(cls.__init__).parameters
+    keys = list(outDict)
+    for key in keys:
+      if key in initSig:
+        newName = '_' + key
+        outDict[newName] = outDict[key]
+        del outDict[key]
     return cls(hyperParamKeys, **outDict)
 
 class FRProcessStage(ABC):
@@ -121,8 +129,11 @@ class FRProcessStage(ABC):
     if len(missingKeys) > 0:
       raise FRAlgProcessorError(f'Missing Following keys from {self}: {missingKeys}')
 
-  def run(self, *args, **kwargs):
+  def run(self, io: FRProcessIO=None, disable=False):
     raise NotImplementedError
+
+  def __call__(self, **kwargs):
+    self.run(FRProcessIO(**kwargs))
 
   @property
   @abstractmethod

@@ -89,7 +89,7 @@ def test_region_modify(sampleComps):
   imsum = lambda: vertsPlugin.region.image.sum()
 
   # 1st action
-  vertsPlugin.updateRegionFromVerts(None)
+  vertsPlugin.updateRegionFromDf(None)
   assert imsum() == 0
 
   newVerts = FRVertices([[5,5], [reach, reach], [reach, 5], [5,5]])

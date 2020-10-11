@@ -79,7 +79,7 @@ class _FRConsts(FRParamGroup):
   CLS_COMP_EXPORTER    : FRParam = newParam('Component Exporter')
 
   CLS_VERT_IMG         : FRParam = newParam('Focused Image Graphics')
-  CLS_MULT_REG_PLT     : FRParam = newParam('Main Image Graphics')
+  CLS_MULT_REG_PLT     : FRParam = newParam('Region Plot')
 
   CLS_REGION_BUF       : FRParam = newParam('Region Modification Buffer')
 

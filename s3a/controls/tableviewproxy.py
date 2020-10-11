@@ -123,7 +123,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     # Remove all IDs that aren't displayed
     # FIXME: This isn't working correctly at the moment
     # self._regionPlots.drop(np.setdiff1d(self._regionPlots.data.index, self._displayedIds))
-    self.regionPlot.resetRegionList(self.displayedIds, compDf.loc[self.displayedIds, regCols])
+    self.regionPlot.resetRegionList(compDf.loc[self.displayedIds, regCols])
     # noinspection PyTypeChecker
     # self._reflectTableSelectionChange(np.intersect1d(self.displayedIds, self.selectedIds))
 

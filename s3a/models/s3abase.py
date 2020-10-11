@@ -207,8 +207,7 @@ class S3ABase(QtWidgets.QMainWindow):
       verts = imgCornerVertices(self.mainImg.image)
       newComp = FR_SINGLETON.tableData.makeCompDf(1)
       newComp.at[REQD_TBL_FIELDS.INST_ID.value, REQD_TBL_FIELDS.VERTICES] = FRComplexVertices([verts])
-      self.compMgr.addComps(newComp, emitChange=False)
-      self.focusedImg.updateAll(self.mainImg.image, newComp.squeeze())
+      self.add_focusComps(newComp)
       for plugin in FR_SINGLETON.tableFieldPlugins:
         plugin.handleShapeFinished(verts)
 
@@ -230,13 +229,13 @@ class S3ABase(QtWidgets.QMainWindow):
     for plugin in FR_SINGLETON.tableFieldPlugins:
       plugin.acceptChanges()
 
-    modifiedComp = self.focusedImg.compSer
+    modifiedComp = self.focusedImg.compSer[[REQD_TBL_FIELDS.INST_ID, REQD_TBL_FIELDS.VERTICES]]
     modified_df = modifiedComp.to_frame().T
     mgr.addComps(modified_df, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
     self.compDisplay.regionPlot.focusById([modifiedComp[REQD_TBL_FIELDS.INST_ID]])
     yield
+    self.add_focusComps(oldSer.to_frame().T)
     self.focusedImg.updateAll(self.mainImg.image, oldSer)
-    mgr.addComps(oldSer.to_frame().T, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
 
   def clearBoundaries(self):
     """Removes all components from the component table"""
@@ -332,8 +331,8 @@ class S3ABase(QtWidgets.QMainWindow):
                                 ' has no processors')
 
   @FR_SINGLETON.actionStack.undoable('Create New Comp', asGroup=True)
-  def add_focusComps(self, newComps: df):
-    changeDict = self.compMgr.addComps(newComps)
+  def add_focusComps(self, newComps: df, addType=FR_ENUMS.COMP_ADD_AS_NEW):
+    changeDict = self.compMgr.addComps(newComps, addType)
     # Focus is performed by comp table
     # Arbitrarily choose the last possible component
     changeList = np.concatenate([changeDict['added'], changeDict['changed']])

@@ -300,7 +300,9 @@ class FRComponentIO:
   def exportClassPng(cls, compDf: df, outFile: FilePath = None, imShape: Tuple[int]=None, **kwargs):
     # Create label to output mapping
     classes = FR_SINGLETON.tableData.compClasses
-    colors = compDf[RTF.COMP_CLASS].apply(classes.index)
+    colors = compDf[RTF.COMP_CLASS]
+    if not np.issubdtype(colors.dtype, np.integer):
+      colors = compDf[RTF.COMP_CLASS].apply(classes.index)
     origIdxs = compDf.index
     compDf.index = colors
     ret = cls.exportIdPng(compDf, outFile, imShape, **kwargs)

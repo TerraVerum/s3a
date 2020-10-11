@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import wraps
 from typing import Tuple, Sequence, Optional, Any, List
 
 import numpy as np
@@ -23,29 +24,13 @@ from .clickables import FRBoundScatterPlot
 __all__ = ['FRMultiRegionPlot', 'FRVertexDefinedImg', 'FRRegionCopierPlot']
 
 from ..models.editorbase import RunOpts
+from ..processing import FRAtomicProcess
 
 Signal = QtCore.Signal
 
-def makeMultiRegionDf(numRows=1, whichCols=None, idList=None) -> df:
-  df_list = []
-  if whichCols is None:
-    whichCols = (RTF.INST_ID, RTF.VERTICES, RTF.COMP_CLASS)
-  elif isinstance(whichCols, FRParam):
-    whichCols = [whichCols]
-  for _ in range(numRows):
-    # Make sure to construct a separate component instance for
-    # each row no objects have the same reference
-    df_list.append([field.value for field in whichCols])
-  outDf = df(df_list, columns=whichCols)
-  if idList is not None:
-    outDf = outDf.set_index(idList)
-  # Ensure base type fields are properly typed
-  coerceDfTypes(outDf, whichCols)
-
-  return outDf
-
-def makeColorsDf(numRows=1, selected:np.ndarray=None, focused: np.ndarray=None,
-                 compClasses: np.ndarray=None, idList: np.ndarray=None, convertClasses=True):
+def makeMultiRegionDf(numRows=1, idList: Sequence[int]=None, selected:Sequence[bool]=None,
+                      focused: Sequence[bool]=None, compClasses: Sequence[str]=None,
+                      vertices: Sequence[FRComplexVertices]=None, convertClasses=True):
   """
   Helper for creating new dataframe holding information determining color data.
   `selected` and `focused` must be boolean arrays indicating whether or not each component
@@ -53,19 +38,22 @@ def makeColorsDf(numRows=1, selected:np.ndarray=None, focused: np.ndarray=None,
   If `convertClasses` is `True`, converts string list of component classes into
   their integer index into `tableData`.
   """
-  cols = ['selected', 'focused', 'compClass']
-  outDf = pd.DataFrame(columns=cols)
+  outDict = {}
   if selected is None:
     selected = np.zeros(numRows, bool)
-  outDf['selected'] = selected
+  outDict['selected'] = selected
   if focused is None:
     focused = np.zeros(numRows, bool)
-  outDf['focused'] = focused
+  outDict['focused'] = focused
   if compClasses is None:
     compClasses = np.zeros(numRows, int)
   elif convertClasses:
     compClasses = compClassToIndex(compClasses)
-  outDf['compClass'] = compClasses
+  outDict[RTF.COMP_CLASS] = compClasses
+  if vertices is None:
+    vertices = [RTF.VERTICES.value for _ in range(numRows)]
+  outDict[RTF.VERTICES] = vertices
+  outDf = pd.DataFrame(outDict)
   if idList is not None:
     outDf = outDf.set_index(idList)
   return outDf
@@ -102,12 +90,12 @@ def _makeBoundSymbol(verts: FRVertices):
 class FRMultiRegionPlot(FRBoundScatterPlot):
   def __init__(self, parent=None):
     super().__init__(size=1, pxMode=False)
+    self.resetColors = FRAtomicProcess(self.resetColors)
     FR_SINGLETON.colorScheme.registerFunc(self.resetColors, FR_CONSTS.CLS_MULT_REG_PLT.name,
                                           runOpts=RunOpts.ON_CHANGED)
     self.setParent(parent)
     self.setZValue(50)
     self.regionData = makeMultiRegionDf(0)
-    self.colorData = makeColorsDf(0)
     self.cmap = np.array([])
     self.resetColors()
 
@@ -121,18 +109,18 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
     # self.centroidPlts.sigClicked = None
     self.sigPointsClicked = None
 
-  def resetRegionList(self, newIds: Optional[Sequence]=None, newRegionDf: Optional[df]=None):
-    if newIds is None:
-      newIds = []
-    if newRegionDf is None:
-      newRegionDf = makeMultiRegionDf(0)
+  def resetRegionList(self, newRegionDf: Optional[df]=None,
+                      convertClasses=True):
+    idList = None
+    if convertClasses and newRegionDf is not None and RTF.COMP_CLASS in newRegionDf.columns:
+      newRegionDf = newRegionDf.copy()
+      newRegionDf[RTF.COMP_CLASS] = compClassToIndex(newRegionDf[RTF.COMP_CLASS])
     numRows = len(newRegionDf)
-    self.regionData = makeMultiRegionDf(0)
-    self.regionData = self.regionData.append(newRegionDf)
-    if newIds is not None:
-      self.regionData = self.regionData.set_index(newIds)
-    self.colorData = makeColorsDf(numRows, compClasses=self.regionData[RTF.COMP_CLASS],
-                                  idList=self.regionData.index, convertClasses=True)
+    if newRegionDf is not None:
+      idList = newRegionDf.index
+    self.regionData = makeMultiRegionDf(numRows, idList=idList)
+    if newRegionDf is not None:
+      self.regionData.update(newRegionDf)
     self.updatePlot()
 
   def selectById(self, selectedIds: OneDArr):
@@ -156,10 +144,10 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
     """
     if len(self.regionData) == 0:
       return
-    for col, idList in zip(self.colorData.columns, [selectedIds, focusedIds]):
+    for col, idList in zip(self.regionData.columns, [selectedIds, focusedIds]):
       if idList is None: continue
-      self.colorData[col] = False
-      self.colorData.loc[idList, col] = True
+      self.regionData[col] = False
+      self.regionData.loc[idList, col] = True
     self.resetColors()
 
   def updatePlot(self):
@@ -185,37 +173,6 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
     self.setData(*plotRegions.T, symbol=boundSymbs,
                           data=self.regionData.index)
     self.resetColors()
-
-  def __setitem__(self, keys: Tuple, vals: Sequence):
-    if not isinstance(keys, tuple):
-      # Only one key passed, assume ID
-      regionIds = keys
-      setVals = slice(None)
-    elif len(keys) == 2:
-      regionIds = keys[0]
-      setVals = keys[1]
-    else:
-      regionIds = keys[0]
-      setVals = keys[1:]
-    # First update old entries
-    newEntryIdxs = np.isin(regionIds, self.regionData.index, invert=True)
-    keysDf = makeMultiRegionDf(len(regionIds), setVals)
-    keysDf = keysDf.set_index(regionIds)
-    # Since we may only be resetting one parameter (either valid or regions),
-    # Make sure to keep the old parameter value for the unset index
-    keysDf.update(self.regionData)
-    keysDf.loc[regionIds, setVals] = vals
-    self.regionData.update(keysDf)
-
-    # Now we can add entries that weren't in our original dataframe
-    # If not all set values were provided in the new dataframe, fix this by embedding
-    # it into the default dataframe
-    newDataDf = makeMultiRegionDf(int(np.sum(newEntryIdxs)), idList=regionIds[newEntryIdxs])
-    newDataDf.loc[:, keysDf.columns] = keysDf.loc[newEntryIdxs, :]
-    self.regionData = pd.concat((self.regionData, newDataDf))
-    # Retain type information
-    coerceDfTypes(self.regionData, makeMultiRegionDf(0).columns)
-    self.updatePlot()
 
   @dynamicDocstring(cmapVals=colormaps())
   def resetColors(self, penWidth=0, penColor='w', selectedFill='00f', focusedFill='f00', classColormap='tab10',
@@ -254,9 +211,9 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
     focusedFill = np.array(pg.Color(focusedFill).getRgbF())
     selectedFill = np.array(pg.Color(selectedFill).getRgbF())
     # combinedFill = (focusedFill + selectedFill)/2
-    fillColors = cmap(self.colorData['compClass'])
-    selected = self.colorData['selected'].to_numpy()
-    focused = self.colorData['focused'].to_numpy()
+    fillColors = cmap(self.regionData[RTF.COMP_CLASS])
+    selected = self.regionData['selected'].to_numpy()
+    focused = self.regionData['focused'].to_numpy()
     fillColors[selected] = selectedFill
     fillColors[focused] = focusedFill
     # fillColors[focused & selected] = combinedFill
@@ -268,6 +225,17 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
 
   def drop(self, ids):
     self.regionData.drop(index=ids, inplace=True)
+
+  def dataBounds(self, ax, frac=1.0, orthoRange=None):
+    allVerts = FRComplexVertices()
+    for v in self.regionData[RTF.VERTICES]:
+      allVerts.extend(v)
+    allVerts = allVerts.stack()
+    if len(allVerts) == 0:
+      return [None, None]
+    bounds = np.r_[allVerts.min(0, keepdims=True), allVerts.max(0, keepdims=True)]
+    return list(bounds[:,ax])
+
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_VERT_IMG)
 class FRVertexDefinedImg(pg.ImageItem):

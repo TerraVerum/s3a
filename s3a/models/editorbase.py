@@ -3,7 +3,7 @@ from functools import wraps
 from inspect import isclass
 from pathlib import Path
 from typing import List, Dict, Any, Union, Collection, Type, Tuple, Sequence, Optional, \
-  Callable
+  Callable, Set
 from warnings import warn
 from enum import Flag, auto
 
@@ -125,7 +125,7 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     and reconstructing the name, tooltip, etc.
     """
 
-    self.interactiveProcs: Dict[str, FRAtomicProcess] = {}
+    self.registeredProcs: Set[FRAtomicProcess] = set()
     """
     Keeps track of registered functions which have been converted to processes so their
     arguments can be exposed to the user
@@ -480,8 +480,11 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     :param btnOpts: Overrides defaults for button used to run this function. If
       `RunOpts.BTN` is not in `RunOpts`, these values are ignored.
     """
-    proc = FRAtomicProcess(func, name)
-    self.interactiveProcs[proc.name] = proc
+    if not isinstance(func, FRAtomicProcess):
+      proc = FRAtomicProcess(func, name)
+    else:
+      proc = func
+    self.registeredProcs.add(proc)
     # Define caller out here that takes no params so qt signal binding doesn't
     # screw up auto parameter population
     def runProc():
@@ -494,8 +497,7 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     if len(proc.input.hyperParamKeys) > 0:
       topParam = self.params if len(paramPath) == 0 else self.params.child(*paramPath)
       # Check if proc params already exist from a previous addition
-      if proc.name not in topParam.names:
-        FRGeneralProcWrapper(proc, self, paramPath)
+      FRGeneralProcWrapper(proc, self, paramPath)
       parentParam = topParam.child(proc.name)
       for param in parentParam:
         if runOpts & RunOpts.ON_CHANGED:
@@ -509,8 +511,9 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
       if runBtn.name() in parentParam.names:
         # Bind to existing button intsead
         runBtn = parentParam.child(runBtn.name())
+      else:
+        parentParam.addChild(runBtn)
       runBtn.sigActivated.connect(runProc)
-      parentParam.addChild(runBtn)
     try:
       self.setParamTooltips(False)
     except AttributeError:
