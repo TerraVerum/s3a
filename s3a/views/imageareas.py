@@ -9,7 +9,7 @@ from skimage.io import imread
 
 from s3a import FR_SINGLETON
 from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS as FRC
-from s3a.generalutils import getClippedBbox, dynamicDocstring
+from s3a.generalutils import getClippedBbox, dynamicDocstring, frParamToPgParamDict
 from s3a.structures import FRParam, FRVertices, FRComplexVertices, FilePath
 from s3a.structures import NChanImg
 from .buttons import FRDrawOpts, FRButtonCollection
@@ -51,7 +51,10 @@ class FREditableImgBase(pg.PlotWidget):
     self.plotItem.ctrlMenu = None
     self.sceneObj.contextMenu = None
 
-    self.toolsEditor.registerFunc(self.clearCurRoi, btnOpts=FRC.TOOL_CLEAR_ROI)
+    btnOpts = frParamToPgParamDict(FRC.TOOL_CLEAR_ROI)
+    btnOpts['ownerObj'] = self
+    btnOpts['type'] = 'registeredaction'
+    self.toolsEditor.registerFunc(self.clearCurRoi, btnOpts=btnOpts)
     self.setMenuFromEditors([self.toolsEditor])
     self.setAspectLocked(True)
     self.getViewBox().invertY()
