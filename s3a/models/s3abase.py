@@ -234,7 +234,7 @@ class S3ABase(QtWidgets.QMainWindow):
     mgr.addComps(modified_df, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
     self.compDisplay.regionPlot.focusById([modifiedComp[REQD_TBL_FIELDS.INST_ID]])
     yield
-    self.add_focusComps(oldSer.to_frame().T)
+    self.add_focusComps(oldSer.to_frame().T, addType=FR_ENUMS.COMP_ADD_AS_MERGE)
     self.focusedImg.updateAll(self.mainImg.image, oldSer)
 
   def clearBoundaries(self):

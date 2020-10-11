@@ -604,8 +604,8 @@ class S3A(S3ABase):
     for opts in self.focusedImg.drawOptsWidget, self.mainImg.drawOptsWidget:
       opts.horizWidth = opts.layout().minimumSize().width()
 
-  def add_focusComps(self, newComps: df):
-    ret = super().add_focusComps(newComps)
+  def add_focusComps(self, newComps: df, addType=FR_ENUMS.COMP_ADD_AS_NEW):
+    ret = super().add_focusComps(newComps, addType=addType)
     selection = self.compDisplay.selectRowsById(newComps[REQD_TBL_FIELDS.INST_ID])
     if self.isVisible() and self.compTbl.showOnCreate:
       # For some reason sometimes the actual table selection doesn't propagate in time, so

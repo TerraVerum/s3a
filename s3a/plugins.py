@@ -113,7 +113,7 @@ class FRVerticesPlugin(FRTableFieldPlugin):
     if fImg.image is None:
       self.region.clear()
       return
-    oldVerts = self.region.regionData[[RTF.VERTICES]]
+    oldData = self.region.regionData
 
     oldSelfImg = fImg.image
     oldSer = fImg.compSer
@@ -133,7 +133,7 @@ class FRVerticesPlugin(FRTableFieldPlugin):
         newVertList.append(vertList-offset)
       centeredVerts.append(newVertList)
     centeredData[RTF.VERTICES] = centeredVerts
-    if np.any(fImg.bbox[0,:] != offset) or not oldVerts[RTF.VERTICES].equals(centeredData[RTF.VERTICES]):
+    if np.any(fImg.bbox[0,:] != offset) or not oldData[RTF.VERTICES].equals(centeredData[RTF.VERTICES]):
       self.region.resetRegionList(newRegionDf=centeredData)
       yield
     else:
@@ -141,7 +141,7 @@ class FRVerticesPlugin(FRTableFieldPlugin):
     if (fImg.compSer.loc[RTF.INST_ID] != oldSer.loc[RTF.INST_ID]
         or fImg.image is None):
       fImg.updateAll(oldSelfImg, oldSer)
-    self.region.resetRegionList(oldVerts)
+    self.region.resetRegionList(oldData, convertClasses=False)
 
   def updateRegionFromClsImg(self, clsImg: GrayImg):
     df = frio.buildFromClassPng(clsImg)
