@@ -101,7 +101,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     # Update and add changed/new components
     # TODO: Find out why this isn't working. For now, just reset the whole comp list
     #  each time components are changed, since the overhead isn't too terrible.
-    regCols = (REQD_TBL_FIELDS.VERTICES,REQD_TBL_FIELDS.COMP_CLASS)
+    regCols = (REQD_TBL_FIELDS.VERTICES,)
     # changedIds = np.concatenate((idLists['added'], idLists['changed']))
     # self._regionPlots[changedIds, regCols] = compDf.loc[changedIds, compCols]
 
