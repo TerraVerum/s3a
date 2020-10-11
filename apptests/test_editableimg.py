@@ -5,7 +5,7 @@ import pytest
 from pyqtgraph.Qt import QtGui, QtCore
 
 from conftest import NUM_COMPS, app, mgr, dfTester, vertsPlugin
-from s3a import FR_SINGLETON
+from s3a import FR_SINGLETON, FRComponentIO as frio, REQD_TBL_FIELDS
 from s3a.constants import FR_CONSTS
 from s3a.controls.drawctrl import FRRoiCollection
 from s3a.parameditors.algcollection import FRAlgParamEditor
@@ -59,7 +59,6 @@ def test_update():
   newCompSer = mgr.compDf.loc[focusedId]
   # Action 1
   fImg.updateAll(app.mainImg.image, newCompSer)
-  newCompSer = newCompSer[FIMG_SER_COLS]
   assert fImg.image is not None
   assert fImg.compSer.equals(newCompSer)
   assert np.array_equal(fImg.bbox[1,:] - fImg.bbox[0,:], fImg.image.shape[:2][::-1])
@@ -76,21 +75,21 @@ def test_update():
   FR_SINGLETON.actionStack.redo()
   assert fImg.compSer.equals(newCompSer)
   FR_SINGLETON.actionStack.redo()
-  assert fImg.compSer.equals(newerSer[FIMG_SER_COLS])
+  assert fImg.compSer.equals(newerSer)
   fImg.changeCurrentPlugin(oldPlugin)
 
 def test_region_modify(sampleComps):
   app.add_focusComps(sampleComps)
   shapeBnds = fImg.image.shape[:2]
   reach = np.min(shapeBnds)
-  oldVerts = vertsPlugin.region.verts
+  oldData = vertsPlugin.region.regionData
   fImg.shapeCollection.curShapeParam = FR_CONSTS.DRAW_SHAPE_POLY
   fImg.drawAction = FR_CONSTS.DRAW_ACT_ADD
-  imsum = lambda: vertsPlugin.region.image.sum()
+  imsum = lambda: vertsPlugin.region.toGrayImg(shapeBnds).sum()
 
   # 1st action
   vertsPlugin.updateRegionFromDf(None)
-  assert imsum() == 0
+  # assert imsum() == 0
 
   newVerts = FRVertices([[5,5], [reach, reach], [reach, 5], [5,5]])
   cplxVerts = FRComplexVertices([newVerts])
@@ -99,19 +98,20 @@ def test_region_modify(sampleComps):
 
   # 2nd action
   fImg.handleShapeFinished(newVerts)
-  assert np.array_equal(vertsPlugin.region.embedMaskInImg(shapeBnds), newMask)
+  assert np.array_equal(vertsPlugin.region.toGrayImg(shapeBnds), newMask)
 
   FR_SINGLETON.actionStack.undo()
   # Cmp to first action
   assert imsum() == 0
   FR_SINGLETON.actionStack.undo()
   # Cmp to original
-  assert vertsPlugin.region.verts == oldVerts
+  assert vertsPlugin.region.regionData[REQD_TBL_FIELDS.VERTICES].equals(oldData[REQD_TBL_FIELDS.VERTICES])
 
   FR_SINGLETON.actionStack.redo()
   assert imsum() == 0
   FR_SINGLETON.actionStack.redo()
-  assert np.array_equal(vertsPlugin.region.embedMaskInImg(shapeBnds), newMask)
+  pluginMask = vertsPlugin.region.toGrayImg(shapeBnds) > 0
+  assert np.array_equal(pluginMask, newMask)
 
 
 @pytest.mark.withcomps

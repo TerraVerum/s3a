@@ -13,7 +13,7 @@ from skimage import color
 from matplotlib import cm
 from matplotlib.pyplot import colormaps
 
-from s3a import FR_SINGLETON
+from s3a import FR_SINGLETON, FRComponentIO as frio
 from s3a.constants import REQD_TBL_FIELDS as RTF, FR_CONSTS
 from s3a.generalutils import coerceDfTypes, stackedVertsPlusConnections, dynamicDocstring
 from s3a.structures import FRParam, FRVertices, FRComplexVertices, OneDArr, BlackWhiteImg
@@ -173,6 +173,9 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
     self.setData(*plotRegions.T, symbol=boundSymbs,
                           data=self.regionData.index)
     self.resetColors()
+
+  def toGrayImg(self, imShape: Sequence[int]=None):
+    return frio.exportClassPng(self.regionData, imShape=imShape)
 
   @dynamicDocstring(cmapVals=colormaps())
   def resetColors(self, penWidth=0, penColor='w', selectedFill='00f', focusedFill='f00', classColormap='tab10',

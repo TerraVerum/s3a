@@ -8,15 +8,13 @@ from pyqtgraph.Qt import QtWidgets
 
 from s3a import FR_SINGLETON, FR_CONSTS as FRC, REQD_TBL_FIELDS as RTF, FRComplexVertices, \
   FRVertices, FRParam, FRComponentIO as frio
-from s3a.generalutils import frPascalCaseToTitle, dynamicDocstring, frParamToPgParamDict, \
-  imgCornerVertices
+from s3a.generalutils import frPascalCaseToTitle
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import FRParamEditorDockGrouping
 from s3a.parameditors.genericeditor import FRTableFieldPlugin
 from s3a.processing.algorithms import _historyMaskHolder
 from s3a.structures import NChanImg, BlackWhiteImg
-from s3a.views.regions import FRVertexDefinedImg, FRMultiRegionPlot, makeMultiRegionDf, \
-  compClassToIndex
+from s3a.views.regions import FRMultiRegionPlot, makeMultiRegionDf
 
 
 class FRVerticesPlugin(FRTableFieldPlugin):
@@ -91,7 +89,7 @@ class FRVerticesPlugin(FRTableFieldPlugin):
     if img is None:
       compMask = None
     else:
-      compMask = frio.exportClassPng(self.region.regionData, imShape=img.shape[:2]) > 0
+      compMask = self.region.toGrayImg(img.shape[:2]) > 0
     newMask = self.curProcessor.run(image=img, prevCompMask=compMask, **vertsDict,
                                     firstRun=self.firstRun)
     self.firstRun = False
