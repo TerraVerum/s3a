@@ -177,7 +177,7 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
   def toGrayImg(self, imShape: Sequence[int]=None):
     return frio.exportClassPng(self.regionData, imShape=imShape)
 
-  @dynamicDocstring(cmapVals=colormaps())
+  @dynamicDocstring(cmapVals=colormaps() + ['None'])
   def resetColors(self, penWidth=0, penColor='w', selectedFill='00f', focusedFill='f00', classColormap='tab10',
                   fillAlpha=0.7):
     """
@@ -193,7 +193,9 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
       helpText: Fill color for the component currently in the focused image
       pType: color
     :param classColormap:
-      helpText: Colormap to use for fill colors by component class
+      helpText: "Colormap to use for fill colors by component class. If `None` is selected,
+        the fill will be transparent."
+
       pType: popuplineeditor
       limits: {cmapVals}
     :param fillAlpha:
@@ -205,22 +207,32 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
       return
     classes = FR_SINGLETON.tableData.compClasses
     nClasses = len(classes)
-    cmap = cm.get_cmap(classColormap, nClasses)
+    def colorsWithAlpha(_classIdxs: Sequence[int]):
+      useAlpha = fillAlpha
+      if classColormap == 'None':
+        cmap = lambda _classes: np.zeros((len(_classes), 4))
+        useAlpha = 0.0
+      else:
+        cmap = cm.get_cmap(classColormap, nClasses)
+      colors = cmap(_classIdxs)
+      colors[:,-1] = useAlpha
+      return colors
     selectedFill = pg.Color(selectedFill)
     focusedFill = pg.Color(focusedFill)
 
     penColors = pg.mkPen(color=penColor, width=penWidth)
 
     focusedFill = np.array(pg.Color(focusedFill).getRgbF())
+    focusedFill[-1] = fillAlpha
     selectedFill = np.array(pg.Color(selectedFill).getRgbF())
+    selectedFill[-1] = fillAlpha
     # combinedFill = (focusedFill + selectedFill)/2
-    fillColors = cmap(self.regionData[RTF.COMP_CLASS])
+    fillColors = colorsWithAlpha(self.regionData[RTF.COMP_CLASS])
     selected = self.regionData['selected'].to_numpy()
     focused = self.regionData['focused'].to_numpy()
     fillColors[selected] = selectedFill
     fillColors[focused] = focusedFill
     # fillColors[focused & selected] = combinedFill
-    fillColors[:,-1] = fillAlpha
 
     self.setPen(penColors)
     self.setBrush([pg.Color(f*255) for f in fillColors])
