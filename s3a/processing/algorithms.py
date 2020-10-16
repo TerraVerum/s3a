@@ -337,6 +337,22 @@ def k_means(image: NChanImg, kVal=5, attempts=10):
 
   return FRProcessIO(image=lbls, imgMeans=imgMeans, summaryInfo={'image': imgMeans[lbls]})
 
+def keep_regions_touching_roi(image: BlackWhiteImg, fgVerts: FRVertices):
+  """
+  For a given binary image input, only keeps connected components that are directly in
+  contact with at least one of the specified vertices. In essence, this function can make
+  a wide variety of operations behave similarly to region growing.
+  """
+  if image.ndim > 2:
+    raise FRAlgProcessorError('Cannot handle multichannel images.\n'
+                              f'(image.shape={image.shape})')
+  out = np.zeros_like(image)
+  seeds = fgVerts[:,::-1]
+  seeds = np.clip(seeds, 0, np.array(image.shape)-1)
+  for seed in seeds:
+    out |= flood(image, tuple(seed))
+  return out
+
 def binarize_kmeans(image: NChanImg, fgVerts: FRVertices, imgMeans: np.ndarray,
                     decisionMetric='Remove Boundary Labels'):
   """
@@ -409,8 +425,10 @@ class FRTopLevelImageProcessors:
 
   @staticmethod
   def c_kMeansProcessor():
-    proc = FRImageProcess.fromFunction(k_means, name='K Means')
+    proc = FRImageProcess.fromFunction(k_means)
     proc.addFunction(binarize_kmeans)
+    # Add as process so it can be disabled
+    proc.addProcess(FRImageProcess.fromFunction(keep_regions_touching_roi, needsWrap=True))
     return proc
 
   @staticmethod
