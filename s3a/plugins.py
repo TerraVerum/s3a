@@ -133,7 +133,7 @@ class FRVerticesPlugin(FRTableFieldPlugin):
         newVertList.append(vertList-offset)
       centeredVerts.append(newVertList)
     centeredData[RTF.VERTICES] = centeredVerts
-    if np.any(fImg.bbox[0,:] != offset) or not oldData[RTF.VERTICES].equals(centeredData[RTF.VERTICES]):
+    if np.any(fImg.bbox[0,:] != offset) or not oldData.equals(centeredData):
       self.region.resetRegionList(newRegionDf=centeredData)
       yield
     else:
