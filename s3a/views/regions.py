@@ -164,7 +164,7 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
                            self.regionData.index):
       concatRegion, isfinite = stackedVertsPlusConnections(region)
       boundLoc = np.nanmin(concatRegion, 0, keepdims=True)
-      boundSymbol = pg.arrayToQPath(*(concatRegion-boundLoc).T, connect=isfinite)
+      boundSymbol = pg.arrayToQPath(*(concatRegion-boundLoc+0.5).T, connect=isfinite)
 
       boundLocs.append(boundLoc)
       boundSymbs.append(boundSymbol)
