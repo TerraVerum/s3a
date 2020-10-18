@@ -4,13 +4,13 @@ from typing import Tuple
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 import numpy as np
 
-from s3a.views.imageareas import FREditableImgBase
+from s3a.views.imageareas import EditableImgBase
 from s3a.views.rois import SHAPE_ROI_MAPPING
 from s3a.constants import FR_CONSTS
 
 shapes = tuple(SHAPE_ROI_MAPPING.keys())
-editableImg = FREditableImgBase(drawShapes=shapes,
-                                drawActions=(FR_CONSTS.DRAW_ACT_SELECT,))
+editableImg = EditableImgBase(drawShapes=shapes,
+                              drawActions=(FR_CONSTS.DRAW_ACT_SELECT,))
 clctn = editableImg.shapeCollection
 
 def leftClick(pt: Tuple[int, int]):
@@ -25,7 +25,7 @@ def leftClick(pt: Tuple[int, int]):
 
 @pytest.fixture
 def mouseDragFactory(qtbot):
-  def mouseDrag(widget: FREditableImgBase, startPos, endPos):
+  def mouseDrag(widget: EditableImgBase, startPos, endPos):
     startPos = widget.imgItem.mapToScene(startPos)
     endPos = widget.imgItem.mapToScene(endPos)
     press = QtGui.QMouseEvent(QtGui.QMouseEvent.MouseButtonPress,

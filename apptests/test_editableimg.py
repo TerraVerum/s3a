@@ -5,12 +5,12 @@ import pytest
 from pyqtgraph.Qt import QtGui, QtCore
 
 from conftest import NUM_COMPS, app, mgr, dfTester, vertsPlugin
-from s3a import FR_SINGLETON, FRComponentIO as frio, REQD_TBL_FIELDS
+from s3a import FR_SINGLETON, ComponentIO as frio, REQD_TBL_FIELDS
 from s3a.constants import FR_CONSTS
-from s3a.controls.drawctrl import FRRoiCollection
-from s3a.parameditors.algcollection import FRAlgParamEditor
-from s3a.processing import FRProcessIO, FRImageProcess, FRImgProcWrapper
-from s3a.structures import FRVertices, FRComplexVertices, FRParam, FRS3AWarning, NChanImg
+from s3a.controls.drawctrl import RoiCollection
+from s3a.parameditors.algcollection import AlgParamEditor
+from s3a.processing import ProcessIO, ImageProcess, ImgProcWrapper
+from s3a.structures import XYVertices, ComplexXYVertices, FRParam, S3AWarning, NChanImg
 from testingconsts import FIMG_SER_COLS
 
 # Construct app outside setUp to drastically reduce loading times
@@ -26,7 +26,7 @@ fImg = app.focusedImg
 
 mgr.addComps(dfTester.compDf)
 
-def leftClickGen(pos: FRVertices, dbclick=False):
+def leftClickGen(pos: XYVertices, dbclick=False):
   Ev = QtCore.QEvent
   Qt = QtCore.Qt
   if dbclick:
@@ -39,9 +39,9 @@ def leftClickGen(pos: FRVertices, dbclick=False):
 
 @pytest.fixture
 def roiFactory():
-  clctn = FRRoiCollection((FR_CONSTS.DRAW_SHAPE_POLY, FR_CONSTS.DRAW_SHAPE_RECT),
-                          app.focusedImg)
-  def _polyRoi(pts: FRVertices, shape: FRParam=FR_CONSTS.DRAW_SHAPE_RECT):
+  clctn = RoiCollection((FR_CONSTS.DRAW_SHAPE_POLY, FR_CONSTS.DRAW_SHAPE_RECT),
+                        app.focusedImg)
+  def _polyRoi(pts: XYVertices, shape: FRParam=FR_CONSTS.DRAW_SHAPE_RECT):
     clctn.curShapeParam = shape
     for pt in pts:
       ev = leftClickGen(pt)
@@ -91,8 +91,8 @@ def test_region_modify(sampleComps):
   vertsPlugin.updateRegionFromDf(None)
   # assert imsum() == 0
 
-  newVerts = FRVertices([[5,5], [reach, reach], [reach, 5], [5,5]])
-  cplxVerts = FRComplexVertices([newVerts])
+  newVerts = XYVertices([[5,5], [reach, reach], [reach, 5], [5,5]])
+  cplxVerts = ComplexXYVertices([newVerts])
   newMask = cplxVerts.toMask(shapeBnds, asBool=False, fillColor=fImg.classIdx+1)
 
   # 2nd action
@@ -116,7 +116,7 @@ def test_region_modify(sampleComps):
 @pytest.mark.withcomps
 def test_selectionbounds_all():
   imBounds = app.mainImg.image.shape[:2][::-1]
-  bounds = FRVertices([[0,0],
+  bounds = XYVertices([[0,0],
                        [0, imBounds[1]],
                        [imBounds[0], imBounds[1]],
                         [imBounds[0], 0]])
@@ -128,15 +128,15 @@ def test_selectionbounds_none():
   app.compTbl.clearSelection()
   app.compDisplay.selectedIds = np.array([], dtype=int)
   # Selection in negative area ensures no comps will be selected
-  app.mainImg.sigSelectionBoundsMade.emit(FRVertices([[-100,-100]]))
+  app.mainImg.sigSelectionBoundsMade.emit(XYVertices([[-100,-100]]))
   assert len(app.compDisplay.selectedIds) == 0
 
 def test_proc_err(tmpdir):
   def badProc(image: NChanImg):
-    return FRProcessIO(image=image, extra=1/0)
-  newCtor = lambda: FRImageProcess.fromFunction(badProc, 'Bad')
-  newClctn = FRAlgParamEditor(Path(tmpdir), [newCtor], FRImgProcWrapper)
+    return ProcessIO(image=image, extra=1 / 0)
+  newCtor = lambda: ImageProcess.fromFunction(badProc, 'Bad')
+  newClctn = AlgParamEditor(Path(tmpdir), [newCtor], ImgProcWrapper)
 
   newClctn.switchActiveProcessor('Bad')
-  with pytest.warns(FRS3AWarning):
-    newClctn.curProcessor.run(image=np.array([[True]], dtype=bool), fgVerts=FRVertices([[0,0]]))
+  with pytest.warns(S3AWarning):
+    newClctn.curProcessor.run(image=np.array([[True]], dtype=bool), fgVerts=XYVertices([[0,0]]))

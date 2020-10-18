@@ -53,12 +53,12 @@ class _FREnums(Enum):
 
 FR_ENUMS = _FREnums
 
-from s3a.structures import FRComplexVertices, FRParam, FRParamGroup, newParam
+from s3a.structures import ComplexXYVertices, FRParam, FRParamGroup, newParam
 
 @dataclass
 class _ReqdTableFields(FRParamGroup):
   INST_ID          : FRParam = newParam('Instance ID', -1)
-  VERTICES         : FRParam = newParam('Vertices', FRComplexVertices())
+  VERTICES         : FRParam = newParam('Vertices', ComplexXYVertices())
   ANN_AUTHOR       : FRParam = newParam('Author', "")
   SRC_IMG_FILENAME : FRParam = newParam('Source Image Filename', "")
   ANN_TIMESTAMP    : FRParam = newParam('Timestamp', "")

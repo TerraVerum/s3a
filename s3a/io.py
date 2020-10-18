@@ -15,8 +15,8 @@ from typing_extensions import Literal
 from s3a.constants import REQD_TBL_FIELDS as RTF
 from s3a.generalutils import augmentException, getCroppedImg, resize_pad
 from s3a.parameditors import FR_SINGLETON
-from s3a.structures import FRParamGroup, FRS3AWarning, FRIOError, FilePath, GrayImg, \
-  FRComplexVertices, FRParam
+from s3a.structures import FRParamGroup, S3AWarning, S3AIOError, FilePath, GrayImg, \
+  ComplexXYVertices, FRParam
 
 FilePathOrDf = Union[FilePath, pd.DataFrame]
 
@@ -26,7 +26,7 @@ def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> pd.Series:
   funcMap = {
     # Format string to look like a list, use ast to convert that string INTO a list, make a numpy array from the list
     np.ndarray        : lambda strVal: np.array(literal_eval(strVal)),
-    FRComplexVertices : FRComplexVertices.deserialize,
+    ComplexXYVertices : ComplexXYVertices.deserialize,
     bool              : lambda strVal: strVal.lower() == 'true',
     FRParam           : lambda strVal: FRParamGroup.fromString(paramVal.group, strVal)
   }
@@ -41,14 +41,14 @@ def _paramSerToStrSer(paramSer: pd.Series, paramVal: Any) -> pd.Series:
   funcMap = {
     # Format string to look like a list, use ast to convert that string INTO a list, make a numpy array from the list
     np.ndarray: lambda param: str(param.tolist()),
-    FRComplexVertices: FRComplexVertices.serialize,
+    ComplexXYVertices: ComplexXYVertices.serialize,
   }
   defaultFunc = lambda param: str(param)
 
   funcToUse = funcMap.get(paramType, defaultFunc)
   return paramSer.apply(funcToUse)
 
-class FRComponentIO:
+class ComponentIO:
   """
   Exporter responsible for saving Component information to a file or object.
   Once created, users can extract different representations of components by
@@ -108,7 +108,7 @@ class FRComponentIO:
              ' table values. To rectify this, a multi-cell overwrite was performed'
              ' for the following cells (shown as <id>: <column>):\n'
              + f'{problemMsg}\n'
-               f'Please try exporting again to confirm the cleanup was successful.', FRS3AWarning)
+               f'Please try exporting again to confirm the cleanup was successful.', S3AWarning)
     return ret
 
   @classmethod
@@ -128,7 +128,7 @@ class FRComponentIO:
     cmpTypes = np.array(list(cls.handledIoTypes.keys()))
     typIdx = [typ in fname for typ in cmpTypes]
     if not any(typIdx):
-      raise FRIOError(f'Not sure how to handle file {fpath.stem}')
+      raise S3AIOError(f'Not sure how to handle file {fpath.stem}')
     fnNameSuffix = cmpTypes[typIdx][-1].title().replace('.', '')
     return getattr(cls, buildOrExport+fnNameSuffix, None)
 
@@ -168,7 +168,7 @@ class FRComponentIO:
     :param outFile: Name of the output file location. If *None*, no file is created. However,
       the export object will still be created and returned.
     :param pdExportArgs: Dictionary of values passed to underlying pandas export function.
-      These will overwrite the default options for :func:`exportToFile <FRComponentMgr.exportToFile>`
+      These will overwrite the default options for :func:`exportToFile <ComponentMgr.exportToFile>`
     :param readOnly: Whether this export should be read-only
     :return: Export version of the component data.
     """
@@ -254,7 +254,7 @@ class FRComponentIO:
         compCls = str(row[RTF.COMP_CLASS])
         if 'compClass' in useKeys:
           outDf['compClass'].append(compCls)
-        maskVerts: FRComplexVertices = row[RTF.VERTICES].copy()
+        maskVerts: ComplexXYVertices = row[RTF.VERTICES].copy()
         for verts in maskVerts:
           verts -= bounds[0,:]
         allVerts = maskVerts.stack()
@@ -287,7 +287,7 @@ class FRComponentIO:
   @classmethod
   def exportPkl(cls, compDf: df, outFile: Union[str, Path]=None, **exportArgs) -> (Any, str):
     """
-    See the function signature for :func:`exportCsv <FRComponentIO.exportCsv>`
+    See the function signature for :func:`exportCsv <ComponentIO.exportCsv>`
     """
     # Since the write-out is a single operation there isn't an intermediate form to return
     pklDf = None
@@ -322,11 +322,11 @@ class FRComponentIO:
     :return:
     """
     if imShape is None:
-      vertMax = FRComplexVertices.stackedMax(compDf[RTF.VERTICES])
+      vertMax = ComplexXYVertices.stackedMax(compDf[RTF.VERTICES])
       imShape = tuple(vertMax[::-1] + 1)
     outMask = np.zeros(imShape[:2], 'int32')
     for idx, comp in compDf.iterrows():
-      verts: FRComplexVertices = comp[RTF.VERTICES]
+      verts: ComplexXYVertices = comp[RTF.VERTICES]
       idx: int
       outMask = verts.toMask(outMask, idx+1, False, False)
 
@@ -411,7 +411,7 @@ class FRComponentIO:
     """
     Deserializes data from a csv file to create a Component :class:`DataFrame`.
     The input .csv should be the same format as one exported by
-    :func:`csvImport <FRComponentMgr.csvImport>`.
+    :func:`csvImport <ComponentMgr.csvImport>`.
 
     :param imShape: If included, this ensures all imported components lie within imSize
            boundaries. If any components do not, an error is thrown since this is
@@ -472,7 +472,7 @@ class FRComponentIO:
 
     for idx, row in inDf.iterrows():
       mask = cls._strToNpArray(row.semanticMask, dtype=bool)
-      verts = FRComplexVertices.fromBwMask(mask)
+      verts = ComplexXYVertices.fromBwMask(mask)
       offset = cls._strToNpArray(row.offset)
       for v in verts: v += offset
       allVerts.append(verts)
@@ -543,7 +543,7 @@ class FRComponentIO:
     if len(offendingIds) > 0:
       warn(f'Vertices on some components extend beyond image dimensions. '
            f'Perhaps this export came from a different image?\n'
-           f'Offending IDs: {offendingIds}', FRS3AWarning)
+           f'Offending IDs: {offendingIds}', S3AWarning)
 
   @classmethod
   def _idImgToDf(cls, idImg: GrayImg):
@@ -552,7 +552,7 @@ class FRComponentIO:
     regionIds = regionIds[regionIds != 0]
     allVerts = []
     for curId in regionIds:
-      verts = FRComplexVertices.fromBwMask(idImg == curId)
+      verts = ComplexXYVertices.fromBwMask(idImg == curId)
       allVerts.append(verts)
     outDf = FR_SINGLETON.tableData.makeCompDf(regionIds.size)
     # Subtract 1 since instance ids are 0-indexed

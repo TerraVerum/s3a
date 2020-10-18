@@ -6,12 +6,12 @@ from pyqtgraph.Qt import QtWidgets, QtGui, QtCore
 from s3a.structures import FRParam
 from s3a import parameditors
 
-__all__ = ['FRDrawOpts', 'FRButtonCollection']
+__all__ = ['DrawOpts', 'ButtonCollection']
 
 class _DEFAULT_OWNER: pass
 """None is a valid owner, so create a sentinel that's not valid"""
 btnCallable = Callable[[FRParam], Any]
-class FRButtonCollection(QtWidgets.QGroupBox):
+class ButtonCollection(QtWidgets.QGroupBox):
   def __init__(self, parent=None, title: str=None, btnParams: Collection[FRParam]=(),
                btnTriggerFns: Union[btnCallable, Collection[btnCallable]]=(),
                exclusive=True, checkable=True, ownerObj=_DEFAULT_OWNER):
@@ -60,8 +60,8 @@ class FRButtonCollection(QtWidgets.QGroupBox):
 
   @classmethod
   def fromToolsEditors(cls,
-                       toolsEditors: Union[parameditors.FRParamEditor,
-                       Sequence[parameditors.FRParamEditor]],
+                       toolsEditors: Union[parameditors.ParamEditor,
+                       Sequence[parameditors.ParamEditor]],
                        parent=None):
     toolParams = []
     toolFns = []
@@ -73,11 +73,11 @@ class FRButtonCollection(QtWidgets.QGroupBox):
           toolParams.append(param.opts['frParam'])
           toolFns.append(lambda *_args, _param=param: _param.sigActivated.emit(_param))
     # Don't create shortcuts since this will be done by the tool editor
-    return FRButtonCollection(parent, title='Tools', btnParams=toolParams,
-                                       btnTriggerFns=toolFns, exclusive=False, checkable=False)
+    return ButtonCollection(parent, title='Tools', btnParams=toolParams,
+                            btnTriggerFns=toolFns, exclusive=False, checkable=False)
 
-class FRDrawOpts(QtWidgets.QWidget):
-  def __init__(self, shapeGrp: FRButtonCollection, actGrp: FRButtonCollection,
+class DrawOpts(QtWidgets.QWidget):
+  def __init__(self, shapeGrp: ButtonCollection, actGrp: ButtonCollection,
                parent: QtWidgets.QWidget=None):
     """
     Creates a draw options widget hosting both shape and action selection buttons.

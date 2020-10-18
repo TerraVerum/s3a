@@ -8,21 +8,21 @@ import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
 
-from s3a import FRComplexVertices, FRComponentIO
+from s3a import ComplexXYVertices, ComponentIO
 from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS
 from s3a.constants import FR_ENUMS
-from s3a.controls.tableviewproxy import FRCompDisplayFilter, FRCompSortFilter
+from s3a.controls.tableviewproxy import CompDisplayFilter, CompSortFilter
 from s3a.generalutils import resolveAuthorName, imgCornerVertices
 from s3a.graphicsutils import addDirItemsToMenu, saveToFile
-from s3a.models.tablemodel import FRComponentMgr
-from s3a.parameditors import FRParamEditor
-from s3a.parameditors import FRParamEditorPlugin
+from s3a.models.tablemodel import ComponentMgr
+from s3a.parameditors import ParamEditor
+from s3a.parameditors import ParamEditorPlugin
 from s3a.parameditors import FR_SINGLETON
-from s3a.parameditors.appstate import FRAppStateEditor
-from s3a.structures import FilePath, NChanImg, FRIOError, \
-  FRAlgProcessorError, FRS3AWarning
-from s3a.views.imageareas import FRMainImage, FRFocusedImage
-from s3a.views.tableview import FRCompTableView
+from s3a.parameditors.appstate import AppStateEditor
+from s3a.structures import FilePath, NChanImg, S3AIOError, \
+  AlgProcessorError, S3AWarning
+from s3a.views.imageareas import MainImage, FocusedImage
+from s3a.views.tableview import CompTableView
 
 __all__ = ['S3ABase']
 
@@ -39,27 +39,27 @@ class S3ABase(QtWidgets.QMainWindow):
 
   def __init__(self, parent=None, **quickLoaderArgs):
     super().__init__(parent)
-    self.mainImg = FRMainImage()
-    self.focusedImg = FRFocusedImage()
+    self.mainImg = MainImage()
+    self.focusedImg = FocusedImage()
     self.focusedImg.toolsEditor.registerFunc(self.acceptFocusedRegion,
                                              btnOpts=FR_CONSTS.TOOL_ACCEPT_FOC_REGION)
 
-    self.compMgr = FRComponentMgr()
+    self.compMgr = ComponentMgr()
     # Register exporter to allow user parameters
-    ioCls = FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_EXPORTER)(FRComponentIO)
+    ioCls = FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_EXPORTER)(ComponentIO)
     ioCls.exportOnlyVis, ioCls.includeFullSourceImgName = \
       FR_SINGLETON.generalProps.registerProps(ioCls,
                                               [FR_CONSTS.EXP_ONLY_VISIBLE, FR_CONSTS.INCLUDE_FNAME_PATH]
                                               )
-    self.compIo: FRComponentIO = ioCls()
+    self.compIo: ComponentIO = ioCls()
 
-    self.compTbl = FRCompTableView()
-    self.compDisplay = FRCompDisplayFilter(self.compMgr, self.mainImg, self.compTbl)
+    self.compTbl = CompTableView()
+    self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl)
 
     self.compTbl.setSortingEnabled(True)
     self.compTbl.setAlternatingRowColors(True)
     # Allow filtering/sorting
-    self.sortFilterProxy = FRCompSortFilter(self.compMgr)
+    self.sortFilterProxy = CompSortFilter(self.compMgr)
     self.compTbl.setModel(self.sortFilterProxy)
 
     self.hasUnsavedChanges = False
@@ -69,9 +69,9 @@ class S3ABase(QtWidgets.QMainWindow):
     # -----
     # INTERFACE WITH QUICK LOADER
     # -----
-    self.appStateEditor = FRAppStateEditor(self, name='App State Editor')
+    self.appStateEditor = AppStateEditor(self, name='App State Editor')
 
-    for plugin in FR_SINGLETON.plugins: # type: FRParamEditorPlugin
+    for plugin in FR_SINGLETON.plugins: # type: ParamEditorPlugin
       plugin.attachS3aRef(self)
 
     def loadCfg(_fname: str):
@@ -164,7 +164,7 @@ class S3ABase(QtWidgets.QMainWindow):
       editor.saveCurStateAsDefault()
 
   @staticmethod
-  def populateParamEditorMenuOpts(objForMenu: FRParamEditor, winMenu: QtWidgets.QMenu,
+  def populateParamEditorMenuOpts(objForMenu: ParamEditor, winMenu: QtWidgets.QMenu,
                                   triggerFn: Callable):
     addDirItemsToMenu(winMenu,
                       objForMenu.saveDir.glob(f'*.{objForMenu.fileType}'),
@@ -206,7 +206,7 @@ class S3ABase(QtWidgets.QMainWindow):
       self.mainImg.drawAction = FR_CONSTS.DRAW_ACT_ADD
       verts = imgCornerVertices(self.mainImg.image)
       newComp = FR_SINGLETON.tableData.makeCompDf(1)
-      newComp.at[REQD_TBL_FIELDS.INST_ID.value, REQD_TBL_FIELDS.VERTICES] = FRComplexVertices([verts])
+      newComp.at[REQD_TBL_FIELDS.INST_ID.value, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices([verts])
       self.add_focusComps(newComp)
       for plugin in FR_SINGLETON.tableFieldPlugins:
         plugin.handleShapeFinished(verts)
@@ -222,7 +222,7 @@ class S3ABase(QtWidgets.QMainWindow):
     mgr = self.compMgr
     focusedId = self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]
     if focusedId not in mgr.compDf.index:
-      warn('Cannot accept region as this component was deleted.', FRS3AWarning)
+      warn('Cannot accept region as this component was deleted.', S3AWarning)
       return
     oldSer = mgr.compDf.loc[focusedId].copy()
 
@@ -313,11 +313,11 @@ class S3ABase(QtWidgets.QMainWindow):
   def loadCompList(self, inFname: str, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
     pathFname = Path(inFname)
     if self.mainImg.image is None:
-      raise FRIOError('Cannot load components when no main image is set.')
+      raise S3AIOError('Cannot load components when no main image is set.')
     fType = pathFname.suffix[1:]
     if not any(fType in typ for typ in self.compIo.handledIoTypes):
-      raise FRIOError(f'Extension {fType} is not recognized. Must be one of:\n'
-                      + self.compIo.handledIoTypes_fileFilter())
+      raise S3AIOError(f'Extension {fType} is not recognized. Must be one of:\n'
+                       + self.compIo.handledIoTypes_fileFilter())
     newComps = self.compIo.buildByFileType(inFname, self.mainImg.image.shape)
     self.compMgr.addComps(newComps, loadType)
 
@@ -327,7 +327,7 @@ class S3ABase(QtWidgets.QMainWindow):
       proc.processor.stageSummary_gui()
     except AttributeError:
       # Processor or proc collection not set
-      raise FRAlgProcessorError('Either no plugin is activated or the activated plugin'
+      raise AlgProcessorError('Either no plugin is activated or the activated plugin'
                                 ' has no processors')
 
   @FR_SINGLETON.actionStack.undoable('Create New Comp', asGroup=True)

@@ -12,15 +12,15 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
 
 from s3a.generalutils import frPascalCaseToTitle
-from s3a.structures import FRS3AWarning, FRAlgProcessorError
+from s3a.structures import S3AWarning, AlgProcessorError
 
-__all__ = ['FRProcessIO', 'FRProcessStage', 'FRGeneralProcess', 'FRImageProcess',
-           'FRAtomicProcess']
+__all__ = ['ProcessIO', 'ProcessStage', 'GeneralProcess', 'ImageProcess',
+           'AtomicProcess']
 
 _infoType = t.List[t.Union[t.List, t.Dict[str, t.Any]]]
 class _DUPLICATE_INFO: pass
 
-class FRProcessIO(dict):
+class ProcessIO(dict):
   """
   The object through which the processor pipeline communicates data. Inputs to one process
   become updated by the results from that process, and this updated ProcessIO is used
@@ -56,7 +56,7 @@ class FRProcessIO(dict):
     if len(warnKeys) > 0:
       warn(f'Hyperparameter keys were specified, but did not exist in provided'
            f' inputs:\n{warnKeys}\n'
-           f'Defaulting to `None` for those keys.', FRS3AWarning)
+           f'Defaulting to `None` for those keys.', S3AWarning)
     super().__init__(**kwargs)
     self.keysFromPrevIO = set(self.keys()) - set(self.hyperParamKeys)
 
@@ -92,12 +92,12 @@ class FRProcessIO(dict):
         del outDict[key]
     return cls(hyperParamKeys, **outDict)
 
-class FRProcessStage(ABC):
+class ProcessStage(ABC):
   name: str
-  input: FRProcessIO = None
+  input: ProcessIO = None
   allowDisable = False
   disabled = False
-  result: FRProcessIO = None
+  result: ProcessIO = None
   mainResultKeys: t.List[str] = None
 
 
@@ -112,7 +112,7 @@ class FRProcessStage(ABC):
   def __str__(self) -> str:
     return repr(self)
 
-  def updateInput(self, prevIo: FRProcessIO):
+  def updateInput(self, prevIo: ProcessIO):
     """
     Helper function to update current inputs from previous ones while ignoring leading
     underscores.
@@ -127,20 +127,20 @@ class FRProcessStage(ABC):
       elif fmtK in requiredKeyFmt:
         missingKeys.append(fmtK)
     if len(missingKeys) > 0:
-      raise FRAlgProcessorError(f'Missing Following keys from {self}: {missingKeys}')
+      raise AlgProcessorError(f'Missing Following keys from {self}: {missingKeys}')
 
-  def run(self, io: FRProcessIO=None, disable=False):
+  def run(self, io: ProcessIO=None, disable=False):
     raise NotImplementedError
 
   def __call__(self, **kwargs):
-    self.run(FRProcessIO(**kwargs))
+    self.run(ProcessIO(**kwargs))
 
   @property
   @abstractmethod
   def stages_flattened(self):
     raise NotImplementedError
 
-class FRAtomicProcess(FRProcessStage):
+class AtomicProcess(ProcessStage):
   """
   Often, process functions return a single argument (e.g. string of text,
   processed image, etc.). In these cases, it is beneficial to know what name should
@@ -171,8 +171,8 @@ class FRAtomicProcess(FRProcessStage):
       self.mainResultKeys = mainResultKeys
 
     self.name = name
-    self.input = FRProcessIO.fromFunction(func, **overriddenDefaults)
-    self.result: t.Optional[FRProcessIO] = None
+    self.input = ProcessIO.fromFunction(func, **overriddenDefaults)
+    self.result: t.Optional[ProcessIO] = None
 
     if needsWrap:
       func = self._wrappedFunc(func, self.mainResultKeys)
@@ -190,18 +190,18 @@ class FRAtomicProcess(FRProcessStage):
     if len(mainResultKeys) == 1:
       @wraps(func)
       def newFunc(*args, **kwargs):
-        return FRProcessIO(**{mainResultKeys[0]: func(*args, **kwargs)})
+        return ProcessIO(**{mainResultKeys[0]: func(*args, **kwargs)})
     else:
       @wraps(func)
       def newFunc(*args, **kwargs):
-        return FRProcessIO(**{k: val for k, val in zip(mainResultKeys, func(*args, **kwargs))})
+        return ProcessIO(**{k: val for k, val in zip(mainResultKeys, func(*args, **kwargs))})
     return newFunc
 
   @property
   def keysFromPrevIO(self):
     return self.input.keysFromPrevIO
 
-  def run(self, prevIO: FRProcessIO=None, disable=False):
+  def run(self, prevIO: ProcessIO=None, disable=False):
     if prevIO is not None:
       self.updateInput(prevIO)
     if not disable:
@@ -215,16 +215,16 @@ class FRAtomicProcess(FRProcessStage):
     return [self]
 
 
-class FRGeneralProcess(FRProcessStage):
+class GeneralProcess(ProcessStage):
 
   def __init__(self, name: str=None):
-    self.stages: t.List[FRProcessStage] = []
+    self.stages: t.List[ProcessStage] = []
     self.name = name
     self.allowDisable = True
 
   def addFunction(self, func: t.Callable, name: str=None, needsWrap=False, **overriddenDefaults):
     """See function signature for AtomicProcess for input explanation"""
-    atomic = FRAtomicProcess(func, name, needsWrap, self.mainResultKeys, **overriddenDefaults)
+    atomic = AtomicProcess(func, name, needsWrap, self.mainResultKeys, **overriddenDefaults)
     numSameNames = 0
     for stage in self.stages:
       if atomic.name == stage.name.split('#')[0]:
@@ -246,19 +246,19 @@ class FRGeneralProcess(FRProcessStage):
   @classmethod
   def wrap(cls, name: str=None, needsAdditionalWrap=False, **overriddenDefaults):
     def _innerDeco(func: t.Callable):
-      return FRImageProcess.fromFunction(func, name, needsAdditionalWrap, **overriddenDefaults)
+      return ImageProcess.fromFunction(func, name, needsAdditionalWrap, **overriddenDefaults)
     return _innerDeco
 
-  def addProcess(self, process: FRGeneralProcess):
+  def addProcess(self, process: GeneralProcess):
     if self.name is None:
       self.name = process.name
     self.stages.append(process)
     return process
 
 
-  def run(self, io: FRProcessIO = None, disable=False):
+  def run(self, io: ProcessIO = None, disable=False):
     if io is None:
-      _activeIO = FRProcessIO()
+      _activeIO = ProcessIO()
     else:
       _activeIO = copy.copy(io)
 
@@ -278,7 +278,7 @@ class FRGeneralProcess(FRProcessStage):
 
   @property
   def stages_flattened(self):
-    outStages: t.List[FRProcessStage] = []
+    outStages: t.List[ProcessStage] = []
     for stage in self.stages:
       outStages.extend(stage.stages_flattened)
     return outStages
@@ -289,16 +289,16 @@ class FRGeneralProcess(FRProcessStage):
   def _nonDisabledStages_flattened(self):
     out = []
     for stage in self.stages:
-      if isinstance(stage, FRAtomicProcess):
+      if isinstance(stage, AtomicProcess):
         out.append(stage)
       elif not stage.disabled:
-        stage: FRGeneralProcess
+        stage: GeneralProcess
         out.extend(stage._nonDisabledStages_flattened())
     return out
 
   def stageSummary_gui(self):
     if self.result is None:
-      raise FRAlgProcessorError('Analytics can only be shown after the algorithmwas run.')
+      raise AlgProcessorError('Analytics can only be shown after the algorithmwas run.')
     outGrid = self._stageSummaryWidget()
     outGrid.showMaximized()
     def fixedShow():
@@ -352,7 +352,7 @@ class FRGeneralProcess(FRProcessStage):
       validInfos.append(validInfo)
     return validInfos
 
-class FRImageProcess(FRGeneralProcess):
+class ImageProcess(GeneralProcess):
   mainResultKeys = ['image']
 
   @classmethod
@@ -415,7 +415,7 @@ class FRImageProcess(FRGeneralProcess):
 
 _winRefs = {}
 
-class FRCategoricalProcess(FRGeneralProcess):
+class CategoricalProcess(GeneralProcess):
   def _stageSummaryWidget(self):
     pass
 

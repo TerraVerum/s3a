@@ -4,13 +4,13 @@ from pyqtgraph.GraphicsScene.mouseEvents import MouseDragEvent
 from pyqtgraph.Qt import QtCore, QtGui
 from skimage.measure import points_in_poly
 
-from s3a.structures import FRVertices
+from s3a.structures import XYVertices
 
 Signal = QtCore.Signal
 
-__all__ = ['FRBoundScatterPlot', 'FRRightPanViewBox']
+__all__ = ['BoundScatterPlot', 'RightPanViewBox']
 
-class FRBoundScatterPlot(pg.ScatterPlotItem):
+class BoundScatterPlot(pg.ScatterPlotItem):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     # TODO: Find out where the mouse is and make sure it's above a point before changing
@@ -25,7 +25,7 @@ class FRBoundScatterPlot(pg.ScatterPlotItem):
   #   else:
   #     self.unsetCursor()
 
-  def boundsWithin(self, selection: FRVertices):
+  def boundsWithin(self, selection: XYVertices):
     # TODO: Optimize for rectangular selections
     # polyPoints = [QtCore.QPointF(*row) for row in selection]
     # selectionPoly = QtGui.QPolygonF(polyPoints)
@@ -94,7 +94,7 @@ class FRBoundScatterPlot(pg.ScatterPlotItem):
       self._maxSpotPxWidth = max(self._maxSpotPxWidth, pxWidth)
     self.bounds = [None, None]
 
-class FRRightPanViewBox(pg.ViewBox):
+class RightPanViewBox(pg.ViewBox):
   def mouseDragEvent(self, ev: MouseDragEvent, axis=None):
     if ev.buttons() == QtCore.Qt.RightButton \
         or ev.button() == QtCore.Qt.RightButton:

@@ -1,3 +1,3 @@
 from .processing import *
-from .algorithms import FRTopLevelImageProcessors
+from .algorithms import TopLevelImageProcessors
 from .guiwrapper import *

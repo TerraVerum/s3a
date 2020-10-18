@@ -14,7 +14,7 @@ from ruamel.yaml import YAML
 
 import s3a
 from s3a.constants import ANN_AUTH_DIR
-from s3a.structures import FRIOError, FRS3AException, FilePath, FRS3AWarning
+from s3a.structures import S3AIOError, S3AException, FilePath, S3AWarning
 
 yaml = YAML()
 
@@ -68,7 +68,7 @@ def saveToFile(saveObj, savePath: Path, allowOverwriteDefault=False):
   if not allowOverwriteDefault and savePath.stem.lower() == 'default':
     errMsg = 'Cannot overwrite default setting.\n\'Default\' is automatically' \
              ' generated, so it should not be modified.'
-    raise FRIOError(errMsg)
+    raise S3AIOError(errMsg)
   else:
     # Known pycharm bug
     # noinspection PyTypeChecker
@@ -161,7 +161,7 @@ def create_addMenuAct(mainWin: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, t
     return act
 
 
-class FRPopupLineEditor(QtWidgets.QLineEdit):
+class PopupLineEditor(QtWidgets.QLineEdit):
   def __init__(self, parent: QtWidgets.QWidget=None, model: QtCore.QAbstractListModel=None,
                placeholderText='Press Tab or type...', clearOnComplete=True,
                forceMatch=True):
@@ -243,9 +243,9 @@ def makeExceptionsShowDialogs(win: QtWidgets.QMainWindow):
       raise
     msgWithTrace = ''.join(format_exception(etype, evalue, tb))
     msgWithoutTrace = str(evalue)
-    dlg = FRScrollableErrorDialog(win, notCritical=issubclass(etype, (FRS3AException,
-                                                                      FRS3AWarning)),
-                                  msgWithTrace=msgWithTrace, msgWithoutTrace=msgWithoutTrace)
+    dlg = ScrollableErrorDialog(win, notCritical=issubclass(etype, (S3AException,
+                                                                    S3AWarning)),
+                                msgWithTrace=msgWithTrace, msgWithoutTrace=msgWithoutTrace)
     dlg.show()
     dlg.exec_()
   def patch_excepthook():
@@ -273,7 +273,7 @@ def raiseErrorLater(err: Exception):
   QtCore.QTimer.singleShot(0, _raise)
 
 
-class FRScrollableErrorDialog(QtWidgets.QDialog):
+class ScrollableErrorDialog(QtWidgets.QDialog):
   def __init__(self, parent: QtWidgets.QWidget=None, notCritical=False,
                msgWithTrace='', msgWithoutTrace=''):
     super().__init__(parent)
@@ -467,7 +467,7 @@ class QAwesomeTooltipEventFilter(QtCore.QObject):
     return super().eventFilter(widget, event)
 
 
-def contextMenuFromEditorActions(editors: Union[s3a.FRParamEditor, Sequence[s3a.FRParamEditor]],
+def contextMenuFromEditorActions(editors: Union[s3a.ParamEditor, Sequence[s3a.ParamEditor]],
                                  title: str=None, menuParent: QtWidgets.QWidget=None):
   if not isinstance(editors, Sequence):
     editors = [editors]

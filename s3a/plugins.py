@@ -6,18 +6,18 @@ import numpy as np
 import pandas as pd
 from pyqtgraph.Qt import QtWidgets
 
-from s3a import FR_SINGLETON, FR_CONSTS as FRC, REQD_TBL_FIELDS as RTF, FRComplexVertices, \
-  FRVertices, FRParam, FRComponentIO as frio
+from s3a import FR_SINGLETON, FR_CONSTS as FRC, REQD_TBL_FIELDS as RTF, ComplexXYVertices, \
+  XYVertices, FRParam, ComponentIO as frio
 from s3a.generalutils import frPascalCaseToTitle
 from s3a.models.s3abase import S3ABase
-from s3a.parameditors import FRParamEditorDockGrouping
-from s3a.parameditors.genericeditor import FRTableFieldPlugin
+from s3a.parameditors import ParamEditorDockGrouping
+from s3a.parameditors.genericeditor import TableFieldPlugin
 from s3a.processing.algorithms import _historyMaskHolder
 from s3a.structures import NChanImg, GrayImg
-from s3a.views.regions import FRMultiRegionPlot, makeMultiRegionDf
+from s3a.views.regions import MultiRegionPlot, makeMultiRegionDf
 
 
-class FRVerticesPlugin(FRTableFieldPlugin):
+class VerticesPlugin(TableFieldPlugin):
   name = 'Vertices'
 
   @classmethod
@@ -25,12 +25,12 @@ class FRVerticesPlugin(FRTableFieldPlugin):
     super().__initEditorParams__()
     cls.procCollection = FR_SINGLETON.imgProcClctn.createProcessorForClass(cls)
 
-    dockGroup = FRParamEditorDockGrouping([cls.toolsEditor, cls.procCollection],
-                                          frPascalCaseToTitle(cls.name))
+    dockGroup = ParamEditorDockGrouping([cls.toolsEditor, cls.procCollection],
+                                        frPascalCaseToTitle(cls.name))
     cls.docks = dockGroup
 
   def __init__(self):
-    self.region = FRMultiRegionPlot()
+    self.region = MultiRegionPlot()
     self.region.hide()
     self.firstRun = True
 
@@ -73,7 +73,7 @@ class FRVerticesPlugin(FRTableFieldPlugin):
     self.updateRegionFromDf(self.focusedImg.compSer.to_frame().T, self.focusedImg.bbox[0, :])
     self.firstRun = True
 
-  def handleShapeFinished(self, roiVerts: FRVertices):
+  def handleShapeFinished(self, roiVerts: XYVertices):
     roiVerts = roiVerts.astype(int)
     vertsDict = {}
     act = self.focusedImg.drawAction
@@ -101,7 +101,7 @@ class FRVerticesPlugin(FRTableFieldPlugin):
 
 
   @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
-  def updateRegionFromDf(self, newData: pd.DataFrame=None, offset: FRVertices=None):
+  def updateRegionFromDf(self, newData: pd.DataFrame=None, offset: XYVertices=None):
     """
     Updates the current focused region using the new provided vertices
     :param newData: Dataframe to use.If *None*, the image will be totally reset and the component
@@ -122,13 +122,13 @@ class FRVerticesPlugin(FRTableFieldPlugin):
       offset = fImg.bbox[0,:]
     if newData is None:
       newData = makeMultiRegionDf(0)
-    # 0-center new vertices relative to FRFocusedImage image
+    # 0-center new vertices relative to FocusedImage image
     # Make a copy of each list first so we aren't modifying the
     # original data
     centeredData = newData.copy()
     centeredVerts = []
     for complexVerts in centeredData[RTF.VERTICES]:
-      newVertList = FRComplexVertices()
+      newVertList = ComplexXYVertices()
       for vertList in complexVerts:
         newVertList.append(vertList-offset)
       centeredVerts.append(newVertList)
@@ -145,17 +145,17 @@ class FRVerticesPlugin(FRTableFieldPlugin):
 
   def updateRegionFromClsImg(self, clsImg: GrayImg):
     df = frio.buildFromClassPng(clsImg)
-    self.updateRegionFromDf(df, offset=FRVertices([0, 0]))
+    self.updateRegionFromDf(df, offset=XYVertices([0, 0]))
     pass
 
-  def acceptChanges(self, overrideVerts: FRComplexVertices=None):
-    # Add in offset from main image to FRVertexRegion vertices
+  def acceptChanges(self, overrideVerts: ComplexXYVertices=None):
+    # Add in offset from main image to VertexRegion vertices
     ser = self.focusedImg.compSer
     if overrideVerts is not None:
       ser.loc[RTF.VERTICES] = overrideVerts
       return
     newVerts_lst = self.region.regionData[RTF.VERTICES].copy()
-    newVerts = FRComplexVertices()
+    newVerts = ComplexXYVertices()
     for verts in newVerts_lst:
       newVerts.extend(verts.copy())
     for vertList in newVerts:
@@ -181,7 +181,7 @@ class FRVerticesPlugin(FRTableFieldPlugin):
   def _onDeactivate(self):
     self.region.hide()
 
-class Dummy(FRTableFieldPlugin):
+class Dummy(TableFieldPlugin):
   name = 'Dummy'
 
   @classmethod
@@ -203,7 +203,7 @@ class Dummy(FRTableFieldPlugin):
   def updateAll(self, mainImg: Optional[NChanImg], newComp: Optional[pd.Series] = None):
     pass
 
-  def handleShapeFinished(self, roiVerts: FRVertices):
+  def handleShapeFinished(self, roiVerts: XYVertices):
     pass
 
   def acceptChanges(self):

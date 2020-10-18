@@ -4,28 +4,28 @@ from typing import List, Union, Type
 from pyqtgraph.Qt import QtWidgets, QtCore
 
 from s3a.constants import GEN_PROPS_DIR, SCHEMES_DIR, BASE_DIR
-from s3a.models.actionstack import FRActionStack
+from s3a.models.actionstack import ActionStack
 from s3a.structures import FRParam
-from .genericeditor import FRParamEditor, FRParamEditorDockGrouping, FRParamEditorPlugin, \
-  FRTableFieldPlugin
-from .algcollection import FRAlgCtorCollection
-from .quickloader import FRQuickLoaderEditor
-from .shortcut import FRShortcutsEditor
-from .table import FRTableFilterEditor, FRTableData
+from .genericeditor import ParamEditor, ParamEditorDockGrouping, ParamEditorPlugin, \
+  TableFieldPlugin
+from .algcollection import AlgCtorCollection
+from .quickloader import QuickLoaderEditor
+from .shortcut import ShortcutsEditor
+from .table import TableFilterEditor, TableData
 from ..generalutils import frPascalCaseToTitle
-from ..processing import FRImgProcWrapper
+from ..processing import ImgProcWrapper
 
 Signal = QtCore.Signal
 
-__all__ = ['FR_SINGLETON', 'FRParamEditor', 'FRParamEditorDockGrouping', 'FRTableFieldPlugin',
-           'FRParamEditorPlugin']
+__all__ = ['FR_SINGLETON', 'ParamEditor', 'ParamEditorDockGrouping', 'TableFieldPlugin',
+           'ParamEditorPlugin']
 
-class FRAppSettingsEditor(FRParamEditor):
+class AppSettingsEditor(ParamEditor):
   def __init__(self, parent=None):
     super().__init__(parent, paramList=[], saveDir=GEN_PROPS_DIR, fileType='genprops')
 
 
-class FRColorSchemeEditor(FRParamEditor):
+class ColorSchemeEditor(ParamEditor):
   def __init__(self, parent=None):
     super().__init__(parent, paramList=[], saveDir=SCHEMES_DIR, fileType='scheme')
 
@@ -35,24 +35,24 @@ class _FRSingleton(QtCore.QObject):
 
   def __init__(self, parent=None):
     super().__init__(parent)
-    self.actionStack = FRActionStack()
-    self.plugins: List[FRParamEditorPlugin] = []
-    self.tableFieldPlugins: List[FRTableFieldPlugin] = []
+    self.actionStack = ActionStack()
+    self.plugins: List[ParamEditorPlugin] = []
+    self.tableFieldPlugins: List[TableFieldPlugin] = []
 
-    self.tableData = FRTableData()
+    self.tableData = TableData()
     self.tableData.loadCfg(BASE_DIR/'tablecfg.yml')
     self.filter = self.tableData.filter
 
 
-    self.shortcuts = FRShortcutsEditor()
-    self.generalProps = FRAppSettingsEditor()
-    self.colorScheme = FRColorSchemeEditor()
-    self.imgProcClctn = FRAlgCtorCollection(FRImgProcWrapper)
-    self.quickLoader = FRQuickLoaderEditor()
+    self.shortcuts = ShortcutsEditor()
+    self.generalProps = AppSettingsEditor()
+    self.colorScheme = ColorSchemeEditor()
+    self.imgProcClctn = AlgCtorCollection(ImgProcWrapper)
+    self.quickLoader = QuickLoaderEditor()
 
     self.docks: List[QtWidgets.QDockWidget] = []
-    propsGrouping = FRParamEditorDockGrouping([self.generalProps, self.colorScheme], 'General Properties')
-    shcGrouping = FRParamEditorDockGrouping([self.shortcuts, self.quickLoader], 'Shortcuts')
+    propsGrouping = ParamEditorDockGrouping([self.generalProps, self.colorScheme], 'General Properties')
+    shcGrouping = ParamEditorDockGrouping([self.shortcuts, self.quickLoader], 'Shortcuts')
 
     self.addDocks([self.filter, propsGrouping, shcGrouping])
 
@@ -60,7 +60,7 @@ class _FRSingleton(QtCore.QObject):
   def registerableEditors(self):
     outList = []
     for editor in self.docks:
-      if isinstance(editor, FRParamEditorDockGrouping):
+      if isinstance(editor, ParamEditorDockGrouping):
         outList.extend(editor.editors)
       else:
         outList.append(editor)
@@ -75,7 +75,7 @@ class _FRSingleton(QtCore.QObject):
         # This logic is to add editors to quick loader, checking for it prevents recursion
         continue
       self.docks.append(dock)
-      if isinstance(dock, FRParamEditorDockGrouping):
+      if isinstance(dock, ParamEditorDockGrouping):
         for editor in dock.editors:
           if editor in self.docks:
             # The editor will be accounted for as a group, so remove it as an individual
@@ -96,7 +96,7 @@ class _FRSingleton(QtCore.QObject):
       return cls
     return multiEditorClsDecorator
 
-  def addPlugin(self, pluginCls: Type[FRParamEditorPlugin], *args, **kwargs):
+  def addPlugin(self, pluginCls: Type[ParamEditorPlugin], *args, **kwargs):
     """
     From a class inheriting the *FRParamEditorPlugin*, creates a plugin object
     that will appear in the S3A toolbar. An entry is created with dropdown options
@@ -110,8 +110,8 @@ class _FRSingleton(QtCore.QObject):
     if nameToUse is None:
       nameToUse = frPascalCaseToTitle(pluginCls.__name__)
     deco = self.registerGroup(FRParam(nameToUse))
-    plugin: FRParamEditorPlugin = deco(pluginCls)(*args, **kwargs)
-    if isinstance(plugin, FRTableFieldPlugin):
+    plugin: ParamEditorPlugin = deco(pluginCls)(*args, **kwargs)
+    if isinstance(plugin, TableFieldPlugin):
       self.tableFieldPlugins.append(weakref.proxy(plugin))
     if plugin.docks is not None:
       self.addDocks(plugin.docks)

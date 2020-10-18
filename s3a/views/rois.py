@@ -5,21 +5,21 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 import cv2 as cv
 
-from s3a import FRComplexVertices
+from s3a import ComplexXYVertices
 from s3a.constants import FR_CONSTS
 from s3a.structures import FRParam
-from s3a.structures import FRVertices
+from s3a.structures import XYVertices
 
-__all__ = ['FRRectROI', 'FRPaintFillROI', 'FRPolygonROI', 'SHAPE_ROI_MAPPING',
-           'FRExtendedROI']
+__all__ = ['RectROI', 'PaintFillROI', 'PolygonROI', 'SHAPE_ROI_MAPPING',
+           'ExtendedROI']
 
-from s3a.views.clickables import FRBoundScatterPlot
+from s3a.views.clickables import BoundScatterPlot
 
 def _clearPoints(roi: pg.ROI):
   while roi.handles:
     roi.removeHandle(0)
 
-class FRROIExtension:
+class ROIExtension:
   """
   Collection of overloaded rois that know how to update themseleves as needed within
   the annotator regions
@@ -27,9 +27,9 @@ class FRROIExtension:
   connected = True
   shadowPen: Optional[QtGui.QPen] = pg.mkBrush(0, 0, 0, 100, width=2)
 
-  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: FRVertices) -> (bool, Optional[FRVertices]):
+  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: XYVertices) -> (bool, Optional[XYVertices]):
     """
-    Customized update for the FRROI.
+    Customized update for the ROI.
 
     :param ev: Mouse event (press, release, move, etc.)
     :param xyEvCoords: Location of the event relative to the imgItem
@@ -41,7 +41,7 @@ class FRROIExtension:
     """
 
   @property
-  def vertices(self): return FRVertices()
+  def vertices(self): return XYVertices()
 
   def clear(self: pg.ROI):
     while self.handles:
@@ -50,23 +50,23 @@ class FRROIExtension:
       #  even though PolyLine should be able  to handle remove by index, it can't
       self.removeHandle(self.handles[0]['item'])
 
-class FRExtendedROI(FRROIExtension, pg.ROI):
+class ExtendedROI(ROIExtension, pg.ROI):
   """
   Purely for specifying the interface provided by the following classes. This is mainly
   so PyCharm knows what methds and signatures are provided by the ROIs below.
   """
 
 
-class FRRectROI(FRROIExtension, pg.RectROI):
+class RectROI(ROIExtension, pg.RectROI):
   connected = True
 
   def __init__(self):
     super().__init__([-1,-1], [0,0], invertible=True)
 
-  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: FRVertices) -> (
-      bool, Optional[FRVertices]):
+  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: XYVertices) -> (
+      bool, Optional[XYVertices]):
     """
-    See function signature for :func:`FRExtendedROI.updateShape`
+    See function signature for :func:`ExtendedROI.updateShape`
     """
     success = True
     verts = None
@@ -100,7 +100,7 @@ class FRRectROI(FRROIExtension, pg.RectROI):
     return constructingRoi, verts
 
   @property
-  def vertices(self) -> FRVertices:
+  def vertices(self) -> XYVertices:
     origin = np.array([self.pos()])
     sz = np.array([self.size()])
     # Sz will be negative at inverted shape dimensions
@@ -114,10 +114,10 @@ class FRRectROI(FRROIExtension, pg.RectROI):
     # This happens when user clicks -- all verts are in the same spot
     if np.all(verts_np[0,:] == verts_np[1,:]):
       verts_np = verts_np[[0]]
-    verts = FRVertices(verts_np, connected=self.connected, dtype=float)
+    verts = XYVertices(verts_np, connected=self.connected, dtype=float)
     return verts
 
-class FREllipseROI(FRROIExtension, pg.EllipseROI):
+class EllipseROI(ROIExtension, pg.EllipseROI):
   connected = True
   constructingROI = False
 
@@ -135,19 +135,19 @@ class FREllipseROI(FRROIExtension, pg.EllipseROI):
     br = self.boundingRect()
     if not br:
       # point selection intsead of full shape
-      return FRVertices([[*self.pos()]])
+      return XYVertices([[*self.pos()]])
     w_h = np.array([br.height(), br.width()])
     mask = self.renderShapeMask(*(w_h+2)) > 0
-    offsetVerts = FRComplexVertices.fromBwMask(mask).stack() + [*self.pos()]
+    offsetVerts = ComplexXYVertices.fromBwMask(mask).stack() + [*self.pos()]
     # If shape is inverted, must be offset even more to put verts in the right place
     invertedOffset = np.clip(np.array([br.x(), br.y()]), -np.inf, 0)
     return (offsetVerts + invertedOffset).astype(int)
 
 
-  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: FRVertices) -> (
-      bool, Optional[FRVertices]):
+  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: XYVertices) -> (
+      bool, Optional[XYVertices]):
     """
-    See function signature for :func:`FRExtendedROI.updateShape`
+    See function signature for :func:`ExtendedROI.updateShape`
     """
     success = True
     verts = None
@@ -181,7 +181,7 @@ class FREllipseROI(FRROIExtension, pg.EllipseROI):
     return constructingRoi, verts
 
 
-class FRPolygonROI(FRROIExtension, pg.PolyLineROI):
+class PolygonROI(ROIExtension, pg.PolyLineROI):
   connected = True
   constructingRoi = False
 
@@ -192,10 +192,10 @@ class FRPolygonROI(FRROIExtension, pg.PolyLineROI):
     # Force new menu options
     self.finishPolyAct = QtWidgets.QAction()
 
-  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: FRVertices) -> (
-      bool, Optional[FRVertices]):
+  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: XYVertices) -> (
+      bool, Optional[XYVertices]):
     """
-    See function signature for :func:`FRExtendedROI.updateShape`
+    See function signature for :func:`ExtendedROI.updateShape`
     """
     success = True
     verts = None
@@ -233,7 +233,7 @@ class FRPolygonROI(FRROIExtension, pg.PolyLineROI):
 
     return self.constructingRoi, verts
 
-  def addVertex(self, xyEvCoords: FRVertices):
+  def addVertex(self, xyEvCoords: XYVertices):
     """
     Creates a new vertex for the polygon
     :param xyEvCoords: Location for the new vertex
@@ -254,18 +254,18 @@ class FRPolygonROI(FRROIExtension, pg.PolyLineROI):
     origin = np.array(self.pos())
     if len(self.handles) > 0:
       verts_np = np.array([(h['pos'].x(), h['pos'].y()) for h in self.handles]) + origin
-      return FRVertices(verts_np, connected=self.connected, dtype=float)
+      return XYVertices(verts_np, connected=self.connected, dtype=float)
     else:
-      return FRVertices(connected=self.connected, dtype=float)
+      return XYVertices(connected=self.connected, dtype=float)
 
-class FRPaintFillROI(FRPolygonROI):
+class PaintFillROI(PolygonROI):
 
   connected = False
 
-  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: FRVertices) -> (
-      bool, Optional[FRVertices]):
+  def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: XYVertices) -> (
+      bool, Optional[XYVertices]):
     """
-    See function signature for :func:`FRExtendedROI.updateShape`
+    See function signature for :func:`ExtendedROI.updateShape`
     """
     success = True
     verts = None
@@ -292,16 +292,16 @@ class FRPaintFillROI(FRPolygonROI):
       ev.accept()
     return self.constructingRoi, verts
 
-SHAPE_ROI_MAPPING: Dict[FRParam, Callable[[], FRExtendedROI]] = {
-  FR_CONSTS.DRAW_SHAPE_PAINT: FRPaintFillROI,
-  FR_CONSTS.DRAW_SHAPE_RECT: FRRectROI,
-  FR_CONSTS.DRAW_SHAPE_POLY: FRPolygonROI,
-  FR_CONSTS.DRAW_SHAPE_ELLIPSE: FREllipseROI,
+SHAPE_ROI_MAPPING: Dict[FRParam, Callable[[], ExtendedROI]] = {
+  FR_CONSTS.DRAW_SHAPE_PAINT: PaintFillROI,
+  FR_CONSTS.DRAW_SHAPE_RECT: RectROI,
+  FR_CONSTS.DRAW_SHAPE_POLY: PolygonROI,
+  FR_CONSTS.DRAW_SHAPE_ELLIPSE: EllipseROI,
 }
 
-def addShadowToPaint(roi: Type[FRExtendedROI]):
+def addShadowToPaint(roi: Type[ExtendedROI]):
   oldPaint = roi.paint
-  def newPaint(self: FRExtendedROI, p, opt, widget):
+  def newPaint(self: ExtendedROI, p, opt, widget):
     if self.shadowPen not in [None, QtCore.Qt.NoPen]:
       prevPen = self.pen
       p.setBrush(self.shadowPen)
@@ -310,7 +310,7 @@ def addShadowToPaint(roi: Type[FRExtendedROI]):
     # oldPaint(self, p, opt, widget)
 
   oldBoundingRect = roi.boundingRect
-  def newBR(self: FRExtendedROI):
+  def newBR(self: ExtendedROI):
     br = oldBoundingRect(self)
     # Logic adapted for invertible shapes and resizable handles from
     # https://groups.google.com/g/pyqtgraph/c/tWtjJOQF5x4/m/CnQF6IgmDAAJ

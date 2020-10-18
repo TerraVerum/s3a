@@ -7,18 +7,18 @@ from s3a import FR_SINGLETON
 from s3a.views.s3agui import S3A
 from testingconsts import SAMPLE_IMG, SAMPLE_IMG_FNAME, NUM_COMPS, \
   SAMPLE_SMALL_IMG, SAMPLE_SMALL_IMG_FNAME
-from s3a.structures import FRS3AException
-from s3a.plugins import FRVerticesPlugin
+from s3a.structures import S3AException
+from s3a.plugins import VerticesPlugin
 
 app = S3A(Image=SAMPLE_IMG_FNAME, guiMode=False, loadLastState=False, author='testauthor')
 mgr = app.compMgr
 vertsPlugin = None
 for plugin in FR_SINGLETON.tableFieldPlugins:
-  if isinstance(plugin, FRVerticesPlugin):
+  if isinstance(plugin, VerticesPlugin):
     vertsPlugin = plugin
     break
 if vertsPlugin is None:
-  raise FRS3AException('Vertices plugin was not provided. Some tests are guaranteed to fail.')
+  raise S3AException('Vertices plugin was not provided. Some tests are guaranteed to fail.')
 app.focusedImg.changeCurrentPlugin(vertsPlugin)
 stack = FR_SINGLETON.actionStack
 

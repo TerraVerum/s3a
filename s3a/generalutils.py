@@ -9,10 +9,10 @@ import cv2 as cv
 
 from s3a.constants import ANN_AUTH_DIR
 from s3a.structures.typeoverloads import TwoDArr
-from .structures import FRVertices, FRParam, FRComplexVertices, NChanImg
+from .structures import XYVertices, FRParam, ComplexXYVertices, NChanImg
 
 
-def stackedVertsPlusConnections(vertList: FRComplexVertices) -> (FRVertices, np.ndarray):
+def stackedVertsPlusConnections(vertList: ComplexXYVertices) -> (XYVertices, np.ndarray):
   """
   Utility for concatenating all vertices within a list while recording where separations
   occurred
@@ -34,11 +34,11 @@ def stackedVertsPlusConnections(vertList: FRComplexVertices) -> (FRVertices, np.
   allVerts = np.vstack(allVerts)
   isfinite = np.ones(len(allVerts), bool)
   isfinite[separationIdxs] = False
-  return FRVertices(allVerts, dtype=float), isfinite
-  #return FRVertices(dtype=float)
+  return XYVertices(allVerts, dtype=float), isfinite
+  #return XYVertices(dtype=float)
 
 
-def splitListAtNans(concatVerts:FRVertices):
+def splitListAtNans(concatVerts:XYVertices):
   """
   Utility for taking a single list of nan-separated region vertices
   and breaking it into several regions with no nans.
@@ -52,7 +52,7 @@ def splitListAtNans(concatVerts:FRVertices):
     curIdx = nanEntry+1
   # Account for final grouping of verts
   allVerts.append(concatVerts[curIdx:,:].astype('int'))
-  return FRComplexVertices(allVerts, coerceListElements=True)
+  return ComplexXYVertices(allVerts, coerceListElements=True)
 
 def getClippedBbox(arrShape: tuple, bbox: TwoDArr, margin: int):
   """
@@ -92,13 +92,13 @@ def coerceDfTypes(dataframe: df, constParams: Collection[FRParam]=None):
       # Coercion isn't possible, nothing to do here
       pass
 
-def largestList(verts: List[FRVertices]) -> FRVertices:
+def largestList(verts: List[XYVertices]) -> XYVertices:
   maxLenList = []
   for vertList in verts:
     if len(vertList) > len(maxLenList): maxLenList = vertList
   # for vertList in newVerts:
   # vertList += cropOffset[0:2]
-  return FRVertices(maxLenList)
+  return XYVertices(maxLenList)
 
 def helpTextToRichText(helpText: str, prependText='', postfixText=''):
   # Outside <qt> tags
@@ -193,32 +193,32 @@ def _safeCallFuncList(fnNames: Collection[str], funcLst: List[Callable],
       rets.append(None)
   return rets, errs
 
-def cornersToFullBoundary(cornerVerts: Union[FRVertices, FRComplexVertices], sizeLimit: float=np.inf,
-                          fillShape: Tuple[int]=None, stackResult=True) -> Union[FRVertices, FRComplexVertices]:
+def cornersToFullBoundary(cornerVerts: Union[XYVertices, ComplexXYVertices], sizeLimit: float=np.inf,
+                          fillShape: Tuple[int]=None, stackResult=True) -> Union[XYVertices, ComplexXYVertices]:
   """
   From a list of corner vertices, returns a list with one vertex for every border pixel.
   Example:
-  >>> cornerVerts = FRVertices([[0,0], [100,0], [100,100],[0,100]])
+  >>> cornerVerts = XYVertices([[0,0], [100,0], [100,100],[0,100]])
   >>> cornersToFullBoundary(cornerVerts)
   # [[0,0], [1,0], ..., [100,0], [100,1], ..., [100,100], ..., ..., [0,100]]
   :param cornerVerts: Corners of the represented polygon
   :param sizeLimit: The largest number of pixels from the enclosed area allowed before the full boundary is no
   longer returned. For instance:
-    >>> cornerVerts = FRVertices([[0,0], [1000,0], [1000,1000],[0,1000]])
+    >>> cornerVerts = XYVertices([[0,0], [1000,0], [1000,1000],[0,1000]])
     >>> cornersToFullBoundary(cornerVerts, 10e5)
     will *NOT* return all boundary vertices, since the enclosed area (10e6) is larger than sizeLimit.
   :param fillShape: Size of mask to create. Useful if verts may extend beyond image dimensions
     and should be truncated. If None, no truncation will occur except for negative verts.
-  :param stackResult: Whether the result should be FRComplexVertices (if stackResult is False)
+  :param stackResult: Whether the result should be ComplexXYVertices (if stackResult is False)
     or a stacked list of exterior verts (if stackResult is True)
   :return: List with one vertex for every border pixel, unless *sizeLimit* is violated.
   """
-  if isinstance(cornerVerts, FRVertices):
-    cornerVerts = FRComplexVertices([cornerVerts])
+  if isinstance(cornerVerts, XYVertices):
+    cornerVerts = ComplexXYVertices([cornerVerts])
   if fillShape is not None:
     fillShape = tuple(fillShape)
   filledMask = cornerVerts.toMask(fillShape, warnIfTooSmall=False)
-  cornerVerts = FRComplexVertices.fromBwMask(filledMask, simplifyVerts=False)
+  cornerVerts = ComplexXYVertices.fromBwMask(filledMask, simplifyVerts=False)
   if not stackResult:
     return cornerVerts
   cornerVerts = cornerVerts.filledVerts().stack()
@@ -256,9 +256,9 @@ def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int,
 def imgCornerVertices(img: NChanImg=None):
   """Returns [x,y] vertices for each corner of the input image"""
   if img is None:
-    return FRVertices()
+    return XYVertices()
   fullImShape_xy = img.shape[:2][::-1]
-  return FRVertices([[0,                   0],
+  return XYVertices([[0,                   0],
               [0,                   fullImShape_xy[1]-1],
               [fullImShape_xy[0]-1, fullImShape_xy[1]-1],
               [fullImShape_xy[0]-1, 0]

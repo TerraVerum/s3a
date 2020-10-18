@@ -8,24 +8,24 @@ from pyqtgraph.Qt import QtCore, QtGui
 
 from s3a import FR_SINGLETON
 from s3a.generalutils import cornersToFullBoundary
-from s3a.models.tablemodel import FRComponentMgr
+from s3a.models.tablemodel import ComponentMgr
 from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS, FR_ENUMS
-from s3a.structures import FRVertices, FRParam, FRParamEditorError, FRS3AWarning, \
-  FRComplexVertices
+from s3a.structures import XYVertices, FRParam, ParamEditorError, S3AWarning, \
+  ComplexXYVertices
 from s3a.structures.typeoverloads import OneDArr
 from s3a.views import tableview
-from s3a.views.imageareas import FRMainImage
-from s3a.views.regions import FRMultiRegionPlot
+from s3a.views.imageareas import MainImage
+from s3a.views.regions import MultiRegionPlot
 
-__all__ = ['FRCompSortFilter', 'FRCompDisplayFilter']
+__all__ = ['CompSortFilter', 'CompDisplayFilter']
 
 Signal = QtCore.Signal
 TBL_FIELDS = FR_SINGLETON.tableData.allFields
 QISM = QtCore.QItemSelectionModel
 
-class FRCompSortFilter(QtCore.QSortFilterProxyModel):
+class CompSortFilter(QtCore.QSortFilterProxyModel):
   colTitles = [f.name for f in TBL_FIELDS]
-  def __init__(self, compMgr: FRComponentMgr, parent=None):
+  def __init__(self, compMgr: ComponentMgr, parent=None):
     super().__init__(parent)
     self.setSourceModel(compMgr)
     # TODO: Move code for filtering into the proxy too. It will be more efficient and
@@ -51,7 +51,7 @@ class FRCompSortFilter(QtCore.QSortFilterProxyModel):
       return str(leftObj) < str(rightObj)
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MAIN_IMG_AREA)
-class FRCompDisplayFilter(QtCore.QObject):
+class CompDisplayFilter(QtCore.QObject):
   sigCompsSelected = Signal(object)
 
   @classmethod
@@ -59,8 +59,8 @@ class FRCompDisplayFilter(QtCore.QObject):
     cls.pltClickBehav: str = FR_SINGLETON.generalProps.registerProp(
       cls, FR_CONSTS.PROP_COMP_SEL_BHV)
 
-  def __init__(self, compMgr: FRComponentMgr, mainImg: FRMainImage,
-               compTbl: tableview.FRCompTableView, parent=None):
+  def __init__(self, compMgr: ComponentMgr, mainImg: MainImage,
+               compTbl: tableview.CompTableView, parent=None):
     super().__init__(parent)
     filterEditor = FR_SINGLETON.filter
     self._mainImgArea = mainImg
@@ -68,7 +68,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     self._compTbl = compTbl
     self._compMgr = compMgr
 
-    self.regionPlot = FRMultiRegionPlot()
+    self.regionPlot = MultiRegionPlot()
     self.displayedIds = np.array([], dtype=int)
     self.selectedIds = np.array([], dtype=int)
 
@@ -160,7 +160,7 @@ class FRCompDisplayFilter(QtCore.QObject):
       keepId = selection[0,0]
     try:
       self._compMgr.mergeCompVertsById(np.unique(selection[:,0]), keepId)
-    except FRS3AWarning:
+    except S3AWarning:
       # No merge was performed, don't alter the table selection
       raise
     else:
@@ -250,7 +250,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     #   self.selectedIds = np.concatenate([self.selectedIds, ids])
 
 
-  def _reflectSelectionBoundsMade(self, selection: Union[OneDArr, FRVertices]):
+  def _reflectSelectionBoundsMade(self, selection: Union[OneDArr, XYVertices]):
     """
     :param selection: bounding box of user selection: [xmin ymin; xmax ymax]
     """
@@ -309,7 +309,7 @@ class FRCompDisplayFilter(QtCore.QObject):
         #   verts = verts[goodVerts,:]
         #   truncatedCompIds.append(idx)
         newVerts.append(verts)
-      newComps.at[idx, REQD_TBL_FIELDS.VERTICES] = FRComplexVertices(newVerts)
+      newComps.at[idx, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices(newVerts)
     # truncatedCompIds = np.unique(truncatedCompIds)
     if self.regionCopier.inCopyMode:
       self._mainImgArea.sigCompsCreated.emit(newComps)
@@ -319,7 +319,7 @@ class FRCompDisplayFilter(QtCore.QObject):
       self._compMgr.addComps(newComps, FR_ENUMS.COMP_ADD_AS_MERGE)
     # if len(truncatedCompIds) > 0:
     #   warn(f'Some regions extended beyond image dimensions. Boundaries for the following'
-    #        f' components were altered: {truncatedCompIds}', FRS3AWarning)
+    #        f' components were altered: {truncatedCompIds}', S3AWarning)
 
   def findFilterableCols(self):
     curComps = self._compMgr.compDf.copy()
@@ -329,7 +329,7 @@ class FRCompDisplayFilter(QtCore.QObject):
       try:
         curComps = self.filterByParamType(curComps, param)
         filterableCols.append(param)
-      except FRParamEditorError:
+      except ParamEditorError:
         badCols.append(param)
     if len(badCols) > 0:
       badTypes = np.unique([f'"{col.pType}"' for col in badCols])
@@ -337,7 +337,7 @@ class FRCompDisplayFilter(QtCore.QObject):
       warn(f'The table filter does not know how to handle'
            f' columns {", ".join(badCols)} since no'
            f' filter exists for types {", ".join(badTypes)}',
-           FRS3AWarning)
+           S3AWarning)
     return filterableCols
 
   def filterByParamType(self, compDf: df, param: FRParam):
@@ -379,7 +379,7 @@ class FRCompDisplayFilter(QtCore.QObject):
       allowedRegex = self._filter[param.name][0]
       isCompAllowed = dfAtParam.str.contains(allowedRegex, regex=True, case=False)
       compDf = compDf.loc[isCompAllowed,:]
-    elif pType == 'FRComplexVertices':
+    elif pType == 'ComplexXYVertices':
       vertsAllowed = np.ones(len(dfAtParam), dtype=bool)
 
       xParam = curFilterParam['X Bounds'][1]
@@ -387,7 +387,7 @@ class FRCompDisplayFilter(QtCore.QObject):
       xmin, xmax, ymin, ymax = [param[val][0] for param in (xParam, yParam) for val in ['min', 'max']]
 
       for vertIdx, verts in enumerate(dfAtParam):
-        stackedVerts: FRVertices = verts.stack()
+        stackedVerts: XYVertices = verts.stack()
         xVerts, yVerts = stackedVerts.x, stackedVerts.y
         isAllowed = np.all((xVerts >= xmin) & (xVerts <= xmax)) & \
                     np.all((yVerts >= ymin) & (yVerts <= ymax))
@@ -396,7 +396,7 @@ class FRCompDisplayFilter(QtCore.QObject):
     else:
       warn('No filter type exists for parameters of type ' f'{pType}.'
            f' Did not filter column {param.name}.',
-           FRS3AWarning)
+           S3AWarning)
     return compDf
 
 

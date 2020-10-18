@@ -1,6 +1,6 @@
 import pytest
 
-from s3a.structures import FRS3AWarning, FRS3AException
+from s3a.structures import S3AWarning, S3AException
 from s3a.parameditors import *
 
 ql = FR_SINGLETON.quickLoader
@@ -30,7 +30,7 @@ def test_invalid_load(qtbot):
     invalidLoadCaller()
     foundException = False
     for ex in exceptions:
-      if issubclass(ex[0], FRS3AException):
+      if issubclass(ex[0], S3AException):
         foundException = True
         break
     assert foundException
@@ -51,12 +51,12 @@ def test_invalid_line_edit_add():
 
 def test_bad_user_profile():
   invalidFileDict = {'colorscheme': 'doesnt exist'}
-  with pytest.warns(FRS3AWarning):
+  with pytest.warns(S3AWarning):
     ql.buildFromUserProfile(invalidFileDict)
 
 def test_bad_load_state(qtbot):
   badLoad = dict(name='Non-existent editor', type='group',
                  children=[dict(name='bad action', type='actionwithshortcut', value='Test')])
   pstate = dict(name='test', type='group', children=[badLoad])
-  with pytest.warns(FRS3AWarning):
+  with pytest.warns(S3AWarning):
     ql.loadParamState('bad state', pstate)

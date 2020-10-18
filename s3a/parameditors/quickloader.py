@@ -5,24 +5,24 @@ from warnings import warn
 from pyqtgraph.Qt import QtCore, QtWidgets
 from pyqtgraph.parametertree.parameterTypes import GroupParameter, Parameter
 
-from s3a.graphicsutils import FRPopupLineEditor, raiseErrorLater
+from s3a.graphicsutils import PopupLineEditor, raiseErrorLater
 from s3a.constants import QUICK_LOAD_DIR
-from .genericeditor import FRParamEditor
-from .pgregistered import FRActionWithShortcutParameter as ActWithShc
-from s3a.structures import FRParamEditorError, FRS3AWarning
+from .genericeditor import ParamEditor
+from .pgregistered import ActionWithShortcutParameter as ActWithShc
+from s3a.structures import ParamEditorError, S3AWarning
 
 
-class FREditorListModel(QtCore.QAbstractListModel):
-  def __init__(self, editorList: List[FRParamEditor], parent: QtWidgets.QWidget=None):
+class EditorListModel(QtCore.QAbstractListModel):
+  def __init__(self, editorList: List[ParamEditor], parent: QtWidgets.QWidget=None):
     super().__init__(parent)
     self.displayFormat = '{stateName} | {editor.name}'
     self.paramStatesLst: List[str] = []
-    self.editorList: List[FRParamEditor] = []
-    self.uniqueEditors: List[FRParamEditor] = []
+    self.editorList: List[ParamEditor] = []
+    self.uniqueEditors: List[ParamEditor] = []
 
     self.addEditors(editorList)
 
-  def addEditors(self, editorList: List[FRParamEditor]):
+  def addEditors(self, editorList: List[ParamEditor]):
     self.uniqueEditors.extend(editorList)
     self.layoutAboutToBeChanged.emit()
     for editor in editorList:
@@ -33,7 +33,7 @@ class FREditorListModel(QtCore.QAbstractListModel):
                                           self.addOptForEditor(e, name))
     self.layoutChanged.emit()
 
-  def addOptForEditor(self, editor: FRParamEditor, name: str):
+  def addOptForEditor(self, editor: ParamEditor, name: str):
     if self.displayFormat.format(editor=editor, stateName=name) in self.displayedData:
       return
     self.layoutAboutToBeChanged.emit()
@@ -94,15 +94,15 @@ def _addRmOption(param: Parameter):
     item.contextMenu.addAction('Remove').triggered.connect(item.requestRemove)
 
 
-class FRQuickLoaderEditor(FRParamEditor):
-  def __init__(self, parent=None, editorList: List[FRParamEditor]=None):
+class QuickLoaderEditor(ParamEditor):
+  def __init__(self, parent=None, editorList: List[ParamEditor]=None):
     super().__init__(parent, paramList=[],
                      saveDir=QUICK_LOAD_DIR, fileType='loader', name='Editor State Shortcuts')
     if editorList is None:
       editorList = []
-    self.listModel = FREditorListModel(editorList, self)
+    self.listModel = EditorListModel(editorList, self)
 
-    self.addNewParamState = FRPopupLineEditor(self, self.listModel, clearOnComplete=False)
+    self.addNewParamState = PopupLineEditor(self, self.listModel, clearOnComplete=False)
     self.centralLayout.insertWidget(0, self.addNewParamState)
 
     # self.addNewParamState.completer().activated.connect(self.addFromLineEdit)
@@ -134,7 +134,7 @@ class FRQuickLoaderEditor(FRParamEditor):
                f"{[grp.name() for grp in invalidGrps]}\n" \
                f"Must be one of:\n" \
                f"{[e.name for e in self.listModel.uniqueEditors]}"
-      warn(errMsg, FRS3AWarning)
+      warn(errMsg, S3AWarning)
     if applyChanges:
       self.applyChanges()
     return ret
@@ -153,7 +153,7 @@ class FRQuickLoaderEditor(FRParamEditor):
           errSettings.append(f'{editor.name}: {ex}')
     if len(errSettings) > 0:
       warn('The following settings could not be loaded (shown as <setting>: <exception>)\n'
-           + "\n\n".join(errSettings), FRS3AWarning)
+           + "\n\n".join(errSettings), S3AWarning)
     return profileSrc
 
 
@@ -188,7 +188,7 @@ class FRQuickLoaderEditor(FRParamEditor):
     self.addNewParamState.clear()
 
 
-  def addActForEditor(self, editor: FRParamEditor, paramState: str, act: ActWithShc=None):
+  def addActForEditor(self, editor: ParamEditor, paramState: str, act: ActWithShc=None):
     if editor.name not in self.params.names:
       curGroup = self.params.addChild(dict(name=editor.name, type='group', removable=True))
     else:
@@ -213,7 +213,7 @@ class FRQuickLoaderEditor(FRParamEditor):
       lambda _act: self._safeLoadParamState(_act, editor, paramState))
     act.isActivateConnected = True
 
-  def _safeLoadParamState(self, action: ActWithShc, editor: FRParamEditor,
+  def _safeLoadParamState(self, action: ActWithShc, editor: ParamEditor,
                           paramState: str):
     """
     It is possible for the quick loader to refer to a param state that no longer
@@ -226,6 +226,6 @@ class FRQuickLoaderEditor(FRParamEditor):
       action.remove()
       # Wait until end of process cycle to raise error
       formattedState = self.listModel.displayFormat.format(editor=editor, stateName=paramState)
-      raiseErrorLater(FRParamEditorError(
+      raiseErrorLater(ParamEditorError(
         f'Attempted to load {formattedState} but the setting was not found.'
       ))

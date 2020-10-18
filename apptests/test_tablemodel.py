@@ -8,7 +8,7 @@ from testingconsts import RND
 from s3a import FR_SINGLETON
 from s3a.constants import FR_ENUMS
 from s3a.constants import REQD_TBL_FIELDS
-from s3a.structures import FRComplexVertices, FRS3AWarning, FRVertices
+from s3a.structures import ComplexXYVertices, S3AWarning, XYVertices
 
 oldIds = np.arange(NUM_COMPS, dtype=int)
 
@@ -45,7 +45,7 @@ def test_rm_by_empty_vert_add(sampleComps):
   # List assignment behaves poorly for list-inherited objs (like frcomplexverts) so
   # use individual assignment
   for idx in deleteIdxs:
-    sampleComps.at[idx, REQD_TBL_FIELDS.VERTICES] = FRComplexVertices()
+    sampleComps.at[idx, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices()
   changeList = mgr.addComps(sampleComps, FR_ENUMS.COMP_ADD_AS_MERGE)
   cmpChangeList(changeList, deleted=deleteIdxs, changed=changeIdxs)
 
@@ -110,9 +110,9 @@ def test_merge_comps(sampleComps):
 
 def test_bad_merge(sampleComps):
   mgr.addComps(sampleComps)
-  with pytest.warns(FRS3AWarning):
+  with pytest.warns(S3AWarning):
     mgr.mergeCompVertsById([0])
-  with pytest.warns(FRS3AWarning):
+  with pytest.warns(S3AWarning):
     mgr.mergeCompVertsById([])
 
 
@@ -121,7 +121,7 @@ def test_table_setdata(sampleComps):
 
   _ = REQD_TBL_FIELDS
   colVals = {
-    _.VERTICES: FRComplexVertices([FRVertices([[1,2], [3,4]])]),
+    _.VERTICES: ComplexXYVertices([XYVertices([[1, 2], [3, 4]])]),
     _.COMP_CLASS: 'bogus',
     _.ANN_AUTHOR: 'Hi There',
     _.SRC_IMG_FILENAME: 'newfilename'

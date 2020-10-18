@@ -6,8 +6,8 @@ import pytest
 
 from conftest import app
 from s3a.generalutils import augmentException
-from s3a import FRComponentIO
-from s3a.structures import FRIOError
+from s3a import ComponentIO
+from s3a.structures import S3AIOError
 
 
 def test_normal_export(sampleComps, tmpdir):
@@ -56,7 +56,7 @@ def test_bad_import(tmpdir):
       io.buildFromCsv(tmpdir/f'junkfile.{ext}')
 
 
-def doAndAssertExport(fpath: Path, io: FRComponentIO, compDf: pd.DataFrame, failMsg: str):
+def doAndAssertExport(fpath: Path, io: ComponentIO, compDf: pd.DataFrame, failMsg: str):
   fpath = Path(fpath)
   try:
     io.exportByFileType(compDf, fpath)
@@ -69,7 +69,7 @@ def doAndAssertExport(fpath: Path, io: FRComponentIO, compDf: pd.DataFrame, fail
 
 def test_impossible_io(tmpdir, sampleComps):
   io = app.compIo
-  with pytest.raises(FRIOError):
+  with pytest.raises(S3AIOError):
     io.exportByFileType(sampleComps, './nopossible.exporttype$')
-  with pytest.raises(FRIOError):
+  with pytest.raises(S3AIOError):
     io.buildByFileType('./nopossible.importtype$')

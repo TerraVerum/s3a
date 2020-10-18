@@ -16,11 +16,11 @@ from s3a.constants import _FREnums, FR_ENUMS
 from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
   autosaveOptsDialog, attemptFileLoad, popupFilePicker, \
   disableAppDuringFunc, saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
-  restoreExceptionBehavior, contextMenuFromEditorActions, FRScrollableErrorDialog
+  restoreExceptionBehavior, contextMenuFromEditorActions, ScrollableErrorDialog
 from s3a.models.s3abase import S3ABase
-from s3a.parameditors import FRParamEditor, FRParamEditorDockGrouping, FR_SINGLETON
-from s3a.structures import FRS3AWarning, FRVertices
-from s3a.views.buttons import FRButtonCollection
+from s3a.parameditors import ParamEditor, ParamEditorDockGrouping, FR_SINGLETON
+from s3a.structures import S3AWarning, XYVertices
+from s3a.views.buttons import ButtonCollection
 
 __all__ = ['S3A']
 
@@ -32,7 +32,7 @@ class S3A(S3ABase):
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
-    cls.toolsEditor = FRParamEditor.buildClsToolsEditor(cls, 'Main Window')
+    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Main Window')
 
   def __init__(self, parent=None, guiMode=True, loadLastState=None,
                **quickLoaderArgs):
@@ -44,7 +44,7 @@ class S3A(S3ABase):
     self.toolsEditor.registerFunc(self.clearBoundaries, btnOpts=FR_CONSTS.TOOL_CLEAR_BOUNDARIES)
     self.toolsEditor.registerFunc(self.exportCompList_gui, btnOpts=FR_CONSTS.TOOL_EXPORT_COMP_LIST)
     if guiMode:
-      warnings.simplefilter('error', FRS3AWarning)
+      warnings.simplefilter('error', S3AWarning)
       makeExceptionsShowDialogs(self)
     def saveRecentLayout(_folderName: Path):
       outFile = _folderName/'savedLayout'
@@ -59,7 +59,7 @@ class S3A(S3ABase):
 
     # Dummy editor for layout options since it doesn't really have editable settings
     # Maybe later this can be elevated to have more options
-    self.layoutEditor = FRParamEditor(self, None, LAYOUTS_DIR, 'dockstate', 'Layout')
+    self.layoutEditor = ParamEditor(self, None, LAYOUTS_DIR, 'dockstate', 'Layout')
 
     self._buildGui()
     self._buildMenu()
@@ -67,7 +67,7 @@ class S3A(S3ABase):
 
     self.focusedImg.sigPluginChanged.connect(lambda: self.updateFocusedToolsGrp())
     for plugin in FR_SINGLETON.tableFieldPlugins:
-      if isinstance(plugin, plugins.FRVerticesPlugin):
+      if isinstance(plugin, plugins.VerticesPlugin):
         # TODO: Config option for which plugin to load by default?
         self.focusedImg.changeCurrentPlugin(plugin)
         break
@@ -200,7 +200,7 @@ class S3A(S3ABase):
     newEditors = [self.focusedImg.toolsEditor]
     if newPlugin is not None:
       newEditors.append(newPlugin.toolsEditor)
-    newTools = FRButtonCollection.fromToolsEditors(newEditors, self.focusedImg)
+    newTools = ButtonCollection.fromToolsEditors(newEditors, self.focusedImg)
     try:
       self._focusedLayout.replaceWidget(self.focusedImg.toolsGrp, newTools)
       self.focusedImg.toolsGrp.deleteLater()
@@ -308,7 +308,7 @@ class S3A(S3ABase):
 
     for docks, plugin in pluginDocks.items():
       if docks is None:
-        docks = FRParamEditorDockGrouping([plugin.toolsEditor], plugin.name)
+        docks = ParamEditorDockGrouping([plugin.toolsEditor], plugin.name)
       menu = self.createMenuOptForDock(docks, parentToolbar=pluginToolbar)
       if plugin in FR_SINGLETON.tableFieldPlugins:
         allActs = menu.actions()
@@ -383,7 +383,7 @@ class S3A(S3ABase):
         baseName = saveDlg.baseFileNameEdit.text()
         folderName = Path(saveDlg.folderName)
       except AttributeError:
-        warnings.warn('Some information was not provided -- autosave not started.', FRS3AWarning)
+        warnings.warn('Some information was not provided -- autosave not started.', S3AWarning)
       else:
         self.startAutosave(interval, folderName, baseName)
 
@@ -398,7 +398,7 @@ class S3A(S3ABase):
   def exportLabeledImg_gui(self):
     """
     # Note -- These three functions will be a single dialog with options
-    # for each requested parameter. It will look like the FRTableFilterEditor dialog.
+    # for each requested parameter. It will look like the TableFilterEditor dialog.
     types: List[FRCompParams] = getTypesFromUser()
     outFile = getOutFileFromUser()
     exportLegend = getExpLegendFromUser()
@@ -488,14 +488,14 @@ class S3A(S3ABase):
     for dock in docks:
       dock.setParent(self)
       self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
-      if isinstance(dock, FRParamEditorDockGrouping):
+      if isinstance(dock, ParamEditorDockGrouping):
         dock.tabs.currentChanged.connect(fixDWFactory(dock))
     for nextEditor in docks[:-1]:
       self.tabifyDockWidget(dock, nextEditor)
 
-  def _createMenuOptForEditor(self, editor: FRParamEditor,
+  def _createMenuOptForEditor(self, editor: ParamEditor,
                               loadFunc=None, overrideName=None):
-    def defaultLoadFunc(objForMenu: FRParamEditor, nameToLoad: str) -> Optional[dict]:
+    def defaultLoadFunc(objForMenu: ParamEditor, nameToLoad: str) -> Optional[dict]:
       with pg.BusyCursor():
         return objForMenu.loadParamState(nameToLoad)
 
@@ -508,7 +508,7 @@ class S3A(S3ABase):
     newMenu.addAction(editAct)
     newMenu.addSeparator()
     def showFunc(_editor=editor):
-      if isinstance(_editor.dock, FRParamEditorDockGrouping):
+      if isinstance(_editor.dock, ParamEditorDockGrouping):
         tabs: QtWidgets.QTabWidget = _editor.dock.tabs
         dockIdx = tabs.indexOf(_editor.dockContentsWidget)
         tabs.setCurrentIndex(dockIdx)
@@ -525,8 +525,8 @@ class S3A(S3ABase):
     editor.hasMenuOption = True
     return newMenu
 
-  def _fixDockWidth(self, dock: Union[FRParamEditorDockGrouping, FRParamEditor], tabIdx: int=None):
-    if isinstance(dock, FRParamEditorDockGrouping):
+  def _fixDockWidth(self, dock: Union[ParamEditorDockGrouping, ParamEditor], tabIdx: int=None):
+    if isinstance(dock, ParamEditorDockGrouping):
       if tabIdx is None:
         tabIdx = dock.tabs.currentIndex()
       curParamEditor = dock.editors[tabIdx]
@@ -538,12 +538,12 @@ class S3A(S3ABase):
       self.resizeDocks([dock], [curParamEditor.width()+100], QtCore.Qt.Horizontal)
 
   def createMenuOptForDock(self,
-                           dockEditor: Union[FRParamEditor, FRParamEditorDockGrouping],
+                           dockEditor: Union[ParamEditor, ParamEditorDockGrouping],
                            loadFunc=None, parentBtn: QtWidgets.QPushButton=None,
                            parentToolbar=None):
     if parentBtn is None:
       parentBtn = QtWidgets.QPushButton()
-    if isinstance(dockEditor, FRParamEditor):
+    if isinstance(dockEditor, ParamEditor):
       parentBtn.setText(dockEditor.name)
       menu = self._createMenuOptForEditor(dockEditor, loadFunc)
       parentBtn.setMenu(menu)
@@ -566,7 +566,7 @@ class S3A(S3ABase):
     layoutGlob = LAYOUTS_DIR.glob('*.dockstate')
     addDirItemsToMenu(self.menuLayout, layoutGlob, self.loadLayout)
 
-  def setInfo(self, xyPos: FRVertices, pxColor: np.ndarray):
+  def setInfo(self, xyPos: XYVertices, pxColor: np.ndarray):
     if pxColor is None: return
     authorName = FR_SINGLETON.tableData.annAuthor
     if self.srcImgFname is not None:

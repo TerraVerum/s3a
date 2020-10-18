@@ -12,9 +12,9 @@ from ruamel.yaml import YAML
 from s3a.graphicsutils import raiseErrorLater
 from s3a.constants import TABLE_DIR, REQD_TBL_FIELDS, DATE_FORMAT, \
   FR_CONSTS
-from s3a.structures import FRParam, FilePath, FRParamGroup, FRParamEditorError, \
-  FRS3AException
-from s3a.parameditors import FRParamEditor
+from s3a.structures import FRParam, FilePath, FRParamGroup, ParamEditorError, \
+  S3AException
+from s3a.parameditors import ParamEditor
 
 yaml = YAML()
 
@@ -42,7 +42,7 @@ def _filterForParam(param: FRParam):
       iterGroup = param.opts['limits']
     children.extend(genParamList(iterGroup, 'bool', True))
     return paramWithChildren
-  elif pType == 'FRComplexVertices':
+  elif pType == 'ComplexXYVertices':
     minMax = _filterForParam(FRParam('', 5))['children']
     xyVerts = genParamList(['X Bounds', 'Y Bounds'], 'group', minMax, 'children')
     children.extend(xyVerts)
@@ -56,7 +56,7 @@ def _filterForParam(param: FRParam):
     paramWithoutChild['type'] = 'str'
     return paramWithoutChild
 
-class FRTableFilterEditor(FRParamEditor):
+class TableFilterEditor(ParamEditor):
   def __init__(self, paramList: List[FRParam]=None, parent=None):
     if paramList is None:
       paramList = []
@@ -80,17 +80,17 @@ class FRTableFilterEditor(FRParamEditor):
     if len(badCols) > 0:
       colNames = [f'"{col}"' for col in badCols]
       colTypes = np.unique([f'"{col.pType}"' for col in badCols])
-      raiseErrorLater(FRParamEditorError(f'The table does not know how to create a'
+      raiseErrorLater(ParamEditorError(f'The table does not know how to create a'
                                         f' filter for fields {", ".join(colNames)}'
                                         f' since types {", ".join(colTypes)} do not'
                                         f' have corresponding filters'))
     self.applyChanges()
 
 
-class FRTableData:
+class TableData:
 
   def __init__(self, annAuthor: str=None):
-    self.filter = FRTableFilterEditor()
+    self.filter = TableFilterEditor()
 
     self.annAuthor = annAuthor
     self.cfgFname: Optional[Path] = None
@@ -148,7 +148,7 @@ class FRTableData:
       # No need to update things
       return
     self.cfg = cfg
-    paramParser = FRYamlParser(cfg)
+    paramParser = YamlParser(cfg)
     newClasses = []
     if 'classes' in cfg:
       classParam = paramParser['classes']
@@ -176,7 +176,7 @@ class FRTableData:
     for field in cfg.get('hidden-cols', []):
       try:
         FRParamGroup.fromString(self.allFields, field).opts['colHidden'] = True
-      except FRS3AException:
+      except S3AException:
         # Specified field to hide isn't in all table fields
         pass
 
@@ -197,7 +197,7 @@ class FRTableData:
 
 
 NestedIndexer = Union[str, Tuple[Union[str,int],...]]
-class FRYamlParser:
+class YamlParser:
   def __init__(self, cfg: dict):
     self.cfg = cfg
 

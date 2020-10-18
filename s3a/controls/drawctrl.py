@@ -5,23 +5,23 @@ from pyqtgraph.Qt import QtCore, QtGui
 
 from s3a import FR_SINGLETON
 from s3a.constants import FR_CONSTS
-from s3a.structures import FRParam, FRVertices
-from s3a.views.rois import FRExtendedROI, SHAPE_ROI_MAPPING
+from s3a.structures import FRParam, XYVertices
+from s3a.views.rois import ExtendedROI, SHAPE_ROI_MAPPING
 
-__all__ = ['FRRoiCollection']
+__all__ = ['RoiCollection']
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_ROI_CLCTN)
-class FRRoiCollection(QtCore.QObject):
-  # Signal(FRExtendedROI)
+class RoiCollection(QtCore.QObject):
+  # Signal(ExtendedROI)
   sigShapeFinished = QtCore.Signal(object)
 
   def __init__(self, allowableShapes: Collection[FRParam]=(), parent: pg.GraphicsView=None):
     super().__init__(parent)
     if allowableShapes is None:
       allowableShapes = set()
-    self.shapeVerts = FRVertices()
+    self.shapeVerts = XYVertices()
     # Make a new graphics item for each roi type
-    self.roiForShape: Dict[FRParam, Union[pg.ROI, FRExtendedROI]] = {}
+    self.roiForShape: Dict[FRParam, Union[pg.ROI, ExtendedROI]] = {}
     self._curShape = allowableShapes[0] if len(allowableShapes) > 0 else None
 
     self._locks = set()
@@ -43,7 +43,7 @@ class FRRoiCollection(QtCore.QObject):
         view.addItem(roi)
 
   def clearAllRois(self):
-    for roi in self.roiForShape.values(): # type: FRExtendedROI
+    for roi in self.roiForShape.values(): # type: ExtendedROI
       roi.clear()
       roi.hide()
       self.addLock(self)
@@ -54,7 +54,7 @@ class FRRoiCollection(QtCore.QObject):
     Multiple locks can be applied; ROIs can only be drawn when all locks are removed.
 
     :param lock: Anything used as a lock. This will have to be manually removed later
-      using `FRRoiCollection.removeLock`
+      using `RoiCollection.removeLock`
     """
     self._locks.add(lock)
 
@@ -92,7 +92,7 @@ class FRRoiCollection(QtCore.QObject):
       posRelToImg = ev.pos()
     # Form of rate-limiting -- only simulate click if the next pixel is at least one away
     # from the previous pixel location
-    xyCoord = FRVertices([[posRelToImg.x(), posRelToImg.y()]], dtype=float)
+    xyCoord = XYVertices([[posRelToImg.x(), posRelToImg.y()]], dtype=float)
     curRoi = self.curShape
     constructingRoi, self.shapeVerts = self.curShape.updateShape(ev, xyCoord)
     if self.shapeVerts is not None:

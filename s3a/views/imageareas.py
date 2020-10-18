@@ -10,32 +10,32 @@ from skimage.io import imread
 from s3a import FR_SINGLETON
 from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS as FRC
 from s3a.generalutils import getClippedBbox, dynamicDocstring, frParamToPgParamDict
-from s3a.structures import FRParam, FRVertices, FRComplexVertices, FilePath
+from s3a.structures import FRParam, XYVertices, ComplexXYVertices, FilePath
 from s3a.structures import NChanImg
-from .buttons import FRDrawOpts, FRButtonCollection
-from .clickables import FRRightPanViewBox
-from .regions import FRRegionCopierPlot
-from ..parameditors import FRParamEditor, FRTableFieldPlugin
+from .buttons import DrawOpts, ButtonCollection
+from .clickables import RightPanViewBox
+from .regions import RegionCopierPlot
+from ..parameditors import ParamEditor, TableFieldPlugin
 
-__all__ = ['FRMainImage', 'FRFocusedImage', 'FREditableImgBase']
+__all__ = ['MainImage', 'FocusedImage', 'EditableImgBase']
 
-from s3a.controls.drawctrl import FRRoiCollection
+from s3a.controls.drawctrl import RoiCollection
 from ..graphicsutils import contextMenuFromEditorActions
 
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
 
 @FR_SINGLETON.registerGroup(FRC.CLS_IMG_AREA)
-class FREditableImgBase(pg.PlotWidget):
+class EditableImgBase(pg.PlotWidget):
   sigMousePosChanged = Signal(object, object)
   """
-  FRVertices() coords, [[[img pixel]]] np.ndarray. If the mouse pos is outside
+  XYVertices() coords, [[[img pixel]]] np.ndarray. If the mouse pos is outside
   image bounds, the second param will be *None*.
   """
 
   @classmethod
   def __initEditorParams__(cls):
-    cls.toolsEditor = FRParamEditor.buildClsToolsEditor(cls)
+    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls)
 
     cls.compCropMargin, cls.treatMarginAsPct = FR_SINGLETON.generalProps.registerProps(
       cls, [FRC.PROP_CROP_MARGIN_VAL, FRC.PROP_TREAT_MARGIN_AS_PCT])
@@ -45,7 +45,7 @@ class FREditableImgBase(pg.PlotWidget):
 
   def __init__(self, parent=None, drawShapes: Collection[FRParam]=(),
                drawActions: Collection[FRParam]=(),**kargs):
-    super().__init__(parent, viewBox=FRRightPanViewBox(), **kargs)
+    super().__init__(parent, viewBox=RightPanViewBox(), **kargs)
     self.menu: QtWidgets.QMenu = self.getViewBox().menu
     # Disable default menus
     self.plotItem.ctrlMenu = None
@@ -69,10 +69,10 @@ class FREditableImgBase(pg.PlotWidget):
     # -----
     # DRAWING OPTIONS
     # -----
-    self.regionCopier = FRRegionCopierPlot(self)
+    self.regionCopier = RegionCopierPlot(self)
 
     self.drawAction: FRParam = FRC.DRAW_ACT_PAN
-    self.shapeCollection = FRRoiCollection(drawShapes, self)
+    self.shapeCollection = RoiCollection(drawShapes, self)
     self.shapeCollection.sigShapeFinished.connect(self.handleShapeFinished)
 
     # Make sure panning is allowed before creating draw widget
@@ -81,18 +81,18 @@ class FREditableImgBase(pg.PlotWidget):
 
     def shapeAssignment(newShapeParam: FRParam):
       self.shapeCollection.curShapeParam = newShapeParam
-    self.drawShapeGrp = FRButtonCollection(self, 'Shapes', drawShapes, shapeAssignment)
+    self.drawShapeGrp = ButtonCollection(self, 'Shapes', drawShapes, shapeAssignment)
 
     def actionAssignment(newActionParam: FRParam):
       self.drawAction = newActionParam
       if self.regionCopier.active:
         self.regionCopier.erase()
-    self.drawActGrp = FRButtonCollection(self, 'Actions', drawActions, actionAssignment)
+    self.drawActGrp = ButtonCollection(self, 'Actions', drawActions, actionAssignment)
 
-    self.drawOptsWidget = FRDrawOpts(self.drawShapeGrp, self.drawActGrp, self)
+    self.drawOptsWidget = DrawOpts(self.drawShapeGrp, self.drawActGrp, self)
 
     # Don't create shortcuts since this will be done by the tool editor
-    self.toolsGrp = FRButtonCollection.fromToolsEditors(self.toolsEditor, self)
+    self.toolsGrp = ButtonCollection.fromToolsEditors(self.toolsEditor, self)
     self.showGuiBtns.sigValueChanged.connect(lambda _p, val: self.toolsGrp.setVisible(val))
 
     # Initialize draw shape/action buttons
@@ -108,7 +108,7 @@ class FREditableImgBase(pg.PlotWidget):
     ev.accept()
 
 
-  def setMenuFromEditors(self, editors: Sequence[FRParamEditor]):
+  def setMenuFromEditors(self, editors: Sequence[ParamEditor]):
     vb: pg.ViewBox = self.getViewBox()
     menu = contextMenuFromEditorActions(editors)
     vb.menu = menu
@@ -125,7 +125,7 @@ class FREditableImgBase(pg.PlotWidget):
   def image(self) -> Optional[NChanImg]:
     return self.imgItem.image
 
-  def handleShapeFinished(self, roiVerts: FRVertices) -> Optional[np.ndarray]:
+  def handleShapeFinished(self, roiVerts: XYVertices) -> Optional[np.ndarray]:
     """
     Overloaded in child classes to process new regions
     """
@@ -155,7 +155,7 @@ class FREditableImgBase(pg.PlotWidget):
       pxColor = self.imgItem.image[pxY, pxX]
       if pxColor.ndim == 0:
         pxColor = np.array([pxColor])
-    pos = FRVertices([pxX, pxY])
+    pos = XYVertices([pxX, pxY])
     self.sigMousePosChanged.emit(pos, pxColor)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
@@ -167,10 +167,10 @@ class FREditableImgBase(pg.PlotWidget):
     self.shapeCollection.clearAllRois()
 
 @FR_SINGLETON.registerGroup(FRC.CLS_MAIN_IMG_AREA)
-class FRMainImage(FREditableImgBase):
+class MainImage(EditableImgBase):
   sigCompsCreated = Signal(object) # pd.DataFrame
   # Hooked up during __init__
-  sigSelectionBoundsMade = Signal(object) # FRVertices
+  sigSelectionBoundsMade = Signal(object) # XYVertices
 
   @classmethod
   def __initEditorParams__(cls):
@@ -201,7 +201,7 @@ class FRMainImage(FREditableImgBase):
     # -----
     self.setImage(imgSrc)
     self.compFromLastProcResult: Optional[pd.DataFrame] = None
-    self.lastProcVerts: Optional[FRVertices] = None
+    self.lastProcVerts: Optional[XYVertices] = None
     copier = self.regionCopier
     def startCopy():
       """
@@ -252,7 +252,7 @@ class FRMainImage(FREditableImgBase):
       ax.setPen(newPen)
 
 
-  def handleShapeFinished(self, roiVerts: FRVertices) -> Optional[np.ndarray]:
+  def handleShapeFinished(self, roiVerts: XYVertices) -> Optional[np.ndarray]:
     if self.regionCopier.active or self.shapeCollection.locked: return
     if self.drawAction in [FRC.DRAW_ACT_SELECT] and roiVerts.connected:
       # Selection
@@ -269,7 +269,7 @@ class FRMainImage(FREditableImgBase):
         return
 
       # noinspection PyTypeChecker
-      verts = FRComplexVertices([verts])
+      verts = ComplexXYVertices([verts])
       newComps = FR_SINGLETON.tableData.makeCompDf()
       newComps[REQD_TBL_FIELDS.VERTICES] = [verts]
       self.compFromLastProcResult = newComps
@@ -283,7 +283,7 @@ class FRMainImage(FREditableImgBase):
     xx, yy, = pos.x(), pos.y()
     if self.drawAction == FRC.DRAW_ACT_PAN and not self.regionCopier.active:
       # Simulate a click-wide boundary selection so points can be selected in pan mode
-      squareCorners = FRVertices([[xx, yy], [xx, yy]], dtype=float)
+      squareCorners = XYVertices([[xx, yy], [xx, yy]], dtype=float)
       self.sigSelectionBoundsMade.emit(squareCorners)
     self.shapeCollection.removeLock(self)
 
@@ -314,14 +314,14 @@ class FRMainImage(FREditableImgBase):
     else:
       self.imgItem.setImage(imgSrc)
 
-  @dynamicDocstring(superDoc=FREditableImgBase.clearCurRoi.__doc__)
+  @dynamicDocstring(superDoc=EditableImgBase.clearCurRoi.__doc__)
   def clearCurRoi(self):
     """{superDoc}"""
     super().clearCurRoi()
     self.regionCopier.erase()
 
 @FR_SINGLETON.registerGroup(FRC.CLS_FOCUSED_IMG_AREA)
-class FRFocusedImage(FREditableImgBase):
+class FocusedImage(EditableImgBase):
   sigPluginChanged = Signal()
 
   def __init__(self, parent=None, **kargs):
@@ -336,12 +336,12 @@ class FRFocusedImage(FREditableImgBase):
     self.compSer: pd.Series = FR_SINGLETON.tableData.makeCompSer()
     self.bbox = np.zeros((2, 2), dtype='int32')
 
-    self.currentPlugin: Optional[FRTableFieldPlugin] = None
+    self.currentPlugin: Optional[TableFieldPlugin] = None
 
     self.switchBtnMode(FRC.DRAW_ACT_ADD)
     self.switchBtnMode(FRC.DRAW_SHAPE_PAINT)
 
-  def handleShapeFinished(self, roiVerts: FRVertices) -> Optional[np.ndarray]:
+  def handleShapeFinished(self, roiVerts: XYVertices) -> Optional[np.ndarray]:
     if self.drawAction == FRC.DRAW_ACT_PAN:
       return
     for plugin in FR_SINGLETON.tableFieldPlugins:
@@ -356,7 +356,7 @@ class FRFocusedImage(FREditableImgBase):
     a 'zoomed-in' view that allows much faster processing than applying image processing
     algorithms to the entire image each iteration.
     :param mainImg: Image from the main view
-    :param newComp: New component to edit using various plugins (See :class:`FRTableFieldPlugin`)
+    :param newComp: New component to edit using various plugins (See :class:`TableFieldPlugin`)
     :param _isAlreadyTrimmed: Used internally during undo. Generally shouldn't be set by the
       user
     """
@@ -370,7 +370,7 @@ class FRFocusedImage(FREditableImgBase):
       self.shapeCollection.clearAllRois()
       self.compSer = FR_SINGLETON.tableData.makeCompSer()
     else:
-      newVerts: FRComplexVertices = newComp[REQD_TBL_FIELDS.VERTICES]
+      newVerts: ComplexXYVertices = newComp[REQD_TBL_FIELDS.VERTICES]
       # Since values INSIDE the dataframe are reset instead of modified, there is no
       # need to go through the trouble of deep copying
       self.compSer = newComp.copy(deep=False)
@@ -380,7 +380,7 @@ class FRFocusedImage(FREditableImgBase):
         self._updateBbox(mainImg.shape, newVerts)
         bboxToUse = self.bbox
       else:
-        bboxToUse = FRVertices([[0,0], mainImg.shape[:2]])
+        bboxToUse = XYVertices([[0,0], mainImg.shape[:2]])
         self.bbox = bboxToUse
       slices = [slice(bboxToUse[0,1], bboxToUse[1,1]),
                 slice(bboxToUse[0,0], bboxToUse[1,0])]
@@ -398,7 +398,7 @@ class FRFocusedImage(FREditableImgBase):
     yield
     self.updateAll(oldImg, oldComp, True)
 
-  def _updateBbox(self, mainImgShape, newVerts: FRComplexVertices):
+  def _updateBbox(self, mainImgShape, newVerts: ComplexXYVertices):
     concatVerts = newVerts.stack()
     # Ignore NAN entries during computation
     bbox = np.vstack([concatVerts.min(0),
@@ -409,7 +409,7 @@ class FRFocusedImage(FREditableImgBase):
       padVal = max((bbox[1,:] - bbox[0,:])*self.compCropMargin/2/100)
     self.bbox = getClippedBbox(mainImgShape, bbox, int(padVal))
 
-  def changeCurrentPlugin(self, newPlugin: FRTableFieldPlugin, forceActivate=True):
+  def changeCurrentPlugin(self, newPlugin: TableFieldPlugin, forceActivate=True):
     if newPlugin is self.currentPlugin:
       return
     if self.currentPlugin is not None:

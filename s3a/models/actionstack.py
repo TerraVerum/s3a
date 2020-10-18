@@ -13,12 +13,12 @@ from typing import Callable, Generator, Deque, Union, Type, Any, List
 
 from typing_extensions import Protocol
 
-from s3a.structures import FRActionStackError, FRS3AWarning
+from s3a.structures import ActionStackError, S3AWarning
 
-__all__ = ['FRActionStack', 'FRAction']
+__all__ = ['ActionStack', 'Action']
 
 # _generatorCallable = Callable[[...], Union[Generator, Any]]
-class FRAction:
+class Action:
   """
   This represents an action which can be done and undone.
   """
@@ -100,7 +100,7 @@ def gracefulNext(generator: Generator):
   except StopIteration as ex:
     return ex.value
 
-class FRActionStack:
+class ActionStack:
   """ The main undo stack.
 
   The two key features are the :func:`redo` and :func:`undo` methods. If an
@@ -114,9 +114,9 @@ class FRActionStack:
   """
 
   def __init__(self, maxlen:int=50):
-    self.actions: Deque[FRAction] = deque(maxlen=maxlen)
+    self.actions: Deque[Action] = deque(maxlen=maxlen)
     self._curReceiver = self.actions
-    self._savepoint: Union[EmptyType, FRAction] = EMPTY
+    self._savepoint: Union[EmptyType, Action] = EMPTY
     self.stackChangedCallbacks: List[Callable] = []
 
   @contextlib.contextmanager
@@ -126,8 +126,8 @@ class FRActionStack:
     All actions which occur within the group will be undone by a single call
     of `stack.undo`.
     """
-    newActBuffer: Deque[FRAction] = deque()
-    with _FRBufferOverride(self, newActBuffer):
+    newActBuffer: Deque[Action] = deque()
+    with _BufferOverride(self, newActBuffer):
       yield
     def grpAct():
       for _ in range(2):
@@ -138,7 +138,7 @@ class FRActionStack:
             act.forward(graceful=True)
         yield
     if self._curReceiver is not None:
-      self._curReceiver.append(FRAction(grpAct, descr=descr, treatAsUndo=True))
+      self._curReceiver.append(Action(grpAct, descr=descr, treatAsUndo=True))
     if flushUnusedRedos:
       self.flushUnusedRedos()
 
@@ -173,7 +173,7 @@ class FRActionStack:
         if copyArgs:
           args = tuple(copy.copy(arg) for arg in args)
           kwargs = {k: copy.copy(v) for k, v in kwargs.items()}
-        action = FRAction(generatorFn, args, kwargs, descr)
+        action = Action(generatorFn, args, kwargs, descr)
         try:
           with self.ignoreActions():
             ret = action.forward()
@@ -226,7 +226,7 @@ class FRActionStack:
   def resizeStack(self, newMaxLen: int):
     if newMaxLen == self.actions.maxlen:
       return
-    newDeque: Deque[FRAction] = deque(maxlen=newMaxLen)
+    newDeque: Deque[Action] = deque(maxlen=newMaxLen)
     newDeque.extend(self.actions)
     receiverNeedsReset = True if self._curReceiver is self.actions else False
     self.actions = newDeque
@@ -242,7 +242,7 @@ class FRActionStack:
 
   def revertToSavepoint(self):
     if self._savepoint is EMPTY:
-      raise FRActionStackError('Attempted to revert to empty savepoint. Perhaps you'
+      raise ActionStackError('Attempted to revert to empty savepoint. Perhaps you'
                                ' performed several \'undo\' operations, then performed'
                                ' a forward operation that flushed your savepoint?')
     if self._savepoint.treatAsUndo:
@@ -261,7 +261,7 @@ class FRActionStack:
     last undo call.
     """
     if not self.canRedo:
-      warn('Nothing to redo', FRS3AWarning)
+      warn('Nothing to redo', S3AWarning)
       return
 
     self.actions.rotate(-1)
@@ -275,7 +275,7 @@ class FRActionStack:
     Undo the last action.
     """
     if not self.canUndo:
-      warn('Nothing to undo', FRS3AWarning)
+      warn('Nothing to undo', S3AWarning)
       return
 
     with self.ignoreActions():
@@ -311,10 +311,10 @@ class FRActionStack:
     return self._savepoint is not cmpAction
 
   def ignoreActions(self):
-    return _FRBufferOverride(self)
+    return _BufferOverride(self)
 
-class _FRBufferOverride:
-  def __init__(self, stack: FRActionStack, newActQueue: deque=None):
+class _BufferOverride:
+  def __init__(self, stack: ActionStack, newActQueue: deque=None):
     self.newActQueue = newActQueue
     self.stack = stack
 

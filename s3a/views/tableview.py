@@ -8,28 +8,28 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
 from s3a import FR_SINGLETON
-from s3a.models.tablemodel import FRComponentMgr
+from s3a.models.tablemodel import ComponentMgr
 from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS
 from s3a.constants import FR_ENUMS
-from s3a.structures import FRS3AException, FRS3AWarning, TwoDArr
+from s3a.structures import S3AException, S3AWarning, TwoDArr
 
-__all__ = ['FRCompTableView']
+__all__ = ['CompTableView']
 
-from ..parameditors import pgregistered, FRParamEditor, FRParamEditorDockGrouping
+from ..parameditors import pgregistered, ParamEditor, ParamEditorDockGrouping
 from ..graphicsutils import contextMenuFromEditorActions
 
 Signal = QtCore.Signal
 
 TBL_FIELDS = FR_SINGLETON.tableData.allFields
 
-class FRPopupTableDialog(QtWidgets.QDialog):
+class PopupTableDialog(QtWidgets.QDialog):
   def __init__(self, *args):
     super().__init__(*args)
     self.setModal(True)
     # -----------
     # Table View
     # -----------
-    self.tbl = FRCompTableView(minimal=True)
+    self.tbl = CompTableView(minimal=True)
     # Keeps track of which columns were edited by the user
     self.dirtyColIdxs = []
 
@@ -113,7 +113,7 @@ class FRPopupTableDialog(QtWidgets.QDialog):
     super().reject()
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_TBL)
-class FRCompTableView(QtWidgets.QTableView):
+class CompTableView(QtWidgets.QTableView):
   """
   Table for displaying :class:`FRComponentMgr` data.
   """
@@ -122,7 +122,7 @@ class FRCompTableView(QtWidgets.QTableView):
   @classmethod
   def __initEditorParams__(cls):
     cls.showOnCreate = FR_SINGLETON.generalProps.registerProp(cls, FR_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE)
-    cls.toolsEditor = FRParamEditor.buildClsToolsEditor(cls, name='Component Table Tools')
+    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, name='Component Table Tools')
     nameFilters = []
     for field in FR_SINGLETON.tableData.allFields:
       show = not field.opts.get('colHidden', False)
@@ -131,7 +131,7 @@ class FRCompTableView(QtWidgets.QTableView):
     cls.colsVisibleProps = FR_SINGLETON.generalProps.registerProp(
       cls, FR_CONSTS.PROP_COLS_TO_SHOW, asProperty=False)
 
-    dockGroup = FRParamEditorDockGrouping([cls.toolsEditor, FR_SINGLETON.filter], 'Component Table')
+    dockGroup = ParamEditorDockGrouping([cls.toolsEditor, FR_SINGLETON.filter], 'Component Table')
     FR_SINGLETON.addDocks(dockGroup)
 
   def __init__(self, *args, minimal=False):
@@ -148,10 +148,10 @@ class FRCompTableView(QtWidgets.QTableView):
     self._prevSelRows = np.array([])
     self.setSortingEnabled(True)
 
-    self.mgr = FRComponentMgr()
+    self.mgr = ComponentMgr()
     self.minimal = minimal
     if not minimal:
-      self.popup = FRPopupTableDialog(*args)
+      self.popup = PopupTableDialog(*args)
       # Create context menu for changing table rows
       self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
       cursor = QtGui.QCursor()
@@ -187,13 +187,13 @@ class FRCompTableView(QtWidgets.QTableView):
         paramDict['type'] = 'list'
         paramDict.update(values={'True': True, 'False': False})
       try:
-        self.setItemDelegateForColumn(ii, pgregistered.FRPgParamDelegate(paramDict, self))
-      except FRS3AException:
+        self.setItemDelegateForColumn(ii, pgregistered.PgParamDelegate(paramDict, self))
+      except S3AException:
         # Parameter doesn't have a registered pyqtgraph editor, so default to
         # generic text editor
         paramDict['type'] = 'text'
         paramDict['default'] = str(curval)
-        self.setItemDelegateForColumn(ii, pgregistered.FRPgParamDelegate(paramDict, self))
+        self.setItemDelegateForColumn(ii, pgregistered.PgParamDelegate(paramDict, self))
 
     self.horizontalHeader().setSectionsMovable(True)
 
@@ -260,7 +260,7 @@ class FRCompTableView(QtWidgets.QTableView):
       # duplicates
       retLists = retLists[~np.isin(retLists[:,2], self.mgr.noEditColIdxs)]
     if warnNoneSelection and len(retLists) == 0:
-      warn('No editable columns selected.', FRS3AWarning)
+      warn('No editable columns selected.', S3AWarning)
     return retLists
 
   def setSelectedCellsAsFirst(self):

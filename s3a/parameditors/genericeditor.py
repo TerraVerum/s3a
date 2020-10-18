@@ -11,10 +11,10 @@ from s3a import models
 from s3a.constants import MENU_OPTS_DIR
 from s3a.generalutils import frPascalCaseToTitle
 from s3a.graphicsutils import dialogGetSaveFileName
-from s3a.models.editorbase import FRParamEditorBase
+from s3a.models.editorbase import ParamEditorBase
 from s3a import parameditors
-from s3a.processing import FRImgProcWrapper
-from s3a.structures import FRParam, FilePath, NChanImg, FRVertices
+from s3a.processing import ImgProcWrapper
+from s3a.structures import FRParam, FilePath, NChanImg, XYVertices
 
 Signal = QtCore.Signal
 
@@ -27,7 +27,7 @@ def clearUnwantedParamVals(paramState: dict):
 _childTuple_asValue = Tuple[FRParam,...]
 childTuple_asParam = Tuple[Tuple[FRParam,...], bool]
 _keyType = Union[FRParam, Union[_childTuple_asValue, childTuple_asParam]]
-class FRParamEditor(FRParamEditorBase):
+class ParamEditor(ParamEditorBase):
   """
   GUI controls for user-interactive parameters within S3A. Each window consists of
   a parameter tree and basic saving capabilities.
@@ -116,7 +116,7 @@ class FRParamEditor(FRParamEditorBase):
     toolsDir = MENU_OPTS_DIR / lowerGroupName
     if name is None:
       name = groupName + ' Tools'
-    toolsEditor = FRParamEditor(
+    toolsEditor = ParamEditor(
       saveDir=toolsDir, fileType=lowerGroupName.replace(' ', '') + 'tools',
       name=name, registerCls=cls, useNewInit=False
     )
@@ -130,12 +130,12 @@ class FRParamEditor(FRParamEditorBase):
     saveName = dialogGetSaveFileName(self, 'Save As', self.lastAppliedName)
     self.saveParamState(saveName)
 
-class FRParamEditorDockGrouping(QtWidgets.QDockWidget):
+class ParamEditorDockGrouping(QtWidgets.QDockWidget):
   """
   When multiple parameter editor windows should be grouped under the same heading,
   this class is responsible for performing that grouping.
   """
-  def __init__(self, editors: List[FRParamEditor], dockName, parent=None):
+  def __init__(self, editors: List[ParamEditor], dockName, parent=None):
     super().__init__(parent)
     self.tabs = QtWidgets.QTabWidget(self)
     self.hide()
@@ -164,7 +164,7 @@ class FRParamEditorDockGrouping(QtWidgets.QDockWidget):
     for editor in self.editors:
       editor.setParent(parent)
 
-  def getTabName(self, editor: FRParamEditor):
+  def getTabName(self, editor: ParamEditor):
     if self.name in editor.name:
       tabName = editor.name.split(self.name)[1][1:]
       if len(tabName) == 0:
@@ -174,24 +174,24 @@ class FRParamEditorDockGrouping(QtWidgets.QDockWidget):
     return tabName
 
 
-class FRParamEditorPlugin(ABC):
+class ParamEditorPlugin(ABC):
   """
   Primitive plugin which can interface with S3A functionality. When this class is overloaded,
   the child class is given a reference to the main S3A window and S3A is made aware of the
   plugin's existence. For interfacing with table fields, see the special case of
-  :class:`FRTableFieldPlugin`
+  :class:`TableFieldPlugin`
   """
   name: str=None
-  toolsEditor: FRParamEditor
+  toolsEditor: ParamEditor
   """Param Editor window which holds user-editable properties exposed by the programmer"""
   s3a: models.s3abase.S3ABase=None
   """Reference to the current S3A window"""
 
-  docks: Union[FRParamEditorDockGrouping, FRParamEditor] = None
+  docks: Union[ParamEditorDockGrouping, ParamEditor] = None
   """
   Docks that should be shown in S3A's menu bar. By default, just the toolsEditor is shown.
   If multiple param editors must be visible, manually set this property to a
-  :class:`FRParamEditorDockGrouping` as performed in :class:`FRVerticesPlugin`.
+  :class:`FRParamEditorDockGrouping` as performed in :class:`XYVerticesPlugin`.
   """
 
   @classmethod
@@ -202,17 +202,17 @@ class FRParamEditorPlugin(ABC):
     self.s3a = s3a
 
 
-class FRTableFieldPlugin(FRParamEditorPlugin):
+class TableFieldPlugin(ParamEditorPlugin):
   """
   Primary method for providing algorithmic refinement of table field data. For
-  instance, the :class:`FRVerticesPlugin` class can refine initial bounding
+  instance, the :class:`XYVerticesPlugin` class can refine initial bounding
   box estimates of component vertices using custom image processing algorithms.
   """
 
-  procCollection: parameditors.algcollection.FRAlgParamEditor= None
+  procCollection: parameditors.algcollection.AlgParamEditor= None
   """
   Most table field plugins will use some sort of processor to infer field data.
-  This property holds spawned collections. See :class:`FRVerticesPlugin` for
+  This property holds spawned collections. See :class:`XYVerticesPlugin` for
   an example.
   """
 
@@ -232,7 +232,7 @@ class FRTableFieldPlugin(FRParamEditorPlugin):
     function
     """
     super().__initEditorParams__()
-    cls.toolsEditor = FRParamEditor.buildClsToolsEditor(cls, 'Tools')
+    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Tools')
 
   def attachS3aRef(self, s3a: models.s3abase.S3ABase):
     super().attachS3aRef(s3a)
@@ -242,14 +242,14 @@ class FRTableFieldPlugin(FRParamEditorPlugin):
   def updateAll(self, mainImg: Optional[NChanImg], newComp: Optional[pd.Series] = None):
     """
     This function is called when a new component is created or the focused image is updated
-    from the main view. See :meth:`FRFocusedImage.updateAll` for parameters.
+    from the main view. See :meth:`FocusedImage.updateAll` for parameters.
     """
     raise NotImplementedError
 
-  def handleShapeFinished(self, roiVerts: FRVertices):
+  def handleShapeFinished(self, roiVerts: XYVertices):
     """
     Called whenever a user completes a shape in the focused image. See
-    :meth:`FRFocusedImage.handleShapeFinished` for parameters.
+    :meth:`FocusedImage.handleShapeFinished` for parameters.
     """
     raise NotImplementedError
 
@@ -286,5 +286,5 @@ class FRTableFieldPlugin(FRParamEditorPlugin):
   def curProcessor(self):
     return self.procCollection.curProcessor
   @curProcessor.setter
-  def curProcessor(self, newProcessor: Union[str, FRImgProcWrapper]):
+  def curProcessor(self, newProcessor: Union[str, ImgProcWrapper]):
     self.procCollection.switchActiveProcessor(newProcessor)

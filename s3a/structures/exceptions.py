@@ -1,13 +1,13 @@
 # --------------
 # Errors used within the application
 # --------------
-class FRS3AException(Exception): pass
-class FRS3AWarning(Warning): pass
+class S3AException(Exception): pass
+class S3AWarning(Warning): pass
 
-class FRIOError(IOError, FRS3AException): pass
-class FRInvalidDrawModeError(FRS3AException): pass
-class FRParamEditorError(FRS3AException): pass
-class FRInvalidROIEvType(FRS3AException): pass
-class FRIllFormedVerticesError(FRS3AException): pass
-class FRAlgProcessorError(FRS3AException): pass
-class FRActionStackError(FRS3AException): pass
+class S3AIOError(IOError, S3AException): pass
+class InvalidDrawModeError(S3AException): pass
+class ParamEditorError(S3AException): pass
+class InvalidROIEvType(S3AException): pass
+class IllFormedVerticesError(S3AException): pass
+class AlgProcessorError(S3AException): pass
+class ActionStackError(S3AException): pass

@@ -12,12 +12,12 @@ from pyqtgraph.parametertree import Parameter, ParameterTree, ParameterItem
 
 from s3a.generalutils import frPascalCaseToTitle, frParamToPgParamDict
 from s3a.graphicsutils import saveToFile, attemptFileLoad
-from s3a.processing import FRAtomicProcess, FRProcessIO, FRGeneralProcWrapper
+from s3a.processing import AtomicProcess, ProcessIO, GeneralProcWrapper
 from s3a.processing.guiwrapper import docParser
-from s3a.structures import FRParam, ContainsSharedProps, FilePath, FRParamEditorError, \
-  FRS3AWarning
+from s3a.structures import FRParam, ContainsSharedProps, FilePath, ParamEditorError, \
+  S3AWarning
 
-__all__ = ['FRParamEditorBase']
+__all__ = ['ParamEditorBase']
 
 Signal = QtCore.Signal
 
@@ -34,7 +34,7 @@ def clearUnwantedParamVals(paramState: dict):
   if paramState.get('value', True) is None:
     paramState.pop('value')
 
-def _mkRunBtn(proc: FRAtomicProcess, btnOpts: Union[FRParam, dict]):
+def _mkRunBtn(proc: AtomicProcess, btnOpts: Union[FRParam, dict]):
   defaultBtnOpts = dict(name=proc.name, type='registeredaction')
   if isinstance(btnOpts, FRParam):
     # Replace falsy helptext with func signature
@@ -65,7 +65,7 @@ all parameters from SPAWNED_EDITORS, thereby letting a user see any option from 
 param editor.
 """
 
-class FRParamEditorBase(QtWidgets.QDockWidget):
+class ParamEditorBase(QtWidgets.QDockWidget):
   """
   GUI controls for user-interactive parameters within S3A. Each window consists of
   a parameter tree and basic saving capabilities.
@@ -125,7 +125,7 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     and reconstructing the name, tooltip, etc.
     """
 
-    self.registeredProcs: Set[FRAtomicProcess] = set()
+    self.registeredProcs: Set[AtomicProcess] = set()
     """
     Keeps track of registered functions which have been converted to processes so their
     arguments can be exposed to the user
@@ -183,7 +183,7 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
 
         * The first element of the tuple must correspond to the base name within the
           parameter grouping in order to properly extract the corresponding children.
-          For instance, to extract MARGIN from :class:`FRGeneralPropertiesEditor`,
+          For instance, to extract MARGIN from :class:`GeneralPropertiesEditor`,
           you must first specify the group parent for that parameter:
             >>> margin = FR_SINGLETON.generalProps[FR_CONSTS.CLS_FOCUSED_IMG_AREA,
             >>>   FR_CONSTS.MARGIN]
@@ -410,7 +410,7 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     if grouping not in self.groupingToParamMapping:
       warn(f'The provided grouping "{grouping}" was not recognized, perhaps because '
            f' `registerGroup()` was never called with this grouping. Registering now'
-           f' as a top-level grouping.', FRS3AWarning)
+           f' as a top-level grouping.', S3AWarning)
       self.registerGroup(None)(grouping)
     groupParam = self.groupingToParamMapping[grouping]
 
@@ -469,7 +469,7 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
 
     :param paramPath:  See `registerProp`
     :param func: Function to make interactive
-    :param name: See `FRAtomicProcess.name`
+    :param name: See `AtomicProcess.name`
     :param runOpts: Combination of ways this function can be run. Multiple of these
       options can be selected at the same time using the `|` operator.
         * If RunOpts.BTN, a button is present as described.
@@ -480,8 +480,8 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
     :param btnOpts: Overrides defaults for button used to run this function. If
       `RunOpts.BTN` is not in `RunOpts`, these values are ignored.
     """
-    if not isinstance(func, FRAtomicProcess):
-      proc = FRAtomicProcess(func, name)
+    if not isinstance(func, AtomicProcess):
+      proc = AtomicProcess(func, name)
     else:
       proc = func
     self.registeredProcs.add(proc)
@@ -491,13 +491,13 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
       return proc.run()
 
     def runpProc_changing(_param: Parameter, newVal: Any):
-      forwardedOpts = FRProcessIO(**{_param.name(): newVal})
+      forwardedOpts = ProcessIO(**{_param.name(): newVal})
       return proc.run(forwardedOpts)
 
     if len(proc.input.hyperParamKeys) > 0:
       topParam = self.params if len(paramPath) == 0 else self.params.child(*paramPath)
       # Check if proc params already exist from a previous addition
-      FRGeneralProcWrapper(proc, self, paramPath)
+      GeneralProcWrapper(proc, self, paramPath)
       parentParam = topParam.child(proc.name)
       for param in parentParam:
         if runOpts & RunOpts.ON_CHANGED:
@@ -610,4 +610,4 @@ class FRParamEditorBase(QtWidgets.QDockWidget):
 
 INITIALIZED_GROUPINGS = set()
 REGISTERED_GROUPINGS = set()
-SPAWNED_EDITORS: List[FRParamEditorBase] = []
+SPAWNED_EDITORS: List[ParamEditorBase] = []

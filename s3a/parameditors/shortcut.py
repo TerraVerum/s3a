@@ -9,9 +9,9 @@ from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from pyqtgraph.parametertree import Parameter
 
 from s3a.constants import SHORTCUTS_DIR
-from s3a.structures import FRParam, FRParamEditorError, FRS3AWarning
-from .genericeditor import FRParamEditor
-from .pgregistered import FRShortcutParameter
+from s3a.structures import FRParam, ParamEditorError, S3AWarning
+from .genericeditor import ParamEditor
+from .pgregistered import ShortcutParameter
 from s3a.generalutils import helpTextToRichText
 
 
@@ -50,18 +50,18 @@ def _getAllBases(cls):
   return baseClasses
 
 
-class FREditableShortcut(QtWidgets.QShortcut):
+class EditableShortcut(QtWidgets.QShortcut):
   paramIdx: Tuple[FRParam, FRParam]
 
 
 @dataclass
-class FRBoundFnParams:
+class BoundFnParams:
   param: FRParam
   func: Callable
   defaultFnArgs: list
 
 
-class FRShortcutsEditor(FRParamEditor):
+class ShortcutsEditor(ParamEditor):
 
   def __init__(self, parent=None):
 
@@ -80,7 +80,7 @@ class FRShortcutsEditor(FRParamEditor):
     # If the registered class is not a graphical widget, the shortcut
     # needs a global context
     self.mainWinRef = None
-    self.boundFnsPerQualname: Dict[FRParam, List[FRBoundFnParams]] = defaultdict(list)
+    self.boundFnsPerQualname: Dict[FRParam, List[BoundFnParams]] = defaultdict(list)
     self.objToShortcutParamMapping: DefaultDict[Any, List[FRParam]] = defaultdict(list)
     """Holds which objects have what shortcuts. Useful for avoiding duplicate shortcuts
     for the same action on one class"""
@@ -98,7 +98,7 @@ class FRShortcutsEditor(FRParamEditor):
       fnArgs = []
 
     def registerMethodDecorator(func: Callable, ownerObj: Any=None):
-      boundFnParam = FRBoundFnParams(param=constParam, func=func, defaultFnArgs=fnArgs)
+      boundFnParam = BoundFnParams(param=constParam, func=func, defaultFnArgs=fnArgs)
       ownerCls = ownerObj if isclass(ownerObj) else type(ownerObj)
       if ownerObj is None:
         qualname, _ = _class_fnNamesFromFnQualname(func.__qualname__)
@@ -180,12 +180,12 @@ class FRShortcutsEditor(FRParamEditor):
       groupParam = self.groupingToParamMapping[cls]
     except KeyError:
       # Not yet registered
-      raise FRParamEditorError(f'{cls} must be registered as a group before any buttons'
+      raise ParamEditorError(f'{cls} must be registered as a group before any buttons'
                                f' can be reigstered to {ownerObj}')
-    shortcutParam: FRShortcutParameter = Parameter.create(name=funcFrParam.name,
-                                                          type='shortcut', value=funcFrParam.value,
-                                                          tip=funcFrParam.helpText,
-                                                          frParam=funcFrParam)
+    shortcutParam: ShortcutParameter = Parameter.create(name=funcFrParam.name,
+                                                        type='shortcut', value=funcFrParam.value,
+                                                        tip=funcFrParam.helpText,
+                                                        frParam=funcFrParam)
     if groupParam.name in self.params.names:
       pgParam = self.params.child(groupParam.name)
     else:
@@ -219,7 +219,7 @@ class FRShortcutsEditor(FRParamEditor):
   def ambigWarning(ownerObj: QtWidgets.QWidget, shc: QtWidgets.QShortcut):
     warn(f'{ownerObj} shortcut ambiguously activated: {shc.key().toString()}\n'
          f'Perhaps multiple shortcuts are assigned the same key sequence?',
-         FRS3AWarning)
+         S3AWarning)
 
 
   def addRegisteredFuncsFromCls(self, grouping: Any, groupParam: FRParam):
@@ -263,7 +263,7 @@ class FRShortcutsEditor(FRParamEditor):
     self.boundFnsPerQualname[grouping.__qualname__] = boundFns_includingBases
 
   @classmethod
-  def addBoundFn(cls, boundFn: FRBoundFnParams, parentParam: Parameter):
+  def addBoundFn(cls, boundFn: BoundFnParams, parentParam: Parameter):
     if boundFn.param.name in parentParam.names:
       # Already registered
       return
@@ -273,7 +273,7 @@ class FRShortcutsEditor(FRParamEditor):
                     'tip'  : boundFn.param.helpText}
     parentParam.addChild(paramForTree)
 
-  def hookupShortcutForBoundFn(self, boundFn: FRBoundFnParams, ownerObj: Any):
+  def hookupShortcutForBoundFn(self, boundFn: BoundFnParams, ownerObj: Any):
     if boundFn.param in self.objToShortcutParamMapping[ownerObj]:
       return
     self.objToShortcutParamMapping[ownerObj].append(boundFn.param)
@@ -290,4 +290,4 @@ class FRShortcutsEditor(FRParamEditor):
     """
     Properties should never be registered as shortcuts, so make sure this is disallowed
     """
-    raise FRParamEditorError('Cannot register property/attribute as a shortcut')
+    raise ParamEditorError('Cannot register property/attribute as a shortcut')

@@ -7,10 +7,10 @@ from warnings import warn
 import cv2 as cv
 import numpy as np
 
-from .exceptions import FRIllFormedVerticesError
+from .exceptions import IllFormedVerticesError
 from .typeoverloads import BlackWhiteImg, NChanImg
 
-class FRVertices(np.ndarray):
+class XYVertices(np.ndarray):
   connected = True
 
   def __new__(cls, inputArr: Union[list, np.ndarray, tuple]=None, connected=True, dtype=int,
@@ -28,10 +28,10 @@ class FRVertices(np.ndarray):
     shapeLen = len(shape)
     # indicates point, so the one dimension must have only 2 elements
     if 1 < shapeLen < 2 and shape[0] != 2:
-      raise FRIllFormedVerticesError(f'A one-dimensional vertex array must be shape (2,).'
+      raise IllFormedVerticesError(f'A one-dimensional vertex array must be shape (2,).'
                                 f' Receieved array of shape {shape}')
     elif shapeLen > 2 or shapeLen > 1 and shape[1] != 2:
-      raise FRIllFormedVerticesError(f'Vertex list must be Nx2. Received shape {shape}.')
+      raise IllFormedVerticesError(f'Vertex list must be Nx2. Received shape {shape}.')
     if obj is None: return
     self.connected = getattr(obj, 'connected', True)
 
@@ -44,7 +44,7 @@ class FRVertices(np.ndarray):
       return self.reshape(-1)
     # Reaching here means the user requested vertices as point when
     # more than one point is in the list
-    raise FRIllFormedVerticesError(f'asPoint() can only be called when one vertex is in'
+    raise IllFormedVerticesError(f'asPoint() can only be called when one vertex is in'
                               f' the vertex list. Currently has shape {self.shape}')
 
   def asRowCol(self):
@@ -74,7 +74,7 @@ class FRVertices(np.ndarray):
   def cols(self, newCols):self.x = newCols
 
 
-class FRComplexVertices(list):
+class ComplexXYVertices(list):
   """
   Allows holes in the component shape. Subclassing ndarray instead of list allows primitive algebraic ops on the list
   contents (e.g. subtracting/adding offset). Since normal usage doesn't typically require a mutable structure, the
@@ -83,7 +83,7 @@ class FRComplexVertices(list):
   hierarchy = np.ones((0,4), dtype=int)
   """See cv.findContours for hierarchy explanation. Used in cv.RETR_CCOMP mode."""
 
-  def __init__(self, inputArr: Union[List[FRVertices], np.ndarray]=None,
+  def __init__(self, inputArr: Union[List[XYVertices], np.ndarray]=None,
                hierarchy:np.ndarray=None,
                coerceListElements=False):
 
@@ -91,14 +91,14 @@ class FRComplexVertices(list):
       inputArr = []
     numInpts = len(inputArr)
     if coerceListElements:
-      inputArr = [FRVertices(el) for el in inputArr]
+      inputArr = [XYVertices(el) for el in inputArr]
     if hierarchy is None:
       hierarchy = np.ones((numInpts, 4), dtype=int)*-1
     super().__init__(inputArr)
     # No hierarchy required unless list is longer than length 1
     self.hierarchy = hierarchy
 
-  def append(self, verts:FRVertices=None) -> None:
+  def append(self, verts:XYVertices=None) -> None:
     if verts is not None:
       super().append(verts)
 
@@ -126,15 +126,15 @@ class FRComplexVertices(list):
     if len(self) == 1:
       return self[0].asPoint()
     else:
-      raise FRIllFormedVerticesError(f'Can only treat FRComplexVertices with one inner list as a point.'
+      raise IllFormedVerticesError(f'Can only treat ComplexXYVertices with one inner list as a point.'
                                 f' Current list has {len(self)} elements.')
 
-  def stack(self, newDtype=int) -> FRVertices:
+  def stack(self, newDtype=int) -> XYVertices:
     if len(self) == 0:
       # Check required for np vstack since it won't work with a 0-element array
-      return FRVertices()
+      return XYVertices()
     else:
-      return FRVertices(np.vstack(self), dtype=newDtype)
+      return XYVertices(np.vstack(self), dtype=newDtype)
 
   @classmethod
   def stackedMax(cls, complexVertList: list):
@@ -143,19 +143,19 @@ class FRComplexVertices(list):
     """
     return np.vstack([v.stack() for v in complexVertList]).max(0)
 
-  def filledVerts(self) -> FRComplexVertices:
+  def filledVerts(self) -> ComplexXYVertices:
     """
     Retrieves all vertex lists corresponding to filled regions in the complex shape
     """
     idxs = np.nonzero(self.hierarchy[:,3] == -1)[0]
-    return FRComplexVertices([self[ii] for ii in idxs])
+    return ComplexXYVertices([self[ii] for ii in idxs])
 
-  def holeVerts(self) -> FRComplexVertices:
+  def holeVerts(self) -> ComplexXYVertices:
     """
     Retrieves all vertex lists corresponding to holes in the complex shape
     """
     idxs = np.nonzero(self.hierarchy[:,3] != -1)[0]
-    return FRComplexVertices([self[ii] for ii in idxs])
+    return ComplexXYVertices([self[ii] for ii in idxs])
 
   def toMask(self, maskShape: Union[Sequence, NChanImg]=None,
              fillColor: Union[int, float, np.ndarray]=None,
@@ -173,7 +173,7 @@ class FRComplexVertices(list):
              f'Vertex shape: {vertMax}, mask shape: {cmpShape}')
     if checkForDisconnectedVerts:
       fillArg = []
-      for verts in self: # type: FRVertices
+      for verts in self: # type: XYVertices
         if verts.connected:
           fillArg.append(verts)
         else:
@@ -196,7 +196,7 @@ class FRComplexVertices(list):
       return out
 
   @staticmethod
-  def fromBwMask(bwMask: BlackWhiteImg, simplifyVerts=True, externOnly=False) -> FRComplexVertices:
+  def fromBwMask(bwMask: BlackWhiteImg, simplifyVerts=True, externOnly=False) -> ComplexXYVertices:
     approxMethod = cv.CHAIN_APPROX_SIMPLE
     if not simplifyVerts:
       approxMethod = cv.CHAIN_APPROX_NONE
@@ -207,9 +207,9 @@ class FRComplexVertices(list):
     # outside
     #bwmask = dilation(bwmask, np.ones((3,3), dtype=bool))
     contours, hierarchy = cv.findContours(bwMask.astype('uint8'), retrMethod, approxMethod)
-    compVertices = FRComplexVertices()
+    compVertices = ComplexXYVertices()
     for contour in contours:
-      compVertices.append(FRVertices(contour[:,0,:]))
+      compVertices.append(XYVertices(contour[:,0,:]))
     if hierarchy is None:
       hierarchy = np.ones((0,1,4), int)*-1
     else:
@@ -229,7 +229,7 @@ class FRComplexVertices(list):
            f'Min:\t{concatVerts.min(0)}\n' \
            f'Max:\t{concatVerts.max(0)}'
 
-  def __eq__(self, other: FRComplexVertices):
+  def __eq__(self, other: ComplexXYVertices):
     if len(self) != len(other):
       return False
     for selfVerts, otherVerts in zip(self, other):
@@ -240,16 +240,16 @@ class FRComplexVertices(list):
   def __ne__(self, other):
     return not self == other
 
-  def copy(self) -> FRComplexVertices:
-    return FRComplexVertices([lst.copy() for lst in self], self.hierarchy)
+  def copy(self) -> ComplexXYVertices:
+    return ComplexXYVertices([lst.copy() for lst in self], self.hierarchy)
 
   def serialize(self):
     return str([arr.tolist() for arr in self])
 
   @staticmethod
-  def deserialize(strObj: str) -> FRComplexVertices:
+  def deserialize(strObj: str) -> ComplexXYVertices:
     # TODO: Infer appropriate hierarchy from the serialized string. It is possible by finding whether vertices are given
     #  in CW or CCW order. This doesn't affect how they are drawn, but it does effect the return values of "holeVerts()"
     #  and "filledVerts()"
     outerLst = literal_eval(strObj)
-    return FRComplexVertices([FRVertices(lst) for lst in outerLst])
+    return ComplexXYVertices([XYVertices(lst) for lst in outerLst])

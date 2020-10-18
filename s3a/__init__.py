@@ -7,8 +7,8 @@ import os
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 
-__all__ = ['appInst', 'FR_SINGLETON', 'S3A', 'FRParamEditor', 'FRParam', 'REQD_TBL_FIELDS',
-           'FRComplexVertices', 'FRVertices', 'FR_CONSTS', 'FRComponentIO', 'RunOpts']
+__all__ = ['appInst', 'FR_SINGLETON', 'S3A', 'ParamEditor', 'FRParam', 'REQD_TBL_FIELDS',
+           'ComplexXYVertices', 'XYVertices', 'FR_CONSTS', 'ComponentIO', 'RunOpts']
 
 pg.setConfigOptions(imageAxisOrder='row-major')
 
@@ -36,18 +36,18 @@ from . import graphicsutils as gutils
 import s3a.constants
 import s3a.structures
 
-from s3a.parameditors import FR_SINGLETON, FRParamEditor
+from s3a.parameditors import FR_SINGLETON, ParamEditor
 from s3a.models.editorbase import RunOpts
-from .io import FRComponentIO
-from s3a.processing.algorithms import FRTopLevelImageProcessors
-from s3a.structures import FRVertices, FRComplexVertices, FRParam
+from .io import ComponentIO
+from s3a.processing.algorithms import TopLevelImageProcessors
+from s3a.structures import XYVertices, ComplexXYVertices, FRParam
 from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS
 
-for name, func in inspect.getmembers(FRTopLevelImageProcessors, inspect.isfunction):
+for name, func in inspect.getmembers(TopLevelImageProcessors, inspect.isfunction):
   FR_SINGLETON.imgProcClctn.addProcessCtor(func)
 
-from s3a.plugins import FRVerticesPlugin
-FR_SINGLETON.addPlugin(FRVerticesPlugin)
+from s3a.plugins import VerticesPlugin
+FR_SINGLETON.addPlugin(VerticesPlugin)
 
 # Minimal means no GUI is needed. Things work faster when they don't have to be
 # shown through the comp display filter

@@ -10,8 +10,8 @@ from conftest import app, mgr, stack
 from helperclasses import CompDfTester
 from s3a import appInst, FR_SINGLETON, S3A
 from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS
-from s3a.structures import FRComplexVertices, FRParam, FRVertices, FRS3AWarning
-from s3a.views.tableview import FRCompTableView
+from s3a.structures import ComplexXYVertices, FRParam, XYVertices, S3AWarning
+from s3a.views.tableview import CompTableView
 
 
 @pytest.mark.withcomps
@@ -36,7 +36,7 @@ def test_split_selected_comps():
   cv.rectangle(compMask, (9, 9), (16, 16), 1, -1)
   cv.rectangle(compMask, (21, 21), (30, 30), 1, -1)
   cv.rectangle(compMask, (46, 46), (60, 60), 1, -1)
-  verts = FRComplexVertices.fromBwMask(compMask > 0)
+  verts = ComplexXYVertices.fromBwMask(compMask > 0)
   comp = FR_SINGLETON.tableData.makeCompDf()
   comp.at[comp.index[0], REQD_TBL_FIELDS.VERTICES] = verts
   app.add_focusComps(comp)
@@ -75,7 +75,7 @@ def test_set_cells_as():
 
 def test_set_as_gui(sampleComps):
   # Monkeypatch gui for testing
-  view = FRCompTableView()
+  view = CompTableView()
   mgr = view.mgr
   mgr.addComps(sampleComps)
   view.popup.exec = lambda: True
@@ -124,7 +124,7 @@ def test_impossible_filter(tmpdir):
   FR_SINGLETON.tableData.loadCfg(tmpFile)
   dftester = CompDfTester(3)
 
-  with pytest.warns(FRS3AWarning):
+  with pytest.warns(S3AWarning):
     newApp = S3A(guiMode=False, loadLastState=False)
     newApp.compMgr.addComps(dftester.compDf)
 
@@ -138,6 +138,6 @@ def compCopiedCompDfs(old: pd.DataFrame, new: pd.DataFrame, newStartIdx=0):
 
 def copyHelper(copyMode=True):
   copier = app.mainImg.regionCopier
-  copier.offset = FRVertices([[50, 50]])
+  copier.offset = XYVertices([[50, 50]])
   copier.regionIds = mgr.compDf.index
   copier.inCopyMode = copyMode

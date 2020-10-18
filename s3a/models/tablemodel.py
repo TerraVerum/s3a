@@ -11,16 +11,16 @@ from s3a import FR_SINGLETON
 from s3a.generalutils import coerceDfTypes
 from s3a.constants import REQD_TBL_FIELDS as RTF
 from s3a.constants import FR_CONSTS, FR_ENUMS
-from s3a.structures import FRComplexVertices
-from s3a.structures import OneDArr, FRS3AWarning
+from s3a.structures import ComplexXYVertices
+from s3a.structures import OneDArr, S3AWarning
 
-__all__ = ['FRComponentMgr', 'FRCompTableModel']
+__all__ = ['ComponentMgr', 'CompTableModel']
 
 Signal = QtCore.Signal
 
 TBL_FIELDS = FR_SINGLETON.tableData.allFields
 
-class FRCompTableModel(QtCore.QAbstractTableModel):
+class CompTableModel(QtCore.QAbstractTableModel):
   # Emits 3-element dict: Deleted comp ids, changed comp ids, added comp ids
   defaultEmitDict = {'deleted': np.array([]), 'changed': np.array([]), 'added': np.array([])}
   sigCompsChanged = Signal(dict)
@@ -80,7 +80,7 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
     if self.compDf.iloc[row, [col, col-1]].values[0] != self.compDf.iat[row, col]:
       warn('Warning! An error occurred setting this value. Please try again using a'
            ' <em>multi-cell</em> edit. E.g. do not just set this value, set it along with'
-           ' at least one other selected cell.', FRS3AWarning)
+           ' at least one other selected cell.', S3AWarning)
     toEmit = self.defaultEmitDict.copy()
     toEmit['changed'] = np.array([self.compDf.index[index.row()]])
     self.sigCompsChanged.emit(toEmit)
@@ -106,7 +106,7 @@ class FRCompTableModel(QtCore.QAbstractTableModel):
     self.sigFieldsChanged.emit()
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_MGR)
-class FRComponentMgr(FRCompTableModel):
+class ComponentMgr(CompTableModel):
   _nextCompId = 0
   compDf: pd.DataFrame
 
@@ -129,7 +129,7 @@ class FRComponentMgr(FRCompTableModel):
     # Delete entries with no vertices, since they make work within the app difficult.
     # TODO: Is this the appropriate response?
     verts = newCompsDf[RTF.VERTICES]
-    dropIds = newCompsDf.index[verts.map(FRComplexVertices.isEmpty)]
+    dropIds = newCompsDf.index[verts.map(ComplexXYVertices.isEmpty)]
     newCompsDf.drop(index=dropIds, inplace=True)
 
 
@@ -243,7 +243,7 @@ class FRComponentMgr(FRCompTableModel):
       this will default to the first component in the selection.
     """
     if mergeIds is None or len(mergeIds) < 2:
-      warn(f'Less than two components are selected, so "merge" is a no-op.', FRS3AWarning)
+      warn(f'Less than two components are selected, so "merge" is a no-op.', S3AWarning)
       return
     mergeComps: df = self.compDf.loc[mergeIds].copy()
     if keepId is None:
@@ -253,9 +253,9 @@ class FRComponentMgr(FRCompTableModel):
     allVerts = [v.stack() for v in mergeComps[RTF.VERTICES]]
     maskShape = np.max(np.vstack(allVerts), 0)[::-1]
     mask = np.zeros(maskShape, bool)
-    for verts in mergeComps[RTF.VERTICES]: # type: FRComplexVertices
+    for verts in mergeComps[RTF.VERTICES]: # type: ComplexXYVertices
       mask |= verts.toMask(tuple(maskShape))
-    newVerts = FRComplexVertices.fromBwMask(mask)
+    newVerts = ComplexXYVertices.fromBwMask(mask)
     keepInfo[RTF.VERTICES] = newVerts
 
     self.rmComps(mergeComps.index)
@@ -277,12 +277,12 @@ class FRComponentMgr(FRCompTableModel):
     splitComps = self.compDf.loc[splitIds, :].copy()
     newComps_lst = []
     for _, comp in splitComps.iterrows():
-      verts: FRComplexVertices = comp[RTF.VERTICES]
+      verts: ComplexXYVertices = comp[RTF.VERTICES]
       tmpMask = verts.toMask(asBool=False).astype('uint8')
       nComps, ccompImg = cv.connectedComponents(tmpMask)
       newVerts = []
       for ii in range(1, nComps):
-        newVerts.append(FRComplexVertices.fromBwMask(ccompImg == ii))
+        newVerts.append(ComplexXYVertices.fromBwMask(ccompImg == ii))
       childComps = pd.concat([comp.to_frame().T]*(nComps-1))
       childComps.loc[:, RTF.VERTICES] = newVerts
       newComps_lst.append(childComps)

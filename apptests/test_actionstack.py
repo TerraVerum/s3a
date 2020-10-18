@@ -1,12 +1,12 @@
 import numpy as np
 import pytest
 
-from s3a.models.actionstack import FRActionStack
-from s3a.structures import FRActionStackError, FRS3AWarning
+from s3a.models.actionstack import ActionStack
+from s3a.structures import ActionStackError, S3AWarning
 
 COUNT = 10
 
-class StackForTesting(FRActionStack):
+class StackForTesting(ActionStack):
   def __init__(self):
     super().__init__()
 
@@ -98,15 +98,15 @@ def test_bad_undo():
     stack.op()
   for _ii in range(4):
     stack.undo()
-  with pytest.warns(FRS3AWarning):
+  with pytest.warns(S3AWarning):
     stack.undo()
 
 def test_bad_redo():
   stack = StackForTesting()
-  with pytest.warns(FRS3AWarning):
+  with pytest.warns(S3AWarning):
     stack.redo()
   stack.op()
-  with pytest.warns(FRS3AWarning):
+  with pytest.warns(S3AWarning):
     stack.undo()
     stack.redo()
     stack.redo()
@@ -127,7 +127,7 @@ def test_invalidate_redos():
 
   stack.op(1)
   # New action should flush old ones
-  with pytest.warns(FRS3AWarning):
+  with pytest.warns(S3AWarning):
     stack.redo()
   stack.undo()
   assert len(stack.actions) == numRemainingEntries+1
@@ -142,7 +142,7 @@ def test_ignore_acts():
     for _ in range(COUNT):
       stack.op()
   assert len(stack.actions) == 0
-  with pytest.warns(FRS3AWarning):
+  with pytest.warns(S3AWarning):
     stack.undo()
 
 def test_max_len():
@@ -151,7 +151,7 @@ def test_max_len():
   for ii in range(cnt):
     stack.op()
 
-  with pytest.warns(FRS3AWarning):
+  with pytest.warns(S3AWarning):
     for ii in range(cnt):
       stack.undo()
 

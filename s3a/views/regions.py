@@ -13,24 +13,24 @@ from skimage import color
 from matplotlib import cm
 from matplotlib.pyplot import colormaps
 
-from s3a import FR_SINGLETON, FRComponentIO as frio
+from s3a import FR_SINGLETON, ComponentIO as frio
 from s3a.constants import REQD_TBL_FIELDS as RTF, FR_CONSTS
 from s3a.generalutils import coerceDfTypes, stackedVertsPlusConnections, dynamicDocstring
-from s3a.structures import FRParam, FRVertices, FRComplexVertices, OneDArr, BlackWhiteImg
+from s3a.structures import FRParam, XYVertices, ComplexXYVertices, OneDArr, BlackWhiteImg
 from s3a.structures.typeoverloads import GrayImg
 from . import imageareas
-from .clickables import FRBoundScatterPlot
+from .clickables import BoundScatterPlot
 
-__all__ = ['FRMultiRegionPlot', 'FRVertexDefinedImg', 'FRRegionCopierPlot']
+__all__ = ['MultiRegionPlot', 'VertexDefinedImg', 'RegionCopierPlot']
 
 from ..models.editorbase import RunOpts
-from ..processing import FRAtomicProcess
+from ..processing import AtomicProcess
 
 Signal = QtCore.Signal
 
 def makeMultiRegionDf(numRows=1, idList: Sequence[int]=None, selected:Sequence[bool]=None,
                       focused: Sequence[bool]=None, compClasses: Sequence[str]=None,
-                      vertices: Sequence[FRComplexVertices]=None, convertClasses=True):
+                      vertices: Sequence[ComplexXYVertices]=None, convertClasses=True):
   """
   Helper for creating new dataframe holding information determining color data.
   `selected` and `focused` must be boolean arrays indicating whether or not each component
@@ -81,16 +81,16 @@ def _makeTxtSymbol(txt: str, fontSize: int):
   outSymbol = tr.map(outSymbol)
   return outSymbol
 
-def _makeBoundSymbol(verts: FRVertices):
+def _makeBoundSymbol(verts: XYVertices):
   verts = verts - verts.min(0, keepdims=True)
   path = arrayToQPath(*verts.T, connect='finite')
   return path
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MULT_REG_PLT)
-class FRMultiRegionPlot(FRBoundScatterPlot):
+class MultiRegionPlot(BoundScatterPlot):
   def __init__(self, parent=None):
     super().__init__(size=1, pxMode=False)
-    self.resetColors = FRAtomicProcess(self.resetColors)
+    self.resetColors = AtomicProcess(self.resetColors)
     FR_SINGLETON.colorScheme.registerFunc(self.resetColors, FR_CONSTS.CLS_MULT_REG_PLT.name,
                                           runOpts=RunOpts.ON_CHANGED)
     self.setParent(parent)
@@ -242,7 +242,7 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
     self.regionData.drop(index=ids, inplace=True)
 
   def dataBounds(self, ax, frac=1.0, orthoRange=None):
-    allVerts = FRComplexVertices()
+    allVerts = ComplexXYVertices()
     for v in self.regionData[RTF.VERTICES]:
       allVerts.extend(v)
     allVerts = allVerts.stack()
@@ -253,7 +253,7 @@ class FRMultiRegionPlot(FRBoundScatterPlot):
 
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_VERT_IMG)
-class FRVertexDefinedImg(pg.ImageItem):
+class VertexDefinedImg(pg.ImageItem):
   sigRegionReverted = Signal(object) # new GrayImg
   @classmethod
   def __initEditorParams__(cls):
@@ -262,7 +262,7 @@ class FRVertexDefinedImg(pg.ImageItem):
 
   def __init__(self):
     super().__init__()
-    self.verts = FRComplexVertices()
+    self.verts = ComplexXYVertices()
     FR_SINGLETON.colorScheme.sigParamStateUpdated.connect(lambda: self.setImage(
       lut=self.getLUTFromScheme()))
 
@@ -273,7 +273,7 @@ class FRVertexDefinedImg(pg.ImageItem):
     return outImg
 
   @FR_SINGLETON.actionStack.undoable('Modify Focused Region')
-  def updateFromVertices(self, newVerts: FRComplexVertices, srcImg: GrayImg=None):
+  def updateFromVertices(self, newVerts: ComplexXYVertices, srcImg: GrayImg=None):
     oldImg = self.image
     oldVerts = self.verts
 
@@ -302,7 +302,7 @@ class FRVertexDefinedImg(pg.ImageItem):
     if np.array_equal(oldImg>0, newMask):
       # Nothing to do
       return
-    verts = FRComplexVertices.fromBwMask(newMask)
+    verts = ComplexXYVertices.fromBwMask(newMask)
     stackedVerts = verts.stack()
     newMask[stackedVerts.rows, stackedVerts.cols] = 2
     self.updateFromVertices(verts, srcImg=newMask)
@@ -314,18 +314,18 @@ class FRVertexDefinedImg(pg.ImageItem):
       lut.append(clr.getRgb())
     return np.array(lut, dtype='uint8')
 
-class FRRegionCopierPlot(pg.PlotCurveItem):
+class RegionCopierPlot(pg.PlotCurveItem):
   sigCopyStarted = QtCore.Signal()
   sigCopyStopped = QtCore.Signal()
 
-  def __init__(self, mainImg: imageareas.FREditableImgBase=None, parent=None):
+  def __init__(self, mainImg: imageareas.EditableImgBase=None, parent=None):
     super().__init__(parent)
     self.active = False
     self.inCopyMode = True
-    self.baseData = FRVertices()
+    self.baseData = XYVertices()
     self.regionIds = np.ndarray([])
-    self.dataMin = FRVertices()
-    self.offset = FRVertices([[0,0]])
+    self.dataMin = XYVertices()
+    self.offset = XYVertices([[0,0]])
 
     self.setShadowPen(color='k', width=2*self.opts['pen'].width())
     """
@@ -339,14 +339,14 @@ class FRRegionCopierPlot(pg.PlotCurveItem):
     self._connectivity = np.ndarray([], bool)
     mainImg.sigMousePosChanged.connect(self.mainMouseMoved)
 
-  def mainMouseMoved(self, xyPos: FRVertices, _pxColor: np.ndarray):
+  def mainMouseMoved(self, xyPos: XYVertices, _pxColor: np.ndarray):
     if not self.active: return
     newData = self.baseData + xyPos
     self.setData(newData[:,0], newData[:,1], connect=self._connectivity)
     self.offset = xyPos - self.dataMin
 
-  def resetBaseData(self, baseData: List[FRComplexVertices], regionIds: OneDArr):
-    allData = FRComplexVertices()
+  def resetBaseData(self, baseData: List[ComplexXYVertices], regionIds: OneDArr):
+    allData = ComplexXYVertices()
     allConnctivity = []
     for verts in baseData: # each list element represents one component
       plotData, connectivity = stackedVertsPlusConnections(verts)
@@ -365,8 +365,8 @@ class FRRegionCopierPlot(pg.PlotCurveItem):
       # connectivity[addtnlFalseConnectivityIdxs] = False
     except ValueError:
       # When no elements are in the array
-      self.dataMin = FRVertices([[0,0]])
-    baseData: FRVertices = plotData - self.dataMin
+      self.dataMin = XYVertices([[0,0]])
+    baseData: XYVertices = plotData - self.dataMin
     self.baseData = baseData
     self._connectivity = connectivity
     self.setData(plotData[:,0], plotData[:,1], connect=connectivity)
@@ -374,5 +374,5 @@ class FRRegionCopierPlot(pg.PlotCurveItem):
     self.regionIds = regionIds
 
   def erase(self):
-    self.resetBaseData([FRComplexVertices()], np.array([]))
+    self.resetBaseData([ComplexXYVertices()], np.array([]))
     self.active = False

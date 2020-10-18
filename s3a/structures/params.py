@@ -9,7 +9,7 @@ from warnings import warn
 from pyqtgraph.Qt import QtCore
 from typing_extensions import Protocol, runtime_checkable
 
-from .exceptions import FRParamEditorError, FRS3AWarning
+from .exceptions import ParamEditorError, S3AWarning
 
 
 @runtime_checkable
@@ -134,9 +134,9 @@ class FRParamGroup:
     baseWarnMsg = f'String representation "{paramName}" was not recognized.\n'
     if default is None:
       # No default specified, so we have to raise Exception
-      raise FRParamEditorError(baseWarnMsg + 'No class default is specified.')
+      raise ParamEditorError(baseWarnMsg + 'No class default is specified.')
     # No exception needed, since the user specified a default type in the derived class
-    warn(baseWarnMsg + f'Defaulting to {default.name}', FRS3AWarning)
+    warn(baseWarnMsg + f'Defaulting to {default.name}', S3AWarning)
     return default
 
   @classmethod

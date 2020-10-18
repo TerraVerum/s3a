@@ -10,34 +10,34 @@ from pyqtgraph.parametertree.parameterTypes import ListParameter
 
 from s3a.constants import MENU_OPTS_DIR
 from s3a.structures import FRParam, \
-  FRAlgProcessorError, FRParamEditorError
-from .genericeditor import FRParamEditor
-from .pgregistered import FRProcGroupParameter
+  AlgProcessorError, ParamEditorError
+from .genericeditor import ParamEditor
+from .pgregistered import ProcGroupParameter
 from s3a.generalutils import frPascalCaseToTitle
-from ..processing import FRGeneralProcWrapper, FRGeneralProcess
-from ..processing.processing import FRImageProcess
+from ..processing import GeneralProcWrapper, GeneralProcess
+from ..processing.processing import ImageProcess
 
 Signal = QtCore.Signal
 
-class FRAlgCtorCollection(FRParamEditor):
-  # sigProcessorCreated = Signal(object) # Signal(FRAlgCollectionEditor)
-  def __init__(self, procWrapType: Type[FRGeneralProcWrapper], parent=None):
+class AlgCtorCollection(ParamEditor):
+  # sigProcessorCreated = Signal(object) # Signal(AlgCollectionEditor)
+  def __init__(self, procWrapType: Type[GeneralProcWrapper], parent=None):
     super().__init__(parent, fileType='', saveDir='')
-    self.processorCtors : List[Callable[[], FRImageProcess]] = []
-    self.spawnedCollections : List[FRAlgParamEditor] = []
+    self.processorCtors : List[Callable[[], ImageProcess]] = []
+    self.spawnedCollections : List[AlgParamEditor] = []
     self.procWrapType = procWrapType
 
   def registerGroup(self, groupParam: FRParam = None, **opts):
-    raise FRParamEditorError("Individual processors shouldn't be registered as groups."
+    raise ParamEditorError("Individual processors shouldn't be registered as groups."
                              " They should be spawned from an AlgCollectionEditor.")
 
-  def createProcessorForClass(self, clsObj, editorName='Processor') -> FRAlgParamEditor:
+  def createProcessorForClass(self, clsObj, editorName='Processor') -> AlgParamEditor:
     if not isclass(clsObj):
       clsObj = type(clsObj)
     clsName = clsObj.__name__
     formattedClsName = frPascalCaseToTitle(clsName)
     editorDir = MENU_OPTS_DIR/formattedClsName.lower()
-    newEditor = FRAlgParamEditor(editorDir, self.processorCtors, self.procWrapType, name=editorName)
+    newEditor = AlgParamEditor(editorDir, self.processorCtors, self.procWrapType, name=editorName)
     self.spawnedCollections.append(newEditor)
     # Wrap in property so changes propagate to the calling class
     lims = newEditor.algOpts.opts['limits']
@@ -48,14 +48,14 @@ class FRAlgCtorCollection(FRParamEditor):
     # self.sigProcessorCreated.emit(newEditor)
     return newEditor
 
-  def addProcessCtor(self, procCtor: Callable[[], FRImageProcess]):
+  def addProcessCtor(self, procCtor: Callable[[], ImageProcess]):
     self.processorCtors.append(procCtor)
     for algCollection in self.spawnedCollections:
       algCollection.addProcessor(procCtor())
 
-class FRAlgParamEditor(FRParamEditor):
-  def __init__(self, saveDir, procCtors: List[Callable[[], FRImageProcess]],
-               procWrapType: Type[FRGeneralProcWrapper], name=None, parent=None):
+class AlgParamEditor(ParamEditor):
+  def __init__(self, saveDir, procCtors: List[Callable[[], ImageProcess]],
+               procWrapType: Type[GeneralProcWrapper], name=None, parent=None):
     algOptDict = {
       'name': 'Algorithm', 'type':  'list', 'values': [], 'value': 'N/A'
     }
@@ -69,11 +69,11 @@ class FRAlgParamEditor(FRParamEditor):
 
     self.saveDir.mkdir(parents=True, exist_ok=True)
 
-    self.curProcessor: Optional[FRGeneralProcWrapper] = None
+    self.curProcessor: Optional[GeneralProcWrapper] = None
     self.procWrapType = procWrapType
-    self.nameToProcMapping: Dict[str, FRGeneralProcWrapper] = {}
+    self.nameToProcMapping: Dict[str, GeneralProcWrapper] = {}
 
-    wrapped : Optional[FRGeneralProcWrapper] = None
+    wrapped : Optional[GeneralProcWrapper] = None
     for processorCtor in procCtors:
       # Retrieve proc so default can be set after
       wrapped = self.addProcessor(processorCtor())
@@ -81,7 +81,7 @@ class FRAlgParamEditor(FRParamEditor):
     self.switchActiveProcessor(proc=wrapped)
     # self.saveParamState('Default', allowOverwriteDefault=True)
 
-  def addProcessor(self, newProc: FRGeneralProcess):
+  def addProcessor(self, newProc: GeneralProcess):
     processor = self.procWrapType(newProc, self)
     self.tree.addParameters(self.params.child(processor.algName))
 
@@ -96,7 +96,7 @@ class FRAlgParamEditor(FRParamEditor):
     this in with the other parameter information before calling default save.
     """
     if paramState is None:
-      paramDict = self.paramDictWithOpts(addList=['enabled'], addTo=[FRProcGroupParameter],
+      paramDict = self.paramDictWithOpts(addList=['enabled'], addTo=[ProcGroupParameter],
                                          removeList=['value'])
       paramState = {'Selected Algorithm': self.algOpts.value().algName,
                     'Parameters': paramDict}
@@ -110,16 +110,16 @@ class FRAlgParamEditor(FRParamEditor):
     isLegitSelection = selectedOpt in self.algOpts.opts['limits']
     if not isLegitSelection:
       selectedImpl = self.algOpts.value()
-      raise FRAlgProcessorError(f'Selection {selectedOpt} does'
+      raise AlgProcessorError(f'Selection {selectedOpt} does'
                                 f' not match the list of available algorithms. Defaulting to {selectedImpl}')
     else:
       selectedImpl = self.algOpts.opts['limits'][selectedOpt]
     self.algOpts.setValue(selectedImpl)
     super().loadParamState(stateName, stateDict['Parameters'])
 
-  def switchActiveProcessor(self, proc: Union[str, FRGeneralProcWrapper]):
+  def switchActiveProcessor(self, proc: Union[str, GeneralProcWrapper]):
     """
-    Changes which processor is active. if FRImgProcWrapper, uses that as the processor.
+    Changes which processor is active. if ImgProcWrapper, uses that as the processor.
     If str, looks for that name in current processors and uses that
     """
     if isinstance(proc, str):

@@ -12,8 +12,8 @@ from s3a import FR_SINGLETON, appInst, S3A, FR_CONSTS, FRParam
 from s3a.models.s3abase import S3ABase
 from s3a.generalutils import resolveAuthorName, imgCornerVertices
 from s3a.constants import REQD_TBL_FIELDS, LAYOUTS_DIR, ANN_AUTH_DIR
-from s3a.structures import FRAlgProcessorError, FRS3AException, FRVertices, \
-  FRComplexVertices, FRS3AWarning
+from s3a.structures import AlgProcessorError, S3AException, XYVertices, \
+  ComplexXYVertices, S3AWarning
 from testingconsts import FIMG_SER_COLS, RND, SAMPLE_IMG, SAMPLE_IMG_FNAME
 
 
@@ -33,7 +33,7 @@ def test_change_img_none():
 
 def test_est_bounds_no_img():
   app.setMainImg()
-  with pytest.raises(FRAlgProcessorError):
+  with pytest.raises(AlgProcessorError):
     app.estimateBoundaries()
 
 """For some reason, the test below works if performed manually. However, I can't
@@ -46,7 +46,7 @@ seem to get the programmatically allocated keystrokes to work."""
 #   FR_SINGLETON.shortcuts.createRegisteredButton(param, app.mainImg)
 #   FR_SINGLETON.shortcuts.createRegisteredButton(p2, app.mainImg)
 #   keypress = QtGui.QKeyEvent(QtGui.QKeyEvent.KeyPress, QtCore.Qt.Key_T, QtCore.Qt.NoModifier, "T")
-#   with pytest.warns(FRS3AWarning):
+#   with pytest.warns(S3AWarning):
 #     QtGui.QGuiApplication.sendEvent(app.mainImg, keypress)
 #     appInst.processEvents()
 
@@ -87,10 +87,10 @@ def test_load_comps_merge(tmpdir):
 def test_import_large_verts(sampleComps, tmpdir):
   sampleComps = sampleComps.copy()
   sampleComps.loc[:, REQD_TBL_FIELDS.INST_ID] = np.arange(len(sampleComps))
-  sampleComps.at[0, REQD_TBL_FIELDS.VERTICES] = FRComplexVertices([FRVertices([[50e3, 50e3]])])
+  sampleComps.at[0, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices([XYVertices([[50e3, 50e3]])])
   io = app.compIo
   io.exportCsv(sampleComps, tmpdir/'Bad Verts.csv')
-  with pytest.warns(FRS3AWarning):
+  with pytest.warns(S3AWarning):
     io.buildFromCsv(tmpdir/'Bad Verts.csv', app.mainImg.image.shape)
 
 def test_change_comp():
@@ -105,7 +105,7 @@ def test_change_comp():
   assert fImg.image is None
 
 def test_save_layout():
-  with pytest.raises(FRS3AException):
+  with pytest.raises(S3AException):
     app.saveLayout('default')
   app.saveLayout('tmp')
   savePath = LAYOUTS_DIR/f'tmp.dockstate'
@@ -138,17 +138,17 @@ def test_autosave(tmpdir):
 def test_stage_plotting(monkeypatch):
   app.mainImg.handleShapeFinished(imgCornerVertices(app.mainImg.image))
   app.focusedImg.currentPlugin.procCollection = FR_SINGLETON.imgProcClctn.createProcessorForClass(app.focusedImg)
-  with pytest.raises(FRAlgProcessorError):
+  with pytest.raises(AlgProcessorError):
     app.showModCompAnalytics()
   # Make a component so modofications can be tested
   focImg = app.focusedImg
   vertsPlugin.procCollection.switchActiveProcessor('Basic Shapes')
-  focImg.handleShapeFinished(FRVertices())
+  focImg.handleShapeFinished(XYVertices())
   assert app.focusedImg.compSer.loc[REQD_TBL_FIELDS.INST_ID] >= 0
 
   focImg = app.focusedImg
   vertsPlugin.procCollection.switchActiveProcessor('Basic Shapes')
-  focImg.handleShapeFinished(FRVertices())
+  focImg.handleShapeFinished(XYVertices())
   proc = focImg.currentPlugin.curProcessor.processor
   oldMakeWidget = proc._stageSummaryWidget
   def patchedWidget():

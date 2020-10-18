@@ -10,13 +10,13 @@ from skimage import morphology as morph
 from skimage.segmentation import quickshift
 
 from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices
-from s3a.processing import FRGeneralProcess
-from s3a.processing.processing import FRProcessIO, FRImageProcess
-from s3a.structures import BlackWhiteImg, FRVertices, FRComplexVertices, NChanImg,\
-  GrayImg, RgbImg, FRAlgProcessorError
+from s3a.processing import GeneralProcess
+from s3a.processing.processing import ProcessIO, ImageProcess
+from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg,\
+  GrayImg, RgbImg, AlgProcessorError
 
 
-def growSeedpoint(img: NChanImg, seeds: FRVertices, thresh: float) -> BlackWhiteImg:
+def growSeedpoint(img: NChanImg, seeds: XYVertices, thresh: float) -> BlackWhiteImg:
   shape = np.array(img.shape[0:2])
   bwOut = np.zeros(shape, dtype=bool)
   # Turn x-y vertices into row-col seeds
@@ -39,7 +39,7 @@ def colorLabelsWithMean(labelImg: GrayImg, refImg: NChanImg) -> RgbImg:
     outImg[curmask,:] = refImg[curmask,:].reshape(-1,3).mean(0)
   return outImg
 
-def growSeedpoint_cv_fastButErratic(img: NChanImg, seeds: FRVertices, thresh: float):
+def growSeedpoint_cv_fastButErratic(img: NChanImg, seeds: XYVertices, thresh: float):
   if len(seeds) == 0:
     return np.zeros(img.shape[:2], bool)
   if img.ndim > 2:
@@ -76,7 +76,7 @@ _historyMaskHolder = [np.array([[]], 'uint8')]
 0 = unspecified, 1 = background, 2 = foreground. Place inside list so reassignment
 doesn't destroy object reference
 """
-def format_vertices(image: NChanImg, fgVerts: FRVertices, bgVerts: FRVertices,
+def format_vertices(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
                     prevCompMask: BlackWhiteImg, firstRun: bool,
                     keepVertHistory=True):
   global _historyMaskHolder
@@ -106,7 +106,7 @@ def format_vertices(image: NChanImg, fgVerts: FRVertices, bgVerts: FRVertices,
     curHistory[_historyMask == 2] = 1
     curHistory[_historyMask == 1] = 2
     fgVerts = bgVerts
-    bgVerts = FRVertices()
+    bgVerts = XYVertices()
 
   if asForeground:
     foregroundAdjustedCompMask = prevCompMask.copy()
@@ -116,11 +116,11 @@ def format_vertices(image: NChanImg, fgVerts: FRVertices, bgVerts: FRVertices,
   # Default to bound slices that encompass the whole image
   bounds = np.array([[0, 0], image.shape[:2][::-1]])
   boundSlices = slice(*bounds[:,1]), slice(*bounds[:,0])
-  return FRProcessIO(image=image, fgVerts=fgVerts, bgVerts=bgVerts, asForeground=asForeground,
-                 historyMask=curHistory, prevCompMask=foregroundAdjustedCompMask,
-                 origCompMask=prevCompMask, boundSlices=boundSlices)
+  return ProcessIO(image=image, fgVerts=fgVerts, bgVerts=bgVerts, asForeground=asForeground,
+                   historyMask=curHistory, prevCompMask=foregroundAdjustedCompMask,
+                   origCompMask=prevCompMask, boundSlices=boundSlices)
 
-def crop_to_local_area(image: NChanImg, fgVerts: FRVertices, bgVerts: FRVertices,
+def crop_to_local_area(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
                        prevCompMask: BlackWhiteImg, historyMask: GrayImg, margin_pctRoiSize=10):
   allVerts = np.vstack([fgVerts, bgVerts])
   if len(allVerts) == 1:
@@ -143,8 +143,8 @@ def crop_to_local_area(image: NChanImg, fgVerts: FRVertices, bgVerts: FRVertices
   toPlot = cv.rectangle(image.copy(), tuple(bounds[0,:]), tuple(bounds[1,:]),
                         (255,0,0), rectThickness)
   info = {'name': 'Selected Area', 'image': toPlot}
-  return FRProcessIO(image=cropped, fgVerts=fgVerts, bgVerts=bgVerts, prevCompMask=croppedCompMask,
-                 boundSlices=boundSlices, historyMask=curHistory, summaryInfo=info)
+  return ProcessIO(image=cropped, fgVerts=fgVerts, bgVerts=bgVerts, prevCompMask=croppedCompMask,
+                   boundSlices=boundSlices, historyMask=curHistory, summaryInfo=info)
 
 def apply_process_result(image: NChanImg, asForeground: bool,
                          prevCompMask: BlackWhiteImg, origCompMask: BlackWhiteImg,
@@ -169,7 +169,7 @@ def apply_process_result(image: NChanImg, asForeground: bool,
     maxs = foregroundPixs.max(0)
   # Add 1 to max slice so stopping value is last foreground pixel
   newSlices = (slice(mins[0], maxs[0]+1), slice(mins[1], maxs[1]+1))
-  return FRProcessIO(image=outMask[newSlices], boundSlices=newSlices)
+  return ProcessIO(image=outMask[newSlices], boundSlices=newSlices)
 
 def return_to_full_size(image: NChanImg, origCompMask: BlackWhiteImg,
                         boundSlices: Tuple[slice]):
@@ -177,19 +177,19 @@ def return_to_full_size(image: NChanImg, origCompMask: BlackWhiteImg,
   if image.ndim > 2:
     image = image.asGrayScale()
   out[boundSlices] = image
-  return FRProcessIO(image=out)
+  return ProcessIO(image=out)
 
 def fill_holes(image: NChanImg):
-  return FRProcessIO(image=binary_fill_holes(image))
+  return ProcessIO(image=binary_fill_holes(image))
 
-def disallow_paint_tool(_image: NChanImg, fgVerts: FRVertices, bgVerts: FRVertices):
+def disallow_paint_tool(_image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices):
   if len(np.vstack([fgVerts, bgVerts])) < 2:
-    raise FRAlgProcessorError('This algorithm requires an enclosed area to work.'
+    raise AlgProcessorError('This algorithm requires an enclosed area to work.'
                               ' Only one vertex was given as an input.')
-  return FRProcessIO(image=_image)
+  return ProcessIO(image=_image)
 
 def openClose():
-  proc = FRImageProcess('Open -> Close')
+  proc = ImageProcess('Open -> Close')
   def perform_op(image: NChanImg, radius=1, shape='rectangle'):
     """
     :param radius: Radius of the structuring element. Note that the total side length
@@ -220,9 +220,9 @@ def keep_largest_comp(image: NChanImg):
   out = np.zeros(image.shape, bool)
   coords = regionPropTbl.coords[regionPropTbl.area.argmax()]
   if coords.size == 0:
-    return FRProcessIO(image=out)
+    return ProcessIO(image=out)
   out[coords[:,0], coords[:,1]] = True
-  return FRProcessIO(image=out)
+  return ProcessIO(image=out)
 
 a = keep_largest_comp.__code__
 a.co_varnames
@@ -232,12 +232,12 @@ def rm_small_comps(image: NChanImg, minSzThreshold=30):
   validCoords = regionPropTbl.coords[regionPropTbl.area >= minSzThreshold]
   out = np.zeros(image.shape, bool)
   if len(validCoords) == 0:
-    return FRProcessIO(image=out)
+    return ProcessIO(image=out)
   coords = np.vstack(validCoords)
   out[coords[:,0], coords[:,1]] = True
-  return FRProcessIO(image=out)
+  return ProcessIO(image=out)
 
-def basic_shapes(image: NChanImg, fgVerts: FRVertices, penSize=1, penShape='circle'):
+def basic_shapes(image: NChanImg, fgVerts: XYVertices, penSize=1, penShape='circle'):
   """
   Draws basic shapes with minimal pre- or post-processing.
 
@@ -257,26 +257,26 @@ def basic_shapes(image: NChanImg, fgVerts: FRVertices, penSize=1, penShape='circ
   try:
     drawFn = drawFns[penShape]
   except KeyError:
-    raise FRAlgProcessorError(f"Can't understand shape {penShape}. Must be one of:\n"
+    raise AlgProcessorError(f"Can't understand shape {penShape}. Must be one of:\n"
                               f"{','.join(drawFns)}")
   if len(fgVerts) > 1:
-    FRComplexVertices([fgVerts]).toMask(out, 1, False, warnIfTooSmall=False)
+    ComplexXYVertices([fgVerts]).toMask(out, 1, False, warnIfTooSmall=False)
   else:
     for vert in fgVerts:
       drawFn(vert)
-  return FRProcessIO(image=out > 0)
+  return ProcessIO(image=out > 0)
 
 def convert_to_squares(image: NChanImg):
   outMask = np.zeros(image.shape, dtype=bool)
   for region in regionprops(label(image)):
     outMask[region.bbox[0]:region.bbox[2],region.bbox[1]:region.bbox[3]] = True
-  return FRProcessIO(image=outMask)
+  return ProcessIO(image=outMask)
 
 def basicOpsCombo():
-  proc = FRImageProcess('Basic Region Operations')
-  toAdd: List[FRImageProcess] = []
+  proc = ImageProcess('Basic Region Operations')
+  toAdd: List[ImageProcess] = []
   for func in fill_holes, keep_largest_comp, rm_small_comps:
-    toAdd.append(FRImageProcess.fromFunction(func))
+    toAdd.append(ImageProcess.fromFunction(func))
   proc.addProcess(toAdd[0])
   proc.addProcess(openClose())
   proc.addProcess(toAdd[1])
@@ -287,11 +287,11 @@ def basicOpsCombo():
 def _grabcutResultToMask(gcResult):
   return np.where((gcResult==2)|(gcResult==0), False, True)
 
-def cv_grabcut(image: NChanImg, fgVerts: FRVertices, bgVerts: FRVertices,
+def cv_grabcut(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
                prevCompMask: BlackWhiteImg, noPrevMask: bool,
                historyMask: GrayImg, iters=5):
   if image.size == 0:
-    return FRProcessIO(image=np.zeros_like(prevCompMask))
+    return ProcessIO(image=np.zeros_like(prevCompMask))
   img = cv.cvtColor(image, cv.COLOR_RGB2BGR)
   # Turn foreground into x-y-width-height
   bgdModel = np.zeros((1,65),np.float64)
@@ -307,16 +307,16 @@ def cv_grabcut(image: NChanImg, fgVerts: FRVertices, bgVerts: FRVertices,
 
   if noPrevMask:
     if cvRect[2] == 0 or cvRect[3] == 0:
-      return FRProcessIO(image=np.zeros_like(prevCompMask))
+      return ProcessIO(image=np.zeros_like(prevCompMask))
     mode = cv.GC_INIT_WITH_RECT
   else:
     mode = cv.GC_INIT_WITH_MASK
   cv.grabCut(img, mask, cvRect, bgdModel, fgdModel, iters, mode=mode)
   outMask = np.where((mask==2)|(mask==0), False, True)
-  return FRProcessIO(image=outMask, summaryInfo={'image': mask})
+  return ProcessIO(image=outMask, summaryInfo={'image': mask})
 
-def quickshift_seg(image: NChanImg, fgVerts: FRVertices, maxDist=10., kernelSize=5,
-               sigma=0.0):
+def quickshift_seg(image: NChanImg, fgVerts: XYVertices, maxDist=10., kernelSize=5,
+                   sigma=0.0):
   # For maxDist of 0, the input isn't changed and it takes a long time
   if maxDist == 0:
     return image
@@ -335,16 +335,16 @@ def k_means(image: NChanImg, kVal=5, attempts=10):
   imgMeans = imgMeans.astype('uint8')
   lbls = lbls.reshape(image.shape[:2])
 
-  return FRProcessIO(image=lbls, imgMeans=imgMeans, summaryInfo={'image': imgMeans[lbls]})
+  return ProcessIO(image=lbls, imgMeans=imgMeans, summaryInfo={'image': imgMeans[lbls]})
 
-def keep_regions_touching_roi(image: BlackWhiteImg, fgVerts: FRVertices):
+def keep_regions_touching_roi(image: BlackWhiteImg, fgVerts: XYVertices):
   """
   For a given binary image input, only keeps connected components that are directly in
   contact with at least one of the specified vertices. In essence, this function can make
   a wide variety of operations behave similarly to region growing.
   """
   if image.ndim > 2:
-    raise FRAlgProcessorError('Cannot handle multichannel images.\n'
+    raise AlgProcessorError('Cannot handle multichannel images.\n'
                               f'(image.shape={image.shape})')
   out = np.zeros_like(image)
   seeds = fgVerts[:,::-1]
@@ -353,7 +353,7 @@ def keep_regions_touching_roi(image: BlackWhiteImg, fgVerts: FRVertices):
     out |= flood(image, tuple(seed))
   return out
 
-def binarize_kmeans(image: NChanImg, fgVerts: FRVertices, imgMeans: np.ndarray,
+def binarize_kmeans(image: NChanImg, fgVerts: XYVertices, imgMeans: np.ndarray,
                     decisionMetric='Remove Boundary Labels'):
   """
 
@@ -384,11 +384,11 @@ def binarize_kmeans(image: NChanImg, fgVerts: FRVertices, imgMeans: np.ndarray,
   #   discardLbls = np.setdiff1d(np.arange(numLbls), discardLbls)
   keepMembership = ~np.isin(image, discardLbls)
   out[keepMembership] = True
-  return FRProcessIO(image=out)
+  return ProcessIO(image=out)
 
-def region_growing(image: NChanImg, fgVerts: FRVertices, seedThresh=10):
+def region_growing(image: NChanImg, fgVerts: XYVertices, seedThresh=10):
   if image.size == 0:
-    return FRProcessIO(image=np.zeros(image.shape[:2], bool))
+    return ProcessIO(image=np.zeros(image.shape[:2], bool))
   if np.all(fgVerts == fgVerts[0, :]):
     # Remove unnecessary redundant seedpoints
     fgVerts = fgVerts[[0], :]
@@ -416,38 +416,31 @@ def region_growing(image: NChanImg, fgVerts: FRVertices, seedThresh=10):
     filledMask = cv.fillPoly(np.zeros_like(outMask, dtype='uint8'), [fgVerts], 1) > 0
     outMask[~filledMask] = False
 
-  return FRProcessIO(image=outMask)
+  return ProcessIO(image=outMask)
 
-class FRTopLevelImageProcessors:
+class TopLevelImageProcessors:
   @staticmethod
   def b_regionGrowProcessor():
-    return FRImageProcess.fromFunction(region_growing)
+    return ImageProcess.fromFunction(region_growing)
 
   @staticmethod
   def c_kMeansProcessor():
-    proc = FRImageProcess.fromFunction(k_means)
+    proc = ImageProcess.fromFunction(k_means)
     proc.addFunction(binarize_kmeans)
     # Add as process so it can be disabled
-    proc.addProcess(FRImageProcess.fromFunction(keep_regions_touching_roi, needsWrap=True))
+    proc.addProcess(ImageProcess.fromFunction(keep_regions_touching_roi, needsWrap=True))
     return proc
 
   @staticmethod
   def a_grabCutProcessor():
-    proc = FRImageProcess.fromFunction(cv_grabcut, name='Primitive Grab Cut')
+    proc = ImageProcess.fromFunction(cv_grabcut, name='Primitive Grab Cut')
     return proc
 
   @staticmethod
   def w_basicShapesProcessor():
-    proc = FRImageProcess.fromFunction(basic_shapes)
+    proc = ImageProcess.fromFunction(basic_shapes)
     proc.disabledStages = [['Basic Region Operations', 'Open -> Close']]
     return proc
 
-# class FRVertsPredictor(FRParamEditorPlugin):
-#   name = 'Vertices Predictor'
-#
-#   @classmethod
-#   def __initEditorParams__(cls):
-#     super().__initEditorParams__()
-
-class FRTopLevelCategoricalProcessors:
+class TopLevelCategoricalProcessors:
   pass
