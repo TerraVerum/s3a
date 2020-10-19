@@ -248,7 +248,7 @@ class MultiRegionPlot(BoundScatterPlot):
     allVerts = allVerts.stack()
     if len(allVerts) == 0:
       return [None, None]
-    bounds = np.r_[allVerts.min(0, keepdims=True), allVerts.max(0, keepdims=True)]
+    bounds = np.r_[allVerts.min(0, keepdims=True)-0.5, allVerts.max(0, keepdims=True)+0.5]
     return list(bounds[:,ax])
 
 
