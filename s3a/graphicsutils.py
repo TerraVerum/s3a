@@ -14,7 +14,7 @@ from ruamel.yaml import YAML
 
 import s3a
 from s3a.constants import ANN_AUTH_DIR
-from s3a.structures import S3AIOError, S3AException, FilePath, S3AWarning
+from s3a.structures import S3AIOError, S3AException, S3AWarning
 
 yaml = YAML()
 
@@ -117,11 +117,6 @@ def dialogGetAuthorName(parent: QtWidgets.QMainWindow) -> str:
   if quitApp:
     sys.exit(0)
   return name
-
-def attemptFileLoad(fpath: FilePath , openMode='r') -> Union[dict, bytes]:
-  with open(fpath, openMode) as ifile:
-    loadObj = yaml.load(ifile)
-  return loadObj
 
 def addDirItemsToMenu(parentMenu: QtWidgets.QMenu, dirGlob: Generator,
                       triggerFunc: Callable, removeExistingChildren=True):

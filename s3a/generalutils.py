@@ -8,7 +8,9 @@ from pandas import DataFrame as df
 import cv2 as cv
 
 from s3a.constants import ANN_AUTH_DIR
-from s3a.structures.typeoverloads import TwoDArr
+from s3a.graphicsutils import yaml
+from s3a.structures import FilePath
+from s3a.structures.typeoverloads import TwoDArr, FilePath
 from .structures import XYVertices, FRParam, ComplexXYVertices, NChanImg
 
 
@@ -341,3 +343,16 @@ def frParamToPgParamDict(param: FRParam):
     paramOpts.update(value=param.value)
   paramOpts.update(frParam=param)
   return paramOpts
+
+def resolveYamlDict(cfgFname: FilePath, cfgDict: dict=None):
+  if cfgDict is not None:
+    cfg = cfgDict
+  else:
+    cfg = attemptFileLoad(cfgFname)
+  return Path(cfgFname), cfg
+
+
+def attemptFileLoad(fpath: FilePath , openMode='r') -> Union[dict, bytes]:
+  with open(fpath, openMode) as ifile:
+    loadObj = yaml.load(ifile)
+  return loadObj

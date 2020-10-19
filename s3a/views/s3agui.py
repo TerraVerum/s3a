@@ -14,9 +14,10 @@ from s3a import plugins
 from s3a.constants import LAYOUTS_DIR, FR_CONSTS, REQD_TBL_FIELDS
 from s3a.constants import _FREnums, FR_ENUMS
 from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
-  autosaveOptsDialog, attemptFileLoad, popupFilePicker, \
+  autosaveOptsDialog, popupFilePicker, \
   disableAppDuringFunc, saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
   restoreExceptionBehavior, contextMenuFromEditorActions, ScrollableErrorDialog
+from s3a.generalutils import attemptFileLoad
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import ParamEditor, ParamEditorDockGrouping, FR_SINGLETON
 from s3a.structures import S3AWarning, XYVertices

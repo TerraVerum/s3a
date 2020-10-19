@@ -10,6 +10,7 @@ from pandas import DataFrame as df
 from ruamel.yaml import YAML
 
 from s3a.graphicsutils import raiseErrorLater
+from s3a.generalutils import attemptFileLoad, resolveYamlDict
 from s3a.constants import TABLE_DIR, REQD_TBL_FIELDS, DATE_FORMAT, \
   FR_CONSTS
 from s3a.structures import FRParam, FilePath, FRParamGroup, ParamEditorError, \
@@ -91,6 +92,7 @@ class TableData:
 
   def __init__(self, annAuthor: str=None):
     self.filter = TableFilterEditor()
+    self.paramParser: Optional[YamlParser] = None
 
     self.annAuthor = annAuthor
     self.cfgFname: Optional[Path] = None
@@ -128,7 +130,7 @@ class TableData:
   def makeCompSer(self):
     return self.makeCompDf().squeeze()
 
-  def loadCfg(self, cfgFname: FilePath, cfgDict: dict=None):
+  def loadCfg(self, cfgFname: FilePath=None, cfgDict: dict=None):
     """
     Lodas the specified table configuration file for S3A. Alternatively, a name
     and dict pair can be supplied instead.
@@ -138,20 +140,19 @@ class TableData:
     :param cfgDict: If not *None*, this is the config data used instad of
       reading *cfgFname* as a file.
     """
-    if cfgDict is not None:
-      cfg = cfgDict
-    else:
-      with open(cfgFname, 'r') as ifile:
-        cfg: dict = yaml.load(ifile)
-    self.cfgFname = Path(cfgFname)
+
+    if cfgFname is None:
+      cfgFname = 'Default.yml'
+      cfgDict = {}
+    self.cfgFname, cfg = resolveYamlDict(cfgFname, cfgDict)
     if cfg == self.cfg:
       # No need to update things
       return
     self.cfg = cfg
-    paramParser = YamlParser(cfg)
+    self.paramParser = YamlParser(cfg)
     newClasses = []
     if 'classes' in cfg:
-      classParam = paramParser['classes']
+      classParam = self.paramParser['classes']
       if isinstance(classParam, FRParam):
         if classParam.value is not None:
           REQD_TBL_FIELDS.COMP_CLASS.value = classParam.value
@@ -169,7 +170,7 @@ class TableData:
     #   self.compClasses.append(newParam)
     self.resetLists()
     for field in cfg.get('opt-tbl-fields', {}):
-      param = paramParser['opt-tbl-fields', field]
+      param = self.paramParser['opt-tbl-fields', field]
       param.group = self.allFields
       self.allFields.append(param)
 

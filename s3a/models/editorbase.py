@@ -10,8 +10,8 @@ from enum import Flag, auto
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter, ParameterTree, ParameterItem
 
-from s3a.generalutils import frPascalCaseToTitle, frParamToPgParamDict
-from s3a.graphicsutils import saveToFile, attemptFileLoad
+from s3a.generalutils import frPascalCaseToTitle, frParamToPgParamDict, attemptFileLoad, resolveYamlDict
+from s3a.graphicsutils import saveToFile
 from s3a.processing import AtomicProcess, ProcessIO, GeneralProcWrapper
 from s3a.processing.guiwrapper import docParser
 from s3a.structures import FRParam, ContainsSharedProps, FilePath, ParamEditorError, \
@@ -344,11 +344,7 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     return statePathPlusStem.with_suffix(f'.{self.fileType}')
 
   def _parseStateDict(self, stateName: Union[str, Path], stateDict: dict=None):
-    if stateDict is not None:
-      return stateDict
-    dictFilename = self.formatFileName(stateName)
-    stateDict = attemptFileLoad(dictFilename)
-    return stateDict
+    return resolveYamlDict(self.formatFileName(stateName), stateDict)[1]
 
   def deleteParamState(self, stateName: str):
     filename = self.formatFileName(stateName)
