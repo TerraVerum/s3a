@@ -1,0 +1,10 @@
+images: []
+annotations: []
+
+import-opts:
+  copy-data: true
+
+export-opts:
+  annotation-format: "csv"
+  include-images: false
+  combine-annotations: false

@@ -61,21 +61,26 @@ class ProcessIO(dict):
     self.keysFromPrevIO = set(self.keys()) - set(self.hyperParamKeys)
 
   @classmethod
-  def fromFunction(cls, func: t.Callable, **overriddenDefaults):
+  def fromFunction(cls, func: t.Callable, ignoreKeys: t.Collection[str]=None, **overriddenDefaults):
     """
     In the ProcessIO scheme, default arguments in a function signature constitute algorithm
     hyperparameters, while required arguments must be provided each time the function is
     run. If `**overriddenDefaults` is given, this will override any default arguments from
     `func`'s signature.
     :param func: Function whose input signature should be parsed
+    :param ignoreKeys: Keys to disregard entirely from the incoming function. This is useful for cases like adding
+      a function at the class instead of instance level and `self` shouldn't be regarded by the parser.
     :param overriddenDefaults: Keys here that match default argument names in `func` will
       override those defaults
     """
+    if ignoreKeys is None:
+      ignoreKeys = []
     outDict = {}
     hyperParamKeys = []
     spec = inspect.signature(func).parameters
     for k, v in spec.items():
-      formattedV = v.default if k not in overriddenDefaults else overriddenDefaults[k]
+      if k in ignoreKeys: continue
+      formattedV = overriddenDefaults.get(k, v.default)
       if formattedV is v.empty:
         formattedV = cls.FROM_PREV_IO
         # Not a hyperparameter
@@ -148,7 +153,7 @@ class AtomicProcess(ProcessStage):
   """
 
   def __init__(self, func: t.Callable, name:str=None, needsWrap=False,
-               mainResultKeys: t.List[str]=None, **overriddenDefaults):
+               mainResultKeys: t.List[str]=None, ignoreKeys: t.Collection[str]=None, **overriddenDefaults):
     """
     :param func: Function to wrap
     :param name: Name of this process. If `None`, defaults to the function name with
@@ -162,6 +167,7 @@ class AtomicProcess(ProcessStage):
     function is assumed to be that key. I.e. in the case where `len(cls.mainResultKeys) == 1`,
     the output is expected to be the direct result, not a sequence of results per key.
     :param mainResultKeys: Set by parent process as needed
+    :param ignoreKeys: See `ProcessIO.fromFunction`
     :param overriddenDefaults: Passed directly to ProcessIO when creating this function's
       input specifications.
     """
@@ -171,7 +177,7 @@ class AtomicProcess(ProcessStage):
       self.mainResultKeys = mainResultKeys
 
     self.name = name
-    self.input = ProcessIO.fromFunction(func, **overriddenDefaults)
+    self.input = ProcessIO.fromFunction(func, ignoreKeys, **overriddenDefaults)
     self.result: t.Optional[ProcessIO] = None
 
     if needsWrap:

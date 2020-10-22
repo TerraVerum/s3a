@@ -5,21 +5,20 @@ from pyqtgraph.Qt import QtWidgets, QtCore
 
 from s3a.constants import GEN_PROPS_DIR, SCHEMES_DIR, BASE_DIR
 from s3a.models.actionstack import ActionStack
-from s3a.parameditors.project import ProjectData
 from s3a.structures import FRParam
 from .genericeditor import ParamEditor, ParamEditorDockGrouping, ParamEditorPlugin, \
   TableFieldPlugin
 from .algcollection import AlgCtorCollection
+from .project import ProjectEditor
 from .quickloader import QuickLoaderEditor
 from .shortcut import ShortcutsEditor
-from .table import TableFilterEditor, TableData
 from ..generalutils import frPascalCaseToTitle
 from ..processing import ImgProcWrapper
 
 Signal = QtCore.Signal
 
 __all__ = ['FR_SINGLETON', 'ParamEditor', 'ParamEditorDockGrouping', 'TableFieldPlugin',
-           'ParamEditorPlugin', 'TableData']
+           'ParamEditorPlugin']
 
 class AppSettingsEditor(ParamEditor):
   def __init__(self, parent=None):
@@ -40,8 +39,8 @@ class _FRSingleton(QtCore.QObject):
     self.plugins: List[ParamEditorPlugin] = []
     self.tableFieldPlugins: List[TableFieldPlugin] = []
 
-    self.projData = ProjectData()
-    self.tableData = self.projData.tableData
+    self.project = ProjectEditor()
+    self.tableData = self.project.projectData.tableData
     self.tableData.loadCfg(BASE_DIR/'tablecfg.yml')
     self.filter = self.tableData.filter
 
