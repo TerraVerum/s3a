@@ -35,7 +35,6 @@ class S3ABase(QtWidgets.QMainWindow):
   def __initEditorParams__(cls):
     cls.estBoundsOnStart, cls.undoBuffSz = FR_SINGLETON.generalProps.registerProps(cls,
         [FR_CONSTS.PROP_EST_BOUNDS_ON_START, FR_CONSTS.PROP_UNDO_BUF_SZ])
-    cls.useDarkTheme = FR_SINGLETON.colorScheme.registerProp(cls, FR_CONSTS.SCHEME_USE_DARK_THEME)
 
   def __init__(self, parent=None, **quickLoaderArgs):
     super().__init__(parent)

@@ -10,7 +10,7 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.console import ConsoleWidget
 
-from s3a import plugins
+from s3a import plugins, RunOpts
 from s3a.constants import LAYOUTS_DIR, FR_CONSTS, REQD_TBL_FIELDS
 from s3a.constants import _FREnums, FR_ENUMS
 from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
@@ -92,7 +92,7 @@ class S3A(S3ABase):
     self.openImgAct.triggered.connect(lambda: self.setMainImg_gui())
     self.resetTblConfigAct.triggered.connect(lambda: self.resetTblFields_gui())
 
-    FR_SINGLETON.colorScheme.sigParamStateUpdated.connect(self.updateTheme)
+    FR_SINGLETON.colorScheme.registerFunc(self.updateTheme, FR_CONSTS.CLS_ANNOTATOR.name, runOpts=RunOpts.ON_CHANGED)
 
     # Menu options
     # FILE
@@ -597,9 +597,13 @@ class S3A(S3ABase):
       fontColor = 'white'
     self.pxColor.setStyleSheet(f'background:rgba{tuple(pxColor)}; color:{fontColor}')
 
-  def updateTheme(self, _newScheme: Dict[str, Any]):
+  def updateTheme(self, useDarkTheme=False):
+    """
+    :param useDarkTheme:
+      title: Use dark theme
+    """
     style = ''
-    if self.useDarkTheme:
+    if useDarkTheme:
       style = qdarkstyle.load_stylesheet()
     self.setStyleSheet(style)
     for opts in self.focusedImg.drawOptsWidget, self.mainImg.drawOptsWidget:

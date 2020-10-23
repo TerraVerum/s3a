@@ -90,9 +90,8 @@ def _makeBoundSymbol(verts: XYVertices):
 class MultiRegionPlot(BoundScatterPlot):
   def __init__(self, parent=None):
     super().__init__(size=1, pxMode=False)
-    self.resetColors = AtomicProcess(self.resetColors)
-    FR_SINGLETON.colorScheme.registerFunc(self.resetColors, FR_CONSTS.CLS_MULT_REG_PLT.name,
-                                          runOpts=RunOpts.ON_CHANGED)
+    self.resetColors = AtomicProcess(self.resetColors, name=FR_CONSTS.CLS_MULT_REG_PLT.name)
+    FR_SINGLETON.colorScheme.registerFunc(self.resetColors, runOpts=RunOpts.ON_CHANGED)
     self.setParent(parent)
     self.setZValue(50)
     self.regionData = makeMultiRegionDf(0)
