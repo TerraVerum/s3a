@@ -110,7 +110,3 @@ class ProjectEditor(ParamEditor):
 
     projName = Path(projName).name
     saveToFile(data.cfg, location/projName)
-
-if __name__ == '__main__':
-    p = ProjectEditor()
-    p.createProject(location='./test')

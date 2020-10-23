@@ -90,13 +90,15 @@ def _makeBoundSymbol(verts: XYVertices):
 class MultiRegionPlot(BoundScatterPlot):
   def __init__(self, parent=None):
     super().__init__(size=1, pxMode=False)
-    self.resetColors = AtomicProcess(self.resetColors, name=FR_CONSTS.CLS_MULT_REG_PLT.name)
-    FR_SINGLETON.colorScheme.registerFunc(self.resetColors, runOpts=RunOpts.ON_CHANGED)
+    # Wrapping in atomic process means when users make changes to properties, these are maintained when calling the
+    # function internally with no parameters
+    self.updateColors = AtomicProcess(self.updateColors, name=FR_CONSTS.CLS_MULT_REG_PLT.name)
+    FR_SINGLETON.colorScheme.registerFunc(self.updateColors, runOpts=RunOpts.ON_CHANGED)
     self.setParent(parent)
     self.setZValue(50)
     self.regionData = makeMultiRegionDf(0)
     self.cmap = np.array([])
-    self.resetColors()
+    self.updateColors()
 
     # 'pointsAt' is an expensive operation if many points are in the scatterplot. Since
     # this will be called anyway when a selection box is made in the main image, disable
@@ -147,7 +149,7 @@ class MultiRegionPlot(BoundScatterPlot):
       if idList is None: continue
       self.regionData[col] = False
       self.regionData.loc[idList, col] = True
-    self.resetColors()
+    self.updateColors()
 
   def updatePlot(self):
     # -----------
@@ -171,14 +173,14 @@ class MultiRegionPlot(BoundScatterPlot):
     plotRegions = np.vstack(boundLocs)
     self.setData(*plotRegions.T, symbol=boundSymbs,
                           data=self.regionData.index)
-    self.resetColors()
+    self.updateColors()
 
   def toGrayImg(self, imShape: Sequence[int]=None):
     return frio.exportClassPng(self.regionData, imShape=imShape)
 
   @dynamicDocstring(cmapVals=colormaps() + ['None'])
-  def resetColors(self, penWidth=0, penColor='w', selectedFill='00f', focusedFill='f00', classColormap='tab10',
-                  fillAlpha=0.7):
+  def updateColors(self, penWidth=0, penColor='w', selectedFill='00f', focusedFill='f00', classColormap='tab10',
+                   fillAlpha=0.7):
     """
     Assigns colors from the specified colormap to each unique class
     :param penWidth: Width of the pen in pixels
