@@ -12,7 +12,7 @@ from .algcollection import AlgCtorCollection
 from .project import ProjectEditor
 from .quickloader import QuickLoaderEditor
 from .shortcut import ShortcutsEditor
-from ..generalutils import frPascalCaseToTitle
+from ..generalutils import pascalCaseToTitle
 from ..processing import ImgProcWrapper
 
 Signal = QtCore.Signal
@@ -109,7 +109,7 @@ class _FRSingleton(QtCore.QObject):
     """
     nameToUse = pluginCls.name
     if nameToUse is None:
-      nameToUse = frPascalCaseToTitle(pluginCls.__name__)
+      nameToUse = pascalCaseToTitle(pluginCls.__name__)
     deco = self.registerGroup(FRParam(nameToUse))
     plugin: ParamEditorPlugin = deco(pluginCls)(*args, **kwargs)
     if isinstance(plugin, TableFieldPlugin):

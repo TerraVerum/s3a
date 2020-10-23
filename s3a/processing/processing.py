@@ -11,7 +11,7 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
 
-from s3a.generalutils import frPascalCaseToTitle
+from s3a.generalutils import pascalCaseToTitle
 from s3a.structures import S3AWarning, AlgProcessorError
 
 __all__ = ['ProcessIO', 'ProcessStage', 'GeneralProcess', 'ImageProcess',
@@ -172,7 +172,7 @@ class AtomicProcess(ProcessStage):
       input specifications.
     """
     if name is None:
-      name = frPascalCaseToTitle(func.__name__)
+      name = pascalCaseToTitle(func.__name__)
     if mainResultKeys is not None:
       self.mainResultKeys = mainResultKeys
 

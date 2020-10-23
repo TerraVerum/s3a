@@ -4,7 +4,7 @@ from abc import ABC
 from copy import deepcopy
 from functools import wraps
 from io import StringIO
-from typing import Tuple, List, Sequence, Union
+from typing import Tuple, List, Sequence, Union, Callable
 from warnings import warn
 
 import numpy as np
@@ -77,12 +77,13 @@ def procRunWrapper(proc: GeneralProcess, groupParam: Parameter):
   return newRun
 
 class GeneralProcWrapper(ABC):
-  def __init__(self, processor: ProcessStage, editor: editorbase.ParamEditorBase,
-               paramPath: Tuple[str, ...]=()):
+  def __init__(self, processor: ProcessStage, editor: editorbase.ParamEditorBase, paramPath: Tuple[str, ...]=(),
+               paramFormat: Callable[[str], str] = None):
     self.processor = processor
     self.algName = processor.name
     self.algParam = FRParam(self.algName)
     self.output = np.zeros((0,0), bool)
+    self.paramFormat = paramFormat
 
     self.editor = editor
     parentParam = editor.params
@@ -108,6 +109,8 @@ class GeneralProcWrapper(ABC):
           if curParam.pType is None:
             curParam.pType = type(val).__name__
         paramDict = frParamToPgParamDict(curParam)
+        if self.paramFormat is not None and 'title' not in paramDict:
+          paramDict['title'] = self.paramFormat(key)
         pgParam = _attemptCreateChild(paramParent, paramDict)
         params.append(pgParam)
       stage.run = atomicRunWrapper(stage, stage.input.hyperParamKeys, params)

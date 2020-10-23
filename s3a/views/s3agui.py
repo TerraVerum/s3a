@@ -598,10 +598,6 @@ class S3A(S3ABase):
     self.pxColor.setStyleSheet(f'background:rgba{tuple(pxColor)}; color:{fontColor}')
 
   def updateTheme(self, useDarkTheme=False):
-    """
-    :param useDarkTheme:
-      title: Use dark theme
-    """
     style = ''
     if useDarkTheme:
       style = qdarkstyle.load_stylesheet()

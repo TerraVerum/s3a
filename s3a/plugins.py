@@ -8,7 +8,7 @@ from pyqtgraph.Qt import QtWidgets
 
 from s3a import FR_SINGLETON, FR_CONSTS as FRC, REQD_TBL_FIELDS as RTF, ComplexXYVertices, \
   XYVertices, FRParam, ComponentIO as frio
-from s3a.generalutils import frPascalCaseToTitle
+from s3a.generalutils import pascalCaseToTitle
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import ParamEditorDockGrouping
 from s3a.parameditors.genericeditor import TableFieldPlugin
@@ -26,7 +26,7 @@ class VerticesPlugin(TableFieldPlugin):
     cls.procCollection = FR_SINGLETON.imgProcClctn.createProcessorForClass(cls)
 
     dockGroup = ParamEditorDockGrouping([cls.toolsEditor, cls.procCollection],
-                                        frPascalCaseToTitle(cls.name))
+                                        pascalCaseToTitle(cls.name))
     cls.docks = dockGroup
 
   def __init__(self):

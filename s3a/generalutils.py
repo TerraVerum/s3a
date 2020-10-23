@@ -161,7 +161,7 @@ def makeUniqueBaseClass(obj: Any):
   return mixin
 
 
-def frPascalCaseToTitle(name: str, addSpaces=True) -> str:
+def pascalCaseToTitle(name: str, addSpaces=True) -> str:
   """
   Helper utility to turn a FRPascaleCase name to a 'Title Case' title
   :param name: camel-cased name

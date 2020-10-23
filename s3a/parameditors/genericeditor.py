@@ -9,7 +9,7 @@ from pyqtgraph.parametertree import Parameter, ParameterItem
 
 from s3a import models
 from s3a.constants import MENU_OPTS_DIR
-from s3a.generalutils import frPascalCaseToTitle
+from s3a.generalutils import pascalCaseToTitle
 from s3a.graphicsutils import dialogGetSaveFileName
 from s3a.models.editorbase import ParamEditorBase
 from s3a import parameditors
@@ -111,7 +111,7 @@ class ParamEditor(ParamEditorBase):
 
   @staticmethod
   def buildClsToolsEditor(cls: type, name=None):
-    groupName = frPascalCaseToTitle(cls.__name__)
+    groupName = pascalCaseToTitle(cls.__name__)
     lowerGroupName = groupName.lower()
     toolsDir = MENU_OPTS_DIR / lowerGroupName
     if name is None:

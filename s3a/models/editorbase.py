@@ -10,7 +10,7 @@ from enum import Flag, auto
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter, ParameterTree, ParameterItem
 
-from s3a.generalutils import frPascalCaseToTitle, frParamToPgParamDict, attemptFileLoad, resolveYamlDict
+from s3a.generalutils import pascalCaseToTitle, frParamToPgParamDict, attemptFileLoad, resolveYamlDict
 from s3a.graphicsutils import saveToFile
 from s3a.processing import AtomicProcess, ProcessIO, GeneralProcWrapper
 from s3a.processing.guiwrapper import docParser
@@ -108,7 +108,7 @@ class ParamEditorBase(QtWidgets.QDockWidget):
       try:
         propClsName = cls.__name__
         name = propClsName[:propClsName.index('Editor')]
-        name = frPascalCaseToTitle(name)
+        name = pascalCaseToTitle(name)
       except ValueError:
         name = "Parameter Editor"
 
@@ -456,6 +456,7 @@ class ParamEditorBase(QtWidgets.QDockWidget):
 
   def registerFunc(self, func: Callable, name:str=None, runOpts=RunOpts.BTN,
                    paramPath:Tuple[str,...]=(),
+                   paramFormat = pascalCaseToTitle,
                    btnOpts: Union[FRParam, dict]=None):
     """
     Like `registerProp`, but for functions instead along with interactive parameters
@@ -473,6 +474,9 @@ class ParamEditorBase(QtWidgets.QDockWidget):
           finished being changed by the user
         * If RunOpts.ON_CHANGING, the function is run every time a value is altered,
           even if the value isn't finished changing.
+    :param paramFormat: Formatter which turns variable names into display names. The default takes variables in pascal
+      case (e.g. variableName) or snake case (e.g. variable_name) and converts to Title Case (e.g. Variable Name).
+      Custom functions must have the signature (str) -> str.
     :param btnOpts: Overrides defaults for button used to run this function. If
       `RunOpts.BTN` is not in `RunOpts`, these values are ignored.
     """
@@ -493,7 +497,7 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     if len(proc.input.hyperParamKeys) > 0:
       topParam = self.params if len(paramPath) == 0 else self.params.child(*paramPath)
       # Check if proc params already exist from a previous addition
-      GeneralProcWrapper(proc, self, paramPath)
+      GeneralProcWrapper(proc, self, paramPath, paramFormat)
       parentParam = topParam.child(proc.name)
       for param in parentParam:
         if runOpts & RunOpts.ON_CHANGED:
