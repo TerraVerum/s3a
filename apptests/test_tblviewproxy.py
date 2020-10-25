@@ -121,12 +121,9 @@ def test_impossible_filter(tmpdir):
       pType: nopossiblefilter
   '''
   tmpFile.write_text(dummyCfgStr)
-  FR_SINGLETON.tableData.loadCfg(tmpFile)
-  dftester = CompDfTester(3)
 
   with pytest.warns(S3AWarning):
-    newApp = S3A(guiMode=False, loadLastState=False)
-    newApp.compMgr.addComps(dftester.compDf)
+    FR_SINGLETON.tableData.loadCfg(tmpFile)
 
 def compCopiedCompDfs(old: pd.DataFrame, new: pd.DataFrame, newStartIdx=0):
   for ii in range(len(old)):

@@ -9,7 +9,7 @@ from s3a.structures import FRParam
 from .genericeditor import ParamEditor, ParamEditorDockGrouping, ParamEditorPlugin, \
   TableFieldPlugin
 from .algcollection import AlgCtorCollection
-from .project import ProjectEditor
+from .project import ProjectData
 from .quickloader import QuickLoaderEditor
 from .shortcut import ShortcutsEditor
 from ..generalutils import pascalCaseToTitle
@@ -39,8 +39,8 @@ class _FRSingleton(QtCore.QObject):
     self.plugins: List[ParamEditorPlugin] = []
     self.tableFieldPlugins: List[TableFieldPlugin] = []
 
-    self.project = ProjectEditor()
-    self.tableData = self.project.projectData.tableData
+    self.projectData = ProjectData()
+    self.tableData = self.projectData.tableData
     self.tableData.loadCfg(BASE_DIR/'tablecfg.yml')
     self.filter = self.tableData.filter
 

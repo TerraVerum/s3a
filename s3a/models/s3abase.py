@@ -51,6 +51,7 @@ class S3ABase(QtWidgets.QMainWindow):
                                               [FR_CONSTS.EXP_ONLY_VISIBLE, FR_CONSTS.INCLUDE_FNAME_PATH]
                                               )
     self.compIo: ComponentIO = ioCls()
+    ComponentIO.tableData = FR_SINGLETON.tableData
 
     self.compTbl = CompTableView()
     self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl)
@@ -151,8 +152,8 @@ class S3ABase(QtWidgets.QMainWindow):
       # will break. So, the table doesn't have to be completely reset
       return
     self.compMgr.beginResetModel()
-    self.compMgr.resetFields()
     self.compMgr.rmComps()
+    self.compMgr.resetFields()
     self.compMgr.endResetModel()
     self.compTbl.setColDelegates()
     self.compTbl.popup.tbl.setColDelegates()

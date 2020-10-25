@@ -1,3 +1,4 @@
+import contextlib
 import pickle
 import sys
 from ast import literal_eval
@@ -14,7 +15,7 @@ from typing_extensions import Literal
 
 from s3a.constants import REQD_TBL_FIELDS as RTF
 from s3a.generalutils import augmentException, getCroppedImg, resize_pad
-from s3a.parameditors import FR_SINGLETON
+from s3a.parameditors.table import TableData
 from s3a.structures import FRParamGroup, S3AWarning, S3AIOError, FilePath, GrayImg, \
   ComplexXYVertices, FRParam
 
@@ -68,6 +69,9 @@ class ComponentIO:
   """
   for k in ['csv', 'pkl']:
     roundTripIoTypes[k] = handledIoTypes[k]
+
+  tableData = TableData()
+  """Table to use for import/export cross checks. This is how class and table field information is derived."""
 
   @classmethod
   def handledIoTypes_fileFilter(cls, typeFilter='', **extraOpts):
@@ -237,7 +241,7 @@ class ComponentIO:
     useKeys = {'img', 'semanticMask', 'bboxMask', 'compClass', 'instId', 'offset'} - set(excludeCols)
     outDf = {k: [] for k in useKeys}
     # Cache index per class for faster access
-    classToIdxMapping = {compCls: ii for ii, compCls in enumerate(FR_SINGLETON.tableData.compClasses, 1)}
+    classToIdxMapping = {compCls: ii for ii, compCls in enumerate(cls.tableData.compClasses, 1)}
     for miniDf, imgName in zip(dfGroupingsByImg, uniqueImgs):
       imgName = imgDir/imgName
       img = _imgCache[imgName]
@@ -299,7 +303,7 @@ class ComponentIO:
   @classmethod
   def exportClassPng(cls, compDf: df, outFile: FilePath = None, imShape: Tuple[int]=None, **kwargs):
     # Create label to output mapping
-    classes = FR_SINGLETON.tableData.compClasses
+    classes = cls.tableData.compClasses
     colors = compDf[RTF.COMP_CLASS]
     if not np.issubdtype(colors.dtype, np.integer):
       colors = compDf[RTF.COMP_CLASS].apply(classes.index)
@@ -435,10 +439,10 @@ class ComponentIO:
         csvDf = csvDf.set_index(RTF.INST_ID.name, drop=False)
       # Decouple index from instance ID until after transfer from csvDf is complete
       # This was causing very strange behavior without reset_index()...
-      outDf = FR_SINGLETON.tableData.makeCompDf(len(csvDf)).reset_index(drop=True)
+      outDf = cls.tableData.makeCompDf(len(csvDf)).reset_index(drop=True)
       # Objects in the original frame are represented as strings, so try to convert these
       # as needed
-      for field in FR_SINGLETON.tableData.allFields:
+      for field in cls.tableData.allFields:
         if field.name in csvDf:
           matchingCol = csvDf[field.name]
           # 'Object' type results in false positives
@@ -466,7 +470,7 @@ class ComponentIO:
   @classmethod
   def buildFromCompimgsDf(cls, inFile: FilePath, imShape: Tuple=None):
     inDf = pd.read_pickle(inFile)
-    outDf = FR_SINGLETON.tableData.makeCompDf(len(inDf))
+    outDf = cls.tableData.makeCompDf(len(inDf))
     outDf[RTF.INST_ID] = inDf['instId']
     allVerts = []
 
@@ -507,7 +511,7 @@ class ComponentIO:
     else:
       clsImg = io.imread(inFileOrImg)
 
-    clsArray = np.array(FR_SINGLETON.tableData.compClasses)
+    clsArray = np.array(cls.tableData.compClasses)
     idImg = measure.label(clsImg)
     outDf = cls.buildFromIdPng(idImg, imShape)
     outClasses = []
@@ -554,7 +558,7 @@ class ComponentIO:
     for curId in regionIds:
       verts = ComplexXYVertices.fromBwMask(idImg == curId)
       allVerts.append(verts)
-    outDf = FR_SINGLETON.tableData.makeCompDf(regionIds.size)
+    outDf = cls.tableData.makeCompDf(regionIds.size)
     # Subtract 1 since instance ids are 0-indexed
     outDf[RTF.INST_ID] = regionIds-1
     outDf[RTF.VERTICES] = allVerts

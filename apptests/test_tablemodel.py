@@ -122,7 +122,7 @@ def test_table_setdata(sampleComps):
   _ = REQD_TBL_FIELDS
   colVals = {
     _.VERTICES: ComplexXYVertices([XYVertices([[1, 2], [3, 4]])]),
-    _.COMP_CLASS: 'bogus',
+    _.COMP_CLASS: 'Unassigned',
     _.ANN_AUTHOR: 'Hi There',
     _.SRC_IMG_FILENAME: 'newfilename'
   }
