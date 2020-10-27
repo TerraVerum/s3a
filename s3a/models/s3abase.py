@@ -261,15 +261,22 @@ class S3ABase(QtWidgets.QMainWindow):
     oldComps = self.compMgr.compDf.copy()
     if fileName is not None:
       fileName = Path(fileName).resolve()
-    if clearExistingComps:
-      self.compMgr.rmComps()
+    if fileName == self.srcImgFname:
+      return
     if imgData is not None:
       self.mainImg.setImage(imgData)
     else:
       self.mainImg.setImage(fileName)
     self.srcImgFname = fileName
+
+    # Handle resulting internal changes
+    if clearExistingComps:
+      self.compMgr.rmComps()
     self.focusedImg.updateAll()
     self.mainImg.plotItem.vb.autoRange()
+    imgAnns = FR_SINGLETON.project.imgToAnnMapping.get(fileName, None)
+    if imgAnns is not None:
+      self.add_focusComps(self.compIo.buildByFileType(imgAnns))
     if self.estBoundsOnStart:
       self.estimateBoundaries()
     yield

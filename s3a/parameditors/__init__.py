@@ -39,8 +39,8 @@ class _FRSingleton(QtCore.QObject):
     self.plugins: List[ParamEditorPlugin] = []
     self.tableFieldPlugins: List[TableFieldPlugin] = []
 
-    self.projectData = ProjectData()
-    self.tableData = self.projectData.tableData
+    self.project = ProjectData()
+    self.tableData = self.project.tableData
     self.tableData.loadCfg(BASE_DIR/'tablecfg.yml')
     self.filter = self.tableData.filter
 
