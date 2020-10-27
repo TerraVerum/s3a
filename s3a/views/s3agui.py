@@ -20,7 +20,7 @@ from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
 from s3a.generalutils import attemptFileLoad
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import ParamEditor, ParamEditorDockGrouping, FR_SINGLETON
-from s3a.structures import S3AWarning, XYVertices
+from s3a.structures import S3AWarning, XYVertices, FilePath, NChanImg
 from s3a.views.buttons import ButtonCollection
 
 __all__ = ['S3A']
@@ -178,12 +178,14 @@ class S3A(S3ABase):
 
     authorName = FR_SINGLETON.tableData.annAuthor
     self.mouseCoords = QtWidgets.QLabel(f"Author: {authorName} Mouse Coords")
+    self.imageLbl = QtWidgets.QLabel(f"Image: None")
 
     self.pxColor = QtWidgets.QLabel("Pixel Color")
 
     self.mainImg.sigMousePosChanged.connect(lambda pos, pxColor: self.setInfo(pos, pxColor))
     # self.focusedImg.sigMousePosChanged.connect(lambda info: setInfo(info))
     self.statBar.show()
+    self.statBar.addWidget(self.imageLbl)
     self.statBar.addWidget(self.mouseCoords)
     self.statBar.addWidget(self.pxColor)
 
@@ -367,6 +369,16 @@ class S3A(S3ABase):
     console = ConsoleWidget(self, namespace=namespace, text=text)
     console.setWindowFlags(QtCore.Qt.Window)
     console.show()
+
+  def setMainImg(self, fileName: FilePath = None, imgData: NChanImg = None,
+                 clearExistingComps=True):
+    ret = super().setMainImg(fileName, imgData, clearExistingComps)
+    img = self.srcImgFname
+    if img is not None:
+      img = img.name
+    self.imageLbl.setText(f'Image: {img}')
+
+    return ret
 
   def setMainImg_gui(self):
     fileFilter = "Image Files (*.png *.tif *.jpg *.jpeg *.bmp *.jfif);;All files(*.*)"
@@ -570,13 +582,8 @@ class S3A(S3ABase):
   def setInfo(self, xyPos: XYVertices, pxColor: np.ndarray):
     if pxColor is None: return
     authorName = FR_SINGLETON.tableData.annAuthor
-    if self.srcImgFname is not None:
-      fname = self.srcImgFname.name
-    else:
-      fname = 'None'
 
     self.mouseCoords.setText(f'Author: {authorName}'
-                             f' | Image: {fname}'
                              f' | Mouse (x,y): {xyPos[0]}, {xyPos[1]}'
                              f' | Pixel Color: ')
     self.pxColor.setText(f'{pxColor}')
