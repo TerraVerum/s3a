@@ -157,7 +157,7 @@ def create_addMenuAct(mainWin: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, t
 
 
 class PopupLineEditor(QtWidgets.QLineEdit):
-  def __init__(self, parent: QtWidgets.QWidget=None, model: QtCore.QAbstractListModel=None,
+  def __init__(self, parent: QtWidgets.QWidget=None, model: QtCore.QAbstractItemModel=None,
                placeholderText='Press Tab or type...', clearOnComplete=True,
                forceMatch=True):
     super().__init__(parent)
@@ -188,6 +188,33 @@ class PopupLineEditor(QtWidgets.QLineEdit):
   #     return False
   #   return super().focusNextPrevChild(nextChild)
 
+  def _chooseNextCompletion(self, incAmt=1):
+    completer = self.completer()
+    popup = completer.popup()
+    if popup.isVisible() and popup.currentIndex().isValid():
+      nextIdx = (completer.currentRow()+incAmt)%completer.completionCount()
+      completer.setCurrentRow(nextIdx)
+    else:
+      completer.complete()
+    popup.show()
+    popup.setCurrentIndex(completer.currentIndex())
+    popup.setFocus()
+
+  def event(self, ev: QtCore.QEvent):
+    if ev.type() != ev.KeyPress:
+      return super().event(ev)
+
+    ev: QtGui.QKeyEvent
+    key = ev.key()
+    if key == QtCore.Qt.Key_Tab:
+      incAmt = 1
+    elif key == QtCore.Qt.Key_Backtab:
+      incAmt = -1
+    else:
+      return super().event(ev)
+    self._chooseNextCompletion(incAmt)
+    return True
+
   def focusOutEvent(self, ev: QtGui.QFocusEvent):
     reason = ev.reason()
     if reason in [QtCore.Qt.TabFocusReason, QtCore.Qt.BacktabFocusReason,
@@ -197,16 +224,9 @@ class PopupLineEditor(QtWidgets.QLineEdit):
       completer = self.completer()
       if completer is None:
         return
-      popup = completer.popup()
-      if popup.isVisible() and popup.currentIndex().isValid():
-        incAmt = 1 if reason == QtCore.Qt.TabFocusReason else -1
-        nextIdx = (completer.currentRow()+incAmt)%completer.completionCount()
-        completer.setCurrentRow(nextIdx)
-      else:
-        completer.complete()
-      popup.show()
-      popup.setCurrentIndex(completer.currentIndex())
-      popup.setFocus()
+      incAmt = 1 if reason == QtCore.Qt.TabFocusReason else -1
+
+      self._chooseNextCompletion(incAmt)
       ev.accept()
       return
     else:
