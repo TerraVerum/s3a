@@ -5,6 +5,7 @@ from typing import List, Optional, Union, Set, Dict
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from skimage import io
 import pandas as pd
+import numpy as np
 
 from s3a.constants import BASE_DIR, REQD_TBL_FIELDS
 from s3a.generalutils import resolveYamlDict
@@ -33,10 +34,16 @@ class ThumbnailViewer(QtWidgets.QListWidget):
 
   def addThumbnail(self, fullName: Path):
     icon = QtGui.QIcon(str(fullName))
+    if fullName.name in self.nameToFullPathMapping:
+      raise S3AIOError('Name already exists in image list')
     newItem = QtWidgets.QListWidgetItem(fullName.name)
     newItem.setIcon(icon)
     self.addItem(newItem)
     self.nameToFullPathMapping[fullName.name] = fullName
+
+  def removeThumbnail(self, name: str):
+    del self.nameToFullPathMapping[name]
+    self.removeItemWidget(self.findItems(name, QtCore.Qt.MatchExactly)[0])
 
 class ProjectData:
   def __init__(self):
@@ -150,7 +157,16 @@ class ProjectData:
       name = self._copyImgToProj(name, data)
     if name not in self.images:
       self.images.append(name)
-    self._thumbnails.addThumbnail(name)
+      self._thumbnails.addThumbnail(name)
+
+  def changeImgPath(self, oldName: Path, newName: Path=None):
+    oldIdx = self.images.index(oldName)
+    if newName is None or newName in self._thumbnails.nameToFullPathMapping:
+      self._thumbnails.removeThumbnail(oldName.name)
+      del self.images[oldIdx]
+    else:
+      self._thumbnails.nameToFullPathMapping[newName.name] = newName
+      self.images[oldIdx] = newName
 
   def addImageFolder(self, folder: FilePath, copyToProj=False):
     folder = Path(folder)
@@ -190,22 +206,28 @@ class ProjectData:
         del self.imgToAnnMapping[key]
         break
 
-  def addAnnotation(self, name: FilePath=None, data: pd.DataFrame=None, image: FilePath=None):
+  def addAnnotation(self, name: FilePath=None, data: pd.DataFrame=None, image: FilePath=None,
+                    overwriteOld=False):
     # Housekeeping for default arguments
     if name is None and data is None:
       raise S3AIOError('`name` and `data` cannot both be `None`')
-    elif name is None and image is None:
-      raise S3AIOError('`name` and `image` cannot both be `None`')
     if data is None:
       data = ComponentIO.buildByFileType(name)
     if image is None:
       # If no explicit matching to an image is provided, try to determine based on annotation name
-      image = self._getImgForAnn(Path(name))
-    image = Path(image).resolve()
+      xpondingImgs = np.unique(data[REQD_TBL_FIELDS.SRC_IMG_FILENAME].to_numpy())
+      # Break into annotaitons by iamge
+      for img in xpondingImgs:
+        self.addAnnotation(name, data, img)
+    image = self._getFullImgName(Path(image))
     # Since only one annotation file can exist per image, concatenate this with any existing files for the same image
     # if needed
+    if image.parent != self.imagesDir:
+      image = self._copyImgToProj(image)
     annForImg = self.imgToAnnMapping.get(image, None)
-    oldAnns = ComponentIO.buildByFileType(annForImg)
+    oldAnns = []
+    if annForImg is not None and not overwriteOld:
+      oldAnns.append(ComponentIO.buildByFileType(annForImg))
     combinedAnns = oldAnns + [data]
     outAnn = pd.concat(combinedAnns, ignore_index=True)
     outAnn[REQD_TBL_FIELDS.INST_ID] = outAnn.index
@@ -215,7 +237,10 @@ class ProjectData:
     self.imgToAnnMapping[image] = outName
 
   def _copyImgToProj(self, name: Path, data: NChanImg=None):
+    name = name.resolve()
     newName = self.imagesDir/name.name
+    if newName.exists():
+      raise S3AIOError(f'Image {newName} already exists in the project')
     if name.exists() and data is None:
       shutil.copy(name, newName)
     elif data is not None:
@@ -225,23 +250,48 @@ class ProjectData:
     else:
       raise S3AIOError(f'No image data associated with {name.name}. Either the file does not exist or no'
                        f' image information was provided.')
+    newName = newName.resolve()
+    if name in self.images:
+      self.changeImgPath(name, newName)
     return newName.resolve()
 
-  def _getImgForAnn(self, name: Path):
-    matchName = name.stem
-    candidates = []
-    for imgName in self.images:
-      if imgName.stem == matchName:
-        candidates.append(imgName)
+  def _getFullImgName(self, name: Path, thorough=True):
+    """
+    From an absolute or relative image name, attempts to find the absolute path it corresponds
+    to based on current project images. A match is located in the following order:
+      - If the image path is already absolute, it is resolved, checked for existence, and returned
+      - Solitary project images are searched to see if they end with the specified relative path
+      - All base image directories are checked to see if they contain this subpath
+
+    :param thorough: If `False`, as soon as a match is found the function returns. Otherwise,
+      all solitary paths and images will be checked to ensure there is exactly one matching
+      image for the name provided.
+    """
+    if name.is_absolute():
+      return name.resolve()
+
+    candidates = set()
+    strName = str(name)
+    for img in self.images:
+      if str(img).endswith(strName):
+        if not thorough:
+          return img
+        candidates.add(img)
+
+    for parent in self.baseImgDirs:
+      curName = (parent/name).resolve()
+      if curName.exists():
+        if not thorough:
+          return curName
+        candidates.add(curName)
+
     numCandidates = len(candidates)
     if numCandidates != 1:
-      msg = f'Annotation was added without an explicit mapping to an image. This is only allowed when' \
-            f' exactly one corresponding image file has a similar name. Encountered {numCandidates} images' \
-            f' with similar names'
+      msg = f'Exactly one corresponding image file must exist for a given annotation. However,' \
+            f' {numCandidates} candidate images were found'
       if numCandidates == 0:
         msg += '.'
       else:
         msg += f':\n{", ".join([c.name for c in candidates])}'
       raise S3AIOError(msg)
-    else:
-      return candidates[0]
+    return candidates.pop()
