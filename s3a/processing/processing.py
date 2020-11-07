@@ -228,9 +228,9 @@ class GeneralProcess(ProcessStage):
     self.name = name
     self.allowDisable = True
 
-  def addFunction(self, func: t.Callable, name: str=None, needsWrap=False, **overriddenDefaults):
+  def addFunction(self, func: t.Callable, **kwargs):
     """See function signature for AtomicProcess for input explanation"""
-    atomic = AtomicProcess(func, name, needsWrap, self.mainResultKeys, **overriddenDefaults)
+    atomic = AtomicProcess(func, mainResultKeys=self.mainResultKeys, **kwargs)
     numSameNames = 0
     for stage in self.stages:
       if atomic.name == stage.name.split('#')[0]:
@@ -243,24 +243,17 @@ class GeneralProcess(ProcessStage):
     return atomic
 
   @classmethod
-  def fromFunction(cls, func: t.Callable, name: str=None, needsWrap=False,
-                   **overriddenDefaults):
+  def fromFunction(cls, func: t.Callable, **kwargs):
+    name = kwargs.get('name', None)
     out = cls(name)
-    out.addFunction(func, name, needsWrap, **overriddenDefaults)
+    out.addFunction(func, **kwargs)
     return out
-
-  @classmethod
-  def wrap(cls, name: str=None, needsAdditionalWrap=False, **overriddenDefaults):
-    def _innerDeco(func: t.Callable):
-      return ImageProcess.fromFunction(func, name, needsAdditionalWrap, **overriddenDefaults)
-    return _innerDeco
 
   def addProcess(self, process: GeneralProcess):
     if self.name is None:
       self.name = process.name
     self.stages.append(process)
     return process
-
 
   def run(self, io: ProcessIO = None, disable=False):
     if io is None:

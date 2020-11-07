@@ -135,7 +135,7 @@ def test_selectionbounds_none():
 def test_proc_err(tmpdir):
   def badProc(image: NChanImg):
     return ProcessIO(image=image, extra=1 / 0)
-  newCtor = lambda: ImageProcess.fromFunction(badProc, 'Bad')
+  newCtor = lambda: ImageProcess.fromFunction(badProc, name='Bad')
   newClctn = AlgParamEditor(Path(tmpdir), [newCtor], ImgProcWrapper)
 
   newClctn.switchActiveProcessor('Bad')
