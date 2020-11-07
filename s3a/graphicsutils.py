@@ -6,8 +6,9 @@ from functools import wraps
 from os.path import basename
 from pathlib import Path
 from traceback import format_exception
-from typing import Optional, Union, Callable, Generator, Sequence
+from typing import Optional, Union, Callable, Generator, Sequence, Dict
 
+from PyQt5 import QtWidgets, QtCore, QtGui
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import Parameter
 from ruamel.yaml import YAML
@@ -504,3 +505,24 @@ def contextMenuFromEditorActions(editors: Union[s3a.ParamEditor, Sequence[s3a.Pa
       menu.addAction(name, action.activate)
 
   return menu
+
+class ThumbnailViewer(QtWidgets.QListWidget):
+  def __init__(self, parent=None):
+    super().__init__(parent)
+    self.nameToFullPathMapping: Dict[str, Path] = {}
+    self.setViewMode(self.IconMode)
+    self.setIconSize(QtCore.QSize(200,200))
+    self.setResizeMode(self.Adjust)
+
+  def addThumbnail(self, fullName: Path):
+    icon = QtGui.QIcon(str(fullName))
+    if fullName.name in self.nameToFullPathMapping:
+      raise S3AIOError('Name already exists in image list')
+    newItem = QtWidgets.QListWidgetItem(fullName.name)
+    newItem.setIcon(icon)
+    self.addItem(newItem)
+    self.nameToFullPathMapping[fullName.name] = fullName
+
+  def removeThumbnail(self, name: str):
+    del self.nameToFullPathMapping[name]
+    self.removeItemWidget(self.findItems(name, QtCore.Qt.MatchExactly)[0])

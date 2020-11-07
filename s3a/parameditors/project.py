@@ -1,18 +1,18 @@
 import shutil
 from pathlib import Path
-from typing import List, Optional, Union, Set, Dict
+from typing import List, Optional, Set, Dict
 
-from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
-from skimage import io
-import pandas as pd
 import numpy as np
+import pandas as pd
+from skimage import io
 
 from s3a.constants import BASE_DIR, REQD_TBL_FIELDS
 from s3a.generalutils import resolveYamlDict
-from s3a.graphicsutils import saveToFile, popupFilePicker, PopupLineEditor
+from s3a.graphicsutils import saveToFile, popupFilePicker
+from s3a.io import ComponentIO
 from s3a.parameditors.table import TableData
 from s3a.structures import FilePath, NChanImg, S3AIOError
-from s3a.io import ComponentIO
+
 
 def hierarchicalUpdate(curDict: dict, other: dict):
   """Dictionary update that allows nested keys to be updated without deleting the non-updated keys"""
@@ -22,28 +22,6 @@ def hierarchicalUpdate(curDict: dict, other: dict):
       hierarchicalUpdate(curVal, v)
     else:
       curDict[k] = v
-
-class ThumbnailViewer(QtWidgets.QListWidget):
-  sigImageSelected = QtCore.Signal(object) # Image full path to delete
-  def __init__(self, parent=None):
-    super().__init__(parent)
-    self.nameToFullPathMapping: Dict[str, Path] = {}
-    self.setViewMode(self.IconMode)
-    self.setIconSize(QtCore.QSize(200,200))
-    self.setResizeMode(self.Adjust)
-
-  def addThumbnail(self, fullName: Path):
-    icon = QtGui.QIcon(str(fullName))
-    if fullName.name in self.nameToFullPathMapping:
-      raise S3AIOError('Name already exists in image list')
-    newItem = QtWidgets.QListWidgetItem(fullName.name)
-    newItem.setIcon(icon)
-    self.addItem(newItem)
-    self.nameToFullPathMapping[fullName.name] = fullName
-
-  def removeThumbnail(self, name: str):
-    del self.nameToFullPathMapping[name]
-    self.removeItemWidget(self.findItems(name, QtCore.Qt.MatchExactly)[0])
 
 class ProjectData:
   def __init__(self):
@@ -58,8 +36,6 @@ class ProjectData:
 
     self.compIo = ComponentIO()
     self.compIo.tableData = self.tableData
-
-    self._thumbnails = ThumbnailViewer()
 
   @property
   def location(self):
@@ -107,7 +83,7 @@ class ProjectData:
     self.annotationsDir.mkdir(exist_ok=True)
     self.imagesDir.mkdir(exist_ok=True)
 
-    shouldCopy = self.cfg['import-opts']['copy-data']
+    shouldCopy = self.cfg['import-opts']['copy-all']
     for image in self.cfg['images']:
       if not isinstance(image, dict):
         image = Path(image)
@@ -157,15 +133,13 @@ class ProjectData:
       name = self._copyImgToProj(name, data)
     if name not in self.images:
       self.images.append(name)
-      self._thumbnails.addThumbnail(name)
+    return name
 
   def changeImgPath(self, oldName: Path, newName: Path=None):
     oldIdx = self.images.index(oldName)
-    if newName is None or newName in self._thumbnails.nameToFullPathMapping:
-      self._thumbnails.removeThumbnail(oldName.name)
+    if newName is None or newName in self.images:
       del self.images[oldIdx]
     else:
-      self._thumbnails.nameToFullPathMapping[newName.name] = newName
       self.images[oldIdx] = newName
 
   def addImageFolder(self, folder: FilePath, copyToProj=False):
@@ -192,11 +166,6 @@ class ProjectData:
     for ann in self.annotationsDir.glob(f'{imgName.stem}.*'):
       ann.unlink()
     self.imgToAnnMapping.pop(imgName, None)
-
-  def removeImage_gui(self):
-    self._thumbnails.show()
-    self._thumbnails.exec_()
-
 
   def removeAnnotation(self, annName: FilePath):
     annName = Path(annName).resolve()

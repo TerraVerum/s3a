@@ -2,7 +2,7 @@ images: []
 annotations: []
 
 import-opts:
-  copy-data: true
+  copy-all: true
 
 export-opts:
   annotation-format: "csv"

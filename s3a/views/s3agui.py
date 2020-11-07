@@ -16,7 +16,7 @@ from s3a.constants import _FREnums, FR_ENUMS
 from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
   autosaveOptsDialog, popupFilePicker, \
   disableAppDuringFunc, saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
-  restoreExceptionBehavior, contextMenuFromEditorActions, ScrollableErrorDialog
+  restoreExceptionBehavior, contextMenuFromEditorActions, ScrollableErrorDialog, ThumbnailViewer
 from s3a.generalutils import attemptFileLoad
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import ParamEditor, ParamEditorDockGrouping, FR_SINGLETON
@@ -57,6 +57,7 @@ class S3A(S3ABase):
     self.setWindowTitle(self.APP_TITLE)
 
     self.curCompIdLbl = QtWidgets.QLabel(self.CUR_COMP_LBL)
+    self._projImgThumbnails = ThumbnailViewer()
 
     # Dummy editor for layout options since it doesn't really have editable settings
     # Maybe later this can be elevated to have more options
@@ -386,6 +387,19 @@ class S3A(S3ABase):
     if fname is not None:
       with pg.BusyCursor():
         self.setMainImg(fname)
+
+  def openProject_gui(self):
+    fileFilter = "Project Config Files (*.yml"
+    fname = popupFilePicker(self, 'Select Project File', fileFilter)
+    if fname is not None:
+      with pg.BusyCursor():
+        self.openProject(fname)
+
+  def openProject(self, projFile: FilePath, projCfg: dict=None):
+    super().openProject(projFile, projCfg)
+    self._projImgThumbnails.clear()
+    for img in FR_SINGLETON.project.images:
+      self._projImgThumbnails.addThumbnail(img)
 
   def startAutosave_gui(self):
     saveDlg = autosaveOptsDialog(self)
