@@ -224,9 +224,6 @@ def keep_largest_comp(image: NChanImg):
   out[coords[:,0], coords[:,1]] = True
   return ProcessIO(image=out)
 
-a = keep_largest_comp.__code__
-a.co_varnames
-
 def rm_small_comps(image: NChanImg, minSzThreshold=30):
   regionPropTbl = area_coord_regionTbl(image)
   validCoords = regionPropTbl.coords[regionPropTbl.area >= minSzThreshold]

@@ -138,7 +138,7 @@ class ProcessStage(ABC):
     raise NotImplementedError
 
   def __call__(self, **kwargs):
-    self.run(ProcessIO(**kwargs))
+    return self.run(ProcessIO(**kwargs))
 
   @property
   @abstractmethod
