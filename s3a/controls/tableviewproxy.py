@@ -1,3 +1,4 @@
+from functools import wraps
 from typing import Union
 from warnings import warn
 
@@ -88,7 +89,7 @@ class CompDisplayFilter(QtCore.QObject):
     self.regionCopier.sigCopyStarted.connect(lambda *args: self.activateRegionCopier())
     self.regionCopier.sigCopyStopped.connect(lambda *args: self.finishRegionCopier())
 
-    mainImg.registerToolFunc(lambda: self.mergeSelectedComps(), btnOpts=FR_CONSTS.TOOL_MERGE_COMPS)
+    mainImg.registerToolFunc(self.mergeSelectedComps, btnOpts=FR_CONSTS.TOOL_MERGE_COMPS)
     mainImg.registerToolFunc(self.splitSelectedComps, btnOpts=FR_CONSTS.TOOL_SPLIT_COMPS)
     mainImg.setMenuFromEditors([mainImg.toolsEditor])
 

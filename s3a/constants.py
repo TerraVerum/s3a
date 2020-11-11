@@ -85,7 +85,7 @@ class _FRConsts(FRParamGroup):
 
   CLS_IMG_AREA         : FRParam = newParam('Base Image Area')
   CLS_MAIN_IMG_AREA    : FRParam = newParam('Main Image Area')
-  CLS_FOCUSED_IMG_AREA : FRParam = newParam('Focused Component Image Area')
+  CLS_FOCUSED_IMG_AREA : FRParam = newParam('Focused Image Area')
   CLS_ROI_CLCTN        : FRParam = newParam('Draw-able Shapes')
   # --------------------------
   # SCHEME PARAMETERS

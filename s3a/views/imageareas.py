@@ -227,6 +227,7 @@ class MainImage(EditableImgBase):
   def registerToolFunc(self, *args, **kwargs):
     """See function signature for `FRParamEditor.registerFunc`"""
     origOpts = kwargs.get('btnOpts')
+    origOpts.opts['ownerObj'] = self
     proc = self.toolsEditor.registerFunc(*args, **kwargs)
     self.toolsGrp.create_addBtn(origOpts,
                                 triggerFn=lambda *_args, **_kwargs: proc.run(),
