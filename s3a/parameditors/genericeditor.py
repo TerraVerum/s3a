@@ -32,7 +32,7 @@ class ParamEditor(ParamEditorBase):
   GUI controls for user-interactive parameters within S3A. Each window consists of
   a parameter tree and basic saving capabilities.
   """
-  def __init__(self, parent=None, paramList: List[Dict]=None, saveDir: FilePath='.',
+  def __init__(self, parent=None, paramList: List[Dict]=None, saveDir: Optional[FilePath]='.',
                fileType='param', name=None, topTreeChild: Parameter=None,
                registerCls: Type=None, registerParam: FRParam=None, **registerGroupOpts):
     super().__init__(parent, paramList, saveDir, fileType, name, topTreeChild,

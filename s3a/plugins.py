@@ -1,16 +1,14 @@
-from functools import partial
-from functools import partial
 from typing import Optional
 
 import numpy as np
 import pandas as pd
-from pyqtgraph.Qt import QtWidgets
+from pyqtgraph.Qt import QtWidgets, QtCore
 
 from s3a import FR_SINGLETON, FR_CONSTS as FRC, REQD_TBL_FIELDS as RTF, ComplexXYVertices, \
-  XYVertices, FRParam, ComponentIO as frio
+  XYVertices, FRParam, ComponentIO as frio, FR_CONSTS, ComponentIO, ParamEditor
 from s3a.generalutils import pascalCaseToTitle
 from s3a.models.s3abase import S3ABase
-from s3a.parameditors import ParamEditorDockGrouping
+from s3a.parameditors import ParamEditorDockGrouping, ParamEditorPlugin, ProjectData
 from s3a.parameditors.genericeditor import TableFieldPlugin
 from s3a.processing.algorithms import _historyMaskHolder
 from s3a.structures import NChanImg, GrayImg
@@ -181,30 +179,47 @@ class VerticesPlugin(TableFieldPlugin):
   def _onDeactivate(self):
     self.region.hide()
 
-class Dummy(TableFieldPlugin):
-  name = 'Dummy'
+class ProjectsPlugin(ParamEditorPlugin):
+  name = 'Project'
+  def __init__(self):
+    self.project = ProjectData()
+    ioCls = FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_EXPORTER)(ComponentIO)
+    ioCls.exportOnlyVis, ioCls.includeFullSourceImgName = \
+      FR_SINGLETON.generalProps.registerProps(ioCls,
+                                              [FR_CONSTS.EXP_ONLY_VISIBLE, FR_CONSTS.INCLUDE_FNAME_PATH]
+                                              )
+    self.compIo: ComponentIO = ioCls()
+
+    self.toolsEditor.registerFunc(self.create_gui, name='Create')
 
   @classmethod
   def __initEditorParams__(cls):
-    super().__initEditorParams__()
-    ps = [FRParam(l, value=f'Ctrl+{l}', pType='registeredaction') for l in 'abcd']
-    def alert(btnName):
-      QtWidgets.QMessageBox.information(cls.toolsEditor, 'Button clicked',
-                                        f'{btnName} button clicked!')
+    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Tools')
 
-    for p in ps:
-      prop = cls.toolsEditor.registerProp(cls, p, asProperty=False, ownerObj=cls)
-      prop.sigActivated.connect(partial(alert, p.name))
+  def save(self):
+    self.project.addAnnotation(data=self.s3a.compMgr.compDf, image=self.s3a.srcImgFname, overwriteOld=True)
 
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
+  def create_gui(self):
+    images = []
+    annotations = []
+    editor = ParamEditor(saveDir=None)
 
+    def getFileList(title: str, selectFolder=False):
+      dlg = QtWidgets.QFileDialog()
+      dlg.setModal(True)
+      getFn = dlg.getOpenFileNames
+      if selectFolder:
+        getFn = lambda *args, **kwargs: [dlg.getExistingDirectory(*args, **kwargs)]
+      return getFn(self.s3a, title, str(self.project.location))
 
-  def updateAll(self, mainImg: Optional[NChanImg], newComp: Optional[pd.Series] = None):
-    pass
+    def addImages(selectFolder=False):
+      images.extend(getFileList('Select Images', selectFolder))
+    def addAnnotations(selectFolder=False):
+      annotations.extend(getFileList('Select Images', selectFolder))
+    editor.registerFunc(addImages)
+    editor.registerFunc(addAnnotations)
+    editor.setWindowFlag(QtCore.Qt.Window)
+    for btn in (editor.saveAsBtn, editor.applyBtn):
+      btn.hide()
+    editor.show()
 
-  def handleShapeFinished(self, roiVerts: XYVertices):
-    pass
-
-  def acceptChanges(self):
-    pass

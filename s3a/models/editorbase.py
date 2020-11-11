@@ -161,7 +161,9 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     # -----------
     # Internal parameters for saving settings
     # -----------
-    self.saveDir = Path(saveDir)
+    if saveDir is not None:
+      saveDir = Path(saveDir)
+    self.saveDir = saveDir
     self.fileType = fileType
     self._stateBeforeEdit = self.params.saveState()
     self.lastAppliedName = None
@@ -239,7 +241,7 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     * Returns dict on successful parameter save and emits sigParamStateCreated.
     * Returns None if no save name was given
     """
-    if saveName is None:
+    if saveName is None or self.saveDir is None:
       return None
     if paramState is None:
       paramState = self.params.saveState(filter='user')

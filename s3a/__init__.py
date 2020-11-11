@@ -46,8 +46,10 @@ from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS
 for name, func in inspect.getmembers(TopLevelImageProcessors, inspect.isfunction):
   FR_SINGLETON.imgProcClctn.addProcessCtor(func)
 
-from s3a.plugins import VerticesPlugin
+from s3a.plugins import VerticesPlugin, ProjectsPlugin
+
 FR_SINGLETON.addPlugin(VerticesPlugin)
+FR_SINGLETON.addPlugin(ProjectsPlugin)
 
 # Minimal means no GUI is needed. Things work faster when they don't have to be
 # shown through the comp display filter

@@ -192,7 +192,15 @@ class S3A(S3ABase):
 
     # EDITORS
     FR_SINGLETON.sigDocksAdded.connect(lambda newDocks: self._addEditorDocks(newDocks))
-    self._addEditorDocks()
+    docks = FR_SINGLETON.docks
+    for plugin in FR_SINGLETON.plugins:
+      pdocks = plugin.docks
+      if pdocks is None: continue
+      try:
+        docks.extend(pdocks)
+      except TypeError:
+        docks.append(pdocks)
+    self._addEditorDocks(docks)
 
   def changeFocusedComp(self, newComps: df, forceKeepLastChange=False):
     ret = super().changeFocusedComp(newComps, forceKeepLastChange)
