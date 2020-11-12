@@ -526,3 +526,32 @@ class ThumbnailViewer(QtWidgets.QListWidget):
   def removeThumbnail(self, name: str):
     del self.nameToFullPathMapping[name]
     self.removeItemWidget(self.findItems(name, QtCore.Qt.MatchExactly)[0])
+
+  def clear(self):
+    super().clear()
+    self.nameToFullPathMapping.clear()
+
+# Taken directly from https://stackoverflow.com/questions/60663793/drop-one-or-more-files-into-listwidget-or-lineedit
+class DropList(QtWidgets.QListWidget):
+  def __init__(self, parent=None):
+    super(DropList, self).__init__(parent)
+    self.setAcceptDrops(True)
+
+  def dragEnterEvent(self, event):
+    if event.mimeData().hasUrls():
+      event.acceptProposedAction()
+    else:
+      event.ignore()
+
+  def dragMoveEvent(self, event):
+    if event.mimeData().hasUrls():
+      event.acceptProposedAction()
+    else:
+      event.ignore()
+
+  def dropEvent(self, event):
+    md = event.mimeData()
+    if md.hasUrls():
+      for url in md.urls():
+        self.addItem(url.toLocalFile())
+      event.acceptProposedAction()

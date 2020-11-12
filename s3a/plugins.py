@@ -1,3 +1,5 @@
+import typing
+from functools import partial
 from typing import Optional
 
 import numpy as np
@@ -7,6 +9,7 @@ from pyqtgraph.Qt import QtWidgets, QtCore
 from s3a import FR_SINGLETON, FR_CONSTS as FRC, REQD_TBL_FIELDS as RTF, ComplexXYVertices, \
   XYVertices, FRParam, ComponentIO as frio, FR_CONSTS, ComponentIO, ParamEditor
 from s3a.generalutils import pascalCaseToTitle
+from s3a.graphicsutils import ThumbnailViewer, DropList
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import ParamEditorDockGrouping, ParamEditorPlugin, ProjectData
 from s3a.parameditors.genericeditor import TableFieldPlugin
@@ -182,7 +185,7 @@ class VerticesPlugin(TableFieldPlugin):
 class ProjectsPlugin(ParamEditorPlugin):
   name = 'Project'
   def __init__(self):
-    self.project = ProjectData()
+    self.data = ProjectData()
     ioCls = FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_EXPORTER)(ComponentIO)
     ioCls.exportOnlyVis, ioCls.includeFullSourceImgName = \
       FR_SINGLETON.generalProps.registerProps(ioCls,
@@ -191,35 +194,74 @@ class ProjectsPlugin(ParamEditorPlugin):
     self.compIo: ComponentIO = ioCls()
 
     self.toolsEditor.registerFunc(self.create_gui, name='Create')
+    self._projImgThumbnails = ThumbnailViewer()
+
+
+  def openProject(self, name: str):
+    self.data.loadCfg(name)
+    self._projImgThumbnails.clear()
+    for img in self.data.images:
+      self._projImgThumbnails.addThumbnail(img)
 
   @classmethod
   def __initEditorParams__(cls):
     cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Tools')
 
   def save(self):
-    self.project.addAnnotation(data=self.s3a.compMgr.compDf, image=self.s3a.srcImgFname, overwriteOld=True)
+    self.data.addAnnotation(data=self.s3a.compMgr.compDf, image=self.s3a.srcImgFname, overwriteOld=True)
 
   def create_gui(self):
     images = []
     annotations = []
     editor = ParamEditor(saveDir=None)
 
-    def getFileList(title: str, selectFolder=False):
-      dlg = QtWidgets.QFileDialog()
-      dlg.setModal(True)
-      getFn = dlg.getOpenFileNames
-      if selectFolder:
-        getFn = lambda *args, **kwargs: [dlg.getExistingDirectory(*args, **kwargs)]
-      return getFn(self.s3a, title, str(self.project.location))
+    dlg = QtWidgets.QDialog(self.s3a)
+    dlg.setModal(True)
+    layout = QtWidgets.QVBoxLayout()
+    dlg.setLayout(layout)
 
-    def addImages(selectFolder=False):
-      images.extend(getFileList('Select Images', selectFolder))
-    def addAnnotations(selectFolder=False):
-      annotations.extend(getFileList('Select Images', selectFolder))
-    editor.registerFunc(addImages)
-    editor.registerFunc(addAnnotations)
+
+
+    # Images / annotations first
+
+    def showImages():
+      pass
+
     editor.setWindowFlag(QtCore.Qt.Window)
     for btn in (editor.saveAsBtn, editor.applyBtn):
       btn.hide()
     editor.show()
 
+
+class NewProjectWizard(QtWidgets.QWizard):
+
+  def __init__(self, project: ProjectsPlugin, parent=None) -> None:
+    super().__init__(parent)
+    self.project = project
+
+    def getFileList(_flist: DropList, _title: str, _selectFolder=False):
+      dlg = QtWidgets.QFileDialog()
+      dlg.setModal(True)
+      getFn = lambda *args, **kwargs: dlg.getOpenFileNames(*args, **kwargs)[0]
+      if _selectFolder:
+        getFn = lambda *args, **kwargs: [dlg.getExistingDirectory(*args, **kwargs)]
+      files = getFn(self, _title, str(self.project.data.location))
+      _flist.addItems(files)
+
+    for fType in ['Images', 'Annotations']:
+      page = QtWidgets.QWizardPage(self)
+      page.setTitle(fType)
+      curLayout = QtWidgets.QVBoxLayout()
+      page.setLayout(curLayout)
+      curLayout.addWidget(QtWidgets.QLabel(f'Project {fType.lower()} are shown below. Use the buttons'
+                                      ' or drag and drop to add files.'))
+      flist = DropList(self)
+      fileBtnLayout = QtWidgets.QHBoxLayout()
+      curLayout.addWidget(flist)
+      for title in f'Add Files', f'Add Folder':
+        selectFolder = 'Folder' in title
+        btn = QtWidgets.QPushButton(title, self)
+        btn.clicked.connect(partial(getFileList, flist, title, selectFolder))
+        fileBtnLayout.addWidget(btn)
+      curLayout.addLayout(fileBtnLayout)
+      self.addPage(page)

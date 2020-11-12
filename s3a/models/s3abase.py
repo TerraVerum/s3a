@@ -274,7 +274,7 @@ class S3ABase(QtWidgets.QMainWindow):
       self.compMgr.rmComps()
     self.focusedImg.updateAll()
     self.mainImg.plotItem.vb.autoRange()
-    imgAnns = FR_SINGLETON.project.imgToAnnMapping.get(fileName, None)
+    imgAnns = FR_SINGLETON.data.imgToAnnMapping.get(fileName, None)
     if imgAnns is not None:
       self.add_focusComps(self.compIo.buildByFileType(imgAnns))
     if self.estBoundsOnStart:
@@ -284,9 +284,6 @@ class S3ABase(QtWidgets.QMainWindow):
     if clearExistingComps:
       # Old comps were cleared, so put them back
       self.compMgr.addComps(oldComps)
-
-  def openProject(self, projFile: FilePath, projCfg: dict=None):
-    FR_SINGLETON.project.loadCfg(projFile, projCfg)
 
   def exportCompList(self, outFname: Union[str, Path], readOnly=True, verifyIntegrity=True):
     self.compIo.exportByFileType(self.exportableDf, outFname, imShape=self.mainImg.image.shape,

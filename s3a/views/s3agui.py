@@ -57,7 +57,6 @@ class S3A(S3ABase):
     self.setWindowTitle(self.APP_TITLE)
 
     self.curCompIdLbl = QtWidgets.QLabel(self.CUR_COMP_LBL)
-    self._projImgThumbnails = ThumbnailViewer()
 
     # Dummy editor for layout options since it doesn't really have editable settings
     # Maybe later this can be elevated to have more options
@@ -192,15 +191,7 @@ class S3A(S3ABase):
 
     # EDITORS
     FR_SINGLETON.sigDocksAdded.connect(lambda newDocks: self._addEditorDocks(newDocks))
-    docks = FR_SINGLETON.docks
-    for plugin in FR_SINGLETON.plugins:
-      pdocks = plugin.docks
-      if pdocks is None: continue
-      try:
-        docks.extend(pdocks)
-      except TypeError:
-        docks.append(pdocks)
-    self._addEditorDocks(docks)
+    self._addEditorDocks()
 
   def changeFocusedComp(self, newComps: df, forceKeepLastChange=False):
     ret = super().changeFocusedComp(newComps, forceKeepLastChange)
@@ -402,12 +393,6 @@ class S3A(S3ABase):
     if fname is not None:
       with pg.BusyCursor():
         self.openProject(fname)
-
-  def openProject(self, projFile: FilePath, projCfg: dict=None):
-    super().openProject(projFile, projCfg)
-    self._projImgThumbnails.clear()
-    for img in FR_SINGLETON.project.images:
-      self._projImgThumbnails.addThumbnail(img)
 
   def startAutosave_gui(self):
     saveDlg = autosaveOptsDialog(self)
