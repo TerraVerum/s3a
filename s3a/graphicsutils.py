@@ -536,6 +536,14 @@ class DropList(QtWidgets.QListWidget):
   def __init__(self, parent=None):
     super(DropList, self).__init__(parent)
     self.setAcceptDrops(True)
+    self.setSelectionMode(self.ExtendedSelection)
+    self.delShc = QtWidgets.QShortcut(QtCore.Qt.Key_Delete, self, self.deleteSelected)
+
+  def deleteSelected(self):
+    selectedIdxs = self.selectionModel().selectedIndexes()
+    selectedRows = reversed(sorted([i.row() for i in selectedIdxs]))
+    for row in selectedRows:
+      self.takeItem(row)
 
   def dragEnterEvent(self, event):
     if event.mimeData().hasUrls():

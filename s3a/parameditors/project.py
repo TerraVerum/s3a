@@ -32,7 +32,7 @@ class ProjectData:
     self.baseImgDirs: Set[Path] = set()
     self.imgToAnnMapping: Dict[Path, Path] = {}
     """Records annotations belonging to each image"""
-    self.exportOpts = {}
+    self.settings = {}
 
     self.compIo = ComponentIO()
     self.compIo.tableData = self.tableData
@@ -52,7 +52,7 @@ class ProjectData:
     cfgFname, cfgDict = resolveYamlDict(cfgFname, cfgDict)
     hierarchicalUpdate(defaultCfg, cfgDict)
     cfg = self.cfg = defaultCfg
-    self.exportOpts = cfg['export-opts']
+    self.settings = cfg['settings']
     self.cfgFname = cfgFname
     tableInfo = cfg.get('table-cfg', {})
     if isinstance(tableInfo, str):
@@ -63,7 +63,7 @@ class ProjectData:
       tableName = cfgFname
     self.tableData.loadCfg(tableName, tableDict)
 
-  def createProject(self, *, name: FilePath= './projectcfg.yml', cfg: dict=None):
+  def create(self, *, name: FilePath= './projectcfg.yml', cfg: dict=None):
     """
     Creates a new project with the specified settings in the specified directory.
     :param name:
@@ -83,15 +83,12 @@ class ProjectData:
     self.annotationsDir.mkdir(exist_ok=True)
     self.imagesDir.mkdir(exist_ok=True)
 
-    shouldCopy = self.cfg['import-opts']['copy-all']
     for image in self.cfg['images']:
-      if not isinstance(image, dict):
-        image = Path(image)
-        if image.is_dir():
-          self.addImageFolder(image, shouldCopy)
-          continue
-        image = {'name': image}
-      self.addImage(**image, copyToProj=shouldCopy)
+      if isinstance(image, dict):
+        image.setdefault('copyToProj', False)
+        self.addImage(**image)
+      else:
+        self.addImageByPath(image, False)
     for annotation in self.cfg['annotations']:
       if not isinstance(annotation, dict):
         annotation = {'name': annotation}
@@ -126,6 +123,14 @@ class ProjectData:
     self.cfg['images'] = strImgNames
     self.cfg['annotations'] = strAnnNames
     saveToFile(self.cfg, self.cfgFname)
+
+  def addImageByPath(self, name: FilePath, copyToProj=False):
+    """Determines whether to add as a folder or file based on filepath type"""
+    image = Path(name)
+    if image.is_dir():
+      self.addImageFolder(image, copyToProj)
+    else:
+      self.addImage(name, copyToProj=copyToProj)
 
   def addImage(self, name: FilePath, data: NChanImg=None, copyToProj=False):
     name = Path(name).resolve()
@@ -200,7 +205,7 @@ class ProjectData:
     combinedAnns = oldAnns + [data]
     outAnn = pd.concat(combinedAnns, ignore_index=True)
     outAnn[REQD_TBL_FIELDS.INST_ID] = outAnn.index
-    outFmt = f".{self.exportOpts['annotation-format']}"
+    outFmt = f".{self.settings['annotation-format']}"
     outName = self.annotationsDir / image.with_suffix(outFmt).name
     ComponentIO.exportByFileType(outAnn, outName, verifyIntegrity=False, readOnly=False, imgDir=self.imagesDir)
     self.imgToAnnMapping[image] = outName
@@ -264,3 +269,23 @@ class ProjectData:
         msg += f':\n{", ".join([c.name for c in candidates])}'
       raise S3AIOError(msg)
     return candidates.pop()
+
+  def export(self, outDir:FilePath='./s3a-export', annotationFormat='csv', combineAnnotations=False, includeImages=True):
+    outDir = Path(outDir)
+
+    if includeImages:
+      shutil.copytree(self.imagesDir, outDir/'images')
+
+    existingAnnFiles = [f for f in self.imgToAnnMapping.values() if f is not None]
+    if combineAnnotations:
+      outAnn = pd.concat(map(ComponentIO.buildByFileType, existingAnnFiles))
+      ComponentIO.exportByFileType(outAnn, outDir/f'annotations.{annotationFormat}')
+    else:
+      outAnnsDir = outDir/'annotations'
+      if self.settings['annotation-format'] == annotationFormat:
+        shutil.copytree(self.annotationsDir, outAnnsDir)
+      else:
+        for annFile in existingAnnFiles:
+          ComponentIO.convert(annFile, outAnnsDir/f'{annFile.stem}.{annotationFormat}')
+
+

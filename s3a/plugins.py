@@ -1,14 +1,16 @@
 import typing
 from functools import partial
-from typing import Optional
+from pathlib import Path
+from typing import Optional, Dict
 
 import numpy as np
 import pandas as pd
 from pyqtgraph.Qt import QtWidgets, QtCore
+from pyqtgraph.parametertree import ParameterTree, Parameter
 
 from s3a import FR_SINGLETON, FR_CONSTS as FRC, REQD_TBL_FIELDS as RTF, ComplexXYVertices, \
   XYVertices, FRParam, ComponentIO as frio, FR_CONSTS, ComponentIO, ParamEditor
-from s3a.generalutils import pascalCaseToTitle
+from s3a.generalutils import pascalCaseToTitle, attemptFileLoad
 from s3a.graphicsutils import ThumbnailViewer, DropList
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import ParamEditorDockGrouping, ParamEditorPlugin, ProjectData
@@ -211,33 +213,70 @@ class ProjectsPlugin(ParamEditorPlugin):
     self.data.addAnnotation(data=self.s3a.compMgr.compDf, image=self.s3a.srcImgFname, overwriteOld=True)
 
   def create_gui(self):
-    images = []
-    annotations = []
-    editor = ParamEditor(saveDir=None)
-
-    dlg = QtWidgets.QDialog(self.s3a)
-    dlg.setModal(True)
-    layout = QtWidgets.QVBoxLayout()
-    dlg.setLayout(layout)
-
-
-
-    # Images / annotations first
-
-    def showImages():
-      pass
-
-    editor.setWindowFlag(QtCore.Qt.Window)
-    for btn in (editor.saveAsBtn, editor.applyBtn):
-      btn.hide()
-    editor.show()
-
+    wiz = NewProjectWizard(self)
+    wiz.exec_()
+    parsedLists = {}
+    for k, val in wiz.fileLists.items():
+      model = val.model()
+      lst = []
+      for ii in range(model.rowCount()):
+        lst.append(model.index(ii, 0).data())
+      parsedLists[k] = lst
+    # Since insertion order is preserved the extraction can be done without keys
+    images, annotations = parsedLists.values()
+    settings = wiz.projSettings
+    projName = settings['Name']
+    prevTemplate = settings['Template Project']
+    if prevTemplate is not None:
+      baseCfg = attemptFileLoad(prevTemplate)
+      if not settings['Keep Existing Images'] or 'images' not in baseCfg:
+        baseCfg['images'] = []
+      if not settings['Keep Existing Annotations' or 'annotations' not in baseCfg]:
+        baseCfg['annotations'] = []
+    else:
+      baseCfg = {'images': [], 'annotations': []}
+    baseCfg['images'].extend(images)
+    baseCfg['annotations'].extend(annotations)
+    projPath = Path(wiz.projSettings['Location'])/projName/f'{projName}.yml'
+    self.data.create(name=projPath, cfg=baseCfg)
 
 class NewProjectWizard(QtWidgets.QWizard):
 
   def __init__(self, project: ProjectsPlugin, parent=None) -> None:
     super().__init__(parent)
     self.project = project
+    self.fileLists : Dict[str, DropList] = {}
+
+
+    # -----
+    # PROJECT SETTINGS
+    # -----
+    page = QtWidgets.QWizardPage(self)
+    page.setTitle('Project Settings')
+    settings = [
+      dict(name='Name', type='str', value='new-project'),
+      dict(name='Location', type='filepicker', value='.', asFolder=True),
+      dict(name='Template Project', type='filepicker', value=None,
+           tip="Path to existing project config file. This will serve as a template for"
+               " the newly created project, except for overridden settings"),
+      dict(name='Keep Existing Images', type='bool', value=True,
+           tip="Whether to keep images specified in the existing config"),
+      dict(name='Keep Existing Annotations', type='bool', value=True,
+           tip="Whether to keep annotations specified in the existing config"),
+      # dict(name='Annotation Storage Format', value='pkl',
+      #      tip="Project's internal representation of annotation files. Pickle (pkl) is the"
+      #          " fastest for interaction, but is not as human readable. Alternatives (e.g. csv)"
+      #          " are more human readable, but much slower when switching from image to image")
+    ]
+    # Use ParamEditor for speedy tree building
+    editor = ParamEditor(saveDir=None, paramList=settings)
+    tree = editor.tree
+    self.projSettings = editor.params
+    layout = QtWidgets.QVBoxLayout()
+    page.setLayout(layout)
+    layout.addWidget(tree)
+    self.addPage(page)
+
 
     def getFileList(_flist: DropList, _title: str, _selectFolder=False):
       dlg = QtWidgets.QFileDialog()
@@ -248,6 +287,10 @@ class NewProjectWizard(QtWidgets.QWizard):
       files = getFn(self, _title, str(self.project.data.location))
       _flist.addItems(files)
 
+
+    # -----
+    # SELECTING PROJECT FILES
+    # -----
     for fType in ['Images', 'Annotations']:
       page = QtWidgets.QWizardPage(self)
       page.setTitle(fType)
@@ -256,6 +299,7 @@ class NewProjectWizard(QtWidgets.QWizard):
       curLayout.addWidget(QtWidgets.QLabel(f'Project {fType.lower()} are shown below. Use the buttons'
                                       ' or drag and drop to add files.'))
       flist = DropList(self)
+      self.fileLists[fType] = flist
       fileBtnLayout = QtWidgets.QHBoxLayout()
       curLayout.addWidget(flist)
       for title in f'Add Files', f'Add Folder':

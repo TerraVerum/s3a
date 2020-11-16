@@ -12,15 +12,16 @@ from s3a.structures import ComplexXYVertices
 from testingconsts import RND, IMG_DIR
 
 class CompDfTester:
-  def __init__(self, numComps):
+  def __init__(self, numComps, fillInfo=True):
     self.compDf = FR_SINGLETON.tableData.makeCompDf(numComps)
     self.compDf.set_index(np.arange(numComps, dtype=int), inplace=True)
     self.numComps = numComps
-    self.fillRandomClasses()
-    self.fillRandomVerts()
+    if fillInfo:
+      self.fillRandomClasses()
+      self.fillRandomVerts()
 
 
-  def fillRandomVerts(self, imShape=(2000, 2000), compDf: df=None):
+  def fillRandomVerts(self, imShape=(2000, 2000), compDf: df=None, vertType='circle'):
     if compDf is None:
       compDf = self.compDf
     mask = np.zeros(imShape[:2], 'uint8')
@@ -30,7 +31,11 @@ class CompDfTester:
       radius = RND.integers(5, max(imShape) // 5)
       o_x = RND.integers(0, imShape[1])
       o_y = RND.integers(0, imShape[0])
-      verts = ComplexXYVertices.fromBwMask(cv.circle(mask, (o_x, o_y), radius, 1, -1))
+      if vertType == 'circle':
+        cv.circle(mask, (o_x, o_y), radius, 1, -1)
+      elif vertType == 'rectangle':
+        cv.rectangle(mask, (o_x, o_y), (o_x+radius, o_y+radius), 1, -1)
+      verts = ComplexXYVertices.fromBwMask(mask)
       compDf.at[ii, REQD_TBL_FIELDS.VERTICES] = verts
       retVal.append(verts)
       mask.fill(0)

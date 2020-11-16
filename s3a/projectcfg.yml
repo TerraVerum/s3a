@@ -1,10 +1,5 @@
 images: []
 annotations: []
 
-import-opts:
-  copy-all: true
-
-export-opts:
-  annotation-format: "csv"
-  include-images: false
-  combine-annotations: false
+settings:
+  annotation-format: "pkl"

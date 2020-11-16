@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from typing import Optional, Union, Callable, Dict, Any
+from typing import Optional, Union, Callable, Dict, Any, Type
 from warnings import warn
 
 import numpy as np
@@ -15,9 +15,9 @@ from s3a.controls.tableviewproxy import CompDisplayFilter, CompSortFilter
 from s3a.generalutils import resolveAuthorName, imgCornerVertices
 from s3a.graphicsutils import addDirItemsToMenu, saveToFile
 from s3a.models.tablemodel import ComponentMgr
+from s3a.parameditors import FR_SINGLETON
 from s3a.parameditors import ParamEditor
 from s3a.parameditors import ParamEditorPlugin
-from s3a.parameditors import FR_SINGLETON
 from s3a.parameditors.appstate import AppStateEditor
 from s3a.structures import FilePath, NChanImg, S3AIOError, \
   AlgProcessorError, S3AWarning
@@ -70,6 +70,13 @@ class S3ABase(QtWidgets.QMainWindow):
     # INTERFACE WITH QUICK LOADER
     # -----
     self.appStateEditor = AppStateEditor(self, name='App State Editor')
+
+    # -----
+    # DEFAULT PLUGINS
+    # -----
+    from s3a.plugins import VerticesPlugin, ProjectsPlugin
+    self.addPlugin(VerticesPlugin)
+    self.addPlugin(ProjectsPlugin)
 
     for plugin in FR_SINGLETON.plugins: # type: ParamEditorPlugin
       plugin.attachS3aRef(self)
@@ -208,8 +215,7 @@ class S3ABase(QtWidgets.QMainWindow):
       newComp = FR_SINGLETON.tableData.makeCompDf(1)
       newComp.at[REQD_TBL_FIELDS.INST_ID.value, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices([verts])
       self.add_focusComps(newComp)
-      for plugin in FR_SINGLETON.tableFieldPlugins:
-        plugin.handleShapeFinished(verts)
+      self.focusedImg.handleShapeFinished(verts)
 
       self.acceptFocusedRegion()
     finally:
@@ -240,6 +246,11 @@ class S3ABase(QtWidgets.QMainWindow):
   def clearBoundaries(self):
     """Removes all components from the component table"""
     self.compMgr.rmComps()
+
+  def addPlugin(self, pluginCls: Type[ParamEditorPlugin], *args, **kwargs):
+    """See FR_SINGLETON.addPlugin"""
+    plugin = FR_SINGLETON.addPlugin(pluginCls, *args, **kwargs)
+    plugin.attachS3aRef(self)
 
   @FR_SINGLETON.actionStack.undoable('Change Main Image')
   def setMainImg(self, fileName: FilePath=None, imgData: NChanImg=None,
@@ -274,11 +285,9 @@ class S3ABase(QtWidgets.QMainWindow):
       self.compMgr.rmComps()
     self.focusedImg.updateAll()
     self.mainImg.plotItem.vb.autoRange()
-    imgAnns = FR_SINGLETON.data.imgToAnnMapping.get(fileName, None)
+    imgAnns = FR_SINGLETON.project.imgToAnnMapping.get(fileName, None)
     if imgAnns is not None:
       self.add_focusComps(self.compIo.buildByFileType(imgAnns))
-    if self.estBoundsOnStart:
-      self.estimateBoundaries()
     yield
     self.setMainImg(oldFile, oldData, clearExistingComps)
     if clearExistingComps:
