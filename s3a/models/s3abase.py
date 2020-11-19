@@ -31,6 +31,15 @@ class S3ABase(QtWidgets.QMainWindow):
   """
   Top-level widget for producing component bounding regions from an input image.
   """
+
+  sigImageChanged = QtCore.Signal()
+  """
+  Like `sigImageChanged` from main image's `imgItem`, but only fires when a new image is
+  loaded. For instance, if a new image is loaded but uses the same filename (for instance,
+  when a preprocessing step is applied to the image), `sigImageChanged` will _not_ be
+  emitted even though `imgItem.sigImageChanged` is emitted.  
+  """
+
   @classmethod
   def __initEditorParams__(cls):
     cls.estBoundsOnStart, cls.undoBuffSz = FR_SINGLETON.generalProps.registerProps(cls,
@@ -119,7 +128,7 @@ class S3ABase(QtWidgets.QMainWindow):
     # -----
     # MAIN IMAGE
     # -----
-    self.mainImg.imgItem.sigImageChanged.connect(lambda: self.clearBoundaries())
+    self.sigImageChanged = self.mainImg.imgItem.sigImageChanged
     self.mainImg.sigCompsCreated.connect(self.add_focusComps)
 
     def handleCompsChanged(changedDict: dict):
@@ -287,7 +296,7 @@ class S3ABase(QtWidgets.QMainWindow):
     self.mainImg.plotItem.vb.autoRange()
     imgAnns = FR_SINGLETON.project.imgToAnnMapping.get(fileName, None)
     if imgAnns is not None:
-      self.add_focusComps(self.compIo.buildByFileType(imgAnns))
+      self.compMgr.addComps(self.compIo.buildByFileType(imgAnns))
     yield
     self.setMainImg(oldFile, oldData, clearExistingComps)
     if clearExistingComps:
