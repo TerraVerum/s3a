@@ -150,9 +150,11 @@ class CompDisplayFilter(QtCore.QObject):
     changes = self._compMgr.splitCompVertsById(np.unique(selection[:,0]))
     self.selectRowsById(changes['added'], QISM.ClearAndSelect)
 
-  def mergeSelectedComps(self, keepId: int=None):
+  def mergeSelectedComps(self, keepId=-1):
     """
     Merges the selected components into one, keeping all properties of the first in the selection
+    :param keepId: If specified and >0, this is the ID whose peripheral data will be retained
+      during the merge. Otherwise, the first selected component is used as the keep ID.
     """
     selection = self._compTbl.ids_rows_colsFromSelection(excludeNoEditCols=False,
                                                          warnNoneSelection=False)
@@ -160,7 +162,7 @@ class CompDisplayFilter(QtCore.QObject):
     if len(selection) < 2:
       # Nothing to do
       return
-    if keepId is None:
+    if keepId < 0:
       keepId = selection[0,0]
     try:
       self._compMgr.mergeCompVertsById(np.unique(selection[:,0]), keepId)
