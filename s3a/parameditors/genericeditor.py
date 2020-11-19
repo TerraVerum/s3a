@@ -8,7 +8,7 @@ from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter, ParameterItem
 
 from s3a import models
-from s3a.constants import MENU_OPTS_DIR
+from s3a.constants import MENU_OPTS_DIR, FR_CONSTS as FRC
 from s3a.generalutils import pascalCaseToTitle
 from s3a.graphicsutils import dialogGetSaveFileName
 from s3a.models.editorbase import ParamEditorBase
@@ -236,8 +236,14 @@ class TableFieldPlugin(ParamEditorPlugin):
 
   def attachS3aRef(self, s3a: models.s3abase.S3ABase):
     super().attachS3aRef(s3a)
-    self.focusedImg = s3a.focusedImg
+    self.focusedImg = focusedImg = s3a.focusedImg
+    s3a.sigRegionAccepted.connect(self.acceptChanges)
+    focusedImg.sigUpdatedAll.connect(self.updateAll)
 
+    def maybeHandleShapeFinished(roiVerts):
+      if self.active:
+        self.handleShapeFinished(roiVerts)
+    focusedImg.sigShapeFinished.connect(maybeHandleShapeFinished)
 
   def updateAll(self, mainImg: Optional[NChanImg], newComp: Optional[pd.Series] = None):
     """

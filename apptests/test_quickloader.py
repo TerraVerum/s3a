@@ -1,5 +1,6 @@
 import pytest
 
+from conftest import assertExInList
 from s3a.structures import S3AWarning, S3AException
 from s3a.parameditors import *
 
@@ -28,12 +29,7 @@ def test_invalid_load(qtbot):
     ql.applyChanges()
   with qtbot.capture_exceptions() as exceptions:
     invalidLoadCaller()
-    foundException = False
-    for ex in exceptions:
-      if issubclass(ex[0], S3AException):
-        foundException = True
-        break
-    assert foundException
+    assertExInList(exceptions)
   assert len(ql.params.child(editor.name).children()) == 0
   ql.params.clearChildren()
 

@@ -33,6 +33,7 @@ class S3ABase(QtWidgets.QMainWindow):
   """
 
   sigImageChanged = QtCore.Signal()
+  sigRegionAccepted = QtCore.Signal()
   """
   Like `sigImageChanged` from main image's `imgItem`, but only fires when a new image is
   loaded. For instance, if a new image is loaded but uses the same filename (for instance,
@@ -128,7 +129,6 @@ class S3ABase(QtWidgets.QMainWindow):
     # -----
     # MAIN IMAGE
     # -----
-    self.sigImageChanged = self.mainImg.imgItem.sigImageChanged
     self.mainImg.sigCompsCreated.connect(self.add_focusComps)
 
     def handleCompsChanged(changedDict: dict):
@@ -241,8 +241,7 @@ class S3ABase(QtWidgets.QMainWindow):
       return
     oldSer = mgr.compDf.loc[focusedId].copy()
 
-    for plugin in FR_SINGLETON.tableFieldPlugins:
-      plugin.acceptChanges()
+    self.sigRegionAccepted.emit()
 
     modifiedComp = self.focusedImg.compSer[[REQD_TBL_FIELDS.INST_ID, REQD_TBL_FIELDS.VERTICES]]
     modified_df = modifiedComp.to_frame().T
@@ -294,9 +293,6 @@ class S3ABase(QtWidgets.QMainWindow):
       self.compMgr.rmComps()
     self.focusedImg.updateAll()
     self.mainImg.plotItem.vb.autoRange()
-    imgAnns = FR_SINGLETON.project.imgToAnnMapping.get(fileName, None)
-    if imgAnns is not None:
-      self.compMgr.addComps(self.compIo.buildByFileType(imgAnns))
     yield
     self.setMainImg(oldFile, oldData, clearExistingComps)
     if clearExistingComps:

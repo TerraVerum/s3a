@@ -1,3 +1,5 @@
+from typing import Type
+
 import pytest
 import os
 
@@ -60,3 +62,6 @@ def resetApp_tester(request):
   yield
   stack.clear()
   app.clearBoundaries()
+
+def assertExInList(exList, typ: Type[Exception]=S3AException):
+  assert any(issubclass(ex[0], typ) for ex in exList)

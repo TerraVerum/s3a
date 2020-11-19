@@ -9,14 +9,14 @@ from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import ParameterTree, Parameter
 
 from s3a import FR_SINGLETON, FR_CONSTS as FRC, REQD_TBL_FIELDS as RTF, ComplexXYVertices, \
-  XYVertices, FRParam, ComponentIO as frio, FR_CONSTS, ComponentIO, ParamEditor
+  XYVertices, FRParam, ComponentIO as frio, FR_CONSTS, ComponentIO, ParamEditor, models
 from s3a.generalutils import pascalCaseToTitle, attemptFileLoad
 from s3a.graphicsutils import ThumbnailViewer, DropList
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import ParamEditorDockGrouping, ParamEditorPlugin, ProjectData
 from s3a.parameditors.genericeditor import TableFieldPlugin
 from s3a.processing.algorithms import _historyMaskHolder
-from s3a.structures import NChanImg, GrayImg
+from s3a.structures import NChanImg, GrayImg, FilePath
 from s3a.views.regions import MultiRegionPlot, makeMultiRegionDf
 
 
@@ -198,6 +198,18 @@ class ProjectsPlugin(ParamEditorPlugin):
     self.toolsEditor.registerFunc(self.create_gui, name='Create')
     self._projImgThumbnails = ThumbnailViewer()
 
+  def attachS3aRef(self, s3a: models.s3abase.S3ABase):
+    super().attachS3aRef(s3a)
+    s3a.sigImageChanged.connect(lambda: self.loadNewAnns())
+
+  def loadNewAnns(self, imgFname: FilePath=None):
+    if imgFname is None:
+      imgFname = self.s3a.srcImgFname
+    if imgFname is None:
+      return
+    imgAnns = self.data.imgToAnnMapping.get(imgFname, None)
+    if imgAnns is not None:
+      self.s3a.compMgr.addComps(self.compIo.buildByFileType(imgAnns))
 
   def openProject(self, name: str):
     self.data.loadCfg(name)

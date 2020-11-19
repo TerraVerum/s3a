@@ -324,6 +324,10 @@ class MainImage(EditableImgBase):
 @FR_SINGLETON.registerGroup(FRC.CLS_FOCUSED_IMG_AREA)
 class FocusedImage(EditableImgBase):
   sigPluginChanged = Signal()
+  sigUpdatedAll = Signal(object, object)
+  """Main image, new component. Emitted during `updateAll()`"""
+  sigShapeFinished = Signal(object)
+  """XYVerts from roi, re-thrown from self.shapeCollection so plugins can tie into it"""
 
   def __init__(self, parent=None, **kargs):
     allowableShapes = (
@@ -345,9 +349,7 @@ class FocusedImage(EditableImgBase):
   def handleShapeFinished(self, roiVerts: XYVertices) -> Optional[np.ndarray]:
     if self.drawAction == FRC.DRAW_ACT_PAN:
       return
-    for plugin in FR_SINGLETON.tableFieldPlugins:
-      if plugin.active:
-        plugin.handleShapeFinished(roiVerts)
+    self.sigShapeFinished.emit(roiVerts)
 
   @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
   def updateAll(self, mainImg: NChanImg=None, newComp:Optional[pd.Series]=None,
@@ -394,8 +396,7 @@ class FocusedImage(EditableImgBase):
       else:
         self.imgItem.setImage(newCompImg)
         QtCore.QTimer.singleShot(0, self.autoRange)
-    for plugin in FR_SINGLETON.tableFieldPlugins:
-      plugin.updateAll(mainImg, newComp)
+    self.sigUpdatedAll.emit(mainImg, newComp)
     yield
     self.updateAll(oldImg, oldComp, True)
 

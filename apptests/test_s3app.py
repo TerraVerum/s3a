@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from pyqtgraph.Qt import QtCore, QtGui
 
-from conftest import NUM_COMPS, app, mgr, dfTester, vertsPlugin
+from conftest import NUM_COMPS, app, mgr, dfTester, vertsPlugin, assertExInList
 from s3a import FR_SINGLETON, appInst, S3A, FR_CONSTS, FRParam
 from s3a.models.s3abase import S3ABase
 from s3a.generalutils import resolveAuthorName, imgCornerVertices
@@ -31,12 +31,13 @@ def test_change_img_none():
   assert app.mainImg.image is None
   assert app.srcImgFname is None
 
-def test_est_bounds_no_img():
+def test_est_bounds_no_img(qtbot):
   oldName = app.srcImgFname
   oldData = app.mainImg.image
   app.setMainImg()
-  with pytest.raises(AlgProcessorError):
+  with qtbot.captureExceptions() as exs:
     app.estimateBoundaries()
+    assertExInList(exs, AlgProcessorError)
   app.setMainImg(oldName, oldData)
 
 
