@@ -297,7 +297,7 @@ class GeneralProcess(ProcessStage):
 
   def stageSummary_gui(self):
     if self.result is None:
-      raise AlgProcessorError('Analytics can only be shown after the algorithmwas run.')
+      raise AlgProcessorError('Analytics can only be shown after the algorithm was run.')
     outGrid = self._stageSummaryWidget()
     outGrid.showMaximized()
     def fixedShow():

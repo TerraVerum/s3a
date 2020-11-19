@@ -125,7 +125,7 @@ class _FRConsts(FRParamGroup):
              ' fixed pixel amount.')
   PROP_ONLY_GROW_MAIN_VB       : FRParam = newParam(
     'Disallow shrink during selection', True,
-    helpText='When selecting components, this parameter determines whetherthe viewbox'
+    helpText='When selecting components, this parameter determines whether the viewbox'
              ' shrinks only to the current selection (if *False*)or just ensures the'
              ' view contains the selected component (if *True*)')
   PROP_FOCUSED_SEED_THRESH     : FRParam = newParam('Seedpoint Threshold in Focused Image', 7.)
