@@ -1,6 +1,7 @@
 import shutil
 from pathlib import Path
 from typing import List, Optional, Set, Dict
+from warnings import warn
 
 import numpy as np
 import pandas as pd
@@ -11,11 +12,13 @@ from s3a.generalutils import resolveYamlDict
 from s3a.graphicsutils import saveToFile, popupFilePicker
 from s3a.io import ComponentIO
 from s3a.parameditors.table import TableData
-from s3a.structures import FilePath, NChanImg, S3AIOError
+from s3a.structures import FilePath, NChanImg, S3AIOError, S3AWarning
 
 
 def hierarchicalUpdate(curDict: dict, other: dict):
   """Dictionary update that allows nested keys to be updated without deleting the non-updated keys"""
+  if other is None:
+    return
   for k, v in other.items():
     curVal = curDict.get(k, None)
     if isinstance(curVal, dict):
@@ -27,12 +30,12 @@ class ProjectData:
   def __init__(self):
     self.tableData = TableData()
     self.cfg = {}
-    self.cfgFname: Optional[Path] = Path()
+    cfgFname = Path()
+    self.cfgFname: Optional[Path] = cfgFname
     self.images: List[Path] = []
     self.baseImgDirs: Set[Path] = set()
     self.imgToAnnMapping: Dict[Path, Path] = {}
     """Records annotations belonging to each image"""
-    self.settings = {}
 
     self.compIo = ComponentIO()
     self.compIo.tableData = self.tableData
@@ -46,13 +49,20 @@ class ProjectData:
   @property
   def annotationsDir(self):
       return self.location/'annotations'
+  @property
+  def settings(self):
+    return self.cfg['settings']
+
+  def clearImgs_anns(self):
+    for lst in self.images, self.imgToAnnMapping, self.baseImgDirs:
+      lst.clear()
 
   def loadCfg(self, cfgFname: FilePath=None, cfgDict: dict = None):
+    self.clearImgs_anns()
     _, defaultCfg = resolveYamlDict(BASE_DIR/'projectcfg.yml')
     cfgFname, cfgDict = resolveYamlDict(cfgFname, cfgDict)
     hierarchicalUpdate(defaultCfg, cfgDict)
     cfg = self.cfg = defaultCfg
-    self.settings = cfg['settings']
     self.cfgFname = cfgFname
     tableInfo = cfg.get('table-cfg', {})
     if isinstance(tableInfo, str):
@@ -61,28 +71,12 @@ class ProjectData:
     else:
       tableDict = tableInfo
       tableName = cfgFname
+    tableName = Path(tableName)
+    if not tableName.is_absolute():
+      tableName = self.location/tableName
     self.tableData.loadCfg(tableName, tableDict)
 
-  def create(self, *, name: FilePath= './projectcfg.yml', cfg: dict=None):
-    """
-    Creates a new project with the specified settings in the specified directory.
-    :param name:
-      helpText: Project Name. The parent directory of this name indicates the directory in which to create the project
-      pType: filepicker
-    :param cfg: see `ProjectData.loadCfg` for information
-    """
-    name = Path(name)
-    location = name.parent
-    location = Path(location)
-    location.mkdir(exist_ok=True, parents=True)
-
-    if not name.exists() and cfg is None:
-      cfg = {}
-    self.loadCfg(name, cfg)
-
-    self.annotationsDir.mkdir(exist_ok=True)
-    self.imagesDir.mkdir(exist_ok=True)
-
+    self.addImageFolder(self.imagesDir)
     for image in self.cfg['images']:
       if isinstance(image, dict):
         image.setdefault('copyToProj', False)
@@ -94,12 +88,44 @@ class ProjectData:
         annotation = {'name': annotation}
       self.addAnnotation(**annotation)
 
-    newName = self.tableData.cfgFname.name
-    saveToFile(self.tableData.cfg, location/newName, True)
-    self.tableData.cfgFname = newName
-    self.cfg['table-cfg'] = newName
+  @classmethod
+  def create(cls, *, name: FilePath= './projectcfg.yml', cfg: dict=None):
+    """
+    Creates a new project with the specified settings in the specified directory.
+    :param name:
+      helpText: Project Name. The parent directory of this name indicates the directory in which to create the project
+      pType: filepicker
+    :param cfg: see `ProjectData.loadCfg` for information
+    """
+    name = Path(name)
+    location = name.parent
+    location = Path(location)
+    location.mkdir(exist_ok=True, parents=True)
+    proj = cls()
+    proj.cfgFname = name
+    proj.annotationsDir.mkdir(exist_ok=True)
+    proj.imagesDir.mkdir(exist_ok=True)
 
-    self.saveCfg()
+    if not name.exists() and cfg is None:
+      cfg = {}
+    proj.loadCfg(name, cfg)
+
+    tdName = proj.tableData.cfgFname
+    if tdName.resolve() != proj.cfgFname:
+      tdName = tdName.name
+      saveToFile(proj.tableData.cfg, location / tdName, True)
+      proj.tableData.cfgFname = tdName
+    else:
+      tdName = tdName.name
+    proj.cfg['table-cfg'] = tdName
+
+    proj.saveCfg()
+    return proj
+
+  @classmethod
+  def open(cls, name: FilePath):
+    proj = cls()
+    proj.loadCfg(name)
 
   def saveCfg(self):
     strImgNames = []
@@ -113,7 +139,7 @@ class ProjectData:
       if img.parent in self.baseImgDirs:
           # This image is already accounted for in the base directories
           continue
-      strImgNames.append(str(img))
+      strImgNames.append(str(img.resolve()))
     for ann in self.imgToAnnMapping.values():
       if location in ann.parents:
         outName = str(ann.relative_to(location))
@@ -127,6 +153,11 @@ class ProjectData:
   def addImageByPath(self, name: FilePath, copyToProj=False):
     """Determines whether to add as a folder or file based on filepath type"""
     image = Path(name)
+    if not image.is_absolute():
+      image = self.location/image
+    if not image.exists():
+      warn(f'Provided image path does not exist: {image}\nNo action performed.', S3AWarning)
+      return
     if image.is_dir():
       self.addImageFolder(image, copyToProj)
     else:
@@ -148,7 +179,9 @@ class ProjectData:
       self.images[oldIdx] = newName
 
   def addImageFolder(self, folder: FilePath, copyToProj=False):
-    folder = Path(folder)
+    folder = Path(folder).resolve()
+    if folder in self.baseImgDirs:
+      return
     if copyToProj:
       newFolder = self.imagesDir/folder.name
       shutil.copytree(folder, newFolder)

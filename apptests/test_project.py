@@ -7,11 +7,10 @@ from s3a.parameditors.project import ProjectData
 
 
 def test_create_project(tmpdir):
-  proj = ProjectData()
   tmpdir = Path(tmpdir)
   projName = 'tmpproj.yml'
   dummyAnnFile  = SAMPLE_SMALL_IMG_FNAME.with_suffix('.pkl')
-  proj.create(name=tmpdir / projName, cfg={'images': [SAMPLE_SMALL_IMG_FNAME], 'export-opts': {'annotation-format': 'pkl'}})
+  proj = ProjectData.create(name=tmpdir / projName, cfg={'images': [SAMPLE_SMALL_IMG_FNAME], 'export-opts': {'annotation-format': 'pkl'}})
   proj.addAnnotation(dummyAnnFile, dfTester.compDf, image=SAMPLE_SMALL_IMG_FNAME.name)
 
   assert tmpdir.exists()

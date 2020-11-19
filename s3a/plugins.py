@@ -250,7 +250,7 @@ class ProjectsPlugin(ParamEditorPlugin):
     baseCfg['images'].extend(images)
     baseCfg['annotations'].extend(annotations)
     projPath = Path(wiz.projSettings['Location'])/projName/f'{projName}.yml'
-    self.data.create(name=projPath, cfg=baseCfg)
+    self.data = ProjectData.create(name=projPath, cfg=baseCfg)
 
 class NewProjectWizard(QtWidgets.QWizard):
 
