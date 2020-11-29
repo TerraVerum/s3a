@@ -11,6 +11,7 @@ from s3a import FR_SINGLETON
 from s3a.generalutils import cornersToFullBoundary
 from s3a.models.tablemodel import ComponentMgr
 from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS, FR_ENUMS
+from s3a.processing import AtomicProcess
 from s3a.structures import XYVertices, FRParam, ParamEditorError, S3AWarning, \
   ComplexXYVertices
 from s3a.structures.typeoverloads import OneDArr
@@ -89,7 +90,9 @@ class CompDisplayFilter(QtCore.QObject):
     self.regionCopier.sigCopyStarted.connect(lambda *args: self.activateRegionCopier())
     self.regionCopier.sigCopyStopped.connect(lambda *args: self.finishRegionCopier())
 
-    mainImg.registerToolFunc(self.mergeSelectedComps, btnOpts=FR_CONSTS.TOOL_MERGE_COMPS)
+    # Wrap in process to ignore the default param
+    toRegister = AtomicProcess(self.mergeSelectedComps, ignoreKeys=['keepId'])
+    mainImg.registerToolFunc(toRegister, btnOpts=FR_CONSTS.TOOL_MERGE_COMPS)
     mainImg.registerToolFunc(self.splitSelectedComps, btnOpts=FR_CONSTS.TOOL_SPLIT_COMPS)
     mainImg.setMenuFromEditors([mainImg.toolsEditor])
 
