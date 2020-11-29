@@ -292,7 +292,7 @@ class S3A(S3ABase):
 
     self.setMenuBar(self.menubar)
 
-    pluginDocks = {p.docks: p for p in FR_SINGLETON.plugins}
+    pluginDocks = [p.docks for p in FR_SINGLETON.plugins]
     # SETTINGS
     for docks in FR_SINGLETON.docks:
       if docks not in pluginDocks:
@@ -309,9 +309,10 @@ class S3A(S3ABase):
         self.focusedImg.changeCurrentPlugin(_plugin)
       return inner
 
-    for docks, plugin in pluginDocks.items():
+    for docks, plugin in zip(pluginDocks, FR_SINGLETON.plugins):
       if docks is None:
-        docks = ParamEditorDockGrouping([plugin.toolsEditor], plugin.name)
+        continue
+      docks = ParamEditorDockGrouping(docks, plugin.name)
       menu = self.createMenuOptForDock(docks, parentToolbar=pluginToolbar)
       if plugin in FR_SINGLETON.tableFieldPlugins:
         allActs = menu.actions()
@@ -523,6 +524,7 @@ class S3A(S3ABase):
       overrideName = editor.name
     if loadFunc is None:
       loadFunc = partial(defaultLoadFunc, editor)
+
     newMenu = QtWidgets.QMenu(overrideName, self)
     editAct = QtWidgets.QAction('Open ' + overrideName, self)
     newMenu.addAction(editAct)

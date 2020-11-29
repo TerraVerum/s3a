@@ -27,7 +27,7 @@ def hierarchicalUpdate(curDict: dict, other: dict):
       curDict[k] = v
 
 class ProjectData:
-  def __init__(self):
+  def __init__(self, cfgFname: FilePath=None, cfgDict: dict=None):
     self.tableData = TableData()
     self.cfg = {}
     cfgFname = Path()
@@ -89,7 +89,7 @@ class ProjectData:
       self.addAnnotation(**annotation)
 
   @classmethod
-  def create(cls, *, name: FilePath= './projectcfg.yml', cfg: dict=None):
+  def create(cls, *, name: FilePath= './projectcfg', cfg: dict=None):
     """
     Creates a new project with the specified settings in the specified directory.
     :param name:
@@ -98,6 +98,7 @@ class ProjectData:
     :param cfg: see `ProjectData.loadCfg` for information
     """
     name = Path(name)
+    name = name/f'{name.name}.s3aprj'
     location = name.parent
     location = Path(location)
     location.mkdir(exist_ok=True, parents=True)

@@ -125,7 +125,7 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     and reconstructing the name, tooltip, etc.
     """
 
-    self.registeredProcs: Set[AtomicProcess] = set()
+    self.registeredProcs: Dict[str, AtomicProcess] = {}
     """
     Keeps track of registered functions which have been converted to processes so their
     arguments can be exposed to the user
@@ -484,9 +484,11 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     """
     if not isinstance(func, AtomicProcess):
       proc = AtomicProcess(func, name)
+      fnName = func.__name__
     else:
       proc = func
-    self.registeredProcs.add(proc)
+      fnName = func.func.__name__
+    self.registeredProcs[fnName] = proc
     # Define caller out here that takes no params so qt signal binding doesn't
     # screw up auto parameter population
     def runProc():

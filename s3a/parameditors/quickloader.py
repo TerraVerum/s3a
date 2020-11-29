@@ -77,6 +77,7 @@ class EditorListModel(QtCore.QAbstractListModel):
 
   @staticmethod
   def getParamStateFiles(stateDir: Path, fileExt: str) -> List[str]:
+    if stateDir is None: return []
     files = stateDir.glob(f'*.{fileExt}')
     return [file.stem for file in files]
 

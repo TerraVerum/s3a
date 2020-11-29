@@ -28,9 +28,7 @@ class VerticesPlugin(TableFieldPlugin):
     super().__initEditorParams__()
     cls.procCollection = FR_SINGLETON.imgProcClctn.createProcessorForClass(cls)
 
-    dockGroup = ParamEditorDockGrouping([cls.toolsEditor, cls.procCollection],
-                                        pascalCaseToTitle(cls.name))
-    cls.docks = dockGroup
+    cls.docks = [cls.toolsEditor, cls.procCollection]
 
   def __init__(self):
     self.region = MultiRegionPlot()
@@ -196,6 +194,7 @@ class ProjectsPlugin(ParamEditorPlugin):
     self.compIo: ComponentIO = ioCls()
 
     self.toolsEditor.registerFunc(self.create_gui, name='Create')
+    self.docks = [self.toolsEditor]
     self._projImgThumbnails = ThumbnailViewer()
 
   def attachS3aRef(self, s3a: models.s3abase.S3ABase):

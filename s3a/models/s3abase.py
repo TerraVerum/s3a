@@ -182,6 +182,8 @@ class S3ABase(QtWidgets.QMainWindow):
   @staticmethod
   def populateParamEditorMenuOpts(objForMenu: ParamEditor, winMenu: QtWidgets.QMenu,
                                   triggerFn: Callable):
+    if objForMenu.saveDir is None:
+      return
     addDirItemsToMenu(winMenu,
                       objForMenu.saveDir.glob(f'*.{objForMenu.fileType}'),
                       triggerFn)

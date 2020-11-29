@@ -83,6 +83,14 @@ class ParamEditor(ParamEditorBase):
     if registerCls is not None:
       self.registerGroup(registerParam)(registerCls)
 
+  def __repr__(self):
+    selfCls = type(self)
+    oldName: str = super().__repr__()
+    # Remove module name for brevity
+    oldName = oldName.replace(f'{selfCls.__module__}.{selfCls.__name__}',
+                              f'{selfCls.__name__} \'{self.name}\'')
+    return oldName
+
   def show(self):
     self.tree.resizeColumnToContents(0)
     # Necessary on MacOS
@@ -113,11 +121,10 @@ class ParamEditor(ParamEditorBase):
   def buildClsToolsEditor(cls: type, name=None):
     groupName = pascalCaseToTitle(cls.__name__)
     lowerGroupName = groupName.lower()
-    toolsDir = MENU_OPTS_DIR / lowerGroupName
     if name is None:
       name = groupName + ' Tools'
     toolsEditor = ParamEditor(
-      saveDir=toolsDir, fileType=lowerGroupName.replace(' ', '') + 'tools',
+      saveDir=None, fileType=lowerGroupName.replace(' ', '') + 'tools',
       name=name, registerCls=cls, useNewInit=False
     )
     for btn in (toolsEditor.saveAsBtn, toolsEditor.applyBtn, toolsEditor.expandAllBtn,
@@ -187,7 +194,7 @@ class ParamEditorPlugin(ABC):
   s3a: models.s3abase.S3ABase=None
   """Reference to the current S3A window"""
 
-  docks: Union[ParamEditorDockGrouping, ParamEditor] = None
+  docks: List[ParamEditor] = None
   """
   Docks that should be shown in S3A's menu bar. By default, just the toolsEditor is shown.
   If multiple param editors must be visible, manually set this property to a
