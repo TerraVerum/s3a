@@ -7,6 +7,7 @@ from pyqtgraph.parametertree import parameterTypes, Parameter
 from pyqtgraph.parametertree.Parameter import PARAM_TYPES
 from pyqtgraph.parametertree.parameterTypes import ActionParameterItem, ActionParameter, \
   TextParameterItem, TextParameter
+import numpy as np
 from s3a.graphicsutils import PopupLineEditor
 
 from s3a.structures import S3AException, FRParam
@@ -290,6 +291,80 @@ class FilePickerParameterItem(parameterTypes.WidgetParameterItem):
 class FilePickerParameter(Parameter):
   itemClass = FilePickerParameterItem
 
+class SliderParameterItem(parameterTypes.WidgetParameterItem):
+
+  def makeWidget(self):
+    param = self.param
+    opts = param.opts
+
+
+    self.slider = QtWidgets.QSlider()
+    self.slider.setOrientation(QtCore.Qt.Horizontal)
+    lbl = QtWidgets.QLabel()
+    lbl.setAlignment(QtCore.Qt.AlignLeft)
+
+    w = QtWidgets.QWidget()
+    layout = QtWidgets.QHBoxLayout()
+    w.setLayout(layout)
+    layout.addWidget(lbl)
+    layout.addWidget(self.slider)
+
+    def setValue(v):
+      self.slider.setValue(self.spanToSliderValue(v))
+    def getValue():
+      return self.span[self.slider.value()]
+
+    def vChanged(v):
+      lbl.setText(self.prettyTextValue(v))
+    self.slider.valueChanged.connect(vChanged)
+
+    w.setValue = setValue
+    w.value = getValue
+    w.sigChanged = self.slider.valueChanged
+    self.optsChanged(param, opts)
+    return w
+
+  # def updateDisplayLabel(self, value=None):
+  #   self.displayLabel.setText(self.prettyTextValue(value))
+
+  def spanToSliderValue(self, v):
+    return int(np.argmin(np.abs(self.span-v)))
+
+  def prettyTextValue(self, v):
+    format_ = self.param.opts.get('format', None)
+    cspan = self.charSpan
+    if format_ is None:
+      format_ = f'{{0:>{cspan.dtype.itemsize}}}'
+    return format_.format(cspan[v].decode())
+
+  def optsChanged(self, param, opts):
+    try:
+      super().optsChanged(param, opts)
+    except AttributeError as ex:
+      pass
+    span = opts.get('span', None)
+    if span is None:
+      step = opts.get('step', 1)
+      start, stop = opts['limits']
+      # Add a bit to 'stop' since python slicing excludes the last value
+      span = np.arange(start, stop+step, step)
+    precision = opts.get('precision', 2)
+    if precision is not None:
+      span = span.round(precision)
+    self.span = span
+    self.charSpan = np.char.array(span)
+    w = self.slider
+    w.setMinimum(0)
+    w.setMaximum(len(span)-1)
+
+  def limitsChanged(self, param, limits):
+    self.optsChanged(param, dict(limits=limits))
+
+class SliderParameter(Parameter):
+  itemClass = SliderParameterItem
+
+
+
 class NoneParameter(parameterTypes.SimpleParameter):
 
   def __init__(self, **opts):
@@ -305,3 +380,4 @@ parameterTypes.registerParameterType('actionwithshortcut', ActionWithShortcutPar
 parameterTypes.registerParameterType('registeredaction', RegisteredActionParameter)
 parameterTypes.registerParameterType('popuplineeditor', PopupLineEditorParameter)
 parameterTypes.registerParameterType('filepicker', FilePickerParameter)
+parameterTypes.registerParameterType('slider', SliderParameter)
