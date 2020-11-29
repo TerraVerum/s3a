@@ -312,7 +312,6 @@ class S3A(S3ABase):
     for docks, plugin in zip(pluginDocks, FR_SINGLETON.plugins):
       if docks is None:
         continue
-      docks = ParamEditorDockGrouping(docks, plugin.name)
       menu = self.createMenuOptForDock(docks, parentToolbar=pluginToolbar)
       if plugin in FR_SINGLETON.tableFieldPlugins:
         allActs = menu.actions()
@@ -525,10 +524,18 @@ class S3A(S3ABase):
     if loadFunc is None:
       loadFunc = partial(defaultLoadFunc, editor)
 
-    newMenu = QtWidgets.QMenu(overrideName, self)
     editAct = QtWidgets.QAction('Open ' + overrideName, self)
-    newMenu.addAction(editAct)
-    newMenu.addSeparator()
+    if editor.saveDir is None:
+      # No save options are possible, just use an action instead of dropdown menu
+      newMenu = editAct
+    else:
+      newMenu = QtWidgets.QMenu(overrideName, self)
+      newMenu.addAction(editAct)
+      newMenu.addSeparator()
+      populateFunc = partial(self.populateParamEditorMenuOpts, editor, newMenu, loadFunc)
+      editor.sigParamStateCreated.connect(populateFunc)
+      # Initialize default menus
+      populateFunc()
     def showFunc(_editor=editor):
       if isinstance(_editor.dock, ParamEditorDockGrouping):
         tabs: QtWidgets.QTabWidget = _editor.dock.tabs
@@ -540,10 +547,6 @@ class S3A(S3ABase):
       # These guarantees are not met if "show" is only called once
       _editor.dock.raise_()
     editAct.triggered.connect(lambda: showFunc())
-    populateFunc = partial(self.populateParamEditorMenuOpts, editor, newMenu, loadFunc)
-    editor.sigParamStateCreated.connect(populateFunc)
-    # Initialize default menus
-    populateFunc()
     editor.hasMenuOption = True
     return newMenu
 
@@ -568,7 +571,11 @@ class S3A(S3ABase):
     if isinstance(dockEditor, ParamEditor):
       parentBtn.setText(dockEditor.name)
       menu = self._createMenuOptForEditor(dockEditor, loadFunc)
-      parentBtn.setMenu(menu)
+      if isinstance(menu, QtWidgets.QMenu):
+        parentBtn.setMenu(menu)
+      else:
+        menu: QtWidgets.QAction
+        parentBtn.clicked.connect(menu.triggered.emit)
     else:
       # FRParamEditorDockGrouping
       parentBtn.setText(dockEditor.name)
@@ -579,7 +586,11 @@ class S3A(S3ABase):
         # "Main Image Settings" -> "Settings"
         tabName = dockEditor.getTabName(editor)
         nameWithoutBase = tabName
-        menu.addMenu(self._createMenuOptForEditor(editor, loadFunc, overrideName=nameWithoutBase))
+        menuOrAct = self._createMenuOptForEditor(editor, loadFunc, overrideName=nameWithoutBase)
+        try:
+          menu.addMenu(menuOrAct)
+        except TypeError: # Action instead
+          menu.addAction(menuOrAct)
     if parentToolbar is not None:
       parentToolbar.addWidget(parentBtn)
     return menu

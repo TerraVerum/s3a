@@ -28,7 +28,7 @@ class VerticesPlugin(TableFieldPlugin):
     super().__initEditorParams__()
     cls.procCollection = FR_SINGLETON.imgProcClctn.createProcessorForClass(cls)
 
-    cls.docks = [cls.toolsEditor, cls.procCollection]
+    cls.docks = ParamEditorDockGrouping([cls.toolsEditor, cls.procCollection], cls.name)
 
   def __init__(self):
     self.region = MultiRegionPlot()
@@ -184,6 +184,13 @@ class VerticesPlugin(TableFieldPlugin):
 
 class ProjectsPlugin(ParamEditorPlugin):
   name = 'Project'
+
+  @classmethod
+  def __initEditorParams__(cls):
+    super().__initEditorParams__()
+    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Tools')
+    cls.docks = ParamEditorDockGrouping([cls.toolsEditor], cls.name)
+
   def __init__(self):
     self.data = ProjectData()
     ioCls = FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_EXPORTER)(ComponentIO)
@@ -194,7 +201,6 @@ class ProjectsPlugin(ParamEditorPlugin):
     self.compIo: ComponentIO = ioCls()
 
     self.toolsEditor.registerFunc(self.create_gui, name='Create')
-    self.docks = [self.toolsEditor]
     self._projImgThumbnails = ThumbnailViewer()
 
   def attachS3aRef(self, s3a: models.s3abase.S3ABase):
@@ -215,10 +221,6 @@ class ProjectsPlugin(ParamEditorPlugin):
     self._projImgThumbnails.clear()
     for img in self.data.images:
       self._projImgThumbnails.addThumbnail(img)
-
-  @classmethod
-  def __initEditorParams__(cls):
-    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Tools')
 
   def save(self):
     self.data.addAnnotation(data=self.s3a.compMgr.compDf, image=self.s3a.srcImgFname, overwriteOld=True)

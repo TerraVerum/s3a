@@ -194,7 +194,7 @@ class ParamEditorPlugin(ABC):
   s3a: models.s3abase.S3ABase=None
   """Reference to the current S3A window"""
 
-  docks: List[ParamEditor] = None
+  docks: Union[ParamEditorDockGrouping, ParamEditor] = None
   """
   Docks that should be shown in S3A's menu bar. By default, just the toolsEditor is shown.
   If multiple param editors must be visible, manually set this property to a

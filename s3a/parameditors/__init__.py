@@ -1,5 +1,5 @@
 import weakref
-from typing import List, Union, Type
+from typing import List, Union, Type, Sequence
 
 from pyqtgraph.Qt import QtWidgets, QtCore
 
@@ -68,7 +68,7 @@ class _FRSingleton(QtCore.QObject):
     return outList
 
   def addDocks(self, docks: Union[QtWidgets.QDockWidget, List[QtWidgets.QDockWidget]], blockEmit=False):
-    if not isinstance(docks, List):
+    if not isinstance(docks, Sequence):
       docks = [docks]
 
     for dock in docks:

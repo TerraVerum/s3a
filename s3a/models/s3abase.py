@@ -261,6 +261,7 @@ class S3ABase(QtWidgets.QMainWindow):
     """See FR_SINGLETON.addPlugin"""
     plugin = FR_SINGLETON.addPlugin(pluginCls, *args, **kwargs)
     plugin.attachS3aRef(self)
+    return plugin
 
   @FR_SINGLETON.actionStack.undoable('Change Main Image')
   def setMainImg(self, fileName: FilePath=None, imgData: NChanImg=None,
