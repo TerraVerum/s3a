@@ -76,14 +76,7 @@ class _FRSingleton(QtCore.QObject):
         # This logic is to add editors to quick loader, checking for it prevents recursion
         continue
       self.docks.append(dock)
-      if isinstance(dock, ParamEditorDockGrouping):
-        for editor in dock.editors:
-          if editor in self.docks:
-            # The editor will be accounted for as a group, so remove it as an individual
-            self.docks.remove(editor)
-        self.quickLoader.listModel.addEditors(dock.editors)
-      else:
-        self.quickLoader.listModel.addEditors([dock])
+      self.quickLoader.addDock(dock)
 
     if not blockEmit:
       self.sigDocksAdded.emit(docks)
@@ -115,7 +108,7 @@ class _FRSingleton(QtCore.QObject):
     if isinstance(plugin, TableFieldPlugin):
       self.tableFieldPlugins.append(weakref.proxy(plugin))
     if plugin.docks is not None:
-      self.addDocks(plugin.docks)
+      self.quickLoader.addDock(plugin.docks)
     self.plugins.append(plugin)
     return plugin
 

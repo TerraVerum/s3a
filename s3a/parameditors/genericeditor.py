@@ -5,14 +5,13 @@ from typing import List, Dict, Union, Type, Tuple, Optional
 
 import pandas as pd
 from pyqtgraph.Qt import QtWidgets, QtCore
-from pyqtgraph.parametertree import Parameter, ParameterItem
+from pyqtgraph.parametertree import Parameter
 
 from s3a import models
-from s3a.constants import MENU_OPTS_DIR, FR_CONSTS as FRC
-from s3a.generalutils import pascalCaseToTitle
-from s3a.graphicsutils import dialogGetSaveFileName
-from s3a.models.editorbase import ParamEditorBase
 from s3a import parameditors
+from s3a.generalutils import pascalCaseToTitle
+from s3a.graphicsutils import dialogGetSaveFileName, menuFromEditorActions
+from s3a.models.editorbase import ParamEditorBase
 from s3a.processing import ImgProcWrapper
 from s3a.structures import FRParam, FilePath, NChanImg, XYVertices
 
@@ -189,6 +188,15 @@ class ParamEditorPlugin(ABC):
   :class:`TableFieldPlugin`
   """
   name: str=None
+  """
+  Name of this plugin as it should appear in the plugin menu
+  """
+
+  menu: QtWidgets.QMenu=None
+  """
+  Menu of additional options that should appear under this plugin
+  """
+
   toolsEditor: ParamEditor
   """Param Editor window which holds user-editable properties exposed by the programmer"""
   s3a: models.s3abase.S3ABase=None
@@ -207,7 +215,12 @@ class ParamEditorPlugin(ABC):
 
   def attachS3aRef(self, s3a: models.s3abase.S3ABase):
     self.s3a = s3a
-
+    if self.menu is not None:
+      try:
+        # Succeeds for gui, fails for non-gui
+        s3a.pluginToolbar.addMenu(self.menu)
+      except AttributeError:
+        pass
 
 class TableFieldPlugin(ParamEditorPlugin):
   """
@@ -231,6 +244,12 @@ class TableFieldPlugin(ParamEditorPlugin):
   """
 
   _active=False
+
+  def __init__(self):
+    def activate():
+      self.focusedImg.changeCurrentPlugin(self)
+    self.toolsEditor.registerFunc(activate, btnOpts={'guibtn':False})
+    self.menu = menuFromEditorActions(self.toolsEditor, 'Tools')
 
   @classmethod
   def __initEditorParams__(cls):

@@ -20,7 +20,7 @@ from ..parameditors import ParamEditor, TableFieldPlugin
 __all__ = ['MainImage', 'FocusedImage', 'EditableImgBase']
 
 from s3a.controls.drawctrl import RoiCollection
-from ..graphicsutils import contextMenuFromEditorActions
+from ..graphicsutils import menuFromEditorActions
 
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
@@ -110,7 +110,7 @@ class EditableImgBase(pg.PlotWidget):
 
   def setMenuFromEditors(self, editors: Sequence[ParamEditor]):
     vb: pg.ViewBox = self.getViewBox()
-    menu = contextMenuFromEditorActions(editors)
+    menu = menuFromEditorActions(editors)
     vb.menu = menu
     self.menu = menu
 
@@ -419,7 +419,7 @@ class FocusedImage(EditableImgBase):
     newEditors = [self.toolsEditor]
     if newPlugin is not None:
       newEditors.append(newPlugin.toolsEditor)
-    self.menu = contextMenuFromEditorActions(newEditors, menuParent=self)
+    self.menu = menuFromEditorActions(newEditors, menuParent=self)
     self.getViewBox().menu = self.menu
     self.currentPlugin = newPlugin
     if forceActivate and newPlugin is not None and not newPlugin.active:

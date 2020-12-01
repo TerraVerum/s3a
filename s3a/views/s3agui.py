@@ -1,7 +1,7 @@
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Optional, Union, Dict, Any
+from typing import Optional, Union
 
 import numpy as np
 import pyqtgraph as pg
@@ -13,11 +13,11 @@ from pyqtgraph.console import ConsoleWidget
 from s3a import plugins, RunOpts
 from s3a.constants import LAYOUTS_DIR, FR_CONSTS, REQD_TBL_FIELDS
 from s3a.constants import _FREnums, FR_ENUMS
+from s3a.generalutils import attemptFileLoad
 from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
   autosaveOptsDialog, popupFilePicker, \
   disableAppDuringFunc, saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
-  restoreExceptionBehavior, contextMenuFromEditorActions, ScrollableErrorDialog, ThumbnailViewer
-from s3a.generalutils import attemptFileLoad
+  restoreExceptionBehavior, menuFromEditorActions
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import ParamEditor, ParamEditorDockGrouping, FR_SINGLETON
 from s3a.structures import S3AWarning, XYVertices, FilePath, NChanImg
@@ -40,6 +40,9 @@ class S3A(S3ABase):
     # Wait to import quick loader profiles until after self initialization so
     # customized loading functions also get called
     superLoaderArgs = {'author': quickLoaderArgs.pop('author', None)}
+    self.pluginToolbar = QtWidgets.QToolBar('Plugin Editors')
+    self.pluginToolbar.setObjectName('Plugin Editor Toolbar')
+
     super().__init__(parent, **superLoaderArgs)
     self.toolsEditor.registerFunc(self.estimateBoundaries_gui, btnOpts=FR_CONSTS.TOOL_ESTIMATE_BOUNDARIES)
     self.toolsEditor.registerFunc(self.clearBoundaries, btnOpts=FR_CONSTS.TOOL_CLEAR_BOUNDARIES)
@@ -99,10 +102,6 @@ class S3A(S3ABase):
     self.saveLayoutAct.triggered.connect(self.saveLayout_gui)
     self.sigLayoutSaved.connect(self._populateLoadLayoutOptions)
 
-    self.exportCompListAct.triggered.connect(self.exportCompList_gui)
-    self.exportLabelImgAct.triggered.connect(self.exportLabeledImg_gui)
-    self.loadCompsAct_merge.triggered.connect(lambda: self.loadCompList_gui(FR_ENUMS.COMP_ADD_AS_MERGE))
-    self.loadCompsAct_new.triggered.connect(lambda: self.loadCompList_gui(FR_ENUMS.COMP_ADD_AS_NEW))
     self.startAutosaveAct.triggered.connect(self.startAutosave_gui)
     self.stopAutosaveAct.triggered.connect(self.stopAutosave)
     self.userGuideAct.triggered.connect(
@@ -159,7 +158,7 @@ class S3A(S3ABase):
 
     sharedMenuWidgets = [self.mainImg, self.compTbl]
     for first, second in zip(sharedMenuWidgets, reversed(sharedMenuWidgets)):
-      first.menu.addMenu(contextMenuFromEditorActions(second.toolsEditor, menuParent=first.menu))
+      first.menu.addMenu(menuFromEditorActions(second.toolsEditor, menuParent=first.menu))
 
     tableDock = QtWidgets.QDockWidget('Component Table Window', self)
     tableDock.setFeatures(tableDock.DockWidgetMovable|tableDock.DockWidgetFloatable)
@@ -238,9 +237,7 @@ class S3A(S3ABase):
     toolbar.setObjectName('Parameter Edtor Toolbar')
     self.paramToolbar = toolbar
 
-    pluginToolbar = self.addToolBar('Plugin Editors')
-    pluginToolbar.setObjectName('Plugin Editor Toolbar')
-    self.pluginToolbar = pluginToolbar
+    self.addToolBar(self.pluginToolbar)
 
     self.menubar.addMenu(self.menuFile)
     self.menubar.addMenu(self.menuEdit)
@@ -258,15 +255,6 @@ class S3A(S3ABase):
     self.menuLayout = create_addMenuAct(self, self.menuFile, '&Layout', True)
     self.saveLayoutAct = create_addMenuAct(self, self.menuLayout, 'Save Layout')
     self.menuLayout.addSeparator()
-
-    # File / components
-    self.menuExport = create_addMenuAct(self, self.menuFile, '&Export...', True)
-    self.exportCompListAct = create_addMenuAct(self, self.menuExport, '&Component List')
-    self.exportLabelImgAct = create_addMenuAct(self, self.menuExport, '&Labeled Image')
-
-    self.menuLoad_Components = create_addMenuAct(self, self.menuFile, '&Import', True)
-    self.loadCompsAct_merge = create_addMenuAct(self, self.menuLoad_Components, 'Update as &Merge')
-    self.loadCompsAct_new = create_addMenuAct(self, self.menuLoad_Components, 'Append as &New')
 
     # File / autosave
     self.menuAutosave = create_addMenuAct(self, self.menuFile, '&Autosave...', True)
@@ -292,35 +280,9 @@ class S3A(S3ABase):
 
     self.setMenuBar(self.menubar)
 
-    pluginDocks = [p.docks for p in FR_SINGLETON.plugins]
     # SETTINGS
     for docks in FR_SINGLETON.docks:
-      if docks not in pluginDocks:
-        self.createMenuOptForDock(docks, parentToolbar=toolbar)
-
-    # This is a bit tricky. If default args are left unfilled, qt slots will fill
-    # with 'false's which breaks the function call. However, lambdas can't be used
-    # inside a for-loop since the bound variable value won't be correct. To
-    # fix this, make a function that generates a function taking no arguments.
-    # This ensures (1) bound scope at eval time is correct for lambda and (2)
-    # extra args aren't populated with False by qt
-    def activator(_plugin):
-      def inner():
-        self.focusedImg.changeCurrentPlugin(_plugin)
-      return inner
-
-    for docks, plugin in zip(pluginDocks, FR_SINGLETON.plugins):
-      if docks is None:
-        continue
-      menu = self.createMenuOptForDock(docks, parentToolbar=pluginToolbar)
-      if plugin in FR_SINGLETON.tableFieldPlugins:
-        allActs = menu.actions()
-        beforeAct = allActs[0] if len(allActs) > 0 else None
-        newAct = QtWidgets.QAction('&Activate', self)
-        activatePlugin = partial(self.focusedImg.changeCurrentPlugin, plugin)
-        # Need to define separate lambda so that function call forces no args
-        newAct.triggered.connect(activator(plugin))
-        menu.insertAction(beforeAct, newAct)
+      self.createMenuOptForDock(docks, parentToolbar=toolbar)
 
   def _maybeLoadLastState_gui(self, loadLastState: bool=None,
                               quickLoaderArgs:dict=None):
@@ -386,13 +348,6 @@ class S3A(S3ABase):
     if fname is not None:
       with pg.BusyCursor():
         self.setMainImg(fname)
-
-  def openProject_gui(self):
-    fileFilter = "Project Config Files (*.yml"
-    fname = popupFilePicker(self, 'Select Project File', fileFilter)
-    if fname is not None:
-      with pg.BusyCursor():
-        self.openProject(fname)
 
   def startAutosave_gui(self):
     saveDlg = autosaveOptsDialog(self)

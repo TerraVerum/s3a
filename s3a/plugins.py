@@ -1,17 +1,17 @@
-import typing
+from functools import partial
 from functools import partial
 from pathlib import Path
 from typing import Optional, Dict
 
 import numpy as np
 import pandas as pd
+import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtCore
-from pyqtgraph.parametertree import ParameterTree, Parameter
 
 from s3a import FR_SINGLETON, FR_CONSTS as FRC, REQD_TBL_FIELDS as RTF, ComplexXYVertices, \
-  XYVertices, FRParam, ComponentIO as frio, FR_CONSTS, ComponentIO, ParamEditor, models
-from s3a.generalutils import pascalCaseToTitle, attemptFileLoad
-from s3a.graphicsutils import ThumbnailViewer, DropList
+  XYVertices, ComponentIO as frio, FR_CONSTS, ComponentIO, ParamEditor, models
+from s3a.generalutils import attemptFileLoad
+from s3a.graphicsutils import ThumbnailViewer, DropList, popupFilePicker, menuFromEditorActions
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import ParamEditorDockGrouping, ParamEditorPlugin, ProjectData
 from s3a.parameditors.genericeditor import TableFieldPlugin
@@ -31,6 +31,7 @@ class VerticesPlugin(TableFieldPlugin):
     cls.docks = ParamEditorDockGrouping([cls.toolsEditor, cls.procCollection], cls.name)
 
   def __init__(self):
+    super().__init__()
     self.region = MultiRegionPlot()
     self.region.hide()
     self.firstRun = True
@@ -189,7 +190,6 @@ class ProjectsPlugin(ParamEditorPlugin):
   def __initEditorParams__(cls):
     super().__initEditorParams__()
     cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Tools')
-    cls.docks = ParamEditorDockGrouping([cls.toolsEditor], cls.name)
 
   def __init__(self):
     self.data = ProjectData()
@@ -201,7 +201,12 @@ class ProjectsPlugin(ParamEditorPlugin):
     self.compIo: ComponentIO = ioCls()
 
     self.toolsEditor.registerFunc(self.create_gui, name='Create')
-    self._projImgThumbnails = ThumbnailViewer()
+    self.toolsEditor.registerFunc(self.open_gui, name='Open')
+    self.toolsEditor.registerFunc(self.imageMgr_gui, name='Open Project Image')
+    self._projImgMgr = ProjectImageManager()
+    self._projImgThumbnails = self._projImgMgr.thumbnails
+    self._projImgMgr.sigImageSelected.connect(lambda imgFname: self.s3a.setMainImg(self._projImgThumbnails.nameToFullPathMapping[imgFname]))
+    self.menu = menuFromEditorActions(self.toolsEditor)
 
   def attachS3aRef(self, s3a: models.s3abase.S3ABase):
     super().attachS3aRef(s3a)
@@ -216,18 +221,37 @@ class ProjectsPlugin(ParamEditorPlugin):
     if imgAnns is not None:
       self.s3a.compMgr.addComps(self.compIo.buildByFileType(imgAnns))
 
-  def openProject(self, name: str):
+  def open(self, name: str):
     self.data.loadCfg(name)
     self._projImgThumbnails.clear()
     for img in self.data.images:
       self._projImgThumbnails.addThumbnail(img)
 
-  def save(self):
-    self.data.addAnnotation(data=self.s3a.compMgr.compDf, image=self.s3a.srcImgFname, overwriteOld=True)
+  def open_gui(self):
+    fname = popupFilePicker(self.s3a, 'Select Project File', 'S3A Project (*.s3aprj)')
+    if fname is not None:
+      with pg.BusyCursor():
+        self.open(fname)
+
+  def imageMgr_gui(self):
+    dlg = self._projImgMgr
+    dlg.show()
+    ok = dlg.exec_()
+    if not ok:
+      return
+
+  def saveCurAnnotation(self):
+    self.data.addAnnotation(data=self.s3a.exportableDf, image=self.s3a.srcImgFname, overwriteOld=True)
+
+  def saveAll(self):
+    self.saveCurAnnotation()
+    self.data.saveCfg()
 
   def create_gui(self):
     wiz = NewProjectWizard(self)
-    wiz.exec_()
+    ok = wiz.exec_()
+    if not ok:
+      return
     parsedLists = {}
     for k, val in wiz.fileLists.items():
       model = val.model()
@@ -322,3 +346,26 @@ class NewProjectWizard(QtWidgets.QWizard):
         fileBtnLayout.addWidget(btn)
       curLayout.addLayout(fileBtnLayout)
       self.addPage(page)
+
+class ProjectImageManager(QtWidgets.QDialog):
+  sigImageSelected = QtCore.Signal(str)
+  def __init__(self, parent=None):
+    super().__init__(parent)
+    layout = QtWidgets.QVBoxLayout()
+    self.setLayout(layout)
+    self.thumbnails = ThumbnailViewer()
+    self.completer = QtWidgets.QLineEdit()
+    self.completer.setPlaceholderText('Type to filter')
+    self.completer.textChanged.connect(self._filterThumbnails)
+    self.thumbnails.itemDoubleClicked.connect(lambda item: self.sigImageSelected.emit(item.text()))
+
+    layout.addWidget(self.completer)
+    layout.addWidget(self.thumbnails)
+
+  def _filterThumbnails(self, text):
+    for ii in range(self.thumbnails.model().rowCount()):
+      item = self.thumbnails.item(ii)
+      if text in item.text():
+        item.setHidden(False)
+      else:
+        item.setHidden(True)

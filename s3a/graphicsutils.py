@@ -37,7 +37,8 @@ def disableAppDuringFunc(func):
 def popupFilePicker(parent, winTitle: str, fileFilter: str) -> Optional[str]:
   retVal = None
   fileDlg = QtWidgets.QFileDialog()
-  fname, _ = fileDlg.getOpenFileName(parent, winTitle, '', fileFilter)
+  fileDlg.setDirectory('~')
+  fname, _ = fileDlg.getOpenFileName(parent, winTitle, filter=fileFilter, options=fileDlg.DontUseNativeDialog)
 
   if len(fname) > 0:
     retVal = fname
@@ -483,8 +484,8 @@ class QAwesomeTooltipEventFilter(QtCore.QObject):
     return super().eventFilter(widget, event)
 
 
-def contextMenuFromEditorActions(editors: Union[s3a.ParamEditor, Sequence[s3a.ParamEditor]],
-                                 title: str=None, menuParent: QtWidgets.QWidget=None):
+def menuFromEditorActions(editors: Union[s3a.ParamEditor, Sequence[s3a.ParamEditor]],
+                          title: str=None, menuParent: QtWidgets.QWidget=None):
   if not isinstance(editors, Sequence):
     editors = [editors]
   if title is None:

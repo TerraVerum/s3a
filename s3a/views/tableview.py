@@ -16,7 +16,7 @@ from s3a.structures import S3AException, S3AWarning, TwoDArr
 __all__ = ['CompTableView']
 
 from ..parameditors import pgregistered, ParamEditor, ParamEditorDockGrouping
-from ..graphicsutils import contextMenuFromEditorActions
+from ..graphicsutils import menuFromEditorActions
 
 Signal = QtCore.Signal
 
@@ -223,7 +223,7 @@ class CompTableView(QtWidgets.QTableView):
     self.sigSelectionChanged.emit(pd.unique(selectedIds))
 
   def createContextMenu(self):
-    menu = contextMenuFromEditorActions(self.toolsEditor, 'Table Tools', self)
+    menu = menuFromEditorActions(self.toolsEditor, 'Table Tools', self)
     return menu
 
   def removeSelectedRows_gui(self):

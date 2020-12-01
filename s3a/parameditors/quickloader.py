@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Union
+from typing import List, Union, Sequence
 from warnings import warn
 
 from pyqtgraph.Qt import QtCore, QtWidgets
@@ -7,6 +7,7 @@ from pyqtgraph.parametertree.parameterTypes import GroupParameter, Parameter
 
 from s3a.graphicsutils import PopupLineEditor, raiseErrorLater
 from s3a.constants import QUICK_LOAD_DIR
+from . import ParamEditorDockGrouping
 from .genericeditor import ParamEditor
 from .pgregistered import ActionWithShortcutParameter as ActWithShc
 from s3a.structures import ParamEditorError, S3AWarning
@@ -23,6 +24,7 @@ class EditorListModel(QtCore.QAbstractListModel):
     self.addEditors(editorList)
 
   def addEditors(self, editorList: List[ParamEditor]):
+    editorList = [e for e in editorList if e not in self.uniqueEditors]
     self.uniqueEditors.extend(editorList)
     self.layoutAboutToBeChanged.emit()
     for editor in editorList:
@@ -157,6 +159,11 @@ class QuickLoaderEditor(ParamEditor):
            + "\n\n".join(errSettings), S3AWarning)
     return profileSrc
 
+  def addDock(self, dock: Union[ParamEditor, ParamEditorDockGrouping]):
+    if isinstance(dock, ParamEditorDockGrouping):
+      self.listModel.addEditors(dock.editors)
+    else:
+      self.listModel.addEditors([dock])
 
   def saveParamState(self, saveName: str=None, paramState: dict=None,
                      allowOverwriteDefault=False, blockWrite=False):
