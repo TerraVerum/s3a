@@ -21,7 +21,7 @@ from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
   restoreExceptionBehavior, menuFromEditorActions
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import ParamEditor, ParamEditorDockGrouping, FR_SINGLETON, \
-  ParamEditorPlugin
+  ParamEditorPlugin, TableFieldPlugin
 from s3a.plugins import MainImagePlugin, CompTablePlugin
 from s3a.structures import S3AWarning, XYVertices, FilePath, NChanImg
 from s3a.views.buttons import ButtonCollection
@@ -43,8 +43,9 @@ class S3A(S3ABase):
     # Wait to import quick loader profiles until after self initialization so
     # customized loading functions also get called
     superLoaderArgs = {'author': quickLoaderArgs.pop('author', None)}
-    self.pluginToolbar = QtWidgets.QToolBar('Plugin Editors')
-    self.pluginToolbar.setObjectName('Plugin Editor Toolbar')
+    # Create toolbars here so plugins instantiated in super init don't throw errors
+    self.generalToolbar = QtWidgets.QToolBar('General Plugins')
+    self.tblFieldToolbar = QtWidgets.QToolBar('Table Field Plugins')
 
     super().__init__(parent, **superLoaderArgs)
     self.toolsEditor.registerFunc(self.estimateBoundaries_gui, btnOpts=FR_CONSTS.TOOL_ESTIMATE_BOUNDARIES)
@@ -131,6 +132,11 @@ class S3A(S3ABase):
   def _buildGui(self):
     self.setDockNestingEnabled(True)
     self.setTabPosition(QtCore.Qt.AllDockWidgetAreas, QtWidgets.QTabWidget.North)
+
+    self.tblFieldToolbar.setObjectName('Table Field Plugins')
+    self.generalToolbar.setObjectName('General Plugins')
+    self.addToolBar(self.generalToolbar)
+    self.addToolBar(self.tblFieldToolbar)
 
     centralwidget = QtWidgets.QWidget(self)
     self.mainImg.setParent(centralwidget)
@@ -233,8 +239,6 @@ class S3A(S3ABase):
     self.menuHelp = QtWidgets.QMenu('&Help', self.menubar)
     menuTools = QtWidgets.QMenu('&Tools', self.menubar)
 
-    self.addToolBar(self.pluginToolbar)
-
     self.menubar.addMenu(self.menuFile)
     self.menubar.addMenu(self.menuEdit)
     self.menubar.addMenu(self.menuAnalytics)
@@ -283,17 +287,22 @@ class S3A(S3ABase):
     if dock is None:
       return
     FR_SINGLETON.quickLoader.addDock(dock)
-    self._tabbifyEditorDocks(dock.editors)
+    self._tabbifyEditorDocks([dock])
 
     if plugin.menu is None and plugin.dock is None:
       # No need to add menu and graphics options
       return
 
+    if isinstance(plugin, TableFieldPlugin):
+      parentTb = self.tblFieldToolbar
+    else:
+      parentTb = self.generalToolbar
+
     if plugin.dock is None:
       dummyDock = ParamEditorDockGrouping([], plugin.name)
-      pluginMenu = self.createMenuOptForDock(dummyDock, parentToolbar=self.pluginToolbar)
+      pluginMenu = self.createMenuOptForDock(dummyDock, parentToolbar=parentTb)
     else:
-      pluginMenu = self.createMenuOptForDock(plugin.dock, parentToolbar=self.pluginToolbar)
+      pluginMenu = self.createMenuOptForDock(plugin.dock, parentToolbar=parentTb)
 
     if plugin.menu is not None:
       pluginMenu.addMenu(plugin.menu)
