@@ -1,6 +1,8 @@
 from typing import Callable
 
-from s3a import models
+from pyqtgraph.Qt import QtWidgets
+
+from s3a import models, RunOpts
 from s3a.constants import FR_CONSTS as FRC
 from s3a.graphicsutils import menuFromEditorActions
 from s3a.parameditors import ParamEditorPlugin, ParamEditor, FR_SINGLETON
@@ -90,4 +92,24 @@ class CompTablePlugin(ParamEditorPlugin):
     self.menu = tbl.menu = menuFromEditorActions([self.toolsEditor], menuParent=s3a)
     super().attachS3aRef(s3a)
 
-ALL_PLUGINS = [VerticesPlugin, ProjectsPlugin, MainImagePlugin, CompTablePlugin]
+class MiscFunctionsPlugin(ParamEditorPlugin):
+  name = 'Misc. Functions'
+
+  @classmethod
+  def __initEditorParams__(cls):
+    super().__initEditorParams__()
+    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Function Details')
+    cls.dock.addEditors([cls.toolsEditor])
+    cls.menu = QtWidgets.QMenu('Functions')
+
+  def registerFunc(self, func: Callable, name:str=None, runOpts=RunOpts.BTN, category:str=None):
+    """See function signature for `ParamEditor.registerFunc`"""
+    paramPath = []
+    if category is not None:
+      paramPath.append(category)
+    proc = self.toolsEditor.registerFunc(func, name, runOpts, paramPath=tuple(paramPath))
+    act = self.menu.addAction(proc.name)
+    act.triggered.connect(lambda: proc(s3a=self.s3a))
+    return proc
+
+ALL_PLUGINS = [VerticesPlugin, ProjectsPlugin, MainImagePlugin, CompTablePlugin, MiscFunctionsPlugin]
