@@ -1,4 +1,5 @@
 import sys
+from copy import copy
 from pathlib import Path
 from typing import Optional, Union, Callable, Dict, Any, Type
 from warnings import warn
@@ -52,6 +53,10 @@ class S3ABase(QtWidgets.QMainWindow):
     self.focusedImg = FocusedImage()
     self.focusedImg.toolsEditor.registerFunc(self.acceptFocusedRegion,
                                              btnOpts=FR_CONSTS.TOOL_ACCEPT_FOC_REGION)
+    opt = copy(FR_CONSTS.TOOL_CLEAR_ROI)
+    opt.opts['ownerObj'] = self.focusedImg
+    self.focusedImg.toolsEditor.registerFunc(self.focusedImg.clearCurRoi, btnOpts=opt)
+
 
     self.compMgr = ComponentMgr()
     # Register exporter to allow user parameters
@@ -81,15 +86,12 @@ class S3ABase(QtWidgets.QMainWindow):
     # -----
     self.appStateEditor = AppStateEditor(self, name='App State Editor')
 
-    # -----
-    # DEFAULT PLUGINS
-    # -----
-    from s3a.plugins import VerticesPlugin, ProjectsPlugin
-    self.addPlugin(VerticesPlugin)
-    self.addPlugin(ProjectsPlugin)
-
-    for plugin in FR_SINGLETON.plugins: # type: ParamEditorPlugin
-      plugin.attachS3aRef(self)
+    for plugin in FR_SINGLETON.clsToPluginMapping.values(): # type: ParamEditorPlugin
+      # Plugins created before window was initialized may need their plugins forcefully
+      # attached here
+      if plugin.s3a is not self:
+        self._handleNewPlugin(plugin)
+    FR_SINGLETON.sigPluginAdded.connect(self._handleNewPlugin)
 
     def loadCfg(_fname: str):
       FR_SINGLETON.tableData.loadCfg(_fname)
@@ -173,6 +175,9 @@ class S3ABase(QtWidgets.QMainWindow):
     self.compMgr.endResetModel()
     self.compTbl.setColDelegates()
     self.compTbl.popup.tbl.setColDelegates()
+
+  def _handleNewPlugin(self, plugin: ParamEditorPlugin):
+    plugin.attachS3aRef(self)
 
   @staticmethod
   def saveAllEditorDefaults():

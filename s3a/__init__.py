@@ -43,8 +43,15 @@ from s3a.processing.algorithms import TopLevelImageProcessors
 from s3a.structures import XYVertices, ComplexXYVertices, FRParam
 from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS
 
+# -----
+# DEFAULT PLUGINS
+# -----
 for name, func in inspect.getmembers(TopLevelImageProcessors, inspect.isfunction):
   FR_SINGLETON.imgProcClctn.addProcessCtor(func)
+
+from s3a.plugins import ALL_PLUGINS
+for plugin in ALL_PLUGINS:
+  FR_SINGLETON.addPlugin(plugin)
 
 # Minimal means no GUI is needed. Things work faster when they don't have to be
 # shown through the comp display filter

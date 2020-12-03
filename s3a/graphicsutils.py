@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import html
 import sys
 from functools import partial
@@ -8,7 +9,6 @@ from pathlib import Path
 from traceback import format_exception
 from typing import Optional, Union, Callable, Generator, Sequence, Dict
 
-from PyQt5 import QtWidgets, QtCore, QtGui
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import Parameter
 from ruamel.yaml import YAML
@@ -498,7 +498,7 @@ def menuFromEditorActions(editors: Union[s3a.ParamEditor, Sequence[s3a.ParamEdit
     def findActions(paramRoot: Parameter):
       for child in paramRoot.childs:
         findActions(child)
-      if 'action' in paramRoot.opts['type']:
+      if 'action' in paramRoot.opts['type'] and paramRoot.opts.get('guibtn', True):
         actions.append(paramRoot)
         paramNames.append(paramRoot.name())
     findActions(editor.params)

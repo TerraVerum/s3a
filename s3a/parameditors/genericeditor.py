@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import List, Dict, Union, Type, Tuple, Optional
+from typing import List, Dict, Union, Type, Tuple, Optional, Sequence
 
 import pandas as pd
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter
 
-from s3a import models
+from s3a import models, views
 from s3a import parameditors
 from s3a.generalutils import pascalCaseToTitle
 from s3a.graphicsutils import dialogGetSaveFileName, menuFromEditorActions
@@ -141,20 +141,21 @@ class ParamEditorDockGrouping(QtWidgets.QDockWidget):
   When multiple parameter editor windows should be grouped under the same heading,
   this class is responsible for performing that grouping.
   """
-  def __init__(self, editors: List[ParamEditor], dockName, parent=None):
+  def __init__(self, editors: List[ParamEditor]=None, dockName:str='', parent=None):
     super().__init__(parent)
     self.tabs = QtWidgets.QTabWidget(self)
     self.hide()
 
-    if dockName is None:
+    if editors is None:
+      editors = []
+
+    if len(dockName) == 0 and len(editors) > 0:
       dockName = editors[0].name
     self.name = dockName
 
-    for editor in editors:
-      # "Main Image Settings" -> "Settings"
-      tabName = self.getTabName(editor)
-      self.tabs.addTab(editor.dockContentsWidget, tabName)
-      editor.dock = self
+    self.editors = []
+    self.addEditors(editors)
+
     mainLayout = QtWidgets.QVBoxLayout()
     mainLayout.addWidget(self.tabs)
     centralWidget = QtWidgets.QWidget()
@@ -163,7 +164,13 @@ class ParamEditorDockGrouping(QtWidgets.QDockWidget):
     self.setObjectName(dockName)
     self.setWindowTitle(dockName)
 
-    self.editors = editors
+  def addEditors(self, editors: Sequence[ParamEditor]):
+    for editor in editors:
+      # "Main Image Settings" -> "Settings"
+      tabName = self.getTabName(editor)
+      self.tabs.addTab(editor.dockContentsWidget, tabName)
+      editor.dock = self
+      self.editors.append(editor)
 
   def setParent(self, parent: QtWidgets.QWidget=None):
     super().setParent(parent)
@@ -171,7 +178,7 @@ class ParamEditorDockGrouping(QtWidgets.QDockWidget):
       editor.setParent(parent)
 
   def getTabName(self, editor: ParamEditor):
-    if self.name in editor.name:
+    if self.name in editor.name and len(self.name) > 0:
       tabName = editor.name.split(self.name)[1][1:]
       if len(tabName) == 0:
         tabName = editor.name
@@ -197,30 +204,39 @@ class ParamEditorPlugin(ABC):
   Menu of additional options that should appear under this plugin
   """
 
-  toolsEditor: ParamEditor
-  """Param Editor window which holds user-editable properties exposed by the programmer"""
-  s3a: models.s3abase.S3ABase=None
-  """Reference to the current S3A window"""
-
-  docks: Union[ParamEditorDockGrouping, ParamEditor] = None
+  dock: Optional[ParamEditorDockGrouping]
   """
   Docks that should be shown in S3A's menu bar. By default, just the toolsEditor is shown.
   If multiple param editors must be visible, manually set this property to a
   :class:`FRParamEditorDockGrouping` as performed in :class:`XYVerticesPlugin`.
   """
 
+  toolsEditor: ParamEditor
+  """Param Editor window which holds user-editable properties exposed by the programmer"""
+  s3a: models.s3abase.S3ABase=None
+  """Reference to the current S3A window"""
+
   @classmethod
   def __initEditorParams__(cls):
-    pass
+    cls.dock = ParamEditorDockGrouping()
+
+  def __init__(self):
+    self.dock.name = self.name
 
   def attachS3aRef(self, s3a: models.s3abase.S3ABase):
     self.s3a = s3a
-    if self.menu is not None:
-      try:
-        # Succeeds for gui, fails for non-gui
-        s3a.pluginToolbar.addMenu(self.menu)
-      except AttributeError:
-        pass
+
+def dummyPluginCreator(name_: str=None, editors: Sequence[ParamEditor]=None):
+  class DummyPlugin(ParamEditorPlugin):
+    name = name_
+
+    @classmethod
+    def __initEditorParams__(cls):
+      super().__initEditorParams__()
+      if editors is not None:
+        cls.dock.addEditors(editors)
+  return DummyPlugin
+
 
 class TableFieldPlugin(ParamEditorPlugin):
   """
@@ -246,10 +262,11 @@ class TableFieldPlugin(ParamEditorPlugin):
   _active=False
 
   def __init__(self):
+    super().__init__()
     def activate():
       self.focusedImg.changeCurrentPlugin(self)
     self.toolsEditor.registerFunc(activate, btnOpts={'guibtn':False})
-    self.menu = menuFromEditorActions(self.toolsEditor, 'Tools')
+    self.menu = menuFromEditorActions(self.toolsEditor)
 
   @classmethod
   def __initEditorParams__(cls):

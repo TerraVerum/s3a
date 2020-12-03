@@ -90,12 +90,6 @@ class CompDisplayFilter(QtCore.QObject):
     self.regionCopier.sigCopyStarted.connect(lambda *args: self.activateRegionCopier())
     self.regionCopier.sigCopyStopped.connect(lambda *args: self.finishRegionCopier())
 
-    # Wrap in process to ignore the default param
-    toRegister = AtomicProcess(self.mergeSelectedComps, ignoreKeys=['keepId'])
-    mainImg.registerToolFunc(toRegister, btnOpts=FR_CONSTS.TOOL_MERGE_COMPS)
-    mainImg.registerToolFunc(self.splitSelectedComps, btnOpts=FR_CONSTS.TOOL_SPLIT_COMPS)
-    mainImg.setMenuFromEditors([mainImg.toolsEditor])
-
     compMgr.sigCompsChanged.connect(self.redrawComps)
     compMgr.sigFieldsChanged.connect(lambda: self._reflectFieldsChanged())
     compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)

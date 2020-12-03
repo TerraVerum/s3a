@@ -1,17 +1,16 @@
-import weakref
-from typing import List, Union, Type, Sequence
+from typing import List, Union, Type, Sequence, Dict
 
 from pyqtgraph.Qt import QtWidgets, QtCore
 
 from s3a.constants import GEN_PROPS_DIR, SCHEMES_DIR, BASE_DIR
 from s3a.models.actionstack import ActionStack
 from s3a.structures import FRParam
-from .genericeditor import ParamEditor, ParamEditorDockGrouping, ParamEditorPlugin, \
-  TableFieldPlugin
 from .algcollection import AlgCtorCollection
-from .project import ProjectData
-from .quickloader import QuickLoaderEditor
+from .genericeditor import ParamEditor, ParamEditorDockGrouping, ParamEditorPlugin, \
+  TableFieldPlugin, dummyPluginCreator
 from .shortcut import ShortcutsEditor
+from .quickloader import QuickLoaderEditor
+from .project import ProjectData
 from ..generalutils import pascalCaseToTitle
 from ..processing import ImgProcWrapper
 
@@ -31,13 +30,17 @@ class ColorSchemeEditor(ParamEditor):
 
 
 class _FRSingleton(QtCore.QObject):
-  sigDocksAdded = Signal(object) # List[QtWidgets.QDockWidget]
+  sigPluginAdded = Signal(object) # List[QtWidgets.QDockWidget]
 
+  _dummyEditor = ParamEditor(saveDir=None)
+  """
+  The first parameter editor will not be properly initialized unless a dummy is first in
+  the list of existing editors. TODO: Maybe some additional logic can change this
+  """
   def __init__(self, parent=None):
     super().__init__(parent)
     self.actionStack = ActionStack()
-    self.plugins: List[ParamEditorPlugin] = []
-    self.tableFieldPlugins: List[TableFieldPlugin] = []
+    self.clsToPluginMapping: Dict[Type[ParamEditorPlugin], ParamEditorPlugin] = {}
 
     self.project = ProjectData()
     self.tableData = self.project.tableData
@@ -45,17 +48,15 @@ class _FRSingleton(QtCore.QObject):
     self.filter = self.tableData.filter
 
 
-    self.shortcuts = ShortcutsEditor()
     self.generalProps = AppSettingsEditor()
     self.colorScheme = ColorSchemeEditor()
-    self.imgProcClctn = AlgCtorCollection(ImgProcWrapper)
+    self.shortcuts = ShortcutsEditor()
     self.quickLoader = QuickLoaderEditor()
+    self.imgProcClctn = AlgCtorCollection(ImgProcWrapper)
 
     self.docks: List[QtWidgets.QDockWidget] = []
-    propsGrouping = ParamEditorDockGrouping([self.generalProps, self.colorScheme], 'General Properties')
-    shcGrouping = ParamEditorDockGrouping([self.shortcuts, self.quickLoader], 'Shortcuts')
-
-    self.addDocks([self.filter, propsGrouping, shcGrouping])
+    self.addPlugin(dummyPluginCreator('General Properties', [self.generalProps, self.colorScheme]))
+    self.addPlugin(dummyPluginCreator('Shortcuts', [self.shortcuts, self.quickLoader]))
 
   @property
   def registerableEditors(self):
@@ -67,25 +68,13 @@ class _FRSingleton(QtCore.QObject):
         outList.append(editor)
     return outList
 
-  def addDocks(self, docks: Union[QtWidgets.QDockWidget, List[QtWidgets.QDockWidget]], blockEmit=False):
-    if not isinstance(docks, Sequence):
-      docks = [docks]
-
-    for dock in docks:
-      if dock in self.docks or dock is self.quickLoader:
-        # This logic is to add editors to quick loader, checking for it prevents recursion
-        continue
-      self.docks.append(dock)
-      self.quickLoader.addDock(dock)
-
-    if not blockEmit:
-      self.sigDocksAdded.emit(docks)
-
-
   def registerGroup(self, groupParam: FRParam, **opts):
     def multiEditorClsDecorator(cls):
       # Since all legwork is done inside the editors themselves, simply call each decorator from here as needed
-      for editor in self.registerableEditors:
+      editorList = self.registerableEditors
+      if len(editorList) == 0:
+        editorList.append(self._dummyEditor)
+      for editor in editorList:
         cls = editor.registerGroup(groupParam, **opts)(cls)
       return cls
     return multiEditorClsDecorator
@@ -105,11 +94,10 @@ class _FRSingleton(QtCore.QObject):
       nameToUse = pascalCaseToTitle(pluginCls.__name__)
     deco = self.registerGroup(FRParam(nameToUse))
     plugin: ParamEditorPlugin = deco(pluginCls)(*args, **kwargs)
-    if isinstance(plugin, TableFieldPlugin):
-      self.tableFieldPlugins.append(weakref.proxy(plugin))
-    if plugin.docks is not None:
-      self.quickLoader.addDock(plugin.docks)
-    self.plugins.append(plugin)
+    self.clsToPluginMapping[pluginCls] = plugin
+    self.sigPluginAdded.emit(plugin)
+    if plugin.dock is not None and plugin.dock not in self.docks:
+      self.docks.append(plugin.dock)
     return plugin
 
   def close(self):

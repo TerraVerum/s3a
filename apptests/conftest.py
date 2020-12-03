@@ -14,14 +14,13 @@ from s3a.plugins import VerticesPlugin
 
 app = S3A(Image=SAMPLE_IMG_FNAME, guiMode=False, loadLastState=False, author='testauthor')
 mgr = app.compMgr
-vertsPlugin = None
-for plugin in FR_SINGLETON.tableFieldPlugins:
-  if isinstance(plugin, VerticesPlugin):
-    vertsPlugin = plugin
-    break
-if vertsPlugin is None:
+try:
+  vertsPlugin = FR_SINGLETON.clsToPluginMapping[VerticesPlugin]
+except KeyError:
   raise S3AException('Vertices plugin was not provided. Some tests are guaranteed to fail.')
+
 app.focusedImg.changeCurrentPlugin(vertsPlugin)
+
 stack = FR_SINGLETON.actionStack
 
 dfTester = CompDfTester(NUM_COMPS)

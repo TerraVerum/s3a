@@ -131,9 +131,6 @@ class CompTableView(QtWidgets.QTableView):
     cls.colsVisibleProps = FR_SINGLETON.generalProps.registerProp(
       cls, FR_CONSTS.PROP_COLS_TO_SHOW, asProperty=False)
 
-    dockGroup = ParamEditorDockGrouping([cls.toolsEditor, FR_SINGLETON.filter], 'Component Table')
-    FR_SINGLETON.addDocks(dockGroup)
-
   def __init__(self, *args, minimal=False):
     """
     Creates the table.
@@ -155,11 +152,6 @@ class CompTableView(QtWidgets.QTableView):
       # Create context menu for changing table rows
       self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
       cursor = QtGui.QCursor()
-      for func, param in zip(
-          [lambda: self.setSelectedCellsAs_gui(), self.removeSelectedRows_gui, self.setSelectedCellsAsFirst],
-          [FR_CONSTS.TOOL_TBL_SET_AS, FR_CONSTS.TOOL_TBL_DEL_ROWS, FR_CONSTS.TOOL_TBL_SET_SAME_AS_FIRST]):
-        self.toolsEditor.registerFunc(func, btnOpts=param)
-      self.menu = self.createContextMenu()
       self.customContextMenuRequested.connect(lambda: self.menu.exec_(cursor.pos()))
       for ii, child in enumerate(self.colsVisibleProps):
         child.sigValueChanged.connect(lambda param, value, idx=ii: self.setColumnHidden(idx, not value))
@@ -221,10 +213,6 @@ class CompTableView(QtWidgets.QTableView):
       return
     self._prevSelRows = newRows
     self.sigSelectionChanged.emit(pd.unique(selectedIds))
-
-  def createContextMenu(self):
-    menu = menuFromEditorActions(self.toolsEditor, 'Table Tools', self)
-    return menu
 
   def removeSelectedRows_gui(self):
     if self.minimal: return

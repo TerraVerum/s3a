@@ -10,6 +10,7 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.console import ConsoleWidget
 
+import s3a.plugins.tablefield
 from s3a import plugins, RunOpts
 from s3a.constants import LAYOUTS_DIR, FR_CONSTS, REQD_TBL_FIELDS
 from s3a.constants import _FREnums, FR_ENUMS
@@ -19,7 +20,9 @@ from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
   disableAppDuringFunc, saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
   restoreExceptionBehavior, menuFromEditorActions
 from s3a.models.s3abase import S3ABase
-from s3a.parameditors import ParamEditor, ParamEditorDockGrouping, FR_SINGLETON
+from s3a.parameditors import ParamEditor, ParamEditorDockGrouping, FR_SINGLETON, \
+  ParamEditorPlugin
+from s3a.plugins import MainImagePlugin, CompTablePlugin
 from s3a.structures import S3AWarning, XYVertices, FilePath, NChanImg
 from s3a.views.buttons import ButtonCollection
 
@@ -70,11 +73,9 @@ class S3A(S3ABase):
     self._hookupSignals()
 
     self.focusedImg.sigPluginChanged.connect(lambda: self.updateFocusedToolsGrp())
-    for plugin in FR_SINGLETON.tableFieldPlugins:
-      if isinstance(plugin, plugins.VerticesPlugin):
-        # TODO: Config option for which plugin to load by default?
-        self.focusedImg.changeCurrentPlugin(plugin)
-        break
+    # TODO: Config option for which plugin to load by default?
+    self.focusedImg.changeCurrentPlugin(FR_SINGLETON.clsToPluginMapping[
+                                          s3a.plugins.tablefield.VerticesPlugin])
 
     # Load layout options
     self.saveLayout('Default', allowOverwriteDefault=True)
@@ -156,9 +157,11 @@ class S3A(S3ABase):
     focusedLayout.addWidget(self.focusedImg)
     self._focusedLayout = focusedLayout
 
-    sharedMenuWidgets = [self.mainImg, self.compTbl]
-    for first, second in zip(sharedMenuWidgets, reversed(sharedMenuWidgets)):
-      first.menu.addMenu(menuFromEditorActions(second.toolsEditor, menuParent=first.menu))
+    plugins = [FR_SINGLETON.clsToPluginMapping[c] for c in [MainImagePlugin, CompTablePlugin]]
+    parents = [self.mainImg, self.compTbl]
+    for plugin, parent in zip(plugins, reversed(parents)):
+      parent.menu.addMenu(menuFromEditorActions([plugin.toolsEditor], plugin.name, menuParent=parent))
+
 
     tableDock = QtWidgets.QDockWidget('Component Table Window', self)
     tableDock.setFeatures(tableDock.DockWidgetMovable|tableDock.DockWidgetFloatable)
@@ -188,9 +191,6 @@ class S3A(S3ABase):
     self.statBar.addWidget(self.mouseCoords)
     self.statBar.addWidget(self.pxColor)
 
-    # EDITORS
-    FR_SINGLETON.sigDocksAdded.connect(lambda newDocks: self._addEditorDocks(newDocks))
-    self._addEditorDocks()
 
   def changeFocusedComp(self, newComps: df, forceKeepLastChange=False):
     ret = super().changeFocusedComp(newComps, forceKeepLastChange)
@@ -232,10 +232,6 @@ class S3A(S3ABase):
     self.menuAnalytics = QtWidgets.QMenu('&Analytics', self.menubar)
     self.menuHelp = QtWidgets.QMenu('&Help', self.menubar)
     menuTools = QtWidgets.QMenu('&Tools', self.menubar)
-
-    toolbar: QtWidgets.QToolBar = self.addToolBar('Parameter Editors')
-    toolbar.setObjectName('Parameter Edtor Toolbar')
-    self.paramToolbar = toolbar
 
     self.addToolBar(self.pluginToolbar)
 
@@ -280,9 +276,27 @@ class S3A(S3ABase):
 
     self.setMenuBar(self.menubar)
 
-    # SETTINGS
-    for docks in FR_SINGLETON.docks:
-      self.createMenuOptForDock(docks, parentToolbar=toolbar)
+
+  def _handleNewPlugin(self, plugin: ParamEditorPlugin):
+    super()._handleNewPlugin(plugin)
+    dock = plugin.dock
+    if dock is None:
+      return
+    FR_SINGLETON.quickLoader.addDock(dock)
+    self._tabbifyEditorDocks(dock.editors)
+
+    if plugin.menu is None and plugin.dock is None:
+      # No need to add menu and graphics options
+      return
+
+    if plugin.dock is None:
+      dummyDock = ParamEditorDockGrouping([], plugin.name)
+      pluginMenu = self.createMenuOptForDock(dummyDock, parentToolbar=self.pluginToolbar)
+    else:
+      pluginMenu = self.createMenuOptForDock(plugin.dock, parentToolbar=self.pluginToolbar)
+
+    if plugin.menu is not None:
+      pluginMenu.addMenu(plugin.menu)
 
   def _maybeLoadLastState_gui(self, loadLastState: bool=None,
                               quickLoaderArgs:dict=None):
@@ -449,9 +463,7 @@ class S3A(S3ABase):
     self.hasUnsavedChanges = False
     self.close()
 
-  def _addEditorDocks(self, docks=None):
-    if docks is None:
-      docks = FR_SINGLETON.docks
+  def _tabbifyEditorDocks(self, docks):
     # Define out here to retain scope
     def fixDWFactory(_dock):
       # Necessary since defining func in loop will cause problems otherwise
