@@ -218,10 +218,7 @@ class ParamEditorPlugin(ABC):
 
   @classmethod
   def __initEditorParams__(cls):
-    cls.dock = ParamEditorDockGrouping()
-
-  def __init__(self):
-    self.dock.name = self.name
+    cls.dock = ParamEditorDockGrouping(dockName=cls.name)
 
   def attachS3aRef(self, s3a: models.s3abase.S3ABase):
     self.s3a = s3a
