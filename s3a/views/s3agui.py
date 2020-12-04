@@ -22,11 +22,14 @@ from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import ParamEditor, ParamEditorDockGrouping, FR_SINGLETON, \
   ParamEditorPlugin, TableFieldPlugin
-from s3a.plugins import MainImagePlugin, CompTablePlugin
+from s3a.plugins import MainImagePlugin, CompTablePlugin, ProjectsPlugin, \
+  MiscFunctionsPlugin
 from s3a.structures import S3AWarning, XYVertices, FilePath, NChanImg
 from s3a.views.buttons import ButtonCollection
 
 __all__ = ['S3A']
+
+_MENU_PLUGINS = [ProjectsPlugin, MiscFunctionsPlugin]
 
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_ANNOTATOR)
 class S3A(S3ABase):
@@ -95,7 +98,6 @@ class S3A(S3ABase):
   def _hookupSignals(self):
     # Buttons
     self.openImgAct.triggered.connect(lambda: self.setMainImg_gui())
-    self.resetTblConfigAct.triggered.connect(lambda: self.resetTblFields_gui())
 
     FR_SINGLETON.colorScheme.registerFunc(self.updateTheme, FR_CONSTS.CLS_ANNOTATOR.name, runOpts=RunOpts.ON_CHANGED)
 
@@ -118,12 +120,6 @@ class S3A(S3ABase):
       self.undoAct.setText(f'Undo: {stack.undoDescr}')
       self.redoAct.setText(f'Redo: {stack.redoDescr}')
     stack.stackChangedCallbacks.append(updateUndoRedoTxts)
-
-    # ANALYTICS
-    self.modCompAnalyticsAct.triggered.connect(self.showModCompAnalytics)
-
-    # TOOLS
-    self.devConsoleAct.triggered.connect(self.showDevConsole)
 
     self.saveAllEditorDefaults()
     for editor in FR_SINGLETON.registerableEditors:
@@ -181,7 +177,6 @@ class S3A(S3ABase):
     self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, tableDock)
 
     # STATUS BAR
-    self.statBar = QtWidgets.QStatusBar(self)
     self.setStatusBar(self.statBar)
 
     authorName = FR_SINGLETON.tableData.annAuthor
@@ -232,24 +227,22 @@ class S3A(S3ABase):
     # MENU BAR
     # -----
     # Top Level
-    self.menubar = QtWidgets.QMenuBar(self)
-    self.menuFile = QtWidgets.QMenu('&File', self.menubar)
-    self.menuEdit = QtWidgets.QMenu('&Edit', self.menubar)
-    self.menuAnalytics = QtWidgets.QMenu('&Analytics', self.menubar)
-    self.menuHelp = QtWidgets.QMenu('&Help', self.menubar)
-    menuTools = QtWidgets.QMenu('&Tools', self.menubar)
+    self.menuFile = QtWidgets.QMenu('&File', self.menuBar_)
+    self.menuEdit = QtWidgets.QMenu('&Edit', self.menuBar_)
+    self.menuHelp = QtWidgets.QMenu('&Help', self.menuBar_)
 
-    self.menubar.addMenu(self.menuFile)
-    self.menubar.addMenu(self.menuEdit)
-    self.menubar.addMenu(self.menuAnalytics)
-    self.menubar.addMenu(menuTools)
-    self.menubar.addMenu(self.menuHelp)
+    existingActs = self.menuBar_.actions()
+    if len(existingActs) == 0:
+      leftmost = None
+    else:
+      leftmost = existingActs[0]
+
+    self.menuBar_.insertMenu(leftmost, self.menuFile)
+    self.menuBar_.insertMenu(leftmost, self.menuEdit)
+    self.menuBar_.addMenu(self.menuHelp)
 
     # File / Image
     self.openImgAct = create_addMenuAct(self, self.menuFile, '&Open Image')
-
-    # File / Config
-    self.resetTblConfigAct = create_addMenuAct(self, self.menuFile, 'Select &Table Configuration')
 
     # File / layout
     self.menuLayout = create_addMenuAct(self, self.menuFile, '&Layout', True)
@@ -268,17 +261,11 @@ class S3A(S3ABase):
     self.redoAct = create_addMenuAct(self, self.menuEdit, '&Redo')
     self.redoAct.setShortcut('Ctrl+Y')
 
-    # Analytics
-    self.modCompAnalyticsAct = create_addMenuAct(self, self.menuAnalytics, 'Modified Component')
-
-    # Tools
-    self.devConsoleAct = create_addMenuAct(self, menuTools, 'Show Developer Console')
-
     # Help
     self.userGuideAct = create_addMenuAct(self, self.menuHelp, 'Online User Guide')
     self.aboutQtAct = create_addMenuAct(self, self.menuHelp, 'Qt Version Info')
 
-    self.setMenuBar(self.menubar)
+    self.setMenuBar(self.menuBar_)
 
 
   def _handleNewPlugin(self, plugin: ParamEditorPlugin):
@@ -293,19 +280,24 @@ class S3A(S3ABase):
       # No need to add menu and graphics options
       return
 
-    if isinstance(plugin, TableFieldPlugin):
+    if type(plugin) in _MENU_PLUGINS:
+      parentTb = self.menuBar_
+    elif isinstance(plugin, TableFieldPlugin):
       parentTb = self.tblFieldToolbar
     else:
       parentTb = self.generalToolbar
 
     if plugin.dock is None:
       dummyDock = ParamEditorDockGrouping([], plugin.name)
-      pluginMenu = self.createMenuOptForDock(dummyDock, parentToolbar=parentTb)
+      pluginMenu = self.createMenuOptForDock(dummyDock, parentToolbarOrMenu=parentTb)
     else:
-      pluginMenu = self.createMenuOptForDock(plugin.dock, parentToolbar=parentTb)
+      pluginMenu = self.createMenuOptForDock(plugin.dock, parentToolbarOrMenu=parentTb)
 
     if plugin.menu is not None:
-      pluginMenu.addMenu(plugin.menu)
+      if plugin.dock is not None:
+        pluginMenu.addSeparator()
+      for action in plugin.menu.actions():
+        pluginMenu.addAction(action)
 
   def _maybeLoadLastState_gui(self, loadLastState: bool=None,
                               quickLoaderArgs:dict=None):
@@ -343,17 +335,6 @@ class S3A(S3ABase):
     saveToFile(dockStates, saveFile,
                allowOverwriteDefault=allowOverwriteDefault)
     self.sigLayoutSaved.emit()
-
-  def showDevConsole(self):
-    namespace = dict(app=self, rtf=REQD_TBL_FIELDS, singleton=FR_SINGLETON)
-    # "dict" default is to use repr instead of string for internal elements, so expanding
-    # into string here ensures repr is not used
-    nsPrintout = [f"{k}: {v}" for k, v in namespace.items()]
-    text = f'Starting console with variables:\n' \
-           f'{nsPrintout}'
-    console = ConsoleWidget(self, namespace=namespace, text=text)
-    console.setWindowFlags(QtCore.Qt.Window)
-    console.show()
 
   def setMainImg(self, fileName: FilePath = None, imgData: NChanImg = None,
                  clearExistingComps=True):
@@ -481,7 +462,7 @@ class S3A(S3ABase):
       return doFix
 
     dock = None
-    for dock in docks:
+    for dock in [FR_SINGLETON.docks[0]] + docks:
       dock.setParent(self)
       self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
       if isinstance(dock, ParamEditorDockGrouping):
@@ -541,7 +522,7 @@ class S3A(S3ABase):
   def createMenuOptForDock(self,
                            dockEditor: Union[ParamEditor, ParamEditorDockGrouping],
                            loadFunc=None, parentBtn: QtWidgets.QPushButton=None,
-                           parentToolbar=None):
+                           parentToolbarOrMenu=None):
     if parentBtn is None:
       parentBtn = QtWidgets.QPushButton()
     if isinstance(dockEditor, ParamEditor):
@@ -555,7 +536,7 @@ class S3A(S3ABase):
     else:
       # FRParamEditorDockGrouping
       parentBtn.setText(dockEditor.name)
-      menu = QtWidgets.QMenu(self)
+      menu = QtWidgets.QMenu(dockEditor.name, self)
       parentBtn.setMenu(menu)
       # newMenu = create_addMenuAct(self, parentBtn, dockEditor.name, True)
       for editor in dockEditor.editors:
@@ -567,8 +548,13 @@ class S3A(S3ABase):
           menu.addMenu(menuOrAct)
         except TypeError: # Action instead
           menu.addAction(menuOrAct)
-    if parentToolbar is not None:
-      parentToolbar.addWidget(parentBtn)
+    if parentToolbarOrMenu is not None:
+      if isinstance(parentToolbarOrMenu, QtWidgets.QToolBar):
+        parentToolbarOrMenu.addWidget(parentBtn)
+      else:
+        # False positive
+        # noinspection PyTypeChecker
+        parentToolbarOrMenu.addMenu(menu)
     return menu
 
   def _populateLoadLayoutOptions(self):

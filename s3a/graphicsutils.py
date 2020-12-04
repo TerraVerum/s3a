@@ -9,6 +9,7 @@ from pathlib import Path
 from traceback import format_exception
 from typing import Optional, Union, Callable, Generator, Sequence, Dict
 
+from pyqtgraph.console import ConsoleWidget
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from pyqtgraph.parametertree import Parameter
 from ruamel.yaml import YAML
@@ -508,12 +509,20 @@ def menuFromEditorActions(editors: Union[s3a.ParamEditor, Sequence[s3a.ParamEdit
   return menu
 
 class ThumbnailViewer(QtWidgets.QListWidget):
+  sigDeleteRequested = QtCore.Signal(object)
+  """List[Selected image paths]"""
+
   def __init__(self, parent=None):
     super().__init__(parent)
     self.nameToFullPathMapping: Dict[str, Path] = {}
     self.setViewMode(self.IconMode)
     self.setIconSize(QtCore.QSize(200,200))
     self.setResizeMode(self.Adjust)
+
+    def findDelImgs():
+      selection = self.selectedImages
+      self.sigDeleteRequested.emit(selection)
+    self.delShc = QtWidgets.QShortcut(QtCore.Qt.Key_Delete, self, findDelImgs)
 
   def addThumbnail(self, fullName: Path):
     icon = QtGui.QIcon(str(fullName))
@@ -523,6 +532,11 @@ class ThumbnailViewer(QtWidgets.QListWidget):
     newItem.setIcon(icon)
     self.addItem(newItem)
     self.nameToFullPathMapping[fullName.name] = fullName
+
+  @property
+  def selectedImages(self):
+    return [self.nameToFullPathMapping[idx.data()] for idx in self.selectedIndexes()]
+
 
   def removeThumbnail(self, name: str):
     del self.nameToFullPathMapping[name]
@@ -564,3 +578,51 @@ class DropList(QtWidgets.QListWidget):
       for url in md.urls():
         self.addItem(url.toLocalFile())
       event.acceptProposedAction()
+
+# Taken directly from https://stackoverflow.com/a/20610786/9463643
+try:
+  from pyqtgraph.Qt import QtWidgets
+  from qtconsole.rich_jupyter_widget import RichJupyterWidget
+  from qtconsole.inprocess import QtInProcessKernelManager
+  from IPython.lib import guisupport
+
+except ImportError:
+  ConsoleWidget = ConsoleWidget
+else:
+
+  class ConsoleWidget(RichJupyterWidget):
+    """ Convenience class for a live IPython console widget. We can replace the standard banner using the customBanner argument"""
+    def __init__(self,text=None,*args,**kwargs):
+      if not text is None: self.banner=text
+      super().__init__(*args,**kwargs)
+      self.kernel_manager = kernel_manager = QtInProcessKernelManager()
+      kernel_manager.start_kernel()
+      # kernel_manager.kernel.gui = 'qt5'
+      self.kernel_client = kernel_client = self._kernel_manager.client()
+      kernel_client.start_channels()
+
+      def stop():
+        kernel_client.stop_channels()
+        kernel_manager.shutdown_kernel()
+        guisupport.get_app_qt4().exit()
+      self.exit_requested.connect(stop)
+
+      namespace = kwargs.get('namespace', {})
+      namespace.setdefault('__console__', self)
+      self.pushVariables(namespace)
+      parent = kwargs.get('parent', None)
+      if parent is not None:
+        self.setParent(parent)
+
+    def pushVariables(self,variableDict):
+      """ Given a dictionary containing name / value pairs, push those variables to the IPython console widget """
+      self.kernel_manager.kernel.shell.push(variableDict)
+    def clearTerminal(self):
+      """ Clears the terminal """
+      self._control.clear()
+    def printText(self,text):
+      """ Prints some plain text to the console """
+      self._append_plain_text(text)
+    def executeCommand(self,command):
+      """ Execute a command in the frame of the console widget """
+      self._execute(command,False)

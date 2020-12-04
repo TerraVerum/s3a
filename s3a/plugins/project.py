@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from functools import partial
 from pathlib import Path
 from typing import Dict
@@ -8,19 +9,15 @@ from pyqtgraph.Qt import QtWidgets, QtCore
 
 from s3a import ParamEditor, FR_SINGLETON, FR_CONSTS, ComponentIO, models
 from s3a.generalutils import attemptFileLoad
-from s3a.graphicsutils import menuFromEditorActions, popupFilePicker, DropList, \
+from s3a.graphicsutils import popupFilePicker, DropList, \
   ThumbnailViewer
-from s3a.parameditors import ParamEditorPlugin, ProjectData
+from s3a.parameditors import ProjectData
 from s3a.structures import FilePath
+from .misc import MiscFunctionsPlugin, MiscFunctionsPluginBase
 
 
-class ProjectsPlugin(ParamEditorPlugin):
+class ProjectsPlugin(MiscFunctionsPluginBase):
   name = 'Project'
-
-  @classmethod
-  def __initEditorParams__(cls):
-    super().__initEditorParams__()
-    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Tools')
 
   def __init__(self):
     super().__init__()
@@ -32,17 +29,20 @@ class ProjectsPlugin(ParamEditorPlugin):
                                               )
     self.compIo: ComponentIO = ioCls()
 
-    self.toolsEditor.registerFunc(self.create_gui, name='Create')
-    self.toolsEditor.registerFunc(self.open_gui, name='Open')
-    self.toolsEditor.registerFunc(self.imageMgr_gui, name='Open Project Image')
+    self.registerFunc(self.create_gui, name='Create')
+    self.registerFunc(self.open_gui, name='Open')
+    self.registerFunc(self.imageMgr_gui, name='Open Project Image')
     self._projImgMgr = ProjectImageManager()
     self._projImgThumbnails = self._projImgMgr.thumbnails
     self._projImgMgr.sigImageSelected.connect(lambda imgFname: self.s3a.setMainImg(self._projImgThumbnails.nameToFullPathMapping[imgFname]))
+    self.projNameLbl = QtWidgets.QLabel()
+
+  def _updateProjLbl(self):
+    self.projNameLbl.setText(f'Project: {self.name}')
 
   def attachS3aRef(self, s3a: models.s3abase.S3ABase):
-    self.menu = menuFromEditorActions(self.toolsEditor, menuParent=s3a)
-
     super().attachS3aRef(s3a)
+    s3a.statBar.addWidget(self.projNameLbl)
     s3a.sigImageChanged.connect(lambda: self.loadNewAnns())
 
   def loadNewAnns(self, imgFname: FilePath=None):
@@ -53,12 +53,14 @@ class ProjectsPlugin(ParamEditorPlugin):
     imgAnns = self.data.imgToAnnMapping.get(imgFname, None)
     if imgAnns is not None:
       self.s3a.compMgr.addComps(self.compIo.buildByFileType(imgAnns))
+    self.data.addImage(imgFname)
 
   def open(self, name: str):
     self.data.loadCfg(name)
     self._projImgThumbnails.clear()
     for img in self.data.images:
       self._projImgThumbnails.addThumbnail(img)
+    self._updateProjLbl()
 
   def open_gui(self):
     fname = popupFilePicker(self.s3a, 'Select Project File', 'S3A Project (*.s3aprj)')
@@ -69,9 +71,14 @@ class ProjectsPlugin(ParamEditorPlugin):
   def imageMgr_gui(self):
     dlg = self._projImgMgr
     dlg.show()
-    ok = dlg.exec_()
-    if not ok:
-      return
+    def onClick(item):
+      imgName = dlg.thumbnails.nameToFullPathMapping[item.text()]
+      self.loadNewAnns(imgName)
+      dlg.thumbnails.disconnect()
+      dlg.close()
+    dlg.thumbnails.itemDoubleClicked.connect(onClick)
+    dlg.exec_()
+
 
   def saveCurAnnotation(self):
     self.data.addAnnotation(data=self.s3a.exportableDf, image=self.s3a.srcImgFname, overwriteOld=True)
@@ -192,7 +199,7 @@ class ProjectImageManager(QtWidgets.QDialog):
     self.completer = QtWidgets.QLineEdit()
     self.completer.setPlaceholderText('Type to filter')
     self.completer.textChanged.connect(self._filterThumbnails)
-    self.thumbnails.itemDoubleClicked.connect(lambda item: self.sigImageSelected.emit(item.text()))
+    self.thumbnails.itemActivated.connect(lambda item: self.sigImageSelected.emit(item.text()))
 
     layout.addWidget(self.completer)
     layout.addWidget(self.thumbnails)

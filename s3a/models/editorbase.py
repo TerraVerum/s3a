@@ -38,13 +38,13 @@ def _mkRunBtn(proc: AtomicProcess, btnOpts: Union[FRParam, dict]):
   defaultBtnOpts = dict(name=proc.name, type='registeredaction')
   if isinstance(btnOpts, FRParam):
     # Replace falsy helptext with func signature
-    if not btnOpts.helpText:
-      btnOpts.helpText = docParser(proc.func.__doc__)['top-descr']
     btnOpts = frParamToPgParamDict(btnOpts)
     # Make sure param type is not overridden
     btnOpts.pop('type', None)
   if btnOpts is not None:
     defaultBtnOpts.update(btnOpts)
+  if len(defaultBtnOpts.get('tip', '')) == 0:
+    defaultBtnOpts['tip'] = docParser(proc.func.__doc__)['top-descr']
   if len(proc.input.hyperParamKeys) > 0:
     # In this case, a descriptive name isn't needed since the func name will be
     # present in the parameter group

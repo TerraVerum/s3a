@@ -34,6 +34,7 @@ class S3ABase(QtWidgets.QMainWindow):
   """
 
   sigImageChanged = QtCore.Signal()
+  sigImageAboutToChange = QtCore.Signal(object, object) # current name, new name (as Paths)
   sigRegionAccepted = QtCore.Signal()
   """
   Like `sigImageChanged` from main image's `imgItem`, but only fires when a new image is
@@ -53,10 +54,12 @@ class S3ABase(QtWidgets.QMainWindow):
     self.focusedImg = FocusedImage()
     self.focusedImg.toolsEditor.registerFunc(self.acceptFocusedRegion,
                                              btnOpts=FR_CONSTS.TOOL_ACCEPT_FOC_REGION)
+    self.statBar = QtWidgets.QStatusBar(self)
+    self.menuBar_ = QtWidgets.QMenuBar(self)
+
     opt = copy(FR_CONSTS.TOOL_CLEAR_ROI)
     opt.opts['ownerObj'] = self.focusedImg
     self.focusedImg.toolsEditor.registerFunc(self.focusedImg.clearCurRoi, btnOpts=opt)
-
 
     self.compMgr = ComponentMgr()
     # Register exporter to allow user parameters
@@ -290,6 +293,7 @@ class S3ABase(QtWidgets.QMainWindow):
       fileName = Path(fileName).resolve()
     if fileName == self.srcImgFname:
       return
+    self.sigImageAboutToChange.emit(self.srcImgFname, fileName)
     if imgData is not None:
       self.mainImg.setImage(imgData)
     else:
@@ -301,6 +305,7 @@ class S3ABase(QtWidgets.QMainWindow):
       self.compMgr.rmComps()
     self.focusedImg.updateAll()
     self.mainImg.plotItem.vb.autoRange()
+    self.sigImageChanged.emit()
     yield
     self.setMainImg(oldFile, oldData, clearExistingComps)
     if clearExistingComps:
@@ -351,6 +356,10 @@ class S3ABase(QtWidgets.QMainWindow):
     self.compMgr.addComps(newComps, loadType)
 
   def showModCompAnalytics(self):
+    """
+    Shows the result of each process stage for most recent result of the currently
+    selected plugin
+    """
     try:
       proc = self.focusedImg.currentPlugin.curProcessor
       proc.processor.stageSummary_gui()

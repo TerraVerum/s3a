@@ -32,10 +32,8 @@ def docParser(docstring: str):
   :param docstring: Function docstring
   """
   parsed = dp.parse(docstring)
-  descr = ''
-  for parseDescr in parsed.short_description, parsed.long_description:
-    if parseDescr is not None:
-      descr += parseDescr
+  descrPieces = [p for p in (parsed.short_description, parsed.long_description) if p is not None]
+  descr = ' '.join(descrPieces)
   out = {}
   for param in parsed.params:
     stream = StringIO(param.description)
