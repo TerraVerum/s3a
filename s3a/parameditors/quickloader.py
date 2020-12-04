@@ -24,7 +24,7 @@ class EditorListModel(QtCore.QAbstractListModel):
     self.addEditors(editorList)
 
   def addEditors(self, editorList: List[ParamEditor]):
-    editorList = [e for e in editorList if e not in self.uniqueEditors]
+    editorList = [e for e in editorList if e not in self.uniqueEditors and e.saveDir is not None]
     self.uniqueEditors.extend(editorList)
     self.layoutAboutToBeChanged.emit()
     for editor in editorList:

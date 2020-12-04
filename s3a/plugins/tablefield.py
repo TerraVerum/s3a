@@ -58,6 +58,7 @@ class VerticesPlugin(TableFieldPlugin):
     paramLst = [FRC.TOOL_RESET_FOC_REGION, FRC.TOOL_FILL_FOC_REGION,
                 FRC.TOOL_CLEAR_FOC_REGION, FRC.TOOL_CLEAR_HISTORY]
     for func, param in zip(funcLst, paramLst):
+      param.opts['ownerObj'] = s3a.focusedImg
       self.toolsEditor.registerFunc(func, btnOpts=param)
 
     self.menu = menuFromEditorActions(self.toolsEditor, menuParent=s3a)
