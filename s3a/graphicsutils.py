@@ -7,7 +7,7 @@ from functools import wraps
 from os.path import basename
 from pathlib import Path
 from traceback import format_exception
-from typing import Optional, Union, Callable, Generator, Sequence, Dict
+from typing import Optional, Union, Callable, Generator, Sequence, Dict, List
 
 from pyqtgraph.console import ConsoleWidget
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
@@ -35,19 +35,41 @@ def disableAppDuringFunc(func):
       mainWin.setEnabled(True)
   return disableApp
 
-def popupFilePicker(parent, winTitle: str, fileFilter: str, asOpen=True) -> Optional[str]:
-  retVal = None
+def popupFilePicker(parent=None, winTitle: str='', fileFilter: str='', asOpen=True, asFolder=False,
+                    selectMultiple=False, startDir: str=None) -> Optional[Union[str, List[str]]]:
   fileDlg = QtWidgets.QFileDialog()
-  # fileDlg.setDirectory('~')
+  fileMode = fileDlg.AnyFile
+  opts = fileDlg.DontUseNativeDialog
   if asOpen:
-    func = fileDlg.getOpenFileName
-  else:
-    func = fileDlg.getSaveFileName
-  fname, _ = func(parent, winTitle, filter=fileFilter, options=fileDlg.DontUseNativeDialog)
+    # Existing files only
+    fileMode = fileDlg.ExistingFiles if selectMultiple else fileDlg.ExistingFile
+  if asFolder:
+    fileMode = fileDlg.Directory
+    opts |= fileDlg.ShowDirsOnly
+  fileDlg.setFileMode(fileMode)
+  fileDlg.setOptions(opts)
+  fileDlg.setModal(True)
+  if startDir is not None:
+    fileDlg.setDirectory(startDir)
+  fileDlg.setNameFilter(fileFilter)
 
-  if len(fname) > 0:
-    retVal = fname
-  return retVal
+  fileDlg.setOption(fileDlg.DontUseNativeDialog, True)
+  fileDlg.setWindowTitle(winTitle)
+  if parent is None:
+    parent = QtWidgets.QApplication.desktop()
+  fileDlg.setParent(parent)
+
+  if fileDlg.exec_():
+    fList = fileDlg.selectedFiles()
+  else:
+    fList = []
+
+  if selectMultiple:
+    return fList
+  elif len(fList) > 0:
+    return fList[0]
+  else:
+    return None
 
 def dialogGetSaveFileName(parent, winTitle, defaultTxt: str=None)-> Optional[str]:
   failedSave = True
@@ -608,7 +630,6 @@ else:
       def stop():
         kernel_client.stop_channels()
         kernel_manager.shutdown_kernel()
-        guisupport.get_app_qt4().exit()
       self.exit_requested.connect(stop)
 
       namespace = kwargs.get('namespace', {})

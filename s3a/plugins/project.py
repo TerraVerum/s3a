@@ -159,10 +159,10 @@ class NewProjectWizard(QtWidgets.QWizard):
     def getFileList(_flist: DropList, _title: str, _selectFolder=False):
       dlg = QtWidgets.QFileDialog()
       dlg.setModal(True)
-      getFn = lambda *args, **kwargs: dlg.getOpenFileNames(*args, **kwargs)[0]
+      getFn = lambda *args, **kwargs: dlg.getOpenFileNames(*args, **kwargs, options=dlg.DontUseNativeDialog)[0]
       if _selectFolder:
-        getFn = lambda *args, **kwargs: [dlg.getExistingDirectory(*args, **kwargs)]
-      files = getFn(self, _title, str(self.project.data.location))
+        getFn = lambda *args, **kwargs: [dlg.getExistingDirectory(*args, **kwargs, options=dlg.DontUseNativeDialog)]
+      files = getFn(self, _title)
       _flist.addItems(files)
 
 

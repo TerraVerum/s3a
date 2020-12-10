@@ -8,7 +8,7 @@ from pyqtgraph.parametertree.Parameter import PARAM_TYPES
 from pyqtgraph.parametertree.parameterTypes import ActionParameterItem, ActionParameter, \
   TextParameterItem, TextParameter
 import numpy as np
-from s3a.graphicsutils import PopupLineEditor
+from s3a.graphicsutils import PopupLineEditor, popupFilePicker
 
 from s3a.structures import S3AException, FRParam
 from s3a import parameditors
@@ -273,18 +273,14 @@ class FilePickerParameterItem(parameterTypes.WidgetParameterItem):
     return button
 
   def _retrieveFolderName_gui(self):
-    folderDlg = QtWidgets.QFileDialog()
-    folderDlg.setModal(True)
     curVal = self.param.value()
     if len(curVal) > 0:
       useDir = curVal
     else:
       useDir = None
-    if self.param.opts['asFolder']:
-      fname = folderDlg.getExistingDirectory(caption='Select File', directory=useDir)
-    else:
-      fname, _ = folderDlg.getOpenFileName(caption='Select File', directory=useDir)
-    if len(fname) == 0:
+    asFolder = self.param.opts['asFolder']
+    fname = popupFilePicker(None, 'Select File', asFolder=asFolder, startDir=useDir)
+    if fname is None:
       return
     self.param.setValue(fname)
 

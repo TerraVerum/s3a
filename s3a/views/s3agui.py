@@ -375,7 +375,7 @@ class S3A(S3ABase):
   def exportAnnotations_gui(self):
     """Saves the component table to a file"""
     fileFilters = self.compIo.handledIoTypes_fileFilter(**{'*': 'All Files'})
-    outFname = popupFilePicker(self, 'Select Save File', fileFilters)
+    outFname = popupFilePicker(self, 'Select Save File', fileFilters, asOpen=False)
     if outFname is not None:
       super().exportAnnotations(outFname)
 
