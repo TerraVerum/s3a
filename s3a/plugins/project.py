@@ -38,7 +38,7 @@ class ProjectsPlugin(MiscFunctionsPluginBase):
     self.projNameLbl = QtWidgets.QLabel()
 
   def _updateProjLbl(self):
-    self.projNameLbl.setText(f'Project: {self.name}')
+    self.projNameLbl.setText(f'Project: {self.data.cfgFname.name}')
 
   def attachS3aRef(self, s3a: models.s3abase.S3ABase):
     super().attachS3aRef(s3a)
@@ -104,7 +104,7 @@ class ProjectsPlugin(MiscFunctionsPluginBase):
     settings = wiz.projSettings
     projName = settings['Name']
     prevTemplate = settings['Template Project']
-    if prevTemplate is not None:
+    if prevTemplate is not None and len(prevTemplate) > 0:
       baseCfg = attemptFileLoad(prevTemplate)
       if not settings['Keep Existing Images'] or 'images' not in baseCfg:
         baseCfg['images'] = []
@@ -114,7 +114,7 @@ class ProjectsPlugin(MiscFunctionsPluginBase):
       baseCfg = {'images': [], 'annotations': []}
     baseCfg['images'].extend(images)
     baseCfg['annotations'].extend(annotations)
-    projPath = Path(wiz.projSettings['Location'])/projName/f'{projName}.yml'
+    projPath = Path(wiz.projSettings['Location'])/projName
     self.data = ProjectData.create(name=projPath, cfg=baseCfg)
 
 

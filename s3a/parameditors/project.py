@@ -63,7 +63,7 @@ class ProjectData:
     cfgFname, cfgDict = resolveYamlDict(cfgFname, cfgDict)
     hierarchicalUpdate(defaultCfg, cfgDict)
     cfg = self.cfg = defaultCfg
-    self.cfgFname = cfgFname
+    self.cfgFname = cfgFname.resolve()
     tableInfo = cfg.get('table-cfg', {})
     if isinstance(tableInfo, str):
       tableDict = None
@@ -103,7 +103,7 @@ class ProjectData:
     location = Path(location)
     location.mkdir(exist_ok=True, parents=True)
     proj = cls()
-    proj.cfgFname = name
+    proj.cfgFname = name.resolve()
     proj.annotationsDir.mkdir(exist_ok=True)
     proj.imagesDir.mkdir(exist_ok=True)
 
@@ -226,7 +226,8 @@ class ProjectData:
       xpondingImgs = np.unique(data[REQD_TBL_FIELDS.SRC_IMG_FILENAME].to_numpy())
       # Break into annotaitons by iamge
       for img in xpondingImgs:
-        self.addAnnotation(name, data, img)
+        self.addAnnotation(name, data[data[REQD_TBL_FIELDS.SRC_IMG_FILENAME] == img], img)
+      return
     image = self._getFullImgName(Path(image))
     # Since only one annotation file can exist per image, concatenate this with any existing files for the same image
     # if needed
