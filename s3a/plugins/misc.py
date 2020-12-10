@@ -1,7 +1,8 @@
 from __future__ import annotations
 from typing import Callable
 
-from PyQt5 import QtWidgets, QtCore
+from pyqtgraph.Qt import QtWidgets, QtCore
+from pyqtgraph import console as pg_console
 
 from s3a import ParamEditor, models, FR_CONSTS as FRC, FR_SINGLETON, RunOpts, \
   REQD_TBL_FIELDS as RTF, FRParam
@@ -125,7 +126,11 @@ class MiscFunctionsPlugin(MiscFunctionsPluginBase):
     nsPrintout = [f"{k}: {v}" for k, v in namespace.items()]
     text = f'Starting console with variables:\n' \
            f'{nsPrintout}'
-    console = ConsoleWidget(parent=self.s3a, namespace=namespace, text=text)
+    try:
+      console = ConsoleWidget(parent=self.s3a, namespace=namespace, text=text)
+    except Exception as ex:
+      # Ipy kernel can have issues for many different reasons. Always be ready to fall back to traditional console
+      console = pg_console.ConsoleWidget(parent=self.s3a, namespace=namespace, text=text)
     console.setWindowFlags(QtCore.Qt.Window)
     console.show()
 
