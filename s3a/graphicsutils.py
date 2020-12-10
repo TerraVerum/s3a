@@ -591,7 +591,7 @@ try:
   from IPython.lib import guisupport
 
 except (ImportError, NotImplementedError):
-  ConsoleWidget = soleWidget
+  ConsoleWidget = ConsoleWidget
 else:
 
   class ConsoleWidget(RichJupyterWidget):
