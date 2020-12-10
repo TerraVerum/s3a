@@ -52,6 +52,7 @@ class S3ABase(QtWidgets.QMainWindow):
     super().__init__(parent)
     self.mainImg = MainImage()
     self.focusedImg = FocusedImage()
+    FR_CONSTS.TOOL_ACCEPT_FOC_REGION.opts['ownerObj'] = self
     self.focusedImg.toolsEditor.registerFunc(self.acceptFocusedRegion,
                                              btnOpts=FR_CONSTS.TOOL_ACCEPT_FOC_REGION)
     self.statBar = QtWidgets.QStatusBar(self)
@@ -117,9 +118,9 @@ class S3ABase(QtWidgets.QMainWindow):
       if self.mainImg.image is None:
         return None
       saveName = _folderName / 'savedState.pkl'
-      self.exportCompList(saveName, readOnly=False)
+      self.exportAnnotations(saveName, readOnly=False)
       return str(saveName)
-    loadExistingComps = lambda infile: self.loadCompList(infile, FR_ENUMS.COMP_ADD_AS_MERGE)
+    loadExistingComps = lambda infile: self.openAnnotations(infile, FR_ENUMS.COMP_ADD_AS_MERGE)
     self.appStateEditor.addImportExportOpts(
       'annotations', loadExistingComps, saveExistingComps)
 
@@ -214,7 +215,7 @@ class S3ABase(QtWidgets.QMainWindow):
       baseSaveNamePlusFolder = autosaveFolder/f'{baseName}_{counter}.csv'
       counter += 1
       if not np.array_equal(self.compMgr.compDf, lastSavedDf):
-        self.exportCompList(baseSaveNamePlusFolder)
+        self.exportAnnotations(baseSaveNamePlusFolder)
         lastSavedDf = self.compMgr.compDf.copy()
 
     self.autosaveTimer.timeout.connect(save_incrementCounter)
@@ -312,7 +313,7 @@ class S3ABase(QtWidgets.QMainWindow):
       # Old comps were cleared, so put them back
       self.compMgr.addComps(oldComps)
 
-  def exportCompList(self, outFname: Union[str, Path], readOnly=True, verifyIntegrity=True):
+  def exportAnnotations(self, outFname: Union[str, Path], readOnly=True, verifyIntegrity=True):
     self.compIo.exportByFileType(self.exportableDf, outFname, imShape=self.mainImg.image.shape,
                                  readOnly=readOnly, verifyIntegrity=verifyIntegrity)
     self.hasUnsavedChanges = False
@@ -344,7 +345,7 @@ class S3ABase(QtWidgets.QMainWindow):
     exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = srcImgFname
     return exportDf
 
-  def loadCompList(self, inFname: str, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
+  def openAnnotations(self, inFname: str, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
     pathFname = Path(inFname)
     if self.mainImg.image is None:
       raise S3AIOError('Cannot load components when no main image is set.')

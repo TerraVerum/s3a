@@ -73,17 +73,17 @@ def test_est_clear_bounds():
 @pytest.mark.withcomps
 def test_export_all_comps(tmpdir):
   compFile = tmpdir/'tmp.csv'
-  app.exportCompList(str(compFile))
+  app.exportAnnotations(str(compFile))
   assert compFile.exists(), 'All-comp export didn\'t produce a component list'
 
 def test_load_comps_merge(tmpdir):
   compFile = tmpdir/'tmp.csv'
 
   app.compMgr.addComps(dfTester.compDf)
-  app.exportCompList(str(compFile))
+  app.exportAnnotations(str(compFile))
   app.clearBoundaries()
 
-  app.loadCompList(str(compFile))
+  app.openAnnotations(str(compFile))
   equalCols = np.setdiff1d(dfTester.compDf.columns, [REQD_TBL_FIELDS.INST_ID,
                                                      REQD_TBL_FIELDS.SRC_IMG_FILENAME])
   dfCmp = app.compMgr.compDf[equalCols].values == dfTester.compDf[equalCols].values
@@ -174,7 +174,7 @@ def test_no_author():
 def test_unsaved_changes(sampleComps, tmpdir):
   app.compMgr.addComps(sampleComps)
   assert app.hasUnsavedChanges
-  app.exportCompList(tmpdir/'export.csv')
+  app.exportAnnotations(tmpdir / 'export.csv')
   assert not app.hasUnsavedChanges
 
 def test_set_colorinfo():
@@ -194,7 +194,7 @@ def test_set_colorinfo():
 @pytest.mark.withcomps
 def test_quickload_profile(tmpdir):
   outfile = Path(tmpdir)/'tmp.csv'
-  app.exportCompList(outfile)
+  app.exportAnnotations(outfile)
   app.appStateEditor.loadParamState(
     stateDict=dict(image=str(SAMPLE_IMG_FNAME), layout='Default', annotations=str(outfile),
     mainimageprocessor='Default', focusedimageprocessor='Default',

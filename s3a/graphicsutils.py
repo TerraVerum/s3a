@@ -35,11 +35,15 @@ def disableAppDuringFunc(func):
       mainWin.setEnabled(True)
   return disableApp
 
-def popupFilePicker(parent, winTitle: str, fileFilter: str) -> Optional[str]:
+def popupFilePicker(parent, winTitle: str, fileFilter: str, asOpen=True) -> Optional[str]:
   retVal = None
   fileDlg = QtWidgets.QFileDialog()
-  fileDlg.setDirectory('~')
-  fname, _ = fileDlg.getOpenFileName(parent, winTitle, filter=fileFilter, options=fileDlg.DontUseNativeDialog)
+  # fileDlg.setDirectory('~')
+  if asOpen:
+    func = fileDlg.getOpenFileName
+  else:
+    func = fileDlg.getSaveFileName
+  fname, _ = func(parent, winTitle, filter=fileFilter, options=fileDlg.DontUseNativeDialog)
 
   if len(fname) > 0:
     retVal = fname
@@ -586,8 +590,8 @@ try:
   from qtconsole.inprocess import QtInProcessKernelManager
   from IPython.lib import guisupport
 
-except ImportError:
-  ConsoleWidget = ConsoleWidget
+except (ImportError, NotImplementedError):
+  ConsoleWidget = soleWidget
 else:
 
   class ConsoleWidget(RichJupyterWidget):

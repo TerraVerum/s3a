@@ -75,6 +75,7 @@ class CompTablePlugin(ParamEditorPlugin):
     for func, param in zip(
         [lambda: tbl.setSelectedCellsAs_gui(), tbl.removeSelectedRows_gui, tbl.setSelectedCellsAsFirst],
         [FRC.TOOL_TBL_SET_AS, FRC.TOOL_TBL_DEL_ROWS, FRC.TOOL_TBL_SET_SAME_AS_FIRST]):
+      param.opts['ownerObj'] = s3a
       self.toolsEditor.registerFunc(func, btnOpts=param)
     self.menu = tbl.menu = menuFromEditorActions([self.toolsEditor], menuParent=s3a)
     super().attachS3aRef(s3a)

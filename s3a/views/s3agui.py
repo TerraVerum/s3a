@@ -12,7 +12,7 @@ from pyqtgraph.console import ConsoleWidget
 
 import s3a.plugins.tablefield
 from s3a import plugins, RunOpts
-from s3a.constants import LAYOUTS_DIR, FR_CONSTS, REQD_TBL_FIELDS
+from s3a.constants import LAYOUTS_DIR, FR_CONSTS as FRC, REQD_TBL_FIELDS
 from s3a.constants import _FREnums, FR_ENUMS
 from s3a.generalutils import attemptFileLoad
 from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
@@ -31,7 +31,7 @@ __all__ = ['S3A']
 
 _MENU_PLUGINS = [ProjectsPlugin, MiscFunctionsPlugin]
 
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_ANNOTATOR)
+@FR_SINGLETON.registerGroup(FRC.CLS_ANNOTATOR)
 class S3A(S3ABase):
   sigLayoutSaved = QtCore.Signal()
   S3A_INST = None
@@ -51,9 +51,11 @@ class S3A(S3ABase):
     self.tblFieldToolbar = QtWidgets.QToolBar('Table Field Plugins')
 
     super().__init__(parent, **superLoaderArgs)
-    self.toolsEditor.registerFunc(self.estimateBoundaries_gui, btnOpts=FR_CONSTS.TOOL_ESTIMATE_BOUNDARIES)
-    self.toolsEditor.registerFunc(self.clearBoundaries, btnOpts=FR_CONSTS.TOOL_CLEAR_BOUNDARIES)
-    self.toolsEditor.registerFunc(self.exportCompList_gui, btnOpts=FR_CONSTS.TOOL_EXPORT_COMP_LIST)
+    for func, param in zip(
+        [self.estimateBoundaries_gui, self.clearBoundaries, self.exportAnnotations_gui],
+        [FRC.TOOL_ESTIMATE_BOUNDARIES, FRC.TOOL_CLEAR_BOUNDARIES, FRC.TOOL_EXPORT_COMP_LIST]):
+      param.opts['ownerObj'] = self
+      self.toolsEditor.registerFunc(func, btnOpts=param)
     if guiMode:
       warnings.simplefilter('error', S3AWarning)
       makeExceptionsShowDialogs(self)
@@ -98,8 +100,10 @@ class S3A(S3ABase):
   def _hookupSignals(self):
     # Buttons
     self.openImgAct.triggered.connect(lambda: self.setMainImg_gui())
+    self.openAnnsAct.triggered.connect(self.openAnnotation_gui)
+    self.exportAnnsAct.triggered.connect(self.exportAnnotations_gui)
 
-    FR_SINGLETON.colorScheme.registerFunc(self.updateTheme, FR_CONSTS.CLS_ANNOTATOR.name, runOpts=RunOpts.ON_CHANGED)
+    FR_SINGLETON.colorScheme.registerFunc(self.updateTheme, FRC.CLS_ANNOTATOR.name, runOpts=RunOpts.ON_CHANGED)
 
     # Menu options
     # FILE
@@ -215,10 +219,8 @@ class S3A(S3ABase):
       newTools.hide()
 
   def resetTblFields_gui(self):
-    fileDlg = QtWidgets.QFileDialog()
-    outFname, _ = fileDlg.getOpenFileName(self, 'Select Table Config File', '',
-                                          'All Files (*.*);; Config Files (*.yml)')
-    if len(outFname) > 0:
+    outFname = popupFilePicker(self, 'Select Table Config File', 'All Files (*.*);; Config Files (*.yml)')
+    if outFname is not None:
       FR_SINGLETON.tableData.loadCfg(outFname)
       self.resetTblFields()
 
@@ -243,6 +245,10 @@ class S3A(S3ABase):
 
     # File / Image
     self.openImgAct = create_addMenuAct(self, self.menuFile, '&Open Image')
+
+    # File / Annotation
+    self.openAnnsAct = create_addMenuAct(self, self.menuFile, 'Open &Annotations')
+    self.exportAnnsAct = create_addMenuAct(self, self.menuFile, 'E&xport Annotations')
 
     # File / layout
     self.menuLayout = create_addMenuAct(self, self.menuFile, '&Layout', True)
@@ -366,37 +372,20 @@ class S3A(S3ABase):
       else:
         self.startAutosave(interval, folderName, baseName)
 
-  def exportCompList_gui(self):
+  def exportAnnotations_gui(self):
     """Saves the component table to a file"""
-    fileDlg = QtWidgets.QFileDialog()
-    fileFilters = self.compIo.handledIoTypes_fileFilter('csv', **{'*': 'All Files'})
-    outFname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilters)
-    if len(outFname) > 0:
-      super().exportCompList(outFname)
+    fileFilters = self.compIo.handledIoTypes_fileFilter(**{'*': 'All Files'})
+    outFname = popupFilePicker(self, 'Select Save File', fileFilters)
+    if outFname is not None:
+      super().exportAnnotations(outFname)
 
-  def exportLabeledImg_gui(self):
-    """
-    # Note -- These three functions will be a single dialog with options
-    # for each requested parameter. It will look like the TableFilterEditor dialog.
-    types: List[FRCompParams] = getTypesFromUser()
-    outFile = getOutFileFromUser()
-    exportLegend = getExpLegendFromUser()
-    """
-    fileDlg = QtWidgets.QFileDialog()
-    # TODO: Delegate this to the exporter. Make a function that makes the right file filter,
-    #   and calls the right exporter function after the filename is retrieved.
-    fileFilters = self.compIo.handledIoTypes_fileFilter('png', **{'*': 'All Files'})
-    fname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilters)
-    if len(fname) > 0:
-      super().exportLabeledImg(fname)
-
-  def loadCompList_gui(self, loadType: _FREnums):
+  def openAnnotation_gui(self):
     # TODO: See note about exporting comps. Delegate the filepicker activity to importer
-    fileFilter = self.compIo.handledIoTypes_fileFilter(['csv', 'pkl'])
+    fileFilter = self.compIo.handledIoTypes_fileFilter()
     fname = popupFilePicker(self, 'Select Load File', fileFilter)
     if fname is None:
       return
-    self.loadCompList(fname, loadType)
+    self.openAnnotations(fname)
 
   def saveLayout_gui(self):
     outName = dialogGetSaveFileName(self, 'Layout Name')
