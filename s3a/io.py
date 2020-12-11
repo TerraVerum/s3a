@@ -468,7 +468,7 @@ class ComponentIO:
     return outDf
 
   @classmethod
-  def buildFromCompimgsDf(cls, inFile: FilePath, imShape: Tuple=None):
+  def buildFromCompimgsDf(cls, inFile: FilePath, imShape: Tuple=None, **importArgs):
     inDf = pd.read_pickle(inFile)
     outDf = cls.tableData.makeCompDf(len(inDf))
     outDf[RTF.INST_ID] = inDf['instId']
@@ -486,7 +486,7 @@ class ComponentIO:
     return outDf
 
   @classmethod
-  def buildFromPkl(cls, inFile: FilePath, imShape: Tuple=None) -> df:
+  def buildFromPkl(cls, inFile: FilePath, imShape: Tuple=None, **importArgs) -> df:
     """
     See docstring for :func:`self.buildFromCsv`
     """
@@ -495,7 +495,7 @@ class ComponentIO:
     return pklDf
 
   @classmethod
-  def buildFromIdPng(cls, inFileOrImg: Union[FilePath, GrayImg], imShape: Tuple=None) -> df:
+  def buildFromIdPng(cls, inFileOrImg: Union[FilePath, GrayImg], imShape: Tuple=None, **importArgs) -> df:
     if isinstance(inFileOrImg, GrayImg):
       labelImg = inFileOrImg
     else:
@@ -505,7 +505,7 @@ class ComponentIO:
     return outDf
 
   @classmethod
-  def buildFromClassPng(cls, inFileOrImg: Union[FilePath, GrayImg], imShape: Tuple=None) -> df:
+  def buildFromClassPng(cls, inFileOrImg: Union[FilePath, GrayImg], imShape: Tuple=None, **importArgs) -> df:
     if isinstance(inFileOrImg, GrayImg):
       clsImg = inFileOrImg
     else:

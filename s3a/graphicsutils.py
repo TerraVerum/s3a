@@ -55,8 +55,7 @@ def popupFilePicker(parent=None, winTitle: str='', fileFilter: str='', asOpen=Tr
 
   fileDlg.setOption(fileDlg.DontUseNativeDialog, True)
   fileDlg.setWindowTitle(winTitle)
-  if parent is None:
-    parent = QtWidgets.QApplication.desktop()
+  parent = QtWidgets.QApplication.desktop()
   fileDlg.setParent(parent)
 
   if fileDlg.exec_():
@@ -537,6 +536,8 @@ def menuFromEditorActions(editors: Union[s3a.ParamEditor, Sequence[s3a.ParamEdit
 class ThumbnailViewer(QtWidgets.QListWidget):
   sigDeleteRequested = QtCore.Signal(object)
   """List[Selected image paths]"""
+  sigImageSelected = QtCore.Signal(object)
+  """Full path of selected image"""
 
   def __init__(self, parent=None):
     super().__init__(parent)
@@ -544,6 +545,7 @@ class ThumbnailViewer(QtWidgets.QListWidget):
     self.setViewMode(self.IconMode)
     self.setIconSize(QtCore.QSize(200,200))
     self.setResizeMode(self.Adjust)
+    self.itemActivated.connect(lambda item: self.sigImageSelected.emit(self.nameToFullPathMapping[item.text()]))
 
     def findDelImgs():
       selection = self.selectedImages
@@ -604,6 +606,11 @@ class DropList(QtWidgets.QListWidget):
       for url in md.urls():
         self.addItem(url.toLocalFile())
       event.acceptProposedAction()
+
+  @property
+  def files(self):
+    model = self.model()
+    return [model.index(ii, 0).data() for ii in range(model.rowCount())]
 
 # Taken directly from https://stackoverflow.com/a/20610786/9463643
 try:

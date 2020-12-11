@@ -172,6 +172,13 @@ class ParamEditorDockGrouping(QtWidgets.QDockWidget):
       editor.dock = self
       self.editors.append(editor)
 
+  def removeEditors(self, editors: Sequence[ParamEditor]):
+    for editor in editors:
+      idx = self.editors.index(editor)
+      self.tabs.removeTab(idx)
+      editor.dock = None
+      del self.editors[editor]
+
   def setParent(self, parent: QtWidgets.QWidget=None):
     super().setParent(parent)
     for editor in self.editors:

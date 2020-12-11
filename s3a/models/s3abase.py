@@ -97,33 +97,6 @@ class S3ABase(QtWidgets.QMainWindow):
         self._handleNewPlugin(plugin)
     FR_SINGLETON.sigPluginAdded.connect(self._handleNewPlugin)
 
-    def loadCfg(_fname: str):
-      FR_SINGLETON.tableData.loadCfg(_fname)
-      self.resetTblFields()
-
-    def saveCfg(_folderName: Path):
-      td = FR_SINGLETON.tableData
-      saveFpath = td.cfgFname
-      if not saveFpath.exists():
-        saveFpath = _folderName/td.cfgFname.name
-        saveToFile(td.cfg, saveFpath, allowOverwriteDefault=True)
-      return str(saveFpath)
-    self.appStateEditor.addImportExportOpts('tablecfg', loadCfg, saveCfg)
-
-    self.appStateEditor.addImportExportOpts(
-      'image', lambda fname: self.setMainImg(fname, clearExistingComps=False),
-      lambda _folderName: str(self.srcImgFname)
-    )
-    def saveExistingComps(_folderName: Path):
-      if self.mainImg.image is None:
-        return None
-      saveName = _folderName / 'savedState.pkl'
-      self.exportAnnotations(saveName, readOnly=False)
-      return str(saveName)
-    loadExistingComps = lambda infile: self.openAnnotations(infile, FR_ENUMS.COMP_ADD_AS_MERGE)
-    self.appStateEditor.addImportExportOpts(
-      'annotations', loadExistingComps, saveExistingComps)
-
     # Connect signals
     # -----
     # COMPONENT MANAGER

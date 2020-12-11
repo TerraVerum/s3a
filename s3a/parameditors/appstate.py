@@ -84,7 +84,7 @@ class AppStateEditor(ParamEditor):
 
 
   def addImportExportOpts(self, optName: str, importFunc: Callable[[str], Any],
-                          exportFunc: Callable[[Path], str]):
+                          exportFunc: Callable[[Path], str], index:int=None):
     """
     Main interface to the app state editor. By providing import and export functions,
     various aspects of the program state can be loaded and saved on demand.
@@ -96,10 +96,18 @@ class AppStateEditor(ParamEditor):
     :param exportFunc: Function to save the app data. Input is a full folder path. Expects
       the output to be a full file path of the saved file. This file is then passed to
       'importFunc' on loading a param state
+    :param index: Where to place this function. In most cases, this won't matter. However, some imports must be
+      performed first / last otherwise app behavior may be undefined. In these cases, passing a value for index ensures
+      correct placement of the import/export pair. By default, the function is added to the end of the import/export list.
     """
     newRow = pd.Series([importFunc, exportFunc], name=optName,
                        index=self._stateFuncsDf.columns)
-    self._stateFuncsDf: pd.DataFrame = self._stateFuncsDf.append(newRow)
+    if index is not None:
+      # First, shift old entries
+      df = self._stateFuncsDf
+      self._stateFuncsDf = pd.concat([df.iloc[:index], newRow.to_frame().T, df.iloc[index:]])
+    else:
+      self._stateFuncsDf: pd.DataFrame = self._stateFuncsDf.append(newRow)
 
   @property
   def RECENT_STATE_FNAME(self):

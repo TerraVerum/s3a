@@ -147,6 +147,9 @@ class CompTableView(QtWidgets.QTableView):
 
     self.mgr = ComponentMgr()
     self.minimal = minimal
+    self.setModel(self.mgr)
+    self.setColDelegates()
+
     if not minimal:
       self.popup = PopupTableDialog(*args)
       # Create context menu for changing table rows
@@ -155,10 +158,9 @@ class CompTableView(QtWidgets.QTableView):
       self.customContextMenuRequested.connect(lambda: self.menu.exec_(cursor.pos()))
       for ii, child in enumerate(self.colsVisibleProps):
         child.sigValueChanged.connect(lambda param, value, idx=ii: self.setColumnHidden(idx, not value))
+
         # Trigger initial hide/show
-        child.sigValueChanged.emit(child, child.value())
-    self.setModel(self.mgr)
-    self.setColDelegates()
+        self.setColumnHidden(ii, not child.value())
 
     self.instIdColIdx = TBL_FIELDS.index(REQD_TBL_FIELDS.INST_ID)
 

@@ -101,7 +101,6 @@ class S3A(S3ABase):
     # Buttons
     self.openImgAct.triggered.connect(lambda: self.setMainImg_gui())
     self.openAnnsAct.triggered.connect(self.openAnnotation_gui)
-    self.exportAnnsAct.triggered.connect(self.exportAnnotations_gui)
 
     FR_SINGLETON.colorScheme.registerFunc(self.updateTheme, FRC.CLS_ANNOTATOR.name, runOpts=RunOpts.ON_CHANGED)
 
@@ -219,7 +218,7 @@ class S3A(S3ABase):
       newTools.hide()
 
   def resetTblFields_gui(self):
-    outFname = popupFilePicker(self, 'Select Table Config File', 'All Files (*.*);; Config Files (*.yml)')
+    outFname = popupFilePicker(None, 'Select Table Config File', 'All Files (*.*);; Config Files (*.yml)')
     if outFname is not None:
       FR_SINGLETON.tableData.loadCfg(outFname)
       self.resetTblFields()
@@ -244,11 +243,10 @@ class S3A(S3ABase):
     self.menuBar_.addMenu(self.menuHelp)
 
     # File / Image
-    self.openImgAct = create_addMenuAct(self, self.menuFile, '&Open Image')
+    self.openImgAct = create_addMenuAct(self, self.menuFile, 'Add Project &Image')
 
     # File / Annotation
-    self.openAnnsAct = create_addMenuAct(self, self.menuFile, 'Open &Annotations')
-    self.exportAnnsAct = create_addMenuAct(self, self.menuFile, 'E&xport Annotations')
+    self.openAnnsAct = create_addMenuAct(self, self.menuFile, 'Add Project &Annotations')
 
     # File / layout
     self.menuLayout = create_addMenuAct(self, self.menuFile, '&Layout', True)
@@ -259,7 +257,6 @@ class S3A(S3ABase):
     self.menuAutosave = create_addMenuAct(self, self.menuFile, '&Autosave...', True)
     self.startAutosaveAct = create_addMenuAct(self, self.menuAutosave, 'Star&t Autosave')
     self.stopAutosaveAct = create_addMenuAct(self, self.menuAutosave, 'Sto&p Autosave')
-
 
     # Edit
     self.undoAct = create_addMenuAct(self, self.menuEdit, '&Undo')
@@ -354,7 +351,7 @@ class S3A(S3ABase):
 
   def setMainImg_gui(self):
     fileFilter = "Image Files (*.png *.tif *.jpg *.jpeg *.bmp *.jfif);;All files(*.*)"
-    fname = popupFilePicker(self, 'Select Main Image', fileFilter)
+    fname = popupFilePicker(None, 'Select Main Image', fileFilter)
     if fname is not None:
       with pg.BusyCursor():
         self.setMainImg(fname)
@@ -375,14 +372,14 @@ class S3A(S3ABase):
   def exportAnnotations_gui(self):
     """Saves the component table to a file"""
     fileFilters = self.compIo.handledIoTypes_fileFilter(**{'*': 'All Files'})
-    outFname = popupFilePicker(self, 'Select Save File', fileFilters, asOpen=False)
+    outFname = popupFilePicker(None, 'Select Save File', fileFilters, asOpen=False)
     if outFname is not None:
       super().exportAnnotations(outFname)
 
   def openAnnotation_gui(self):
     # TODO: See note about exporting comps. Delegate the filepicker activity to importer
     fileFilter = self.compIo.handledIoTypes_fileFilter()
-    fname = popupFilePicker(self, 'Select Load File', fileFilter)
+    fname = popupFilePicker(None, 'Select Load File', fileFilter)
     if fname is None:
       return
     self.openAnnotations(fname)
@@ -447,7 +444,7 @@ class S3A(S3ABase):
     def fixDWFactory(_dock):
       # Necessary since defining func in loop will cause problems otherwise
       def doFix(tabIdx):
-        self._fixDockWidth(_dock, tabIdx)
+        self.fixDockWidth(_dock, tabIdx)
       return doFix
 
     dock = None
@@ -482,21 +479,23 @@ class S3A(S3ABase):
       editor.sigParamStateCreated.connect(populateFunc)
       # Initialize default menus
       populateFunc()
-    def showFunc(_editor=editor):
-      if isinstance(_editor.dock, ParamEditorDockGrouping):
-        tabs: QtWidgets.QTabWidget = _editor.dock.tabs
-        dockIdx = tabs.indexOf(_editor.dockContentsWidget)
-        tabs.setCurrentIndex(dockIdx)
-      self._fixDockWidth(_editor.dock)
-      _editor.dock.show()
-      # "Show" twice forces 1) window to exist and 2) it is currently raised and focused
-      # These guarantees are not met if "show" is only called once
-      _editor.dock.raise_()
-    editAct.triggered.connect(lambda: showFunc())
+    editAct.triggered.connect(lambda: self.showEditorDock(editor))
     editor.hasMenuOption = True
     return newMenu
 
-  def _fixDockWidth(self, dock: Union[ParamEditorDockGrouping, ParamEditor], tabIdx: int=None):
+  def showEditorDock(self, editor: Union[ParamEditor, ParamEditorDockGrouping]):
+    if isinstance(editor.dock, ParamEditorDockGrouping):
+      tabs: QtWidgets.QTabWidget = editor.dock.tabs
+      dockIdx = tabs.indexOf(editor.dockContentsWidget)
+      tabs.setCurrentIndex(dockIdx)
+    self.fixDockWidth(editor.dock)
+    editor.dock.show()
+    # "Show" twice forces 1) window to exist and 2) it is currently raised and focused
+    # These guarantees are not met if "show" is only called once
+    editor.dock.raise_()
+
+
+  def fixDockWidth(self, dock: Union[ParamEditorDockGrouping, ParamEditor], tabIdx: int=None):
     if isinstance(dock, ParamEditorDockGrouping):
       if tabIdx is None:
         tabIdx = dock.tabs.currentIndex()

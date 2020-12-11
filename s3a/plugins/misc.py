@@ -6,7 +6,7 @@ from pyqtgraph import console as pg_console
 
 from s3a import ParamEditor, models, FR_CONSTS as FRC, FR_SINGLETON, RunOpts, \
   REQD_TBL_FIELDS as RTF, FRParam
-from s3a.graphicsutils import menuFromEditorActions, ConsoleWidget
+from s3a.graphicsutils import menuFromEditorActions, ConsoleWidget, create_addMenuAct
 from s3a.parameditors import ParamEditorPlugin
 from s3a.processing import AtomicProcess
 from s3a.views.imageareas import EditableImgBase
@@ -97,13 +97,23 @@ class MiscFunctionsPluginBase(ParamEditorPlugin):
     cls.dock.addEditors([cls.toolsEditor])
     cls.menu = QtWidgets.QMenu('Functions')
 
-  def registerFunc(self, func: Callable, name:str=None, runOpts=RunOpts.BTN, category:str=None):
+  def registerFunc(self, func: Callable, name:str=None, runOpts=RunOpts.BTN, submenuName:str=None):
     """See function signature for `ParamEditor.registerFunc`"""
     paramPath = []
-    if category is not None:
-      paramPath.append(category)
+    if submenuName is not None:
+      paramPath.append(submenuName)
+      parentMenu = None
+      for act in self.menu.actions():
+        if act.text() == submenuName and act.menu():
+          parentMenu = act.menu()
+          break
+      if parentMenu is None:
+        parentMenu = create_addMenuAct(self.toolsEditor, self.menu, submenuName, True)
+        self.toolsEditor.params.addChild(dict(name=submenuName, type='group'))
+    else:
+      parentMenu = self.menu
     proc = self.toolsEditor.registerFunc(func, name, runOpts, paramPath=tuple(paramPath))
-    act = self.menu.addAction(proc.name)
+    act = parentMenu.addAction(proc.name)
     act.triggered.connect(lambda: proc(s3a=self.s3a))
     return proc
 

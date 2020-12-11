@@ -5,7 +5,7 @@ from pathlib import Path
 __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR', 'QUICK_LOAD_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'TABLE_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
            'MAIN_IMG_DIR', 'FOC_IMG_DIR', 'APP_STATE_DIR',
-           'DATE_FORMAT', 'REQD_TBL_FIELDS', 'FR_CONSTS', 'FR_ENUMS']
+           'DATE_FORMAT', 'REQD_TBL_FIELDS', 'FR_CONSTS', 'FR_ENUMS', 'PROJ_FILE_TYPE']
 BASE_DIR = Path(__file__).parent
 MENU_OPTS_DIR = BASE_DIR/'menuopts'
 ICON_DIR = BASE_DIR/'icons'
@@ -26,6 +26,8 @@ MAIN_IMG_DIR = MENU_OPTS_DIR/'mainimg'
 TABLE_DIR = MENU_OPTS_DIR/'table'
 APP_STATE_DIR = Path.home()/'.s3a'
 
+
+PROJ_FILE_TYPE = 's3aprj'
 
 # Ensure menuopts and layouts directories exist
 LAYOUTS_DIR.mkdir(parents=True, exist_ok=True)

@@ -88,10 +88,11 @@ class GeneralProcWrapper(ABC):
     if len(paramPath) > 0:
       parentParam = parentParam.child(*paramPath)
     _attemptCreateChild(parentParam, dict(name=self.algName, type='group'))
-    self.unpackStages(self.processor, paramPath)
+    self._outerParamPath = paramPath
+    self.unpackStages(self.processor)
 
   def unpackStages(self, stage: ProcessStage, parentPath: Tuple[str, ...]=()):
-    paramParent: Parameter = self.editor.params.child(self.algName, *parentPath)
+    paramParent: Parameter = self.editor.params.child(*self._outerParamPath, self.algName, *parentPath)
     if isinstance(stage, AtomicProcess):
       stage: AtomicProcess
       docParams = docParser(stage.func.__doc__)

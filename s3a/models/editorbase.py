@@ -498,8 +498,8 @@ class ParamEditorBase(QtWidgets.QDockWidget):
       forwardedOpts = ProcessIO(**{_param.name(): newVal})
       return proc.run(forwardedOpts)
 
+    topParam = self.params if len(paramPath) == 0 else self.params.child(*paramPath)
     if len(proc.input.hyperParamKeys) > 0:
-      topParam = self.params if len(paramPath) == 0 else self.params.child(*paramPath)
       # Check if proc params already exist from a previous addition
       GeneralProcWrapper(proc, self, paramPath, paramFormat)
       parentParam = topParam.child(proc.name)
@@ -509,7 +509,7 @@ class ParamEditorBase(QtWidgets.QDockWidget):
         if runOpts & RunOpts.ON_CHANGING:
           param.sigValueChanging.connect(runpProc_changing)
     else:
-      parentParam = self.params
+      parentParam = topParam
     if runOpts & RunOpts.BTN:
       runBtn = _mkRunBtn(proc, btnOpts)
       if runBtn.name() in parentParam.names:
