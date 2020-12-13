@@ -49,12 +49,12 @@ from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS
 for name, func in inspect.getmembers(TopLevelImageProcessors, inspect.isfunction):
   FR_SINGLETON.imgProcClctn.addProcessCtor(func)
 
-from s3a.plugins import ALL_PLUGINS, MiscFunctionsPlugin, ProjectsPlugin
-for plugin in ALL_PLUGINS:
+from s3a.plugins import ALL_PLUGINS
+from s3a.plugins.misc import RandomToolsPlugin
+for plugin in ALL_PLUGINS():
   FR_SINGLETON.addPlugin(plugin)
 
-miscPlugin = FR_SINGLETON.clsToPluginMapping[MiscFunctionsPlugin]
-projPlugin = FR_SINGLETON.clsToPluginMapping[ProjectsPlugin]
+miscPlugin = FR_SINGLETON.clsToPluginMapping[RandomToolsPlugin]
 
 # Minimal means no GUI is needed. Things work faster when they don't have to be
 # shown through the comp display filter

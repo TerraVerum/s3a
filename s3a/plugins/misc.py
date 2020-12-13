@@ -1,29 +1,27 @@
 from __future__ import annotations
-from typing import Callable
 
-from pyqtgraph.Qt import QtWidgets, QtCore
+from typing import Callable, Sequence
+
 from pyqtgraph import console as pg_console
+from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
-from s3a import ParamEditor, models, FR_CONSTS as FRC, FR_SINGLETON, RunOpts, \
-  REQD_TBL_FIELDS as RTF, FRParam
-from s3a.graphicsutils import menuFromEditorActions, ConsoleWidget, create_addMenuAct
-from s3a.parameditors import ParamEditorPlugin
-from s3a.processing import AtomicProcess
+from s3a.parameditors import FR_SINGLETON
+from s3a.models import s3abase
+from s3a.constants import FR_CONSTS as FRC, REQD_TBL_FIELDS as RTF
+from s3a.graphicsutils import ConsoleWidget, menuFromEditorActions
+from s3a.plugins.base import ParamEditorPlugin
+from s3a.structures import FRParam
 from s3a.views.imageareas import EditableImgBase
 
 
 class MainImagePlugin(ParamEditorPlugin):
   name = 'Main Image'
-  @classmethod
-  def __initEditorParams__(cls):
-    super().__initEditorParams__()
-    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Tools')
 
   def __init__(self):
     super().__init__()
 
-  def attachS3aRef(self, s3a: models.s3abase.S3ABase):
-    mainImg = s3a.mainImg
+  def attachWinRef(self, win: s3abase.S3ABase):
+    mainImg = win.mainImg
 
     copier = mainImg.regionCopier
     def startCopy():
@@ -46,18 +44,18 @@ class MainImagePlugin(ParamEditorPlugin):
     funcForEditableImgPlugin(startMove, self, mainImg, btnOpts=FRC.TOOL_MOVE_REGIONS)
     funcForEditableImgPlugin(startCopy, self, mainImg, btnOpts=FRC.TOOL_COPY_REGIONS)
 
-    if not hasattr(s3a, 'compDisplay'):
+    if not hasattr(win, 'compDisplay'):
       return
 
-    tbl = s3a.compDisplay
+    tbl = win.compDisplay
     # Wrap in process to ignore the default param
-    toRegister = AtomicProcess(tbl.mergeSelectedComps, ignoreKeys=['keepId'])
-    funcForEditableImgPlugin(toRegister, self, mainImg, btnOpts=FRC.TOOL_MERGE_COMPS)
+    funcForEditableImgPlugin(tbl.mergeSelectedComps, self, mainImg, btnOpts=FRC.TOOL_MERGE_COMPS, ignoreKeys=['keepId'])
     funcForEditableImgPlugin(tbl.splitSelectedComps, self, mainImg, btnOpts=FRC.TOOL_SPLIT_COMPS)
-    mainImg.setMenuFromEditors([self.toolsEditor])
     # No need for a dropdown menu
     self.dock = None
-    super().attachS3aRef(s3a)
+    super().attachWinRef(win)
+
+    mainImg.addActionsFromMenu(self.menu)
 
 
 class CompTablePlugin(ParamEditorPlugin):
@@ -66,62 +64,53 @@ class CompTablePlugin(ParamEditorPlugin):
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
-    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Tools')
     cls.dock.addEditors([FR_SINGLETON.filter])
 
 
-  def attachS3aRef(self, s3a: models.s3abase.S3ABase):
+  def attachWinRef(self, win: s3abase.S3ABase):
 
-    tbl = s3a.compTbl
+    tbl = win.compTbl
     for func, param in zip(
         [lambda: tbl.setSelectedCellsAs_gui(), tbl.removeSelectedRows_gui, tbl.setSelectedCellsAsFirst],
         [FRC.TOOL_TBL_SET_AS, FRC.TOOL_TBL_DEL_ROWS, FRC.TOOL_TBL_SET_SAME_AS_FIRST]):
-      param.opts['ownerObj'] = s3a
-      self.toolsEditor.registerFunc(func, btnOpts=param)
-    self.menu = tbl.menu = menuFromEditorActions([self.toolsEditor], menuParent=s3a)
-    super().attachS3aRef(s3a)
+      param.opts['ownerObj'] = win
+      self.registerFunc(func, name=param.name, btnOpts=param)
+    tbl.menu = menuFromEditorActions(self.toolsEditor, menuParent=tbl)
+    super().attachWinRef(win)
 
+class EditPlugin(ParamEditorPlugin):
 
-class MiscFunctionsPluginBase(ParamEditorPlugin):
-  """
-  Base is defined separate from actual misc funcs plugin so the same structure can be
-  easily subclassed. Otherwise, remnant registered functions etc. will stick around
-  and be associated with the class
-  """
-  name = 'Tools'
+  name = '&Edit'
 
-  @classmethod
-  def __initEditorParams__(cls):
-    super().__initEditorParams__()
-    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Function Details...')
-    cls.dock.addEditors([cls.toolsEditor])
-    cls.menu = QtWidgets.QMenu('Functions')
+  def attachWinRef(self, win: s3abase.S3ABase):
+    super().attachWinRef(win)
+    stack = FR_SINGLETON.actionStack
 
-  def registerFunc(self, func: Callable, name:str=None, runOpts=RunOpts.BTN, submenuName:str=None):
-    """See function signature for `ParamEditor.registerFunc`"""
-    paramPath = []
-    if submenuName is not None:
-      paramPath.append(submenuName)
-      parentMenu = None
-      for act in self.menu.actions():
-        if act.text() == submenuName and act.menu():
-          parentMenu = act.menu()
-          break
-      if parentMenu is None:
-        parentMenu = create_addMenuAct(self.toolsEditor, self.menu, submenuName, True)
-        self.toolsEditor.params.addChild(dict(name=submenuName, type='group'))
-    else:
-      parentMenu = self.menu
-    proc = self.toolsEditor.registerFunc(func, name, runOpts, paramPath=tuple(paramPath))
-    act = parentMenu.addAction(proc.name)
-    act.triggered.connect(lambda: proc(s3a=self.s3a))
-    return proc
+    for param in FRC.TOOL_UNDO, FRC.TOOL_REDO: param.opts['ownerObj'] = win
+    self.registerFunc(stack.undo, name='Undo', btnOpts=FRC.TOOL_UNDO)
+    self.registerFunc(stack.redo, name='Redo', btnOpts=FRC.TOOL_REDO)
 
-class MiscFunctionsPlugin(MiscFunctionsPluginBase):
-  def attachS3aRef(self, s3a: models.s3abase.S3ABase):
-    super().attachS3aRef(s3a)
+    def updateUndoRedoTxts():
+      self.undoAct.setText(f'Undo: {stack.undoDescr}')
+      self.redoAct.setText(f'Redo: {stack.redoDescr}')
+    stack.stackChangedCallbacks.append(updateUndoRedoTxts)
+    updateUndoRedoTxts()
 
-    self.registerFunc(s3a.showModCompAnalytics)
+  @property
+  def undoAct(self):
+      return [a for a in self.menu.actions() if a.text().startswith('Undo')][0]
+
+  @property
+  def redoAct(self):
+    return [a for a in self.menu.actions() if a.text().startswith('Redo')][0]
+
+class RandomToolsPlugin(ParamEditorPlugin):
+  name = '&Tools'
+
+  def attachWinRef(self, win: s3abase.S3ABase):
+    super().attachWinRef(win)
+
+    self.registerFunc(win.showModCompAnalytics)
     self.registerFunc(self.showDevConsole)
 
   def showDevConsole(self):
@@ -130,27 +119,53 @@ class MiscFunctionsPlugin(MiscFunctionsPluginBase):
     is on your system, a qt console will be loaded. Otherwise, a (less capable) standard
     pyqtgraph console will be used.
     """
-    namespace = dict(app=self.s3a, rtf=RTF, singleton=FR_SINGLETON)
+    namespace = dict(app=self.win, rtf=RTF, singleton=FR_SINGLETON)
     # "dict" default is to use repr instead of string for internal elements, so expanding
     # into string here ensures repr is not used
     nsPrintout = [f"{k}: {v}" for k, v in namespace.items()]
     text = f'Starting console with variables:\n' \
            f'{nsPrintout}'
     try:
-      console = ConsoleWidget(parent=self.s3a, namespace=namespace, text=text)
+      console = ConsoleWidget(parent=self.win, namespace=namespace, text=text)
     except Exception as ex:
       # Ipy kernel can have issues for many different reasons. Always be ready to fall back to traditional console
-      console = pg_console.ConsoleWidget(parent=self.s3a, namespace=namespace, text=text)
+      console = pg_console.ConsoleWidget(parent=self.win, namespace=namespace, text=text)
     console.setWindowFlags(QtCore.Qt.Window)
     console.show()
 
+class HelpPlugin(ParamEditorPlugin):
+  name = '&Help'
+
+  def attachWinRef(self, win: QtWidgets.QMainWindow):
+    super().attachWinRef(win)
+    self.registerFunc(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl('https://gitlab.com/ficsresearch/s3a/-/wikis/home')),
+                         name='Online User Guide')
+    self.registerFunc(lambda: QtWidgets.QMessageBox.aboutQt(win, 'About Qt'), name='About Qt')
 
 def funcForEditableImgPlugin(func: Callable, plugin: ParamEditorPlugin, editableImg: EditableImgBase, **kwargs):
   """See function signature for `FRParamEditor.registerFunc`"""
   origOpts = kwargs.pop('btnOpts', FRParam(''))
   origOpts.opts['ownerObj'] = editableImg
 
-  proc = plugin.toolsEditor.registerFunc(func, **kwargs, btnOpts=origOpts)
+  proc = plugin.registerFunc(func, **kwargs, name=origOpts.name, btnOpts=origOpts)
   editableImg.toolsGrp.create_addBtn(origOpts,
                                      triggerFn=lambda *_args, **_kwargs: proc.run(),
                                      checkable=False, ownerObj=editableImg)
+
+def miscFuncsPluginFactory(name_: str=None, regFuncs: Sequence[Callable]=None, titles: Sequence[str]=None, showFuncDetails=False):
+  class DummyFuncsPlugin(ParamEditorPlugin):
+    name = name_
+    _showFuncDetails = showFuncDetails
+
+    def attachWinRef(self, win: s3abase.S3ABase):
+      super().attachWinRef(win)
+
+      nonlocal regFuncs, titles
+      if regFuncs is None:
+        regFuncs = []
+      if titles is None:
+        titles = [None] * len(regFuncs)
+      for func, title in zip(regFuncs, titles):
+        self.registerFunc(func, title)
+
+  return DummyFuncsPlugin

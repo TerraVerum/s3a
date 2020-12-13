@@ -149,6 +149,11 @@ class _FRConsts(FRParamGroup):
   PROP_COLS_TO_SHOW            : FRParam = newParam('Visible Table Columns', pType='group')
 
   # --------------------------
+  # MISC TOOLS
+  # --------------------------
+  TOOL_UNDO               : FRParam =  newParam('Undo', 'Ctrl+Z')
+  TOOL_REDO               : FRParam =  newParam('Redo', 'Ctrl+Y')
+  # --------------------------
   # IMAGE TOOLS
   # --------------------------
   TOOL_MERGE_COMPS        : FRParam = newParam('Merge Selected', 'Ctrl+Alt+G')

@@ -204,7 +204,7 @@ class MultiRegionPlot(BoundScatterPlot):
       limits: [0,1]
       step: 0.1
     """
-    if len(self.regionData) == 0:
+    if len(self.regionData) == 0 or len(self.data) == 0:
       return
     classes = FR_SINGLETON.tableData.compClasses
     nClasses = len(classes)

@@ -5,110 +5,170 @@ from pathlib import Path
 from typing import Dict
 
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtWidgets
+from pyqtgraph.Qt import QtWidgets, QtCore
+from pyqtgraph.parametertree import Parameter
 
 from s3a import ParamEditor, FR_SINGLETON, FR_CONSTS, ComponentIO, models
-from s3a.generalutils import attemptFileLoad
+from s3a.generalutils import attemptFileLoad, dynamicDocstring
 from s3a.graphicsutils import popupFilePicker, DropList, \
-  ThumbnailViewer
+  ThumbnailViewer, flexibleParamTree, paramWindow
 from s3a.parameditors import ProjectData
 from s3a.structures import FilePath
-from .misc import MiscFunctionsPluginBase
+from .base import ParamEditorPlugin
 from ..constants import APP_STATE_DIR, PROJ_FILE_TYPE
 
 
-class ProjectsPlugin(MiscFunctionsPluginBase):
-  name = 'Project'
+class FilePlugin(ParamEditorPlugin):
+  name = '&File'
+
+  @classmethod
+  def __initEditorParams__(cls):
+    super().__initEditorParams__()
 
   def __init__(self):
     super().__init__()
-    self.data = ProjectData()
+    self.projData = ProjectData()
     ioCls = FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_EXPORTER)(ComponentIO)
     ioCls.exportOnlyVis, ioCls.includeFullSourceImgName = \
       FR_SINGLETON.generalProps.registerProps(ioCls,
                                               [FR_CONSTS.EXP_ONLY_VISIBLE, FR_CONSTS.INCLUDE_FNAME_PATH]
                                               )
     self.compIo: ComponentIO = ioCls()
+    self.autosaveTimer = QtCore.QTimer()
+
+    self.registerFunc(self.save)
+    self.registerFunc(self.showProjImgs_gui, name='Open Image')
+    self.menu.addSeparator()
 
     self.registerFunc(self.create_gui, name='Create Project')
+    self.registerFunc(self.open_gui, name='Open Project')
 
-    self.registerFunc(self.addImages_gui, name='Images', submenuName='Add')
-    self.registerFunc(self.addAnnotations_gui, name='Annotations', submenuName='Add')
+    self.registerFunc(lambda: self.win.setMainImg_gui, name='Add New Image')
+    self.registerFunc(lambda: self.win.openAnnotation_gui, name='Add New Annotation')
+    self.menu.addSeparator()
 
-    self.registerFunc(self.open_gui, name='Project', submenuName='Open')
-    self.registerFunc(self.showProjImgs_gui, name='Image', submenuName='Open')
+    self.registerFunc(self.addImages_gui, name='Add Image Batch')
+    self.registerFunc(self.addAnnotations_gui, name='Add Annotation Batch')
+    self.menu.addSeparator()
 
-    self.registerFunc(self.save, name='Project', submenuName='Save')
-    self.registerFunc(self.saveCurAnnotation, name='Annotation', submenuName='Save')
+    self.registerPopoutFuncs('Export...', [self.projData.exportProj, self.projData.exportAnnotations], ['Project', 'Annotations'])
 
-    self.toolsEditor.params.addChild(dict(name='Export', type='group'))
-    for title, func in zip(['Project', 'Annotations'], [self.data.exportProj, self.data.exportAnnotations]):
-      self.toolsEditor.registerFunc(func, title, paramPath=('Export',))
-    act = self.menu.addAction('Export...')
-    act.triggered.connect(self.showExportOpts)
+    self.registerPopoutFuncs('Autosave...', [self.startAutosave, self.stopAutosave])
 
     self._projImgMgr = ProjectImageManager()
     self._projImgThumbnails = self._projImgMgr.thumbnails
-    self._projImgMgr.sigImageSelected.connect(lambda imgFname: self.s3a.setMainImg(imgFname))
+    self._projImgMgr.sigImageSelected.connect(lambda imgFname: self.win.setMainImg(imgFname))
     def handleDelete(delImgs):
       for img in delImgs:
-        self.data.removeImage(img)
+        self.projData.removeImage(img)
     self._projImgMgr.sigDeleteRequested.connect(handleDelete)
     self.projNameLbl = QtWidgets.QLabel()
 
     self._createDefaultProj()
 
   def _updateProjLbl(self):
-    self.projNameLbl.setText(f'Project: {self.data.cfgFname.name}')
+    self.projNameLbl.setText(f'Project: {self.projData.cfgFname.name}')
 
-  def attachS3aRef(self, s3a: models.s3abase.S3ABase):
-    super().attachS3aRef(s3a)
-    s3a.statBar.addWidget(self.projNameLbl)
+  def attachWinRef(self, win: models.s3abase.S3ABase):
+    super().attachWinRef(win)
+    win.statBar.addWidget(self.projNameLbl)
     def handleChange():
-      img = self.s3a.srcImgFname
+      img = self.win.srcImgFname
       if img is not None:
-        self.data.addImage(img)
+        self.projData.addImage(img)
         self.loadNewAnns()
-    s3a.sigImageChanged.connect(handleChange)
-    s3a.sigImageAboutToChange.connect(lambda oldImg, newImg: self.saveCurAnnotation())
+    win.sigImageChanged.connect(handleChange)
+    win.sigImageAboutToChange.connect(lambda oldImg, newImg: self.saveCurAnnotation())
     def handleExport(_dir):
+      self.projData.settings['startup-image'] = str(win.srcImgFname)
       self.save()
-      return str(self.data.cfgFname)
-    s3a.appStateEditor.addImportExportOpts('Project', self.open, handleExport, 0)
+      return str(self.projData.cfgFname)
+    win.appStateEditor.addImportExportOpts('Project', self.open, handleExport, 0)
 
   def _createDefaultProj(self):
-    self.data.create(name=APP_STATE_DIR/PROJ_FILE_TYPE)
+    self.projData.create(name=APP_STATE_DIR / PROJ_FILE_TYPE, parent=self.projData)
 
   def loadNewAnns(self, imgFname: FilePath=None):
     if imgFname is None:
-      imgFname = self.s3a.srcImgFname
+      imgFname = self.win.srcImgFname
     if imgFname is None:
       return
-    imgAnns = self.data.imgToAnnMapping.get(imgFname, None)
+    imgAnns = self.projData.imgToAnnMapping.get(imgFname, None)
     if imgAnns is not None:
-      self.s3a.compMgr.addComps(self.compIo.buildByFileType(imgAnns, imgDir=self.data.imagesDir,
-                                                            imShape=self.s3a.mainImg.image.shape))
+      self.win.compMgr.addComps(self.compIo.buildByFileType(imgAnns, imgDir=self.projData.imagesDir,
+                                                            imShape=self.win.mainImg.image.shape))
 
   def open(self, name: str):
-    self.data.loadCfg(name)
+    self.projData.loadCfg(name)
     self._projImgThumbnails.clear()
-    for img in self.data.images:
+    for img in self.projData.images:
       self._projImgThumbnails.addThumbnail(img)
     self._updateProjLbl()
-    startupImg = self.data.settings['startup-image']
+    startupImg = self.projData.settings['startup-image']
     if startupImg is not None:
-      self.s3a.setMainImg(startupImg)
+      self.win.setMainImg(startupImg)
 
   def open_gui(self):
     fname = popupFilePicker(None, 'Select Project File', f'S3A Project (*.{PROJ_FILE_TYPE})')
     if fname is not None:
-      self.s3a.setMainImg(None)
+      self.win.setMainImg(None)
       with pg.BusyCursor():
         self.open(fname)
 
   def save(self):
     self.saveCurAnnotation()
-    self.data.saveCfg()
+    self.projData.saveCfg()
+
+  @dynamicDocstring(ioTypes=list(ComponentIO.handledIoTypes))
+  def startAutosave(self, interval=5, backupFolder='', baseName='autosave', exportType='pkl'):
+    """
+    Saves the current annotation set evert *interval* minutes
+
+    :param interval:
+      helpText: Interval in minutes between saves
+      limits: [1, 1e9]
+    :param backupFolder:
+      helpText: "If provided, annotations are saved here sequentially afte reach *interval* minutes.
+      Each output is named `[Parent Folder]/[base name]_[counter].[export type]`, where `counter`
+      is the current save file number.'"
+      pType: filepicker
+      asFolder: True
+    :param baseName: What to name the saved annotation file
+    :param exportType:
+      helpText: File format for backups
+      pType: list
+      limits: {ioTypes}
+    """
+    self.autosaveTimer = QtCore.QTimer()
+    self.autosaveTimer.start(interval * 60 * 1000)
+    self.autosaveTimer.timeout.connect(self.saveCurAnnotation)
+    if len(str(backupFolder)) == 0:
+      return
+    backupFolder = Path(backupFolder)
+    backupFolder.mkdir(exist_ok=True, parents=True)
+    lastSavedDf = self.win.exportableDf.copy()
+    # Qtimer expects ms, turn mins->s->ms
+    # Figure out where to start the counter
+    globExpr = lambda: backupFolder.glob(f'{baseName}*.{exportType}')
+    existingFiles = list(globExpr())
+    if len(existingFiles) == 0:
+      counter = 0
+    else:
+      counter = max(map(lambda fname: int(fname.stem.rsplit('_')[1]), existingFiles)) + 1
+
+    def save_incrementCounter():
+      nonlocal counter, lastSavedDf
+      baseSaveNamePlusFolder = backupFolder / f'{baseName}_{counter}.{exportType}'
+      counter += 1
+      curDf = self.win.exportableDf
+      if not curDf.equals(lastSavedDf):
+        self.win.exportAnnotations(baseSaveNamePlusFolder)
+        lastSavedDf = curDf.copy()
+
+    self.autosaveTimer.timeout.connect(save_incrementCounter)
+
+  def stopAutosave(self):
+    self.autosaveTimer.stop()
 
   def showProjImgs_gui(self):
     self._projImgMgr.show()
@@ -120,7 +180,7 @@ class ProjectsPlugin(MiscFunctionsPluginBase):
     wiz.addPage(page)
     if wiz.exec_():
       for file in page.fileList.files:
-        self.data.addImageByPath(file)
+        self.projData.addImageByPath(file)
 
   def addAnnotations_gui(self):
     wiz = QtWidgets.QWizard()
@@ -128,20 +188,17 @@ class ProjectsPlugin(MiscFunctionsPluginBase):
     wiz.addPage(page)
     if wiz.exec_():
       for file in page.fileList.files:
-        self.data.addAnnotationByPath(file)
-
-  def showExportOpts(self):
-    self.s3a.showEditorDock(self.toolsEditor)
-    next(iter(self.toolsEditor.params.child('Export').items)).setExpanded(True)
-    self.s3a.fixDockWidth(self.toolsEditor.dock)
-
+        self.projData.addAnnotationByPath(file)
 
   def saveCurAnnotation(self):
-    srcImg = self.s3a.srcImgFname
+    srcImg = self.win.srcImgFname
     if srcImg is None:
       return
-    self.data.addAnnotation(data=self.s3a.exportableDf, image=srcImg, overwriteOld=True)
-    self.s3a.srcImgFname = self.data.imagesDir/srcImg.name
+    elif not srcImg.exists():
+      # Data may have been set programmatically and given a name, so make sure this exists before saving
+      srcImg = self.projData.addImage(name=srcImg, data=self.win.mainImg.image, copyToProj=True, allowOverwrite=True)
+    self.projData.addAnnotation(data=self.win.exportableDf, image=srcImg, overwriteOld=True)
+    self.win.srcImgFname = self.projData.imagesDir / srcImg.name
 
   def create_gui(self):
     wiz = NewProjectWizard(self)
@@ -167,12 +224,12 @@ class ProjectsPlugin(MiscFunctionsPluginBase):
     baseCfg['images'].extend(images)
     baseCfg['annotations'].extend(annotations)
     projPath = Path(wiz.projSettings['Location'])/projName
-    self.data = ProjectData.create(name=projPath, cfg=baseCfg)
+    self.projData = ProjectData.create(name=projPath, cfg=baseCfg)
 
 
 class NewProjectWizard(QtWidgets.QWizard):
 
-  def __init__(self, project: ProjectsPlugin, parent=None) -> None:
+  def __init__(self, project: FilePlugin, parent=None) -> None:
     super().__init__(parent)
     self.project = project
     self.fileLists : Dict[str, DropList] = {}
@@ -223,7 +280,7 @@ class NewProjectWizard(QtWidgets.QWizard):
     page.setTitle(name)
     curLayout = QtWidgets.QVBoxLayout()
     page.setLayout(curLayout)
-    curLayout.addWidget(QtWidgets.QLabel(f'Project {name.lower()} are shown below. Use the buttons'
+    curLayout.addWidget(QtWidgets.QLabel(f'New project {name.lower()} are shown below. Use the buttons'
                                          ' or drag and drop to add files.'))
     flist = DropList(wizard)
     page.fileList = flist
@@ -232,7 +289,7 @@ class NewProjectWizard(QtWidgets.QWizard):
     for title in f'Add Files', f'Add Folder':
       selectFolder = 'Folder' in title
       btn = QtWidgets.QPushButton(title, wizard)
-      btn.clicked.connect(partial(getFileList, flist, title, selectFolder))
+      btn.clicked.connect(partial(getFileList, wizard, flist, title, selectFolder))
       fileBtnLayout.addWidget(btn)
     curLayout.addLayout(fileBtnLayout)
     return page

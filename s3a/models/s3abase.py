@@ -18,7 +18,7 @@ from s3a.graphicsutils import addDirItemsToMenu, saveToFile
 from s3a.models.tablemodel import ComponentMgr
 from s3a.parameditors import FR_SINGLETON
 from s3a.parameditors import ParamEditor
-from s3a.parameditors import ParamEditorPlugin
+from s3a.plugins.base import ParamEditorPlugin
 from s3a.parameditors.appstate import AppStateEditor
 from s3a.structures import FilePath, NChanImg, S3AIOError, \
   AlgProcessorError, S3AWarning
@@ -50,13 +50,16 @@ class S3ABase(QtWidgets.QMainWindow):
 
   def __init__(self, parent=None, **quickLoaderArgs):
     super().__init__(parent)
+    self.generalToolbar = QtWidgets.QToolBar('General Plugins')
+    self.tblFieldToolbar = QtWidgets.QToolBar('Table Field Plugins')
+
     self.mainImg = MainImage()
     self.focusedImg = FocusedImage()
-    FR_CONSTS.TOOL_ACCEPT_FOC_REGION.opts['ownerObj'] = self
+    FR_CONSTS.TOOL_ACCEPT_FOC_REGION.opts['ownerObj'] = self.focusedImg
     self.focusedImg.toolsEditor.registerFunc(self.acceptFocusedRegion,
                                              btnOpts=FR_CONSTS.TOOL_ACCEPT_FOC_REGION)
     self.statBar = QtWidgets.QStatusBar(self)
-    self.menuBar_ = QtWidgets.QMenuBar(self)
+    self.menuBar_ = self.menuBar()
 
     opt = copy(FR_CONSTS.TOOL_CLEAR_ROI)
     opt.opts['ownerObj'] = self.focusedImg
@@ -83,7 +86,6 @@ class S3ABase(QtWidgets.QMainWindow):
 
     self.hasUnsavedChanges = False
     self.srcImgFname: Optional[Path] = None
-    self.autosaveTimer: Optional[QtCore.QTimer] = None
 
     # -----
     # INTERFACE WITH QUICK LOADER
@@ -93,7 +95,7 @@ class S3ABase(QtWidgets.QMainWindow):
     for plugin in FR_SINGLETON.clsToPluginMapping.values(): # type: ParamEditorPlugin
       # Plugins created before window was initialized may need their plugins forcefully
       # attached here
-      if plugin.s3a is not self:
+      if plugin.win is not self:
         self._handleNewPlugin(plugin)
     FR_SINGLETON.sigPluginAdded.connect(self._handleNewPlugin)
 
@@ -154,48 +156,12 @@ class S3ABase(QtWidgets.QMainWindow):
     self.compTbl.popup.tbl.setColDelegates()
 
   def _handleNewPlugin(self, plugin: ParamEditorPlugin):
-    plugin.attachS3aRef(self)
+    plugin.attachWinRef(self)
 
   @staticmethod
   def saveAllEditorDefaults():
     for editor in FR_SINGLETON.registerableEditors:
       editor.saveCurStateAsDefault()
-
-  @staticmethod
-  def populateParamEditorMenuOpts(objForMenu: ParamEditor, winMenu: QtWidgets.QMenu,
-                                  triggerFn: Callable):
-    if objForMenu.saveDir is None:
-      return
-    addDirItemsToMenu(winMenu,
-                      objForMenu.saveDir.glob(f'*.{objForMenu.fileType}'),
-                      triggerFn)
-
-  def startAutosave(self, interval_mins: float, autosaveFolder: Path, baseName: str):
-    autosaveFolder.mkdir(exist_ok=True, parents=True)
-    lastSavedDf = self.compMgr.compDf.copy()
-    # Qtimer expects ms, turn mins->s->ms
-    self.autosaveTimer = QtCore.QTimer()
-    # Figure out where to start the counter
-    globExpr = lambda: autosaveFolder.glob(f'{baseName}*.csv')
-    existingFiles = list(globExpr())
-    if len(existingFiles) == 0:
-      counter = 0
-    else:
-      counter = max(map(lambda fname: int(fname.stem.rsplit('_')[1]), existingFiles)) + 1
-
-    def save_incrementCounter():
-      nonlocal counter, lastSavedDf
-      baseSaveNamePlusFolder = autosaveFolder/f'{baseName}_{counter}.csv'
-      counter += 1
-      if not np.array_equal(self.compMgr.compDf, lastSavedDf):
-        self.exportAnnotations(baseSaveNamePlusFolder)
-        lastSavedDf = self.compMgr.compDf.copy()
-
-    self.autosaveTimer.timeout.connect(save_incrementCounter)
-    self.autosaveTimer.start(int(interval_mins*60*1000))
-
-  def stopAutosave(self):
-    self.autosaveTimer.stop()
 
   def updateUndoBuffSz(self, _genProps: Dict[str, Any]):
     FR_SINGLETON.actionStack.resizeStack(self.undoBuffSz)
@@ -242,7 +208,7 @@ class S3ABase(QtWidgets.QMainWindow):
   def addPlugin(self, pluginCls: Type[ParamEditorPlugin], *args, **kwargs):
     """See FR_SINGLETON.addPlugin"""
     plugin = FR_SINGLETON.addPlugin(pluginCls, *args, **kwargs)
-    plugin.attachS3aRef(self)
+    plugin.attachWinRef(self)
     return plugin
 
   @FR_SINGLETON.actionStack.undoable('Change Main Image')

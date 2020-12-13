@@ -5,12 +5,11 @@ import pandas as pd
 
 from s3a import FR_SINGLETON, FR_CONSTS as FRC, XYVertices, REQD_TBL_FIELDS as RTF, \
   ComplexXYVertices, ComponentIO as frio
-from s3a.graphicsutils import menuFromEditorActions
 from s3a.models.s3abase import S3ABase
-from s3a.parameditors import TableFieldPlugin
 from s3a.processing.algorithms import _historyMaskHolder
 from s3a.structures import NChanImg, GrayImg
 from s3a.views.regions import MultiRegionPlot, makeMultiRegionDf
+from .base import TableFieldPlugin
 
 
 class VerticesPlugin(TableFieldPlugin):
@@ -32,8 +31,8 @@ class VerticesPlugin(TableFieldPlugin):
     # Disable local cropping on primitive grab cut by default
     self.procCollection.nameToProcMapping['Primitive Grab Cut'].setStageEnabled(['Crop To Local Area'], False)
 
-  def attachS3aRef(self, s3a: S3ABase):
-    s3a.focusedImg.addItem(self.region)
+  def attachWinRef(self, win: S3ABase):
+    win.focusedImg.addItem(self.region)
 
     def fill():
       """Completely fill the focused region mask"""
@@ -58,11 +57,10 @@ class VerticesPlugin(TableFieldPlugin):
     paramLst = [FRC.TOOL_RESET_FOC_REGION, FRC.TOOL_FILL_FOC_REGION,
                 FRC.TOOL_CLEAR_FOC_REGION, FRC.TOOL_CLEAR_HISTORY]
     for func, param in zip(funcLst, paramLst):
-      param.opts['ownerObj'] = s3a.focusedImg
-      self.toolsEditor.registerFunc(func, btnOpts=param)
+      param.opts['ownerObj'] = win.focusedImg
+      self.registerFunc(func, btnOpts=param)
 
-    self.menu = menuFromEditorActions(self.toolsEditor, menuParent=s3a)
-    super().attachS3aRef(s3a)
+    super().attachWinRef(win)
 
 
 

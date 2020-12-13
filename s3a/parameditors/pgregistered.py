@@ -262,6 +262,7 @@ class FilePickerParameterItem(parameterTypes.WidgetParameterItem):
       param.opts['value'] = ''
     fpath = param.opts['value']
     param.opts.setdefault('asFolder', False)
+    param.opts.setdefault('existing', True)
     button = QtWidgets.QPushButton()
     param.sigValueChanged.connect(lambda param, val: button.setText(val))
     button.setValue = button.setText
@@ -278,8 +279,8 @@ class FilePickerParameterItem(parameterTypes.WidgetParameterItem):
       useDir = curVal
     else:
       useDir = None
-    asFolder = self.param.opts['asFolder']
-    fname = popupFilePicker(None, 'Select File', asFolder=asFolder, startDir=useDir)
+    opts = self.param.opts
+    fname = popupFilePicker(None, 'Select File', asFolder=opts['asFolder'], asOpen=opts['existing'], startDir=useDir)
     if fname is None:
       return
     self.param.setValue(fname)

@@ -1,19 +1,16 @@
 from __future__ import annotations
 
-from abc import ABC
 from typing import List, Dict, Union, Type, Tuple, Optional, Sequence
+from functools import partial
 
-import pandas as pd
+import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter
 
-from s3a import models, views
-from s3a import parameditors
 from s3a.generalutils import pascalCaseToTitle
-from s3a.graphicsutils import dialogGetSaveFileName, menuFromEditorActions
+from s3a.graphicsutils import dialogGetSaveFileName, addDirItemsToMenu
 from s3a.models.editorbase import ParamEditorBase
-from s3a.processing import ImgProcWrapper
-from s3a.structures import FRParam, FilePath, NChanImg, XYVertices
+from s3a.structures import FRParam, FilePath
 
 Signal = QtCore.Signal
 
@@ -40,10 +37,6 @@ class ParamEditor(ParamEditorBase):
     self.hide()
     self.setWindowTitle(self.name)
     self.setObjectName(self.name)
-
-    # This will be set to 'True' when an action for this editor is added to
-    # the main window menu
-    self.hasMenuOption = False
 
     # -----------
     # Additional widget buttons
@@ -91,14 +84,20 @@ class ParamEditor(ParamEditorBase):
     return oldName
 
   def show(self):
+    if self.dock is self:
+      return super().show()
+    if isinstance(self.dock, ParamEditorDockGrouping):
+      tabs: QtWidgets.QTabWidget = self.dock.tabs
+      dockIdx = tabs.indexOf(self.dockContentsWidget)
+      tabs.setCurrentIndex(dockIdx)
     self.tree.resizeColumnToContents(0)
     # Necessary on MacOS
-    self.setWindowState(QtCore.Qt.WindowActive)
-    self.raise_()
+    self.dock.setWindowState(QtCore.Qt.WindowActive)
+    self.dock.raise_()
+    self.dock.show()
     # Necessary on Windows
     self.activateWindow()
     self.applyBtn.setFocus()
-    super().show()
 
   def reject(self):
     """
@@ -106,15 +105,6 @@ class ParamEditor(ParamEditorBase):
     """
     self.params.restoreState(self._stateBeforeEdit, removeChildren=False)
     super().reject()
-
-  def applyChanges(self):
-    # Don't emit any signals if nothing changed
-    newState = self.params.saveState(filter='user')
-    outDict = self.params.getValues()
-    if self._stateBeforeEdit != newState:
-      self._stateBeforeEdit = newState
-      self.sigParamStateUpdated.emit(outDict)
-    return outDict
 
   @staticmethod
   def buildClsToolsEditor(cls: type, name=None):
@@ -131,10 +121,38 @@ class ParamEditor(ParamEditorBase):
       btn.hide()
     return toolsEditor
 
-
   def saveParamState_gui(self):
     saveName = dialogGetSaveFileName(self, 'Save As', self.lastAppliedName)
     self.saveParamState(saveName)
+
+  def createMenuOpt(self, overrideName=None, parentMenu: QtWidgets.QMenu=None):
+    def loadFunc(nameToLoad: str) -> Optional[dict]:
+      with pg.BusyCursor():
+        return self.loadParamState(nameToLoad)
+
+    if overrideName is None:
+      overrideName = self.name
+    editAct = QtWidgets.QAction('Open ' + overrideName, self)
+    if self.saveDir is None:
+      # No save options are possible, just use an action instead of dropdown menu
+      newMenuOrAct = editAct
+      if parentMenu is not None:
+        parentMenu.addAction(newMenuOrAct)
+    else:
+      newMenuOrAct = QtWidgets.QMenu(overrideName, self)
+      newMenuOrAct.addAction(editAct)
+      newMenuOrAct.addSeparator()
+      def populateFunc():
+        addDirItemsToMenu(newMenuOrAct,
+                          self.saveDir.glob(f'*.{self.fileType}'),
+                          loadFunc)
+      self.sigParamStateCreated.connect(populateFunc)
+      # Initialize default menus
+      populateFunc()
+      if parentMenu is not None:
+        parentMenu.addMenu(newMenuOrAct)
+    editAct.triggered.connect(self.show)
+    return newMenuOrAct
 
 class ParamEditorDockGrouping(QtWidgets.QDockWidget):
   """
@@ -151,6 +169,7 @@ class ParamEditorDockGrouping(QtWidgets.QDockWidget):
 
     if len(dockName) == 0 and len(editors) > 0:
       dockName = editors[0].name
+    dockName = dockName.replace('&', '')
     self.name = dockName
 
     self.editors = []
@@ -164,20 +183,27 @@ class ParamEditorDockGrouping(QtWidgets.QDockWidget):
     self.setObjectName(dockName)
     self.setWindowTitle(dockName)
 
+    self.biggestMinWidth = 0
+
   def addEditors(self, editors: Sequence[ParamEditor]):
+    minWidth = 0
     for editor in editors:
+      editor.tree.resizeColumnToContents(0)
+      if editor.width() > minWidth:
+        minWidth = editor.width()
       # "Main Image Settings" -> "Settings"
       tabName = self.getTabName(editor)
       self.tabs.addTab(editor.dockContentsWidget, tabName)
       editor.dock = self
       self.editors.append(editor)
+    self.biggestMinWidth = minWidth
 
   def removeEditors(self, editors: Sequence[ParamEditor]):
     for editor in editors:
       idx = self.editors.index(editor)
       self.tabs.removeTab(idx)
-      editor.dock = None
-      del self.editors[editor]
+      editor.dock = editor
+      del self.editors[idx]
 
   def setParent(self, parent: QtWidgets.QWidget=None):
     super().setParent(parent)
@@ -193,151 +219,15 @@ class ParamEditorDockGrouping(QtWidgets.QDockWidget):
       tabName = editor.name
     return tabName
 
-
-class ParamEditorPlugin(ABC):
-  """
-  Primitive plugin which can interface with S3A functionality. When this class is overloaded,
-  the child class is given a reference to the main S3A window and S3A is made aware of the
-  plugin's existence. For interfacing with table fields, see the special case of
-  :class:`TableFieldPlugin`
-  """
-  name: str=None
-  """
-  Name of this plugin as it should appear in the plugin menu
-  """
-
-  menu: QtWidgets.QMenu=None
-  """
-  Menu of additional options that should appear under this plugin
-  """
-
-  dock: Optional[ParamEditorDockGrouping]
-  """
-  Docks that should be shown in S3A's menu bar. By default, just the toolsEditor is shown.
-  If multiple param editors must be visible, manually set this property to a
-  :class:`FRParamEditorDockGrouping` as performed in :class:`XYVerticesPlugin`.
-  """
-
-  toolsEditor: ParamEditor
-  """Param Editor window which holds user-editable properties exposed by the programmer"""
-  s3a: models.s3abase.S3ABase=None
-  """Reference to the current S3A window"""
-
-  @classmethod
-  def __initEditorParams__(cls):
-    cls.dock = ParamEditorDockGrouping(dockName=cls.name)
-
-  def attachS3aRef(self, s3a: models.s3abase.S3ABase):
-    self.s3a = s3a
-
-def dummyPluginCreator(name_: str=None, editors: Sequence[ParamEditor]=None):
-  class DummyPlugin(ParamEditorPlugin):
-    name = name_
-
-    @classmethod
-    def __initEditorParams__(cls):
-      super().__initEditorParams__()
-      if editors is not None:
-        cls.dock.addEditors(editors)
-  return DummyPlugin
-
-
-class TableFieldPlugin(ParamEditorPlugin):
-  """
-  Primary method for providing algorithmic refinement of table field data. For
-  instance, the :class:`XYVerticesPlugin` class can refine initial bounding
-  box estimates of component vertices using custom image processing algorithms.
-  """
-
-  procCollection: parameditors.algcollection.AlgParamEditor= None
-  """
-  Most table field plugins will use some sort of processor to infer field data.
-  This property holds spawned collections. See :class:`XYVerticesPlugin` for
-  an example.
-  """
-
-  focusedImg = None
-  """
-  Holds a reference to the focused image and set when the s3a reference is set. This
-  is useful for most table field plugins, since focusedImg will hold a reference to the
-  component series that is modified by the plugins.
-  """
-
-  _active=False
-
-  def __init__(self):
-    super().__init__()
-    def activate():
-      self.focusedImg.changeCurrentPlugin(self)
-    self.toolsEditor.registerFunc(activate, btnOpts={'guibtn':False})
-    self.menu = menuFromEditorActions(self.toolsEditor)
-
-  @classmethod
-  def __initEditorParams__(cls):
-    """
-    Initializes shared parameters accessible through the :meth:`FRParamEditor.registerProp`
-    function
-    """
-    super().__initEditorParams__()
-    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Tools')
-
-  def attachS3aRef(self, s3a: models.s3abase.S3ABase):
-    super().attachS3aRef(s3a)
-    self.focusedImg = focusedImg = s3a.focusedImg
-    s3a.sigRegionAccepted.connect(self.acceptChanges)
-    focusedImg.sigUpdatedAll.connect(self.updateAll)
-
-    def maybeHandleShapeFinished(roiVerts):
-      if self.active:
-        self.handleShapeFinished(roiVerts)
-    focusedImg.sigShapeFinished.connect(maybeHandleShapeFinished)
-
-  def updateAll(self, mainImg: Optional[NChanImg], newComp: Optional[pd.Series] = None):
-    """
-    This function is called when a new component is created or the focused image is updated
-    from the main view. See :meth:`FocusedImage.updateAll` for parameters.
-    """
-    raise NotImplementedError
-
-  def handleShapeFinished(self, roiVerts: XYVertices):
-    """
-    Called whenever a user completes a shape in the focused image. See
-    :meth:`FocusedImage.handleShapeFinished` for parameters.
-    """
-    raise NotImplementedError
-
-  def acceptChanges(self):
-    """
-    This must be overloaded by each plugin so the set component data is properly stored
-    in the focused component. Essentially, any changes made by this plugin are saved
-    after a call to this method.
-    """
-    raise NotImplementedError
-
-  @property
-  def active(self):
-    """Whether this plugin is currently in use by the focused image."""
-    return self._active
-
-  @active.setter
-  def active(self, newActive: bool):
-    if newActive == self._active:
-      return
-    if newActive:
-      self._onActivate()
-    else:
-      self._onDeactivate()
-    self._active = newActive
-
-  def _onActivate(self):
-    """Overloaded by plugin classes to set up the plugin for use"""
-
-  def _onDeactivate(self):
-    """Overloaded by plugin classes to tear down when the plugin is no longer in use"""
-
-  @property
-  def curProcessor(self):
-    return self.procCollection.curProcessor
-  @curProcessor.setter
-  def curProcessor(self, newProcessor: Union[str, ImgProcWrapper]):
-    self.procCollection.switchActiveProcessor(newProcessor)
+  def createMenuOpt(self, overrideName=None, parentMenu: QtWidgets.QMenu=None):
+    if overrideName is None:
+      overrideName = self.name
+    if parentMenu is None:
+      parentMenu = QtWidgets.QMenu(overrideName, self)
+    # newMenu = create_addMenuAct(self, parentBtn, dockEditor.name, True)
+    for editor in self.editors: # type: ParamEditor
+      # "Main Image Settings" -> "Settings"
+      tabName = self.getTabName(editor)
+      nameWithoutBase = tabName
+      editor.createMenuOpt(overrideName=nameWithoutBase, parentMenu=parentMenu)
+    return parentMenu

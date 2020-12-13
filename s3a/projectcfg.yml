@@ -5,4 +5,4 @@ settings:
   annotation-format: "pkl"
   startup-image:
 
-table-cfg:
+table-cfg: {}

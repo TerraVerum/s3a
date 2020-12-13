@@ -11,7 +11,7 @@ from typing import Optional, Union, Callable, Generator, Sequence, Dict, List
 
 from pyqtgraph.console import ConsoleWidget
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-from pyqtgraph.parametertree import Parameter
+from pyqtgraph.parametertree import Parameter, ParameterTree
 from ruamel.yaml import YAML
 
 import s3a
@@ -658,3 +658,47 @@ else:
     def executeCommand(self,command):
       """ Execute a command in the frame of the console widget """
       self._execute(command,False)
+
+def flexibleParamTree(topParam:Parameter=None, showTop=True):
+  tree = ParameterTree()
+  tree.setTextElideMode(QtCore.Qt.ElideRight)
+  tree.header().setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
+  if topParam is not None:
+    tree.setParameters(topParam, showTop)
+  return tree
+
+def setParamTooltips(tree: ParameterTree, expandNameCol=True):
+  iterator = QtWidgets.QTreeWidgetItemIterator(tree)
+  item: QtWidgets.QTreeWidgetItem = iterator.value()
+  while item is not None:
+    # TODO: Set word wrap on long labels. Currently either can show '...' or wrap but not
+    #   both
+    # if self.tree.itemWidget(item, 0) is None:
+    #   lbl = QtWidgets.QLabel(item.text(0))
+    #   self.tree.setItemWidget(item, 0, lbl)
+    if (hasattr(item, 'param')
+        and 'tip' in item.param.opts
+        and len(item.toolTip(0)) == 0
+        and tree.itemWidget(item, 0) is None):
+      item.setToolTip(0, item.param.opts['tip'])
+    iterator += 1
+    item = iterator.value()
+  if expandNameCol:
+    expandtreeParams(tree, True)
+
+def expandtreeParams(tree: ParameterTree, expandedVal=True):
+  for item in tree.topLevelItems():
+    item.setExpanded(expandedVal)
+  tree.resizeColumnToContents(0)
+
+def paramWindow(param: Parameter):
+  tree = flexibleParamTree(param)
+  tree.setHeaderHidden(True)
+  tree.resizeColumnToContents(0)
+  setParamTooltips(tree, True)
+  dlg = QtWidgets.QDialog()
+  layout = QtWidgets.QVBoxLayout()
+  dlg.setLayout(layout)
+  layout.addWidget(tree)
+  dlg.exec_()
+  tree.clear()

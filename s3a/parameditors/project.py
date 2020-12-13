@@ -1,3 +1,4 @@
+from __future__ import annotations
 import shutil
 from pathlib import Path
 from typing import List, Optional, Set, Dict
@@ -21,7 +22,7 @@ def hierarchicalUpdate(curDict: dict, other: dict):
     return
   for k, v in other.items():
     curVal = curDict.get(k, None)
-    if isinstance(curVal, dict):
+    if isinstance(curVal, dict) and isinstance(v, dict):
       hierarchicalUpdate(curVal, v)
     else:
       curDict[k] = v
@@ -30,8 +31,7 @@ class ProjectData:
   def __init__(self, cfgFname: FilePath=None, cfgDict: dict=None):
     self.tableData = TableData()
     self.cfg = {}
-    cfgFname = Path()
-    self.cfgFname: Optional[Path] = cfgFname
+    self.cfgFname: Optional[Path] = None
     self.images: List[Path] = []
     self.baseImgDirs: Set[Path] = set()
     self.imgToAnnMapping: Dict[Path, Path] = {}
@@ -39,6 +39,9 @@ class ProjectData:
 
     self.compIo = ComponentIO()
     self.compIo.tableData = self.tableData
+
+    if cfgFname is not None or cfgDict is not None:
+      self.loadCfg(cfgFname, cfgDict)
 
   @property
   def location(self):
@@ -64,11 +67,13 @@ class ProjectData:
     hierarchicalUpdate(defaultCfg, cfgDict)
     cfg = self.cfg = defaultCfg
     self.cfgFname = cfgFname.resolve()
-    tableInfo = cfg.get('table-cfg', {})
+    tableInfo = cfg.get('table-cfg', None)
     if isinstance(tableInfo, str):
       tableDict = None
       tableName = tableInfo
     else:
+      if tableInfo is None:
+        tableInfo = {}
       tableDict = tableInfo
       tableName = cfgFname
     tableName = Path(tableName)
@@ -90,7 +95,7 @@ class ProjectData:
         self.addAnnotationByPath(annotation)
 
   @classmethod
-  def create(cls, *, name: FilePath= f'./{PROJ_FILE_TYPE}', cfg: dict=None):
+  def create(cls, *, name: FilePath= f'./{PROJ_FILE_TYPE}', cfg: dict=None, parent: ProjectData=None):
     """
     Creates a new project with the specified settings in the specified directory.
     :param name:
@@ -102,26 +107,27 @@ class ProjectData:
     name = name/f'{name.name}.{PROJ_FILE_TYPE}'
     location = name.parent
     location.mkdir(exist_ok=True, parents=True)
-    proj = cls()
-    proj.cfgFname = name.resolve()
-    proj.annotationsDir.mkdir(exist_ok=True)
-    proj.imagesDir.mkdir(exist_ok=True)
+    if parent is None:
+      parent = cls()
+    parent.cfgFname = name.resolve()
+    parent.annotationsDir.mkdir(exist_ok=True)
+    parent.imagesDir.mkdir(exist_ok=True)
 
     if not name.exists() and cfg is None:
       cfg = {}
-    proj.loadCfg(name, cfg)
+    parent.loadCfg(name, cfg)
 
-    tdName = proj.tableData.cfgFname
-    if tdName.resolve() != proj.cfgFname:
+    tdName = parent.tableData.cfgFname
+    if tdName.resolve() != parent.cfgFname:
       tdName = tdName.name
-      saveToFile(proj.tableData.cfg, location / tdName, True)
-      proj.tableData.cfgFname = tdName
+      saveToFile(parent.tableData.cfg, location / tdName, True)
+      parent.tableData.cfgFname = tdName
     else:
       tdName = tdName.name
-    proj.cfg['table-cfg'] = tdName
+    parent.cfg['table-cfg'] = tdName
 
-    proj.saveCfg()
-    return proj
+    parent.saveCfg()
+    return parent
 
   @classmethod
   def open(cls, name: FilePath):
@@ -266,9 +272,9 @@ class ProjectData:
     ComponentIO.exportByFileType(outAnn, outName, verifyIntegrity=False, readOnly=False, imgDir=self.imagesDir)
     self.imgToAnnMapping[image] = outName
 
-  def _copyImgToProj(self, name: Path, data: NChanImg=None):
+  def _copyImgToProj(self, name: Path, data: NChanImg=None, allowOverwrite=False):
     newName = (self.imagesDir/name.name).resolve()
-    if newName.exists():
+    if (newName.exists() and not allowOverwrite) or newName == name:
       # Already in the project, no need to copy
       return newName
     if name.exists() and data is None:
@@ -358,8 +364,10 @@ class ProjectData:
     if outputFolder.resolve() == self.cfgFname and not combine:
       return
 
+    outputFolder.mkdir(exist_ok=True)
     if includeImages:
       outImgDir = outputFolder / 'images'
+      outImgDir.mkdir(exist_ok=True)
       for img in self.imagesDir.glob('*.*'):
         if self.imgToAnnMapping.get(img, None) is not None:
           shutil.copy(img, outImgDir)

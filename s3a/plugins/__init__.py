@@ -1,6 +1,6 @@
-from .misc import MainImagePlugin, CompTablePlugin, MiscFunctionsPlugin
-from .project import ProjectsPlugin
-from .tablefield import VerticesPlugin
+def ALL_PLUGINS():
+  from .misc import MainImagePlugin, CompTablePlugin, RandomToolsPlugin, EditPlugin, HelpPlugin
+  from .file import FilePlugin
+  from .tablefield import VerticesPlugin
 
-ALL_PLUGINS = [VerticesPlugin, ProjectsPlugin, MainImagePlugin, CompTablePlugin,
-               MiscFunctionsPlugin]
+  return [VerticesPlugin, FilePlugin, EditPlugin, MainImagePlugin, CompTablePlugin, RandomToolsPlugin, HelpPlugin]

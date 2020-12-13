@@ -10,7 +10,7 @@ from s3a.views.s3agui import S3A
 from testingconsts import SAMPLE_IMG, SAMPLE_IMG_FNAME, NUM_COMPS, \
   SAMPLE_SMALL_IMG, SAMPLE_SMALL_IMG_FNAME
 from s3a.structures import S3AException
-from s3a.plugins import VerticesPlugin
+from s3a.plugins.tablefield import VerticesPlugin
 
 app = S3A(Image=SAMPLE_IMG_FNAME, guiMode=False, loadLastState=False, author='testauthor')
 mgr = app.compMgr

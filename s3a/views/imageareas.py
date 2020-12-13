@@ -16,7 +16,8 @@ from s3a.structures import NChanImg
 from .buttons import DrawOpts, ButtonCollection
 from .clickables import RightPanViewBox
 from .regions import RegionCopierPlot
-from ..parameditors import ParamEditor, TableFieldPlugin
+from ..parameditors import ParamEditor
+from ..plugins.base import TableFieldPlugin
 
 __all__ = ['MainImage', 'FocusedImage', 'EditableImgBase']
 
@@ -48,6 +49,7 @@ class EditableImgBase(pg.PlotWidget):
     vb = self.getViewBox()
     self.menu: QtWidgets.QMenu = vb.menu
     self.oldVbMenu: ViewBoxMenu = vb.menu
+    self.oldVbMenu.viewAll.setText('Reset Zoom')
     # Disable default menus
     self.plotItem.ctrlMenu = None
     self.sceneObj.contextMenu = None
@@ -104,12 +106,18 @@ class EditableImgBase(pg.PlotWidget):
     ev.accept()
 
 
-  def setMenuFromEditors(self, editors: Sequence[ParamEditor]):
+  def addActionsFromMenu(self, menu: QtWidgets.QMenu):
     vb: pg.ViewBox = self.getViewBox()
-    menu = menuFromEditorActions(editors)
-    menu.insertAction(menu.actions()[0], self.oldVbMenu.viewAll)
-    vb.menu = menu
-    self.menu = menu
+    menuCopy = QtWidgets.QMenu(self)
+    for action in menu.actions():
+      if action.isSeparator():
+        menuCopy.addSeparator()
+      else:
+        menuCopy.addAction(action.text(), action.trigger)
+    firstAct = menuCopy.actions()[0]
+    menuCopy.insertAction(firstAct, self.oldVbMenu.viewAll)
+    vb.menu = menuCopy
+    self.menu = menuCopy
 
   def switchBtnMode(self, newMode: FRParam):
     # EAFP

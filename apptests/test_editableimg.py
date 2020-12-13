@@ -79,7 +79,7 @@ def test_update():
   fImg.changeCurrentPlugin(oldPlugin)
 
 def test_region_modify(sampleComps):
-  vertsPlugin.attachS3aRef(app)
+  vertsPlugin.attachWinRef(app)
   app.add_focusComps(sampleComps)
   shapeBnds = fImg.image.shape[:2]
   reach = np.min(shapeBnds)
