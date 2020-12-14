@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from pyqtgraph.Qt import QtCore
 
-from conftest import NUM_COMPS, app, mgr, stack, dfTester
+from conftest import NUM_COMPS, stack, dfTester
 from helperclasses import clearTmpFiles
 from testingconsts import RND
 from s3a import FR_SINGLETON
@@ -13,29 +13,29 @@ from s3a.structures import ComplexXYVertices, S3AWarning, XYVertices
 oldIds = np.arange(NUM_COMPS, dtype=int)
 
 @pytest.fixture
-def sampleComps():
+def sampleComps(app):
   app.clearBoundaries()
   clearTmpFiles()
   return dfTester.compDf.copy()
 
 
-def test_normal_add(sampleComps):
+def test_normal_add(sampleComps, mgr):
   mgr.rmComps()
   changeList = mgr.addComps(sampleComps)
   cmpChangeList(changeList, oldIds)
 
-def test_undo_add(sampleComps):
+def test_undo_add(sampleComps, mgr):
   mgr.addComps(sampleComps)
   stack.undo()
   assert len(mgr.compDf) == 0
   stack.redo()
   assert np.array_equal(mgr.compDf, sampleComps)
 
-def test_empty_add():
+def test_empty_add(mgr):
   changeList = mgr.addComps(FR_SINGLETON.tableData.makeCompDf(0))
   cmpChangeList(changeList)
 
-def test_rm_by_empty_vert_add(sampleComps):
+def test_rm_by_empty_vert_add(sampleComps, mgr):
   numDeletions = NUM_COMPS//3
   perm = RND.permutation(NUM_COMPS)
   deleteIdxs = np.sort(perm[:numDeletions])
@@ -50,7 +50,7 @@ def test_rm_by_empty_vert_add(sampleComps):
   cmpChangeList(changeList, deleted=deleteIdxs, changed=changeIdxs)
 
 
-def test_double_add(sampleComps):
+def test_double_add(sampleComps, mgr):
   changeList = mgr.addComps(sampleComps, FR_ENUMS.COMP_ADD_AS_NEW)
   cmpChangeList(changeList, added=oldIds)
 
@@ -58,7 +58,7 @@ def test_double_add(sampleComps):
   changeList = mgr.addComps(sampleComps, FR_ENUMS.COMP_ADD_AS_NEW)
   cmpChangeList(changeList, added=oldIds + NUM_COMPS)
 
-def test_change_comps(sampleComps):
+def test_change_comps(sampleComps, mgr):
   changeList = mgr.addComps(sampleComps, FR_ENUMS.COMP_ADD_AS_NEW)
   cmpChangeList(changeList, added=oldIds)
 
@@ -69,7 +69,7 @@ def test_change_comps(sampleComps):
                                 mgr.compDf[REQD_TBL_FIELDS.COMP_CLASS].values,
                                 '"Class" list doesn\'t match during test_change_comps')
 
-def test_rm_comps(sampleComps):
+def test_rm_comps(sampleComps, mgr):
   ids = np.arange(NUM_COMPS, dtype=int)
 
   # Standard remove
@@ -92,7 +92,7 @@ def test_rm_comps(sampleComps):
   mgr.addComps(sampleComps)
   mgr.rmComps(sampleComps.index[0])
 
-def test_rm_undo(sampleComps):
+def test_rm_undo(sampleComps, mgr):
   ids = np.arange(NUM_COMPS, dtype=int)
 
   # Standard remove
@@ -101,28 +101,29 @@ def test_rm_undo(sampleComps):
   FR_SINGLETON.actionStack.undo()
   assert mgr.compDf.equals(sampleComps)
 
-def test_merge_comps(sampleComps):
+def test_merge_comps(sampleComps, mgr):
   mgr.addComps(sampleComps)
   mgr.mergeCompVertsById(sampleComps.index)
   assert len(mgr.compDf) == 1
   FR_SINGLETON.actionStack.undo()
   assert len(mgr.compDf) == len(sampleComps)
 
-def test_bad_merge(sampleComps):
+def test_bad_merge(sampleComps, mgr):
   mgr.addComps(sampleComps)
   with pytest.warns(S3AWarning):
     mgr.mergeCompVertsById([0])
   with pytest.warns(S3AWarning):
     mgr.mergeCompVertsById([])
 
-
-def test_table_setdata(sampleComps):
+def test_table_setdata(sampleComps, app, mgr):
   mgr.addComps(sampleComps)
+  clsname = 'newclassforthistest'
+  FR_SINGLETON.tableData.compClasses += [clsname]
 
   _ = REQD_TBL_FIELDS
   colVals = {
     _.VERTICES: ComplexXYVertices([XYVertices([[1, 2], [3, 4]])]),
-    _.COMP_CLASS: 'Unassigned',
+    _.COMP_CLASS: clsname,
     _.ANN_AUTHOR: 'Hi There',
     _.SRC_IMG_FILENAME: 'newfilename'
   }
@@ -139,8 +140,9 @@ def test_table_setdata(sampleComps):
     assert mgr.compDf.iloc[row, col] == newVal
     stack.undo()
     assert mgr.compDf.iloc[row, col] == oldVal
+  del FR_SINGLETON.tableData.compClasses[-1]
 
-def test_table_getdata(sampleComps):
+def test_table_getdata(sampleComps, mgr):
   mgr.addComps(sampleComps)
   idx = mgr.index(0, list(REQD_TBL_FIELDS).index(REQD_TBL_FIELDS.COMP_CLASS))
   dataVal = sampleComps.iat[0, idx.column()]

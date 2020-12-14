@@ -46,7 +46,7 @@ class CompDfTester:
       compDf = self.compDf
     # Encapsulate in np array for random indexing
     npClasses = np.array(FR_SINGLETON.tableData.compClasses)
-    randomIdxs = RND.integers(0, len(npClasses), size=self.numComps)
+    randomIdxs = RND.integers(0, len(npClasses), size=len(compDf))
 
     newClasses = npClasses[randomIdxs]
     compDf.loc[:, REQD_TBL_FIELDS.COMP_CLASS] = newClasses

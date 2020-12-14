@@ -4,24 +4,23 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from conftest import app
 from s3a.generalutils import augmentException
 from s3a import ComponentIO
 from s3a.structures import S3AIOError
 
 
-def test_normal_export(sampleComps, tmpdir):
+def test_normal_export(sampleComps, tmp_path, app):
   io = app.compIo
   io.exportOnlyVis = False
   for ftype in io.handledIoTypes:
-    curPath = tmpdir / f'normalExport - All IDs.{ftype}'
-    doAndAssertExport(curPath, io, sampleComps.copy(), 'Normal export with all IDs not successful.')
+    curPath = tmp_path / f'normalExport - All IDs.{ftype}'
+    doAndAssertExport(app, curPath, io, sampleComps.copy(), 'Normal export with all IDs not successful.')
 
 @pytest.mark.withcomps
-def test_filter_export(tmpdir, monkeypatch):
+def test_filter_export(tmp_path, monkeypatch, app):
   io = app.compIo
 
-  curPath = tmpdir / 'normalExport - Filtered IDs export all.csv'
+  curPath = tmp_path / 'normalExport - Filtered IDs export all.csv'
   filterIds = np.array([0,3,2])
   sampleComps = app.compMgr.compDf
   with monkeypatch.context() as m:
@@ -33,9 +32,9 @@ def test_filter_export(tmpdir, monkeypatch):
                                 ' when not exporting only visible, but'
                                 ' ID lists don\'t match.')
   # With export only visible false, should still export whole frame
-  doAndAssertExport(curPath, io, exportDf, 'Normal export with filter ids passed not successful.')
+  doAndAssertExport(app, curPath, io, exportDf, 'Normal export with filter ids passed not successful.')
 
-  curPath = tmpdir / 'normalExport - Filtered IDs export filtered.csv'
+  curPath = tmp_path / 'normalExport - Filtered IDs export filtered.csv'
   with monkeypatch.context() as m:
     m.setattr(io, 'exportOnlyVis', True)
     m.setattr(app.compDisplay, 'displayedIds', filterIds)
@@ -44,19 +43,19 @@ def test_filter_export(tmpdir, monkeypatch):
                                 'Export DF should use only filtered IDs when exporting only '
                                 'visible, but ID lists don\'t match.')
   # With export only visible false, should still export whole frame
-  doAndAssertExport(curPath, io, exportDf, 'Export with filtered ids not successful.')
+  doAndAssertExport(app, curPath, io, exportDf, 'Export with filtered ids not successful.')
 
-def test_bad_import(tmpdir):
+def test_bad_import(tmp_path, app):
   io = app.compIo
   for ext in io.handledIoTypes:
-    ofile = open(tmpdir/f'junkfile.{ext}', 'w')
+    ofile = open(tmp_path/f'junkfile.{ext}', 'w')
     ofile.write('Vertices\nabsolute junk')
     ofile.close()
     with pytest.raises(Exception):
-      io.buildFromCsv(tmpdir/f'junkfile.{ext}')
+      io.buildFromCsv(tmp_path/f'junkfile.{ext}')
 
 
-def doAndAssertExport(fpath: Path, io: ComponentIO, compDf: pd.DataFrame, failMsg: str):
+def doAndAssertExport(app, fpath: Path, io: ComponentIO, compDf: pd.DataFrame, failMsg: str):
   fpath = Path(fpath)
   try:
     io.exportByFileType(compDf, fpath)
@@ -67,7 +66,7 @@ def doAndAssertExport(fpath: Path, io: ComponentIO, compDf: pd.DataFrame, failMs
   inDf = io.buildByFileType(fpath, app.mainImg.image.shape[:2])
   assert len(inDf) > 0
 
-def test_impossible_io(tmpdir, sampleComps):
+def test_impossible_io(tmp_path, sampleComps, app):
   io = app.compIo
   with pytest.raises(S3AIOError):
     io.exportByFileType(sampleComps, './nopossible.exporttype$')

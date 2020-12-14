@@ -1,30 +1,14 @@
-from pathlib import Path
-
 import numpy as np
 import pytest
 from pyqtgraph.Qt import QtGui, QtCore
 
-from conftest import NUM_COMPS, app, mgr, dfTester, vertsPlugin
-from s3a import FR_SINGLETON, ComponentIO as frio, REQD_TBL_FIELDS
+from testingconsts import NUM_COMPS
+from s3a import FR_SINGLETON, REQD_TBL_FIELDS
 from s3a.constants import FR_CONSTS
 from s3a.controls.drawctrl import RoiCollection
 from s3a.parameditors.algcollection import AlgParamEditor
 from s3a.processing import ProcessIO, ImageProcess, ImgProcWrapper
 from s3a.structures import XYVertices, ComplexXYVertices, FRParam, S3AWarning, NChanImg
-from testingconsts import FIMG_SER_COLS
-
-# Construct app outside setUp to drastically reduce loading times
-# Make the processor wellformed
-vertsPlugin.procCollection.switchActiveProcessor('Basic Shapes')
-proc = vertsPlugin.curProcessor
-for stage in proc.processor.stages:
-  if stage.allowDisable:
-    proc.setStageEnabled([stage.name], False)
-stack = FR_SINGLETON.actionStack
-
-fImg = app.focusedImg
-
-mgr.addComps(dfTester.compDf)
 
 def leftClickGen(pos: XYVertices, dbclick=False):
   Ev = QtCore.QEvent
@@ -38,7 +22,7 @@ def leftClickGen(pos: XYVertices, dbclick=False):
   return out
 
 @pytest.fixture
-def roiFactory():
+def roiFactory(app):
   clctn = RoiCollection((FR_CONSTS.DRAW_SHAPE_POLY, FR_CONSTS.DRAW_SHAPE_RECT),
                         app.focusedImg)
   def _polyRoi(pts: XYVertices, shape: FRParam=FR_CONSTS.DRAW_SHAPE_RECT):
@@ -51,7 +35,8 @@ def roiFactory():
   return _polyRoi
 
 @pytest.mark.withcomps
-def test_update():
+def test_update(app, mgr, vertsPlugin):
+  fImg = app.focusedImg
   oldPlugin = fImg.currentPlugin
   fImg.changeCurrentPlugin(vertsPlugin)
   assert fImg.image is None
@@ -78,7 +63,8 @@ def test_update():
   assert fImg.compSer.equals(newerSer)
   fImg.changeCurrentPlugin(oldPlugin)
 
-def test_region_modify(sampleComps):
+def test_region_modify(sampleComps, app, mgr, vertsPlugin):
+  fImg = app.focusedImg
   vertsPlugin.attachWinRef(app)
   app.add_focusComps(sampleComps)
   shapeBnds = fImg.image.shape[:2]
@@ -115,7 +101,7 @@ def test_region_modify(sampleComps):
 
 
 @pytest.mark.withcomps
-def test_selectionbounds_all():
+def test_selectionbounds_all(app, mgr):
   imBounds = app.mainImg.image.shape[:2][::-1]
   bounds = XYVertices([[0,0],
                        [0, imBounds[1]],
@@ -125,18 +111,18 @@ def test_selectionbounds_all():
   assert len(app.compDisplay.selectedIds) == len(mgr.compDf)
 
 @pytest.mark.withcomps
-def test_selectionbounds_none():
+def test_selectionbounds_none(app):
   app.compTbl.clearSelection()
   app.compDisplay.selectedIds = np.array([], dtype=int)
   # Selection in negative area ensures no comps will be selected
   app.mainImg.sigSelectionBoundsMade.emit(XYVertices([[-100,-100]]))
   assert len(app.compDisplay.selectedIds) == 0
 
-def test_proc_err(tmpdir):
+def test_proc_err(tmp_path):
   def badProc(image: NChanImg):
     return ProcessIO(image=image, extra=1 / 0)
   newCtor = lambda: ImageProcess.fromFunction(badProc, name='Bad')
-  newClctn = AlgParamEditor(Path(tmpdir), [newCtor], ImgProcWrapper)
+  newClctn = AlgParamEditor(tmp_path, [newCtor], ImgProcWrapper)
 
   newClctn.switchActiveProcessor('Bad')
   with pytest.warns(S3AWarning):
