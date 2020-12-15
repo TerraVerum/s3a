@@ -1,8 +1,10 @@
 images: []
 annotations: []
 
-settings:
-  annotation-format: "pkl"
-  startup-image:
-
 table-cfg: {}
+
+annotation-format: "pkl"
+
+startup:
+  image:
+  state:

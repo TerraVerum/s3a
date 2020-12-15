@@ -61,7 +61,7 @@ class ParamEditorPlugin(ABC):
       cls.dock.addEditors([cls.toolsEditor])
     cls.menu = QtWidgets.QMenu(cls.name)
 
-  def __init__(self):
+  def __init__(self, *args, **kwargs):
     if self.dock is not None:
       self.dock.createMenuOpt(parentMenu=self.menu)
       self.menu.addSeparator()
@@ -93,7 +93,7 @@ class ParamEditorPlugin(ABC):
     if isinstance(opts, FRParam): opts = opts.opts
     if opts.get('guibtn', True):
       act = parentMenu.addAction(proc.name)
-      act.triggered.connect(lambda: proc(s3a=self.win))
+      act.triggered.connect(lambda: proc(win=self.win))
     return proc
 
   def registerPopoutFuncs(self, groupName: str, funcList: Sequence[Callable], nameList: Sequence[str]=None):

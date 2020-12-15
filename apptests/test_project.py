@@ -3,13 +3,13 @@ from pathlib import Path
 from apptests.testingconsts import SAMPLE_SMALL_IMG_FNAME
 from apptests.conftest import dfTester
 from s3a import ComponentIO
-from s3a.parameditors.project import ProjectData
+from s3a.plugins.file import ProjectData
 
 
 def test_create_project(tmp_path, app, sampleComps):
   projName = 'tmpproj'
   dummyAnnFile  = SAMPLE_SMALL_IMG_FNAME.with_suffix(f'{SAMPLE_SMALL_IMG_FNAME.suffix}.pkl')
-  proj = ProjectData.create(name=tmp_path / projName, cfg={'images': [SAMPLE_SMALL_IMG_FNAME], 'export-opts': {'annotation-format': 'pkl'}})
+  proj = ProjectData.create(name=tmp_path / projName, cfg={'images': [SAMPLE_SMALL_IMG_FNAME], 'annotation-format': 'pkl'})
   proj.addAnnotation(dummyAnnFile, dfTester.compDf, image=SAMPLE_SMALL_IMG_FNAME.name)
 
   assert tmp_path.exists()

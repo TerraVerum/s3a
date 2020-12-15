@@ -6,6 +6,7 @@ from functools import partial
 from functools import wraps
 from os.path import basename
 from pathlib import Path
+from textwrap import wrap
 from traceback import format_exception
 from typing import Optional, Union, Callable, Generator, Sequence, Dict, List
 
@@ -366,7 +367,7 @@ class ScrollableErrorDialog(QtWidgets.QDialog):
       if showTrace:
         newText = msgWithTrace
       else:
-        newText = msgWithoutTrace
+        newText = '\n'.join(wrap(msgWithoutTrace))
       showTrace = not showTrace
       msgLbl.setText(newText)
     self.msgLbl = msgLbl
@@ -565,10 +566,10 @@ class ThumbnailViewer(QtWidgets.QListWidget):
   def selectedImages(self):
     return [self.nameToFullPathMapping[idx.data()] for idx in self.selectedIndexes()]
 
-
   def removeThumbnail(self, name: str):
+    item = self.findItems(name, QtCore.Qt.MatchExactly)[0]
+    self.takeItem(self.row(item))
     del self.nameToFullPathMapping[name]
-    self.removeItemWidget(self.findItems(name, QtCore.Qt.MatchExactly)[0])
 
   def clear(self):
     super().clear()

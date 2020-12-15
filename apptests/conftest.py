@@ -76,7 +76,10 @@ def vertsPlugin(app):
 @pytest.fixture(autouse=True)
 def resetApp_tester(request, app, filePlg, mgr):
   for img in filePlg.projData.images:
-    filePlg.projData.removeImage(img)
+    try:
+      filePlg.projData.removeImage(img)
+    except FileNotFoundError:
+      pass
   app.mainImg.shapeCollection.forceUnlock()
   if 'smallimage' in request.keywords:
     app.setMainImg(SAMPLE_SMALL_IMG_FNAME, SAMPLE_SMALL_IMG)

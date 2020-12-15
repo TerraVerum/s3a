@@ -49,16 +49,16 @@ from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS
 for name, func in inspect.getmembers(TopLevelImageProcessors, inspect.isfunction):
   FR_SINGLETON.imgProcClctn.addProcessCtor(func)
 
-from s3a.plugins import ALL_PLUGINS
-from s3a.plugins.misc import RandomToolsPlugin
-for plugin in ALL_PLUGINS():
-  FR_SINGLETON.addPlugin(plugin)
-
-miscPlugin = FR_SINGLETON.clsToPluginMapping[RandomToolsPlugin]
-
 # Minimal means no GUI is needed. Things work faster when they don't have to be
 # shown through the comp display filter
 if customPlatform is not None:
   from .models.s3abase import S3ABase as S3A
 else:
   from .views.s3agui import S3A
+
+from s3a.plugins import ALL_PLUGINS
+from s3a.plugins.misc import RandomToolsPlugin
+for plugin in ALL_PLUGINS():
+  FR_SINGLETON.addPlugin(plugin)
+
+miscPlugin = FR_SINGLETON.clsToPluginMapping[RandomToolsPlugin]

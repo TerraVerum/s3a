@@ -11,7 +11,7 @@ from .genericeditor import ParamEditor, ParamEditorDockGrouping
 from s3a.plugins import base
 from .shortcut import ShortcutsEditor
 from .quickloader import QuickLoaderEditor
-from .project import ProjectData
+from .table import TableData
 from ..generalutils import pascalCaseToTitle
 from ..processing import ImgProcWrapper
 
@@ -42,8 +42,7 @@ class _FRSingleton(QtCore.QObject):
     self.actionStack = ActionStack()
     self.clsToPluginMapping: Dict[Type[base.ParamEditorPlugin], base.ParamEditorPlugin] = {}
 
-    self.project = ProjectData()
-    self.tableData = self.project.tableData
+    self.tableData = TableData()
     self.tableData.loadCfg(BASE_DIR/'tablecfg.yml')
     self.filter = self.tableData.filter
 
