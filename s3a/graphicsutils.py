@@ -553,9 +553,9 @@ class ThumbnailViewer(QtWidgets.QListWidget):
       self.sigDeleteRequested.emit(selection)
     self.delShc = QtWidgets.QShortcut(QtCore.Qt.Key_Delete, self, findDelImgs)
 
-  def addThumbnail(self, fullName: Path):
+  def addThumbnail(self, fullName: Path, force=False):
     icon = QtGui.QIcon(str(fullName))
-    if fullName.name in self.nameToFullPathMapping:
+    if fullName.name in self.nameToFullPathMapping and not force:
       raise S3AIOError('Name already exists in image list')
     newItem = QtWidgets.QListWidgetItem(fullName.name)
     newItem.setIcon(icon)
@@ -567,7 +567,10 @@ class ThumbnailViewer(QtWidgets.QListWidget):
     return [self.nameToFullPathMapping[idx.data()] for idx in self.selectedIndexes()]
 
   def removeThumbnail(self, name: str):
-    item = self.findItems(name, QtCore.Qt.MatchExactly)[0]
+    items = self.findItems(name, QtCore.Qt.MatchExactly)
+    if len(items) == 0:
+      return
+    item = items[0]
     self.takeItem(self.row(item))
     del self.nameToFullPathMapping[name]
 

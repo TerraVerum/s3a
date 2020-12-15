@@ -1,7 +1,7 @@
+import os
 from typing import Type
 
 import pytest
-import os
 
 os.environ['S3A_PLATFORM'] = 'minimal'
 from helperclasses import CompDfTester
@@ -77,8 +77,9 @@ def vertsPlugin(app):
 def resetApp_tester(request, app, filePlg, mgr):
   for img in filePlg.projData.images:
     try:
-      filePlg.projData.removeImage(img)
-    except FileNotFoundError:
+      if img != app.srcImgFname:
+        filePlg.projData.removeImage(img)
+    except (FileNotFoundError, S3AException):
       pass
   app.mainImg.shapeCollection.forceUnlock()
   if 'smallimage' in request.keywords:

@@ -65,8 +65,7 @@ class FilePlugin(ParamEditorPlugin):
 
     def onAdd(imList):
       for im in imList:
-        if im.name not in self._imgThumbnails.nameToFullPathMapping:
-          self._imgThumbnails.addThumbnail(im)
+        self._imgThumbnails.addThumbnail(im, force=True)
     def onMove(imList):
       for oldName, newName in imList:
         self._imgThumbnails.nameToFullPathMapping[oldName.name] = newName
@@ -83,8 +82,8 @@ class FilePlugin(ParamEditorPlugin):
           continue
         self._imgThumbnails.removeThumbnail(name.name)
       if delCurrent:
-        warn(f'Cannot delete {self.win.srcImgFname.name} since it is currently'
-             f' being annotated. Change the image and try again.', S3AWarning)
+        raise S3AIOError(f'Cannot delete {self.win.srcImgFname.name} since it is currently'
+             f' being annotated. Change the image and try again.')
     self.projData.sigImagesAdded.connect(onAdd)
     self.projData.sigImagesMoved.connect(onMove)
     self.projData.sigImagesRemoved.connect(onDel)
@@ -134,9 +133,11 @@ class FilePlugin(ParamEditorPlugin):
                                                             imShape=self.win.mainImg.image.shape))
 
   def open(self, name: str):
-    if self.projData.loadCfg(name) is not None:
-      self._imgThumbnails.clear()
-      self._updateProjLbl()
+    if Path(name).resolve() == self.projData.cfgFname:
+      return
+    self._imgThumbnails.clear()
+    self.projData.loadCfg(name)
+    self._updateProjLbl()
     startupImg = self.projData.startup['image']
     if startupImg is not None:
       startupImg = Path(startupImg)
@@ -233,8 +234,12 @@ class FilePlugin(ParamEditorPlugin):
     elif not srcImg.exists():
       # Data may have been set programmatically and given a name, so make sure this exists before saving
       srcImg = self.projData.addImage(name=srcImg, data=self.win.mainImg.image, copyToProj=True, allowOverwrite=True)
+      if srcImg is None:
+        # Orig file didn't exist, but it was in the image folder
+        srcImg = self.win.srcImgFname
     self.projData.addAnnotation(data=self.win.exportableDf, image=srcImg, overwriteOld=True)
     self.win.srcImgFname = self.projData.imagesDir / srcImg.name
+    self.win.hasUnsavedChanges = False
 
   def create_gui(self):
     wiz = NewProjectWizard(self)
@@ -260,7 +265,7 @@ class FilePlugin(ParamEditorPlugin):
     baseCfg['images'].extend(images)
     baseCfg['annotations'].extend(annotations)
     projPath = Path(wiz.projSettings['Location'])/projName
-    self.projData = ProjectData.create(name=projPath, cfg=baseCfg)
+    self.projData.create(name=projPath, cfg=baseCfg, parent=self.projData)
 
 
 class NewProjectWizard(QtWidgets.QWizard):

@@ -209,10 +209,9 @@ def test_load_last_settings(tmp_path, sampleComps, app):
   app.add_focusComps(sampleComps)
   app.appStateEditor.saveParamState()
   app.forceClose()
-  app.setMainImg(None, None)
   app.appStateEditor.loadParamState()
   app.appStateEditor.saveDir = oldSaveDir
   assert np.array_equal(app.mainImg.image, SAMPLE_IMG)
   sampleComps[REQD_TBL_FIELDS.SRC_IMG_FILENAME] = SAMPLE_IMG_FNAME.name
-  assert np.array_equal(sampleComps, app.compMgr.compDf)
+  assert np.array_equal(sampleComps, app.exportableDf)
 
