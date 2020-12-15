@@ -13,7 +13,7 @@ from s3a.structures import FRParam, \
   AlgProcessorError, ParamEditorError
 from .genericeditor import ParamEditor
 from .pgregistered import ProcGroupParameter
-from s3a.generalutils import frPascalCaseToTitle
+from s3a.generalutils import pascalCaseToTitle
 from ..processing import GeneralProcWrapper, GeneralProcess
 from ..processing.processing import ImageProcess
 
@@ -35,7 +35,7 @@ class AlgCtorCollection(ParamEditor):
     if not isclass(clsObj):
       clsObj = type(clsObj)
     clsName = clsObj.__name__
-    formattedClsName = frPascalCaseToTitle(clsName)
+    formattedClsName = pascalCaseToTitle(clsName)
     editorDir = MENU_OPTS_DIR/formattedClsName.lower()
     newEditor = AlgParamEditor(editorDir, self.processorCtors, self.procWrapType, name=editorName)
     self.spawnedCollections.append(newEditor)

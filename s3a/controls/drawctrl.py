@@ -13,7 +13,7 @@ __all__ = ['RoiCollection']
 @FR_SINGLETON.registerGroup(FR_CONSTS.CLS_ROI_CLCTN)
 class RoiCollection(QtCore.QObject):
   # Signal(ExtendedROI)
-  sigShapeFinished = QtCore.Signal(object)
+  sigShapeFinished = QtCore.Signal(object) # roiVerts : XYVertices
 
   def __init__(self, allowableShapes: Collection[FRParam]=(), parent: pg.GraphicsView=None):
     super().__init__(parent)

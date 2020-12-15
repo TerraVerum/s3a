@@ -1,20 +1,15 @@
-from functools import partial
-from functools import partial
 from typing import Optional
 
 import numpy as np
 import pandas as pd
-from pyqtgraph.Qt import QtWidgets
 
-from s3a import FR_SINGLETON, FR_CONSTS as FRC, REQD_TBL_FIELDS as RTF, ComplexXYVertices, \
-  XYVertices, FRParam, ComponentIO as frio
-from s3a.generalutils import frPascalCaseToTitle
+from s3a import FR_SINGLETON, FR_CONSTS as FRC, XYVertices, REQD_TBL_FIELDS as RTF, \
+  ComplexXYVertices, ComponentIO as frio
 from s3a.models.s3abase import S3ABase
-from s3a.parameditors import ParamEditorDockGrouping
-from s3a.parameditors.genericeditor import TableFieldPlugin
 from s3a.processing.algorithms import _historyMaskHolder
 from s3a.structures import NChanImg, GrayImg
 from s3a.views.regions import MultiRegionPlot, makeMultiRegionDf
+from .base import TableFieldPlugin
 
 
 class VerticesPlugin(TableFieldPlugin):
@@ -25,11 +20,10 @@ class VerticesPlugin(TableFieldPlugin):
     super().__initEditorParams__()
     cls.procCollection = FR_SINGLETON.imgProcClctn.createProcessorForClass(cls)
 
-    dockGroup = ParamEditorDockGrouping([cls.toolsEditor, cls.procCollection],
-                                        frPascalCaseToTitle(cls.name))
-    cls.docks = dockGroup
+    cls.dock.addEditors([cls.procCollection])
 
   def __init__(self):
+    super().__init__()
     self.region = MultiRegionPlot()
     self.region.hide()
     self.firstRun = True
@@ -37,9 +31,8 @@ class VerticesPlugin(TableFieldPlugin):
     # Disable local cropping on primitive grab cut by default
     self.procCollection.nameToProcMapping['Primitive Grab Cut'].setStageEnabled(['Crop To Local Area'], False)
 
-  def attachS3aRef(self, s3a: S3ABase):
-    super().attachS3aRef(s3a)
-    s3a.focusedImg.addItem(self.region)
+  def attachWinRef(self, win: S3ABase):
+    win.focusedImg.addItem(self.region)
 
     def fill():
       """Completely fill the focused region mask"""
@@ -59,11 +52,16 @@ class VerticesPlugin(TableFieldPlugin):
       will erase algorithm knowledge of past edits.
       """
       _historyMaskHolder[0].fill(0)
+
     funcLst = [self.resetFocusedRegion, fill, clear, clearProcessorHistory]
     paramLst = [FRC.TOOL_RESET_FOC_REGION, FRC.TOOL_FILL_FOC_REGION,
                 FRC.TOOL_CLEAR_FOC_REGION, FRC.TOOL_CLEAR_HISTORY]
     for func, param in zip(funcLst, paramLst):
-      self.toolsEditor.registerFunc(func, btnOpts=param)
+      param.opts['ownerObj'] = win.focusedImg
+      self.registerFunc(func, btnOpts=param)
+
+    super().attachWinRef(win)
+
 
 
   def updateAll(self, mainImg: Optional[NChanImg], newComp: Optional[pd.Series] = None):
@@ -180,31 +178,3 @@ class VerticesPlugin(TableFieldPlugin):
 
   def _onDeactivate(self):
     self.region.hide()
-
-class Dummy(TableFieldPlugin):
-  name = 'Dummy'
-
-  @classmethod
-  def __initEditorParams__(cls):
-    super().__initEditorParams__()
-    ps = [FRParam(l, value=f'Ctrl+{l}', pType='registeredaction') for l in 'abcd']
-    def alert(btnName):
-      QtWidgets.QMessageBox.information(cls.toolsEditor, 'Button clicked',
-                                        f'{btnName} button clicked!')
-
-    for p in ps:
-      prop = cls.toolsEditor.registerProp(cls, p, asProperty=False, ownerObj=cls)
-      prop.sigActivated.connect(partial(alert, p.name))
-
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-
-
-  def updateAll(self, mainImg: Optional[NChanImg], newComp: Optional[pd.Series] = None):
-    pass
-
-  def handleShapeFinished(self, roiVerts: XYVertices):
-    pass
-
-  def acceptChanges(self):
-    pass

@@ -5,7 +5,7 @@ from pathlib import Path
 __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR', 'QUICK_LOAD_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'TABLE_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
            'MAIN_IMG_DIR', 'FOC_IMG_DIR', 'APP_STATE_DIR',
-           'DATE_FORMAT', 'REQD_TBL_FIELDS', 'FR_CONSTS', 'FR_ENUMS']
+           'DATE_FORMAT', 'REQD_TBL_FIELDS', 'FR_CONSTS', 'FR_ENUMS', 'PROJ_FILE_TYPE']
 BASE_DIR = Path(__file__).parent
 MENU_OPTS_DIR = BASE_DIR/'menuopts'
 ICON_DIR = BASE_DIR/'icons'
@@ -26,6 +26,8 @@ MAIN_IMG_DIR = MENU_OPTS_DIR/'mainimg'
 TABLE_DIR = MENU_OPTS_DIR/'table'
 APP_STATE_DIR = Path.home()/'.s3a'
 
+
+PROJ_FILE_TYPE = 's3aprj'
 
 # Ensure menuopts and layouts directories exist
 LAYOUTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -85,7 +87,7 @@ class _FRConsts(FRParamGroup):
 
   CLS_IMG_AREA         : FRParam = newParam('Base Image Area')
   CLS_MAIN_IMG_AREA    : FRParam = newParam('Main Image Area')
-  CLS_FOCUSED_IMG_AREA : FRParam = newParam('Focused Component Image Area')
+  CLS_FOCUSED_IMG_AREA : FRParam = newParam('Focused Image Area')
   CLS_ROI_CLCTN        : FRParam = newParam('Draw-able Shapes')
   # --------------------------
   # SCHEME PARAMETERS
@@ -125,7 +127,7 @@ class _FRConsts(FRParamGroup):
              ' fixed pixel amount.')
   PROP_ONLY_GROW_MAIN_VB       : FRParam = newParam(
     'Disallow shrink during selection', True,
-    helpText='When selecting components, this parameter determines whetherthe viewbox'
+    helpText='When selecting components, this parameter determines whether the viewbox'
              ' shrinks only to the current selection (if *False*)or just ensures the'
              ' view contains the selected component (if *True*)')
   PROP_FOCUSED_SEED_THRESH     : FRParam = newParam('Seedpoint Threshold in Focused Image', 7.)
@@ -146,6 +148,11 @@ class _FRConsts(FRParamGroup):
                                         ' window by hiding these buttons.')
   PROP_COLS_TO_SHOW            : FRParam = newParam('Visible Table Columns', pType='group')
 
+  # --------------------------
+  # MISC TOOLS
+  # --------------------------
+  TOOL_UNDO               : FRParam =  newParam('Undo', 'Ctrl+Z')
+  TOOL_REDO               : FRParam =  newParam('Redo', 'Ctrl+Y')
   # --------------------------
   # IMAGE TOOLS
   # --------------------------

@@ -1,3 +1,5 @@
+from typing import Type
+
 import pytest
 import os
 
@@ -6,21 +8,13 @@ from helperclasses import CompDfTester
 from s3a import FR_SINGLETON
 from s3a.views.s3agui import S3A
 from testingconsts import SAMPLE_IMG, SAMPLE_IMG_FNAME, NUM_COMPS, \
-  SAMPLE_SMALL_IMG, SAMPLE_SMALL_IMG_FNAME
+  SAMPLE_SMALL_IMG, SAMPLE_SMALL_IMG_FNAME, TEST_AUTHOR
 from s3a.structures import S3AException
-from s3a.plugins import VerticesPlugin
+from s3a.plugins.tablefield import VerticesPlugin
+from s3a.plugins.file import FilePlugin
 
-app = S3A(Image=SAMPLE_IMG_FNAME, guiMode=False, loadLastState=False, author='testauthor')
-mgr = app.compMgr
-vertsPlugin = None
-for plugin in FR_SINGLETON.tableFieldPlugins:
-  if isinstance(plugin, VerticesPlugin):
-    vertsPlugin = plugin
-    break
-if vertsPlugin is None:
-  raise S3AException('Vertices plugin was not provided. Some tests are guaranteed to fail.')
-app.focusedImg.changeCurrentPlugin(vertsPlugin)
 stack = FR_SINGLETON.actionStack
+FR_SINGLETON.tableData.annAuthor = TEST_AUTHOR
 
 dfTester = CompDfTester(NUM_COMPS)
 dfTester.fillRandomVerts(imShape=SAMPLE_IMG.shape)
@@ -44,10 +38,48 @@ dfTester.fillRandomClasses()
 def sampleComps():
   return dfTester.compDf.copy()
 
+# Assign temporary project directory
+@pytest.fixture(scope="session", autouse=True)
+def app(tmpdir_factory, filePlg):
+  filePlg.projData.create(name=str(tmpdir_factory.mktemp('proj')), parent=filePlg.projData)
+  app_ = S3A(Image=SAMPLE_IMG_FNAME, guiMode=False, loadLastState=False, author=TEST_AUTHOR)
+  return app_
+
+@pytest.fixture(scope='session')
+def filePlg():
+  plg: FilePlugin = FR_SINGLETON.clsToPluginMapping[FilePlugin]
+  return plg
+
+@pytest.fixture(scope="session")
+def mgr(app):
+  return app.compMgr
+
+@pytest.fixture(scope='session', autouse=True)
+def vertsPlugin(app):
+  try:
+    plg = FR_SINGLETON.clsToPluginMapping[VerticesPlugin]
+  except KeyError:
+    raise S3AException('Vertices plugin was not provided. Some tests are guaranteed to fail.')
+
+  app.focusedImg.changeCurrentPlugin(plg)
+
+  plg.procCollection.switchActiveProcessor('Basic Shapes')
+  proc = plg.curProcessor
+  for stage in proc.processor.stages:
+    if stage.allowDisable:
+      proc.setStageEnabled([stage.name], False)
+
+  return plg
+
 # Each test can request wheter it starts with components, small image, etc.
 # After each test, all components are removed from the app
 @pytest.fixture(autouse=True)
-def resetApp_tester(request):
+def resetApp_tester(request, app, filePlg, mgr):
+  for img in filePlg.projData.images:
+    try:
+      filePlg.projData.removeImage(img)
+    except FileNotFoundError:
+      pass
   app.mainImg.shapeCollection.forceUnlock()
   if 'smallimage' in request.keywords:
     app.setMainImg(SAMPLE_SMALL_IMG_FNAME, SAMPLE_SMALL_IMG)
@@ -60,3 +92,6 @@ def resetApp_tester(request):
   yield
   stack.clear()
   app.clearBoundaries()
+
+def assertExInList(exList, typ: Type[Exception]=S3AException):
+  assert any(issubclass(ex[0], typ) for ex in exList)

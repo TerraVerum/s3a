@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from pyqtgraph.graphicsItems.ViewBox.ViewBoxMenu import ViewBoxMenu
 from skimage.io import imread
 
 from s3a import FR_SINGLETON
@@ -15,12 +16,13 @@ from s3a.structures import NChanImg
 from .buttons import DrawOpts, ButtonCollection
 from .clickables import RightPanViewBox
 from .regions import RegionCopierPlot
-from ..parameditors import ParamEditor, TableFieldPlugin
+from ..parameditors import ParamEditor
+from ..plugins.base import TableFieldPlugin
 
 __all__ = ['MainImage', 'FocusedImage', 'EditableImgBase']
 
 from s3a.controls.drawctrl import RoiCollection
-from ..graphicsutils import contextMenuFromEditorActions
+from ..graphicsutils import menuFromEditorActions
 
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
@@ -35,8 +37,6 @@ class EditableImgBase(pg.PlotWidget):
 
   @classmethod
   def __initEditorParams__(cls):
-    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls)
-
     cls.compCropMargin, cls.treatMarginAsPct = FR_SINGLETON.generalProps.registerProps(
       cls, [FRC.PROP_CROP_MARGIN_VAL, FRC.PROP_TREAT_MARGIN_AS_PCT])
     cls.showGuiBtns = FR_SINGLETON.generalProps.registerProp(
@@ -46,18 +46,16 @@ class EditableImgBase(pg.PlotWidget):
   def __init__(self, parent=None, drawShapes: Collection[FRParam]=(),
                drawActions: Collection[FRParam]=(),**kargs):
     super().__init__(parent, viewBox=RightPanViewBox(), **kargs)
-    self.menu: QtWidgets.QMenu = self.getViewBox().menu
+    vb = self.getViewBox()
+    self.menu: QtWidgets.QMenu = vb.menu
+    self.oldVbMenu: ViewBoxMenu = vb.menu
+    self.oldVbMenu.viewAll.setText('Reset Zoom')
     # Disable default menus
     self.plotItem.ctrlMenu = None
     self.sceneObj.contextMenu = None
 
-    btnOpts = frParamToPgParamDict(FRC.TOOL_CLEAR_ROI)
-    btnOpts['ownerObj'] = self
-    btnOpts['type'] = 'registeredaction'
-    self.toolsEditor.registerFunc(self.clearCurRoi, btnOpts=btnOpts)
-    self.setMenuFromEditors([self.toolsEditor])
     self.setAspectLocked(True)
-    self.getViewBox().invertY()
+    vb.invertY()
     self.setMouseEnabled(True)
     # -----
     # IMAGE
@@ -92,7 +90,7 @@ class EditableImgBase(pg.PlotWidget):
     self.drawOptsWidget = DrawOpts(self.drawShapeGrp, self.drawActGrp, self)
 
     # Don't create shortcuts since this will be done by the tool editor
-    self.toolsGrp = ButtonCollection.fromToolsEditors(self.toolsEditor, self)
+    self.toolsGrp = ButtonCollection.fromToolsEditors([], self)
     self.showGuiBtns.sigValueChanged.connect(lambda _p, val: self.toolsGrp.setVisible(val))
 
     # Initialize draw shape/action buttons
@@ -108,11 +106,18 @@ class EditableImgBase(pg.PlotWidget):
     ev.accept()
 
 
-  def setMenuFromEditors(self, editors: Sequence[ParamEditor]):
+  def addActionsFromMenu(self, menu: QtWidgets.QMenu):
     vb: pg.ViewBox = self.getViewBox()
-    menu = contextMenuFromEditorActions(editors)
-    vb.menu = menu
-    self.menu = menu
+    menuCopy = QtWidgets.QMenu(self)
+    for action in menu.actions():
+      if action.isSeparator():
+        menuCopy.addSeparator()
+      else:
+        menuCopy.addAction(action.text(), action.trigger)
+    firstAct = menuCopy.actions()[0]
+    menuCopy.insertAction(firstAct, self.oldVbMenu.viewAll)
+    vb.menu = menuCopy
+    self.menu = menuCopy
 
   def switchBtnMode(self, newMode: FRParam):
     # EAFP
@@ -180,7 +185,6 @@ class MainImage(EditableImgBase):
     (cls.gridClr, cls.gridWidth, cls.showGrid) = FR_SINGLETON.colorScheme.registerProps(
       cls, [FRC.SCHEME_GRID_CLR, FRC.SCHEME_GRID_LINE_WIDTH, FRC.SCHEME_SHOW_GRID]
     )
-    FR_SINGLETON.addDocks(cls.toolsEditor)
 
   def __init__(self, parent=None, imgSrc=None, **kargs):
     allowedShapes = (FRC.DRAW_SHAPE_RECT, FRC.DRAW_SHAPE_POLY, FRC.DRAW_SHAPE_ELLIPSE)
@@ -202,35 +206,9 @@ class MainImage(EditableImgBase):
     self.setImage(imgSrc)
     self.compFromLastProcResult: Optional[pd.DataFrame] = None
     self.lastProcVerts: Optional[XYVertices] = None
-    copier = self.regionCopier
-    def startCopy():
-      """
-      Copies the selected components. They can be pasted by <b>double-clicking</b>
-      on the destination location. When done copying, Click the *Clear ROI* tool change
-      the current draw action.
-      """
-      copier.inCopyMode = True
-      copier.sigCopyStarted.emit()
-    self.registerToolFunc(startCopy, btnOpts=FRC.TOOL_COPY_REGIONS)
-
-    def startMove():
-      """
-      Moves the selected components. They can be pasted by <b>double-clicking</b>
-      on the destination location.
-      """
-      copier.inCopyMode = False
-      copier.sigCopyStarted.emit()
-    self.registerToolFunc(startMove, btnOpts=FRC.TOOL_MOVE_REGIONS)
 
     self.switchBtnMode(FRC.DRAW_ACT_ADD)
 
-  def registerToolFunc(self, *args, **kwargs):
-    """See function signature for `FRParamEditor.registerFunc`"""
-    origOpts = kwargs.get('btnOpts')
-    proc = self.toolsEditor.registerFunc(*args, **kwargs)
-    self.toolsGrp.create_addBtn(origOpts,
-                                triggerFn=lambda *_args, **_kwargs: proc.run(),
-                                checkable=False, ownerObj=self)
   def _initGrid(self):
     pi: pg.PlotItem = self.plotItem
     pi.showGrid(alpha=1.0)
@@ -323,6 +301,16 @@ class MainImage(EditableImgBase):
 @FR_SINGLETON.registerGroup(FRC.CLS_FOCUSED_IMG_AREA)
 class FocusedImage(EditableImgBase):
   sigPluginChanged = Signal()
+  sigUpdatedAll = Signal(object, object)
+  """Main image, new component. Emitted during `updateAll()`"""
+  sigShapeFinished = Signal(object)
+  """XYVerts from roi, re-thrown from self.shapeCollection so plugins can tie into it"""
+
+  @classmethod
+  def __initEditorParams__(cls):
+    super().__initEditorParams__()
+    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls)
+
 
   def __init__(self, parent=None, **kargs):
     allowableShapes = (
@@ -344,9 +332,7 @@ class FocusedImage(EditableImgBase):
   def handleShapeFinished(self, roiVerts: XYVertices) -> Optional[np.ndarray]:
     if self.drawAction == FRC.DRAW_ACT_PAN:
       return
-    for plugin in FR_SINGLETON.tableFieldPlugins:
-      if plugin.active:
-        plugin.handleShapeFinished(roiVerts)
+    self.sigShapeFinished.emit(roiVerts)
 
   @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
   def updateAll(self, mainImg: NChanImg=None, newComp:Optional[pd.Series]=None,
@@ -393,8 +379,7 @@ class FocusedImage(EditableImgBase):
       else:
         self.imgItem.setImage(newCompImg)
         QtCore.QTimer.singleShot(0, self.autoRange)
-    for plugin in FR_SINGLETON.tableFieldPlugins:
-      plugin.updateAll(mainImg, newComp)
+    self.sigUpdatedAll.emit(mainImg, newComp)
     yield
     self.updateAll(oldImg, oldComp, True)
 
@@ -417,7 +402,7 @@ class FocusedImage(EditableImgBase):
     newEditors = [self.toolsEditor]
     if newPlugin is not None:
       newEditors.append(newPlugin.toolsEditor)
-    self.menu = contextMenuFromEditorActions(newEditors, menuParent=self)
+    self.menu = menuFromEditorActions(newEditors, menuParent=self)
     self.getViewBox().menu = self.menu
     self.currentPlugin = newPlugin
     if forceActivate and newPlugin is not None and not newPlugin.active:

@@ -1,6 +1,7 @@
 import sys
+from copy import copy
 from pathlib import Path
-from typing import Optional, Union, Callable, Dict, Any
+from typing import Optional, Union, Callable, Dict, Any, Type
 from warnings import warn
 
 import numpy as np
@@ -15,9 +16,9 @@ from s3a.controls.tableviewproxy import CompDisplayFilter, CompSortFilter
 from s3a.generalutils import resolveAuthorName, imgCornerVertices
 from s3a.graphicsutils import addDirItemsToMenu, saveToFile
 from s3a.models.tablemodel import ComponentMgr
-from s3a.parameditors import ParamEditor
-from s3a.parameditors import ParamEditorPlugin
 from s3a.parameditors import FR_SINGLETON
+from s3a.parameditors import ParamEditor
+from s3a.plugins.base import ParamEditorPlugin
 from s3a.parameditors.appstate import AppStateEditor
 from s3a.structures import FilePath, NChanImg, S3AIOError, \
   AlgProcessorError, S3AWarning
@@ -31,18 +32,38 @@ class S3ABase(QtWidgets.QMainWindow):
   """
   Top-level widget for producing component bounding regions from an input image.
   """
+
+  sigImageChanged = QtCore.Signal()
+  sigImageAboutToChange = QtCore.Signal(object, object) # current name, new name (as Paths)
+  sigRegionAccepted = QtCore.Signal()
+  """
+  Like `sigImageChanged` from main image's `imgItem`, but only fires when a new image is
+  loaded. For instance, if a new image is loaded but uses the same filename (for instance,
+  when a preprocessing step is applied to the image), `sigImageChanged` will _not_ be
+  emitted even though `imgItem.sigImageChanged` is emitted.  
+  """
+
   @classmethod
   def __initEditorParams__(cls):
     cls.estBoundsOnStart, cls.undoBuffSz = FR_SINGLETON.generalProps.registerProps(cls,
         [FR_CONSTS.PROP_EST_BOUNDS_ON_START, FR_CONSTS.PROP_UNDO_BUF_SZ])
-    cls.useDarkTheme = FR_SINGLETON.colorScheme.registerProp(cls, FR_CONSTS.SCHEME_USE_DARK_THEME)
 
   def __init__(self, parent=None, **quickLoaderArgs):
     super().__init__(parent)
+    self.generalToolbar = QtWidgets.QToolBar('General Plugins')
+    self.tblFieldToolbar = QtWidgets.QToolBar('Table Field Plugins')
+
     self.mainImg = MainImage()
     self.focusedImg = FocusedImage()
+    FR_CONSTS.TOOL_ACCEPT_FOC_REGION.opts['ownerObj'] = self.focusedImg
     self.focusedImg.toolsEditor.registerFunc(self.acceptFocusedRegion,
                                              btnOpts=FR_CONSTS.TOOL_ACCEPT_FOC_REGION)
+    self.statBar = QtWidgets.QStatusBar(self)
+    self.menuBar_ = self.menuBar()
+
+    opt = copy(FR_CONSTS.TOOL_CLEAR_ROI)
+    opt.opts['ownerObj'] = self.focusedImg
+    self.focusedImg.toolsEditor.registerFunc(self.focusedImg.clearCurRoi, btnOpts=opt)
 
     self.compMgr = ComponentMgr()
     # Register exporter to allow user parameters
@@ -52,6 +73,7 @@ class S3ABase(QtWidgets.QMainWindow):
                                               [FR_CONSTS.EXP_ONLY_VISIBLE, FR_CONSTS.INCLUDE_FNAME_PATH]
                                               )
     self.compIo: ComponentIO = ioCls()
+    ComponentIO.tableData = FR_SINGLETON.tableData
 
     self.compTbl = CompTableView()
     self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl)
@@ -64,42 +86,18 @@ class S3ABase(QtWidgets.QMainWindow):
 
     self.hasUnsavedChanges = False
     self.srcImgFname: Optional[Path] = None
-    self.autosaveTimer: Optional[QtCore.QTimer] = None
 
     # -----
     # INTERFACE WITH QUICK LOADER
     # -----
     self.appStateEditor = AppStateEditor(self, name='App State Editor')
 
-    for plugin in FR_SINGLETON.plugins: # type: ParamEditorPlugin
-      plugin.attachS3aRef(self)
-
-    def loadCfg(_fname: str):
-      FR_SINGLETON.tableData.loadCfg(_fname)
-      self.resetTblFields()
-
-    def saveCfg(_folderName: Path):
-      td = FR_SINGLETON.tableData
-      saveFpath = td.cfgFname
-      if not saveFpath.exists():
-        saveFpath = _folderName/td.cfgFname.name
-        saveToFile(td.cfg, saveFpath, allowOverwriteDefault=True)
-      return str(saveFpath)
-    self.appStateEditor.addImportExportOpts('tablecfg', loadCfg, saveCfg)
-
-    self.appStateEditor.addImportExportOpts(
-      'image', lambda fname: self.setMainImg(fname, clearExistingComps=False),
-      lambda _folderName: str(self.srcImgFname)
-    )
-    def saveExistingComps(_folderName: Path):
-      if self.mainImg.image is None:
-        return None
-      saveName = _folderName / 'savedState.pkl'
-      self.exportCompList(saveName, readOnly=False)
-      return str(saveName)
-    loadExistingComps = lambda infile: self.loadCompList(infile, FR_ENUMS.COMP_ADD_AS_MERGE)
-    self.appStateEditor.addImportExportOpts(
-      'annotations', loadExistingComps, saveExistingComps)
+    for plugin in FR_SINGLETON.clsToPluginMapping.values(): # type: ParamEditorPlugin
+      # Plugins created before window was initialized may need their plugins forcefully
+      # attached here
+      if plugin.win is not self:
+        self._handleNewPlugin(plugin)
+    FR_SINGLETON.sigPluginAdded.connect(self._handleNewPlugin)
 
     # Connect signals
     # -----
@@ -112,7 +110,6 @@ class S3ABase(QtWidgets.QMainWindow):
     # -----
     # MAIN IMAGE
     # -----
-    self.mainImg.imgItem.sigImageChanged.connect(lambda: self.clearBoundaries())
     self.mainImg.sigCompsCreated.connect(self.add_focusComps)
 
     def handleCompsChanged(changedDict: dict):
@@ -152,50 +149,19 @@ class S3ABase(QtWidgets.QMainWindow):
       # will break. So, the table doesn't have to be completely reset
       return
     self.compMgr.beginResetModel()
-    self.compMgr.resetFields()
     self.compMgr.rmComps()
+    self.compMgr.resetFields()
     self.compMgr.endResetModel()
     self.compTbl.setColDelegates()
     self.compTbl.popup.tbl.setColDelegates()
+
+  def _handleNewPlugin(self, plugin: ParamEditorPlugin):
+    plugin.attachWinRef(self)
 
   @staticmethod
   def saveAllEditorDefaults():
     for editor in FR_SINGLETON.registerableEditors:
       editor.saveCurStateAsDefault()
-
-  @staticmethod
-  def populateParamEditorMenuOpts(objForMenu: ParamEditor, winMenu: QtWidgets.QMenu,
-                                  triggerFn: Callable):
-    addDirItemsToMenu(winMenu,
-                      objForMenu.saveDir.glob(f'*.{objForMenu.fileType}'),
-                      triggerFn)
-
-  def startAutosave(self, interval_mins: float, autosaveFolder: Path, baseName: str):
-    autosaveFolder.mkdir(exist_ok=True, parents=True)
-    lastSavedDf = self.compMgr.compDf.copy()
-    # Qtimer expects ms, turn mins->s->ms
-    self.autosaveTimer = QtCore.QTimer()
-    # Figure out where to start the counter
-    globExpr = lambda: autosaveFolder.glob(f'{baseName}*.csv')
-    existingFiles = list(globExpr())
-    if len(existingFiles) == 0:
-      counter = 0
-    else:
-      counter = max(map(lambda fname: int(fname.stem.rsplit('_')[1]), existingFiles)) + 1
-
-    def save_incrementCounter():
-      nonlocal counter, lastSavedDf
-      baseSaveNamePlusFolder = autosaveFolder/f'{baseName}_{counter}.csv'
-      counter += 1
-      if not np.array_equal(self.compMgr.compDf, lastSavedDf):
-        self.exportCompList(baseSaveNamePlusFolder)
-        lastSavedDf = self.compMgr.compDf.copy()
-
-    self.autosaveTimer.timeout.connect(save_incrementCounter)
-    self.autosaveTimer.start(int(interval_mins*60*1000))
-
-  def stopAutosave(self):
-    self.autosaveTimer.stop()
 
   def updateUndoBuffSz(self, _genProps: Dict[str, Any]):
     FR_SINGLETON.actionStack.resizeStack(self.undoBuffSz)
@@ -208,8 +174,7 @@ class S3ABase(QtWidgets.QMainWindow):
       newComp = FR_SINGLETON.tableData.makeCompDf(1)
       newComp.at[REQD_TBL_FIELDS.INST_ID.value, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices([verts])
       self.add_focusComps(newComp)
-      for plugin in FR_SINGLETON.tableFieldPlugins:
-        plugin.handleShapeFinished(verts)
+      self.focusedImg.handleShapeFinished(verts)
 
       self.acceptFocusedRegion()
     finally:
@@ -226,8 +191,7 @@ class S3ABase(QtWidgets.QMainWindow):
       return
     oldSer = mgr.compDf.loc[focusedId].copy()
 
-    for plugin in FR_SINGLETON.tableFieldPlugins:
-      plugin.acceptChanges()
+    self.sigRegionAccepted.emit()
 
     modifiedComp = self.focusedImg.compSer[[REQD_TBL_FIELDS.INST_ID, REQD_TBL_FIELDS.VERTICES]]
     modified_df = modifiedComp.to_frame().T
@@ -240,6 +204,12 @@ class S3ABase(QtWidgets.QMainWindow):
   def clearBoundaries(self):
     """Removes all components from the component table"""
     self.compMgr.rmComps()
+
+  def addPlugin(self, pluginCls: Type[ParamEditorPlugin], *args, **kwargs):
+    """See FR_SINGLETON.addPlugin"""
+    plugin = FR_SINGLETON.addPlugin(pluginCls, *args, **kwargs)
+    plugin.attachWinRef(self)
+    return plugin
 
   @FR_SINGLETON.actionStack.undoable('Change Main Image')
   def setMainImg(self, fileName: FilePath=None, imgData: NChanImg=None,
@@ -261,24 +231,28 @@ class S3ABase(QtWidgets.QMainWindow):
     oldComps = self.compMgr.compDf.copy()
     if fileName is not None:
       fileName = Path(fileName).resolve()
-    if clearExistingComps:
-      self.compMgr.rmComps()
+    if fileName == self.srcImgFname:
+      return
+    self.sigImageAboutToChange.emit(self.srcImgFname, fileName)
     if imgData is not None:
       self.mainImg.setImage(imgData)
     else:
       self.mainImg.setImage(fileName)
     self.srcImgFname = fileName
+
+    # Handle resulting internal changes
+    if clearExistingComps:
+      self.compMgr.rmComps()
     self.focusedImg.updateAll()
     self.mainImg.plotItem.vb.autoRange()
-    if self.estBoundsOnStart:
-      self.estimateBoundaries()
+    self.sigImageChanged.emit()
     yield
     self.setMainImg(oldFile, oldData, clearExistingComps)
     if clearExistingComps:
       # Old comps were cleared, so put them back
       self.compMgr.addComps(oldComps)
 
-  def exportCompList(self, outFname: Union[str, Path], readOnly=True, verifyIntegrity=True):
+  def exportAnnotations(self, outFname: Union[str, Path], readOnly=True, verifyIntegrity=True):
     self.compIo.exportByFileType(self.exportableDf, outFname, imShape=self.mainImg.image.shape,
                                  readOnly=readOnly, verifyIntegrity=verifyIntegrity)
     self.hasUnsavedChanges = False
@@ -310,7 +284,7 @@ class S3ABase(QtWidgets.QMainWindow):
     exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = srcImgFname
     return exportDf
 
-  def loadCompList(self, inFname: str, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
+  def openAnnotations(self, inFname: str, loadType=FR_ENUMS.COMP_ADD_AS_NEW):
     pathFname = Path(inFname)
     if self.mainImg.image is None:
       raise S3AIOError('Cannot load components when no main image is set.')
@@ -322,6 +296,10 @@ class S3ABase(QtWidgets.QMainWindow):
     self.compMgr.addComps(newComps, loadType)
 
   def showModCompAnalytics(self):
+    """
+    Shows the result of each process stage for most recent result of the currently
+    selected plugin
+    """
     try:
       proc = self.focusedImg.currentPlugin.curProcessor
       proc.processor.stageSummary_gui()

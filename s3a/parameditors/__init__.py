@@ -1,24 +1,23 @@
-import weakref
-from typing import List, Union, Type
+from __future__ import annotations
+from typing import List, Union, Type, Sequence, Dict
 
 from pyqtgraph.Qt import QtWidgets, QtCore
 
 from s3a.constants import GEN_PROPS_DIR, SCHEMES_DIR, BASE_DIR
 from s3a.models.actionstack import ActionStack
 from s3a.structures import FRParam
-from .genericeditor import ParamEditor, ParamEditorDockGrouping, ParamEditorPlugin, \
-  TableFieldPlugin
 from .algcollection import AlgCtorCollection
-from .quickloader import QuickLoaderEditor
+from .genericeditor import ParamEditor, ParamEditorDockGrouping
+from s3a.plugins import base
 from .shortcut import ShortcutsEditor
-from .table import TableFilterEditor, TableData
-from ..generalutils import frPascalCaseToTitle
+from .quickloader import QuickLoaderEditor
+from .table import TableData
+from ..generalutils import pascalCaseToTitle
 from ..processing import ImgProcWrapper
 
 Signal = QtCore.Signal
 
-__all__ = ['FR_SINGLETON', 'ParamEditor', 'ParamEditorDockGrouping', 'TableFieldPlugin',
-           'ParamEditorPlugin']
+__all__ = ['FR_SINGLETON', 'ParamEditor', 'ParamEditorDockGrouping']
 
 class AppSettingsEditor(ParamEditor):
   def __init__(self, parent=None):
@@ -31,30 +30,32 @@ class ColorSchemeEditor(ParamEditor):
 
 
 class _FRSingleton(QtCore.QObject):
-  sigDocksAdded = Signal(object) # List[QtWidgets.QDockWidget]
+  sigPluginAdded = Signal(object) # List[QtWidgets.QDockWidget]
 
+  _dummyEditor = ParamEditor(saveDir=None)
+  """
+  The first parameter editor will not be properly initialized unless a dummy is first in
+  the list of existing editors. TODO: Maybe some additional logic can change this
+  """
   def __init__(self, parent=None):
     super().__init__(parent)
     self.actionStack = ActionStack()
-    self.plugins: List[ParamEditorPlugin] = []
-    self.tableFieldPlugins: List[TableFieldPlugin] = []
+    self.clsToPluginMapping: Dict[Type[base.ParamEditorPlugin], base.ParamEditorPlugin] = {}
 
     self.tableData = TableData()
     self.tableData.loadCfg(BASE_DIR/'tablecfg.yml')
     self.filter = self.tableData.filter
 
 
-    self.shortcuts = ShortcutsEditor()
     self.generalProps = AppSettingsEditor()
     self.colorScheme = ColorSchemeEditor()
-    self.imgProcClctn = AlgCtorCollection(ImgProcWrapper)
+    self.shortcuts = ShortcutsEditor()
     self.quickLoader = QuickLoaderEditor()
+    self.imgProcClctn = AlgCtorCollection(ImgProcWrapper)
 
     self.docks: List[QtWidgets.QDockWidget] = []
-    propsGrouping = ParamEditorDockGrouping([self.generalProps, self.colorScheme], 'General Properties')
-    shcGrouping = ParamEditorDockGrouping([self.shortcuts, self.quickLoader], 'Shortcuts')
-
-    self.addDocks([self.filter, propsGrouping, shcGrouping])
+    self.addPlugin(base.dummyPluginFactory('&Settings', [self.generalProps, self.colorScheme]))
+    self.addPlugin(base.dummyPluginFactory('Sho&rtcuts', [self.shortcuts, self.quickLoader]))
 
   @property
   def registerableEditors(self):
@@ -66,37 +67,18 @@ class _FRSingleton(QtCore.QObject):
         outList.append(editor)
     return outList
 
-  def addDocks(self, docks: Union[QtWidgets.QDockWidget, List[QtWidgets.QDockWidget]], blockEmit=False):
-    if not isinstance(docks, List):
-      docks = [docks]
-
-    for dock in docks:
-      if dock in self.docks or dock is self.quickLoader:
-        # This logic is to add editors to quick loader, checking for it prevents recursion
-        continue
-      self.docks.append(dock)
-      if isinstance(dock, ParamEditorDockGrouping):
-        for editor in dock.editors:
-          if editor in self.docks:
-            # The editor will be accounted for as a group, so remove it as an individual
-            self.docks.remove(editor)
-        self.quickLoader.listModel.addEditors(dock.editors)
-      else:
-        self.quickLoader.listModel.addEditors([dock])
-
-    if not blockEmit:
-      self.sigDocksAdded.emit(docks)
-
-
   def registerGroup(self, groupParam: FRParam, **opts):
     def multiEditorClsDecorator(cls):
       # Since all legwork is done inside the editors themselves, simply call each decorator from here as needed
-      for editor in self.registerableEditors:
+      editorList = self.registerableEditors
+      if len(editorList) == 0:
+        editorList.append(self._dummyEditor)
+      for editor in editorList:
         cls = editor.registerGroup(groupParam, **opts)(cls)
       return cls
     return multiEditorClsDecorator
 
-  def addPlugin(self, pluginCls: Type[ParamEditorPlugin], *args, **kwargs):
+  def addPlugin(self, pluginCls: Type[base.ParamEditorPlugin], *args, **kwargs):
     """
     From a class inheriting the *FRParamEditorPlugin*, creates a plugin object
     that will appear in the S3A toolbar. An entry is created with dropdown options
@@ -108,14 +90,13 @@ class _FRSingleton(QtCore.QObject):
     """
     nameToUse = pluginCls.name
     if nameToUse is None:
-      nameToUse = frPascalCaseToTitle(pluginCls.__name__)
+      nameToUse = pascalCaseToTitle(pluginCls.__name__)
     deco = self.registerGroup(FRParam(nameToUse))
-    plugin: ParamEditorPlugin = deco(pluginCls)(*args, **kwargs)
-    if isinstance(plugin, TableFieldPlugin):
-      self.tableFieldPlugins.append(weakref.proxy(plugin))
-    if plugin.docks is not None:
-      self.addDocks(plugin.docks)
-    self.plugins.append(plugin)
+    plugin: base.ParamEditorPlugin = deco(pluginCls)(*args, **kwargs)
+    self.clsToPluginMapping[pluginCls] = plugin
+    self.sigPluginAdded.emit(plugin)
+    if plugin.dock is not None and plugin.dock not in self.docks:
+      self.docks.append(plugin.dock)
     return plugin
 
   def close(self):

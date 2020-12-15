@@ -1,31 +1,35 @@
 import warnings
-from functools import partial
 from pathlib import Path
-from typing import Optional, Union, Dict, Any
+from typing import Union
 
 import numpy as np
 import pyqtgraph as pg
 import qdarkstyle
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-from pyqtgraph.console import ConsoleWidget
 
-from s3a import plugins
-from s3a.constants import LAYOUTS_DIR, FR_CONSTS, REQD_TBL_FIELDS
-from s3a.constants import _FREnums, FR_ENUMS
-from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
-  autosaveOptsDialog, popupFilePicker, \
-  disableAppDuringFunc, saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
-  restoreExceptionBehavior, contextMenuFromEditorActions, ScrollableErrorDialog
+import s3a.plugins.tablefield
+from s3a import RunOpts
+from s3a.constants import FR_ENUMS
+from s3a.constants import LAYOUTS_DIR, FR_CONSTS as FRC, REQD_TBL_FIELDS
 from s3a.generalutils import attemptFileLoad
+from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
+  popupFilePicker, \
+  disableAppDuringFunc, saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
+  restoreExceptionBehavior, menuFromEditorActions
 from s3a.models.s3abase import S3ABase
-from s3a.parameditors import ParamEditor, ParamEditorDockGrouping, FR_SINGLETON
+from s3a.parameditors import ParamEditor, FR_SINGLETON
+from s3a.plugins.base import ParamEditorPlugin, dummyPluginFactory
+from s3a.plugins.misc import RandomToolsPlugin, MainImagePlugin, CompTablePlugin
+from s3a.plugins.file import FilePlugin
 from s3a.structures import S3AWarning, XYVertices, FilePath, NChanImg
 from s3a.views.buttons import ButtonCollection
 
 __all__ = ['S3A']
 
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_ANNOTATOR)
+_MENU_PLUGINS = [RandomToolsPlugin]
+
+@FR_SINGLETON.registerGroup(FRC.CLS_ANNOTATOR)
 class S3A(S3ABase):
   sigLayoutSaved = QtCore.Signal()
   S3A_INST = None
@@ -41,9 +45,11 @@ class S3A(S3ABase):
     # customized loading functions also get called
     superLoaderArgs = {'author': quickLoaderArgs.pop('author', None)}
     super().__init__(parent, **superLoaderArgs)
-    self.toolsEditor.registerFunc(self.estimateBoundaries_gui, btnOpts=FR_CONSTS.TOOL_ESTIMATE_BOUNDARIES)
-    self.toolsEditor.registerFunc(self.clearBoundaries, btnOpts=FR_CONSTS.TOOL_CLEAR_BOUNDARIES)
-    self.toolsEditor.registerFunc(self.exportCompList_gui, btnOpts=FR_CONSTS.TOOL_EXPORT_COMP_LIST)
+    for func, param in zip(
+        [self.estimateBoundaries_gui, self.clearBoundaries, self.exportAnnotations_gui],
+        [FRC.TOOL_ESTIMATE_BOUNDARIES, FRC.TOOL_CLEAR_BOUNDARIES, FRC.TOOL_EXPORT_COMP_LIST]):
+      param.opts['ownerObj'] = self
+      self.toolsEditor.registerFunc(func, btnOpts=param)
     if guiMode:
       warnings.simplefilter('error', S3AWarning)
       makeExceptionsShowDialogs(self)
@@ -67,11 +73,9 @@ class S3A(S3ABase):
     self._hookupSignals()
 
     self.focusedImg.sigPluginChanged.connect(lambda: self.updateFocusedToolsGrp())
-    for plugin in FR_SINGLETON.tableFieldPlugins:
-      if isinstance(plugin, plugins.VerticesPlugin):
-        # TODO: Config option for which plugin to load by default?
-        self.focusedImg.changeCurrentPlugin(plugin)
-        break
+    # TODO: Config option for which plugin to load by default?
+    self.focusedImg.changeCurrentPlugin(FR_SINGLETON.clsToPluginMapping[
+                                          s3a.plugins.tablefield.VerticesPlugin])
 
     # Load layout options
     self.saveLayout('Default', allowOverwriteDefault=True)
@@ -88,49 +92,18 @@ class S3A(S3ABase):
     self.hasUnsavedChanges = False
 
   def _hookupSignals(self):
-    # Buttons
-    self.openImgAct.triggered.connect(lambda: self.setMainImg_gui())
-    self.resetTblConfigAct.triggered.connect(lambda: self.resetTblFields_gui())
-
-    FR_SINGLETON.colorScheme.sigParamStateUpdated.connect(self.updateTheme)
-
-    # Menu options
-    # FILE
-    self.saveLayoutAct.triggered.connect(self.saveLayout_gui)
-    self.sigLayoutSaved.connect(self._populateLoadLayoutOptions)
-
-    self.exportCompListAct.triggered.connect(self.exportCompList_gui)
-    self.exportLabelImgAct.triggered.connect(self.exportLabeledImg_gui)
-    self.loadCompsAct_merge.triggered.connect(lambda: self.loadCompList_gui(FR_ENUMS.COMP_ADD_AS_MERGE))
-    self.loadCompsAct_new.triggered.connect(lambda: self.loadCompList_gui(FR_ENUMS.COMP_ADD_AS_NEW))
-    self.startAutosaveAct.triggered.connect(self.startAutosave_gui)
-    self.stopAutosaveAct.triggered.connect(self.stopAutosave)
-    self.userGuideAct.triggered.connect(
-      lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl('https://gitlab.com/ficsresearch/s3a/-/wikis/home')))
-    self.aboutQtAct.triggered.connect(lambda: QtWidgets.QMessageBox.aboutQt(self, 'About Qt'))
-
+    FR_SINGLETON.colorScheme.registerFunc(self.updateTheme, name=FRC.CLS_ANNOTATOR.name, runOpts=RunOpts.ON_CHANGED)
     # EDIT
-    stack = FR_SINGLETON.actionStack
-    self.undoAct.triggered.connect(lambda: stack.undo())
-    self.redoAct.triggered.connect(lambda: stack.redo())
-    def updateUndoRedoTxts():
-      self.undoAct.setText(f'Undo: {stack.undoDescr}')
-      self.redoAct.setText(f'Redo: {stack.redoDescr}')
-    stack.stackChangedCallbacks.append(updateUndoRedoTxts)
-
-    # ANALYTICS
-    self.modCompAnalyticsAct.triggered.connect(self.showModCompAnalytics)
-
-    # TOOLS
-    self.devConsoleAct.triggered.connect(self.showDevConsole)
-
     self.saveAllEditorDefaults()
-    for editor in FR_SINGLETON.registerableEditors:
-      editor.setAllExpanded(False)
 
   def _buildGui(self):
     self.setDockNestingEnabled(True)
     self.setTabPosition(QtCore.Qt.AllDockWidgetAreas, QtWidgets.QTabWidget.North)
+
+    self.tblFieldToolbar.setObjectName('Table Field Plugins')
+    self.generalToolbar.setObjectName('General Plugins')
+    self.addToolBar(self.generalToolbar)
+    self.addToolBar(self.tblFieldToolbar)
 
     centralwidget = QtWidgets.QWidget(self)
     self.mainImg.setParent(centralwidget)
@@ -157,9 +130,11 @@ class S3A(S3ABase):
     focusedLayout.addWidget(self.focusedImg)
     self._focusedLayout = focusedLayout
 
-    sharedMenuWidgets = [self.mainImg, self.compTbl]
-    for first, second in zip(sharedMenuWidgets, reversed(sharedMenuWidgets)):
-      first.menu.addMenu(contextMenuFromEditorActions(second.toolsEditor, menuParent=first.menu))
+    _plugins = [FR_SINGLETON.clsToPluginMapping[c] for c in [MainImagePlugin, CompTablePlugin]]
+    parents = [self.mainImg, self.compTbl]
+    for plugin, parent in zip(_plugins, reversed(parents)):
+      parent.menu.addMenu(menuFromEditorActions([plugin.toolsEditor], plugin.name, menuParent=parent))
+
 
     tableDock = QtWidgets.QDockWidget('Component Table Window', self)
     tableDock.setFeatures(tableDock.DockWidgetMovable|tableDock.DockWidgetFloatable)
@@ -173,7 +148,6 @@ class S3A(S3ABase):
     self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, tableDock)
 
     # STATUS BAR
-    self.statBar = QtWidgets.QStatusBar(self)
     self.setStatusBar(self.statBar)
 
     authorName = FR_SINGLETON.tableData.annAuthor
@@ -189,9 +163,6 @@ class S3A(S3ABase):
     self.statBar.addWidget(self.mouseCoords)
     self.statBar.addWidget(self.pxColor)
 
-    # EDITORS
-    FR_SINGLETON.sigDocksAdded.connect(lambda newDocks: self._addEditorDocks(newDocks))
-    self._addEditorDocks()
 
   def changeFocusedComp(self, newComps: df, forceKeepLastChange=False):
     ret = super().changeFocusedComp(newComps, forceKeepLastChange)
@@ -215,112 +186,32 @@ class S3A(S3ABase):
       newTools.hide()
 
   def resetTblFields_gui(self):
-    fileDlg = QtWidgets.QFileDialog()
-    outFname, _ = fileDlg.getOpenFileName(self, 'Select Table Config File', '',
-                                          'All Files (*.*);; Config Files (*.yml)')
-    if len(outFname) > 0:
+    outFname = popupFilePicker(None, 'Select Table Config File', 'All Files (*.*);; Config Files (*.yml)')
+    if outFname is not None:
       FR_SINGLETON.tableData.loadCfg(outFname)
       self.resetTblFields()
 
   def _buildMenu(self):
-    # -----
-    # MENU BAR
-    # -----
-    # Top Level
-    self.menubar = QtWidgets.QMenuBar(self)
-    self.menuFile = QtWidgets.QMenu('&File', self.menubar)
-    self.menuEdit = QtWidgets.QMenu('&Edit', self.menubar)
-    self.menuAnalytics = QtWidgets.QMenu('&Analytics', self.menubar)
-    self.menuHelp = QtWidgets.QMenu('&Help', self.menubar)
-    menuTools = QtWidgets.QMenu('&Tools', self.menubar)
+    # TODO: Find a better way of fixing up menu order
+    menus = self.menuBar_.actions()
+    menuFile = [a for a in menus if a.text() == FilePlugin.name][0]
+    self.menuBar_.insertAction(menus[0], menuFile)
 
-    toolbar: QtWidgets.QToolBar = self.addToolBar('Parameter Editors')
-    toolbar.setObjectName('Parameter Edtor Toolbar')
-    self.paramToolbar = toolbar
+  def _handleNewPlugin(self, plugin: ParamEditorPlugin):
+    super()._handleNewPlugin(plugin)
+    dock = plugin.dock
+    if dock is None:
+      return
+    FR_SINGLETON.quickLoader.addDock(dock)
+    self._tabbifyEditorDocks([dock])
 
-    pluginToolbar = self.addToolBar('Plugin Editors')
-    pluginToolbar.setObjectName('Plugin Editor Toolbar')
-    self.pluginToolbar = pluginToolbar
+    if plugin.menu is None:
+      # No need to add menu and graphics options
+      return
 
-    self.menubar.addMenu(self.menuFile)
-    self.menubar.addMenu(self.menuEdit)
-    self.menubar.addMenu(self.menuAnalytics)
-    self.menubar.addMenu(menuTools)
-    self.menubar.addMenu(self.menuHelp)
+    parentTb = plugin.parentMenu
 
-    # File / Image
-    self.openImgAct = create_addMenuAct(self, self.menuFile, '&Open Image')
-
-    # File / Config
-    self.resetTblConfigAct = create_addMenuAct(self, self.menuFile, 'Select &Table Configuration')
-
-    # File / layout
-    self.menuLayout = create_addMenuAct(self, self.menuFile, '&Layout', True)
-    self.saveLayoutAct = create_addMenuAct(self, self.menuLayout, 'Save Layout')
-    self.menuLayout.addSeparator()
-
-    # File / components
-    self.menuExport = create_addMenuAct(self, self.menuFile, '&Export...', True)
-    self.exportCompListAct = create_addMenuAct(self, self.menuExport, '&Component List')
-    self.exportLabelImgAct = create_addMenuAct(self, self.menuExport, '&Labeled Image')
-
-    self.menuLoad_Components = create_addMenuAct(self, self.menuFile, '&Import', True)
-    self.loadCompsAct_merge = create_addMenuAct(self, self.menuLoad_Components, 'Update as &Merge')
-    self.loadCompsAct_new = create_addMenuAct(self, self.menuLoad_Components, 'Append as &New')
-
-    # File / autosave
-    self.menuAutosave = create_addMenuAct(self, self.menuFile, '&Autosave...', True)
-    self.startAutosaveAct = create_addMenuAct(self, self.menuAutosave, 'Star&t Autosave')
-    self.stopAutosaveAct = create_addMenuAct(self, self.menuAutosave, 'Sto&p Autosave')
-
-
-    # Edit
-    self.undoAct = create_addMenuAct(self, self.menuEdit, '&Undo')
-    self.undoAct.setShortcut('Ctrl+Z')
-    self.redoAct = create_addMenuAct(self, self.menuEdit, '&Redo')
-    self.redoAct.setShortcut('Ctrl+Y')
-
-    # Analytics
-    self.modCompAnalyticsAct = create_addMenuAct(self, self.menuAnalytics, 'Modified Component')
-
-    # Tools
-    self.devConsoleAct = create_addMenuAct(self, menuTools, 'Show Developer Console')
-
-    # Help
-    self.userGuideAct = create_addMenuAct(self, self.menuHelp, 'Online User Guide')
-    self.aboutQtAct = create_addMenuAct(self, self.menuHelp, 'Qt Version Info')
-
-    self.setMenuBar(self.menubar)
-
-    pluginDocks = {p.docks: p for p in FR_SINGLETON.plugins}
-    # SETTINGS
-    for docks in FR_SINGLETON.docks:
-      if docks not in pluginDocks:
-        self.createMenuOptForDock(docks, parentToolbar=toolbar)
-
-    # This is a bit tricky. If default args are left unfilled, qt slots will fill
-    # with 'false's which breaks the function call. However, lambdas can't be used
-    # inside a for-loop since the bound variable value won't be correct. To
-    # fix this, make a function that generates a function taking no arguments.
-    # This ensures (1) bound scope at eval time is correct for lambda and (2)
-    # extra args aren't populated with False by qt
-    def activator(_plugin):
-      def inner():
-        self.focusedImg.changeCurrentPlugin(_plugin)
-      return inner
-
-    for docks, plugin in pluginDocks.items():
-      if docks is None:
-        docks = ParamEditorDockGrouping([plugin.toolsEditor], plugin.name)
-      menu = self.createMenuOptForDock(docks, parentToolbar=pluginToolbar)
-      if plugin in FR_SINGLETON.tableFieldPlugins:
-        allActs = menu.actions()
-        beforeAct = allActs[0] if len(allActs) > 0 else None
-        newAct = QtWidgets.QAction('&Activate', self)
-        activatePlugin = partial(self.focusedImg.changeCurrentPlugin, plugin)
-        # Need to define separate lambda so that function call forces no args
-        newAct.triggered.connect(activator(plugin))
-        menu.insertAction(beforeAct, newAct)
+    self.createMenuOptForPlugin(plugin, parentToolbarOrMenu=parentTb)
 
   def _maybeLoadLastState_gui(self, loadLastState: bool=None,
                               quickLoaderArgs:dict=None):
@@ -359,17 +250,6 @@ class S3A(S3ABase):
                allowOverwriteDefault=allowOverwriteDefault)
     self.sigLayoutSaved.emit()
 
-  def showDevConsole(self):
-    namespace = dict(app=self, rtf=REQD_TBL_FIELDS, singleton=FR_SINGLETON)
-    # "dict" default is to use repr instead of string for internal elements, so expanding
-    # into string here ensures repr is not used
-    nsPrintout = [f"{k}: {v}" for k, v in namespace.items()]
-    text = f'Starting console with variables:\n' \
-           f'{nsPrintout}'
-    console = ConsoleWidget(self, namespace=namespace, text=text)
-    console.setWindowFlags(QtCore.Qt.Window)
-    console.show()
-
   def setMainImg(self, fileName: FilePath = None, imgData: NChanImg = None,
                  clearExistingComps=True):
     ret = super().setMainImg(fileName, imgData, clearExistingComps)
@@ -382,55 +262,25 @@ class S3A(S3ABase):
 
   def setMainImg_gui(self):
     fileFilter = "Image Files (*.png *.tif *.jpg *.jpeg *.bmp *.jfif);;All files(*.*)"
-    fname = popupFilePicker(self, 'Select Main Image', fileFilter)
+    fname = popupFilePicker(None, 'Select Main Image', fileFilter)
     if fname is not None:
       with pg.BusyCursor():
         self.setMainImg(fname)
 
-  def startAutosave_gui(self):
-    saveDlg = autosaveOptsDialog(self)
-    success = saveDlg.exec_()
-    if success:
-      try:
-        interval = saveDlg.intervalEdit.value()
-        baseName = saveDlg.baseFileNameEdit.text()
-        folderName = Path(saveDlg.folderName)
-      except AttributeError:
-        warnings.warn('Some information was not provided -- autosave not started.', S3AWarning)
-      else:
-        self.startAutosave(interval, folderName, baseName)
-
-  def exportCompList_gui(self):
+  def exportAnnotations_gui(self):
     """Saves the component table to a file"""
-    fileDlg = QtWidgets.QFileDialog()
-    fileFilters = self.compIo.handledIoTypes_fileFilter('csv', **{'*': 'All Files'})
-    outFname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilters)
-    if len(outFname) > 0:
-      super().exportCompList(outFname)
+    fileFilters = self.compIo.handledIoTypes_fileFilter(**{'*': 'All Files'})
+    outFname = popupFilePicker(None, 'Select Save File', fileFilters, asOpen=False)
+    if outFname is not None:
+      super().exportAnnotations(outFname)
 
-  def exportLabeledImg_gui(self):
-    """
-    # Note -- These three functions will be a single dialog with options
-    # for each requested parameter. It will look like the TableFilterEditor dialog.
-    types: List[FRCompParams] = getTypesFromUser()
-    outFile = getOutFileFromUser()
-    exportLegend = getExpLegendFromUser()
-    """
-    fileDlg = QtWidgets.QFileDialog()
-    # TODO: Delegate this to the exporter. Make a function that makes the right file filter,
-    #   and calls the right exporter function after the filename is retrieved.
-    fileFilters = self.compIo.handledIoTypes_fileFilter('png', **{'*': 'All Files'})
-    fname, _ = fileDlg.getSaveFileName(self, 'Select Save File', '', fileFilters)
-    if len(fname) > 0:
-      super().exportLabeledImg(fname)
-
-  def loadCompList_gui(self, loadType: _FREnums):
+  def openAnnotation_gui(self):
     # TODO: See note about exporting comps. Delegate the filepicker activity to importer
-    fileFilter = self.compIo.handledIoTypes_fileFilter(['csv', 'pkl'])
-    fname = popupFilePicker(self, 'Select Load File', fileFilter)
+    fileFilter = self.compIo.handledIoTypes_fileFilter()
+    fname = popupFilePicker(None, 'Select Load File', fileFilter)
     if fname is None:
       return
-    self.loadCompList(fname, loadType)
+    self.openAnnotations(fname)
 
   def saveLayout_gui(self):
     outName = dialogGetSaveFileName(self, 'Layout Name')
@@ -487,93 +337,30 @@ class S3A(S3ABase):
     self.hasUnsavedChanges = False
     self.close()
 
-  def _addEditorDocks(self, docks=None):
-    if docks is None:
-      docks = FR_SINGLETON.docks
-    # Define out here to retain scope
-    def fixDWFactory(_dock):
-      # Necessary since defining func in loop will cause problems otherwise
-      def doFix(tabIdx):
-        self._fixDockWidth(_dock, tabIdx)
-      return doFix
-
+  def _tabbifyEditorDocks(self, docks):
     dock = None
-    for dock in docks:
+    for dock in [FR_SINGLETON.docks[0]] + docks:
       dock.setParent(self)
       self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
-      if isinstance(dock, ParamEditorDockGrouping):
-        dock.tabs.currentChanged.connect(fixDWFactory(dock))
     for nextEditor in docks[:-1]:
       self.tabifyDockWidget(dock, nextEditor)
 
-  def _createMenuOptForEditor(self, editor: ParamEditor,
-                              loadFunc=None, overrideName=None):
-    def defaultLoadFunc(objForMenu: ParamEditor, nameToLoad: str) -> Optional[dict]:
-      with pg.BusyCursor():
-        return objForMenu.loadParamState(nameToLoad)
-
-    if overrideName is None:
-      overrideName = editor.name
-    if loadFunc is None:
-      loadFunc = partial(defaultLoadFunc, editor)
-    newMenu = QtWidgets.QMenu(overrideName, self)
-    editAct = QtWidgets.QAction('Open ' + overrideName, self)
-    newMenu.addAction(editAct)
-    newMenu.addSeparator()
-    def showFunc(_editor=editor):
-      if isinstance(_editor.dock, ParamEditorDockGrouping):
-        tabs: QtWidgets.QTabWidget = _editor.dock.tabs
-        dockIdx = tabs.indexOf(_editor.dockContentsWidget)
-        tabs.setCurrentIndex(dockIdx)
-      self._fixDockWidth(_editor.dock)
-      _editor.dock.show()
-      # "Show" twice forces 1) window to exist and 2) it is currently raised and focused
-      # These guarantees are not met if "show" is only called once
-      _editor.dock.raise_()
-    editAct.triggered.connect(lambda: showFunc())
-    populateFunc = partial(self.populateParamEditorMenuOpts, editor, newMenu, loadFunc)
-    editor.sigParamStateCreated.connect(populateFunc)
-    # Initialize default menus
-    populateFunc()
-    editor.hasMenuOption = True
-    return newMenu
-
-  def _fixDockWidth(self, dock: Union[ParamEditorDockGrouping, ParamEditor], tabIdx: int=None):
-    if isinstance(dock, ParamEditorDockGrouping):
-      if tabIdx is None:
-        tabIdx = dock.tabs.currentIndex()
-      curParamEditor = dock.editors[tabIdx]
-    else:
-      curParamEditor = dock
-    curParamEditor.tree.resizeColumnToContents(0)
-    minWidth = curParamEditor.width() + 100
-    if dock.width() < minWidth:
-      self.resizeDocks([dock], [curParamEditor.width()+100], QtCore.Qt.Horizontal)
-
-  def createMenuOptForDock(self,
-                           dockEditor: Union[ParamEditor, ParamEditorDockGrouping],
-                           loadFunc=None, parentBtn: QtWidgets.QPushButton=None,
-                           parentToolbar=None):
-    if parentBtn is None:
-      parentBtn = QtWidgets.QPushButton()
-    if isinstance(dockEditor, ParamEditor):
-      parentBtn.setText(dockEditor.name)
-      menu = self._createMenuOptForEditor(dockEditor, loadFunc)
-      parentBtn.setMenu(menu)
-    else:
-      # FRParamEditorDockGrouping
-      parentBtn.setText(dockEditor.name)
-      menu = QtWidgets.QMenu(self)
-      parentBtn.setMenu(menu)
-      # newMenu = create_addMenuAct(self, parentBtn, dockEditor.name, True)
-      for editor in dockEditor.editors:
-        # "Main Image Settings" -> "Settings"
-        tabName = dockEditor.getTabName(editor)
-        nameWithoutBase = tabName
-        menu.addMenu(self._createMenuOptForEditor(editor, loadFunc, overrideName=nameWithoutBase))
-    if parentToolbar is not None:
-      parentToolbar.addWidget(parentBtn)
-    return menu
+  def createMenuOptForPlugin(self, plugin: ParamEditorPlugin, parentToolbarOrMenu=None):
+    if isinstance(parentToolbarOrMenu, QtWidgets.QToolBar):
+      btn = QtWidgets.QToolButton()
+      btn.setText(plugin.name)
+      parentToolbarOrMenu.addWidget(btn)
+      parentToolbarOrMenu = btn
+      btn.addMenu = btn.setMenu
+      btn.addAction = lambda act: act.triggered.connect(btn.click)
+      btn.setPopupMode(btn.InstantPopup)
+    parentToolbarOrMenu.addMenu(plugin.menu)
+    oldShow = plugin.dock.showEvent
+    def show_fixDockWidth(ev):
+      oldShow(ev)
+      if plugin.dock.width() < plugin.dock.biggestMinWidth + 100:
+        self.resizeDocks([plugin.dock], [plugin.dock.biggestMinWidth + 100], QtCore.Qt.Horizontal)
+    plugin.dock.showEvent = show_fixDockWidth
 
   def _populateLoadLayoutOptions(self):
     layoutGlob = LAYOUTS_DIR.glob('*.dockstate')
@@ -604,9 +391,9 @@ class S3A(S3ABase):
       fontColor = 'white'
     self.pxColor.setStyleSheet(f'background:rgba{tuple(pxColor)}; color:{fontColor}')
 
-  def updateTheme(self, _newScheme: Dict[str, Any]):
+  def updateTheme(self, useDarkTheme=False):
     style = ''
-    if self.useDarkTheme:
+    if useDarkTheme:
       style = qdarkstyle.load_stylesheet()
     self.setStyleSheet(style)
     for opts in self.focusedImg.drawOptsWidget, self.mainImg.drawOptsWidget:
@@ -620,6 +407,23 @@ class S3A(S3ABase):
       # directly forward the selection here
       self.compTbl.setSelectedCellsAs_gui(selection)
     return ret
+
+  def savePlotScreenshot(self, outFname:FilePath=None):
+    """
+    Saves main image and the plot of components to a file
+    :param outFname:
+      helpText: Where to save the image
+      pType: filepicker
+      existing: False
+    """
+    if outFname is None:
+      return
+    outFname = Path(outFname)
+    pixmap = self.mainImg.imgItem.getPixmap()
+    painter = QtGui.QPainter(pixmap)
+    self.compDisplay.regionPlot.paint(painter)
+    painter.end()
+    self.mainImg.render()
 
 if __name__ == '__main__':
   import sys

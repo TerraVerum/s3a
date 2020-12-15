@@ -1,3 +1,4 @@
+from functools import wraps
 from typing import Union
 from warnings import warn
 
@@ -10,6 +11,7 @@ from s3a import FR_SINGLETON
 from s3a.generalutils import cornersToFullBoundary
 from s3a.models.tablemodel import ComponentMgr
 from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS, FR_ENUMS
+from s3a.processing import AtomicProcess
 from s3a.structures import XYVertices, FRParam, ParamEditorError, S3AWarning, \
   ComplexXYVertices
 from s3a.structures.typeoverloads import OneDArr
@@ -64,7 +66,7 @@ class CompDisplayFilter(QtCore.QObject):
     super().__init__(parent)
     filterEditor = FR_SINGLETON.filter
     self._mainImgArea = mainImg
-    self._filter = filterEditor.params.getValues()
+    self._filter = filterEditor
     self._compTbl = compTbl
     self._compMgr = compMgr
 
@@ -75,24 +77,27 @@ class CompDisplayFilter(QtCore.QObject):
     self.regionCopier = mainImg.regionCopier
 
     # Attach to UI signals
+    def _maybeRedraw():
+      """
+      Since an updated filter can also result from refreshed table fields, make sure not to update in that case
+      (otherwise errors may occur from missing classes, etc.)
+      """
+      if np.array_equal(FR_SINGLETON.tableData.allFields, self._compMgr.compDf.columns):
+        self.redrawComps()
+    self._filter.sigParamStateUpdated.connect(_maybeRedraw)
+
     mainImg.sigSelectionBoundsMade.connect(self._reflectSelectionBoundsMade)
     self.regionCopier.sigCopyStarted.connect(lambda *args: self.activateRegionCopier())
     self.regionCopier.sigCopyStopped.connect(lambda *args: self.finishRegionCopier())
 
-    mainImg.registerToolFunc(lambda: self.mergeSelectedComps(), btnOpts=FR_CONSTS.TOOL_MERGE_COMPS)
-    mainImg.registerToolFunc(self.splitSelectedComps, btnOpts=FR_CONSTS.TOOL_SPLIT_COMPS)
-    mainImg.setMenuFromEditors([mainImg.toolsEditor])
-
     compMgr.sigCompsChanged.connect(self.redrawComps)
     compMgr.sigFieldsChanged.connect(lambda: self._reflectFieldsChanged())
-    filterEditor.sigParamStateUpdated.connect(self._updateFilter)
-    FR_SINGLETON.colorScheme.sigParamStateUpdated.connect(lambda: self._updateFilter(self._filter))
     compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
 
     mainImg.addItem(self.regionPlot)
     mainImg.addItem(self.regionCopier)
 
-    self.filterableCols = self.findFilterableCols()
+    # self.filterableCols = self.findFilterableCols()
 
   def redrawComps(self, idLists=None):
     # Following mix of cases are possible:
@@ -133,10 +138,6 @@ class CompDisplayFilter(QtCore.QObject):
       xpondingIdx = model.mapFromSource(self._compMgr.index(rowId,0)).row()
       self._compTbl.showRow(xpondingIdx)
 
-  def _updateFilter(self, newFilterDict):
-    self._filter = newFilterDict
-    self.redrawComps(self._compMgr.defaultEmitDict)
-
   def splitSelectedComps(self):
     """Makes a separate component for each distinct boundary of all selected components"""
     selection = self._compTbl.ids_rows_colsFromSelection(excludeNoEditCols=False,
@@ -146,9 +147,11 @@ class CompDisplayFilter(QtCore.QObject):
     changes = self._compMgr.splitCompVertsById(np.unique(selection[:,0]))
     self.selectRowsById(changes['added'], QISM.ClearAndSelect)
 
-  def mergeSelectedComps(self, keepId: int=None):
+  def mergeSelectedComps(self, keepId=-1):
     """
     Merges the selected components into one, keeping all properties of the first in the selection
+    :param keepId: If specified and >0, this is the ID whose peripheral data will be retained
+      during the merge. Otherwise, the first selected component is used as the keep ID.
     """
     selection = self._compTbl.ids_rows_colsFromSelection(excludeNoEditCols=False,
                                                          warnNoneSelection=False)
@@ -156,7 +159,7 @@ class CompDisplayFilter(QtCore.QObject):
     if len(selection) < 2:
       # Nothing to do
       return
-    if keepId is None:
+    if keepId < 0:
       keepId = selection[0,0]
     try:
       self._compMgr.mergeCompVertsById(np.unique(selection[:,0]), keepId)
@@ -167,7 +170,6 @@ class CompDisplayFilter(QtCore.QObject):
       self.selectRowsById(np.array([keepId]), QISM.ClearAndSelect)
 
   def _reflectFieldsChanged(self):
-    self.filterableCols = self.findFilterableCols()
     self.redrawComps()
 
   def _reflectTableSelectionChange(self, selectedIds: OneDArr):
@@ -278,8 +280,9 @@ class CompDisplayFilter(QtCore.QObject):
 
   def _populateDisplayedIds(self):
     curComps = self._compMgr.compDf.copy()
-    for param in self.filterableCols:
-      curComps = self.filterByParamType(curComps, param)
+    for fieldName, opts in self._filter.activeFilters.items():
+      frParam = FR_SINGLETON.tableData.fieldFromName(fieldName)
+      curComps = self.filterByParamType(curComps, frParam, opts)
 
     # Give self the id list of surviving comps
     self.displayedIds = curComps[REQD_TBL_FIELDS.INST_ID]
@@ -321,42 +324,40 @@ class CompDisplayFilter(QtCore.QObject):
     #   warn(f'Some regions extended beyond image dimensions. Boundaries for the following'
     #        f' components were altered: {truncatedCompIds}', S3AWarning)
 
-  def findFilterableCols(self):
-    curComps = self._compMgr.compDf.copy()
-    filterableCols = []
-    badCols = []
-    for param in curComps.columns:
-      try:
-        curComps = self.filterByParamType(curComps, param)
-        filterableCols.append(param)
-      except ParamEditorError:
-        badCols.append(param)
-    if len(badCols) > 0:
-      badTypes = np.unique([f'"{col.pType}"' for col in badCols])
-      badCols = map(lambda val: f'"{val}"', badCols)
-      warn(f'The table filter does not know how to handle'
-           f' columns {", ".join(badCols)} since no'
-           f' filter exists for types {", ".join(badTypes)}',
-           S3AWarning)
-    return filterableCols
+  # def findFilterableCols(self):
+  #   curComps = self._compMgr.compDf.copy()
+  #   filterableCols = []
+  #   badCols = []
+  #   for param in curComps.columns:
+  #     try:
+  #       curComps = self.filterByParamType(curComps, param)
+  #       filterableCols.append(param)
+  #     except ParamEditorError:
+  #       badCols.append(param)
+  #   if len(badCols) > 0:
+  #     badTypes = np.unique([f'"{col.pType}"' for col in badCols])
+  #     badCols = map(lambda val: f'"{val}"', badCols)
+  #     warn(f'The table filter does not know how to handle'
+  #          f' columns {", ".join(badCols)} since no'
+  #          f' filter exists for types {", ".join(badTypes)}',
+  #          S3AWarning)
+  #   return filterableCols
 
-  def filterByParamType(self, compDf: df, param: FRParam):
+  def filterByParamType(self, compDf: df, column: FRParam, filterOpts: dict):
     # TODO: Each type should probably know how to filter itself. That is,
     #  find some way of keeping this logic from just being an if/else tree...
-    if param.name not in self._filter:
-      return compDf
-    pType = param.pType
+    pType = column.pType
     # idx 0 = value, 1 = children
-    curFilterParam = self._filter[param.name][1]
-    dfAtParam = compDf.loc[:, param]
+    dfAtParam = compDf.loc[:, column]
 
     if pType in ['int', 'float']:
-      curmin, curmax = [curFilterParam[name][0] for name in ['min', 'max']]
+      curmin, curmax = [filterOpts[name]['value'] for name in ['min', 'max']]
 
       compDf = compDf.loc[(dfAtParam >= curmin) & (dfAtParam <= curmax),:]
     elif pType == 'bool':
-      allowTrue, allowFalse = [curFilterParam[name][0] for name in
-                               [f'{param.name}', f'Not {param.name}']]
+      filterOpts = filterOpts['Options']['children']
+      allowTrue, allowFalse = [filterOpts[name]['value'] for name in
+                               [f'{column.name}', f'Not {column.name}']]
 
       validList = np.array(dfAtParam, dtype=bool)
       if not allowTrue:
@@ -366,25 +367,26 @@ class CompDisplayFilter(QtCore.QObject):
     elif pType in ['FRParam', 'list', 'popuplineeditor']:
       existingParams = np.array(dfAtParam)
       allowedParams = []
+      filterOpts = filterOpts['Options']['children']
       if pType == 'FRParam':
-        groupSubParams = [p.name for p in param.value.group]
+        groupSubParams = [p.name for p in column.value.group]
       else:
-        groupSubParams = param.opts['limits']
+        groupSubParams = column.opts['limits']
       for groupSubParam in groupSubParams:
-        isAllowed = curFilterParam[groupSubParam][0]
+        isAllowed = filterOpts[groupSubParam]['value']
         if isAllowed:
           allowedParams.append(groupSubParam)
       compDf = compDf.loc[np.isin(existingParams, allowedParams),:]
     elif pType in ['str', 'text']:
-      allowedRegex = self._filter[param.name][0]
+      allowedRegex = filterOpts['Regex Value']['value']
       isCompAllowed = dfAtParam.str.contains(allowedRegex, regex=True, case=False)
       compDf = compDf.loc[isCompAllowed,:]
     elif pType == 'ComplexXYVertices':
       vertsAllowed = np.ones(len(dfAtParam), dtype=bool)
 
-      xParam = curFilterParam['X Bounds'][1]
-      yParam = curFilterParam['Y Bounds'][1]
-      xmin, xmax, ymin, ymax = [param[val][0] for param in (xParam, yParam) for val in ['min', 'max']]
+      xParam = filterOpts['X Bounds']['children']
+      yParam = filterOpts['Y Bounds']['children']
+      xmin, xmax, ymin, ymax = [param[val]['value'] for param in (xParam, yParam) for val in ['min', 'max']]
 
       for vertIdx, verts in enumerate(dfAtParam):
         stackedVerts: XYVertices = verts.stack()
@@ -395,7 +397,7 @@ class CompDisplayFilter(QtCore.QObject):
       compDf = compDf.loc[vertsAllowed,:]
     else:
       warn('No filter type exists for parameters of type ' f'{pType}.'
-           f' Did not filter column {param.name}.',
+           f' Did not filter column {column.name}.',
            S3AWarning)
     return compDf
 

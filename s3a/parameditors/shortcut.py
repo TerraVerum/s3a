@@ -135,10 +135,12 @@ class ShortcutsEditor(ParamEditor):
   def createRegisteredButton(self, btnParam: FRParam, ownerObj: Any, doRegister=True,
                              baseBtn: QtWidgets.QAbstractButton=None):
     """Check if this shortcut was already made globally or for this owner"""
-    doRegister = (doRegister
-                  and (btnParam, ownerObj) not in self.paramToShortcutMapping
-                  and (btnParam, None) not in self.paramToShortcutMapping
-                  )
+    for prevRegisteredOwner in ownerObj, None:
+      if (btnParam, prevRegisteredOwner) in self.paramToShortcutMapping:
+        doRegister = False
+        ownerObj = prevRegisteredOwner
+        break
+
     if baseBtn is not None:
       newBtn = baseBtn
       tooltipText = btnParam.helpText
@@ -148,18 +150,23 @@ class ShortcutsEditor(ParamEditor):
     else:
       newBtn = QtWidgets.QPushButton(btnParam.name, self)
       tooltipText = btnParam.helpText
-    if btnParam.value is None or not doRegister:
+    if btnParam.value is None:
       # Either the shortcut wasn't given a value or wasn't requested, or already exists
+      newBtn.setToolTip(tooltipText)
       return newBtn
 
-    if isclass(ownerObj):
+    param = None
+    if isclass(ownerObj) and doRegister:
       self.registerMethod_cls(btnParam, forceCreate=True)(
         lambda *args: newBtn.clicked.emit(), ownerObj)
+    elif doRegister:
+      param = self.registerMethod_obj(lambda *args: newBtn.clicked.emit(), btnParam, ownerObj)
+    else:
+      ownerObj = type(ownerObj)
+
+    if param is None:
       clsParam = self.groupingToParamMapping[ownerObj]
       param = self[clsParam, btnParam, True]
-    else:
-      param = self.registerMethod_obj(lambda *args: newBtn.clicked.emit(), btnParam, ownerObj)
-
     param.opts['tip'] = tooltipText
 
     def shcChanged(_param, newSeq: str):

@@ -161,7 +161,7 @@ class ComponentMgr(CompTableModel):
     compsToAdd = newCompsDf.iloc[~newChangedIdxs, :]
     self.compDf = pd.concat((self.compDf, compsToAdd), sort=False)
     # Retain type information
-    coerceDfTypes(self.compDf, TBL_FIELDS)
+    coerceDfTypes(self.compDf)
 
     toEmit['added'] = newIds[~newChangedIdxs]
     self.layoutChanged.emit()
@@ -211,7 +211,7 @@ class ComponentMgr(CompTableModel):
     self.layoutChanged.emit()
 
     # Preserve type information after change
-    coerceDfTypes(self.compDf, TBL_FIELDS)
+    coerceDfTypes(self.compDf)
 
     # Determine next ID for new components
     self._nextCompId = 0

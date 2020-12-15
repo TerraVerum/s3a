@@ -1,15 +1,18 @@
 from __future__ import annotations
+
 import html
 import sys
 from functools import partial
 from functools import wraps
 from os.path import basename
 from pathlib import Path
+from textwrap import wrap
 from traceback import format_exception
-from typing import Optional, Union, Callable, Generator, Sequence
+from typing import Optional, Union, Callable, Generator, Sequence, Dict, List
 
+from pyqtgraph.console import ConsoleWidget
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-from pyqtgraph.parametertree import Parameter
+from pyqtgraph.parametertree import Parameter, ParameterTree
 from ruamel.yaml import YAML
 
 import s3a
@@ -33,14 +36,40 @@ def disableAppDuringFunc(func):
       mainWin.setEnabled(True)
   return disableApp
 
-def popupFilePicker(parent, winTitle: str, fileFilter: str) -> Optional[str]:
-  retVal = None
+def popupFilePicker(parent=None, winTitle: str='', fileFilter: str='', asOpen=True, asFolder=False,
+                    selectMultiple=False, startDir: str=None) -> Optional[Union[str, List[str]]]:
   fileDlg = QtWidgets.QFileDialog()
-  fname, _ = fileDlg.getOpenFileName(parent, winTitle, '', fileFilter)
+  fileMode = fileDlg.AnyFile
+  opts = fileDlg.DontUseNativeDialog
+  if asOpen:
+    # Existing files only
+    fileMode = fileDlg.ExistingFiles if selectMultiple else fileDlg.ExistingFile
+  if asFolder:
+    fileMode = fileDlg.Directory
+    opts |= fileDlg.ShowDirsOnly
+  fileDlg.setFileMode(fileMode)
+  fileDlg.setOptions(opts)
+  fileDlg.setModal(True)
+  if startDir is not None:
+    fileDlg.setDirectory(startDir)
+  fileDlg.setNameFilter(fileFilter)
 
-  if len(fname) > 0:
-    retVal = fname
-  return retVal
+  fileDlg.setOption(fileDlg.DontUseNativeDialog, True)
+  fileDlg.setWindowTitle(winTitle)
+  parent = QtWidgets.QApplication.desktop()
+  fileDlg.setParent(parent)
+
+  if fileDlg.exec_():
+    fList = fileDlg.selectedFiles()
+  else:
+    fList = []
+
+  if selectMultiple:
+    return fList
+  elif len(fList) > 0:
+    return fList[0]
+  else:
+    return None
 
 def dialogGetSaveFileName(parent, winTitle, defaultTxt: str=None)-> Optional[str]:
   failedSave = True
@@ -157,7 +186,7 @@ def create_addMenuAct(mainWin: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, t
 
 
 class PopupLineEditor(QtWidgets.QLineEdit):
-  def __init__(self, parent: QtWidgets.QWidget=None, model: QtCore.QAbstractListModel=None,
+  def __init__(self, parent: QtWidgets.QWidget=None, model: QtCore.QAbstractItemModel=None,
                placeholderText='Press Tab or type...', clearOnComplete=True,
                forceMatch=True):
     super().__init__(parent)
@@ -188,6 +217,33 @@ class PopupLineEditor(QtWidgets.QLineEdit):
   #     return False
   #   return super().focusNextPrevChild(nextChild)
 
+  def _chooseNextCompletion(self, incAmt=1):
+    completer = self.completer()
+    popup = completer.popup()
+    if popup.isVisible() and popup.currentIndex().isValid():
+      nextIdx = (completer.currentRow()+incAmt)%completer.completionCount()
+      completer.setCurrentRow(nextIdx)
+    else:
+      completer.complete()
+    popup.show()
+    popup.setCurrentIndex(completer.currentIndex())
+    popup.setFocus()
+
+  def event(self, ev: QtCore.QEvent):
+    if ev.type() != ev.KeyPress:
+      return super().event(ev)
+
+    ev: QtGui.QKeyEvent
+    key = ev.key()
+    if key == QtCore.Qt.Key_Tab:
+      incAmt = 1
+    elif key == QtCore.Qt.Key_Backtab:
+      incAmt = -1
+    else:
+      return super().event(ev)
+    self._chooseNextCompletion(incAmt)
+    return True
+
   def focusOutEvent(self, ev: QtGui.QFocusEvent):
     reason = ev.reason()
     if reason in [QtCore.Qt.TabFocusReason, QtCore.Qt.BacktabFocusReason,
@@ -197,16 +253,9 @@ class PopupLineEditor(QtWidgets.QLineEdit):
       completer = self.completer()
       if completer is None:
         return
-      popup = completer.popup()
-      if popup.isVisible() and popup.currentIndex().isValid():
-        incAmt = 1 if reason == QtCore.Qt.TabFocusReason else -1
-        nextIdx = (completer.currentRow()+incAmt)%completer.completionCount()
-        completer.setCurrentRow(nextIdx)
-      else:
-        completer.complete()
-      popup.show()
-      popup.setCurrentIndex(completer.currentIndex())
-      popup.setFocus()
+      incAmt = 1 if reason == QtCore.Qt.TabFocusReason else -1
+
+      self._chooseNextCompletion(incAmt)
       ev.accept()
       return
     else:
@@ -318,7 +367,7 @@ class ScrollableErrorDialog(QtWidgets.QDialog):
       if showTrace:
         newText = msgWithTrace
       else:
-        newText = msgWithoutTrace
+        newText = '\n'.join(wrap(msgWithoutTrace))
       showTrace = not showTrace
       msgLbl.setText(newText)
     self.msgLbl = msgLbl
@@ -462,8 +511,8 @@ class QAwesomeTooltipEventFilter(QtCore.QObject):
     return super().eventFilter(widget, event)
 
 
-def contextMenuFromEditorActions(editors: Union[s3a.ParamEditor, Sequence[s3a.ParamEditor]],
-                                 title: str=None, menuParent: QtWidgets.QWidget=None):
+def menuFromEditorActions(editors: Union[s3a.ParamEditor, Sequence[s3a.ParamEditor]],
+                          title: str=None, menuParent: QtWidgets.QWidget=None):
   if not isinstance(editors, Sequence):
     editors = [editors]
   if title is None:
@@ -476,7 +525,7 @@ def contextMenuFromEditorActions(editors: Union[s3a.ParamEditor, Sequence[s3a.Pa
     def findActions(paramRoot: Parameter):
       for child in paramRoot.childs:
         findActions(child)
-      if 'action' in paramRoot.opts['type']:
+      if 'action' in paramRoot.opts['type'] and paramRoot.opts.get('guibtn', True):
         actions.append(paramRoot)
         paramNames.append(paramRoot.name())
     findActions(editor.params)
@@ -484,3 +533,173 @@ def contextMenuFromEditorActions(editors: Union[s3a.ParamEditor, Sequence[s3a.Pa
       menu.addAction(name, action.activate)
 
   return menu
+
+class ThumbnailViewer(QtWidgets.QListWidget):
+  sigDeleteRequested = QtCore.Signal(object)
+  """List[Selected image paths]"""
+  sigImageSelected = QtCore.Signal(object)
+  """Full path of selected image"""
+
+  def __init__(self, parent=None):
+    super().__init__(parent)
+    self.nameToFullPathMapping: Dict[str, Path] = {}
+    self.setViewMode(self.IconMode)
+    self.setIconSize(QtCore.QSize(200,200))
+    self.setResizeMode(self.Adjust)
+    self.itemActivated.connect(lambda item: self.sigImageSelected.emit(self.nameToFullPathMapping[item.text()]))
+
+    def findDelImgs():
+      selection = self.selectedImages
+      self.sigDeleteRequested.emit(selection)
+    self.delShc = QtWidgets.QShortcut(QtCore.Qt.Key_Delete, self, findDelImgs)
+
+  def addThumbnail(self, fullName: Path):
+    icon = QtGui.QIcon(str(fullName))
+    if fullName.name in self.nameToFullPathMapping:
+      raise S3AIOError('Name already exists in image list')
+    newItem = QtWidgets.QListWidgetItem(fullName.name)
+    newItem.setIcon(icon)
+    self.addItem(newItem)
+    self.nameToFullPathMapping[fullName.name] = fullName
+
+  @property
+  def selectedImages(self):
+    return [self.nameToFullPathMapping[idx.data()] for idx in self.selectedIndexes()]
+
+  def removeThumbnail(self, name: str):
+    item = self.findItems(name, QtCore.Qt.MatchExactly)[0]
+    self.takeItem(self.row(item))
+    del self.nameToFullPathMapping[name]
+
+  def clear(self):
+    super().clear()
+    self.nameToFullPathMapping.clear()
+
+# Taken directly from https://stackoverflow.com/questions/60663793/drop-one-or-more-files-into-listwidget-or-lineedit
+class DropList(QtWidgets.QListWidget):
+  def __init__(self, parent=None):
+    super(DropList, self).__init__(parent)
+    self.setAcceptDrops(True)
+    self.setSelectionMode(self.ExtendedSelection)
+    self.delShc = QtWidgets.QShortcut(QtCore.Qt.Key_Delete, self, self.deleteSelected)
+
+  def deleteSelected(self):
+    selectedIdxs = self.selectionModel().selectedIndexes()
+    selectedRows = reversed(sorted([i.row() for i in selectedIdxs]))
+    for row in selectedRows:
+      self.takeItem(row)
+
+  def dragEnterEvent(self, event):
+    if event.mimeData().hasUrls():
+      event.acceptProposedAction()
+    else:
+      event.ignore()
+
+  def dragMoveEvent(self, event):
+    if event.mimeData().hasUrls():
+      event.acceptProposedAction()
+    else:
+      event.ignore()
+
+  def dropEvent(self, event):
+    md = event.mimeData()
+    if md.hasUrls():
+      for url in md.urls():
+        self.addItem(url.toLocalFile())
+      event.acceptProposedAction()
+
+  @property
+  def files(self):
+    model = self.model()
+    return [model.index(ii, 0).data() for ii in range(model.rowCount())]
+
+# Taken directly from https://stackoverflow.com/a/20610786/9463643
+try:
+  from pyqtgraph.Qt import QtWidgets
+  from qtconsole.rich_jupyter_widget import RichJupyterWidget
+  from qtconsole.inprocess import QtInProcessKernelManager
+  from IPython.lib import guisupport
+
+except (ImportError, NotImplementedError):
+  ConsoleWidget = ConsoleWidget
+else:
+
+  class ConsoleWidget(RichJupyterWidget):
+    """ Convenience class for a live IPython console widget. We can replace the standard banner using the customBanner argument"""
+    def __init__(self,text=None,*args,**kwargs):
+      if not text is None: self.banner=text
+      super().__init__(*args,**kwargs)
+      self.kernel_manager = kernel_manager = QtInProcessKernelManager()
+      kernel_manager.start_kernel()
+      # kernel_manager.kernel.gui = 'qt5'
+      self.kernel_client = kernel_client = self._kernel_manager.client()
+      kernel_client.start_channels()
+
+      def stop():
+        kernel_client.stop_channels()
+        kernel_manager.shutdown_kernel()
+      self.exit_requested.connect(stop)
+
+      namespace = kwargs.get('namespace', {})
+      namespace.setdefault('__console__', self)
+      self.pushVariables(namespace)
+      parent = kwargs.get('parent', None)
+      if parent is not None:
+        self.setParent(parent)
+
+    def pushVariables(self,variableDict):
+      """ Given a dictionary containing name / value pairs, push those variables to the IPython console widget """
+      self.kernel_manager.kernel.shell.push(variableDict)
+    def clearTerminal(self):
+      """ Clears the terminal """
+      self._control.clear()
+    def printText(self,text):
+      """ Prints some plain text to the console """
+      self._append_plain_text(text)
+    def executeCommand(self,command):
+      """ Execute a command in the frame of the console widget """
+      self._execute(command,False)
+
+def flexibleParamTree(topParam:Parameter=None, showTop=True):
+  tree = ParameterTree()
+  tree.setTextElideMode(QtCore.Qt.ElideRight)
+  tree.header().setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
+  if topParam is not None:
+    tree.setParameters(topParam, showTop)
+  return tree
+
+def setParamTooltips(tree: ParameterTree, expandNameCol=True):
+  iterator = QtWidgets.QTreeWidgetItemIterator(tree)
+  item: QtWidgets.QTreeWidgetItem = iterator.value()
+  while item is not None:
+    # TODO: Set word wrap on long labels. Currently either can show '...' or wrap but not
+    #   both
+    # if self.tree.itemWidget(item, 0) is None:
+    #   lbl = QtWidgets.QLabel(item.text(0))
+    #   self.tree.setItemWidget(item, 0, lbl)
+    if (hasattr(item, 'param')
+        and 'tip' in item.param.opts
+        and len(item.toolTip(0)) == 0
+        and tree.itemWidget(item, 0) is None):
+      item.setToolTip(0, item.param.opts['tip'])
+    iterator += 1
+    item = iterator.value()
+  if expandNameCol:
+    expandtreeParams(tree, True)
+
+def expandtreeParams(tree: ParameterTree, expandedVal=True):
+  for item in tree.topLevelItems():
+    item.setExpanded(expandedVal)
+  tree.resizeColumnToContents(0)
+
+def paramWindow(param: Parameter):
+  tree = flexibleParamTree(param)
+  tree.setHeaderHidden(True)
+  tree.resizeColumnToContents(0)
+  setParamTooltips(tree, True)
+  dlg = QtWidgets.QDialog()
+  layout = QtWidgets.QVBoxLayout()
+  dlg.setLayout(layout)
+  layout.addWidget(tree)
+  dlg.exec_()
+  tree.clear()

@@ -6,7 +6,7 @@ import pandas as pd
 import cv2 as cv
 import pytest
 
-from conftest import app, mgr, stack
+from conftest import stack
 from helperclasses import CompDfTester
 from s3a import appInst, FR_SINGLETON, S3A
 from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS
@@ -15,7 +15,7 @@ from s3a.views.tableview import CompTableView
 
 
 @pytest.mark.withcomps
-def test_merge_selected_comps():
+def test_merge_selected_comps(app, mgr):
   oldLen = len(mgr.compDf)
   app.compTbl.selectAll()
   appInst.processEvents()
@@ -30,7 +30,7 @@ def test_merge_selected_comps():
   app.compDisplay.mergeSelectedComps()
 
 
-def test_split_selected_comps():
+def test_split_selected_comps(app, mgr):
   compMask = np.zeros((100,100), 'uint8')
   cv.rectangle(compMask, (0, 0), (5, 5), 1, -1)
   cv.rectangle(compMask, (9, 9), (16, 16), 1, -1)
@@ -52,7 +52,7 @@ def test_split_selected_comps():
   app.compDisplay.splitSelectedComps()
 
 @pytest.mark.withcomps
-def test_set_cells_as():
+def test_set_cells_as(app, mgr):
   oldCls = FR_SINGLETON.tableData.compClasses[0]
   # Even amount of comps for easy comparison
   if (len(mgr.compDf) % 2) == 1:
@@ -97,7 +97,7 @@ def test_set_as_gui(sampleComps):
   assert np.array_equal(editableDf.values, cmpDf.values)
 
 @pytest.mark.withcomps
-def test_move_comps():
+def test_move_comps(app, mgr, copyHelper):
   copyHelper(copyMode=False)
   oldComps = mgr.compDf.copy()
   app.compDisplay.finishRegionCopier(True)
@@ -105,15 +105,15 @@ def test_move_comps():
 
 
 @pytest.mark.withcomps
-def test_copy_comps():
+def test_copy_comps(app, mgr, copyHelper):
   copyHelper(copyMode=True)
   oldComps = mgr.compDf.copy()
   app.compDisplay.finishRegionCopier(True)
   assert len(mgr.compDf) == 2*len(oldComps)
   compCopiedCompDfs(oldComps, mgr.compDf, newStartIdx=len(oldComps))
 
-def test_impossible_filter(tmpdir):
-  tmpFile = Path(tmpdir)/'testCfg.yml'
+def test_impossible_filter(tmp_path):
+  tmpFile = tmp_path/'testCfg.yml'
   dummyCfgStr = '''
   opt-tbl-fields:
     dummy:
@@ -121,12 +121,9 @@ def test_impossible_filter(tmpdir):
       pType: nopossiblefilter
   '''
   tmpFile.write_text(dummyCfgStr)
-  FR_SINGLETON.tableData.loadCfg(tmpFile)
-  dftester = CompDfTester(3)
 
   with pytest.warns(S3AWarning):
-    newApp = S3A(guiMode=False, loadLastState=False)
-    newApp.compMgr.addComps(dftester.compDf)
+    FR_SINGLETON.tableData.loadCfg(tmpFile)
 
 def compCopiedCompDfs(old: pd.DataFrame, new: pd.DataFrame, newStartIdx=0):
   for ii in range(len(old)):
@@ -136,8 +133,11 @@ def compCopiedCompDfs(old: pd.DataFrame, new: pd.DataFrame, newStartIdx=0):
     oldComp.at[REQD_TBL_FIELDS.INST_ID] += newStartIdx
     assert np.array_equal(oldComp, new.iloc[newStartIdx+ii, :])
 
-def copyHelper(copyMode=True):
-  copier = app.mainImg.regionCopier
-  copier.offset = XYVertices([[50, 50]])
-  copier.regionIds = mgr.compDf.index
-  copier.inCopyMode = copyMode
+@pytest.fixture
+def copyHelper(app, mgr):
+  def copyHelper(copyMode=True):
+    copier = app.mainImg.regionCopier
+    copier.offset = XYVertices([[50, 50]])
+    copier.regionIds = mgr.compDf.index
+    copier.inCopyMode = copyMode
+  return copyHelper

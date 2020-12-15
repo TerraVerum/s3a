@@ -11,3 +11,4 @@ class InvalidROIEvType(S3AException): pass
 class IllFormedVerticesError(S3AException): pass
 class AlgProcessorError(S3AException): pass
 class ActionStackError(S3AException): pass
+class PluginError(S3AException): pass

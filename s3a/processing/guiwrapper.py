@@ -4,7 +4,7 @@ from abc import ABC
 from copy import deepcopy
 from functools import wraps
 from io import StringIO
-from typing import Tuple, List, Sequence, Union
+from typing import Tuple, List, Sequence, Union, Callable
 from warnings import warn
 
 import numpy as np
@@ -32,10 +32,8 @@ def docParser(docstring: str):
   :param docstring: Function docstring
   """
   parsed = dp.parse(docstring)
-  descr = ''
-  for parseDescr in parsed.short_description, parsed.long_description:
-    if parseDescr is not None:
-      descr += parseDescr
+  descrPieces = [p for p in (parsed.short_description, parsed.long_description) if p is not None]
+  descr = ' '.join(descrPieces)
   out = {}
   for param in parsed.params:
     stream = StringIO(param.description)
@@ -77,22 +75,24 @@ def procRunWrapper(proc: GeneralProcess, groupParam: Parameter):
   return newRun
 
 class GeneralProcWrapper(ABC):
-  def __init__(self, processor: ProcessStage, editor: editorbase.ParamEditorBase,
-               paramPath: Tuple[str, ...]=()):
+  def __init__(self, processor: ProcessStage, editor: editorbase.ParamEditorBase, paramPath: Tuple[str, ...]=(),
+               paramFormat: Callable[[str], str] = None):
     self.processor = processor
     self.algName = processor.name
     self.algParam = FRParam(self.algName)
     self.output = np.zeros((0,0), bool)
+    self.paramFormat = paramFormat
 
     self.editor = editor
     parentParam = editor.params
     if len(paramPath) > 0:
       parentParam = parentParam.child(*paramPath)
     _attemptCreateChild(parentParam, dict(name=self.algName, type='group'))
-    self.unpackStages(self.processor, paramPath)
+    self._outerParamPath = paramPath
+    self.unpackStages(self.processor)
 
   def unpackStages(self, stage: ProcessStage, parentPath: Tuple[str, ...]=()):
-    paramParent: Parameter = self.editor.params.child(self.algName, *parentPath)
+    paramParent: Parameter = self.editor.params.child(*self._outerParamPath, self.algName, *parentPath)
     if isinstance(stage, AtomicProcess):
       stage: AtomicProcess
       docParams = docParser(stage.func.__doc__)
@@ -108,6 +108,8 @@ class GeneralProcWrapper(ABC):
           if curParam.pType is None:
             curParam.pType = type(val).__name__
         paramDict = frParamToPgParamDict(curParam)
+        if self.paramFormat is not None and 'title' not in paramDict:
+          paramDict['title'] = self.paramFormat(key)
         pgParam = _attemptCreateChild(paramParent, paramDict)
         params.append(pgParam)
       stage.run = atomicRunWrapper(stage, stage.input.hyperParamKeys, params)

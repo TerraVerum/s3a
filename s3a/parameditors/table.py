@@ -4,17 +4,20 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import List, Union, Tuple, Any, Optional
+from warnings import warn
 
 import numpy as np
 from pandas import DataFrame as df
 from ruamel.yaml import YAML
+from pyqtgraph.parametertree import Parameter
+from pyqtgraph.Qt import QtWidgets
 
 from s3a.graphicsutils import raiseErrorLater
 from s3a.generalutils import attemptFileLoad, resolveYamlDict
 from s3a.constants import TABLE_DIR, REQD_TBL_FIELDS, DATE_FORMAT, \
   FR_CONSTS
 from s3a.structures import FRParam, FilePath, FRParamGroup, ParamEditorError, \
-  S3AException
+  S3AException, S3AWarning
 from s3a.parameditors import ParamEditor
 
 yaml = YAML()
@@ -28,34 +31,47 @@ def _filterForParam(param: FRParam):
   children = []
   pType = param.pType
   paramWithChildren = {'name': param.name, 'type': 'group', 'children': children}
-  paramWithoutChild = {'name': param.name, 'type': pType, 'value': None}
+  children.append(dict(name='Active', type='bool', value=False))
   if pType in ['int', 'float']:
     retVal = genParamList(['min', 'max'], pType, 0)
+    retVal[0]['value'] = -sys.maxsize
     retVal[1]['value'] = sys.maxsize
     children.extend(retVal)
-    return paramWithChildren
-  elif pType in ['FRParam', 'Enum', 'list', 'popuplineeditor']:
+  elif pType in ['FRParam', 'Enum', 'list', 'popuplineeditor', 'bool']:
     if pType == 'FRParam':
       iterGroup = [param.name for param in param.value.group]
     elif pType == 'Enum':
       iterGroup = [param for param in param.value]
+    elif pType == 'bool':
+      iterGroup = [f'{param.name}', f'Not {param.name}']
     else: # pType == 'list' or 'popuplineeditor'
       iterGroup = param.opts['limits']
-    children.extend(genParamList(iterGroup, 'bool', True))
-    return paramWithChildren
+    optsParam = Parameter.create(name='Options', type='group', children=genParamList(iterGroup, 'bool', True))
+    def changeOpts(allowed: bool):
+      for param in optsParam.childs:
+        param.setValue(allowed)
+    paramWithChildren = Parameter.create(**paramWithChildren)
+    actions = [Parameter.create(name=name, type='action') for name in ('Select All', 'Clear All')]
+    actions[0].sigActivated.connect(lambda: changeOpts(True))
+    actions[1].sigActivated.connect(lambda: changeOpts(False))
+    paramWithChildren.addChildren(actions)
+    paramWithChildren.addChild(optsParam)
   elif pType == 'ComplexXYVertices':
-    minMax = _filterForParam(FRParam('', 5))['children']
+    minMax = _filterForParam(FRParam('', 5))
+    minMax.removeChild(minMax.childs[0])
+    minMax = minMax.saveState()['children']
     xyVerts = genParamList(['X Bounds', 'Y Bounds'], 'group', minMax, 'children')
     children.extend(xyVerts)
-    return paramWithChildren
-  elif pType == 'bool':
-    children.extend(genParamList([f'{param.name}', f'Not {param.name}'], pType, True))
-    return paramWithChildren
-  else:
+  elif pType in ['str', 'text']:
     # Assumes string
-    paramWithoutChild['value'] = ''
-    paramWithoutChild['type'] = 'str'
-    return paramWithoutChild
+    children.append(dict(name='Regex Value', type='str', value=''))
+  else:
+    # Don't know how to handle the parameter
+    return None
+
+  if isinstance(paramWithChildren, dict):
+    paramWithChildren = Parameter.create(**paramWithChildren)
+  return paramWithChildren
 
 class TableFilterEditor(ParamEditor):
   def __init__(self, paramList: List[FRParam]=None, parent=None):
@@ -65,27 +81,39 @@ class TableFilterEditor(ParamEditor):
       _filterForParam(param) for param in paramList
     ]
     super().__init__(parent, paramList=_FILTER_PARAMS, saveDir=TABLE_DIR, fileType='filter',
-                     name='Component Table Filter')
+                     name='&Component Table Filter')
 
   def updateParamList(self, paramList: List[FRParam]):
-    newParams = [
-      _filterForParam(param) for param in paramList
-    ]
-    self.params.clearChildren()
+    newParams = []
     badCols = []
-    for ii, child in enumerate(newParams):
+    for param in paramList:
       try:
-        self.params.addChild(child)
+        curFilter = _filterForParam(param)
       except KeyError:
-        badCols.append(paramList[ii])
+        curFilter = None
+      if curFilter is None:
+        badCols.append(param)
+      else:
+        newParams.append(curFilter)
+    self.params.clearChildren()
+    self.params.addChildren(newParams)
     if len(badCols) > 0:
       colNames = [f'"{col}"' for col in badCols]
       colTypes = np.unique([f'"{col.pType}"' for col in badCols])
-      raiseErrorLater(ParamEditorError(f'The table does not know how to create a'
-                                        f' filter for fields {", ".join(colNames)}'
-                                        f' since types {", ".join(colTypes)} do not'
-                                        f' have corresponding filters'))
+      warn(f'The table does not know how to create a filter for fields {", ".join(colNames)}'
+            f' since types {", ".join(colTypes)} do not have corresponding filters', S3AWarning)
     self.applyChanges()
+
+  @property
+  def activeFilters(self):
+    filters = {}
+    for child in self.params.childs:
+      if child['Active']:
+        cState = child.saveState('user')
+        keepChildren = cState['children']
+        keepChildren.pop('Active')
+        filters[child.name()] = keepChildren
+    return filters
 
 
 class TableData:
@@ -142,7 +170,7 @@ class TableData:
     """
 
     if cfgFname is None:
-      cfgFname = 'Default.yml'
+      cfgFname = 'default.yml'
       cfgDict = {}
     self.cfgFname, cfg = resolveYamlDict(cfgFname, cfgDict)
     if cfg == self.cfg:
@@ -182,6 +210,9 @@ class TableData:
         pass
 
     self.filter.updateParamList(self.allFields)
+
+  def clear(self):
+    self.loadCfg(cfgDict={})
 
   def resetLists(self):
     for lst in self.allFields, self.compClasses:

@@ -11,7 +11,7 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
 
-from s3a.generalutils import frPascalCaseToTitle
+from s3a.generalutils import pascalCaseToTitle
 from s3a.structures import S3AWarning, AlgProcessorError
 
 __all__ = ['ProcessIO', 'ProcessStage', 'GeneralProcess', 'ImageProcess',
@@ -61,21 +61,26 @@ class ProcessIO(dict):
     self.keysFromPrevIO = set(self.keys()) - set(self.hyperParamKeys)
 
   @classmethod
-  def fromFunction(cls, func: t.Callable, **overriddenDefaults):
+  def fromFunction(cls, func: t.Callable, ignoreKeys: t.Collection[str]=None, **overriddenDefaults):
     """
     In the ProcessIO scheme, default arguments in a function signature constitute algorithm
     hyperparameters, while required arguments must be provided each time the function is
     run. If `**overriddenDefaults` is given, this will override any default arguments from
     `func`'s signature.
     :param func: Function whose input signature should be parsed
+    :param ignoreKeys: Keys to disregard entirely from the incoming function. This is useful for cases like adding
+      a function at the class instead of instance level and `self` shouldn't be regarded by the parser.
     :param overriddenDefaults: Keys here that match default argument names in `func` will
       override those defaults
     """
+    if ignoreKeys is None:
+      ignoreKeys = []
     outDict = {}
     hyperParamKeys = []
     spec = inspect.signature(func).parameters
     for k, v in spec.items():
-      formattedV = v.default if k not in overriddenDefaults else overriddenDefaults[k]
+      if k in ignoreKeys: continue
+      formattedV = overriddenDefaults.get(k, v.default)
       if formattedV is v.empty:
         formattedV = cls.FROM_PREV_IO
         # Not a hyperparameter
@@ -133,7 +138,7 @@ class ProcessStage(ABC):
     raise NotImplementedError
 
   def __call__(self, **kwargs):
-    self.run(ProcessIO(**kwargs))
+    return self.run(ProcessIO(**kwargs))
 
   @property
   @abstractmethod
@@ -148,7 +153,7 @@ class AtomicProcess(ProcessStage):
   """
 
   def __init__(self, func: t.Callable, name:str=None, needsWrap=False,
-               mainResultKeys: t.List[str]=None, **overriddenDefaults):
+               mainResultKeys: t.List[str]=None, ignoreKeys: t.Collection[str]=None, **overriddenDefaults):
     """
     :param func: Function to wrap
     :param name: Name of this process. If `None`, defaults to the function name with
@@ -162,16 +167,17 @@ class AtomicProcess(ProcessStage):
     function is assumed to be that key. I.e. in the case where `len(cls.mainResultKeys) == 1`,
     the output is expected to be the direct result, not a sequence of results per key.
     :param mainResultKeys: Set by parent process as needed
+    :param ignoreKeys: See `ProcessIO.fromFunction`
     :param overriddenDefaults: Passed directly to ProcessIO when creating this function's
       input specifications.
     """
     if name is None:
-      name = frPascalCaseToTitle(func.__name__)
+      name = pascalCaseToTitle(func.__name__)
     if mainResultKeys is not None:
       self.mainResultKeys = mainResultKeys
 
     self.name = name
-    self.input = ProcessIO.fromFunction(func, **overriddenDefaults)
+    self.input = ProcessIO.fromFunction(func, ignoreKeys, **overriddenDefaults)
     self.result: t.Optional[ProcessIO] = None
 
     if needsWrap:
@@ -222,9 +228,9 @@ class GeneralProcess(ProcessStage):
     self.name = name
     self.allowDisable = True
 
-  def addFunction(self, func: t.Callable, name: str=None, needsWrap=False, **overriddenDefaults):
+  def addFunction(self, func: t.Callable, **kwargs):
     """See function signature for AtomicProcess for input explanation"""
-    atomic = AtomicProcess(func, name, needsWrap, self.mainResultKeys, **overriddenDefaults)
+    atomic = AtomicProcess(func, mainResultKeys=self.mainResultKeys, **kwargs)
     numSameNames = 0
     for stage in self.stages:
       if atomic.name == stage.name.split('#')[0]:
@@ -237,24 +243,17 @@ class GeneralProcess(ProcessStage):
     return atomic
 
   @classmethod
-  def fromFunction(cls, func: t.Callable, name: str=None, needsWrap=False,
-                   **overriddenDefaults):
+  def fromFunction(cls, func: t.Callable, **kwargs):
+    name = kwargs.get('name', None)
     out = cls(name)
-    out.addFunction(func, name, needsWrap, **overriddenDefaults)
+    out.addFunction(func, **kwargs)
     return out
-
-  @classmethod
-  def wrap(cls, name: str=None, needsAdditionalWrap=False, **overriddenDefaults):
-    def _innerDeco(func: t.Callable):
-      return ImageProcess.fromFunction(func, name, needsAdditionalWrap, **overriddenDefaults)
-    return _innerDeco
 
   def addProcess(self, process: GeneralProcess):
     if self.name is None:
       self.name = process.name
     self.stages.append(process)
     return process
-
 
   def run(self, io: ProcessIO = None, disable=False):
     if io is None:
@@ -298,7 +297,7 @@ class GeneralProcess(ProcessStage):
 
   def stageSummary_gui(self):
     if self.result is None:
-      raise AlgProcessorError('Analytics can only be shown after the algorithmwas run.')
+      raise AlgProcessorError('Analytics can only be shown after the algorithm was run.')
     outGrid = self._stageSummaryWidget()
     outGrid.showMaximized()
     def fixedShow():
