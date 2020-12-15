@@ -39,6 +39,8 @@ class AppStateEditor(ParamEditor):
       paramState = dict(Parameters=paramState, **updateDict)
       for editor in FR_SINGLETON.quickLoader.listModel.uniqueEditors:
         editor.applyChanges()
+        if editor.lastAppliedName == 'Default':
+          continue
         curSaveName = str(saveOnExitDir/editor.name)
         formattedName = editor.name.replace(' ', '').lower()
         editor.saveParamState(curSaveName, blockWrite=False)

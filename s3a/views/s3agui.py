@@ -101,8 +101,6 @@ class S3A(S3ABase):
     self.setTabPosition(QtCore.Qt.AllDockWidgetAreas, QtWidgets.QTabWidget.North)
 
     self.tblFieldToolbar.setObjectName('Table Field Plugins')
-    self.generalToolbar.setObjectName('General Plugins')
-    self.addToolBar(self.generalToolbar)
     self.addToolBar(self.tblFieldToolbar)
 
     centralwidget = QtWidgets.QWidget(self)

@@ -224,7 +224,7 @@ class ShortcutsEditor(ParamEditor):
 
   @staticmethod
   def ambigWarning(ownerObj: QtWidgets.QWidget, shc: QtWidgets.QShortcut):
-    warn(f'{ownerObj} shortcut ambiguously activated: {shc.key().toString()}\n'
+    warn(f'{ownerObj.__class__} shortcut ambiguously activated: {shc.key().toString()}\n'
          f'Perhaps multiple shortcuts are assigned the same key sequence?',
          S3AWarning)
 

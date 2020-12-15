@@ -172,10 +172,24 @@ class _FRConsts(FRParamGroup):
   # --------------------------
   TOOL_ESTIMATE_BOUNDARIES   : FRParam = newParam('Estimate Boundaries', 'Ctrl+Alt+Shift+E', guibtn=False)
   TOOL_CLEAR_BOUNDARIES      : FRParam = newParam('Clear Boundaries', 'Ctrl+Alt+Shift+C', guibtn=False)
-  TOOL_EXPORT_COMP_LIST      : FRParam = newParam('Export Table', 'Ctrl+S')
+  TOOL_EXPORT_COMP_LIST      : FRParam = newParam('Export Table', 'Ctrl+Shift+S')
   TOOL_TBL_SET_SAME_AS_FIRST : FRParam = newParam('Set Cells as First', 'Ctrl+D')
   TOOL_TBL_SET_AS            : FRParam = newParam('Set Cells As...', 'Ctrl+Shift+D')
   TOOL_TBL_DEL_ROWS          : FRParam = newParam('Delete Table Rows', 'Del')
+
+  # --------------------------
+  # PROJECT
+  # --------------------------
+  TOOL_PROJ_SAVE     : FRParam = newParam('Save', 'Ctrl+S')
+  TOOL_PROJ_OPEN     : FRParam = newParam('Open Project', 'Ctrl+K,P,O')
+  TOOL_PROJ_OPEN_IMG : FRParam = newParam('Open Project Image', 'Ctrl+K,I,O')
+  TOOL_PROJ_CREATE   : FRParam = newParam('Create Project', 'Ctrl+K,P,C')
+  TOOL_PROJ_ADD_IMG  : FRParam = newParam('Add New Image', 'Ctrl+K,I,A')
+  TOOL_PROJ_ADD_ANN  : FRParam = newParam('Add New Annotation', 'Ctrl+K,A,A')
+  TOOL_PROJ_SETTINGS : FRParam = newParam('Project Settings...', 'Ctrl+K,P,S')
+  TOOL_PROJ_EXPORT   : FRParam = newParam('Export...', 'Ctrl+K,P,E')
+  TOOL_AUTOSAVE      : FRParam = newParam('Autosave...', 'Ctrl+K,A,O')
+
 
   # --------------------------
   # COMPONENT EXPORT PARAMETERS
@@ -196,37 +210,46 @@ class _FRConsts(FRParamGroup):
   # --------------------------
   # DRAWING
   # -------------------
+  # Modes
+  DRAW_MODE_EDIT : FRParam = newParam(
+    'Activate "Edit" draw mode', 'Ctrl+K,D,E', 'registeredaction',
+    icon=str(ICON_DIR/'edit.svg'))
+  DRAW_MODE_VIEW : FRParam = newParam(
+    'Activate "View" draw mode', 'Ctrl+K,D,V', 'registeredaction',
+    icon=str(ICON_DIR/'view.svg'))
+
   # Shapes
   DRAW_SHAPE_RECT : FRParam = newParam(
-    'Activate "Rectangular" draw shape', 'Ctrl+Alt+D,R', 'registeredaction',
+    'Activate "Rectangular" draw shape', 'Ctrl+K,D,R', 'registeredaction',
     icon=str(ICON_DIR/'rectangle.svg'))
   DRAW_SHAPE_POLY : FRParam = newParam(
-    'Activate "Polygon" draw shape', 'Ctrl+Alt+D,Y', 'registeredaction',
+    'Activate "Polygon" draw shape', 'Ctrl+K,D,Y', 'registeredaction',
     icon=str(ICON_DIR/'polygon.svg'))
   DRAW_SHAPE_ELLIPSE : FRParam = newParam(
-    'Activate "Ellipse" draw shape', 'Ctrl+Alt+D,E', 'registeredaction',
+    'Activate "Ellipse" draw shape', 'Ctrl+K,D,L', 'registeredaction',
     icon=str(ICON_DIR/'ellipse.svg'))
-  DRAW_SHAPE_FREE : FRParam = newParam('Activate "Freehand" draw shape')
+  DRAW_SHAPE_FREE : FRParam = newParam('Activate "Freehand" draw shape', 'Ctrl+K,D,H')
   DRAW_SHAPE_PAINT: FRParam = newParam(
-    'Activate "Paint" draw shape', 'Ctrl+Alt+D,T', icon=str(ICON_DIR/'paint.svg'))
+    'Activate "Paint" draw shape', 'Ctrl+K,D,N', icon=str(ICON_DIR/'paint.svg'))
   DRAW_SHAPE_NONE : FRParam = newParam('None')
+
   # Actions
   DRAW_ACT_ADD    : FRParam = newParam(
-    'Activate "Add to Foreground" action', 'Ctrl+Alt+D,F', 'registeredaction',
+    'Activate "Add to Foreground" action', 'Ctrl+K,D,F', 'registeredaction',
     icon=str(ICON_DIR/'foreground.png'),
     helpText='When an ROI is created, the image processor will attempt to make a new'
              ' component at that location. Right-click and drag to pan.')
   DRAW_ACT_REM    : FRParam = newParam(
-    'Activate "Add to Background" action', 'Ctrl+Alt+D, B', 'registeredaction',
+    'Activate "Add to Background" action', 'Ctrl+K,D, B', 'registeredaction',
     icon=str(ICON_DIR/'background.png'),
     helpText='When an ROI is created, the image processor will attempt to take the enclosed'
              ' area away from the current component shape. Right-click and drag to pan.')
   DRAW_ACT_SELECT : FRParam = newParam(
-    'Activate "Select" draw action', 'Ctrl+Alt+D, S', 'registeredaction', icon=str(ICON_DIR/'select.svg'),
+    'Activate "Select" draw action', 'Ctrl+K,D, S', 'registeredaction', icon=str(ICON_DIR/'select.svg'),
     helpText='When component boundaries are enclosed by this ROI, they will be selected'
              ' in the component table. Right-click and drag to pan.')
   DRAW_ACT_PAN    : FRParam = newParam(
-    'Activate "Pan" draw action', 'Ctrl+Alt+D,P', 'registeredaction', icon=str(ICON_DIR/'pan.svg'),
+    'Activate "Pan" draw action', 'Ctrl+K,D,P', 'registeredaction', icon=str(ICON_DIR/'pan.svg'),
     helpText='No ROI will be drawn in this mode. Right- or left-click and drag to pan.')
 FR_CONSTS = _FRConsts()
 

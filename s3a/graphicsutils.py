@@ -345,6 +345,7 @@ class ScrollableErrorDialog(QtWidgets.QDialog):
     msgLbl = QtWidgets.QLabel(msgWithTrace, scrollAreaWidgetContents)
     msgLbl.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse
                                       | QtCore.Qt.TextSelectableByKeyboard)
+    msgLbl.setTextFormat(QtCore.Qt.PlainText)
     scrollLayout.addWidget(msgLbl, 0, QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
     scrollArea.setWidget(scrollAreaWidgetContents)
     verticalLayout.addWidget(scrollArea)
@@ -357,19 +358,31 @@ class ScrollableErrorDialog(QtWidgets.QDialog):
     spacerItem = QtWidgets.QSpacerItem(ok.width(), ok.height(),
                                        QtWidgets.QSizePolicy.Expanding,
                                        QtWidgets.QSizePolicy.Minimum)
-
     ok.clicked.connect(self.close)
-    self.resize(self.sizeHint())
+
+    sh = self.sizeHint()
+    newWidth = max(sh.width(), self.width())
+    newHeight = max(sh.height(), self.height())
+    self.resize(newWidth, newHeight)
 
     showTrace = False
     def updateTxt():
       nonlocal showTrace
       if showTrace:
         newText = msgWithTrace
+        msgLbl.setTextFormat(QtCore.Qt.PlainText)
       else:
-        newText = '\n'.join(wrap(msgWithoutTrace))
+        newLines = msgWithoutTrace.splitlines()
+        allLines = []
+        for line in newLines:
+          if line == '': line = [line]
+          else: line = wrap(line)
+          allLines.extend(line)
+        newText = '<br>'.join(allLines)
+        msgLbl.setTextFormat(QtCore.Qt.RichText)
       showTrace = not showTrace
       msgLbl.setText(newText)
+
     self.msgLbl = msgLbl
     toggleTrace.clicked.connect(lambda: updateTxt())
 
@@ -705,4 +718,3 @@ def paramWindow(param: Parameter):
   dlg.setLayout(layout)
   layout.addWidget(tree)
   dlg.exec_()
-  tree.clear()

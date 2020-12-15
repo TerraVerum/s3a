@@ -13,7 +13,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtCore
 from skimage import io
 
-from s3a import ParamEditor, FR_SINGLETON, FR_CONSTS, ComponentIO, models, REQD_TBL_FIELDS
+from s3a import ParamEditor, FR_SINGLETON, FR_CONSTS as FRC, ComponentIO, models, REQD_TBL_FIELDS
 from s3a.generalutils import attemptFileLoad, dynamicDocstring, resolveYamlDict
 from s3a.graphicsutils import popupFilePicker, DropList, \
   ThumbnailViewer, saveToFile
@@ -33,32 +33,32 @@ class FilePlugin(ParamEditorPlugin):
   def __init__(self):
     super().__init__()
     self.projData = ProjectData()
-    ioCls = FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_EXPORTER)(ComponentIO)
+    ioCls = FR_SINGLETON.registerGroup(FRC.CLS_COMP_EXPORTER)(ComponentIO)
     ioCls.exportOnlyVis, ioCls.includeFullSourceImgName = \
       FR_SINGLETON.generalProps.registerProps(ioCls,
-                                              [FR_CONSTS.EXP_ONLY_VISIBLE, FR_CONSTS.INCLUDE_FNAME_PATH]
+                                              [FRC.EXP_ONLY_VISIBLE, FRC.INCLUDE_FNAME_PATH]
                                               )
     self.compIo: ComponentIO = ioCls()
     self.autosaveTimer = QtCore.QTimer()
 
-    self.registerFunc(self.save)
-    self.registerFunc(self.showProjImgs_gui, name='Open Project Image')
+    self.registerFunc(self.save, btnOpts=FRC.TOOL_PROJ_SAVE)
+    self.registerFunc(self.showProjImgs_gui, btnOpts=FRC.TOOL_PROJ_OPEN_IMG)
     self.menu.addSeparator()
 
-    self.registerFunc(self.create_gui, name='Create Project')
-    self.registerFunc(self.open_gui, name='Open Project')
+    self.registerFunc(self.create_gui, btnOpts=FRC.TOOL_PROJ_CREATE)
+    self.registerFunc(self.open_gui, btnOpts=FRC.TOOL_PROJ_OPEN)
 
-    self.registerFunc(lambda: self.win.setMainImg_gui(), name='Add New Image')
-    self.registerFunc(lambda: self.win.openAnnotation_gui(), name='Add New Annotation')
-    self.menu.addSeparator()
+    self.registerPopoutFuncs([self.updateProjectProperties, self.addImages_gui, self.addAnnotations_gui],
+                             ['Update Project Properties', 'Add Images', 'Add Annotations'],
+                             btnOpts=FRC.TOOL_PROJ_SETTINGS)
 
-    self.registerFunc(self.addImages_gui, name='Add Image Batch')
-    self.registerFunc(self.addAnnotations_gui, name='Add Annotation Batch')
-    self.menu.addSeparator()
+    self.registerFunc(lambda: self.win.setMainImg_gui(), btnOpts=FRC.TOOL_PROJ_ADD_IMG)
+    self.registerFunc(lambda: self.win.openAnnotation_gui(), btnOpts=FRC.TOOL_PROJ_ADD_ANN)
 
-    self.registerPopoutFuncs('Export...', [self.projData.exportProj, self.projData.exportAnnotations], ['Project', 'Annotations'])
+    self.registerPopoutFuncs([self.projData.exportProj, self.projData.exportAnnotations],
+                             ['Project', 'Annotations'], btnOpts=FRC.TOOL_PROJ_EXPORT)
 
-    self.registerPopoutFuncs('Autosave...', [self.startAutosave, self.stopAutosave])
+    self.registerPopoutFuncs([self.startAutosave, self.stopAutosave], btnOpts=FRC.TOOL_AUTOSAVE)
 
     self._projImgMgr = ProjectImageManager()
     self._imgThumbnails = self._projImgMgr.thumbnails
@@ -111,7 +111,10 @@ class FilePlugin(ParamEditorPlugin):
     win.sigImageChanged.connect(handleChange)
     win.sigImageAboutToChange.connect(lambda oldImg, newImg: self.saveCurAnnotation())
     def handleExport(_dir):
-      self.projData.startup['image'] = str(win.srcImgFname)
+      saveImg = win.srcImgFname
+      if saveImg.parent == self.projData.imagesDir:
+        saveImg = saveImg.name
+      self.projData.startup['image'] = str(saveImg)
       self.save()
       return str(self.projData.cfgFname)
     win.appStateEditor.addImportExportOpts('Project', self.open, handleExport, 0)
@@ -155,6 +158,26 @@ class FilePlugin(ParamEditorPlugin):
   def save(self):
     self.saveCurAnnotation()
     self.projData.saveCfg()
+
+  @dynamicDocstring(ioTypes=list(ComponentIO.handledIoTypes))
+  def updateProjectProperties(self, cfgName:FilePath=None, annotationFormat:str=None):
+    """
+    Updates the specified project properties, for each one that is provided
+
+    :param cfgName:
+      pType: filepicker
+    :param annotationFormat:
+      helpText: "How to save annotations internally. Note that altering
+      this value may alter the speed of saving and loading annotations."
+      pType: list
+      limits: {ioTypes}
+    """
+    if cfgName is not None:
+      cfgName = Path(cfgName)
+      self.projData.loadCfg(cfgName)
+    if annotationFormat is not None and annotationFormat in ComponentIO.handledIoTypes:
+      self.projData.cfg['annotation-format'] = annotationFormat
+
 
   @dynamicDocstring(ioTypes=list(ComponentIO.handledIoTypes))
   def startAutosave(self, interval=5, backupFolder='', baseName='autosave', exportType='pkl'):
@@ -208,6 +231,11 @@ class FilePlugin(ParamEditorPlugin):
     self.autosaveTimer.stop()
 
   def showProjImgs_gui(self):
+    if len(self.projData.images) == 0:
+      warn('This project does not have any images yet. You can add them either in\n'
+           '<code>File > Project Settings... > Add Image Files</code> or\n'
+           '<code>File > Add New Image</code>.', S3AWarning)
+      return
     self._projImgMgr.show()
     self._projImgMgr.raise_()
 
@@ -551,6 +579,10 @@ class ProjectData(QtCore.QObject):
            + ',\n'.join(offendingAnns), S3AWarning)
     self.cfg['images'] = strImgNames
     self.cfg['annotations'] = strAnnNames
+    tblName = self.tableData.cfgFname
+    if tblName.parent == self.location:
+      tblName = tblName.name
+    self.cfg['table-cfg'] = str(tblName)
     saveToFile(self.cfg, self.cfgFname)
 
   def addImageByPath(self, name: FilePath, copyToProj=False):

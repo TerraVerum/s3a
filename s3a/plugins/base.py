@@ -8,7 +8,8 @@ from pyqtgraph.Qt import QtWidgets
 
 from s3a import models
 from s3a import parameditors as pe
-from s3a.structures import NChanImg, XYVertices, FRParam
+from s3a.structures import NChanImg, XYVertices, FRParam, S3AException
+from ..generalutils import frParamToPgParamDict
 from ..graphicsutils import create_addMenuAct, paramWindow
 from ..processing import ImgProcWrapper
 
@@ -49,7 +50,7 @@ class ParamEditorPlugin(ABC):
   def parentMenu(self):
     """
     When this plugin is added, its options will be visible under a certain menu or toolbar. Where it is placed is
-    determined by this value, which is usually S3A's generalToolbar, tblFieldToolbar, or under a specific
+    determined by this value, which is usually the window's menu bar
     """
     return self.win.menuBar()
 
@@ -88,16 +89,34 @@ class ParamEditorPlugin(ABC):
         editor.params.addChild(dict(name=submenuName, type='group'))
     else:
       parentMenu = self.menu
-    proc = editor.registerFunc(func, **kwargs)
     opts = kwargs.get('btnOpts', {})
-    if isinstance(opts, FRParam): opts = opts.opts
+    if isinstance(opts, FRParam): opts = frParamToPgParamDict(opts)
+    kwargs.setdefault('ownerObj', self)
+
+    proc = editor.registerFunc(func, **kwargs)
+
     if opts.get('guibtn', True):
-      act = parentMenu.addAction(proc.name)
+      if 'name' in kwargs:
+        actName = kwargs['name']
+      elif 'name' in opts:
+        actName = opts['name']
+      else:
+        actName = proc.name
+      act = parentMenu.addAction(actName)
       act.triggered.connect(lambda: proc(win=self.win))
     return proc
 
-  def registerPopoutFuncs(self, groupName: str, funcList: Sequence[Callable], nameList: Sequence[str]=None):
-    self.menu.addAction(groupName, lambda: paramWindow(self.toolsEditor.params.child(groupName)))
+  def registerPopoutFuncs(self, funcList: Sequence[Callable], nameList: Sequence[str]=None, groupName:str=None, btnOpts: FRParam=None):
+    # TODO: I really don't like this. Consider any refactoring option that doesn't
+    #   have an import inside a function
+    from s3a import FR_SINGLETON
+    if groupName is None and btnOpts is None:
+      raise S3AException('Must provide either group name or button options')
+    if groupName is None:
+      groupName = btnOpts.name
+    act = self.menu.addAction(groupName, lambda: paramWindow(self.toolsEditor.params.child(groupName)))
+    act.clicked = act.triggered
+    FR_SINGLETON.shortcuts.createRegisteredButton(btnOpts, self, baseBtn=act)
     if nameList is None:
       nameList = [None]*len(funcList)
     for title, func in zip(nameList, funcList):

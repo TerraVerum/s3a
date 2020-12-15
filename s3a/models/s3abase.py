@@ -50,7 +50,6 @@ class S3ABase(QtWidgets.QMainWindow):
 
   def __init__(self, parent=None, **quickLoaderArgs):
     super().__init__(parent)
-    self.generalToolbar = QtWidgets.QToolBar('General Plugins')
     self.tblFieldToolbar = QtWidgets.QToolBar('Table Field Plugins')
 
     self.mainImg = MainImage()
