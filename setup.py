@@ -39,7 +39,7 @@ setup(
   url='https://gitlab.com/ficsresearch/s3a',
   download_url='https://gitlab.com/ficsresearch/s3a',
   license='MIT',
-  description='Application to facilitate semantic labeling of image data',
+  description='Semantic labeling made simple',
   long_description=long_description,
   long_description_content_type='text/markdown',
   keywords='semantic, labeling, image, annotation',
