@@ -1,4 +1,5 @@
 from setuptools import setup, find_packages
+from s3a import __version__
 
 from pathlib import Path
 
@@ -22,7 +23,7 @@ long_description = (here / 'README.md').read_text(encoding='utf-8')
 
 setup(
   name='s3a',
-  version='0.1.5',
+  version=__version__,
   package_dir={'s3a':'s3a'},
   packages=find_packages(),
   data_files=[('s3a/s3a/icons', _mltGlob('s3a/icons', '*.svg', '*.png')),
