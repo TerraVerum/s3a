@@ -12,7 +12,7 @@ __all__ = ['appInst', 'FR_SINGLETON', 'S3A', 'ParamEditor', 'FRParam', 'REQD_TBL
 
 pg.setConfigOptions(imageAxisOrder='row-major')
 
-from setup import __version__
+from .__version__ import __version__
 
 # Makes sure that when the folder is run as a module, the app exists in the outermost
 # scope of the application

@@ -1,7 +1,10 @@
-from setuptools import setup, find_packages
 from pathlib import Path
 
-__version__ = '0.2.1'
+from setuptools import setup, find_packages
+
+__version__ : str
+line = open(Path(__file__).parent/f's3a/__version__.py').readline()
+exec(line)
 
 def _mltGlob(curDir, *globs):
   curDir = Path(curDir)
