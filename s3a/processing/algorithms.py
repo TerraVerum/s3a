@@ -63,9 +63,9 @@ def growSeedpoint_cv_fastButErratic(img: NChanImg, seeds: XYVertices, thresh: fl
   return bwOut.astype(bool)
 
 def area_coord_regionTbl(_image: NChanImg):
-  if not np.any(_image.data):
+  if not np.any(_image):
     return pd.DataFrame({'coords': [np.array([[]])], 'area': [0]})
-  regionDict = regionprops_table(label(_image.data), properties=('coords', 'area'))
+  regionDict = regionprops_table(label(_image), properties=('coords', 'area'))
   _regionPropTbl = pd.DataFrame(regionDict)
   return _regionPropTbl
 
