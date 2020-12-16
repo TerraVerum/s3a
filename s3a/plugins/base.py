@@ -190,7 +190,7 @@ class TableFieldPlugin(ParamEditorPlugin):
     This function is called when a new component is created or the focused image is updated
     from the main view. See :meth:`FocusedImage.updateAll` for parameters.
     """
-    raise NotImplementedError
+    pass
 
   def handleShapeFinished(self, roiVerts: XYVertices):
     """

@@ -13,7 +13,7 @@ from .shortcut import ShortcutsEditor
 from .quickloader import QuickLoaderEditor
 from .table import TableData
 from ..generalutils import pascalCaseToTitle
-from ..processing import ImgProcWrapper
+from ..processing import ImgProcWrapper, GeneralProcWrapper
 
 Signal = QtCore.Signal
 
@@ -52,6 +52,7 @@ class _FRSingleton(QtCore.QObject):
     self.shortcuts = ShortcutsEditor()
     self.quickLoader = QuickLoaderEditor()
     self.imgProcClctn = AlgCtorCollection(ImgProcWrapper)
+    self.globalPredClctn = AlgCtorCollection(GeneralProcWrapper)
 
     self.docks: List[QtWidgets.QDockWidget] = []
     self.addPlugin(base.dummyPluginFactory('&Settings', [self.generalProps, self.colorScheme]))

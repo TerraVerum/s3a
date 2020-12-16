@@ -9,7 +9,7 @@ from warnings import warn
 
 import numpy as np
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore
+from pyqtgraph.Qt import QtCore, QtWidgets
 
 from s3a.generalutils import pascalCaseToTitle
 from s3a.structures import S3AWarning, AlgProcessorError
@@ -134,8 +134,9 @@ class ProcessStage(ABC):
     if len(missingKeys) > 0:
       raise AlgProcessorError(f'Missing Following keys from {self}: {missingKeys}')
 
-  def run(self, io: ProcessIO=None, disable=False):
-    raise NotImplementedError
+  def run(self, io: ProcessIO=None, disable=False, **runKwargs):
+    if io is not None:
+      io.update(**runKwargs)
 
   def __call__(self, **kwargs):
     return self.run(ProcessIO(**kwargs))
@@ -207,7 +208,8 @@ class AtomicProcess(ProcessStage):
   def keysFromPrevIO(self):
     return self.input.keysFromPrevIO
 
-  def run(self, prevIO: ProcessIO=None, disable=False):
+  def run(self, prevIO: ProcessIO=None, disable=False, **runKwargs):
+    super().run(prevIO, disable, **runKwargs)
     if prevIO is not None:
       self.updateInput(prevIO)
     if not disable:
@@ -255,7 +257,8 @@ class GeneralProcess(ProcessStage):
     self.stages.append(process)
     return process
 
-  def run(self, io: ProcessIO = None, disable=False):
+  def run(self, io: ProcessIO = None, disable=False, **runKwargs):
+    super().run(io, disable, **runKwargs)
     if io is None:
       _activeIO = ProcessIO()
     else:
@@ -263,7 +266,8 @@ class GeneralProcess(ProcessStage):
 
     for i, stage in enumerate(self.stages):
       newIO = stage.run(_activeIO, disable=self.disabled or disable)
-      _activeIO.update(newIO)
+      if isinstance(newIO, ProcessIO):
+        _activeIO.update(newIO)
 
     return self.result
 
@@ -350,6 +354,11 @@ class GeneralProcess(ProcessStage):
             validInfo[key] = _DUPLICATE_INFO
       validInfos.append(validInfo)
     return validInfos
+
+class GlobalPredictionProcess(GeneralProcess):
+  def _stageSummaryWidget(self):
+    return QtWidgets.QWidget()
+  mainResultKeys = ['image']
 
 class ImageProcess(GeneralProcess):
   mainResultKeys = ['image']

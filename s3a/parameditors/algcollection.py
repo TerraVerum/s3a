@@ -23,7 +23,7 @@ class AlgCtorCollection(ParamEditor):
   # sigProcessorCreated = Signal(object) # Signal(AlgCollectionEditor)
   def __init__(self, procWrapType: Type[GeneralProcWrapper], parent=None):
     super().__init__(parent, fileType='', saveDir='')
-    self.processorCtors : List[Callable[[], ImageProcess]] = []
+    self.processorCtors : List[Callable[[], GeneralProcess]] = []
     self.spawnedCollections : List[AlgParamEditor] = []
     self.procWrapType = procWrapType
 
@@ -48,13 +48,18 @@ class AlgCtorCollection(ParamEditor):
     # self.sigProcessorCreated.emit(newEditor)
     return newEditor
 
-  def addProcessCtor(self, procCtor: Callable[[], ImageProcess]):
+  def addProcessCtor(self, procCtor: Callable[[], GeneralProcess]):
     self.processorCtors.append(procCtor)
     for algCollection in self.spawnedCollections:
       algCollection.addProcessor(procCtor())
 
+  def addProcessFunction(self, func: Callable, procType: Type[GeneralProcess], name:str=None, **kwargs):
+    def ctor():
+      return procType.fromFunction(func, name=name, **kwargs)
+    self.addProcessCtor(ctor)
+
 class AlgParamEditor(ParamEditor):
-  def __init__(self, saveDir, procCtors: List[Callable[[], ImageProcess]],
+  def __init__(self, saveDir, procCtors: List[Callable[[], GeneralProcess]],
                procWrapType: Type[GeneralProcWrapper], name=None, parent=None):
     algOptDict = {
       'name': 'Algorithm', 'type':  'list', 'values': [], 'value': 'N/A'

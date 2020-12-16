@@ -60,21 +60,21 @@ def _attemptCreateChild(parent: Parameter, child: Union[Parameter, dict]):
 def atomicRunWrapper(proc: AtomicProcess, names: Sequence[str], params: Sequence[Parameter]):
   oldRun = proc.run
   @wraps(oldRun)
-  def newRun(io: ProcessIO = None, disable=False) -> ProcessIO:
+  def newRun(io: ProcessIO = None, disable=False, **runKwargs) -> ProcessIO:
     newIo = {name: param.value() for name, param in zip(names, params)}
     proc.input.update(**newIo)
-    return oldRun(io, disable)
+    return oldRun(io, disable, **runKwargs)
   return newRun
 
 def procRunWrapper(proc: GeneralProcess, groupParam: Parameter):
   oldRun = proc.run
   @wraps(oldRun)
-  def newRun(io: ProcessIO = None, disable=False):
+  def newRun(io: ProcessIO = None, disable=False, **runKwargs):
     proc.disabled = not groupParam.opts['enabled']
-    return oldRun(io, disable=disable)
+    return oldRun(io, disable=disable, **runKwargs)
   return newRun
 
-class GeneralProcWrapper(ABC):
+class GeneralProcWrapper:
   def __init__(self, processor: ProcessStage, editor: editorbase.ParamEditorBase, paramPath: Tuple[str, ...]=(),
                paramFormat: Callable[[str], str] = None):
     self.processor = processor
@@ -138,7 +138,7 @@ class GeneralProcWrapper(ABC):
       paramForStage.menuActTriggered('Toggle Enable')
 
   def run(self, **kwargs):
-    raise NotImplementedError
+    return self.processor.run(ProcessIO(**kwargs))
 
   def __repr__(self) -> str:
     selfCls = type(self)

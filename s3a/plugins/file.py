@@ -120,6 +120,7 @@ class FilePlugin(ParamEditorPlugin):
     win.appStateEditor.addImportExportOpts('Project', self.open, handleExport, 0)
 
     self._projImgMgr.hide()
+    self._updateProjLbl()
     win.addDockWidget(QtCore.Qt.RightDockWidgetArea, self._projImgMgr)
 
   def _createDefaultProj(self):
@@ -294,6 +295,7 @@ class FilePlugin(ParamEditorPlugin):
     baseCfg['annotations'].extend(annotations)
     projPath = Path(wiz.projSettings['Location'])/projName
     self.projData.create(name=projPath, cfg=baseCfg, parent=self.projData)
+    self._updateProjLbl()
 
 
 class NewProjectWizard(QtWidgets.QWizard):

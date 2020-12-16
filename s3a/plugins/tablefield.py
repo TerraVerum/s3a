@@ -1,15 +1,19 @@
-from typing import Optional
+from typing import Optional, Sequence
 
 import numpy as np
 import pandas as pd
 
 from s3a import FR_SINGLETON, FR_CONSTS as FRC, XYVertices, REQD_TBL_FIELDS as RTF, \
-  ComplexXYVertices, ComponentIO as frio
+  ComplexXYVertices, ComponentIO as frio, models
 from s3a.models.s3abase import S3ABase
 from s3a.processing.algorithms import _historyMaskHolder
 from s3a.structures import NChanImg, GrayImg
 from s3a.views.regions import MultiRegionPlot, makeMultiRegionDf
 from .base import TableFieldPlugin
+from ..constants import FR_ENUMS
+import numpy as np
+
+from ..processing.processing import GlobalPredictionProcess
 
 
 class VerticesPlugin(TableFieldPlugin):
@@ -178,3 +182,79 @@ class VerticesPlugin(TableFieldPlugin):
 
   def _onDeactivate(self):
     self.region.hide()
+
+
+class GlobalPredictionsPlugin(TableFieldPlugin):
+  name = 'Global Predictions'
+
+  mgr: models.tablemodel.ComponentMgr
+
+  @classmethod
+  def __initEditorParams__(cls):
+    super().__initEditorParams__()
+    cls.procCollection = FR_SINGLETON.globalPredClctn.createProcessorForClass(cls)
+    cls.dock.addEditors([cls.procCollection])
+
+  def __init__(self):
+    super().__init__()
+    self.origToDupMappingDf = pd.DataFrame(columns=['orig', 'duplicate'])
+
+  def attachWinRef(self, win: models.s3abase.S3ABase):
+    super().attachWinRef(win)
+    def onChange(changeDict):
+      origIds = self.origToDupMappingDf['orig']
+      keeps = ~np.isin(origIds, changeDict['deleted'])
+      self.origToDupMappingDf = self.origToDupMappingDf.loc[keeps]
+    win.compMgr.sigCompsChanged.connect(onChange)
+    self.mgr = win.compMgr
+
+  def handleShapeFinished(self, roiVerts: XYVertices):
+    pass
+
+  def acceptChanges(self):
+    origVerts = self.focusedImg.compSer[RTF.VERTICES].copy()
+    origOffset = origVerts.stack().min(0)
+    # Account for margin in focused image
+    for verts in origVerts:
+      verts -= origOffset
+    origId = self.focusedImg.compSer[RTF.INST_ID]
+    df = self.mgr.compDf
+    modifiedCompIds = self.origToDupMappingDf.loc[self.origToDupMappingDf['orig'] == origId, 'duplicate']
+    toModifyIdxs = df.index.isin(modifiedCompIds)
+    toModifyVerts = df.loc[toModifyIdxs, RTF.VERTICES]
+    allNewVerts = []
+    for complexVerts in toModifyVerts: # type: ComplexXYVertices
+      offset = complexVerts.stack().min(0)
+      newVerts = []
+      for verts in origVerts:
+        newVerts.append(verts + offset)
+      allNewVerts.append(ComplexXYVertices(newVerts))
+    toAddDf = pd.DataFrame(np.c_[toModifyIdxs, allNewVerts], columns=[RTF.INST_ID, RTF.VERTICES])
+    toAddDf = toAddDf.set_index(RTF.INST_ID, drop=False)
+    self.mgr.addComps(toAddDf, FR_ENUMS.COMP_ADD_AS_MERGE)
+
+
+  def updateAll(self, mainImg: Optional[NChanImg], newComp: Optional[pd.Series] = None):
+    if self.focusedImg.image is None:
+      return
+    boxes: Sequence[XYVertices] = self.curProcessor.run(image=self.focusedImg.image, globalImage=self.win.mainImg.image)
+    verts = [ComplexXYVertices([box]) for box in boxes]
+    newComps = FR_SINGLETON.tableData.makeCompDf(len(boxes))
+    newComps[RTF.VERTICES] = verts
+    changeList = self.win.compMgr.addComps(newComps)['added']
+    origId = np.tile(self.focusedImg.compSer[RTF.INST_ID], len(boxes))
+    newData = np.c_[origId, changeList]
+    mappingDf = pd.DataFrame(newData, columns=self.origToDupMappingDf.columns)
+    self.origToDupMappingDf: pd.DataFrame = self.origToDupMappingDf.append(mappingDf).reset_index(drop=True)
+
+
+def dummyProc(image: np.ndarray, globalImage: np.ndarray, nboxes=5):
+  imShape = np.array(globalImage.shape[:2])
+
+  # Reverse shape for x-y instead of row-col
+  box = imShape[::-1]*np.array([[0,0], [0,1], [1,1], [1,0]])
+  boxes = box*np.linspace(.1, .9, nboxes)[:,None, None]
+  boxes = list(boxes.astype(int))
+  return boxes
+
+FR_SINGLETON.globalPredClctn.addProcessFunction(dummyProc, GlobalPredictionProcess)
