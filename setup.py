@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
-from s3a import __version__
-
 from pathlib import Path
+
+__version__ = '0.2.1'
 
 def _mltGlob(curDir, *globs):
   curDir = Path(curDir)

@@ -7,11 +7,12 @@ import os
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 
-__version__ = '0.2.0'
 __all__ = ['appInst', 'FR_SINGLETON', 'S3A', 'ParamEditor', 'FRParam', 'REQD_TBL_FIELDS',
            'ComplexXYVertices', 'XYVertices', 'FR_CONSTS', 'ComponentIO', 'RunOpts', '__version__']
 
 pg.setConfigOptions(imageAxisOrder='row-major')
+
+from setup import __version__
 
 # Makes sure that when the folder is run as a module, the app exists in the outermost
 # scope of the application
