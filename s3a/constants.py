@@ -190,6 +190,12 @@ class _FRConsts(FRParamGroup):
   TOOL_PROJ_EXPORT   : FRParam = newParam('Export...', 'Ctrl+K,P,E')
   TOOL_AUTOSAVE      : FRParam = newParam('Autosave...', 'Ctrl+K,A,O')
 
+  # --------------------------
+  # GLOBAL PREDICTIONS
+  # --------------------------
+  TOOL_PRED_SEL     : FRParam = newParam('Global Estimate From Selection', 'Ctrl+K,G,S')
+  TOOL_PRED_DEL_GRP : FRParam = newParam('Delete Selected Groups', 'Ctrl+K,G,D')
+
 
   # --------------------------
   # COMPONENT EXPORT PARAMETERS

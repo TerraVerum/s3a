@@ -198,7 +198,8 @@ class ComponentIO:
   @classmethod
   def exportCompimgsDf(cls, compDf: df, outFile: Union[str, Path]=None,
                        imgDir: FilePath=None, margin=0, marginAsPct=False,
-                       colorMaskByClass=False, excludeCols=()):
+                       colorMaskByClass=False,
+                       includeCols=('instId', 'img', 'semanticMask', 'bboxMask', 'compClass', 'offset')):
     """
     Creates a dataframe consisting of extracted images around each component
     :param compDf: Dataframe to export
@@ -211,15 +212,14 @@ class ComponentIO:
       a raw pixel value.
     :param colorMaskByClass: If `True`, masks are given the int value of their associated
       class instead of being boolean.
-    :param excludeCols: Which columns to exclude from the export list (see 'return' list
-      for returned parameters)
+    :param includeCols: Which columns to include in the export list
     :return: Dataframe with the following keys:
+      - instId: The component's Instance ID
       - img: The (MxNxC) image corresponding to the component vertices, where MxN are
         the padded row sizes and C is the number of image channels
       - semanticMask: Binary mask representing the component vertices
       - bboxMask: Square box representing (min)->(max) component vertices. This is useful
         for excluding the margin when a semantic mask is not desired and the margin was > 0.
-      - instId: The component's Instance ID
       - compClass: Class of the component
       - offset: Image (x,y) coordinate of the min component vertex.
     """
@@ -238,7 +238,7 @@ class ComponentIO:
     dfGroupingsByImg = []
     for imgName in uniqueImgs:
       dfGroupingsByImg.append(compDf[compDf[RTF.SRC_IMG_FILENAME] == imgName])
-    useKeys = {'img', 'semanticMask', 'bboxMask', 'compClass', 'instId', 'offset'} - set(excludeCols)
+    useKeys = set(includeCols)
     outDf = {k: [] for k in useKeys}
     # Cache index per class for faster access
     classToIdxMapping = {compCls: ii for ii, compCls in enumerate(cls.tableData.compClasses, 1)}

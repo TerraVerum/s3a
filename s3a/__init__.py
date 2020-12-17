@@ -40,7 +40,7 @@ import s3a.structures
 from s3a.parameditors import FR_SINGLETON, ParamEditor
 from s3a.models.editorbase import RunOpts
 from .io import ComponentIO
-from s3a.processing.algorithms import TopLevelImageProcessors
+from s3a.processing.algorithms import TopLevelImageProcessors, TOP_GLOBAL_PROCESSOR_FUNCS
 from s3a.structures import XYVertices, ComplexXYVertices, FRParam
 from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS
 
@@ -49,6 +49,9 @@ from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS
 # -----
 for name, func in inspect.getmembers(TopLevelImageProcessors, inspect.isfunction):
   FR_SINGLETON.imgProcClctn.addProcessCtor(func)
+
+for ctor in TOP_GLOBAL_PROCESSOR_FUNCS:
+  FR_SINGLETON.globalPredClctn.addProcessCtor(ctor)
 
 # Minimal means no GUI is needed. Things work faster when they don't have to be
 # shown through the comp display filter

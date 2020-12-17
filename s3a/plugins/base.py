@@ -11,7 +11,7 @@ from s3a import parameditors as pe
 from s3a.structures import NChanImg, XYVertices, FRParam, S3AException
 from ..generalutils import frParamToPgParamDict
 from ..graphicsutils import create_addMenuAct, paramWindow
-from ..processing import ImgProcWrapper
+from ..processing import GeneralProcWrapper
 
 
 class ParamEditorPlugin(ABC):
@@ -43,7 +43,7 @@ class ParamEditorPlugin(ABC):
   _showFuncDetails=False
   """If *True*, a menu option will be added to edit parameters for functions that need them"""
 
-  win: QtWidgets.QMainWindow=None
+  win = None
   """Reference to the application main window"""
 
   @property
@@ -124,7 +124,7 @@ class ParamEditorPlugin(ABC):
     self.menu.addSeparator()
 
 
-  def attachWinRef(self, win: QtWidgets.QMainWindow):
+  def attachWinRef(self, win):
     self.win = win
     self.menu.setParent(self.parentMenu, self.menu.windowFlags())
 
@@ -141,20 +141,23 @@ def dummyPluginFactory(name_: str=None, editors: Sequence[pe.ParamEditor]=None):
   return DummyPlugin
 
 
-class TableFieldPlugin(ParamEditorPlugin):
-  """
-  Primary method for providing algorithmic refinement of table field data. For
-  instance, the :class:`XYVerticesPlugin` class can refine initial bounding
-  box estimates of component vertices using custom image processing algorithms.
-  """
-
-  procCollection: pe.algcollection.AlgParamEditor= None
+class ProcessorPlugin(ParamEditorPlugin):
+  procCollection: pe.algcollection.AlgParamEditor = None
   """
   Most table field plugins will use some sort of processor to infer field data.
   This property holds spawned collections. See :class:`XYVerticesPlugin` for
   an example.
   """
 
+  @property
+  def curProcessor(self):
+    return self.procCollection.curProcessor
+
+  @curProcessor.setter
+  def curProcessor(self, newProcessor: Union[str, GeneralProcWrapper]):
+    self.procCollection.switchActiveProcessor(newProcessor)
+
+class TableFieldPlugin(ProcessorPlugin):
   focusedImg = None
   """
   Holds a reference to the focused image and set when the s3a reference is set. This
@@ -227,10 +230,3 @@ class TableFieldPlugin(ParamEditorPlugin):
 
   def _onDeactivate(self):
     """Overloaded by plugin classes to tear down when the plugin is no longer in use"""
-
-  @property
-  def curProcessor(self):
-    return self.procCollection.curProcessor
-  @curProcessor.setter
-  def curProcessor(self, newProcessor: Union[str, ImgProcWrapper]):
-    self.procCollection.switchActiveProcessor(newProcessor)

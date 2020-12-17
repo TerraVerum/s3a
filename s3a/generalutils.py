@@ -231,9 +231,8 @@ def cornersToFullBoundary(cornerVerts: Union[XYVertices, ComplexXYVertices], siz
   return cornerVerts
 
 
-def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int,
-                  *otherBboxes: np.ndarray,
-                  coordsAsSlices=False) -> (np.ndarray, np.ndarray):
+def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int, *otherBboxes: np.ndarray,
+                  coordsAsSlices=False, returnSlices=True) -> (np.ndarray, np.ndarray):
   verts = np.vstack(verts)
   img_np = image
   compCoords = np.vstack([verts.min(0), verts.max(0)])
@@ -250,6 +249,8 @@ def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int,
   if image.ndim > 2:
     indexer += (slice(None),)
   croppedImg = image[indexer]
+  if not returnSlices:
+    return croppedImg
   if coordsAsSlices:
     return croppedImg, coordSlices
   else:

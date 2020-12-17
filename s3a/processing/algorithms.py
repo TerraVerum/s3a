@@ -1,17 +1,20 @@
+from functools import wraps
 from typing import Tuple, List
 
 import cv2 as cv
 import numpy as np
 import pandas as pd
-from scipy.ndimage import binary_fill_holes
+from scipy.ndimage import binary_fill_holes, maximum_filter
 from skimage.measure import regionprops, label, regionprops_table
 from skimage.morphology import flood, disk
 from skimage import morphology as morph
 from skimage.segmentation import quickshift
 
-from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices
-from s3a.processing import GeneralProcess
-from s3a.processing.processing import ProcessIO, ImageProcess
+from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices, dynamicDocstring, \
+  pascalCaseToTitle
+from s3a.constants import REQD_TBL_FIELDS as RTF
+from s3a.processing import AtomicProcess
+from s3a.processing.processing import ProcessIO, ImageProcess, GlobalPredictionProcess
 from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg,\
   GrayImg, RgbImg, AlgProcessorError
 
@@ -439,5 +442,91 @@ class TopLevelImageProcessors:
     proc.disabledStages = [['Basic Region Operations', 'Open -> Close']]
     return proc
 
-class TopLevelCategoricalProcessors:
-  pass
+
+# -----
+# GLOBAL PROCESSING
+# -----
+def get_component_images(image: np.ndarray, components: pd.DataFrame):
+  """
+  From a main image and dataframe of components, adds an 'img' column to `components` which holds the
+  subregion within the image each component occupies.
+  """
+  imgs = [getCroppedImg(image, verts.stack(), 0) for verts in components[RTF.VERTICES]]
+  return ProcessIO(subimages=imgs)
+
+def dispatchedProcessor(func):
+  inputSpec = ProcessIO.fromFunction(func, ignoreKeys=['template'])
+  inputSpec['components'] = inputSpec.FROM_PREV_IO
+  def dispatcher(image: np.ndarray, components: pd.DataFrame, **kwargs):
+    out = ProcessIO()
+    allComps = []
+    for ii, comp in components.iterrows():
+      verts = comp[RTF.VERTICES].stack()
+      template = getCroppedImg(image, verts, 0, returnSlices=False)
+      result = func(image=image, template=template, **kwargs)
+      if isinstance(result, ProcessIO):
+        pts = result['matchPts']
+        out.update(**result)
+        out.pop('components', None)
+      else:
+        pts = result
+      allComps.append(pts_to_components(pts, comp))
+    outComps = pd.concat(allComps, ignore_index=True)
+    out['components'] = outComps
+    return out
+  dispatcher.__doc__ = func.__doc__
+  proc = GlobalPredictionProcess(pascalCaseToTitle(func.__name__))
+  proc.addFunction(dispatcher)
+  proc.stages[0].input = inputSpec
+  return proc
+
+@dynamicDocstring(metricTypes=[d for d in dir(cv) if d.startswith('TM')])
+def cv_template_match(template: np.ndarray, image: np.ndarray, threshold=0.8, metric='TM_CCOEFF_NORMED'):
+  """
+  Performs template matching using default opencv functions
+  :param template: Template image
+  :param image: Main image
+  :param threshold:
+    helpText: Cutoff point to consider a matched template
+    limits: [0, 1]
+    step: 0.1
+  :param metric:
+    helpText: Template maching metric
+    pType: list
+    limits: {metricTypes}
+  """
+  if image.ndim < 3:
+    grayImg = image
+  else:
+    grayImg = cv.cvtColor(image, cv.COLOR_RGB2GRAY)
+  if template.ndim > 2:
+    template = cv.cvtColor(template, cv.COLOR_RGB2GRAY)
+
+  metric = getattr(cv, metric)
+  res = cv.matchTemplate(grayImg, template, metric)
+  maxFilter = maximum_filter(res, template.shape[:2])
+  # Non-max suppression to remove close-together peaks
+  res[maxFilter > res] = 0
+  loc = np.nonzero(res >= threshold)
+  scores = res[loc]
+  matchPts = np.c_[loc[::-1]]
+  return ProcessIO(matchPts=matchPts, scores=scores, matchImg=maxFilter)
+
+
+def pts_to_components(matchPts: np.ndarray, component: pd.Series):
+  numOutComps = len(matchPts)
+  # Explicit copy otherwise all rows point to the same component
+  outComps = pd.concat([component.to_frame().T]*numOutComps, ignore_index=True).copy()
+  origOffset = component[RTF.VERTICES].stack().min(0)
+  allNewverts = []
+  for ii, pt in zip(outComps.index, matchPts):
+    newVerts = []
+    for verts in outComps.at[ii, RTF.VERTICES]:
+      newVerts.append(verts-origOffset+pt)
+    allNewverts.append(ComplexXYVertices(newVerts))
+  outComps[RTF.VERTICES] = allNewverts
+  return outComps
+
+TOP_GLOBAL_PROCESSOR_FUNCS = [
+  lambda: dispatchedProcessor(cv_template_match)
+]

@@ -104,6 +104,7 @@ class ProcessStage(ABC):
   disabled = False
   result: ProcessIO = None
   mainResultKeys: t.List[str] = None
+  mainInputKeys: t.List[str] = None
 
 
   def __repr__(self) -> str:
@@ -153,8 +154,9 @@ class AtomicProcess(ProcessStage):
   be assigned to that result.
   """
 
-  def __init__(self, func: t.Callable, name:str=None, needsWrap=False,
-               mainResultKeys: t.List[str]=None, ignoreKeys: t.Collection[str]=None, **overriddenDefaults):
+  def __init__(self, func: t.Callable, name:str=None, *, needsWrap=False,
+               mainResultKeys: t.List[str]=None, mainInputKeys: t.List[str]=None,
+               ignoreKeys: t.Collection[str]=None, **overriddenDefaults):
     """
     :param func: Function to wrap
     :param name: Name of this process. If `None`, defaults to the function name with
@@ -168,6 +170,7 @@ class AtomicProcess(ProcessStage):
     function is assumed to be that key. I.e. in the case where `len(cls.mainResultKeys) == 1`,
     the output is expected to be the direct result, not a sequence of results per key.
     :param mainResultKeys: Set by parent process as needed
+    :param mainInputKeys: Set by parent process as needed
     :param ignoreKeys: See `ProcessIO.fromFunction`
     :param overriddenDefaults: Passed directly to ProcessIO when creating this function's
       input specifications.
@@ -176,17 +179,26 @@ class AtomicProcess(ProcessStage):
       name = pascalCaseToTitle(func.__name__)
     if mainResultKeys is not None:
       self.mainResultKeys = mainResultKeys
+    if mainInputKeys is not None:
+      self.mainInputKeys = mainInputKeys
 
     self.name = name
     self.input = ProcessIO.fromFunction(func, ignoreKeys, **overriddenDefaults)
     self.result: t.Optional[ProcessIO] = None
+
+    if mainInputKeys is not None:
+      keys = set(self.input.keys())
+      missingKeys = set(mainInputKeys) - keys
+      if missingKeys:
+        raise AlgProcessorError(f'{name} input signature is missing the following required input keys:\n'
+                                f'{missingKeys}')
 
     if needsWrap:
       func = self._wrappedFunc(func, self.mainResultKeys)
     self.func = func
 
   @classmethod
-  def _wrappedFunc(cls, func, mainResultKeys: t.List[str]=None):
+  def _wrappedFunc(cls, func, mainResultKeys: t.List[str]=None, mainInputKeys: t.List[str]=None):
     """
     Wraps a function returining either a result or list of results, instead making the
     return value an `FRProcessIO` object where each `cls.mainResultkey` corresponds
@@ -232,7 +244,7 @@ class GeneralProcess(ProcessStage):
 
   def addFunction(self, func: t.Callable, **kwargs):
     """See function signature for AtomicProcess for input explanation"""
-    atomic = AtomicProcess(func, mainResultKeys=self.mainResultKeys, **kwargs)
+    atomic = AtomicProcess(func, mainResultKeys=self.mainResultKeys, mainInputKeys=self.mainInputKeys, **kwargs)
     numSameNames = 0
     for stage in self.stages:
       if atomic.name == stage.name.split('#')[0]:
@@ -358,7 +370,8 @@ class GeneralProcess(ProcessStage):
 class GlobalPredictionProcess(GeneralProcess):
   def _stageSummaryWidget(self):
     return QtWidgets.QWidget()
-  mainResultKeys = ['image']
+  mainInputKeys = ['image', 'components']
+  mainResultKeys = ['components']
 
 class ImageProcess(GeneralProcess):
   mainResultKeys = ['image']

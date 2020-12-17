@@ -298,6 +298,21 @@ class MainImage(EditableImgBase):
     super().clearCurRoi()
     self.regionCopier.erase()
 
+  def widgetContainer(self, parent=None):
+    """
+    Though this is a PlotWidget class, it has a lot of widget children (tools group, buttons) that are
+    not visible when spawning the widget. This is a convenience method that creates a new, outer widget
+    from all teh graphical elements of an EditableImage.
+    """
+    wid = QtWidgets.QWidget(parent)
+    layout = QtWidgets.QVBoxLayout()
+    wid.setLayout(layout)
+
+    layout.addWidget(self.drawOptsWidget)
+    layout.addWidget(self.toolsGrp)
+    layout.addWidget(self)
+    return wid
+
 @FR_SINGLETON.registerGroup(FRC.CLS_FOCUSED_IMG_AREA)
 class FocusedImage(EditableImgBase):
   sigPluginChanged = Signal()
