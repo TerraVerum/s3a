@@ -55,7 +55,7 @@ def makeMultiRegionDf(numRows=1, idList: Sequence[int]=None, selected:Sequence[b
   outDict[RTF.VERTICES] = vertices
   outDf = pd.DataFrame(outDict)
   if idList is not None:
-    outDf = outDf.set_index(idList)
+    outDf = outDf.set_index(idList, drop=True)
   return outDf
 
 def compClassToIndex(compClasses: Sequence[str]):
@@ -161,7 +161,7 @@ class MultiRegionPlot(BoundScatterPlot):
       self.setData(x=[], y=[], data=[])
       return
 
-    for region, _id in zip(self.regionData.loc[:, RTF.VERTICES],
+    for region, _id in zip(self.regionData[RTF.VERTICES],
                            self.regionData.index):
       concatRegion, isfinite = stackedVertsPlusConnections(region)
       boundLoc = np.nanmin(concatRegion, 0, keepdims=True)

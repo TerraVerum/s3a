@@ -136,7 +136,7 @@ class ComponentMgr(CompTableModel):
     if addtype == FR_ENUMS.COMP_ADD_AS_NEW:
       # Treat all comps as new -> set their IDs to guaranteed new values
       newIds = np.arange(self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int)
-      newCompsDf.loc[:,RTF.INST_ID] = newIds
+      newCompsDf[RTF.INST_ID] = newIds
       newCompsDf.set_index(newIds, inplace=True)
       dropIds = np.array([], dtype=int)
 
@@ -274,7 +274,7 @@ class ComponentMgr(CompTableModel):
 
     :param splitIds: Ids of components to split up
     """
-    splitComps = self.compDf.loc[splitIds, :].copy()
+    splitComps = self.compDf.loc[splitIds].copy()
     newComps_lst = []
     for _, comp in splitComps.iterrows():
       verts: ComplexXYVertices = comp[RTF.VERTICES]
@@ -284,7 +284,7 @@ class ComponentMgr(CompTableModel):
       for ii in range(1, nComps):
         newVerts.append(ComplexXYVertices.fromBwMask(ccompImg == ii))
       childComps = pd.concat([comp.to_frame().T]*(nComps-1))
-      childComps.loc[:, RTF.VERTICES] = newVerts
+      childComps[RTF.VERTICES] = newVerts
       newComps_lst.append(childComps)
     newComps = pd.concat(newComps_lst)
     # Keep track of which comps were removed and added by this op

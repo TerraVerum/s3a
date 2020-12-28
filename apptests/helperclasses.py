@@ -49,7 +49,7 @@ class CompDfTester:
     randomIdxs = RND.integers(0, len(npClasses), size=len(compDf))
 
     newClasses = npClasses[randomIdxs]
-    compDf.loc[:, REQD_TBL_FIELDS.COMP_CLASS] = newClasses
+    compDf[REQD_TBL_FIELDS.COMP_CLASS] = newClasses
     return newClasses
 
 

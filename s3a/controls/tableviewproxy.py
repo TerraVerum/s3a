@@ -175,7 +175,7 @@ class CompDisplayFilter(QtCore.QObject):
   def _reflectTableSelectionChange(self, selectedIds: OneDArr):
     self.selectedIds = selectedIds
     self.regionPlot.selectById(selectedIds)
-    selectedComps = self._compMgr.compDf.loc[selectedIds, :]
+    selectedComps = self._compMgr.compDf.loc[selectedIds]
     self.sigCompsSelected.emit(selectedComps)
     self.scaleViewboxToSelectedIds()
 
@@ -353,7 +353,7 @@ class CompDisplayFilter(QtCore.QObject):
     if pType in ['int', 'float']:
       curmin, curmax = [filterOpts[name]['value'] for name in ['min', 'max']]
 
-      compDf = compDf.loc[(dfAtParam >= curmin) & (dfAtParam <= curmax),:]
+      compDf = compDf.loc[(dfAtParam >= curmin) & (dfAtParam <= curmax)]
     elif pType == 'bool':
       filterOpts = filterOpts['Options']['children']
       allowTrue, allowFalse = [filterOpts[name]['value'] for name in
@@ -361,9 +361,9 @@ class CompDisplayFilter(QtCore.QObject):
 
       validList = np.array(dfAtParam, dtype=bool)
       if not allowTrue:
-        compDf = compDf.loc[~validList, :]
+        compDf = compDf.loc[~validList]
       if not allowFalse:
-        compDf = compDf.loc[validList, :]
+        compDf = compDf.loc[validList]
     elif pType in ['FRParam', 'list', 'popuplineeditor']:
       existingParams = np.array(dfAtParam)
       allowedParams = []
@@ -376,11 +376,11 @@ class CompDisplayFilter(QtCore.QObject):
         isAllowed = filterOpts[groupSubParam]['value']
         if isAllowed:
           allowedParams.append(groupSubParam)
-      compDf = compDf.loc[np.isin(existingParams, allowedParams),:]
+      compDf = compDf.loc[np.isin(existingParams, allowedParams)]
     elif pType in ['str', 'text']:
       allowedRegex = filterOpts['Regex Value']['value']
       isCompAllowed = dfAtParam.str.contains(allowedRegex, regex=True, case=False)
-      compDf = compDf.loc[isCompAllowed,:]
+      compDf = compDf.loc[isCompAllowed]
     elif pType == 'ComplexXYVertices':
       vertsAllowed = np.ones(len(dfAtParam), dtype=bool)
 
@@ -394,7 +394,7 @@ class CompDisplayFilter(QtCore.QObject):
         isAllowed = np.all((xVerts >= xmin) & (xVerts <= xmax)) & \
                     np.all((yVerts >= ymin) & (yVerts <= ymax))
         vertsAllowed[vertIdx] = isAllowed
-      compDf = compDf.loc[vertsAllowed,:]
+      compDf = compDf.loc[vertsAllowed]
     else:
       warn('No filter type exists for parameters of type ' f'{pType}.'
            f' Did not filter column {column.name}.',

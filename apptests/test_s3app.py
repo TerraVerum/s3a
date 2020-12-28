@@ -89,7 +89,7 @@ def test_load_comps_merge(tmp_path, app, sampleComps):
 
 def test_import_large_verts(sampleComps, tmp_path, app):
   sampleComps = sampleComps.copy()
-  sampleComps.loc[:, REQD_TBL_FIELDS.INST_ID] = np.arange(len(sampleComps))
+  sampleComps[REQD_TBL_FIELDS.INST_ID] = np.arange(len(sampleComps))
   sampleComps.at[0, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices([XYVertices([[50e3, 50e3]])])
   io = app.compIo
   io.exportCsv(sampleComps, tmp_path/'Bad Verts.csv')

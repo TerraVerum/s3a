@@ -57,7 +57,7 @@ def test_set_cells_as(app, mgr):
   # Even amount of comps for easy comparison
   if (len(mgr.compDf) % 2) == 1:
     mgr.rmComps(mgr.compDf.index[-1])
-  mgr.compDf.loc[:, REQD_TBL_FIELDS.COMP_CLASS] = oldCls
+  mgr.compDf[REQD_TBL_FIELDS.COMP_CLASS] = oldCls
   # Ensure the overwrite data will be different from what it's overwriting
   newCls = FR_SINGLETON.tableData.compClasses[1]
   newDf = mgr.compDf.loc[[0]]
