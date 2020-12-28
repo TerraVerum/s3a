@@ -142,17 +142,20 @@ class S3ABase(QtWidgets.QMainWindow):
     When table fields change, the displayed columns must change and the view
     must be made aware. Ensure this occurs here
     """
+    # Even if the field names are the same, e.g. classes may added or default values could
+    # be changed. So, reset the cell editor delegates no matter what
+    self.compTbl.setColDelegates()
+    self.compTbl.popup.tbl.setColDelegates()
     # Make sure this is necessary, first
     if self.compMgr.colTitles == list([f.name for f in FR_SINGLETON.tableData.allFields]):
       # Fields haven't changed since last reset. Types could be different, but nothing
       # will break. So, the table doesn't have to be completely reset
       return
+
     self.compMgr.beginResetModel()
     self.compMgr.rmComps()
     self.compMgr.resetFields()
     self.compMgr.endResetModel()
-    self.compTbl.setColDelegates()
-    self.compTbl.popup.tbl.setColDelegates()
 
   def _handleNewPlugin(self, plugin: ParamEditorPlugin):
     plugin.attachWinRef(self)

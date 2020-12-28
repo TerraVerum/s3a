@@ -160,12 +160,12 @@ class FilePlugin(ParamEditorPlugin):
     self.saveCurAnnotation()
     self.projData.saveCfg()
 
-  @dynamicDocstring(ioTypes=list(ComponentIO.handledIoTypes))
-  def updateProjectProperties(self, cfgName:FilePath=None, annotationFormat:str=None):
+  @dynamicDocstring(ioTypes=['<Unchanged>'] + list(ComponentIO.handledIoTypes))
+  def updateProjectProperties(self, tableConfig:FilePath=None, annotationFormat:str=None):
     """
     Updates the specified project properties, for each one that is provided
 
-    :param cfgName:
+    :param tableConfig:
       pType: filepicker
     :param annotationFormat:
       helpText: "How to save annotations internally. Note that altering
@@ -173,9 +173,10 @@ class FilePlugin(ParamEditorPlugin):
       pType: list
       limits: {ioTypes}
     """
-    if cfgName is not None:
-      cfgName = Path(cfgName)
-      self.projData.loadCfg(cfgName)
+    if tableConfig is not None:
+      tableConfig = Path(tableConfig)
+      self.projData.tableData.loadCfg(tableConfig)
+      self.win.resetTblFields()
     if annotationFormat is not None and annotationFormat in ComponentIO.handledIoTypes:
       self.projData.cfg['annotation-format'] = annotationFormat
 
