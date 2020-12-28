@@ -15,21 +15,16 @@ from .genericeditor import ParamEditor
 from .pgregistered import ProcGroupParameter
 from s3a.generalutils import pascalCaseToTitle
 from ..processing import GeneralProcWrapper, GeneralProcess
-from ..processing.processing import ImageProcess
 
 Signal = QtCore.Signal
 
 class AlgCtorCollection(ParamEditor):
   # sigProcessorCreated = Signal(object) # Signal(AlgCollectionEditor)
   def __init__(self, procWrapType: Type[GeneralProcWrapper], parent=None):
-    super().__init__(parent, fileType='', saveDir='')
+    super().__init__(parent, saveDir='', fileType='')
     self.processorCtors : List[Callable[[], GeneralProcess]] = []
     self.spawnedCollections : List[AlgParamEditor] = []
     self.procWrapType = procWrapType
-
-  def registerGroup(self, groupParam: FRParam = None, **opts):
-    raise ParamEditorError("Individual processors shouldn't be registered as groups."
-                             " They should be spawned from an AlgCollectionEditor.")
 
   def createProcessorForClass(self, clsObj, editorName='Processor') -> AlgParamEditor:
     if not isclass(clsObj):
@@ -87,7 +82,7 @@ class AlgParamEditor(ParamEditor):
     # self.saveParamState('Default', allowOverwriteDefault=True)
 
   def addProcessor(self, newProc: GeneralProcess):
-    processor = self.procWrapType(newProc, self)
+    processor = self.procWrapType(newProc, parentParam=self.params)
     self.tree.addParameters(self.params.child(processor.algName))
 
     self.nameToProcMapping.update({processor.algName: processor})

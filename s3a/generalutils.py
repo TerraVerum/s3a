@@ -1,11 +1,13 @@
 import re
 from collections import deque
+from inspect import isclass
 from pathlib import Path
 from typing import Any, Optional, List, Collection, Callable, Tuple, Union, Sequence
 
 import numpy as np
 from pandas import DataFrame as df
 import cv2 as cv
+from pyqtgraph.parametertree import Parameter
 
 from s3a.constants import ANN_AUTH_DIR
 from s3a.graphicsutils import yaml
@@ -163,7 +165,7 @@ def makeUniqueBaseClass(obj: Any):
 
 def pascalCaseToTitle(name: str, addSpaces=True) -> str:
   """
-  Helper utility to turn a FRPascaleCase name to a 'Title Case' title
+  Helper utility to turn a PascalCase name to a 'Title Case' title
   :param name: camel-cased name
   :param addSpaces: Whether to add spaces in the final result
   :return: Space-separated, properly capitalized version of :param:`Name`
@@ -357,3 +359,33 @@ def attemptFileLoad(fpath: FilePath , openMode='r') -> Union[dict, bytes]:
   with open(fpath, openMode) as ifile:
     loadObj = yaml.load(ifile)
   return loadObj
+
+
+def getParamChild(param: Parameter, *childPath: Sequence[str], allowCreate=True, **groupOpts):
+  while childPath and childPath[0] in param.names:
+    param = param.child(childPath[0])
+    childPath = childPath[1:]
+  # All future children must be created
+  if allowCreate:
+    for chName in childPath:
+      param = param.addChild(dict(name=chName, type='group', **groupOpts))
+      childPath = childPath[1:]
+  elif len(childPath) > 0:
+    # Child doesn't exist
+    raise KeyError(f'Children {childPath} do not exist in param {param}')
+  return param
+
+
+def getAllBases(cls):
+  baseClasses = [cls]
+  nextClsPtr = 0
+  if not isclass(cls):
+    return baseClasses
+  # Get all bases of bases, too
+  while nextClsPtr < len(baseClasses):
+    curCls = baseClasses[nextClsPtr]
+    curBases = curCls.__bases__
+    # Only add base classes that haven't already been added to prevent infinite recursion
+    baseClasses.extend([tmpCls for tmpCls in curBases if tmpCls not in baseClasses])
+    nextClsPtr += 1
+  return baseClasses

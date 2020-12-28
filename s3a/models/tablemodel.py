@@ -105,13 +105,9 @@ class CompTableModel(QtCore.QAbstractTableModel):
     self.editColIdxs = np.setdiff1d(np.arange(len(self.colTitles)), self.noEditColIdxs)
     self.sigFieldsChanged.emit()
 
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_MGR)
 class ComponentMgr(CompTableModel):
   _nextCompId = 0
   compDf: pd.DataFrame
-
-  def __init__(self):
-    super().__init__()
 
   def resetFields(self):
     super().resetFields()

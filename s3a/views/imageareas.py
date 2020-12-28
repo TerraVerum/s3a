@@ -1,4 +1,4 @@
-from typing import Union, Optional, Collection, Sequence
+from typing import Union, Optional, Collection
 
 import cv2 as cv
 import numpy as np
@@ -10,25 +10,23 @@ from skimage.io import imread
 
 from s3a import FR_SINGLETON
 from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS as FRC
-from s3a.generalutils import getClippedBbox, dynamicDocstring, frParamToPgParamDict
+from s3a.controls.drawctrl import RoiCollection
+from s3a.generalutils import getClippedBbox, dynamicDocstring
 from s3a.structures import FRParam, XYVertices, ComplexXYVertices, FilePath
 from s3a.structures import NChanImg
 from .buttons import DrawOpts, ButtonCollection
 from .clickables import RightPanViewBox
 from .regions import RegionCopierPlot
-from ..parameditors import ParamEditor
+from ..graphicsutils import menuFromEditorActions
+from ..parameditors import ParamEditor, EditorPropsMixin
 from ..plugins.base import TableFieldPlugin
 
 __all__ = ['MainImage', 'FocusedImage', 'EditableImgBase']
 
-from s3a.controls.drawctrl import RoiCollection
-from ..graphicsutils import menuFromEditorActions
-
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
 
-@FR_SINGLETON.registerGroup(FRC.CLS_IMG_AREA)
-class EditableImgBase(pg.PlotWidget):
+class EditableImgBase(EditorPropsMixin, pg.PlotWidget):
   sigMousePosChanged = Signal(object, object)
   """
   XYVertices() coords, [[[img pixel]]] np.ndarray. If the mouse pos is outside
@@ -38,9 +36,9 @@ class EditableImgBase(pg.PlotWidget):
   @classmethod
   def __initEditorParams__(cls):
     cls.compCropMargin, cls.treatMarginAsPct = FR_SINGLETON.generalProps.registerProps(
-      cls, [FRC.PROP_CROP_MARGIN_VAL, FRC.PROP_TREAT_MARGIN_AS_PCT])
+      [FRC.PROP_CROP_MARGIN_VAL, FRC.PROP_TREAT_MARGIN_AS_PCT])
     cls.showGuiBtns = FR_SINGLETON.generalProps.registerProp(
-      cls, FRC.PROP_SHOW_GUI_TOOL_BTNS, asProperty=False
+      FRC.PROP_SHOW_GUI_TOOL_BTNS, asProperty=False
     )
 
   def __init__(self, parent=None, drawShapes: Collection[FRParam]=(),
@@ -171,7 +169,6 @@ class EditableImgBase(pg.PlotWidget):
     """Clears the current ROI shape"""
     self.shapeCollection.clearAllRois()
 
-@FR_SINGLETON.registerGroup(FRC.CLS_MAIN_IMG_AREA)
 class MainImage(EditableImgBase):
   sigCompsCreated = Signal(object) # pd.DataFrame
   # Hooked up during __init__
@@ -181,9 +178,9 @@ class MainImage(EditableImgBase):
   def __initEditorParams__(cls):
     super().__initEditorParams__()
     (cls.minCompSize, cls.onlyGrowViewbox) = FR_SINGLETON.generalProps.registerProps(
-      cls, [FRC.PROP_MIN_COMP_SZ, FRC.PROP_ONLY_GROW_MAIN_VB])
+      [FRC.PROP_MIN_COMP_SZ, FRC.PROP_ONLY_GROW_MAIN_VB])
     (cls.gridClr, cls.gridWidth, cls.showGrid) = FR_SINGLETON.colorScheme.registerProps(
-      cls, [FRC.SCHEME_GRID_CLR, FRC.SCHEME_GRID_LINE_WIDTH, FRC.SCHEME_SHOW_GRID]
+      [FRC.SCHEME_GRID_CLR, FRC.SCHEME_GRID_LINE_WIDTH, FRC.SCHEME_SHOW_GRID]
     )
 
   def __init__(self, parent=None, imgSrc=None, **kargs):
@@ -313,7 +310,6 @@ class MainImage(EditableImgBase):
     layout.addWidget(self)
     return wid
 
-@FR_SINGLETON.registerGroup(FRC.CLS_FOCUSED_IMG_AREA)
 class FocusedImage(EditableImgBase):
   sigPluginChanged = Signal()
   sigUpdatedAll = Signal(object, object)

@@ -3,21 +3,10 @@ from __future__ import annotations
 import html
 import weakref
 from dataclasses import dataclass, fields, field
-from typing import Any, Optional, Collection, Union, Dict
+from typing import Any, Optional, Collection, Union
 from warnings import warn
 
-from pyqtgraph.Qt import QtCore
-from typing_extensions import Protocol, runtime_checkable
-
 from .exceptions import ParamEditorError, S3AWarning
-
-
-@runtime_checkable
-class ContainsSharedProps(Protocol):
-  @classmethod
-  def __initEditorParams__(cls):
-    return
-
 
 class FRParam:
   def __init__(self, name: str, value=None, pType: Optional[str]=None, helpText='',
@@ -62,13 +51,27 @@ class FRParam:
       a group. This is set by the FRParamGroup, not manually
     """
 
+  def toPgDict(self):
+    """
+    Simple conversion function from FRParams used internally to the dictionary form expected
+    by pyqtgraph parameters
+    """
+    paramOpts = dict(name=self.name, type=self.pType,
+                     **self.opts)
+    if len(self.helpText) > 0:
+      paramOpts['tip'] = self.helpText
+    if self.pType == 'group' and self.value is not None:
+      paramOpts.update(children=self.value)
+    else:
+      paramOpts.update(value=self.value)
+    paramOpts.update(frParam=self)
+    return paramOpts
+
   def __str__(self):
     return f'{self.name}'
 
   def __repr__(self):
-    return f'FRParam(name=\'{self.name}\', value=\'{self.value}\', ' \
-           f'pType=\'{self.pType}\', helpText=\'{self.helpText}\', ' \
-           f'group=FRParamGroup(...))'
+    return f'{self.name}: <{self.pType}>'
 
   def __lt__(self, other):
     """

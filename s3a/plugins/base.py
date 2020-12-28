@@ -9,12 +9,12 @@ from pyqtgraph.Qt import QtWidgets
 from s3a import models
 from s3a import parameditors as pe
 from s3a.structures import NChanImg, XYVertices, FRParam, S3AException
-from ..generalutils import frParamToPgParamDict
 from ..graphicsutils import create_addMenuAct, paramWindow
+from ..parameditors import EditorPropsMixin
 from ..processing import GeneralProcWrapper
 
 
-class ParamEditorPlugin(ABC):
+class ParamEditorPlugin(EditorPropsMixin):
   """
   Primitive plugin which can interface with S3A functionality. When this class is overloaded,
   the child class is given a reference to the main S3A window and S3A is made aware of the
@@ -90,7 +90,7 @@ class ParamEditorPlugin(ABC):
     else:
       parentMenu = self.menu
     opts = kwargs.get('btnOpts', {})
-    if isinstance(opts, FRParam): opts = frParamToPgParamDict(opts)
+    if isinstance(opts, FRParam): opts = opts.toPgDict()
     kwargs.setdefault('ownerObj', self)
 
     proc = editor.registerFunc(func, **kwargs)
@@ -120,7 +120,7 @@ class ParamEditorPlugin(ABC):
     if nameList is None:
       nameList = [None]*len(funcList)
     for title, func in zip(nameList, funcList):
-      self.toolsEditor.registerFunc(func, name=title, paramPath=(groupName,))
+      self.toolsEditor.registerFunc(func, name=title, namePath=(groupName,))
     self.menu.addSeparator()
 
 

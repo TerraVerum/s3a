@@ -33,11 +33,10 @@ class FilePlugin(ParamEditorPlugin):
   def __init__(self):
     super().__init__()
     self.projData = ProjectData()
-    ioCls = FR_SINGLETON.registerGroup(FRC.CLS_COMP_EXPORTER)(ComponentIO)
+    ioCls = ComponentIO
     ioCls.exportOnlyVis, ioCls.includeFullSourceImgName = \
-      FR_SINGLETON.generalProps.registerProps(ioCls,
-                                              [FRC.EXP_ONLY_VISIBLE, FRC.INCLUDE_FNAME_PATH]
-                                              )
+      FR_SINGLETON.generalProps.registerProps(
+        [FRC.EXP_ONLY_VISIBLE, FRC.INCLUDE_FNAME_PATH])
     self.compIo: ComponentIO = ioCls()
     self.autosaveTimer = QtCore.QTimer()
 
@@ -327,7 +326,7 @@ class NewProjectWizard(QtWidgets.QWizard):
       #          " are more human readable, but much slower when switching from image to image")
     ]
     # Use ParamEditor for speedy tree building
-    editor = ParamEditor(saveDir=None, paramList=settings)
+    editor = ParamEditor(paramList=settings, saveDir=None)
     tree = editor.tree
     self.projSettings = editor.params
     self.nameToPageMapping: Dict[str, QtWidgets.QWizardPage] = {}

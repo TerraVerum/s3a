@@ -24,6 +24,7 @@ from .clickables import BoundScatterPlot
 __all__ = ['MultiRegionPlot', 'VertexDefinedImg', 'RegionCopierPlot']
 
 from ..models.editorbase import RunOpts
+from ..parameditors import EditorPropsMixin
 from ..processing import AtomicProcess
 
 Signal = QtCore.Signal
@@ -86,8 +87,7 @@ def _makeBoundSymbol(verts: XYVertices):
   path = arrayToQPath(*verts.T, connect='finite')
   return path
 
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MULT_REG_PLT)
-class MultiRegionPlot(BoundScatterPlot):
+class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
   def __init__(self, parent=None):
     super().__init__(size=1, pxMode=False)
     # Wrapping in atomic process means when users make changes to properties, these are maintained when calling the
@@ -253,13 +253,15 @@ class MultiRegionPlot(BoundScatterPlot):
     return list(bounds[:,ax])
 
 
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_VERT_IMG)
-class VertexDefinedImg(pg.ImageItem):
+class VertexDefinedImg(EditorPropsMixin, pg.ImageItem):
   sigRegionReverted = Signal(object) # new GrayImg
+
+  __groupingName__ = 'Focused Image Graphics'
+
   @classmethod
   def __initEditorParams__(cls):
     cls.fillClr, cls.vertClr = FR_SINGLETON.colorScheme.registerProps(
-      cls, [FR_CONSTS.SCHEME_REG_FILL_COLOR, FR_CONSTS.SCHEME_REG_VERT_COLOR])
+      [FR_CONSTS.SCHEME_REG_FILL_COLOR, FR_CONSTS.SCHEME_REG_VERT_COLOR])
 
   def __init__(self):
     super().__init__()

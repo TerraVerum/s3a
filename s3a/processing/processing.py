@@ -234,7 +234,6 @@ class AtomicProcess(ProcessStage):
   def stages_flattened(self):
     return [self]
 
-
 class GeneralProcess(ProcessStage):
 
   def __init__(self, name: str=None):
@@ -242,9 +241,18 @@ class GeneralProcess(ProcessStage):
     self.name = name
     self.allowDisable = True
 
-  def addFunction(self, func: t.Callable, **kwargs):
-    """See function signature for AtomicProcess for input explanation"""
-    atomic = AtomicProcess(func, mainResultKeys=self.mainResultKeys, mainInputKeys=self.mainInputKeys, **kwargs)
+  def addFunction(self, func: t.Callable, keySpec: t.Union[t.Type[GeneralProcess], GeneralProcess]=None, **kwargs):
+    """
+    Wraps the provided function in an AtomicProcess and adds it to the current process.
+    :param func: Forwarded to AtomicProcess
+    :param kwargs: Forwarded to AtomicProcess
+    :param keySpec: This argument should have 'mainInputKeys' and 'mainResultKeys' that are used
+      when adding a function to this process. This can be beneficial when an Atomic Process
+      is added with different keys than the current process type
+    """
+    if keySpec is None:
+      keySpec = self
+    atomic = AtomicProcess(func, mainResultKeys=keySpec.mainResultKeys, mainInputKeys=keySpec.mainInputKeys, **kwargs)
     numSameNames = 0
     for stage in self.stages:
       if atomic.name == stage.name.split('#')[0]:
@@ -367,14 +375,9 @@ class GeneralProcess(ProcessStage):
       validInfos.append(validInfo)
     return validInfos
 
-class GlobalPredictionProcess(GeneralProcess):
-  def _stageSummaryWidget(self):
-    return QtWidgets.QWidget()
-  mainInputKeys = ['image', 'components']
-  mainResultKeys = ['components']
-
 class ImageProcess(GeneralProcess):
   mainResultKeys = ['image']
+  mainInputKeys = ['image']
 
   @classmethod
   def _cmpPrevCurInfos(cls, prevInfos: t.List[dict], infos: t.List[dict]):

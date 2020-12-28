@@ -1,18 +1,16 @@
-from functools import wraps
 from typing import Union
 from warnings import warn
 
 import numpy as np
-from pandas import DataFrame as df
 import pyqtgraph as pg
+from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui
 
 from s3a import FR_SINGLETON
-from s3a.generalutils import cornersToFullBoundary
-from s3a.models.tablemodel import ComponentMgr
 from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS, FR_ENUMS
-from s3a.processing import AtomicProcess
-from s3a.structures import XYVertices, FRParam, ParamEditorError, S3AWarning, \
+from s3a.models.tablemodel import ComponentMgr
+from s3a.parameditors import EditorPropsMixin
+from s3a.structures import XYVertices, FRParam, S3AWarning, \
   ComplexXYVertices
 from s3a.structures.typeoverloads import OneDArr
 from s3a.views import tableview
@@ -52,14 +50,15 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
       # If that doesn't work, default to stringified comparison
       return str(leftObj) < str(rightObj)
 
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MAIN_IMG_AREA)
-class CompDisplayFilter(QtCore.QObject):
+class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
   sigCompsSelected = Signal(object)
+
+  __groupingName__ = 'Main Image Area'
 
   @classmethod
   def __initEditorParams__(cls):
     cls.pltClickBehav: str = FR_SINGLETON.generalProps.registerProp(
-      cls, FR_CONSTS.PROP_COMP_SEL_BHV)
+      FR_CONSTS.PROP_COMP_SEL_BHV)
 
   def __init__(self, compMgr: ComponentMgr, mainImg: MainImage,
                compTbl: tableview.CompTableView, parent=None):

@@ -3,14 +3,11 @@ from typing import Tuple, Dict, Union, Collection
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 
-from s3a import FR_SINGLETON
-from s3a.constants import FR_CONSTS
 from s3a.structures import FRParam, XYVertices
 from s3a.views.rois import ExtendedROI, SHAPE_ROI_MAPPING
 
 __all__ = ['RoiCollection']
 
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_ROI_CLCTN)
 class RoiCollection(QtCore.QObject):
   # Signal(ExtendedROI)
   sigShapeFinished = QtCore.Signal(object) # roiVerts : XYVertices
@@ -22,7 +19,7 @@ class RoiCollection(QtCore.QObject):
     self.shapeVerts = XYVertices()
     # Make a new graphics item for each roi type
     self.roiForShape: Dict[FRParam, Union[pg.ROI, ExtendedROI]] = {}
-    self._curShape = allowableShapes[0] if len(allowableShapes) > 0 else None
+    self._curShape = next(iter(allowableShapes)) if len(allowableShapes) > 0 else None
 
     self._locks = set()
     self.addLock(self)

@@ -16,6 +16,7 @@ from s3a.structures import S3AException, S3AWarning, TwoDArr
 __all__ = ['CompTableView']
 
 from ..parameditors import pgregistered, ParamEditor, ParamEditorDockGrouping
+from ..parameditors import EditorPropsMixin
 from ..graphicsutils import menuFromEditorActions
 
 Signal = QtCore.Signal
@@ -112,8 +113,8 @@ class PopupTableDialog(QtWidgets.QDialog):
       self.tbl.showColumn(ii)
     super().reject()
 
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_TBL)
-class CompTableView(QtWidgets.QTableView):
+class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
+  __groupingName__ = 'Component Table'
   """
   Table for displaying :class:`FRComponentMgr` data.
   """
@@ -121,7 +122,7 @@ class CompTableView(QtWidgets.QTableView):
 
   @classmethod
   def __initEditorParams__(cls):
-    cls.showOnCreate = FR_SINGLETON.generalProps.registerProp(cls, FR_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE)
+    cls.showOnCreate = FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE)
     cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, name='Component Table Tools')
     nameFilters = []
     for field in FR_SINGLETON.tableData.allFields:
@@ -129,7 +130,7 @@ class CompTableView(QtWidgets.QTableView):
       nameFilters.append(dict(name=field.name, type='bool', value=show))
     FR_CONSTS.PROP_COLS_TO_SHOW.value = nameFilters
     cls.colsVisibleProps = FR_SINGLETON.generalProps.registerProp(
-      cls, FR_CONSTS.PROP_COLS_TO_SHOW, asProperty=False)
+      FR_CONSTS.PROP_COLS_TO_SHOW, asProperty=False)
 
   def __init__(self, *args, minimal=False):
     """

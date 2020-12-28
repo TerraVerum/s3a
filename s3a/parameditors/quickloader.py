@@ -99,8 +99,8 @@ def _addRmOption(param: Parameter):
 
 class QuickLoaderEditor(ParamEditor):
   def __init__(self, parent=None, editorList: List[ParamEditor]=None):
-    super().__init__(parent, paramList=[],
-                     saveDir=QUICK_LOAD_DIR, fileType='loader', name='Editor State Shortcuts')
+    super().__init__(parent, paramList=[], saveDir=QUICK_LOAD_DIR, fileType='loader',
+                     name='Editor State Shortcuts')
     if editorList is None:
       editorList = []
     self.listModel = EditorListModel(editorList, self)

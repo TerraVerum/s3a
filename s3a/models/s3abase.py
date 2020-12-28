@@ -1,7 +1,7 @@
 import sys
 from copy import copy
 from pathlib import Path
-from typing import Optional, Union, Callable, Dict, Any, Type
+from typing import Optional, Union, Dict, Any, Type
 from warnings import warn
 
 import numpy as np
@@ -14,12 +14,10 @@ from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS
 from s3a.constants import FR_ENUMS
 from s3a.controls.tableviewproxy import CompDisplayFilter, CompSortFilter
 from s3a.generalutils import resolveAuthorName, imgCornerVertices
-from s3a.graphicsutils import addDirItemsToMenu, saveToFile
 from s3a.models.tablemodel import ComponentMgr
-from s3a.parameditors import FR_SINGLETON
-from s3a.parameditors import ParamEditor
-from s3a.plugins.base import ParamEditorPlugin
+from s3a.parameditors import FR_SINGLETON, EditorPropsMixin
 from s3a.parameditors.appstate import AppStateEditor
+from s3a.plugins.base import ParamEditorPlugin
 from s3a.structures import FilePath, NChanImg, S3AIOError, \
   AlgProcessorError, S3AWarning
 from s3a.views.imageareas import MainImage, FocusedImage
@@ -27,8 +25,7 @@ from s3a.views.tableview import CompTableView
 
 __all__ = ['S3ABase']
 
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_S3A_MODEL)
-class S3ABase(QtWidgets.QMainWindow):
+class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
   """
   Top-level widget for producing component bounding regions from an input image.
   """
@@ -43,9 +40,11 @@ class S3ABase(QtWidgets.QMainWindow):
   emitted even though `imgItem.sigImageChanged` is emitted.  
   """
 
+  __groupingName__ = 'S3A Window'
+
   @classmethod
   def __initEditorParams__(cls):
-    cls.estBoundsOnStart, cls.undoBuffSz = FR_SINGLETON.generalProps.registerProps(cls,
+    cls.estBoundsOnStart, cls.undoBuffSz = FR_SINGLETON.generalProps.registerProps(
         [FR_CONSTS.PROP_EST_BOUNDS_ON_START, FR_CONSTS.PROP_UNDO_BUF_SZ])
 
   def __init__(self, parent=None, **quickLoaderArgs):
@@ -66,11 +65,11 @@ class S3ABase(QtWidgets.QMainWindow):
 
     self.compMgr = ComponentMgr()
     # Register exporter to allow user parameters
-    ioCls = FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_EXPORTER)(ComponentIO)
+    ioCls = ComponentIO
     ioCls.exportOnlyVis, ioCls.includeFullSourceImgName = \
-      FR_SINGLETON.generalProps.registerProps(ioCls,
-                                              [FR_CONSTS.EXP_ONLY_VISIBLE, FR_CONSTS.INCLUDE_FNAME_PATH]
-                                              )
+      FR_SINGLETON.generalProps.registerProps(
+        [FR_CONSTS.EXP_ONLY_VISIBLE, FR_CONSTS.INCLUDE_FNAME_PATH],
+        (FR_CONSTS.CLS_COMP_EXPORTER.name,))
     self.compIo: ComponentIO = ioCls()
     ComponentIO.tableData = FR_SINGLETON.tableData
 

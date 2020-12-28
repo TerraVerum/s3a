@@ -13,15 +13,14 @@ from s3a import RunOpts
 from s3a.constants import FR_ENUMS
 from s3a.constants import LAYOUTS_DIR, FR_CONSTS as FRC, REQD_TBL_FIELDS
 from s3a.generalutils import attemptFileLoad
-from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
-  popupFilePicker, \
+from s3a.graphicsutils import makeExceptionsShowDialogs, popupFilePicker, \
   disableAppDuringFunc, saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
   restoreExceptionBehavior, menuFromEditorActions
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import ParamEditor, FR_SINGLETON
-from s3a.plugins.base import ParamEditorPlugin, dummyPluginFactory
-from s3a.plugins.misc import RandomToolsPlugin, MainImagePlugin, CompTablePlugin
+from s3a.plugins.base import ParamEditorPlugin
 from s3a.plugins.file import FilePlugin
+from s3a.plugins.misc import RandomToolsPlugin, MainImagePlugin, CompTablePlugin
 from s3a.structures import S3AWarning, XYVertices, FilePath, NChanImg
 from s3a.views.buttons import ButtonCollection
 
@@ -29,7 +28,6 @@ __all__ = ['S3A']
 
 _MENU_PLUGINS = [RandomToolsPlugin]
 
-@FR_SINGLETON.registerGroup(FRC.CLS_ANNOTATOR)
 class S3A(S3ABase):
   sigLayoutSaved = QtCore.Signal()
   S3A_INST = None

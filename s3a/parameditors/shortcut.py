@@ -2,7 +2,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial
 from inspect import isclass
-from typing import Tuple, Callable, Any, Dict, List, DefaultDict
+from typing import Tuple, Callable, Any, Dict, List, DefaultDict, Sequence
 from warnings import warn
 
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
@@ -12,7 +12,8 @@ from s3a.constants import SHORTCUTS_DIR
 from s3a.structures import FRParam, ParamEditorError, S3AWarning
 from .genericeditor import ParamEditor
 from .pgregistered import ShortcutParameter
-from s3a.generalutils import helpTextToRichText
+from s3a.generalutils import helpTextToRichText, getParamChild, pascalCaseToTitle, \
+  getAllBases
 
 
 def _class_fnNamesFromFnQualname(qualname: str) -> (str, str):
@@ -33,21 +34,6 @@ def _class_fnNamesFromFnQualname(qualname: str) -> (str, str):
     fnParentClass = qualname[:lastDotIdx]
     fnName = qualname[lastDotIdx+1:]
   return fnParentClass, fnName
-
-
-def _getAllBases(cls):
-  baseClasses = [cls]
-  nextClsPtr = 0
-  if not isclass(cls):
-    return baseClasses
-  # Get all bases of bases, too
-  while nextClsPtr < len(baseClasses):
-    curCls = baseClasses[nextClsPtr]
-    curBases = curCls.__bases__
-    # Only add base classes that haven't already been added to prevent infinite recursion
-    baseClasses.extend([tmpCls for tmpCls in curBases if tmpCls not in baseClasses])
-    nextClsPtr += 1
-  return baseClasses
 
 
 class EditableShortcut(QtWidgets.QShortcut):
@@ -86,7 +72,6 @@ class ShortcutsEditor(ParamEditor):
     for the same action on one class"""
     # Allow global shortcuts
     self.globalParam = FRParam('Global')
-    self.groupingToParamMapping[type(None)] = self.globalParam
 
   def registerMethod_cls(self, constParam: FRParam, fnArgs: List[Any]=None, forceCreate=False):
     """
@@ -97,7 +82,7 @@ class ShortcutsEditor(ParamEditor):
     if fnArgs is None:
       fnArgs = []
 
-    def registerMethodDecorator(func: Callable, ownerObj: Any=None):
+    def registerMethodDecorator(func: Callable, ownerObj: Any=None, namePath: Sequence[str]=()):
       boundFnParam = BoundFnParams(param=constParam, func=func, defaultFnArgs=fnArgs)
       ownerCls = ownerObj if isclass(ownerObj) else type(ownerObj)
       if ownerObj is None:
@@ -106,31 +91,19 @@ class ShortcutsEditor(ParamEditor):
         qualname = ownerCls.__qualname__
       self.boundFnsPerQualname[qualname].append(boundFnParam)
       # Make sure it's an object not just a class before forcing extended init
-      groupParam = self.groupingToParamMapping[ownerCls]
       if ownerObj is not None and ownerCls != ownerObj:
-        self._extendedClassInit(ownerObj, groupParam)
+        self.addRegisteredFuncsFromCls(ownerCls, namePath)
+        boundParamList = self.boundFnsPerQualname.get(ownerCls.__qualname__, [])
+        for boundParam in boundParamList:
+          self.hookupShortcutForBoundFn(boundParam, ownerObj)
       elif forceCreate:
-        self.addRegisteredFuncsFromCls(ownerCls, groupParam)
+        self.addRegisteredFuncsFromCls(ownerCls, namePath)
       # Global shortcuts won't get created since no 'global' widget init will be
       # called. In those cases, create right away
       if ownerCls == type(None):
         self.hookupShortcutForBoundFn(boundFnParam, None)
       return func
     return registerMethodDecorator
-
-  def _extendedClassInit(self, clsObj: Any, groupParam: FRParam):
-    grouping = type(clsObj)
-    try:
-      self.addRegisteredFuncsFromCls(grouping, groupParam)
-    except Exception as ex:
-      # Already added previously from a different class.
-      # This is the easiest way to check error type since pg throws a raw exception,
-      # not a subclass
-      if 'Already have child' not in str(ex):
-        raise
-    boundParamList = self.boundFnsPerQualname.get(grouping.__qualname__, [])
-    for boundParam in boundParamList:
-      self.hookupShortcutForBoundFn(boundParam, clsObj)
 
   def createRegisteredButton(self, btnParam: FRParam, ownerObj: Any, doRegister=True,
                              baseBtn: QtWidgets.QAbstractButton=None):
@@ -165,8 +138,7 @@ class ShortcutsEditor(ParamEditor):
       ownerObj = type(ownerObj)
 
     if param is None:
-      clsParam = self.groupingToParamMapping[ownerObj]
-      param = self[clsParam, btnParam, True]
+      param = self.params.child(pascalCaseToTitle(ownerObj.__name__), btnParam.name)
     param.opts['tip'] = tooltipText
 
     def shcChanged(_param, newSeq: str):
@@ -183,21 +155,12 @@ class ShortcutsEditor(ParamEditor):
   def registerMethod_obj(self, func: Callable[[], Any], funcFrParam: FRParam, ownerObj: Any,
                          *funcArgs, **funcKwargs):
     cls = type(ownerObj)
-    try:
-      groupParam = self.groupingToParamMapping[cls]
-    except KeyError:
-      # Not yet registered
-      raise ParamEditorError(f'{cls} must be registered as a group before any buttons'
-                               f' can be reigstered to {ownerObj}')
     shortcutParam: ShortcutParameter = Parameter.create(name=funcFrParam.name,
                                                         type='shortcut', value=funcFrParam.value,
                                                         tip=funcFrParam.helpText,
                                                         frParam=funcFrParam)
-    if groupParam.name in self.params.names:
-      pgParam = self.params.child(groupParam.name)
-    else:
-      pgParam = Parameter.create(name=groupParam.name, type='group')
-      self.params.addChild(pgParam)
+    clsName = pascalCaseToTitle(cls.__name__)
+    pgParam = getParamChild(self.params, clsName)
     if funcFrParam.name not in pgParam.names:
       pgParam.addChild(shortcutParam)
     else:
@@ -229,41 +192,30 @@ class ShortcutsEditor(ParamEditor):
          S3AWarning)
 
 
-  def addRegisteredFuncsFromCls(self, grouping: Any, groupParam: FRParam):
+  def addRegisteredFuncsFromCls(self, grouping: Any, namePath: Sequence[str]=()):
     """
     For a given class, adds the registered parameters from that class to the respective
     editor. This is how the dropdown menus in the editors are populated with the
     user-specified variables.
 
     :param grouping: Current class
-
-    :param groupParam: :class:`FRParam` value encapsulating the human readable class name.
-           This is how the class will be displayed in the :class:`FRShortcutsEditor`.
-
-    :return: None
+    :param namePath: Sequence of groups to traverse to find this parameter
     """
     # Make sure to add parameters from registered base classes, too, if they exist
     iterGroupings = []
-    baseClasses = _getAllBases(grouping)
+    baseClasses = getAllBases(grouping)
     for baseCls in baseClasses:
       iterGroupings.append(baseCls.__qualname__)
     boundFns_includingBases = []
 
     # If this group already exists, append the children to the existing group
     # instead of adding a new child
-    if groupParam.name in self.params.names:
-      ownerParam = self.params.child(groupParam.name)
-      shouldAdd = False
-    else:
-      ownerParam = Parameter.create(name=groupParam.name, type='group')
-      shouldAdd = True
+    ownerParam = getParamChild(self.params, *namePath)
     for curGrouping in iterGroupings:
       groupParamList = self.boundFnsPerQualname.get(curGrouping, [])
       boundFns_includingBases.extend(groupParamList)
       for boundFn in groupParamList:
         self.addBoundFn(boundFn, ownerParam)
-    if shouldAdd and len(ownerParam.children()) > 0:
-      self.params.addChild(ownerParam)
 
     # Now make sure when props are registered for this grouping, they include
     # base class shortcuts too

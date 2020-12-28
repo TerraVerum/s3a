@@ -17,11 +17,9 @@ class AppStateEditor(ParamEditor):
 
   def __init__(self, parent=None, paramList: List[Dict] = None,
                saveDir: FilePath = APP_STATE_DIR, fileType='param', name=None,
-               topTreeChild: Parameter = None, registerCls: Type = None,
-               registerParam: FRParam = None):
+               topTreeChild: Parameter = None, registerParam: FRParam = None):
     # TODO: Add params to choose which features are saved, etc.
-    super().__init__(parent, paramList, saveDir, fileType, name, topTreeChild,
-                     registerCls, registerParam)
+    super().__init__(parent, paramList, saveDir, fileType, name, topTreeChild)
     self._stateFuncsDf = pd.DataFrame(columns=['importFuncs', 'exportFuncs'])
 
   def saveParamState(self, saveName: str=None, paramState: dict=None,
