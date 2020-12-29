@@ -167,13 +167,13 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
 
   def setColDelegates(self):
     for ii, field in enumerate(TBL_FIELDS):
-      curType = field.pType
+      curType = field.pType.lower()
       curval = field.value
       paramDict = dict(type=curType, default=curval, **field.opts)
-      if curType == 'Enum':
+      if curType == 'enum':
         paramDict['type'] = 'list'
         paramDict.update(values=list(type(curval)))
-      elif curType == 'FRParam':
+      elif curType == 'frparam':
         paramDict['type'] = 'list'
         paramDict.update(values=list(curval.group))
       elif curType == 'bool':

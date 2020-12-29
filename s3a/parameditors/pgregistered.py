@@ -3,14 +3,18 @@ from pathlib import Path
 from typing import List
 
 from pyqtgraph.Qt import QtGui, QtWidgets, QtCore
-from pyqtgraph.parametertree import parameterTypes, Parameter
+from pyqtgraph.parametertree import parameterTypes, Parameter, ParameterTree
 from pyqtgraph.parametertree.Parameter import PARAM_TYPES
 from pyqtgraph.parametertree.parameterTypes import ActionParameterItem, ActionParameter, \
   TextParameterItem, TextParameter
+import pyqtgraph as pg
 import numpy as np
+
+from s3a.controls.drawctrl import RoiCollection
 from s3a.graphicsutils import PopupLineEditor, popupFilePicker
 
-from s3a.structures import S3AException, FRParam
+from s3a.constants import FR_CONSTS as FRC
+from s3a.structures import S3AException, FRParam, XYVertices
 from s3a import parameditors
 
 
@@ -32,16 +36,20 @@ class PgParamDelegate(QtWidgets.QStyledItemDelegate):
     if paramDict['type'] not in PARAM_TYPES:
       raise S3AException(errMsg)
     paramDict.update(name='dummy')
-    param = Parameter.create(**paramDict)
+    self.param = param = Parameter.create(**paramDict)
     if hasattr(param.itemClass, 'makeWidget'):
       self.item = param.itemClass(param, 0)
     else:
       raise S3AException(errMsg)
 
+    # TODO: Deal with params that go out of scope before yielding a value
+    self._indirectItem = isinstance(self.item.makeWidget(), QtWidgets.QPushButton)
+
   def createEditor(self, parent, option, index: QtCore.QModelIndex):
-    editor = self.item.makeWidget()
-    editor.setParent(parent)
-    editor.setMaximumSize(option.rect.width(), option.rect.height())
+    if not self._indirectItem:
+      editor = self.item.makeWidget()
+      editor.setParent(parent)
+      editor.setMaximumSize(option.rect.width(), option.rect.height())
     return editor
 
   def setModelData(self, editor: QtWidgets.QWidget,
@@ -255,7 +263,6 @@ class _DummySignal:
   def disconnect(self, *args): pass
 
 class FilePickerParameterItem(parameterTypes.WidgetParameterItem):
-
   def makeWidget(self):
     param = self.param
     if param.opts['value'] is None:
@@ -264,10 +271,9 @@ class FilePickerParameterItem(parameterTypes.WidgetParameterItem):
     param.opts.setdefault('asFolder', False)
     param.opts.setdefault('existing', True)
     button = QtWidgets.QPushButton()
-    param.sigValueChanged.connect(lambda param, val: button.setText(val))
     button.setValue = button.setText
-    button.value = button.text
     button.sigChanged = _DummySignal()
+    button.value = button.text
     button.setText(fpath)
     button.clicked.connect(self._retrieveFolderName_gui)
 
@@ -275,7 +281,7 @@ class FilePickerParameterItem(parameterTypes.WidgetParameterItem):
 
   def _retrieveFolderName_gui(self):
     curVal = self.param.value()
-    if len(curVal) > 0:
+    if curVal:
       useDir = curVal
     else:
       useDir = None
@@ -360,6 +366,52 @@ class SliderParameterItem(parameterTypes.WidgetParameterItem):
 class SliderParameter(Parameter):
   itemClass = SliderParameterItem
 
+class _CustomRoiCollection(RoiCollection):
+  sigShapeCleared = QtCore.Signal()
+  def clearAllRois(self):
+    super().clearAllRois()
+    self.sigShapeCleared.emit()
+
+class XYVerticesParameterItem(parameterTypes.WidgetParameterItem):
+  def makeWidget(self):
+    param = self.param
+
+    self.verts = XYVertices()
+    self.shapes = _CustomRoiCollection((FRC.DRAW_SHAPE_POLY,))
+
+    button = QtWidgets.QPushButton()
+    button.value = lambda: self.verts
+    def setter(verts: np.ndarray):
+      try:
+        button.setText(str(verts))
+      except RuntimeError:
+        # Button no longer in C++ scope
+        pass
+      self.verts = np.asarray(verts, dtype=XYVertices)
+    button.setValue = setter
+    button.sigChanged = _DummySignal()
+
+    self.item = param.opts.get('item', self.param.sceneItem)
+    self.shapes.addRoisToView(self.item)
+    oldClctn = self.item.shapeCollection
+
+    def resetClctn():
+      self.item.shapeCollection = oldClctn
+    def onFinish(roiVerts):
+      setter(roiVerts)
+      # self.shapes.clearAllRois()
+    def onStart():
+      self.item.shapeCollection = self.shapes
+
+    self.shapes.sigShapeCleared.connect(resetClctn)
+    self.shapes.sigShapeFinished.connect(onFinish)
+    button.clicked.connect(onStart)
+
+    return button
+
+class XYVerticesParameter(Parameter):
+  itemClass = XYVerticesParameterItem
+  sceneItem: pg.PlotWidget = None
 
 
 class NoneParameter(parameterTypes.SimpleParameter):
@@ -378,3 +430,4 @@ parameterTypes.registerParameterType('registeredaction', RegisteredActionParamet
 parameterTypes.registerParameterType('popuplineeditor', PopupLineEditorParameter)
 parameterTypes.registerParameterType('filepicker', FilePickerParameter)
 parameterTypes.registerParameterType('slider', SliderParameter)
+parameterTypes.registerParameterType('xyvertices', XYVerticesParameter)

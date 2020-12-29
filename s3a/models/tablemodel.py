@@ -77,7 +77,13 @@ class CompTableModel(QtCore.QAbstractTableModel):
     # Also, pandas iloc unnecessarily coerces to 2D ndarray when setting, so iloc will fail
     # when assigning an array to a single location. Not sure how to prevent this...
     # For now, checking this on export
-    if self.compDf.iloc[row, [col, col-1]].values[0] != self.compDf.iat[row, col]:
+    cmp = self.compDf.iloc[row, [col, col-1]].values[0] != self.compDf.iat[row, col]
+    try:
+      cmp = bool(cmp)
+    except ValueError:
+      # Numpy array-like
+      cmp = np.any(cmp)
+    if cmp:
       warn('Warning! An error occurred setting this value. Please try again using a'
            ' <em>multi-cell</em> edit. E.g. do not just set this value, set it along with'
            ' at least one other selected cell.', S3AWarning)

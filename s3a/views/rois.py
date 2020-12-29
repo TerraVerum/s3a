@@ -5,15 +5,12 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 import cv2 as cv
 
-from s3a import ComplexXYVertices
 from s3a.constants import FR_CONSTS
 from s3a.structures import FRParam
-from s3a.structures import XYVertices
+from s3a.structures import XYVertices, ComplexXYVertices
 
 __all__ = ['RectROI', 'PaintFillROI', 'PolygonROI', 'SHAPE_ROI_MAPPING',
            'ExtendedROI']
-
-from s3a.views.clickables import BoundScatterPlot
 
 def _clearPoints(roi: pg.ROI):
   while roi.handles:

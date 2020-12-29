@@ -29,7 +29,7 @@ def genParamList(nameIter, paramType, defaultVal, defaultParam='value'):
 def _filterForParam(param: FRParam):
   """Constructs a filter for the parameter based on its type"""
   children = []
-  pType = param.pType
+  pType = param.pType.lower()
   paramWithChildren = {'name': param.name, 'type': 'group', 'children': children}
   children.append(dict(name='Active', type='bool', value=False))
   if pType in ['int', 'float']:
@@ -37,10 +37,10 @@ def _filterForParam(param: FRParam):
     retVal[0]['value'] = -sys.maxsize
     retVal[1]['value'] = sys.maxsize
     children.extend(retVal)
-  elif pType in ['FRParam', 'Enum', 'list', 'popuplineeditor', 'bool']:
-    if pType == 'FRParam':
+  elif pType in ['frparam', 'enum', 'list', 'popuplineeditor', 'bool']:
+    if pType == 'frparam':
       iterGroup = [param.name for param in param.value.group]
-    elif pType == 'Enum':
+    elif pType == 'enum':
       iterGroup = [param for param in param.value]
     elif pType == 'bool':
       iterGroup = [f'{param.name}', f'Not {param.name}']
@@ -56,7 +56,7 @@ def _filterForParam(param: FRParam):
     actions[1].sigActivated.connect(lambda: changeOpts(False))
     paramWithChildren.addChildren(actions)
     paramWithChildren.addChild(optsParam)
-  elif pType == 'ComplexXYVertices':
+  elif 'xyvertices' in pType:
     minMax = _filterForParam(FRParam('', 5))
     minMax.removeChild(minMax.childs[0])
     minMax = minMax.saveState()['children']

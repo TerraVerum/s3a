@@ -30,8 +30,7 @@ class FRParam:
       opts = {}
     if pType is None:
       # Infer from value
-      pType = type(value).__name__
-      pType = pType
+      pType = type(value).__name__.lower()
     ht = helpText
     if ht is not None and len(ht) > 0:
       # TODO: Checking for mightBeRichText fails on pyside2? Even though the function
