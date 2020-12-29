@@ -436,6 +436,11 @@ class ImageProcess(GeneralProcess):
 
 _winRefs = {}
 
+class GlobalPredictionProcess(ImageProcess):
+  def _stageSummaryWidget(self):
+    return QtWidgets.QWidget()
+  mainResultKeys = ['components']
+
 class CategoricalProcess(GeneralProcess):
   def _stageSummaryWidget(self):
     pass
