@@ -108,13 +108,13 @@ class RegisteredActionParameterItem(ActionParameterItem):
     btn.setToolTip(param.opts.get('tip', ''))
     if param.value() is None: return
     # Else: shortcut exists to be registered
-    cls = param.opts.get('ownerObj', type(None))
+    owner = param.opts.get('ownerObj', type(None))
     frParam = param.opts.get('frParam', None)
     if frParam is None:
       frParam = FRParam(param.name(), param.value(), param.type(), param.opts['tip'])
       param.opts['frParam'] = frParam
     self.button = parameditors.FR_SINGLETON.shortcuts.createRegisteredButton(
-      frParam, cls, baseBtn=self.button
+      frParam, owner, baseBtn=self.button
     )
     return
 

@@ -32,6 +32,8 @@ class S3A(S3ABase):
   sigLayoutSaved = QtCore.Signal()
   S3A_INST = None
 
+  __groupingName__ = 'Application'
+
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
@@ -44,8 +46,8 @@ class S3A(S3ABase):
     superLoaderArgs = {'author': quickLoaderArgs.pop('author', None)}
     super().__init__(parent, **superLoaderArgs)
     for func, param in zip(
-        [self.estimateBoundaries_gui, self.clearBoundaries, self.exportAnnotations_gui],
-        [FRC.TOOL_ESTIMATE_BOUNDARIES, FRC.TOOL_CLEAR_BOUNDARIES, FRC.TOOL_EXPORT_COMP_LIST]):
+        [self.clearBoundaries, self.exportAnnotations_gui],
+        [FRC.TOOL_CLEAR_BOUNDARIES, FRC.TOOL_EXPORT_COMP_LIST]):
       param.opts['ownerObj'] = self
       self.toolsEditor.registerFunc(func, btnOpts=param)
     if guiMode:

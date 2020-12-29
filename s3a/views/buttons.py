@@ -34,7 +34,7 @@ class ButtonCollection(QtWidgets.QGroupBox):
     if not btnParam.opts.get('guibtn', True):
       return
     if ownerObj is _DEFAULT_OWNER:
-      ownerObj = self.parent()
+      ownerObj = btnParam.opts.get('ownerObj', self.parent())
     newBtn = parameditors.FR_SINGLETON.shortcuts.createRegisteredButton(btnParam, ownerObj)
     if checkable:
       newBtn.setCheckable(True)

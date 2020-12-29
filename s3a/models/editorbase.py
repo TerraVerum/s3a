@@ -36,9 +36,9 @@ def _mkRunBtn(proc: AtomicProcess, btnOpts: Union[FRParam, dict]):
   if isinstance(btnOpts, FRParam):
     # Replace falsy helptext with func signature
     btnOpts = btnOpts.toPgDict()
+  if btnOpts is not None:
     # Make sure param type is not overridden
     btnOpts.pop('type', None)
-  if btnOpts is not None:
     defaultBtnOpts.update(btnOpts)
   if len(defaultBtnOpts.get('tip', '')) == 0:
     defaultBtnOpts['tip'] = docParser(proc.func.__doc__)['top-descr']

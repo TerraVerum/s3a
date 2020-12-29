@@ -91,7 +91,8 @@ class ParamEditorPlugin(EditorPropsMixin):
       parentMenu = self.menu
     opts = kwargs.get('btnOpts', {})
     if isinstance(opts, FRParam): opts = opts.toPgDict()
-    kwargs.setdefault('ownerObj', self)
+    opts.setdefault('ownerObj', self)
+    kwargs['btnOpts'] = opts
 
     proc = editor.registerFunc(func, **kwargs)
 

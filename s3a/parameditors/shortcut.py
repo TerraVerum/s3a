@@ -35,6 +35,11 @@ def _class_fnNamesFromFnQualname(qualname: str) -> (str, str):
     fnName = qualname[lastDotIdx+1:]
   return fnParentClass, fnName
 
+def _clsNameOrGroup(cls: type):
+  if hasattr(cls, '__groupingName__'):
+    return cls.__groupingName__
+  return pascalCaseToTitle(cls.__name__)
+
 
 class EditableShortcut(QtWidgets.QShortcut):
   paramIdx: Tuple[FRParam, FRParam]
@@ -138,7 +143,7 @@ class ShortcutsEditor(ParamEditor):
       ownerObj = type(ownerObj)
 
     if param is None:
-      param = self.params.child(pascalCaseToTitle(ownerObj.__name__), btnParam.name)
+      param = self.params.child(_clsNameOrGroup(ownerObj), btnParam.name)
     param.opts['tip'] = tooltipText
 
     def shcChanged(_param, newSeq: str):
@@ -159,7 +164,7 @@ class ShortcutsEditor(ParamEditor):
                                                         type='shortcut', value=funcFrParam.value,
                                                         tip=funcFrParam.helpText,
                                                         frParam=funcFrParam)
-    clsName = pascalCaseToTitle(cls.__name__)
+    clsName = _clsNameOrGroup(cls)
     pgParam = getParamChild(self.params, clsName)
     if funcFrParam.name not in pgParam.names:
       pgParam.addChild(shortcutParam)
@@ -208,8 +213,6 @@ class ShortcutsEditor(ParamEditor):
       iterGroupings.append(baseCls.__qualname__)
     boundFns_includingBases = []
 
-    # If this group already exists, append the children to the existing group
-    # instead of adding a new child
     ownerParam = getParamChild(self.params, *namePath)
     for curGrouping in iterGroupings:
       groupParamList = self.boundFnsPerQualname.get(curGrouping, [])
