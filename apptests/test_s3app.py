@@ -33,9 +33,14 @@ def test_est_bounds_no_img(qtbot, app):
   oldName = app.srcImgFname
   oldData = app.mainImg.image
   app.setMainImg()
-  with qtbot.captureExceptions() as exs:
-    app.estimateBoundaries()
-    assertExInList(exs, AlgProcessorError)
+  # Since the AlgProcessorError is raised within a qt event loop AND is caught by qtbot,
+  # a subsequent warning will be raised by attempting to accept a blank focused image.
+  # This cannot happen during real execution, since qtbot will not capture the processor
+  # error. So, this extra warning catch is only necessary during the unit test
+  with pytest.warns(S3AWarning):
+    with qtbot.captureExceptions() as exs:
+      app.estimateBoundaries()
+      assertExInList(exs, AlgProcessorError)
   app.setMainImg(oldName, oldData)
 
 

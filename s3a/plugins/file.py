@@ -203,7 +203,7 @@ class FilePlugin(ParamEditorPlugin):
       limits: {ioTypes}
     """
     self.autosaveTimer = QtCore.QTimer()
-    self.autosaveTimer.start(interval * 60 * 1000)
+    self.autosaveTimer.start(int(interval * 60 * 1000))
     self.autosaveTimer.timeout.connect(self.saveCurAnnotation)
     if len(str(backupFolder)) == 0:
       return

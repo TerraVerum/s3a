@@ -65,7 +65,6 @@ def test_update(app, mgr, vertsPlugin):
 
 def test_region_modify(sampleComps, app, mgr, vertsPlugin):
   fImg = app.focusedImg
-  vertsPlugin.attachWinRef(app)
   app.add_focusComps(sampleComps)
   shapeBnds = fImg.image.shape[:2]
   reach = np.min(shapeBnds)
