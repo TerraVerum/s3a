@@ -87,9 +87,6 @@ class S3A(S3ABase):
       QtCore.QTimer.singleShot(0, lambda: self._maybeLoadLastState_gui(loadLastState, quickLoaderArgs))
     elif loadLastState:
       self.loadLastState(quickLoaderArgs)
-    # Needs to be reset if loading last state also added new components, but no user changes
-    # were made
-    self.hasUnsavedChanges = False
 
   def _hookupSignals(self):
     FR_SINGLETON.colorScheme.registerFunc(self.updateTheme, name=FRC.CLS_ANNOTATOR.name, runOpts=RunOpts.ON_CHANGED)

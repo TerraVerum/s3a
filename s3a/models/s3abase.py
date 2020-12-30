@@ -256,7 +256,6 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
   def exportAnnotations(self, outFname: Union[str, Path], readOnly=True, verifyIntegrity=True):
     self.compIo.exportByFileType(self.exportableDf, outFname, imShape=self.mainImg.image.shape,
                                  readOnly=readOnly, verifyIntegrity=verifyIntegrity)
-    self.hasUnsavedChanges = False
 
   def exportLabeledImg(self, outFname: str=None):
     return self.compIo.exportByFileType(self.exportableDf, outFname, imShape=self.mainImg.image.shape)

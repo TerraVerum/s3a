@@ -174,7 +174,9 @@ def test_no_author(app):
 def test_unsaved_changes(sampleComps, tmp_path, app):
   app.compMgr.addComps(sampleComps)
   assert app.hasUnsavedChanges
-  app.exportAnnotations(tmp_path / 'export.csv')
+  from s3a.plugins.file import FilePlugin
+  plg = FR_SINGLETON.clsToPluginMapping[FilePlugin]
+  plg.saveCurAnnotation()
   assert not app.hasUnsavedChanges
 
 def test_set_colorinfo(app):

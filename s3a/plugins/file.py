@@ -134,6 +134,8 @@ class FilePlugin(ParamEditorPlugin):
     if imgAnns is not None:
       self.win.compMgr.addComps(self.compIo.buildByFileType(imgAnns, imgDir=self.projData.imagesDir,
                                                             imShape=self.win.mainImg.image.shape))
+      # 'hasUnsavedChanges' will be true after this, even though the changes are saved.
+      self.win.hasUnsavedChanges = False
 
   def open(self, name: str):
     if Path(name).resolve() == self.projData.cfgFname:
@@ -712,7 +714,7 @@ class ProjectData(QtCore.QObject):
     # Housekeeping for default arguments
     if name is None and data is None:
       raise S3AIOError('`name` and `data` cannot both be `None`')
-    elif name in self.imgToAnnMapping.values():
+    elif name in self.imgToAnnMapping.values() and not overwriteOld:
       # Already present, shouldn't be added
       return
     if data is None:
