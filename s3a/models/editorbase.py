@@ -441,7 +441,7 @@ class ParamEditorBase(QtWidgets.QDockWidget):
 
   @classmethod
   @contextmanager
-  def setBaseRegisterPath(cls, *path: Sequence[str]):
+  def setBaseRegisterPath(cls, *path: str):
     oldPath = cls._baseRegisterPath
     cls._baseRegisterPath = path
     yield

@@ -209,7 +209,6 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
   def addPlugin(self, pluginCls: Type[ParamEditorPlugin], *args, **kwargs):
     """See FR_SINGLETON.addPlugin"""
     plugin = FR_SINGLETON.addPlugin(pluginCls, *args, **kwargs)
-    plugin.attachWinRef(self)
     return plugin
 
   @FR_SINGLETON.actionStack.undoable('Change Main Image')
