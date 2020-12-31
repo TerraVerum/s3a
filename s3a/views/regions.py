@@ -148,6 +148,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     for col, idList in zip(self.regionData.columns, [selectedIds, focusedIds]):
       if idList is None: continue
       self.regionData[col] = False
+      idList = np.intersect1d(self.regionData.index, idList)
       self.regionData.loc[idList, col] = True
     self.updateColors()
 
