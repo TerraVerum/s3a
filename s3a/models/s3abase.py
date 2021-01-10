@@ -144,17 +144,18 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     # Even if the field names are the same, e.g. classes may added or default values could
     # be changed. So, reset the cell editor delegates no matter what
     self.compTbl.setColDelegates()
-    self.compTbl.popup.tbl.setColDelegates()
+    self.compTbl.popup.reflectDelegateChange()
     # Make sure this is necessary, first
-    if self.compMgr.colTitles == list([f.name for f in FR_SINGLETON.tableData.allFields]):
-      # Fields haven't changed since last reset. Types could be different, but nothing
-      # will break. So, the table doesn't have to be completely reset
-      return
+    for mgr in self.compMgr, self.compTbl.popup.tbl.mgr:
+      if mgr.colTitles == list([f.name for f in FR_SINGLETON.tableData.allFields]):
+        # Fields haven't changed since last reset. Types could be different, but nothing
+        # will break. So, the table doesn't have to be completely reset
+        return
 
-    self.compMgr.beginResetModel()
-    self.compMgr.rmComps()
-    self.compMgr.resetFields()
-    self.compMgr.endResetModel()
+      mgr.beginResetModel()
+      mgr.rmComps()
+      mgr.resetFields()
+      mgr.endResetModel()
 
   def _handleNewPlugin(self, plugin: ParamEditorPlugin):
     plugin.attachWinRef(self)

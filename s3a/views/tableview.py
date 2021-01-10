@@ -67,10 +67,6 @@ class PopupTableDialog(QtWidgets.QDialog):
     # -----------
     self.closeBtn.clicked.connect(self.close)
     self.applyBtn.clicked.connect(self.accept)
-    # TODO: Find if there's a better way to see if changes happen in a table
-    for colIdx in range(len(self.titles)):
-      deleg = self.tbl.itemDelegateForColumn(colIdx)
-      deleg.commitData.connect(partial(self.reflectDataChanged, colIdx))
 
   def updateWarnMsg(self, updatableCols: Sequence[str]):
     warnMsg = 'Note! '
@@ -80,6 +76,15 @@ class PopupTableDialog(QtWidgets.QDialog):
       tblInfo = "Only " + ", ".join(updatableCols)
     warnMsg += f'{tblInfo} will be updated from this view.'
     self.warnLbl.setText(warnMsg)
+
+  def reflectDelegateChange(self):
+    # TODO: Find if there's a better way to see if changes happen in a table
+    self.titles = np.array(list([f.name for f in TBL_FIELDS]))
+    self.tbl.setColDelegates()
+    for colIdx in range(len(self.titles)):
+      deleg = self.tbl.itemDelegateForColumn(colIdx)
+      deleg.commitData.connect(partial(self.reflectDataChanged, colIdx))
+
 
   @property
   def data(self):

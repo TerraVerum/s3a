@@ -81,7 +81,7 @@ class CompTablePlugin(ParamEditorPlugin):
         [FRC.TOOL_TBL_SET_AS, FRC.TOOL_TBL_DEL_ROWS, FRC.TOOL_TBL_SET_SAME_AS_FIRST]):
       param.opts['ownerObj'] = win
       self.registerFunc(func, name=param.name, btnOpts=param)
-    tbl.menu = menuFromEditorActions(self.toolsEditor, menuParent=tbl)
+    tbl.menu = menuFromEditorActions(self.toolsEditor, menuParent=tbl, nest=False)
     super().attachWinRef(win)
 
 class EditPlugin(ParamEditorPlugin):
