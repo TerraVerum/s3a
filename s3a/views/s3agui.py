@@ -198,7 +198,7 @@ class S3A(S3ABase):
     if dock is None:
       return
     FR_SINGLETON.quickLoader.addDock(dock)
-    self._tabbifyEditorDocks([dock])
+    self.addTabbedDock(QtCore.Qt.RightDockWidgetArea, dock)
 
     if plugin.menu is None:
       # No need to add menu and graphics options
@@ -332,13 +332,16 @@ class S3A(S3ABase):
     self.hasUnsavedChanges = False
     self.close()
 
-  def _tabbifyEditorDocks(self, docks):
-    dock = None
-    for dock in [FR_SINGLETON.docks[0]] + docks:
-      dock.setParent(self)
-      self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
-    for nextEditor in docks[:-1]:
-      self.tabifyDockWidget(dock, nextEditor)
+  # Stolen and adapted for python from https://stackoverflow.com/a/42910109/9463643
+  def addTabbedDock(self, area: QtCore.Qt.DockWidgetArea, dockwidget: QtWidgets.QDockWidget):
+    # noinspection PyTypeChecker
+    curAreaWidgets = [d for d in self.findChildren(QtWidgets.QDockWidget)
+                      if self.dockWidgetArea(d) == area]
+    try:
+      self.tabifyDockWidget(curAreaWidgets[-1], dockwidget)
+    except IndexError:
+      # First dock in area
+      self.addDockWidget(area, dockwidget)
 
   def createMenuOptForPlugin(self, plugin: ParamEditorPlugin, parentToolbarOrMenu=None):
     if isinstance(parentToolbarOrMenu, QtWidgets.QToolBar):
