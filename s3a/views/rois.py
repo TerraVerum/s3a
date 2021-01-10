@@ -5,7 +5,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 import cv2 as cv
 
-from s3a.constants import FR_CONSTS
+from s3a.constants import PRJ_CONSTS
 from s3a.structures import FRParam
 from s3a.structures import XYVertices, ComplexXYVertices
 
@@ -289,13 +289,13 @@ class PaintFillROI(PolygonROI):
       ev.accept()
     return self.constructingRoi, verts
 
-SHAPE_ROI_MAPPING: Dict[FRParam, Callable[[], ExtendedROI]] = {
-  FR_CONSTS.DRAW_SHAPE_PAINT: PaintFillROI,
-  FR_CONSTS.DRAW_SHAPE_RECT: RectROI,
-  FR_CONSTS.DRAW_SHAPE_POLY: PolygonROI,
-  FR_CONSTS.DRAW_SHAPE_ELLIPSE: EllipseROI,
-}
 
+SHAPE_ROI_MAPPING: Dict[FRParam, Callable[[], ExtendedROI]] = {
+  PRJ_CONSTS.DRAW_SHAPE_RECT: RectROI,
+  PRJ_CONSTS.DRAW_SHAPE_POLY: PolygonROI,
+  PRJ_CONSTS.DRAW_SHAPE_ELLIPSE: EllipseROI,
+  PRJ_CONSTS.DRAW_SHAPE_PAINT: PaintFillROI,
+}
 def addShadowToPaint(roi: Type[ExtendedROI]):
   oldPaint = roi.paint
   def newPaint(self: ExtendedROI, p, opt, widget):
@@ -303,7 +303,7 @@ def addShadowToPaint(roi: Type[ExtendedROI]):
       prevPen = self.pen
       p.setBrush(self.shadowPen)
     oldPaint(self, p, opt, widget)
-      # self.setPen(prevPen)
+    # self.setPen(prevPen)
     # oldPaint(self, p, opt, widget)
 
   oldBoundingRect = roi.boundingRect

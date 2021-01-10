@@ -8,17 +8,15 @@ from warnings import warn
 
 import numpy as np
 from pandas import DataFrame as df
-from ruamel.yaml import YAML
+from pyqtgraph.Qt import QtCore
 from pyqtgraph.parametertree import Parameter
-from pyqtgraph.Qt import QtWidgets
+from ruamel.yaml import YAML
 
-from s3a.graphicsutils import raiseErrorLater
-from s3a.generalutils import attemptFileLoad, resolveYamlDict
 from s3a.constants import TABLE_DIR, REQD_TBL_FIELDS, DATE_FORMAT, \
-  FR_CONSTS
-from s3a.structures import FRParam, FilePath, FRParamGroup, ParamEditorError, \
-  S3AException, S3AWarning
+  PRJ_CONSTS, BASE_DIR
+from s3a.generalutils import resolveYamlDict, hierarchicalUpdate
 from s3a.parameditors import ParamEditor
+from s3a.structures import FRParam, FilePath, FRParamGroup, S3AException, S3AWarning
 
 yaml = YAML()
 
@@ -116,9 +114,12 @@ class TableFilterEditor(ParamEditor):
     return filters
 
 
-class TableData:
+class TableData(QtCore.QObject):
+  sigCfgUpdated = QtCore.Signal(object)
+  """dict (self.cfg) during update"""
 
   def __init__(self, annAuthor: str=None):
+    super().__init__()
     self.filter = TableFilterEditor()
     self.paramParser: Optional[YamlParser] = None
 
@@ -127,7 +128,6 @@ class TableData:
     self.cfg: Optional[dict] = None
 
     self.allFields: List[FRParam] = []
-    self.compClasses: List[str] = []
     self.resetLists()
 
   def makeCompDf(self, numRows=1) -> df:
@@ -150,7 +150,7 @@ class TableData:
     # Set the metadata for this application run
     outDf[REQD_TBL_FIELDS.ANN_AUTHOR] = self.annAuthor
     outDf[REQD_TBL_FIELDS.ANN_TIMESTAMP] = datetime.now().strftime(DATE_FORMAT)
-    outDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME] = FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
+    outDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME] = PRJ_CONSTS.ANN_CUR_FILE_INDICATOR.value
     if dropRow:
       outDf = outDf.drop(index=REQD_TBL_FIELDS.INST_ID.value)
     return outDf
@@ -158,7 +158,7 @@ class TableData:
   def makeCompSer(self):
     return self.makeCompDf().squeeze()
 
-  def loadCfg(self, cfgFname: FilePath=None, cfgDict: dict=None):
+  def loadCfg(self, cfgFname: FilePath=None, cfgDict: dict=None, force=False):
     """
     Lodas the specified table configuration file for S3A. Alternatively, a name
     and dict pair can be supplied instead.
@@ -167,66 +167,46 @@ class TableData:
       configuration name assiciated with the given dictionary.
     :param cfgDict: If not *None*, this is the config data used instad of
       reading *cfgFname* as a file.
+    :param force: If *True*, the new config will be loaded even if it is the same name as the
+    current config
     """
 
-    if cfgFname is None:
-      cfgFname = 'default.yml'
-      cfgDict = {}
-    self.cfgFname, cfg = resolveYamlDict(cfgFname, cfgDict)
+    _, baseCfgDict = resolveYamlDict(BASE_DIR/'tablecfg.yml')
+    cfgFname, cfgDict = resolveYamlDict(cfgFname, cfgDict)
+    cfgFname = cfgFname.resolve()
+    if not force and self.cfgFname == cfgFname:
+      return None
+    hierarchicalUpdate(baseCfgDict, cfgDict)
+
+    cfg = baseCfgDict
     if cfg == self.cfg:
       # No need to update things
       return
+
+    self.cfgFname = cfgFname
     self.cfg = cfg
     self.paramParser = YamlParser(cfg)
-    newClasses = []
-    if 'classes' in cfg:
-      classParam = self.paramParser['classes']
-      if isinstance(classParam, FRParam):
-        if classParam.value is not None:
-          REQD_TBL_FIELDS.COMP_CLASS.value = classParam.value
-        if classParam.pType is not None:
-          REQD_TBL_FIELDS.COMP_CLASS.pType = classParam.pType
-        classParam = classParam.opts['limits']
-      else:
-        REQD_TBL_FIELDS.COMP_CLASS.pType = 'list'
-      newClasses.extend(classParam)
-    if REQD_TBL_FIELDS.COMP_CLASS.value not in newClasses:
-      newClasses.append(REQD_TBL_FIELDS.COMP_CLASS.value)
-    REQD_TBL_FIELDS.COMP_CLASS.opts['limits'] = newClasses.copy()
-    # for compCls in cfg.get('classes', []):
-    #   newParam = FRParam(compCls, group=self.compClasses)
-    #   self.compClasses.append(newParam)
     self.resetLists()
-    for field in cfg.get('opt-tbl-fields', {}):
-      param = self.paramParser['opt-tbl-fields', field]
+    for field in cfg.get('fields', {}):
+      param = self.paramParser['fields', field]
       param.group = self.allFields
       self.allFields.append(param)
 
-    for field in cfg.get('hidden-cols', []):
-      try:
-        FRParamGroup.fromString(self.allFields, field).opts['colHidden'] = True
-      except S3AException:
-        # Specified field to hide isn't in all table fields
-        pass
-
     self.filter.updateParamList(self.allFields)
+    self.sigCfgUpdated.emit(self.cfg)
 
   def clear(self):
     self.loadCfg(cfgDict={})
 
   def resetLists(self):
-    for lst in self.allFields, self.compClasses:
-      lst.clear()
-    self.allFields.extend(list(REQD_TBL_FIELDS))
-    self.compClasses.extend(REQD_TBL_FIELDS.COMP_CLASS.opts['limits'])
+    self.allFields.clear()
+    self.allFields.extend(REQD_TBL_FIELDS)
 
-  def fieldFromName(self, name: str):
+  def fieldFromName(self, name: Union[str, FRParam]):
     """
     Helper function to retrieve the FRParam corresponding to the field with this name
     """
-    return FRParamGroup.fromString(self.allFields, name)
-
-
+    return FRParamGroup.fieldFromParam(self.allFields, name)
 
 NestedIndexer = Union[str, Tuple[Union[str,int],...]]
 class YamlParser:

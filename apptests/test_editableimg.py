@@ -4,7 +4,7 @@ from pyqtgraph.Qt import QtGui, QtCore
 
 from testingconsts import NUM_COMPS
 from s3a import FR_SINGLETON, REQD_TBL_FIELDS
-from s3a.constants import FR_CONSTS
+from s3a.constants import PRJ_CONSTS
 from s3a.controls.drawctrl import RoiCollection
 from s3a.parameditors.algcollection import AlgParamEditor
 from s3a.processing import ProcessIO, ImageProcess, ImgProcWrapper
@@ -23,9 +23,9 @@ def leftClickGen(pos: XYVertices, dbclick=False):
 
 @pytest.fixture
 def roiFactory(app):
-  clctn = RoiCollection((FR_CONSTS.DRAW_SHAPE_POLY, FR_CONSTS.DRAW_SHAPE_RECT),
+  clctn = RoiCollection((PRJ_CONSTS.DRAW_SHAPE_POLY, PRJ_CONSTS.DRAW_SHAPE_RECT),
                         app.focusedImg)
-  def _polyRoi(pts: XYVertices, shape: FRParam=FR_CONSTS.DRAW_SHAPE_RECT):
+  def _polyRoi(pts: XYVertices, shape: FRParam=PRJ_CONSTS.DRAW_SHAPE_RECT):
     clctn.curShapeParam = shape
     for pt in pts:
       ev = leftClickGen(pt)
@@ -43,14 +43,14 @@ def test_update(app, mgr, vertsPlugin):
   focusedId = NUM_COMPS-1
   newCompSer = mgr.compDf.loc[focusedId]
   # Action 1
-  fImg.updateAll(app.mainImg.image, newCompSer)
+  fImg.updateFocusedComp(newCompSer)
   assert fImg.image is not None
   assert fImg.compSer.equals(newCompSer)
   assert np.array_equal(fImg.bbox[1,:] - fImg.bbox[0,:], fImg.image.shape[:2][::-1])
 
   # Action 2
   newerSer = mgr.compDf.loc[0]
-  fImg.updateAll(app.mainImg.image, newerSer)
+  fImg.updateFocusedComp(newerSer)
 
   FR_SINGLETON.actionStack.undo()
   assert fImg.compSer.equals(newCompSer)
@@ -69,8 +69,8 @@ def test_region_modify(sampleComps, app, mgr, vertsPlugin):
   shapeBnds = fImg.image.shape[:2]
   reach = np.min(shapeBnds)
   oldData = vertsPlugin.region.regionData
-  fImg.shapeCollection.curShapeParam = FR_CONSTS.DRAW_SHAPE_POLY
-  fImg.drawAction = FR_CONSTS.DRAW_ACT_ADD
+  fImg.shapeCollection.curShapeParam = PRJ_CONSTS.DRAW_SHAPE_POLY
+  fImg.drawAction = PRJ_CONSTS.DRAW_ACT_ADD
   imsum = lambda: vertsPlugin.region.toGrayImg(shapeBnds).sum()
 
   # 1st action

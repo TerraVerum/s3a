@@ -6,8 +6,8 @@ import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui
 
-from s3a import FR_SINGLETON
-from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS, FR_ENUMS
+from s3a import FR_SINGLETON, RunOpts
+from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
 from s3a.models.tablemodel import ComponentMgr
 from s3a.parameditors import EditorPropsMixin
 from s3a.structures import XYVertices, FRParam, S3AWarning, \
@@ -29,7 +29,7 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
     super().__init__(parent)
     self.setSourceModel(compMgr)
     # TODO: Move code for filtering into the proxy too. It will be more efficient and
-    #  easier to generalize than the current solution in FRCompDisplayFilter.
+    #  easier to generalize than the current solution in CompDisplayFilter.
 
 
   def sort(self, column: int, order: QtCore.Qt.SortOrder=...) -> None:
@@ -58,7 +58,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
   @classmethod
   def __initEditorParams__(cls):
     cls.pltClickBehav: str = FR_SINGLETON.generalProps.registerProp(
-      FR_CONSTS.PROP_COMP_SEL_BHV)
+      PRJ_CONSTS.PROP_COMP_SEL_BHV)
 
   def __init__(self, compMgr: ComponentMgr, mainImg: MainImage,
                compTbl: tableview.CompTableView, parent=None):
@@ -68,12 +68,22 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     self._filter = filterEditor
     self._compTbl = compTbl
     self._compMgr = compMgr
-
     self.regionPlot = MultiRegionPlot()
     self.displayedIds = np.array([], dtype=int)
     self.selectedIds = np.array([], dtype=int)
+    self.labelCol = REQD_TBL_FIELDS.INST_ID
+    self.updateLabelCol()
 
     self.regionCopier = mainImg.regionCopier
+
+    with FR_SINGLETON.colorScheme.setBaseRegisterPath(self.regionPlot.__groupingName__):
+      proc, argsParam = FR_SINGLETON.colorScheme.registerFunc(
+        self.updateLabelCol, runOpts=RunOpts.ON_CHANGED, returnParam=True, nest=False)
+    def updateLblList():
+      fields = FR_SINGLETON.tableData.allFields
+      # TODO: Filter out non-viable field types
+      argsParam.child('labelCol').setLimits([f.name for f in fields])
+    FR_SINGLETON.tableData.sigCfgUpdated.connect(updateLblList)
 
     # Attach to UI signals
     def _maybeRedraw():
@@ -85,7 +95,6 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
         self.redrawComps()
     self._filter.sigParamStateUpdated.connect(_maybeRedraw)
 
-    mainImg.sigSelectionBoundsMade.connect(self._reflectSelectionBoundsMade)
     self.regionCopier.sigCopyStarted.connect(lambda *args: self.activateRegionCopier())
     self.regionCopier.sigCopyStopped.connect(lambda *args: self.finishRegionCopier())
 
@@ -97,6 +106,20 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     mainImg.addItem(self.regionCopier)
 
     # self.filterableCols = self.findFilterableCols()
+
+  def updateLabelCol(self, labelCol=REQD_TBL_FIELDS.INST_ID.name):
+    """
+    Changes the data column used to label (color) the region plot data
+    :param labelCol:
+      helpText: New column to use
+      title: Labeling Column
+      pType: list
+    """
+    self.labelCol = FR_SINGLETON.tableData.fieldFromName(labelCol)
+    newLblData = self.labelCol.toNumeric(self._compMgr.compDf[self.labelCol], rescale=True)
+
+    self.regionPlot.regionData[PRJ_ENUMS.FIELD_LABEL] = newLblData
+    self.regionPlot.updateColors()
 
   def redrawComps(self, idLists=None):
     # Following mix of cases are possible:
@@ -110,7 +133,6 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     # Update and add changed/new components
     # TODO: Find out why this isn't working. For now, just reset the whole comp list
     #  each time components are changed, since the overhead isn't too terrible.
-    regCols = (REQD_TBL_FIELDS.VERTICES,REQD_TBL_FIELDS.COMP_CLASS)
     # changedIds = np.concatenate((idLists['added'], idLists['changed']))
     # self._regionPlots[changedIds, regCols] = compDf.loc[changedIds, compCols]
 
@@ -127,7 +149,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     # Remove all IDs that aren't displayed
     # FIXME: This isn't working correctly at the moment
     # self._regionPlots.drop(np.setdiff1d(self._regionPlots.data.index, self._displayedIds))
-    self.regionPlot.resetRegionList(compDf.loc[self.displayedIds, regCols])
+    self.regionPlot.resetRegionList(compDf.loc[self.displayedIds], lblField=self.labelCol)
     # noinspection PyTypeChecker
     # self._reflectTableSelectionChange(np.intersect1d(self.displayedIds, self.selectedIds))
 
@@ -251,7 +273,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     #   self.selectedIds = np.concatenate([self.selectedIds, ids])
 
 
-  def _reflectSelectionBoundsMade(self, selection: Union[OneDArr, XYVertices]):
+  def reflectSelectionBoundsMade(self, selection: Union[OneDArr, XYVertices]):
     """
     :param selection: bounding box of user selection: [xmin ymin; xmax ymax]
     """
@@ -318,7 +340,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
       self.activateRegionCopier(self.regionCopier.regionIds)
     else: # Move mode
       self.regionCopier.erase()
-      self._compMgr.addComps(newComps, FR_ENUMS.COMP_ADD_AS_MERGE)
+      self._compMgr.addComps(newComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
     # if len(truncatedCompIds) > 0:
     #   warn(f'Some regions extended beyond image dimensions. Boundaries for the following'
     #        f' components were altered: {truncatedCompIds}', S3AWarning)

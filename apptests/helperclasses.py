@@ -47,9 +47,9 @@ class CompDfTester:
     # Encapsulate in np array for random indexing
     npClasses = np.array(FR_SINGLETON.tableData.compClasses)
     randomIdxs = RND.integers(0, len(npClasses), size=len(compDf))
-
+    clsCol = FR_SINGLETON.tableData.fieldFromName('Class')
     newClasses = npClasses[randomIdxs]
-    compDf[REQD_TBL_FIELDS.COMP_CLASS] = newClasses
+    compDf[clsCol] = newClasses
     return newClasses
 
 

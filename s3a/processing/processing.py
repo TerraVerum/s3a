@@ -11,13 +11,15 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets
 
-from s3a.generalutils import pascalCaseToTitle
+from s3a.generalutils import pascalCaseToTitle, coerceAnnotation
 from s3a.structures import S3AWarning, AlgProcessorError
 
 __all__ = ['ProcessIO', 'ProcessStage', 'GeneralProcess', 'ImageProcess',
            'AtomicProcess']
 
 _infoType = t.List[t.Union[t.List, t.Dict[str, t.Any]]]
+StrList = t.List[str]
+StrCol = t.Collection[str]
 class _DUPLICATE_INFO: pass
 
 class ProcessIO(dict):
@@ -61,7 +63,8 @@ class ProcessIO(dict):
     self.keysFromPrevIO = set(self.keys()) - set(self.hyperParamKeys)
 
   @classmethod
-  def fromFunction(cls, func: t.Callable, ignoreKeys: t.Collection[str]=None, **overriddenDefaults):
+  def fromFunction(cls, func: t.Callable, ignoreKeys: StrCol=None, forceKeys: StrCol=None,
+                   **overriddenDefaults):
     """
     In the ProcessIO scheme, default arguments in a function signature constitute algorithm
     hyperparameters, while required arguments must be provided each time the function is
@@ -70,17 +73,25 @@ class ProcessIO(dict):
     :param func: Function whose input signature should be parsed
     :param ignoreKeys: Keys to disregard entirely from the incoming function. This is useful for cases like adding
       a function at the class instead of instance level and `self` shouldn't be regarded by the parser.
+    :param forceKeys: Keys without defaults but that should count as hyperparameters.
+      It is strongly advised that `overriddenDefaults` should be provided for these values,
+      or the value should be specified in the parameter's docstring
     :param overriddenDefaults: Keys here that match default argument names in `func` will
       override those defaults
     """
     if ignoreKeys is None:
       ignoreKeys = []
+    if forceKeys is None:
+      forceKeys = []
     outDict = {}
     hyperParamKeys = []
     spec = inspect.signature(func).parameters
     for k, v in spec.items():
       if k in ignoreKeys: continue
       formattedV = overriddenDefaults.get(k, v.default)
+      if formattedV is v.empty and k in forceKeys:
+        # Replace with *None* as described in func doc
+        formattedV = coerceAnnotation(v.annotation)
       if formattedV is v.empty:
         formattedV = cls.FROM_PREV_IO
         # Not a hyperparameter
@@ -103,8 +114,8 @@ class ProcessStage(ABC):
   allowDisable = False
   disabled = False
   result: ProcessIO = None
-  mainResultKeys: t.List[str] = None
-  mainInputKeys: t.List[str] = None
+  mainResultKeys: StrList = None
+  mainInputKeys: StrList = None
 
 
   def __repr__(self) -> str:
@@ -155,8 +166,8 @@ class AtomicProcess(ProcessStage):
   """
 
   def __init__(self, func: t.Callable, name:str=None, *, needsWrap=False,
-               mainResultKeys: t.List[str]=None, mainInputKeys: t.List[str]=None,
-               ignoreKeys: t.Collection[str]=None, **overriddenDefaults):
+               mainResultKeys: StrList=None, mainInputKeys: StrList=None,
+               **procIoKwargs):
     """
     :param func: Function to wrap
     :param name: Name of this process. If `None`, defaults to the function name with
@@ -171,9 +182,7 @@ class AtomicProcess(ProcessStage):
     the output is expected to be the direct result, not a sequence of results per key.
     :param mainResultKeys: Set by parent process as needed
     :param mainInputKeys: Set by parent process as needed
-    :param ignoreKeys: See `ProcessIO.fromFunction`
-    :param overriddenDefaults: Passed directly to ProcessIO when creating this function's
-      input specifications.
+    :param procIoKwargs: Passed to ProcessIO.fromFunction
     """
     if name is None:
       name = pascalCaseToTitle(func.__name__)
@@ -183,7 +192,7 @@ class AtomicProcess(ProcessStage):
       self.mainInputKeys = mainInputKeys
 
     self.name = name
-    self.input = ProcessIO.fromFunction(func, ignoreKeys, **overriddenDefaults)
+    self.input = ProcessIO.fromFunction(func, **procIoKwargs)
     self.result: t.Optional[ProcessIO] = None
 
     if mainInputKeys is not None:
@@ -198,7 +207,7 @@ class AtomicProcess(ProcessStage):
     self.func = func
 
   @classmethod
-  def _wrappedFunc(cls, func, mainResultKeys: t.List[str]=None, mainInputKeys: t.List[str]=None):
+  def _wrappedFunc(cls, func, mainResultKeys: StrList=None, mainInputKeys: StrList=None):
     """
     Wraps a function returining either a result or list of results, instead making the
     return value an `FRProcessIO` object where each `cls.mainResultkey` corresponds

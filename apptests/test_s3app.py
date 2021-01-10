@@ -29,21 +29,6 @@ def test_change_img_none(app):
   assert app.mainImg.image is None
   assert app.srcImgFname is None
 
-def test_est_bounds_no_img(qtbot, app):
-  oldName = app.srcImgFname
-  oldData = app.mainImg.image
-  app.setMainImg()
-  # Since the AlgProcessorError is raised within a qt event loop AND is caught by qtbot,
-  # a subsequent warning will be raised by attempting to accept a blank focused image.
-  # This cannot happen during real execution, since qtbot will not capture the processor
-  # error. So, this extra warning catch is only necessary during the unit test
-  with pytest.warns(S3AWarning):
-    with qtbot.captureExceptions() as exs:
-      app.estimateBoundaries()
-      assertExInList(exs, AlgProcessorError)
-  app.setMainImg(oldName, oldData)
-
-
 """For some reason, the test below works if performed manually. However, I can't
 seem to get the programmatically allocated keystrokes to work."""
 # def test_ambig_shc(qtbot):
@@ -59,31 +44,24 @@ seem to get the programmatically allocated keystrokes to work."""
 #     appInst.processEvents()
 
 
-@pytest.mark.smallimage
-def test_est_clear_bounds(app, vertsPlugin):
-  # Change to easy processor first for speed
-  clctn = vertsPlugin.procCollection
-  prevProc = clctn.curProcessor
-  clctn.switchActiveProcessor('Basic Shapes')
-  app.estimateBoundaries()
-  assert len(app.compMgr.compDf) > 0, 'Comp not created after global estimate'
+@pytest.mark.withcomps
+def test_clear_bounds(app, vertsPlugin):
+  assert len(app.compMgr.compDf) > 0
   app.clearBoundaries()
-  assert len(
-    app.compMgr.compDf) == 0, 'Comps not cleared after clearing boundaries'
-  # Restore state
-  clctn.switchActiveProcessor(prevProc)
+  assert len(app.compMgr.compDf) == 0, \
+    'Comps not cleared after clearing boundaries'
 
 @pytest.mark.withcomps
 def test_export_all_comps(tmp_path, app):
   compFile = tmp_path/'tmp.csv'
-  app.exportAnnotations(str(compFile))
+  app.exportCurAnnotation(str(compFile))
   assert compFile.exists(), 'All-comp export didn\'t produce a component list'
 
 def test_load_comps_merge(tmp_path, app, sampleComps):
   compFile = tmp_path/'tmp.csv'
 
   app.compMgr.addComps(sampleComps)
-  app.exportAnnotations(str(compFile))
+  app.exportCurAnnotation(str(compFile))
   app.clearBoundaries()
 
   app.openAnnotations(str(compFile))
@@ -201,7 +179,7 @@ def test_set_colorinfo(app):
 @pytest.mark.withcomps
 def test_quickload_profile(tmp_path, app):
   outfile = tmp_path/'tmp.csv'
-  app.exportAnnotations(outfile)
+  app.exportCurAnnotation(outfile)
   app.appStateEditor.loadParamState(
     stateDict=dict(image=str(SAMPLE_IMG_FNAME), layout='Default', annotations=str(outfile),
     mainimageprocessor='Default', focusedimageprocessor='Default',

@@ -168,7 +168,12 @@ class ComplexXYVertices(list):
              fillColor: Union[int, float, np.ndarray]=None,
              asBool=True, checkForDisconnectedVerts=False, warnIfTooSmall=True):
     if maskShape is None:
-      maskShape = tuple(self.stack().max(0)[::-1]+1)
+      try:
+        maskShape = tuple(self.stack().max(0)[::-1]+1)
+      except ValueError:
+        # Mask is zero-sized
+        dtype = 'bool' if asBool else 'uint16'
+        return np.zeros((0,0), dtype)
       # Guaranteed not to be too small
       warnIfTooSmall = False
     if warnIfTooSmall:
@@ -196,6 +201,10 @@ class ComplexXYVertices(list):
     nChans = 1 if out.ndim < 3 else out.shape[2]
     if fillColor is None:
       fillColor = tuple([1 for _ in range(nChans)])
+    fillColorCmp = np.array(fillColor)
+    if np.any((np.iinfo(out.dtype).min > fillColorCmp)
+              | (fillColorCmp > np.iinfo(out.dtype).max)):
+      raise ValueError('Fill color is larger or smaller than mask range can represent')
     cv.fillPoly(out, fillArg, fillColor)
     if asBool:
       return out > 0
@@ -213,7 +222,9 @@ class ComplexXYVertices(list):
     # Contours are on the inside of components, so dilate first to make sure they are on the
     # outside
     #bwmask = dilation(bwmask, np.ones((3,3), dtype=bool))
-    contours, hierarchy = cv.findContours(bwMask.astype('uint8'), retrMethod, approxMethod)
+    if bwMask.dtype != np.uint8:
+      bwMask = bwMask.astype('uint8')
+    contours, hierarchy = cv.findContours(bwMask, retrMethod, approxMethod)
     compVertices = ComplexXYVertices()
     for contour in contours:
       compVertices.append(XYVertices(contour[:,0,:]))

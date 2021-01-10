@@ -1,18 +1,21 @@
 import weakref
+from collections import defaultdict
 from contextlib import contextmanager
 from enum import Flag, auto
 from pathlib import Path
-from typing import List, Dict, Any, Union, Tuple, Sequence, Callable
+from typing import List, Dict, Any, Union, Tuple, Sequence, Callable, Set
+from warnings import warn
 
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter
+from pyqtgraph.parametertree.parameterTypes import GroupParameter
 
 from s3a.generalutils import pascalCaseToTitle, resolveYamlDict, getParamChild
 from s3a.graphicsutils import saveToFile, flexibleParamTree, setParamTooltips, \
   expandtreeParams
-from s3a.processing import AtomicProcess, ProcessIO, GeneralProcWrapper, ProcessStage
+from s3a.processing import AtomicProcess, ProcessIO, GeneralProcWrapper, ProcessStage, GeneralProcess
 from s3a.processing.guiwrapper import docParser
-from s3a.structures import FRParam, FilePath
+from s3a.structures import FRParam, FilePath, ParamEditorError, S3AWarning
 
 __all__ = ['ParamEditorBase']
 
@@ -31,7 +34,32 @@ def clearUnwantedParamVals(paramState: dict):
   if paramState.get('value', True) is None:
     paramState.pop('value')
 
-def _mkRunBtn(proc: AtomicProcess, btnOpts: Union[FRParam, dict]):
+def paramState_noDefaults(param: Parameter):
+  parentDict = {}
+  val = param.value()
+  if val != param.defaultValue():
+    parentDict['value'] = param.value()
+  if param.hasChildren() and not parentDict:
+    inner = {}
+    for child in param:
+      chDict = paramState_noDefaults(child)
+      if len(chDict) > 0:
+        inner[child.name()] = paramState_noDefaults(child)
+    if len(inner) > 0:
+      parentDict['children'] = inner
+  return parentDict
+
+
+def params_flattened(param: Parameter, addList=None):
+  if addList is None:
+    addList = []
+  if not param.hasChildren():
+    addList.append(param)
+  for child in param.children(): # type: Parameter
+    params_flattened(child, addList)
+  return addList
+
+def _mkRunDict(proc: ProcessStage, btnOpts: Union[FRParam, dict]):
   defaultBtnOpts = dict(name=proc.name, type='registeredaction')
   if isinstance(btnOpts, FRParam):
     # Replace falsy helptext with func signature
@@ -40,14 +68,13 @@ def _mkRunBtn(proc: AtomicProcess, btnOpts: Union[FRParam, dict]):
     # Make sure param type is not overridden
     btnOpts.pop('type', None)
     defaultBtnOpts.update(btnOpts)
-  if len(defaultBtnOpts.get('tip', '')) == 0:
+  if len(defaultBtnOpts.get('tip', '')) == 0 and isinstance(proc, AtomicProcess):
     defaultBtnOpts['tip'] = docParser(proc.func.__doc__)['top-descr']
   if len(proc.input.hyperParamKeys) > 0:
     # In this case, a descriptive name isn't needed since the func name will be
     # present in the parameter group
     defaultBtnOpts['name'] = 'Run'
-  runBtn = Parameter.create(**defaultBtnOpts)
-  return runBtn
+  return defaultBtnOpts
 
 oneOrMultChildren = Union[Sequence[FRParam], FRParam]
 _childTuple_asValue = Tuple[FRParam, oneOrMultChildren]
@@ -116,10 +143,10 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     and reconstructing the name, tooltip, etc.
     """
 
-    self.registeredProcs: Dict[str, AtomicProcess] = {}
+    self.procToParamsMapping: Dict[ProcessStage, GroupParameter] = {}
     """
-    Keeps track of registered functions which have been converted to processes so their
-    arguments can be exposed to the user
+    Keeps track of registered functions (or prcesses) and their associated
+    gui parameters
     """
 
     self.instantiatedClassTypes = set()
@@ -177,8 +204,8 @@ class ParamEditorBase(QtWidgets.QDockWidget):
           parameter grouping in order to properly extract the corresponding children.
           For instance, to extract MARGIN from :class:`GeneralPropertiesEditor`,
           you must first specify the group parent for that parameter:
-            >>> margin = FR_SINGLETON.generalProps[FR_CONSTS.CLS_FOCUSED_IMG_AREA,
-            >>>   FR_CONSTS.MARGIN]
+            >>> margin = FR_SINGLETON.generalProps[PRJ_CONSTS.CLS_FOCUSED_IMG_AREA,
+            >>>   PRJ_CONSTS.MARGIN]
         * The second parameter must be a single :class:`FRParam` object or a sequence
           of :class:`FRParam` objects. If a sequence is given, a list of output values
           respecting input order is provided.
@@ -226,17 +253,20 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     return outDict
 
   def saveParamState(self, saveName: str=None, paramState: dict=None,
-                     allowOverwriteDefault=False, blockWrite=False):
+                     allowOverwriteDefault=False, blockWrite=False,
+                     saveChangedOnly=True):
     """
     * Returns dict on successful parameter save and emits sigParamStateCreated.
     * Returns None if no save name was given
     """
     if saveName is None or self.saveDir is None:
       return None
-    if paramState is None:
+    if paramState is None and allowOverwriteDefault:
       paramState = self.params.saveState(filter='user')
+      clearUnwantedParamVals(paramState)
+    elif paramState is None:
+      paramState = paramState_noDefaults(self.params)
     # Remove non-useful values
-    clearUnwantedParamVals(paramState)
     if not blockWrite and self.saveDir is not None:
       self.saveDir.mkdir(parents=True, exist_ok=True)
       saveToFile(paramState, self.formatFileName(saveName),
@@ -287,7 +317,6 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     addCustomOpts(paramDict, self.params)
     return paramDict
 
-
   def loadParamState(self, stateName: Union[str, Path], stateDict: dict=None,
                      addChildren=False, removeChildren=False, applyChanges=True):
     loadDict = self._parseStateDict(stateName, stateDict)
@@ -296,6 +325,35 @@ class ParamEditorBase(QtWidgets.QDockWidget):
       self.applyChanges()
     self.lastAppliedName = stateName
     return loadDict
+
+  def loadFromPartialNames(self, stateName: Union[str, Path],
+                           stateDict: dict=None,
+                           candidateParams: List[Parameter]=None,
+                           applyChanges=True):
+    loadDict = self._parseStateDict(stateName, stateDict)
+    if candidateParams is None:
+      candidateParams = params_flattened(self.params)
+    def titleOrName(param):
+      return param.opts['title'] or param.name()
+    for kk, vv in loadDict.items():
+      if isinstance(vv, dict):
+        # Successively traverse down child tree
+        candidateParams = [p for p in candidateParams if titleOrName(p.parent()) == kk]
+        self.loadFromPartialNames('', vv, candidateParams)
+        del loadDict[kk]
+    with self.params.treeChangeBlocker():
+      for kk, vv in loadDict.items():
+        matches = [p for p in candidateParams if titleOrName(p) == kk]
+        if len(matches) == 1:
+          matches[0].setValue(vv)
+        elif len(matches) == 0:
+          warn(f'No matching parameters for key {kk}. Ignoring.', S3AWarning)
+        else:
+          raise ParamEditorError(f'Multiple matching parameters for key {kk}:\n'
+                                 f'{matches}')
+    if applyChanges:
+      self.applyChanges()
+
 
   def formatFileName(self, stateName: Union[str, Path]=None):
     stateName = Path(stateName)
@@ -330,7 +388,7 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     return outProps
 
   def registerProp(self, constParam: FRParam=None, namePath: Sequence[str]=(),
-                   asProperty=True, **etxraOpts):
+                   asProperty=True, overrideBasePath: Sequence[str]=None, **etxraOpts):
     """
     Registers a property defined by *constParam* that will appear in the respective
     parameter editor.
@@ -344,13 +402,19 @@ class ParamEditorBase(QtWidgets.QDockWidget):
       for the new param. Otherwise, returns the param itself. If asProperty is false,
       the returned parameter must be evaluated to obtain a value, e.g.
       x = registerProp(..., asProperty=False); myVal = x.value()
+    :param overrideBasePath: Whether to use the base path specified by ParamEditor._baseRegisterPath
+      (if *None*) or this specified override
     :param etxraOpts: Extra options passed directly to the created :class:`pyqtgraph.Parameter`
+
     :return: Property bound to this value in the parameter editor
     """
     paramOpts = constParam.toPgDict()
     paramOpts.update(etxraOpts)
     paramForEditor = Parameter.create(**paramOpts)
-    namePath: Sequence = tuple(self._baseRegisterPath) + tuple(namePath)
+    if overrideBasePath is None:
+      namePath = tuple(self._baseRegisterPath) + tuple(namePath)
+    else:
+      namePath = tuple(overrideBasePath) + tuple(namePath)
     paramForCls = getParamChild(self.params, *namePath)
 
     if constParam.name not in paramForCls.names:
@@ -374,7 +438,11 @@ class ParamEditorBase(QtWidgets.QDockWidget):
   def registerFunc(self, func: Callable, *, runOpts=RunOpts.BTN,
                    namePath:Tuple[str, ...]=(),
                    paramFormat = pascalCaseToTitle,
-                   btnOpts: Union[FRParam, dict]=None, **kwargs):
+                   overrideBasePath: Sequence[str]=None,
+                   btnOpts: Union[FRParam, dict]=None,
+                   nest=True,
+                   returnParam=False,
+                   **kwargs):
     """
     Like `registerProp`, but for functions instead along with interactive parameters
     for each argument. A button is added for the user to force run this function as
@@ -393,17 +461,20 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     :param paramFormat: Formatter which turns variable names into display names. The default takes variables in pascal
       case (e.g. variableName) or snake case (e.g. variable_name) and converts to Title Case (e.g. Variable Name).
       Custom functions must have the signature (str) -> str.
+    :param overrideBasePath: See :meth:`~ParamEditor.registerProp`
     :param btnOpts: Overrides defaults for button used to run this function. If
       `RunOpts.BTN` is not in `RunOpts`, these values are ignored.
+    :param nest: If *True*, functions with multiple default arguments will have these nested
+      inside a group parameter bearing the function name. Otherwise, they will be added
+      directly to the parent parameter specified by `namePath` + `baseRegisterPath`
+    :param returnParam: Whether to return the parent parameter associated with this newly
+      registered function
     :param kwargs: All additional kwargs are passed to AtomicProcess when wrapping the function.
     """
     if not isinstance(func, ProcessStage):
-      proc = AtomicProcess(func, **kwargs)
-      fnName = func.__name__
+      proc: ProcessStage = AtomicProcess(func, **kwargs)
     else:
       proc = func
-      fnName = func.func.__name__
-    self.registeredProcs[fnName] = proc
     # Define caller out here that takes no params so qt signal binding doesn't
     # screw up auto parameter population
     def runProc():
@@ -413,30 +484,38 @@ class ParamEditorBase(QtWidgets.QDockWidget):
       forwardedOpts = ProcessIO(**{_param.name(): newVal})
       return proc.run(forwardedOpts)
 
+    if overrideBasePath is None:
+      namePath = tuple(self._baseRegisterPath) + tuple(namePath)
+    else:
+      namePath = tuple(overrideBasePath) + tuple(namePath)
+
     topParam = getParamChild(self.params, *namePath)
     if len(proc.input.hyperParamKeys) > 0:
       # Check if proc params already exist from a previous addition
-      GeneralProcWrapper(proc, topParam, paramFormat, treatAsAtomic=True)
-      parentParam = topParam.child(proc.name)
+      wrapped = GeneralProcWrapper(proc, topParam, paramFormat, treatAsAtomic=True, nestHyperparams=nest)
+      parentParam = wrapped.parentParam
       for param in parentParam:
         if runOpts & RunOpts.ON_CHANGED:
           param.sigValueChanged.connect(runProc)
         if runOpts & RunOpts.ON_CHANGING:
           param.sigValueChanging.connect(runpProc_changing)
     else:
-      parentParam = topParam
+      parentParam: GroupParameter = topParam
     if runOpts & RunOpts.BTN:
-      runBtn = _mkRunBtn(proc, btnOpts)
-      if runBtn.name() in parentParam.names:
-        # Bind to existing button intsead
-        runBtn = parentParam.child(runBtn.name())
-      else:
-        parentParam.addChild(runBtn)
+      runBtnDict = _mkRunDict(proc, btnOpts)
+      if not nest:
+        # Make sure button name is correct
+        runBtnDict['name'] = proc.name
+      runBtn = getParamChild(parentParam, chOpts=runBtnDict)
       runBtn.sigActivated.connect(runProc)
     try:
       self.setParamTooltips(False)
     except AttributeError:
       pass
+    self.procToParamsMapping[proc] = parentParam
+
+    if returnParam:
+      return proc, parentParam
     return proc
 
   @classmethod

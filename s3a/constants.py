@@ -5,7 +5,7 @@ from pathlib import Path
 __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR', 'QUICK_LOAD_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'TABLE_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
            'MAIN_IMG_DIR', 'FOC_IMG_DIR', 'APP_STATE_DIR',
-           'DATE_FORMAT', 'REQD_TBL_FIELDS', 'FR_CONSTS', 'FR_ENUMS', 'PROJ_FILE_TYPE']
+           'DATE_FORMAT', 'REQD_TBL_FIELDS', 'PRJ_CONSTS', 'PRJ_ENUMS', 'PROJ_FILE_TYPE']
 BASE_DIR = Path(__file__).parent
 MENU_OPTS_DIR = BASE_DIR/'menuopts'
 ICON_DIR = BASE_DIR/'icons'
@@ -33,7 +33,7 @@ PROJ_FILE_TYPE = 's3aprj'
 LAYOUTS_DIR.mkdir(parents=True, exist_ok=True)
 APP_STATE_DIR.mkdir(parents=True, exist_ok=True)
 
-class _FREnums(Enum):
+class _PrjEnums(Enum):
   # --------------------------
   # COMPONENTS
   # --------------------------
@@ -53,7 +53,14 @@ class _FREnums(Enum):
   # --------------------------
   HIER_ALL_FILLED  = 'All Filled'
 
-FR_ENUMS = _FREnums
+  # --------------------------
+  # COMMON DATAFRAME FIELDS
+  # --------------------------
+  FIELD_SELECTED   = 'selected'
+  FIELD_FOCUSED    = 'focused'
+  FIELD_LABEL    = 'label'
+
+PRJ_ENUMS = _PrjEnums
 
 from s3a.structures import ComplexXYVertices, FRParam, FRParamGroup, newParam
 
@@ -64,12 +71,11 @@ class _ReqdTableFields(FRParamGroup):
   ANN_AUTHOR       : FRParam = newParam('Author', "")
   SRC_IMG_FILENAME : FRParam = newParam('Source Image Filename', "")
   ANN_TIMESTAMP    : FRParam = newParam('Timestamp', "")
-  COMP_CLASS       : FRParam = newParam('Class', 'Unassigned', 'list', limits=[])
 REQD_TBL_FIELDS = _ReqdTableFields()
 
 
 @dataclass
-class _FRConsts(FRParamGroup):
+class _PrjConsts(FRParamGroup):
   # --------------------------
   # CLASS NAMES
   # --------------------------
@@ -81,7 +87,7 @@ class _FRConsts(FRParamGroup):
   CLS_COMP_EXPORTER    : FRParam = newParam('Component Exporter')
 
   CLS_VERT_IMG         : FRParam = newParam('Focused Image Graphics')
-  CLS_MULT_REG_PLT     : FRParam = newParam('Region Plot')
+  CLS_MULT_REG_PLT     : FRParam = newParam('Component Plot')
 
   CLS_REGION_BUF       : FRParam = newParam('Region Modification Buffer')
 
@@ -104,6 +110,7 @@ class _FRConsts(FRParamGroup):
   SCHEME_GRID_LINE_WIDTH : FRParam = newParam('Grid Line Width', 1)
   SCHEME_GRID_CLR        : FRParam = newParam('Grid Line Color', 'fff', 'color')
   SCHEME_SHOW_GRID       : FRParam = newParam('Show Grid', False)
+  SCHEME_LBL_COL         : FRParam = newParam('Labeling Column', REQD_TBL_FIELDS.INST_ID.name, pType='list', limits=[])
 
   # --------------------------
   # REGION-CREATION PARAMETERS
@@ -146,7 +153,6 @@ class _FRConsts(FRParamGroup):
     'Show tool buttons', True, helpText='Since these buttons also have right-click menu options,'
                                         ' it may be desirable to save space in the main'
                                         ' window by hiding these buttons.')
-  PROP_COLS_TO_SHOW            : FRParam = newParam('Visible Table Columns', pType='group')
 
   # --------------------------
   # MISC TOOLS
@@ -166,6 +172,7 @@ class _FRConsts(FRParamGroup):
   TOOL_ACCEPT_FOC_REGION  : FRParam = newParam('Accept', 'Ctrl+Shift+A')
   TOOL_CLEAR_ROI          : FRParam = newParam('Clear ROI', 'Esc', guibtn=False)
   TOOL_CLEAR_HISTORY      : FRParam = newParam('Clear Processor History', 'Ctrl+Alt+C,H', guibtn=False)
+  TOOL_PROC_ANALYTICS     : FRParam = newParam('Show Analytics', 'Ctrl+K+S+P', guibtn=True)
 
   # --------------------------
   # WINDOW TOOLS
@@ -217,12 +224,9 @@ class _FRConsts(FRParamGroup):
   # DRAWING
   # -------------------
   # Modes
-  DRAW_MODE_EDIT : FRParam = newParam(
+  DRAW_MODE_FOCUSED : FRParam = newParam(
     'Activate "Edit" draw mode', 'Ctrl+K,D,E', 'registeredaction',
     icon=str(ICON_DIR/'edit.svg'))
-  DRAW_MODE_VIEW : FRParam = newParam(
-    'Activate "View" draw mode', 'Ctrl+K,D,V', 'registeredaction',
-    icon=str(ICON_DIR/'view.svg'))
 
   # Shapes
   DRAW_SHAPE_RECT : FRParam = newParam(
@@ -240,14 +244,19 @@ class _FRConsts(FRParamGroup):
   DRAW_SHAPE_NONE : FRParam = newParam('None')
 
   # Actions
+  DRAW_ACT_CREATE    : FRParam = newParam(
+    'Activate "Create Component" action', 'Ctrl+K,D,C', 'registeredaction',
+    icon=str(ICON_DIR/'create.svg'),
+    helpText='When an ROI is created, the image processor will attempt to make a new'
+             ' component at that location. Right-click and drag to pan.')
   DRAW_ACT_ADD    : FRParam = newParam(
     'Activate "Add to Foreground" action', 'Ctrl+K,D,F', 'registeredaction',
-    icon=str(ICON_DIR/'foreground.png'),
+    icon=str(ICON_DIR/'foreground.svg'),
     helpText='When an ROI is created, the image processor will attempt to make a new'
              ' component at that location. Right-click and drag to pan.')
   DRAW_ACT_REM    : FRParam = newParam(
     'Activate "Add to Background" action', 'Ctrl+K,D, B', 'registeredaction',
-    icon=str(ICON_DIR/'background.png'),
+    icon=str(ICON_DIR/'background.svg'),
     helpText='When an ROI is created, the image processor will attempt to take the enclosed'
              ' area away from the current component shape. Right-click and drag to pan.')
   DRAW_ACT_SELECT : FRParam = newParam(
@@ -257,13 +266,13 @@ class _FRConsts(FRParamGroup):
   DRAW_ACT_PAN    : FRParam = newParam(
     'Activate "Pan" draw action', 'Ctrl+K,D,P', 'registeredaction', icon=str(ICON_DIR/'pan.svg'),
     helpText='No ROI will be drawn in this mode. Right- or left-click and drag to pan.')
-FR_CONSTS = _FRConsts()
+PRJ_CONSTS = _PrjConsts()
 
 # from ruamel.yaml import YAML
 # yaml = YAML()
-# for cls in FRParam, FRParamGroup, _FRConsts:
+# for cls in FRParam, FRParamGroup, _PrjConsts:
 #   yaml.register_class(cls)
-# for p in FR_CONSTS:
+# for p in PRJ_CONSTS:
 #   p.group = []
 # p = Path('./consts.yml')
-# yaml.dump(FR_CONSTS, p)
+# yaml.dump(PRJ_CONSTS, p)

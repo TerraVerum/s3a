@@ -17,10 +17,8 @@ def newCfg(app):
     oldCfg = td.cfg
     oldFname = td.cfgFname
     td.loadCfg(name, cfg)
-    app.resetTblFields()
     yield
     td.loadCfg(oldFname, oldCfg)
-    app.resetTblFields()
   return newCfg
 
 @pytest.mark.withcomps

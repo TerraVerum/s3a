@@ -4,13 +4,13 @@ from typing import Tuple
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 import numpy as np
 
-from s3a.views.imageareas import EditableImgBase
+from s3a.views.imageareas import MainImage
 from s3a.views.rois import SHAPE_ROI_MAPPING
-from s3a.constants import FR_CONSTS
+from s3a.constants import PRJ_CONSTS
 
 shapes = tuple(SHAPE_ROI_MAPPING.keys())
-editableImg = EditableImgBase(drawShapes=shapes,
-                              drawActions=(FR_CONSTS.DRAW_ACT_SELECT,))
+editableImg = MainImage(drawShapes=shapes,
+                        drawActions=(PRJ_CONSTS.DRAW_ACT_SELECT,))
 clctn = editableImg.shapeCollection
 
 def leftClick(pt: Tuple[int, int]):
@@ -25,7 +25,7 @@ def leftClick(pt: Tuple[int, int]):
 
 @pytest.fixture
 def mouseDragFactory(qtbot):
-  def mouseDrag(widget: EditableImgBase, startPos, endPos):
+  def mouseDrag(widget: MainImage, startPos, endPos):
     startPos = widget.imgItem.mapToScene(startPos)
     endPos = widget.imgItem.mapToScene(endPos)
     press = QtGui.QMouseEvent(QtGui.QMouseEvent.MouseButtonPress,
@@ -49,14 +49,14 @@ def test_simple_click():
   # this is a legal and expected op for every one
   editableImg.shapeCollection.forceUnlock()
   pt = (0,0)
-  editableImg.drawAction = FR_CONSTS.DRAW_ACT_SELECT
+  editableImg.drawAction = PRJ_CONSTS.DRAW_ACT_SELECT
   for curShape in shapes:
     clctn.curShapeParam = curShape
     leftClick(pt)
     assert np.all(pt in clctn.curShape.vertices)
 
 def test_drag_pt(mouseDragFactory):
-  editableImg.drawAction = FR_CONSTS.DRAW_ACT_SELECT
+  editableImg.drawAction = PRJ_CONSTS.DRAW_ACT_SELECT
   for curShape in shapes:
     clctn.curShapeParam = curShape
     mouseDragFactory(editableImg, QtCore.QPoint(10,10), QtCore.QPoint(100,100))

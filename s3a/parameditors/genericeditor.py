@@ -110,7 +110,7 @@ class ParamEditor(ParamEditorBase):
     if name is None:
       name = groupName + ' Tools'
     toolsEditor = ParamEditor(saveDir=None,
-                              fileType=lowerGroupName.replace(' ', '') + 'tools',
+                              fileType=lowerGroupName.replace(' ', '') + 'toolsEditor',
                               name=name, useNewInit=False)
     for btn in (toolsEditor.saveAsBtn, toolsEditor.applyBtn, toolsEditor.expandAllBtn,
                 toolsEditor.collapseAllBtn):
@@ -186,7 +186,7 @@ class ParamEditorDockGrouping(QtWidgets.QDockWidget):
     for editor in editors:
       editor.tree.resizeColumnToContents(0)
       if editor.width() > minWidth:
-        minWidth = editor.width()
+        minWidth = editor.width()//2
       # "Main Image Settings" -> "Settings"
       tabName = self.getTabName(editor)
       self.tabs.addTab(editor.dockContentsWidget, tabName)

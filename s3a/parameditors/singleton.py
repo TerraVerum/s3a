@@ -7,7 +7,6 @@ from pyqtgraph.Qt import QtWidgets, QtCore
 from s3a.constants import GEN_PROPS_DIR, SCHEMES_DIR, BASE_DIR
 from s3a.models.actionstack import ActionStack
 from s3a.plugins import base
-from s3a.structures import FRParam
 from .algcollection import AlgCtorCollection
 from .genericeditor import ParamEditor, ParamEditorDockGrouping, EditorPropsMixin
 from .quickloader import QuickLoaderEditor
@@ -28,7 +27,6 @@ class _FRSingleton(QtCore.QObject):
     self.clsToPluginMapping: Dict[Type[base.ParamEditorPlugin], base.ParamEditorPlugin] = {}
 
     self.tableData = TableData()
-    self.tableData.loadCfg(BASE_DIR/'tablecfg.yml')
     self.filter = self.tableData.filter
 
 

@@ -9,7 +9,7 @@ import pytest
 from conftest import stack
 from helperclasses import CompDfTester
 from s3a import appInst, FR_SINGLETON, S3A
-from s3a.constants import REQD_TBL_FIELDS, FR_CONSTS
+from s3a.constants import REQD_TBL_FIELDS, PRJ_CONSTS
 from s3a.structures import ComplexXYVertices, FRParam, XYVertices, S3AWarning
 from s3a.views.tableview import CompTableView
 
@@ -115,10 +115,11 @@ def test_copy_comps(app, mgr, copyHelper):
 def test_impossible_filter(tmp_path):
   tmpFile = tmp_path/'testCfg.yml'
   dummyCfgStr = '''
-  opt-tbl-fields:
-    dummy:
-      value: {}
-      pType: nopossiblefilter
+  table-cfg:
+    fields:
+      dummy:
+        value: {}
+        pType: nopossiblefilter
   '''
   tmpFile.write_text(dummyCfgStr)
 

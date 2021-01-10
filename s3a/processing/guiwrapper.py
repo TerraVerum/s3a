@@ -10,6 +10,7 @@ from warnings import warn
 import docstring_parser as dp
 import numpy as np
 from pyqtgraph.parametertree import Parameter
+from pyqtgraph.parametertree.parameterTypes import GroupParameter
 from ruamel import yaml
 
 from s3a.generalutils import augmentException, getParamChild
@@ -87,8 +88,10 @@ def addAtomicToParam(stage: AtomicProcess, parentParam: Parameter,
     if curParam is None:
       curParam = FRParam(name=key, value=val)
     else:
-      # Default value should be overridden by func signature
-      curParam.value = val
+      # Default value should be overridden by func signature, if it is provided.
+      # Mostly needed during "forceKeys" usage
+      if val is not stage.input.FROM_PREV_IO:
+        curParam.value = val
       if curParam.pType is None:
         curParam.pType = type(val).__name__
     paramDict = curParam.toPgDict()
@@ -129,7 +132,7 @@ def addGeneralToParam(stage: GeneralProcess, parentParam: Parameter, nestHyperpa
     addStageToParam(childStage, parentParam)
 
 class GeneralProcWrapper(CompositionMixin):
-  def __init__(self, processor: ProcessStage, parentParam: Parameter=None,
+  def __init__(self, processor: ProcessStage, parentParam: GroupParameter=None,
                argNameFormat: Callable[[str], str] = None, treatAsAtomic=False, nestHyperparams=True):
     self.processor = self.exposes(processor)
     self.algName = processor.name
@@ -138,9 +141,9 @@ class GeneralProcWrapper(CompositionMixin):
     self.nestHyperparams = nestHyperparams
     if parentParam is None:
       parentParam = Parameter.create(name=self.algName, type='group')
-    else:
+    elif nestHyperparams:
       parentParam = getParamChild(parentParam, self.algName)
-    self.parentParam = parentParam
+    self.parentParam : GroupParameter = parentParam
     self.addStage(self.processor)
 
   def addStage(self, stage: ProcessStage):

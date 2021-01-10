@@ -6,7 +6,7 @@ from conftest import NUM_COMPS, stack, dfTester
 from helperclasses import clearTmpFiles
 from testingconsts import RND
 from s3a import FR_SINGLETON
-from s3a.constants import FR_ENUMS
+from s3a.constants import PRJ_ENUMS
 from s3a.constants import REQD_TBL_FIELDS
 from s3a.structures import ComplexXYVertices, S3AWarning, XYVertices
 
@@ -46,24 +46,24 @@ def test_rm_by_empty_vert_add(sampleComps, mgr):
   # use individual assignment
   for idx in deleteIdxs:
     sampleComps.at[idx, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices()
-  changeList = mgr.addComps(sampleComps, FR_ENUMS.COMP_ADD_AS_MERGE)
+  changeList = mgr.addComps(sampleComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
   cmpChangeList(changeList, deleted=deleteIdxs, changed=changeIdxs)
 
 
 def test_double_add(sampleComps, mgr):
-  changeList = mgr.addComps(sampleComps, FR_ENUMS.COMP_ADD_AS_NEW)
+  changeList = mgr.addComps(sampleComps, PRJ_ENUMS.COMP_ADD_AS_NEW)
   cmpChangeList(changeList, added=oldIds)
 
   # Should be new IDs during 'add as new'
-  changeList = mgr.addComps(sampleComps, FR_ENUMS.COMP_ADD_AS_NEW)
+  changeList = mgr.addComps(sampleComps, PRJ_ENUMS.COMP_ADD_AS_NEW)
   cmpChangeList(changeList, added=oldIds + NUM_COMPS)
 
 def test_change_comps(sampleComps, mgr):
-  changeList = mgr.addComps(sampleComps, FR_ENUMS.COMP_ADD_AS_NEW)
+  changeList = mgr.addComps(sampleComps, PRJ_ENUMS.COMP_ADD_AS_NEW)
   cmpChangeList(changeList, added=oldIds)
 
   newClasses = dfTester.fillRandomClasses(sampleComps)
-  changeList = mgr.addComps(sampleComps, FR_ENUMS.COMP_ADD_AS_MERGE)
+  changeList = mgr.addComps(sampleComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
   cmpChangeList(changeList, changed=oldIds)
   np.testing.assert_array_equal(newClasses,
                                 mgr.compDf[REQD_TBL_FIELDS.COMP_CLASS].values,
@@ -85,7 +85,7 @@ def test_rm_comps(sampleComps, mgr):
   for _ in range(10):
     mgr.addComps(sampleComps)
   prevIds = mgr.compDf[REQD_TBL_FIELDS.INST_ID].values
-  changeList = mgr.rmComps(FR_ENUMS.COMP_RM_ALL)
+  changeList = mgr.rmComps(PRJ_ENUMS.COMP_RM_ALL)
   cmpChangeList(changeList,deleted=prevIds)
 
   # Remove single

@@ -1,17 +1,19 @@
 import re
-from collections import deque
+from ast import literal_eval
+from contextlib import contextmanager
 from inspect import isclass
 from pathlib import Path
 from typing import Any, Optional, List, Collection, Callable, Tuple, Union, Sequence
+import typing as t
 
 import numpy as np
+import pandas as pd
 from pandas import DataFrame as df
 import cv2 as cv
 from pyqtgraph.parametertree import Parameter
 
 from s3a.constants import ANN_AUTH_DIR
 from s3a.graphicsutils import yaml
-from s3a.structures import FilePath
 from s3a.structures.typeoverloads import TwoDArr, FilePath
 from .structures import XYVertices, FRParam, ComplexXYVertices, NChanImg
 
@@ -95,6 +97,7 @@ def coerceDfTypes(dataframe: df, constParams: Collection[FRParam]=None):
     except TypeError:
       # Coercion isn't possible, nothing to do here
       pass
+  return dataframe
 
 def largestList(verts: List[XYVertices]) -> XYVertices:
   maxLenList = []
@@ -182,9 +185,11 @@ def pascalCaseToTitle(name: str, addSpaces=True) -> str:
   name = name.replace('_', ' ')
   return name.title()
 
+def lower_NoSpaces(name: str):
+  return name.replace(' ', '').lower()
 
-def _safeCallFuncList(fnNames: Collection[str], funcLst: List[Callable],
-                      fnArgs: List[Sequence]=None):
+def safeCallFuncList(fnNames: Collection[str], funcLst: List[Callable],
+                     fnArgs: List[Sequence]=None):
   errs = []
   rets = []
   if fnArgs is None:
@@ -331,22 +336,6 @@ def dynamicDocstring(**kwargs):
     return obj
   return wrapper
 
-def frParamToPgParamDict(param: FRParam):
-  """
-  Simple conversion function from FRParams used internally to the dictionary form expected
-  by pyqtgraph parameters
-  """
-  paramOpts = dict(name=param.name, type=param.pType,
-                   **param.opts)
-  if len(param.helpText) > 0:
-    paramOpts['tip'] = param.helpText
-  if param.pType == 'group' and param.value is not None:
-    paramOpts.update(children=param.value)
-  else:
-    paramOpts.update(value=param.value)
-  paramOpts.update(frParam=param)
-  return paramOpts
-
 def resolveYamlDict(cfgFname: FilePath, cfgDict: dict=None):
   if cfgDict is not None:
     cfg = cfgDict
@@ -354,6 +343,8 @@ def resolveYamlDict(cfgFname: FilePath, cfgDict: dict=None):
     cfg = attemptFileLoad(cfgFname)
   return Path(cfgFname), cfg
 
+def serAsFrame(ser: pd.Series):
+  return ser.to_frame().T
 
 def attemptFileLoad(fpath: FilePath , openMode='r') -> Union[dict, bytes]:
   with open(fpath, openMode) as ifile:
@@ -361,18 +352,27 @@ def attemptFileLoad(fpath: FilePath , openMode='r') -> Union[dict, bytes]:
   return loadObj
 
 
-def getParamChild(param: Parameter, *childPath: Sequence[str], allowCreate=True, **groupOpts):
+def getParamChild(param: Parameter, *childPath: Sequence[str], allowCreate=True, groupOpts:dict=None,
+                  chOpts: dict=None):
+  if groupOpts is None:
+    groupOpts = {}
+  groupOpts.setdefault('type', 'group')
   while childPath and childPath[0] in param.names:
     param = param.child(childPath[0])
     childPath = childPath[1:]
   # All future children must be created
   if allowCreate:
     for chName in childPath:
-      param = param.addChild(dict(name=chName, type='group', **groupOpts))
+      param = param.addChild(dict(name=chName, **groupOpts))
       childPath = childPath[1:]
   elif len(childPath) > 0:
     # Child doesn't exist
     raise KeyError(f'Children {childPath} do not exist in param {param}')
+  if chOpts is not None:
+    if chOpts['name'] in param.names:
+      param = param.child(chOpts['name'])
+    else:
+      param = param.addChild(chOpts)
   return param
 
 
@@ -389,3 +389,68 @@ def getAllBases(cls):
     baseClasses.extend([tmpCls for tmpCls in curBases if tmpCls not in baseClasses])
     nextClsPtr += 1
   return baseClasses
+
+
+def hierarchicalUpdate(curDict: dict, other: dict):
+  """Dictionary update that allows nested keys to be updated without deleting the non-updated keys"""
+  if other is None:
+    return
+  for k, v in other.items():
+    curVal = curDict.get(k, None)
+    if isinstance(curVal, dict) and isinstance(v, dict):
+      hierarchicalUpdate(curVal, v)
+    elif isinstance(curVal, list) and isinstance(v, list):
+      curVal.extend(v)
+    else:
+      curDict[k] = v
+
+def coerceAnnotation(ann: Any):
+  """
+  From a function argument annotation, attempts to find a default value matching
+  that annotation. E.g. for the function signature
+  `def a(param: int)`
+  `inspect` is used to find the signature, and `param`'s annotation would be `int`.
+  This function would turn that into `int()`, or 0. Attempts are as follows:
+    - If the annotation is a string, attempts are made to convert it to a value, e.g.
+      `def a(param: 'int')` will follow the flow of `def a(param: int).Note this
+       will fail if the annotation is for a class not in scope upon evaluation.
+    - If direct conversion works as described in the docstring, the value is returned.
+
+       * If this fails due to *TypeError*, the following cases are examined:
+         * typing.Union (flow is followed for each union type until non-None is
+         returned or all types have been examined)
+         * typing.List, Tuple, Dict, <builtim>: That builtin is returned
+
+     - All other cases result in *None* being returned.
+  """
+  if isinstance(ann, str):
+    ann = literal_eval(ann)
+  try:
+    return ann()
+  except TypeError:
+    # Check for typing types
+    if getattr(ann, '__module__', None) == t.__name__:
+      if ann.__origin__ is t.Union:
+        ann: t.Union
+        for arg in ann.__args__:
+          ret = coerceAnnotation(arg)
+          if ret is not None:
+            return ret
+      else:
+        # Check for typing instances of builtins
+        if hasattr(ann, '_name'):
+          try:
+            return literal_eval(ann._name.lower())
+          except Exception as ex:
+            pass
+  return None
+
+@contextmanager
+def monkeyPatch(obj, toChange: str, newVal):
+  oldVal = getattr(obj, toChange, None)
+  setattr(obj, toChange, newVal)
+  yield
+  if oldVal is None:
+    delattr(obj, toChange)
+  else:
+    setattr(obj, toChange, oldVal)

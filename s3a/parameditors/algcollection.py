@@ -89,8 +89,7 @@ class AlgParamEditor(ParamEditor):
     self.algOpts.setLimits(self.nameToProcMapping.copy())
     return processor
 
-  def saveParamState(self, saveName: str=None, paramState: dict=None,
-                     allowOverwriteDefault=False, blockWrite=False):
+  def saveParamState(self, saveName: str=None, paramState: dict=None, **kwargs):
     """
     The algorithm editor also needs to store information about the selected algorithm, so lump
     this in with the other parameter information before calling default save.
@@ -100,7 +99,7 @@ class AlgParamEditor(ParamEditor):
                                          removeList=['value'])
       paramState = {'Selected Algorithm': self.algOpts.value().algName,
                     'Parameters': paramDict}
-    return super().saveParamState(saveName, paramState, allowOverwriteDefault, blockWrite)
+    return super().saveParamState(saveName, paramState, **kwargs)
 
   def loadParamState(self, stateName: Union[str, Path], stateDict: dict=None,
                      addChildren=False, removeChildren=False, applyChanges=True):

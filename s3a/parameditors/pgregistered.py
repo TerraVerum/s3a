@@ -13,7 +13,7 @@ import numpy as np
 from s3a.controls.drawctrl import RoiCollection
 from s3a.graphicsutils import PopupLineEditor, popupFilePicker
 
-from s3a.constants import FR_CONSTS as FRC
+from s3a.constants import PRJ_CONSTS as CNST
 from s3a.structures import S3AException, FRParam, XYVertices
 from s3a import parameditors
 
@@ -108,19 +108,13 @@ class RegisteredActionParameterItem(ActionParameterItem):
     btn.setToolTip(param.opts.get('tip', ''))
     if param.value() is None: return
     # Else: shortcut exists to be registered
-    owner = param.opts.get('ownerObj', type(None))
-    frParam = param.opts.get('frParam', None)
-    if frParam is None:
-      frParam = FRParam(param.name(), param.value(), param.type(), param.opts['tip'])
-      param.opts['frParam'] = frParam
-    self.button = parameditors.FR_SINGLETON.shortcuts.createRegisteredButton(
-      frParam, owner, baseBtn=self.button
+    parameditors.FR_SINGLETON.shortcuts.createRegisteredButton(
+      FRParam(**param.opts), baseBtn=self.button
     )
     return
 
 class RegisteredActionParameter(ActionParameter):
   itemClass = RegisteredActionParameterItem
-
 
 class ShortcutParameter(Parameter):
   itemClass = ShortcutParameterItem
@@ -284,9 +278,10 @@ class FilePickerParameterItem(parameterTypes.WidgetParameterItem):
     if curVal:
       useDir = curVal
     else:
-      useDir = None
+      useDir = str(Path.cwd())
     opts = self.param.opts
-    fname = popupFilePicker(None, 'Select File', asFolder=opts['asFolder'], asOpen=opts['existing'], startDir=useDir)
+    opts['startDir'] = str(Path(useDir).absolute())
+    fname = popupFilePicker(None, 'Select File', **opts)
     if fname is None:
       return
     self.param.setValue(fname)
@@ -366,6 +361,57 @@ class SliderParameterItem(parameterTypes.WidgetParameterItem):
 class SliderParameter(Parameter):
   itemClass = SliderParameterItem
 
+class ChecklistParameter(parameterTypes.GroupParameter):
+
+  def __init__(self, **opts):
+    super().__init__(**opts)
+
+  def setLimits(self, limits):
+    super().setLimits(limits)
+    self.clearChildren()
+    exclusive = self.opts.get('exclusive', False)
+    for chOpts in limits:
+      if isinstance(chOpts, str):
+        chOpts = dict(name=chOpts, value=not exclusive)
+      child = self.create(type='bool', **chOpts)
+      self._hookupParam(child, exclusive)
+      self.addChild(child)
+    if exclusive and len(self.value()) != 1:
+      self.setValue([limits[-1]])
+
+  def _hookupParam(self, param, exclusive):
+    def onChange_exclusive(_param, value):
+      if value:
+        self.setValue([param.name()])
+    def onChange_default(_param, value):
+      self.sigValueChanged.emit(self, self.value())
+    if exclusive:
+      param.sigValueChanged.connect(onChange_exclusive)
+    else:
+      param.sigValueChanged.connect(onChange_default)
+
+  def setOpts(self, **opts):
+    if 'exclusive' in opts and 'limits' not in opts:
+      self.setLimits(self.opts['limits'])
+    super().setOpts(**opts)
+
+  def value(self):
+    return [p.name() for p in self.children() if p.value()]
+
+  def setValue(self, value, blockSignal=None):
+    exclusive = self.opts['exclusive']
+    # Will emit at the end, so no problem discarding existing changes
+    value = [v for v in value if v in self.names]
+    if value == self.value():
+      return value
+    for chParam in self.childs:
+      chParam.setValue(chParam.name() in value)
+      if exclusive:
+        chParam.setReadonly(chParam.value())
+    newVal = self.value()
+    self.sigValueChanged.emit(self, newVal)
+    return newVal
+
 class _CustomRoiCollection(RoiCollection):
   sigShapeCleared = QtCore.Signal()
   def clearAllRois(self):
@@ -377,7 +423,7 @@ class XYVerticesParameterItem(parameterTypes.WidgetParameterItem):
     param = self.param
 
     self.verts = XYVertices()
-    self.shapes = _CustomRoiCollection((FRC.DRAW_SHAPE_POLY,))
+    self.shapes = _CustomRoiCollection((CNST.DRAW_SHAPE_POLY,))
 
     button = QtWidgets.QPushButton()
     button.value = lambda: self.verts
@@ -431,3 +477,4 @@ parameterTypes.registerParameterType('popuplineeditor', PopupLineEditorParameter
 parameterTypes.registerParameterType('filepicker', FilePickerParameter)
 parameterTypes.registerParameterType('slider', SliderParameter)
 parameterTypes.registerParameterType('xyvertices', XYVerticesParameter)
+parameterTypes.registerParameterType('checklist', ChecklistParameter)

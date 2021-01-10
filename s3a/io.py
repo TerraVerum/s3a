@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame as df
 from skimage import io, measure
+from skimage.exposure import rescale_intensity
 from typing_extensions import Literal
 
 from s3a.constants import REQD_TBL_FIELDS as RTF
@@ -29,7 +30,7 @@ def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> pd.Series:
     np.ndarray        : lambda strVal: np.array(literal_eval(strVal)),
     ComplexXYVertices : ComplexXYVertices.deserialize,
     bool              : lambda strVal: strVal.lower() == 'true',
-    FRParam           : lambda strVal: FRParamGroup.fromString(paramVal.group, strVal)
+    FRParam           : lambda strVal: FRParamGroup.fieldFromParam(paramVal.group, strVal)
   }
   defaultFunc = lambda strVal: paramType(strVal)
   funcToUse = funcMap.get(paramType, defaultFunc)
@@ -198,8 +199,8 @@ class ComponentIO:
   @classmethod
   def exportCompimgsDf(cls, compDf: df, outFile: Union[str, Path]=None,
                        imgDir: FilePath=None, margin=0, marginAsPct=False,
-                       colorMaskByClass=False,
-                       includeCols=('instId', 'img', 'semanticMask', 'bboxMask', 'compClass', 'offset')):
+                       includeCols=('instId', 'img', 'semanticMask', 'bboxMask', 'lbl', 'offset'),
+                       lblField='Class', **kwargs):
     """
     Creates a dataframe consisting of extracted images around each component
     :param compDf: Dataframe to export
@@ -210,9 +211,9 @@ class ComponentIO:
     :param margin: How much padding to give around each component
     :param marginAsPct: Whether the margin should be a percentage of the component size or
       a raw pixel value.
-    :param colorMaskByClass: If `True`, masks are given the int value of their associated
-      class instead of being boolean.
     :param includeCols: Which columns to include in the export list
+    :param lblField: See ComponentIO.exportLblPng. This label is provided in the output dataframe
+      as well, if specified.
     :return: Dataframe with the following keys:
       - instId: The component's Instance ID
       - img: The (MxNxC) image corresponding to the component vertices, where MxN are
@@ -220,8 +221,9 @@ class ComponentIO:
       - semanticMask: Binary mask representing the component vertices
       - bboxMask: Square box representing (min)->(max) component vertices. This is useful
         for excluding the margin when a semantic mask is not desired and the margin was > 0.
-      - compClass: Class of the component
+      - label: Field value of the component for the field specified by `lblField`
       - offset: Image (x,y) coordinate of the min component vertex.
+    :param kwargs: Passed to ComponentIO.exportLblPng
     """
     _imgCache = {}
     if imgDir is None:
@@ -229,23 +231,26 @@ class ComponentIO:
     else:
       imgDir = Path(imgDir)
     uniqueImgs = np.unique(compDf[RTF.SRC_IMG_FILENAME])
+    dfGroupingsByImg = []
     for imgName in uniqueImgs:
       imgName = Path(imgName)
       if not imgName.is_absolute():
         imgName = imgDir/imgName
       if imgName not in _imgCache:
         _imgCache[imgName] = io.imread(imgName)
-    dfGroupingsByImg = []
-    for imgName in uniqueImgs:
       dfGroupingsByImg.append(compDf[compDf[RTF.SRC_IMG_FILENAME] == imgName])
+
     useKeys = set(includeCols)
     outDf = {k: [] for k in useKeys}
-    # Cache index per class for faster access
-    classToIdxMapping = {compCls: ii for ii, compCls in enumerate(cls.tableData.compClasses, 1)}
+    lblField = cls.tableData.fieldFromName(lblField)
+    bboxFills = lblField.toNumeric(compDf[lblField])
+
     for miniDf, imgName in zip(dfGroupingsByImg, uniqueImgs):
       imgName = imgDir/imgName
       img = _imgCache[imgName]
-      for idx, row in miniDf.iterrows():
+      lblImg = cls.exportLblPng(miniDf, imShape=img.shape[:2], lblField=lblField, **kwargs)
+
+      for ii, (idx, row) in enumerate(miniDf.iterrows()):
         allVerts = row[RTF.VERTICES].stack()
         if marginAsPct:
           compImgSz = allVerts.max(0) - allVerts.min(0)
@@ -253,34 +258,31 @@ class ComponentIO:
         else:
           marginToUse = margin
         compImg, bounds = getCroppedImg(img, allVerts, marginToUse, coordsAsSlices=False)
+
         if 'img' in useKeys:
           outDf['img'].append(compImg)
-        compCls = str(row[RTF.COMP_CLASS])
-        if 'compClass' in useKeys:
-          outDf['compClass'].append(compCls)
-        maskVerts: ComplexXYVertices = row[RTF.VERTICES].copy()
-        for verts in maskVerts:
-          verts -= bounds[0,:]
-        allVerts = maskVerts.stack()
-        if colorMaskByClass:
-          bboxFillClr = classToIdxMapping[compCls]
-          bboxMaskType = 'uint16'
-          asBool = False
-        else:
-          bboxMaskType = bool
-          bboxFillClr = 1
-          asBool = True
+        lbl = row[lblField]
+
+        if 'label' in useKeys:
+          outDf['label'].append(lbl)
+
+        indexer = tuple(slice(*b) for b in bounds[:, ::-1].T)
+        if lblImg.ndim > 2:
+          indexer += (...,)
+        mask = lblImg[indexer]
         if 'semanticMask' in useKeys:
-          mask = maskVerts.toMask(compImg.shape[:2], fillColor=bboxFillClr,
-                                  asBool=asBool)
+          # x-y to row-col, transpose to get min-max in axis 0 and row-col in axis 1
           outDf['semanticMask'].append(mask)
+
         if 'bboxMask' in useKeys:
-          bboxMask = np.zeros(compImg.shape[:2], dtype=bboxMaskType)
-          bboxBounds = np.r_[allVerts.min(0, keepdims=True), allVerts.max(0, keepdims=True)]
-          bboxMask[bboxBounds[0,1]:bboxBounds[1,1], bboxBounds[0,0]:bboxBounds[1,0]] = bboxFillClr
+          bboxMask = np.zeros(compImg.shape[:2], dtype=lblImg.dtype)
+          bboxBounds = np.r_[allVerts.min(0, keepdims=True)+marginToUse, allVerts.max(0, keepdims=True)-marginToUse]
+          bboxMask[bboxBounds[0,1]:bboxBounds[1,1], bboxBounds[0,0]:bboxBounds[1,0]] = bboxFills[ii]
           outDf['bboxMask'].append(bboxMask)
+
         if 'instId' in useKeys:
-          outDf['instId'].append(row.name)
+          outDf['instId'].append(idx)
+
         if 'offset' in useKeys:
           outDf['offset'].append(bounds[0,:])
     outDf = pd.DataFrame(outDf)
@@ -301,18 +303,69 @@ class ComponentIO:
     return pklDf
 
   @classmethod
+  def exportLblPng(cls, compDf: df, outFile: FilePath=None, imShape: Tuple[int]=None,
+                   lblField: Union[FRParam, str]='Instance ID', bgColor=0, allowOffset=None,
+                   rescaleOutput=False, returnLblMapping=False,
+                   **kwargs):
+    """
+    :param compDf: Dataframe to export
+    :param outFile: Filename to save, leave *None* to avoid saving to a file
+    :param imShape: MxN shape of image containing these annotations
+    :param lblField: Data field to use as an index label. E.g. "Class" will use the 'class'
+      column, but any other column can be specified. The output ground truth masks
+      will be colored according to this field.  See :meth:`FRParam.toNumeric` for details.
+      If `lblField` is *None*, the foreground mask will be boolean instead of integer-colored.
+    :param bgColor: Color of the mask background. Must be an integer.
+    :param allowOffset: Some label fields may have 0-based starting values. In cases
+      where `bgColor` is also 0, an offset is required to prevent those field values
+      from being considered background. `allowOffset` determines whether this change
+      can be made to the data. See `FRParam.toNumeric` for detailed description.
+    :param rescaleOutput: For images designed for human use, it is helpful to have
+      outputs rescaled to the entire intensity range. Otherwise, they usually end
+      up looking pure black and it is difficult to see components in the image.
+      When `rescaleOutput` is *True*, all numbers are scaled to the 'uint16' range.
+    :param returnLblMapping: Whether to return a pd.Series matching original index values
+      to their numeric counterparts
+    :param kwargs:
+    :return:
+    """
+
+    lblField = cls.tableData.fieldFromName(lblField)
+
+    if lblField not in cls.tableData.allFields:
+      raise S3AIOError(f'Specified label field {lblField} does not exist in the table'
+                       f' fields. Must be one of:\n'
+                       f'{[f.name for f in cls.tableData.allFields]}')
+    if bgColor < 0:
+      raise S3AIOError(f'Background color must be >= 0, was {bgColor}')
+
+    labels = compDf[lblField]
+    labels_numeric = lblField.toNumeric(labels, allowOffset)
+    asBool = np.issubdtype(labels_numeric.dtype, np.bool)
+
+    if rescaleOutput:
+      labels_numeric = rescale_intensity(labels_numeric, out_range='uint16')
+
+    if imShape is None:
+      vertMax = ComplexXYVertices.stackedMax(compDf[RTF.VERTICES])
+      imShape = tuple(vertMax[::-1] + 1)
+    maskType = 'uint16' if np.min(bgColor) >= 0 else 'int32'
+    outMask = np.full(imShape[:2], bgColor, maskType)
+    for fillClr, (_, comp) in zip(labels_numeric, compDf.iterrows()):
+      verts: ComplexXYVertices = comp[RTF.VERTICES]
+      outMask = verts.toMask(outMask, int(fillClr), asBool, False)
+
+    if outFile is not None:
+      io.imsave(outFile, outMask.astype('uint16'), check_contrast=False)
+    if returnLblMapping:
+      mapping = pd.Series(data=labels_numeric, index=labels, name=lblField)
+      return outMask, mapping
+    return outMask
+
+  @classmethod
   def exportClassPng(cls, compDf: df, outFile: FilePath = None, imShape: Tuple[int]=None, **kwargs):
     # Create label to output mapping
-    classes = cls.tableData.compClasses
-    colors = compDf[RTF.COMP_CLASS]
-    if not np.issubdtype(colors.dtype, np.integer):
-      colors = compDf[RTF.COMP_CLASS].apply(classes.index)
-    origIdxs = compDf.index
-    compDf.index = colors
-    ret = cls.exportIdPng(compDf, outFile, imShape, **kwargs)
-    compDf.index = origIdxs
-
-    return ret
+    return cls.exportLblPng(compDf, outFile, imShape, 'Class', **kwargs)
 
   @classmethod
   def exportIdPng(cls, compDf: df, outFile: FilePath=None,
@@ -325,18 +378,7 @@ class ComponentIO:
     :param outFile: Where to save the output. If *None*, no export is created.
     :return:
     """
-    if imShape is None:
-      vertMax = ComplexXYVertices.stackedMax(compDf[RTF.VERTICES])
-      imShape = tuple(vertMax[::-1] + 1)
-    outMask = np.zeros(imShape[:2], 'int32')
-    for idx, comp in compDf.iterrows():
-      verts: ComplexXYVertices = comp[RTF.VERTICES]
-      idx: int
-      outMask = verts.toMask(outMask, idx+1, False, False)
-
-    if outFile is not None:
-      io.imsave(outFile, outMask.astype('uint16'), check_contrast=False)
-    return outMask
+    return cls.exportLblPng(compDf, outFile, imShape, **kwargs)
 
   @classmethod
   def exportCompimgsFolders(cls, compDf: df, imgDir: FilePath=None, margin=0, marginAsPct=False,
@@ -468,7 +510,9 @@ class ComponentIO:
     return outDf
 
   @classmethod
-  def buildFromCompimgsDf(cls, inFile: FilePath, imShape: Tuple=None, **importArgs):
+  def buildFromCompimgsDf(cls, inFile: FilePath, imShape: Tuple=None,
+                          lblField='Class', **importArgs):
+    lblField = cls.tableData.fieldFromName(lblField)
     inDf = pd.read_pickle(inFile)
     outDf = cls.tableData.makeCompDf(len(inDf))
     outDf[RTF.INST_ID] = inDf['instId']
@@ -481,7 +525,7 @@ class ComponentIO:
       for v in verts: v += offset
       allVerts.append(verts)
     outDf[RTF.VERTICES] = allVerts
-    outDf[RTF.COMP_CLASS] = inDf.compClass
+    outDf[lblField] = inDf[lblField]
     cls.checkVertBounds(outDf[RTF.VERTICES], imShape)
     return outDf
 
@@ -493,6 +537,32 @@ class ComponentIO:
     pklDf = pd.read_pickle(inFile)
     cls.checkVertBounds(pklDf[RTF.VERTICES], imShape)
     return pklDf
+
+  @classmethod
+  def buildFromLblPng(cls, inFileOrImg: Union[FilePath, GrayImg],
+                      labelMapping: pd.Series=None,
+                      useDistinctRegions=False,
+                      **importArgs) -> df:
+    if isinstance(inFileOrImg, GrayImg):
+      labelImg = inFileOrImg
+    else:
+      labelImg = io.imread(inFileOrImg, as_gray=True)
+    allVerts = []
+    lblField_out = []
+    for origVal, numericLbl in labelMapping.iteritems():
+      verts = ComplexXYVertices.fromBwMask(labelImg == numericLbl)
+      if useDistinctRegions:
+        allVerts.extend(verts)
+        orig = np.tile(origVal, len(verts))
+      else:
+        allVerts.append(verts)
+        orig = [origVal]
+      lblField_out.extend(orig)
+    outDf = cls.tableData.makeCompDf(len(allVerts))
+    outDf[labelMapping.name] = lblField_out
+    outDf[RTF.VERTICES] = allVerts
+    return outDf
+
 
   @classmethod
   def buildFromIdPng(cls, inFileOrImg: Union[FilePath, GrayImg], imShape: Tuple=None, **importArgs) -> df:
@@ -510,8 +580,8 @@ class ComponentIO:
       clsImg = inFileOrImg
     else:
       clsImg = io.imread(inFileOrImg)
-
-    clsArray = np.array(cls.tableData.compClasses)
+    clsParam = cls.tableData.fieldFromName('Class')
+    clsArray = np.array(clsParam.opts['limits'])
     idImg = measure.label(clsImg)
     outDf = cls.buildFromIdPng(idImg, imShape)
     outClasses = []
@@ -519,7 +589,7 @@ class ComponentIO:
       # All ID pixels should be the same class, so any representative will do
       curCls = clsImg[idImg == curId][0]
       outClasses.append(clsArray[curCls-1])
-    outDf[RTF.COMP_CLASS] = outClasses
+    outDf[cls.tableData.fieldFromName('Class')] = outClasses
     outDf.reset_index(inplace=True, drop=True)
     outDf[RTF.INST_ID] = outDf.index
     return outDf

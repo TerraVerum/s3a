@@ -7,10 +7,10 @@ import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
-from s3a import FR_SINGLETON
+from s3a import FR_SINGLETON, RunOpts
 from s3a.models.tablemodel import ComponentMgr
-from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS
-from s3a.constants import FR_ENUMS
+from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS
+from s3a.constants import PRJ_ENUMS
 from s3a.structures import S3AException, S3AWarning, TwoDArr
 
 __all__ = ['CompTableView']
@@ -37,7 +37,7 @@ class PopupTableDialog(QtWidgets.QDialog):
     # -----------
     # Warning Message
     # -----------
-    self.titles = np.array(self.tbl.mgr.colTitles)
+    self.reflectDelegateChange()
     self.warnLbl = QtWidgets.QLabel(self)
     self.warnLbl.setStyleSheet("font-weight: bold; color:red; font-size:14")
     self.updateWarnMsg([])
@@ -101,7 +101,7 @@ class PopupTableDialog(QtWidgets.QDialog):
       else:
         self.tbl.showColumn(ii)
     self.tbl.mgr.rmComps()
-    self.tbl.mgr.addComps(compDf, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.tbl.mgr.addComps(compDf, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)
     self.updateWarnMsg([])
 
   def reflectDataChanged(self, editedColIdx: int):
@@ -121,21 +121,14 @@ class PopupTableDialog(QtWidgets.QDialog):
 class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
   __groupingName__ = 'Component Table'
   """
-  Table for displaying :class:`FRComponentMgr` data.
+  Table for displaying :class:`ComponentMgr` data.
   """
   sigSelectionChanged = Signal(object)
 
   @classmethod
   def __initEditorParams__(cls):
-    cls.showOnCreate = FR_SINGLETON.generalProps.registerProp(FR_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE)
+    cls.showOnCreate = FR_SINGLETON.generalProps.registerProp(PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE)
     cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, name='Component Table Tools')
-    nameFilters = []
-    for field in FR_SINGLETON.tableData.allFields:
-      show = not field.opts.get('colHidden', False)
-      nameFilters.append(dict(name=field.name, type='bool', value=show))
-    FR_CONSTS.PROP_COLS_TO_SHOW.value = nameFilters
-    cls.colsVisibleProps = FR_SINGLETON.generalProps.registerProp(
-      FR_CONSTS.PROP_COLS_TO_SHOW, asProperty=False)
 
   def __init__(self, *args, minimal=False):
     """
@@ -156,19 +149,33 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
     self.setModel(self.mgr)
     self.setColDelegates()
 
+    with FR_SINGLETON.generalProps.setBaseRegisterPath(self.__groupingName__):
+      proc, params = FR_SINGLETON.generalProps.registerFunc(
+        self.setVisibleColumns, runOpts=RunOpts.ON_CHANGED, nest=False,
+        returnParam=True, forceKeys=['visibleColumns'])
+    def onChange(*_args):
+      params.child('visibleColumns').setLimits([f.name for f in TBL_FIELDS])
+    onChange()
+    FR_SINGLETON.tableData.sigCfgUpdated.connect(onChange)
+    proc.run()
+
     if not minimal:
       self.popup = PopupTableDialog(*args)
       # Create context menu for changing table rows
       self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
       cursor = QtGui.QCursor()
       self.customContextMenuRequested.connect(lambda: self.menu.exec_(cursor.pos()))
-      for ii, child in enumerate(self.colsVisibleProps):
-        child.sigValueChanged.connect(lambda param, value, idx=ii: self.setColumnHidden(idx, not value))
-
-        # Trigger initial hide/show
-        self.setColumnHidden(ii, not child.value())
 
     self.instIdColIdx = TBL_FIELDS.index(REQD_TBL_FIELDS.INST_ID)
+
+  def setVisibleColumns(self, visibleColumns: Sequence[str]):
+    """
+    Determines which columns to show. All unspecified columns will be hidden.
+    :param visibleColumns:
+      pType: checklist
+    """
+    for ii, col in enumerate(self.mgr.colTitles):
+      self.setColumnHidden(ii, col not in visibleColumns)
 
   def setColDelegates(self):
     for ii, field in enumerate(TBL_FIELDS):
@@ -197,7 +204,7 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
 
     self.horizontalHeader().setSectionsMovable(True)
 
-  # When the model is changed, get a reference to the FRComponentMgr
+  # When the model is changed, get a reference to the ComponentMgr
   def setModel(self, modelOrProxy: QtCore.QAbstractTableModel):
     super().setModel(modelOrProxy)
     try:
@@ -305,4 +312,4 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
     colsForLoc = self.mgr.compDf.columns[selectionIdxs[:,2]]
     for idxTriplet, colForLoc in zip(selectionIdxs, colsForLoc):
       newDataDf.at[idxTriplet[0], colForLoc] = overwriteData.iat[idxTriplet[2]]
-    self.mgr.addComps(newDataDf, addtype=FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.mgr.addComps(newDataDf, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)

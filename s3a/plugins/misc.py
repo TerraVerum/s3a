@@ -1,23 +1,21 @@
 from __future__ import annotations
 
-from typing import Callable, Sequence, Optional, Union, List, Set
+from typing import Callable, Sequence, List, Set
 
+import cv2 as cv
 import numpy as np
 import pandas as pd
+import pyqtgraph as pg
 from pyqtgraph import console as pg_console
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-import pyqtgraph as pg
 
 from s3a import models, XYVertices, ComplexXYVertices
-from s3a.constants import FR_CONSTS as FRC, REQD_TBL_FIELDS as RTF, FR_ENUMS
+from s3a.constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF, PRJ_ENUMS
 from s3a.controls.tableviewproxy import CompDisplayFilter
 from s3a.graphicsutils import ConsoleWidget, menuFromEditorActions
 from s3a.models import s3abase
 from s3a.parameditors import FR_SINGLETON
 from s3a.plugins.base import ParamEditorPlugin, ProcessorPlugin
-from s3a.processing import GeneralProcWrapper
-from s3a.structures import FRParam, NChanImg
-from s3a.views.imageareas import EditableImgBase
 
 
 class MainImagePlugin(ParamEditorPlugin):
@@ -46,22 +44,40 @@ class MainImagePlugin(ParamEditorPlugin):
       copier.inCopyMode = False
       copier.sigCopyStarted.emit()
 
-    funcForEditableImgPlugin(mainImg.clearCurRoi, self, mainImg, btnOpts=FRC.TOOL_CLEAR_ROI)
-    funcForEditableImgPlugin(startMove, self, mainImg, btnOpts=FRC.TOOL_MOVE_REGIONS)
-    funcForEditableImgPlugin(startCopy, self, mainImg, btnOpts=FRC.TOOL_COPY_REGIONS)
+    self.registerFunc(startMove, btnOpts=CNST.TOOL_MOVE_REGIONS)
+    self.registerFunc(startCopy, btnOpts=CNST.TOOL_COPY_REGIONS)
 
-    if not hasattr(win, 'compDisplay'):
-      return
+    if hasattr(win, 'compDisplay'):
+      tbl = win.compDisplay
+      # Wrap in process to ignore the default param
+      self.registerFunc(tbl.mergeSelectedComps, btnOpts=CNST.TOOL_MERGE_COMPS, ignoreKeys=['keepId'])
+      self.registerFunc(tbl.splitSelectedComps, btnOpts=CNST.TOOL_SPLIT_COMPS)
+      win.mainImg.registerDrawAction([CNST.DRAW_ACT_SELECT, CNST.DRAW_ACT_PAN],
+                                   lambda verts, _p: win.compDisplay.reflectSelectionBoundsMade(verts))
 
-    tbl = win.compDisplay
-    # Wrap in process to ignore the default param
-    funcForEditableImgPlugin(tbl.mergeSelectedComps, self, mainImg, btnOpts=FRC.TOOL_MERGE_COMPS, ignoreKeys=['keepId'])
-    funcForEditableImgPlugin(tbl.splitSelectedComps, self, mainImg, btnOpts=FRC.TOOL_SPLIT_COMPS)
+    win.mainImg.registerDrawAction(CNST.DRAW_ACT_CREATE, self.createComponent)
+    win.mainImg.addTools(self.toolsEditor)
     # No need for a dropdown menu
     self.dock = None
     super().attachWinRef(win)
 
-    mainImg.addActionsFromMenu(self.menu)
+  @property
+  def image(self):
+    return self.win.mainImg.image
+
+  def createComponent(self, roiVerts: XYVertices):
+    verts = np.clip(roiVerts.astype(int), 0, self.image.shape[:2][::-1])
+
+    if cv.contourArea(verts) < self.win.mainImg.minCompSize:
+      # Use as selection instead of creation
+      self.win.compDisplay.reflectSelectionBoundsMade(roiVerts[[0]])
+      return
+
+    # noinspection PyTypeChecker
+    verts = ComplexXYVertices([verts])
+    newComps = FR_SINGLETON.tableData.makeCompDf()
+    newComps[RTF.VERTICES] = [verts]
+    self.win.add_focusComps(newComps)
 
 
 class CompTablePlugin(ParamEditorPlugin):
@@ -78,7 +94,7 @@ class CompTablePlugin(ParamEditorPlugin):
     tbl = win.compTbl
     for func, param in zip(
         [lambda: tbl.setSelectedCellsAs_gui(), tbl.removeSelectedRows_gui, tbl.setSelectedCellsAsFirst],
-        [FRC.TOOL_TBL_SET_AS, FRC.TOOL_TBL_DEL_ROWS, FRC.TOOL_TBL_SET_SAME_AS_FIRST]):
+        [CNST.TOOL_TBL_SET_AS, CNST.TOOL_TBL_DEL_ROWS, CNST.TOOL_TBL_SET_SAME_AS_FIRST]):
       param.opts['ownerObj'] = win
       self.registerFunc(func, name=param.name, btnOpts=param)
     tbl.menu = menuFromEditorActions(self.toolsEditor, menuParent=tbl, nest=False)
@@ -92,9 +108,9 @@ class EditPlugin(ParamEditorPlugin):
     super().attachWinRef(win)
     stack = FR_SINGLETON.actionStack
 
-    for param in FRC.TOOL_UNDO, FRC.TOOL_REDO: param.opts['ownerObj'] = win
-    self.registerFunc(stack.undo, name='Undo', btnOpts=FRC.TOOL_UNDO)
-    self.registerFunc(stack.redo, name='Redo', btnOpts=FRC.TOOL_REDO)
+    for param in CNST.TOOL_UNDO, CNST.TOOL_REDO: param.opts['ownerObj'] = win
+    self.registerFunc(stack.undo, name='Undo', btnOpts=CNST.TOOL_UNDO)
+    self.registerFunc(stack.redo, name='Redo', btnOpts=CNST.TOOL_REDO)
 
     def updateUndoRedoTxts():
       self.undoAct.setText(f'Undo: {stack.undoDescr}')
@@ -116,7 +132,6 @@ class RandomToolsPlugin(ParamEditorPlugin):
   def attachWinRef(self, win: s3abase.S3ABase):
     super().attachWinRef(win)
 
-    self.registerFunc(win.showModCompAnalytics)
     self.registerFunc(self.showDevConsole)
 
   def showDevConsole(self):
@@ -147,16 +162,6 @@ class HelpPlugin(ParamEditorPlugin):
     self.registerFunc(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl('https://gitlab.com/ficsresearch/s3a/-/wikis/home')),
                          name='Online User Guide')
     self.registerFunc(lambda: QtWidgets.QMessageBox.aboutQt(win, 'About Qt'), name='About Qt')
-
-def funcForEditableImgPlugin(func: Callable, plugin: ParamEditorPlugin, editableImg: EditableImgBase, **kwargs):
-  """See function signature for `FRParamEditor.registerFunc`"""
-  origOpts = kwargs.pop('btnOpts', FRParam(''))
-  origOpts.opts['ownerObj'] = editableImg
-
-  proc = plugin.registerFunc(func, **kwargs, name=origOpts.name, btnOpts=origOpts)
-  editableImg.toolsGrp.create_addBtn(origOpts,
-                                     triggerFn=lambda *_args, **_kwargs: proc.run(),
-                                     checkable=False, ownerObj=editableImg)
 
 def miscFuncsPluginFactory(name_: str=None, regFuncs: Sequence[Callable]=None, titles: Sequence[str]=None, showFuncDetails=False):
   class DummyFuncsPlugin(ParamEditorPlugin):
@@ -192,8 +197,8 @@ class GlobalPredictionsPlugin(ProcessorPlugin):
     super().__init__()
     self.idGroupings: List[Set[int]] = []
 
-    self.registerFunc(self.predictFromSelection, btnOpts=FRC.TOOL_PRED_SEL)
-    self.registerFunc(lambda: self.deleteGroupsWithIds(self.win.compDisplay.selectedIds), btnOpts=FRC.TOOL_PRED_DEL_GRP)
+    self.registerFunc(self.predictFromSelection, btnOpts=CNST.TOOL_PRED_SEL)
+    self.registerFunc(lambda: self.deleteGroupsWithIds(self.win.compDisplay.selectedIds), btnOpts=CNST.TOOL_PRED_DEL_GRP)
     self.registerFunc(self.lastRunAnalytics)
 
   def attachWinRef(self, win: models.s3abase.S3ABase):
@@ -208,6 +213,10 @@ class GlobalPredictionsPlugin(ProcessorPlugin):
     win.sigRegionAccepted.connect(self.acceptChanges)
 
   def acceptChanges(self):
+    # TODO: make this work
+    return
+
+    # noinspection PyUnreachableCode
     origVerts = self.focusedImg.compSer[RTF.VERTICES].copy()
     origOffset = origVerts.stack().min(0)
     # Account for margin in focused image
@@ -229,7 +238,7 @@ class GlobalPredictionsPlugin(ProcessorPlugin):
       allNewVerts.append(ComplexXYVertices(newVerts))
     toAddDf = pd.DataFrame(np.c_[toModifyIdxs, allNewVerts], columns=[RTF.INST_ID, RTF.VERTICES])
     toAddDf = toAddDf.set_index(RTF.INST_ID, drop=False)
-    self.mgr.addComps(toAddDf, FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.mgr.addComps(toAddDf, PRJ_ENUMS.COMP_ADD_AS_MERGE)
 
   def _groupsWithIds(self, idList: Sequence[int]):
     allIds = []
@@ -295,7 +304,7 @@ class GlobalPredictionsPlugin(ProcessorPlugin):
     scoreHoverLbl = parent.scoreHoverLbl = QtWidgets.QLabel()
     parent.compMgr = newMgr = ComponentMgr()
     parent.mainImg = newImg = MainImage()
-    newImg.drawActGrp.paramToBtnMapping[FRC.DRAW_ACT_ADD].hide()
+    newImg.drawActGrp.paramToBtnMapping[CNST.DRAW_ACT_ADD].hide()
     newTbl = CompTableView(minimal=True)
     newTbl.setModel(CompSortFilter(newMgr))
     cols = [RTF.INST_ID, FR_SINGLETON.tableData.fieldFromName('Notes')]
@@ -328,8 +337,8 @@ class FindDuplicatesPlugin(ProcessorPlugin):
     super().__init__()
     self.idGroupings: List[Set[int]] = []
 
-    self.registerFunc(self.predictFromSelection, btnOpts=FRC.TOOL_PRED_SEL)
-    self.registerFunc(lambda: self.deleteGroupsWithIds(self.win.compDisplay.selectedIds), btnOpts=FRC.TOOL_PRED_DEL_GRP)
+    self.registerFunc(self.predictFromSelection, btnOpts=CNST.TOOL_PRED_SEL)
+    self.registerFunc(lambda: self.deleteGroupsWithIds(self.win.compDisplay.selectedIds), btnOpts=CNST.TOOL_PRED_DEL_GRP)
     self.registerFunc(self.lastRunAnalytics)
 
   def attachWinRef(self, win: models.s3abase.S3ABase):
@@ -365,7 +374,7 @@ class FindDuplicatesPlugin(ProcessorPlugin):
       allNewVerts.append(ComplexXYVertices(newVerts))
     toAddDf = pd.DataFrame(np.c_[toModifyIdxs, allNewVerts], columns=[RTF.INST_ID, RTF.VERTICES])
     toAddDf = toAddDf.set_index(RTF.INST_ID, drop=False)
-    self.mgr.addComps(toAddDf, FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.mgr.addComps(toAddDf, PRJ_ENUMS.COMP_ADD_AS_MERGE)
 
   def _groupsWithIds(self, idList: Sequence[int]):
     allIds = []
@@ -431,7 +440,7 @@ class FindDuplicatesPlugin(ProcessorPlugin):
     scoreHoverLbl = parent.scoreHoverLbl = QtWidgets.QLabel()
     parent.compMgr = newMgr = ComponentMgr()
     parent.mainImg = newImg = MainImage()
-    newImg.drawActGrp.paramToBtnMapping[FRC.DRAW_ACT_ADD].hide()
+    newImg.drawActGrp.paramToBtnMapping[CNST.DRAW_ACT_ADD].hide()
     newTbl = CompTableView(minimal=True)
     newTbl.setModel(CompSortFilter(newMgr))
     cols = [RTF.INST_ID, FR_SINGLETON.tableData.fieldFromName('Notes')]

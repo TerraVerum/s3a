@@ -11,6 +11,7 @@ from . import ParamEditorDockGrouping
 from .genericeditor import ParamEditor
 from .pgregistered import ActionWithShortcutParameter as ActWithShc
 from s3a.structures import ParamEditorError, S3AWarning
+from ..generalutils import lower_NoSpaces
 
 
 class EditorListModel(QtCore.QAbstractListModel):
@@ -142,22 +143,26 @@ class QuickLoaderEditor(ParamEditor):
       self.applyChanges()
     return ret
 
-  def buildFromUserProfile(self, profileSrc: dict):
+  def buildFromStartupParams(self, startupSrc: dict):
     # If quick loader is given along with other params, use the quick loader as the
     # base and apply other settings on top of it
     errSettings = []
+    # Ignore case and spacing on input keys
+    startupSrc = {lower_NoSpaces(kk): vv for kk, vv in startupSrc.items()}
 
-    for editor in [self] + self.listModel.uniqueEditors:
-      paramStateName = profileSrc.get(editor.name.replace(' ', '').lower(), None)
-      if paramStateName is not None:
-        try:
-          editor.loadParamState(paramStateName)
-        except Exception as ex:
-          errSettings.append(f'{editor.name}: {ex}')
+    for editor in [self] + self.listModel.uniqueEditors: # type: ParamEditor
+      paramStateInfo: Union[dict, str] = startupSrc.get(lower_NoSpaces(editor.name), None)
+      try:
+        if isinstance(paramStateInfo, dict):
+          editor.loadFromPartialNames(self.lastAppliedName, paramStateInfo)
+        elif paramStateInfo is not None:
+          editor.loadParamState(paramStateInfo)
+      except Exception as ex:
+        errSettings.append(f'{editor.name}: {ex}')
     if len(errSettings) > 0:
       warn('The following settings could not be loaded (shown as <setting>: <exception>)\n'
            + "\n\n".join(errSettings), S3AWarning)
-    return profileSrc
+    return startupSrc
 
   def addDock(self, dock: Union[ParamEditor, ParamEditorDockGrouping]):
     if isinstance(dock, ParamEditorDockGrouping):
@@ -165,10 +170,11 @@ class QuickLoaderEditor(ParamEditor):
     else:
       self.listModel.addEditors([dock])
 
-  def saveParamState(self, saveName: str=None, paramState: dict=None,
-                     allowOverwriteDefault=False, blockWrite=False):
-    stateDict = self.paramDictWithOpts(['type'], [ActWithShc, GroupParameter])
-    super().saveParamState(saveName, stateDict, allowOverwriteDefault, blockWrite)
+  def saveParamState(self, saveName: str=None, paramState: dict=None, **kwargs):
+    stateDict = self.paramDictWithOpts(['type'], [ActWithShc, GroupParameter],
+                                       paramDict=paramState)
+    kwargs['paramState'] = stateDict
+    super().saveParamState(saveName, **kwargs)
 
 
   def applyChanges(self):

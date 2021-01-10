@@ -10,7 +10,7 @@ from pyqtgraph.Qt import QtCore
 from s3a import FR_SINGLETON
 from s3a.generalutils import coerceDfTypes
 from s3a.constants import REQD_TBL_FIELDS as RTF
-from s3a.constants import FR_CONSTS, FR_ENUMS
+from s3a.constants import PRJ_ENUMS
 from s3a.structures import ComplexXYVertices
 from s3a.structures import OneDArr, S3AWarning
 
@@ -106,7 +106,7 @@ class CompTableModel(QtCore.QAbstractTableModel):
 
     self.compDf = FR_SINGLETON.tableData.makeCompDf(0)
 
-    noEditParams = set(RTF) - {RTF.COMP_CLASS}
+    noEditParams = set(RTF)
     self.noEditColIdxs = [self.colTitles.index(col.name) for col in noEditParams]
     self.editColIdxs = np.setdiff1d(np.arange(len(self.colTitles)), self.noEditColIdxs)
     self.sigFieldsChanged.emit()
@@ -120,7 +120,7 @@ class ComponentMgr(CompTableModel):
     self._nextCompId = 0
 
   @FR_SINGLETON.actionStack.undoable('Add Components')
-  def addComps(self, newCompsDf: df, addtype: FR_ENUMS = FR_ENUMS.COMP_ADD_AS_NEW, emitChange=True):
+  def addComps(self, newCompsDf: df, addtype: PRJ_ENUMS = PRJ_ENUMS.COMP_ADD_AS_NEW, emitChange=True):
     toEmit = self.defaultEmitDict.copy()
     existingIds = self.compDf.index
 
@@ -135,12 +135,17 @@ class ComponentMgr(CompTableModel):
     newCompsDf.drop(index=dropIds, inplace=True)
 
 
-    if addtype == FR_ENUMS.COMP_ADD_AS_NEW:
+    if addtype == PRJ_ENUMS.COMP_ADD_AS_NEW:
       # Treat all comps as new -> set their IDs to guaranteed new values
       newIds = np.arange(self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int)
       newCompsDf[RTF.INST_ID] = newIds
       newCompsDf.set_index(newIds, inplace=True)
       dropIds = np.array([], dtype=int)
+    else:
+      # Merge may have been performed with new comps (id -1) mixed in
+      needsUpdatedId = newCompsDf.index == RTF.INST_ID.value
+      newIds = np.arange(self._nextCompId, self._nextCompId + np.sum(needsUpdatedId), dtype=int)
+      newCompsDf.loc[needsUpdatedId, RTF.INST_ID] = newIds
 
     # Track dropped data for undo
     alteredIdxs = np.concatenate([newCompsDf.index.values, dropIds])
@@ -177,18 +182,18 @@ class ComponentMgr(CompTableModel):
     yield toEmit
 
     # Undo add by deleting new components and un-updating existing ones
-    self.addComps(alteredDataDf, FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.addComps(alteredDataDf, PRJ_ENUMS.COMP_ADD_AS_MERGE)
     addedCompIdxs = toEmit['added']
     if len(addedCompIdxs) > 0:
       self.rmComps(toEmit['added'])
 
   @FR_SINGLETON.actionStack.undoable('Remove Components')
-  def rmComps(self, idsToRemove: Union[np.ndarray, type(FR_ENUMS)] = FR_ENUMS.COMP_RM_ALL,
+  def rmComps(self, idsToRemove: Union[np.ndarray, type(PRJ_ENUMS)] = PRJ_ENUMS.COMP_RM_ALL,
               emitChange=True) -> dict:
     toEmit = self.defaultEmitDict.copy()
     # Generate ID list
     existingCompIds = self.compDf.index
-    if idsToRemove is FR_ENUMS.COMP_RM_ALL:
+    if idsToRemove is PRJ_ENUMS.COMP_RM_ALL:
       idsToRemove = existingCompIds
     elif not hasattr(idsToRemove, '__iter__'):
       # single number passed in
@@ -231,7 +236,7 @@ class ComponentMgr(CompTableModel):
       return toEmit
 
     # Undo code
-    self.addComps(removedData, FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.addComps(removedData, PRJ_ENUMS.COMP_ADD_AS_MERGE)
 
   @FR_SINGLETON.actionStack.undoable('Merge Components')
   def mergeCompVertsById(self, mergeIds: OneDArr=None, keepId: int=None):
@@ -261,9 +266,9 @@ class ComponentMgr(CompTableModel):
     keepInfo[RTF.VERTICES] = newVerts
 
     self.rmComps(mergeComps.index)
-    self.addComps(keepInfo.to_frame().T, FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.addComps(keepInfo.to_frame().T, PRJ_ENUMS.COMP_ADD_AS_MERGE)
     yield
-    self.addComps(mergeComps, FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.addComps(mergeComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
 
   @FR_SINGLETON.actionStack.undoable('Split Components')
   def splitCompVertsById(self, splitIds: OneDArr):
@@ -294,5 +299,5 @@ class ComponentMgr(CompTableModel):
     outDict.update(self.addComps(newComps))
     yield outDict
     undoDict = self.rmComps(newComps.index)
-    undoDict.update(self.addComps(splitComps, FR_ENUMS.COMP_ADD_AS_MERGE))
+    undoDict.update(self.addComps(splitComps, PRJ_ENUMS.COMP_ADD_AS_MERGE))
     return undoDict

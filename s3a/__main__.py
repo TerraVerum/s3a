@@ -19,7 +19,7 @@ def main(guiMode=True, loadLastState=None, **profileArgs) -> Optional[S3A]:
 
   :param tableCfg: YAML configuration file for table fields and classes. Should contain
     one or more of the following specifications:
-      * opt-tbl-fields: Fields to include in the component table
+      * table-fields: Fields to include in the component table
       * classes: Allowed class for a component
 
   :param loadLastState: When the app is closed, all settings are saved. If this is *True*,
@@ -33,7 +33,6 @@ def main(guiMode=True, loadLastState=None, **profileArgs) -> Optional[S3A]:
   :key `param editor name`: Name of the parameter editor within S3A with a loadable state.
     This can be e.g. `colorscheme`, `shortcuts`, etc.
   """
-  profileArgs = {k.replace(' ', '').lower(): v for k, v in profileArgs.items()}
   # Handle here for faster bootup
   tableCfg = profileArgs.pop('tablecfg', None)
   if tableCfg is not None:

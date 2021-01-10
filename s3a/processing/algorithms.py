@@ -119,7 +119,7 @@ def format_vertices(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
   # Default to bound slices that encompass the whole image
   bounds = np.array([[0, 0], image.shape[:2][::-1]])
   boundSlices = slice(*bounds[:,1]), slice(*bounds[:,0])
-  return ProcessIO(image=image, fgVerts=fgVerts, bgVerts=bgVerts, asForeground=asForeground,
+  return ProcessIO(image=image, summaryInfo=None, fgVerts=fgVerts, bgVerts=bgVerts, asForeground=asForeground,
                    historyMask=curHistory, prevCompMask=foregroundAdjustedCompMask,
                    origCompMask=prevCompMask, boundSlices=boundSlices)
 

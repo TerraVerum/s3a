@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from abc import ABC
 from typing import Optional, Callable, Sequence, Union
 
 import pandas as pd
 from pyqtgraph.Qt import QtWidgets
 
-from s3a import models
 from s3a import parameditors as pe
-from s3a.structures import NChanImg, XYVertices, FRParam, S3AException
+from s3a.constants import PRJ_CONSTS
+from s3a.structures import FRParam, S3AException, AlgProcessorError
 from ..graphicsutils import create_addMenuAct, paramWindow
 from ..parameditors import EditorPropsMixin
 from ..processing import GeneralProcWrapper
@@ -71,8 +70,10 @@ class ParamEditorPlugin(EditorPropsMixin):
     """
     :param func: Function to register
     :param submenuName: If provided, this function is placed under a breakout menu with this name
-    :param kwargs: Forwarded to `ParamEditor.registerFunc`
     :param editor: If provided, the function is registered here instead of the plugin's tool editor
+    :param ownerObj: Registered functions with associated shortcuts must be scoped
+      to an owner object. This is not needed if no shortcut is associated with the button opts.
+    :param kwargs: Forwarded to `ParamEditor.registerFunc`
     """
     if editor is None:
       editor = self.toolsEditor
@@ -116,8 +117,8 @@ class ParamEditorPlugin(EditorPropsMixin):
     if groupName is None:
       groupName = btnOpts.name
     act = self.menu.addAction(groupName, lambda: paramWindow(self.toolsEditor.params.child(groupName)))
-    act.clicked = act.triggered
-    FR_SINGLETON.shortcuts.createRegisteredButton(btnOpts, self, baseBtn=act)
+    act.click = act.triggered.emit
+    FR_SINGLETON.shortcuts.registerShortcut(btnOpts, btnOpts, overrideOwnerObj=self, baseBtn=act)
     if nameList is None:
       nameList = [None]*len(funcList)
     for title, func in zip(nameList, funcList):
@@ -172,36 +173,29 @@ class TableFieldPlugin(ProcessorPlugin):
   def parentMenu(self):
     return self.win.tblFieldToolbar
 
-  def __init__(self):
-    super().__init__()
-    def activate():
-      self.focusedImg.changeCurrentPlugin(self)
-    self.registerFunc(activate, btnOpts={'guibtn':False})
-
-  def attachWinRef(self, win: models.s3abase.S3ABase):
+  def attachWinRef(self, win):
     super().attachWinRef(win)
     self.focusedImg = focusedImg = win.focusedImg
     win.sigRegionAccepted.connect(self.acceptChanges)
-    focusedImg.sigUpdatedAll.connect(self.updateAll)
+    focusedImg.sigUpdatedFocusedComp.connect(self.updateFocusedComp)
+    self.active = True
+    self.registerFunc(self.processorAnalytics, btnOpts=PRJ_CONSTS.TOOL_PROC_ANALYTICS)
 
-    def maybeHandleShapeFinished(roiVerts):
-      if self.active:
-        self.handleShapeFinished(roiVerts)
-    focusedImg.sigShapeFinished.connect(maybeHandleShapeFinished)
+  def processorAnalytics(self):
+    proc = self.curProcessor
+    try:
+      proc.processor.stageSummary_gui()
+    except NotImplementedError:
+      raise AlgProcessorError(f'Processor type {type(proc)} does not implement'
+                              f' summary analytics.')
 
-  def updateAll(self, mainImg: Optional[NChanImg], newComp: Optional[pd.Series] = None):
+
+  def updateFocusedComp(self, newComp: pd.Series = None):
     """
     This function is called when a new component is created or the focused image is updated
-    from the main view. See :meth:`FocusedImage.updateAll` for parameters.
+    from the main view. See :meth:`MainImage.updateFocusedComp` for parameters.
     """
     pass
-
-  def handleShapeFinished(self, roiVerts: XYVertices):
-    """
-    Called whenever a user completes a shape in the focused image. See
-    :meth:`FocusedImage.handleShapeFinished` for parameters.
-    """
-    raise NotImplementedError
 
   def acceptChanges(self):
     """

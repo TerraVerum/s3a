@@ -3,8 +3,10 @@ from __future__ import annotations
 import html
 import weakref
 from dataclasses import dataclass, fields, field
-from typing import Any, Optional, Collection, Union
+from typing import Any, Optional, Collection, Union, Sequence
 from warnings import warn
+
+import numpy as np
 
 from .exceptions import ParamEditorError, S3AWarning
 
@@ -31,8 +33,8 @@ class FRParam:
     if pType is None:
       # Infer from value
       pType = type(value).__name__.lower()
-    ht = helpText
-    if ht is not None and len(ht) > 0:
+    ht = helpText or opts.get('tip', None)
+    if ht:
       # TODO: Checking for mightBeRichText fails on pyside2? Even though the function
       # is supposed to exist?
       ht = html.escape(ht)
@@ -55,8 +57,10 @@ class FRParam:
     Simple conversion function from FRParams used internally to the dictionary form expected
     by pyqtgraph parameters
     """
+    opts = self.opts.copy()
+    opts.pop('type', 'name')
     paramOpts = dict(name=self.name, type=self.pType,
-                     **self.opts)
+                     **opts)
     if len(self.helpText) > 0:
       paramOpts['tip'] = self.helpText
     if self.pType == 'group' and self.value is not None:
@@ -91,6 +95,51 @@ class FRParam:
     # sufficient to form a proper hash
     return hash(self.name,)
 
+  def toNumeric(self, data: Sequence, offset:bool=None, rescale=False, returnUnique=False):
+    """
+    Useful for converting string-like or list-like parameters to integer representations.
+    If self's `value` is non-numeric data (e.g. strings):
+       - First, the parameter is searched for a 'limits' property. This will contain all
+         possible values this field could be.
+       - If no limits exist, unique values in the input data will be considered the
+         limits
+    :param data: Array-like data to be turned into numeric values according to the parameter type
+    :param offset: Whether to offset entries (increment all numeric outputs by 1). This
+      is useful when 0 is indicative of e.g. a background label, but also the numeric
+      value corresponding to the first possible set entry. If `offset` is *True*, output
+      values will be incremented by 1 as described. If *False*, they won't. If *None*,
+      offset will be applied depending on the parameter type. If already numeric, no offset
+      will be applied. Otherwise, `offset` will be *True*.
+    :param rescale: If *True*, values will be rescaled to the range 0-1. `offset` is ignored
+      in that case.
+    :param returnUnique: Whether to also return an array of the unique values within `data`.
+      If data is already numeric, *None* is returned instead of this array.
+   """
+    numericVals = np.asarray(data).copy()
+    if numericVals.size == 0:
+      return numericVals
+    if not np.issubdtype(type(self.value), np.number):
+      if offset is None:
+        offset = True
+      # Check for limits that indicate the exhaustive list of possible values.
+      # Otherwise, just use the unique values of this set as the limits
+      if 'limits' in self.opts:
+        listLims = list(self.opts['limits'])
+        numericVals = np.array([listLims.index(v) for v in numericVals])
+      else:
+        listLims, numericVals = np.unique(numericVals, return_inverse=True)
+    else:
+      listLims = None
+    if offset and not rescale:
+      numericVals += 1
+    if rescale:
+      maxVal = len(listLims) if listLims is not None else np.max(data)
+      if maxVal > 0:
+        # Can't use /= since dtype may change
+        numericVals =  numericVals / maxVal
+    if returnUnique:
+      return numericVals, listLims
+    return numericVals
 
 @dataclass
 class FRParamGroup:
@@ -121,19 +170,20 @@ class FRParamGroup:
       param.group = weakref.proxy(self)
 
   @staticmethod
-  def fromString(group: Union[Collection[FRParam], FRParamGroup], paramName: str,
-                 default: FRParam=None):
+  def fieldFromParam(group: Union[Collection[FRParam], FRParamGroup], param: Union[str, FRParam],
+                     default: FRParam=None):
     """
-    Allows user to create a :class:`FRParam` object from its string value
+    Allows user to create a :class:`FRParam` object from its string value (or a parameter that
+    can equal one of the parameters in this list)
     """
-    paramName = str(paramName.lower())
-    for param in group:
-      if param.name.lower() == paramName:
-        return param
-    # If we reach here the value didn't match any FRComponentTypes values. Throw an error
+    param = str(param.lower())
+    for matchParam in group:
+      if matchParam.name.lower() == param:
+        return matchParam
+    # If we reach here the value didn't match any CNSTomponentTypes values. Throw an error
     if default is None and hasattr(group, 'getDefault'):
       default = group.getDefault()
-    baseWarnMsg = f'String representation "{paramName}" was not recognized.\n'
+    baseWarnMsg = f'String representation "{param}" was not recognized.\n'
     if default is None:
       # No default specified, so we have to raise Exception
       raise ParamEditorError(baseWarnMsg + 'No class default is specified.')
@@ -145,7 +195,7 @@ class FRParamGroup:
   def getDefault(cls) -> Optional[FRParam]:
     """
     Returns the default Param from the group. This can be overloaded in derived classes to yield a safe
-    fallback class if the :func:`fromString` method fails.
+    fallback class if the :func:`fieldFromParam` method fails.
     """
     return None
 
