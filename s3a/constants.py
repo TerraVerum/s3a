@@ -115,29 +115,12 @@ class _PrjConsts(FRParamGroup):
   # --------------------------
   # REGION-CREATION PARAMETERS
   # --------------------------
-  PROP_MAIN_IMG_SEED_THRESH    : FRParam = newParam('Seedpoint Threshold in Main Image', 10.)
   PROP_MIN_COMP_SZ             : FRParam = newParam('Minimum New Component Size (px)', 50)
-  PROP_NEW_COMP_SZ             : FRParam = newParam('New Component Side Length (px)', 30)
-  PROP_EST_BOUNDS_ON_START     : FRParam = newParam('Estimate Boundaries on Image Load', False)
-  PROP_MK_MULT_COMPS_ON_ADD    : FRParam = newParam(
-    'New Component for Each Separate Boundary', False,
-    helpText='When creating a new component in the main image, separate boundarieswill'
-             ' not be assigned to one single component. Rather, a new compnentwill be '
-             ' created for each closed boundary.')
-  PROP_TREAT_MARGIN_AS_PCT     : FRParam = newParam(
-    'Treat crop margin as % of image size', True,
-    helpText='See note under *Crop Padding Value*')
-  PROP_CROP_MARGIN_VAL         : FRParam = newParam(
-    'Crop Padding Value', 15,
-    helpText='If *Treat as %* is selected, then the padding will be proportionateto'
-             ' the size of the focused component. Otherwise, the padding will be a'
-             ' fixed pixel amount.')
   PROP_ONLY_GROW_MAIN_VB       : FRParam = newParam(
     'Disallow shrink during selection', True,
     helpText='When selecting components, this parameter determines whether the viewbox'
              ' shrinks only to the current selection (if *False*)or just ensures the'
              ' view contains the selected component (if *True*)')
-  PROP_FOCUSED_SEED_THRESH     : FRParam = newParam('Seedpoint Threshold in Focused Image', 7.)
   PROP_UNDO_BUF_SZ             : FRParam = newParam(
     'Size of Undo Buffer', 300, helpText='Increasing the buffer size will require more memory,'
                                          'but can save a larger record of past actions.')
@@ -146,14 +129,7 @@ class _PrjConsts(FRParamGroup):
     helpText='When `Boundary Only`, components are selected when clicking on their boundaries.\n'
              'When `Entire Component`, clicking anywhere within the component'
              ' will select it')
-  PROP_STEPS_BW_SAVE           : FRParam = newParam('Operations Between Buffer Saves', 1)
-  PROP_CHECK_LARGE_CHANGES     : FRParam = newParam('Save buffer during large region changes', True)
   PROP_SHOW_TBL_ON_COMP_CREATE : FRParam = newParam('Show popup table when creating component', False)
-  PROP_SHOW_GUI_TOOL_BTNS      : FRParam = newParam(
-    'Show tool buttons', True, helpText='Since these buttons also have right-click menu options,'
-                                        ' it may be desirable to save space in the main'
-                                        ' window by hiding these buttons.')
-
   # --------------------------
   # MISC TOOLS
   # --------------------------

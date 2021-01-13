@@ -57,6 +57,7 @@ class VerticesPlugin(TableFieldPlugin):
 
     win.focusedImg.registerDrawAction([CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self._run_drawAct)
     win.focusedImg.addTools(self.toolsEditor)
+    self.vb: pg.ViewBox = win.focusedImg.getViewBox()
     super().attachWinRef(win)
 
   def updateFocusedComp(self, newComp:pd.Series = None):
@@ -99,8 +100,23 @@ class VerticesPlugin(TableFieldPlugin):
       compMask = compGrayscale > 0
     # TODO: When multiple classes can be represented within focused image, this is where
     #  change will have to occur
-    newGrayscale = self.curProcessor.run(image=img, prevCompMask=compMask, **vertsDict,
-                                         firstRun=self.firstRun).astype('uint8')
+    # Clip viewrange to min view axis area instead of max, which will happen internally
+    # otherwise
+    vbRange = np.array(self.vb.viewRange())
+    span = np.diff(vbRange).flatten()
+    center = vbRange[:,0]+span/2
+    minSpan = np.min(span)
+    offset = center - minSpan/2
+    viewbox = minSpan*np.array([[0,0], [0,1], [1,1], [1,0]]) + offset
+    newGrayscale = self.curProcessor.run(
+      image=img,
+      prevCompMask=compMask,
+      **vertsDict,
+      firstRun=self.firstRun,
+      viewbox=XYVertices(viewbox),
+      prevCompVerts=self.focusedImg.compSer[RTF.VERTICES]
+    ).astype('uint8')
+
     self.firstRun = False
     if not np.array_equal(newGrayscale, compGrayscale):
       self.updateRegionFromMask(newGrayscale)

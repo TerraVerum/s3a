@@ -124,16 +124,43 @@ def format_vertices(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
                    historyMask=curHistory, prevCompMask=foregroundAdjustedCompMask,
                    origCompMask=prevCompMask, boundSlices=boundSlices)
 
-def crop_to_local_area(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
-                       prevCompMask: BlackWhiteImg, historyMask: GrayImg, margin_pctRoiSize=10):
-  allVerts = np.vstack([fgVerts, bgVerts])
-  if len(allVerts) == 1:
-    # Single point, use image size as reference shape
-    vertArea_rowCol = image.shape[:2]
+def crop_to_local_area(image: NChanImg,
+                       fgVerts: XYVertices,
+                       bgVerts: XYVertices,
+                       prevCompMask: BlackWhiteImg,
+                       prevCompVerts: ComplexXYVertices,
+                       viewbox: XYVertices,
+                       historyMask: GrayImg,
+                       reference='viewbox',
+                       margin_pct=10
+                       ):
+  """
+  :param reference:
+    pType: list
+    limits:
+      - image
+      - component
+      - viewbox
+      - roi
+  """
+  roiVerts = np.vstack([fgVerts, bgVerts])
+  compVerts = np.vstack([prevCompVerts + [roiVerts]])
+  if reference == 'image':
+    allVerts = np.array([[0, 0], image.shape[:2]])
+  elif reference == 'roi' and len(roiVerts) > 1:
+    allVerts = roiVerts
+  elif reference == 'component' and len(compVerts) > 1:
+    allVerts = compVerts
   else:
-    # Lots of points, use their bounded area
+    # viewbox or badly sized previous region/roi
+    allVerts = viewbox
+  # Lots of points, use their bounded area
+  try:
     vertArea_rowCol = (allVerts.max(0)-allVerts.min(0))[::-1]
-  margin = int(round(max(vertArea_rowCol) * (margin_pctRoiSize / 100)))
+  except ValueError:
+    # 0-sized
+    vertArea_rowCol = 0
+  margin = int(round(max(vertArea_rowCol) * (margin_pct / 100)))
   cropped, bounds = getCroppedImg(image, allVerts, margin)
   vertOffset = bounds.min(0)
   for vertList in fgVerts, bgVerts:

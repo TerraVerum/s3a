@@ -50,13 +50,10 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
 
   @classmethod
   def __initEditorParams__(cls):
-    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls)
+    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Region Tools')
 
-    cls.compCropMargin, cls.treatMarginAsPct = FR_SINGLETON.generalProps.registerProps(
-      [CNST.PROP_CROP_MARGIN_VAL, CNST.PROP_TREAT_MARGIN_AS_PCT])
-
-    (cls.minCompSize, cls.onlyGrowViewbox) = FR_SINGLETON.generalProps.registerProps(
-      [CNST.PROP_MIN_COMP_SZ, CNST.PROP_ONLY_GROW_MAIN_VB])
+    cls.onlyGrowViewbox, cls.minCompSize = FR_SINGLETON.generalProps.registerProps(
+      [CNST.PROP_ONLY_GROW_MAIN_VB, CNST.PROP_MIN_COMP_SZ])
 
   def __init__(self, parent=None, drawShapes: Collection[FRParam]=None,
                drawActions: Collection[FRParam]=(),
