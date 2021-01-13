@@ -171,6 +171,12 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     self.sigRegionAccepted.emit()
 
     ser = self.focusedImg.compSer
+    if ser[REQD_TBL_FIELDS.VERTICES].isEmpty():
+      # Component should be erased. Since new components will not match existing
+      # IDs the same function will work regardless of whether this was new or existing
+      self.compMgr.rmComps([ser[REQD_TBL_FIELDS.INST_ID]])
+      return
+
     if exists:
       undo = self._acceptFocused_existing(ser)
     else:

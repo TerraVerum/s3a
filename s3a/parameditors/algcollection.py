@@ -7,13 +7,12 @@ from typing import Optional, Dict, List, Callable, Union, Type
 from pyqtgraph.Qt import QtCore
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.parameterTypes import ListParameter
-
 from s3a.constants import MENU_OPTS_DIR
-from s3a.structures import FRParam, \
-  AlgProcessorError, ParamEditorError
+from s3a.generalutils import pascalCaseToTitle
+from s3a.structures import AlgProcessorError
+
 from .genericeditor import ParamEditor
 from .pgregistered import ProcGroupParameter
-from s3a.generalutils import pascalCaseToTitle
 from ..processing import GeneralProcWrapper, GeneralProcess
 
 Signal = QtCore.Signal

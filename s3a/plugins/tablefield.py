@@ -131,6 +131,8 @@ class VerticesPlugin(TableFieldPlugin):
     :param offset: Offset of newVerts relative to main image coordinates
     """
     fImg = self.focusedImg
+    if newData is None or np.all(newData[RTF.VERTICES].apply(ComplexXYVertices.isEmpty)):
+      newData = makeMultiRegionDf(0)
     if fImg.image is None:
       self.region.clear()
       return
@@ -140,8 +142,6 @@ class VerticesPlugin(TableFieldPlugin):
 
     if offset is None:
       offset = XYVertices([[0,0]])
-    if newData is None:
-      newData = makeMultiRegionDf(0)
     # 0-center new vertices relative to FocusedImage image
     # Make a copy of each list first so we aren't modifying the
     # original data

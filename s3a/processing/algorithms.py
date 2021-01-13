@@ -462,6 +462,7 @@ class TopLevelImageProcessors:
   @staticmethod
   def a_grabCutProcessor():
     proc = ImageProcess.fromFunction(cv_grabcut, name='Primitive Grab Cut')
+    proc.addProcess(ImageProcess.fromFunction(keep_regions_touching_roi, needsWrap=True))
     return proc
 
   @staticmethod
