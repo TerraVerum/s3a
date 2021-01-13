@@ -186,7 +186,7 @@ class ParamEditorDockGrouping(QtWidgets.QDockWidget):
     for editor in editors:
       editor.tree.resizeColumnToContents(0)
       if editor.width() > minWidth:
-        minWidth = editor.width()//2
+        minWidth = int(editor.width()*0.8)
       # "Main Image Settings" -> "Settings"
       tabName = self.getTabName(editor)
       self.tabs.addTab(editor.dockContentsWidget, tabName)

@@ -15,13 +15,15 @@ btnCallable = Callable[[FRParam], Any]
 class ButtonCollection(QtWidgets.QGroupBox):
   def __init__(self, parent=None, title: str=None, btnParams: Collection[FRParam]=(),
                btnTriggerFns: Union[btnCallable, Collection[btnCallable]]=(),
-               exclusive=True, checkable=True):
+               exclusive=True, asToolBtn=True,
+               **createOpts):
     super().__init__(parent)
     self.lastTriggered: Optional[FRParam] = None
     self.uiLayout = QtWidgets.QHBoxLayout(self)
     self.btnGroup = QtWidgets.QButtonGroup(self)
     self.paramToFuncMapping: Dict[FRParam, btnCallable] = dict()
     self.paramToBtnMapping: Dict[FRParam, QtWidgets.QPushButton] = dict()
+    self.asToolBtn = asToolBtn
     if title is not None:
       self.setTitle(title)
     self.btnGroup.setExclusive(exclusive)
@@ -29,12 +31,13 @@ class ButtonCollection(QtWidgets.QGroupBox):
     if not isinstance(btnTriggerFns, Iterable):
       btnTriggerFns = [btnTriggerFns]*len(btnParams)
     for param, fn in zip(btnParams, btnTriggerFns):
-      self.create_addBtn(param, fn, checkable)
+      self.create_addBtn(param, fn, **createOpts)
 
   def create_addBtn(self, btnParam: FRParam, triggerFn: btnCallable, checkable=True, **registerOpts):
     if btnParam in self.paramToBtnMapping or not btnParam.opts.get('guibtn', True):
       # Either already exists or wasn't designed to be a button
       return
+    registerOpts.setdefault('asToolBtn', self.asToolBtn)
     newBtn = parameditors.FR_SINGLETON.shortcuts.createRegisteredButton(btnParam, **registerOpts)
     if checkable:
       newBtn.setCheckable(True)

@@ -130,7 +130,7 @@ class S3A(S3ABase):
     self.statBar.addWidget(self.mouseCoords)
     self.statBar.addWidget(self.pxColor)
 
-  def changeFocusedComp(self, newComps: df, forceKeepLastChange=False):
+  def changeFocusedComp(self, newComps: df=None, forceKeepLastChange=False):
     ret = super().changeFocusedComp(newComps, forceKeepLastChange)
     self.curCompIdLbl.setText(f'Component ID: {self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]}')
     return ret

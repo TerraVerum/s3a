@@ -8,6 +8,12 @@ T = TypeVar('T')
 
 class CompositionMixin:
   _exposedObjs = []
+
+  def __new__(cls, *args, **kwargs):
+    obj = super().__new__(cls)
+    obj._exposedObjs = []
+    return obj
+
   def exposes(self, obj: T) -> T:
     """Adds methods from *obj* not shadowed by *self* to *self*'s mro"""
     self._exposedObjs.append(obj)

@@ -16,6 +16,7 @@ from s3a.graphicsutils import ConsoleWidget, menuFromEditorActions
 from s3a.models import s3abase
 from s3a.parameditors import FR_SINGLETON
 from s3a.plugins.base import ParamEditorPlugin, ProcessorPlugin
+from s3a.processing import ProcessIO
 
 
 class MainImagePlugin(ParamEditorPlugin):
@@ -47,13 +48,21 @@ class MainImagePlugin(ParamEditorPlugin):
     self.registerFunc(startMove, btnOpts=CNST.TOOL_MOVE_REGIONS)
     self.registerFunc(startCopy, btnOpts=CNST.TOOL_COPY_REGIONS)
 
-    if hasattr(win, 'compDisplay'):
-      tbl = win.compDisplay
-      # Wrap in process to ignore the default param
-      self.registerFunc(tbl.mergeSelectedComps, btnOpts=CNST.TOOL_MERGE_COMPS, ignoreKeys=['keepId'])
-      self.registerFunc(tbl.splitSelectedComps, btnOpts=CNST.TOOL_SPLIT_COMPS)
-      win.mainImg.registerDrawAction([CNST.DRAW_ACT_SELECT, CNST.DRAW_ACT_PAN],
-                                   lambda verts, _p: win.compDisplay.reflectSelectionBoundsMade(verts))
+
+    disp = win.compDisplay
+    # Wrap in process to ignore the default param
+
+    def actHandler(verts, param):
+      # When editing, only want to select if nothing is already selected
+      if (param not in [CNST.DRAW_ACT_REM, CNST.DRAW_ACT_ADD]
+          or  len(disp.selectedIds) == 0
+      ):
+          disp.reflectSelectionBoundsMade(verts)
+
+    self.registerFunc(disp.mergeSelectedComps, btnOpts=CNST.TOOL_MERGE_COMPS, ignoreKeys=['keepId'])
+    self.registerFunc(disp.splitSelectedComps, btnOpts=CNST.TOOL_SPLIT_COMPS)
+    win.mainImg.registerDrawAction([CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM, CNST.DRAW_ACT_SELECT, CNST.DRAW_ACT_PAN],
+                                 actHandler)
 
     win.mainImg.registerDrawAction(CNST.DRAW_ACT_CREATE, self.createComponent)
     win.mainImg.addTools(self.toolsEditor)
@@ -195,132 +204,28 @@ class GlobalPredictionsPlugin(ProcessorPlugin):
 
   def __init__(self):
     super().__init__()
-    self.idGroupings: List[Set[int]] = []
-
     self.registerFunc(self.predictFromSelection, btnOpts=CNST.TOOL_PRED_SEL)
-    self.registerFunc(lambda: self.deleteGroupsWithIds(self.win.compDisplay.selectedIds), btnOpts=CNST.TOOL_PRED_DEL_GRP)
     self.registerFunc(self.lastRunAnalytics)
 
-  def attachWinRef(self, win: models.s3abase.S3ABase):
+  def attachWinRef(self, win):
     super().attachWinRef(win)
-    def onChange(changeDict):
-      deleted = set(changeDict['deleted'])
-      for grouping in self.idGroupings:
-        grouping -= deleted
-    win.compMgr.sigCompsChanged.connect(onChange)
     self.mgr = win.compMgr
     self.focusedImg = win.focusedImg
-    win.sigRegionAccepted.connect(self.acceptChanges)
-
-  def acceptChanges(self):
-    # TODO: make this work
-    return
-
-    # noinspection PyUnreachableCode
-    origVerts = self.focusedImg.compSer[RTF.VERTICES].copy()
-    origOffset = origVerts.stack().min(0)
-    # Account for margin in focused image
-    for verts in origVerts:
-      verts -= origOffset
-    origId = self.focusedImg.compSer[RTF.INST_ID]
-    df = self.mgr.compDf
-    modifiedCompIds = self._groupsWithIds([origId])
-    if len(modifiedCompIds) == 0:
-      return
-    toModifyIdxs = df.index.isin(modifiedCompIds)
-    toModifyVerts = df.loc[toModifyIdxs, RTF.VERTICES]
-    allNewVerts = []
-    for complexVerts in toModifyVerts: # type: ComplexXYVertices
-      offset = complexVerts.stack().min(0)
-      newVerts = []
-      for verts in origVerts:
-        newVerts.append(verts + offset)
-      allNewVerts.append(ComplexXYVertices(newVerts))
-    toAddDf = pd.DataFrame(np.c_[toModifyIdxs, allNewVerts], columns=[RTF.INST_ID, RTF.VERTICES])
-    toAddDf = toAddDf.set_index(RTF.INST_ID, drop=False)
-    self.mgr.addComps(toAddDf, PRJ_ENUMS.COMP_ADD_AS_MERGE)
-
-  def _groupsWithIds(self, idList: Sequence[int]):
-    allIds = []
-    for grouping in self.idGroupings:
-      if any(id_ in grouping for id_ in idList):
-        allIds.extend(grouping)
-    return allIds
+    win.focusedImg.toolsEditor.registerFunc(self.predictFromSelection)
 
   def makePrediction(self, comps: pd.DataFrame):
     if self.win.mainImg.image is None:
       return
-    result = self.curProcessor.run(components=comps, image=self.win.mainImg.image)
-    newComps = result['components']
-    with FR_SINGLETON.actionStack.group('Make Prediction'):
-      changeList = self.mgr.addComps(newComps)['added']
-      deleteOrigs = result.get('deleteOrig', True)
-      if deleteOrigs:
-        self.mgr.rmComps(comps.index)
-    origId = self.focusedImg.compSer[RTF.INST_ID]
-    if result.get('asGroup', False):
-      self.idGroupings.append(set(changeList + [origId]))
+    newComps = self.curProcessor.run(components=comps, image=self.win.mainImg.image)
+    if isinstance(newComps, ProcessIO):
+      newComps = newComps['components']
+    self.mgr.addComps(newComps)
 
   def predictFromSelection(self):
     self.makePrediction(self.mgr.compDf.loc[self.win.compDisplay.selectedIds])
 
-  def deleteGroupsWithIds(self, idList: Sequence[int]):
-    toDelete = self._groupsWithIds(idList)
-    self.mgr.rmComps(toDelete)
-
   def lastRunAnalytics(self):
-    analyticsWin = self._buildAnalyticsLayout()
-    scores = self.curProcessor.processor.result['scores']
-    lastIds = np.asarray(list(self.idGroupings[-1]))
-    keeps = np.isin(lastIds, self.mgr.compDf.index)
-    lastIds = lastIds[keeps]
-    scores = scores[keeps]
-    lastComps = self.mgr.compDf.loc[lastIds].copy()
-    lastComps[FR_SINGLETON.tableData.fieldFromName('Notes')] = scores
-    analyticsWin.compMgr.addComps(lastComps)
-
-    analyticsWin.mainImg.setImage(self.win.mainImg.image)
-    tmImgOverlay = pg.ImageItem(self.curProcessor.processor.result['matchImg'])
-    tmImgOverlay.setOpacity(0.75)
-    verts =  lastComps.loc[lastComps.index[0], RTF.VERTICES].stack()
-    templateSize = verts.max(0) - verts.min(0)
-    tmImgOverlay.setPos(templateSize[0]//2, templateSize[1]//2)
-    analyticsWin.mainImg.addItem(tmImgOverlay)
-
-    analyticsWin.show()
-    analyticsWin.exec_()
-
-  @staticmethod
-  def _buildAnalyticsLayout():
-    from s3a.models.tablemodel import ComponentMgr
-    from s3a.views.imageareas import MainImage
-    from s3a.views.tableview import CompTableView
-    from s3a.controls.tableviewproxy import CompSortFilter
-    parent = QtWidgets.QDialog()
-    parent.setModal(True)
-    lay = QtWidgets.QVBoxLayout()
-    parent.setLayout(lay)
-
-    scoreHoverLbl = parent.scoreHoverLbl = QtWidgets.QLabel()
-    parent.compMgr = newMgr = ComponentMgr()
-    parent.mainImg = newImg = MainImage()
-    newImg.drawActGrp.paramToBtnMapping[CNST.DRAW_ACT_ADD].hide()
-    newTbl = CompTableView(minimal=True)
-    newTbl.setModel(CompSortFilter(newMgr))
-    cols = [RTF.INST_ID, FR_SINGLETON.tableData.fieldFromName('Notes')]
-    for ii, col in enumerate(FR_SINGLETON.tableData.allFields):
-      if col not in cols:
-        newTbl.setColumnHidden(ii, True)
-    newMgr.beginResetModel()
-    newMgr.colTitles[newMgr.colTitles.index('Notes')] = 'Score'
-    newMgr.endResetModel()
-
-    lay.addWidget(scoreHoverLbl)
-    lay.addWidget(newImg.widgetContainer())
-    newImg.toolsGrp.hide()
-    lay.addWidget(newTbl)
-    parent.compDisplay = CompDisplayFilter(newMgr, newImg, newTbl)
-    return parent
+    raise NotImplementedError
 
 class FindDuplicatesPlugin(ProcessorPlugin):
   name = 'Find Duplicates'

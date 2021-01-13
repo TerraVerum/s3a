@@ -130,15 +130,21 @@ class ShortcutsEditor(ParamEditor):
 
   def createRegisteredButton(self, btnOpts: FRParam,
                              baseBtn: QtWidgets.QAbstractButton=None,
-                             **kwargs):
+                             asToolBtn=False, **kwargs):
+    if asToolBtn:
+      btnType = QtWidgets.QToolButton
+    else:
+      btnType = QtWidgets.QPushButton
     tooltipText = btnOpts.helpText
     if baseBtn is not None:
       newBtn = baseBtn
     elif 'icon' in btnOpts.opts:
-      newBtn = QtWidgets.QPushButton(QtGui.QIcon(btnOpts.opts['icon']), '', self)
+      newBtn = btnType(self)
+      newBtn.setIcon(QtGui.QIcon(btnOpts.opts['icon']))
       tooltipText = helpTextToRichText(btnOpts.helpText, btnOpts.name)
     else:
-      newBtn = QtWidgets.QPushButton(btnOpts.name, self)
+      newBtn = btnType(self)
+      newBtn.setText(btnOpts.name)
     if btnOpts.value is None:
       # Either the shortcut wasn't given a value or wasn't requested, or already exists
       newBtn.setToolTip(tooltipText)

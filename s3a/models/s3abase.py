@@ -107,9 +107,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     def handleCompsChanged(changedDict: dict):
       focusedId = self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]
       if focusedId in changedDict['deleted']:
-        self.focusedImg.updateFocusedComp()
-      elif focusedId in changedDict['changed']:
-        self.changeFocusedComp(self.compMgr.compDf.loc[[focusedId]])
+        self.changeFocusedComp()
     self.compMgr.sigCompsChanged.connect(handleCompsChanged)
 
     # -----
@@ -177,6 +175,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       undo = self._acceptFocused_existing(ser)
     else:
       undo = self._acceptFocused_new(ser)
+    self.changeFocusedComp()
     yield
     undo()
 
@@ -194,7 +193,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     self.compMgr.addComps(modifiedDf, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)
     def undo():
       self.add_focusComps(oldComp, addType=PRJ_ENUMS.COMP_ADD_AS_MERGE)
-      self.focusedImg.updateFocusedComp(oldComp.iloc[0])
+      self.changeFocusedComp(oldComp.iloc[0])
     return undo
 
 
@@ -237,7 +236,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       self.mainImg.setImage(fileName)
     self.srcImgFname = fileName
 
-    self.focusedImg.updateFocusedComp()
+    self.changeFocusedComp()
     self.mainImg.plotItem.vb.autoRange()
     self.filePlg.addImage(fileName)
     self.loadNewAnnotations()
@@ -350,19 +349,22 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     self.changeFocusedComp(self.compMgr.compDf.loc[[changeList[-1]]])
 
   @FR_SINGLETON.actionStack.undoable('Change Focused Component')
-  def changeFocusedComp(self, newComps: df, forceKeepLastChange=False):
+  def changeFocusedComp(self, newComps: df=None, forceKeepLastChange=False):
     oldSer = self.focusedImg.compSer.copy()
     oldImg = self.focusedImg.image
-    if len(newComps) == 0:
-      return
-    # TODO: More robust scenario if multiple comps are in the dataframe
-    #   For now, just use the last in the selection. This is so that if multiple
-    #   components are selected in a row, the most recently selected is always
-    #   the current displayed.
-    newComp: pd.Series = newComps.iloc[-1,:]
-    newCompId = newComp[REQD_TBL_FIELDS.INST_ID]
-    self.compDisplay.regionPlot.focusById([newCompId])
-    self.focusedImg.updateFocusedComp(newComp)
+    if newComps is None or len(newComps) == 0:
+      self.focusedImg.updateFocusedComp()
+      self.compDisplay.regionPlot.focusById([])
+      self.compDisplay.selectRowsById([])
+    else:
+      # TODO: More robust scenario if multiple comps are in the dataframe
+      #   For now, just use the last in the selection. This is so that if multiple
+      #   components are selected in a row, the most recently selected is always
+      #   the current displayed.
+      newComp: pd.Series = newComps.iloc[-1,:]
+      newCompId = newComp[REQD_TBL_FIELDS.INST_ID]
+      self.compDisplay.regionPlot.focusById([newCompId])
+      self.focusedImg.updateFocusedComp(newComp)
     # Nothing happened since the last component change, so just replace it instead of
     # adding a distinct action to the buffer queue
     stack = FR_SINGLETON.actionStack
@@ -372,4 +374,4 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     if oldImg is not None and len(oldSer.loc[REQD_TBL_FIELDS.VERTICES]) > 0:
       self.changeFocusedComp(oldSer.to_frame().T, forceKeepLastChange=True)
     else:
-      self.focusedImg.updateFocusedComp()
+      self.changeFocusedComp()

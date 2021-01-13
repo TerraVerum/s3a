@@ -147,7 +147,7 @@ class VerticesPlugin(TableFieldPlugin):
       yield
     if (fImg.compSer.loc[RTF.INST_ID] != oldSer.loc[RTF.INST_ID]
         or fImg.image is None):
-      fImg.updateFocusedComp(oldSer)
+      self.win.updateFocusedImg(oldSer)
     self.region.resetRegionList(oldData)
 
   def updateRegionFromMask(self, mask: BlackWhiteImg, offset=None):
@@ -158,11 +158,10 @@ class VerticesPlugin(TableFieldPlugin):
 
   def acceptChanges(self, overrideVerts: ComplexXYVertices=None):
     # Add in offset from main image to VertexRegion vertices
+    newVerts = overrideVerts or self.collapseRegionVerts()
     ser = self.focusedImg.compSer
-    if overrideVerts is not None:
-      ser.loc[RTF.VERTICES] = overrideVerts
-      return
-    ser[RTF.VERTICES] = self.collapseRegionVerts()
+    ser[RTF.VERTICES] = newVerts
+    self.updateFocusedComp()
 
   def collapseRegionVerts(self, simplify=True):
     """

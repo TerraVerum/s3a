@@ -129,14 +129,14 @@ class ProcessStage(ABC):
   def __str__(self) -> str:
     return repr(self)
 
-  def updateInput(self, prevIo: ProcessIO):
+  def updateInput(self, prevIo: ProcessIO, **kwargs):
     """
     Helper function to update current inputs from previous ones while ignoring leading
     underscores.
     """
     selfFmtToUnfmt = {k.lstrip('_'): k for k in self.input}
     requiredKeyFmt = {k: v for k, v in selfFmtToUnfmt.items() if v in self.input.keysFromPrevIO}
-    prevIoKeyToFmt = {k.lstrip('_'): k for k in prevIo}
+    prevIoKeyToFmt = {k.lstrip('_'): k for k in {**prevIo, **kwargs}}
     missingKeys = []
     for fmtK, trueK in selfFmtToUnfmt.items():
       if fmtK in prevIoKeyToFmt:
@@ -147,8 +147,7 @@ class ProcessStage(ABC):
       raise AlgProcessorError(f'Missing Following keys from {self}: {missingKeys}')
 
   def run(self, io: ProcessIO=None, disable=False, **runKwargs):
-    if io is not None:
-      io.update(**runKwargs)
+    raise NotImplementedError
 
   def __call__(self, **kwargs):
     return self.run(ProcessIO(**kwargs))
@@ -230,9 +229,8 @@ class AtomicProcess(ProcessStage):
     return self.input.keysFromPrevIO
 
   def run(self, prevIO: ProcessIO=None, disable=False, **runKwargs):
-    super().run(prevIO, disable, **runKwargs)
     if prevIO is not None:
-      self.updateInput(prevIO)
+      self.updateInput(prevIO, **runKwargs)
     if not disable:
       self.result = self.func(**self.input)
     else:
@@ -287,11 +285,11 @@ class GeneralProcess(ProcessStage):
     return process
 
   def run(self, io: ProcessIO = None, disable=False, **runKwargs):
-    super().run(io, disable, **runKwargs)
     if io is None:
       _activeIO = ProcessIO()
     else:
       _activeIO = copy.copy(io)
+    _activeIO.update(runKwargs)
 
     for i, stage in enumerate(self.stages):
       newIO = stage.run(_activeIO, disable=self.disabled or disable)
@@ -385,8 +383,8 @@ class GeneralProcess(ProcessStage):
     return validInfos
 
 class ImageProcess(GeneralProcess):
-  mainResultKeys = ['image']
   mainInputKeys = ['image']
+  mainResultKeys = ['image']
 
   @classmethod
   def _cmpPrevCurInfos(cls, prevInfos: t.List[dict], infos: t.List[dict]):

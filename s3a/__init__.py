@@ -8,7 +8,8 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 
 __all__ = ['appInst', 'FR_SINGLETON', 'S3A', 'ParamEditor', 'FRParam', 'REQD_TBL_FIELDS',
-           'ComplexXYVertices', 'XYVertices', 'PRJ_CONSTS', 'ComponentIO', 'RunOpts', '__version__']
+           'ComplexXYVertices', 'XYVertices', 'PRJ_CONSTS', 'ComponentIO', 'RunOpts',
+           '__version__']
 
 pg.setConfigOptions(imageAxisOrder='row-major')
 

@@ -1,4 +1,4 @@
-from functools import wraps
+from functools import wraps, lru_cache
 from typing import Tuple, List
 
 import cv2 as cv
@@ -10,8 +10,9 @@ from skimage.morphology import flood, disk
 from skimage import morphology as morph
 from skimage.segmentation import quickshift
 
-from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices, dynamicDocstring, \
-  pascalCaseToTitle
+from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices, \
+  dynamicDocstring, \
+  pascalCaseToTitle, serAsFrame
 from s3a.constants import REQD_TBL_FIELDS as RTF
 from s3a.processing import AtomicProcess
 from s3a.processing.processing import ProcessIO, ImageProcess, GlobalPredictionProcess
@@ -454,7 +455,7 @@ def get_component_images(image: np.ndarray, components: pd.DataFrame):
   imgs = [getCroppedImg(image, verts.stack(), 0) for verts in components[RTF.VERTICES]]
   return ProcessIO(subimages=imgs)
 
-def dispatchedProcessor(func):
+def dispatchedTemplateMatcher(func):
   inputSpec = ProcessIO.fromFunction(func, ignoreKeys=['template'])
   inputSpec['components'] = inputSpec.FROM_PREV_IO
   def dispatcher(image: np.ndarray, components: pd.DataFrame, **kwargs):
@@ -479,6 +480,36 @@ def dispatchedProcessor(func):
   proc.addFunction(dispatcher)
   proc.stages[0].input = inputSpec
   return proc
+
+def dispatchedFocusedProcessor(func):
+  inputSpec = ProcessIO.fromFunction(func)
+  inputSpec['components'] = inputSpec.FROM_PREV_IO
+  def dispatcher(image: np.ndarray, components: pd.DataFrame, **kwargs):
+    out = ProcessIO()
+    allComps = []
+    for ii, comp in components.iterrows():
+      verts = comp[RTF.VERTICES].stack()
+      focusedImage = getCroppedImg(image, verts, 0, returnSlices=False)
+      result = func(image=focusedImage, **kwargs)
+      if isinstance(result, ProcessIO):
+        mask = result['image']
+        out.update(**result)
+        out.pop('components', None)
+      else:
+        mask = result
+      newComp = comp.copy()
+      if mask is not None:
+        newComp[RTF.VERTICES] = ComplexXYVertices.fromBwMask(mask)
+      allComps.append(serAsFrame(newComp))
+    outComps = pd.concat(allComps, ignore_index=True)
+    out['components'] = outComps
+    return out
+  dispatcher.__doc__ = func.__doc__
+  proc = GlobalPredictionProcess(pascalCaseToTitle(func.__name__))
+  proc.addFunction(dispatcher)
+  proc.stages[0].input = inputSpec
+  return proc
+
 
 @dynamicDocstring(metricTypes=[d for d in dir(cv) if d.startswith('TM')])
 def cv_template_match(template: np.ndarray, image: np.ndarray, threshold=0.8, metric='TM_CCOEFF_NORMED'):
@@ -516,7 +547,7 @@ def cv_template_match(template: np.ndarray, image: np.ndarray, threshold=0.8, me
 def pts_to_components(matchPts: np.ndarray, component: pd.Series):
   numOutComps = len(matchPts)
   # Explicit copy otherwise all rows point to the same component
-  outComps = pd.concat([component.to_frame().T]*numOutComps, ignore_index=True).copy()
+  outComps = pd.concat([serAsFrame(component)]*numOutComps, ignore_index=True).copy()
   origOffset = component[RTF.VERTICES].stack().min(0)
   allNewverts = []
   for ii, pt in zip(outComps.index, matchPts):
@@ -527,6 +558,32 @@ def pts_to_components(matchPts: np.ndarray, component: pd.Series):
   outComps[RTF.VERTICES] = allNewverts
   return outComps
 
+
+@lru_cache()
+def _modelFromFile(model: str):
+  fname = MODEL_DIR/model
+  return tf.load(fname)
+
+def nn_model_prediction(image: NChanImg, model=''):
+  """
+
+  :param image:
+  :param fgVerts:
+  :param model:
+    pType: list
+    limits:
+      - ''
+      - LinkNet
+      - SegNet
+      - DeepLab
+  """
+  if not model:
+    return None
+  nnModel = _modelFromFile(model)
+
+  return np.random.random((image.shape[:2])) > 0
+
 TOP_GLOBAL_PROCESSOR_FUNCS = [
-  lambda: dispatchedProcessor(cv_template_match)
+  lambda: dispatchedTemplateMatcher(cv_template_match),
+  lambda: dispatchedFocusedProcessor(nn_model_prediction)
 ]

@@ -310,7 +310,8 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
       def regenTools(editor: ParamEditor, grp: ButtonCollection):
         grp.clear()
         ButtonCollection.fromToolsEditors(editor, checkable=False, ownerClctn=grp)
-      retClctn = ButtonCollection.fromToolsEditors(toolsEditor, title=toolsEditor.name)
+      retClctn = ButtonCollection.fromToolsEditors(
+        toolsEditor, checkable=False, title=toolsEditor.name)
       toolsEditor.params.sigChildAdded.connect(lambda *args: regenTools(toolsEditor, retClctn))
       self.toolbar.addWidget(retClctn)
     self.getViewBox().menu = self.menu

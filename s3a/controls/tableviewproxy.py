@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Sequence
 from warnings import warn
 
 import numpy as np
@@ -240,7 +240,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     vb.setRange(viewRect, padding=0)
 
 
-  def selectRowsById(self, ids: OneDArr,
+  def selectRowsById(self, ids: Sequence[int],
                      selectionMode=QISM.Rows|QISM.ClearAndSelect,
                      onlyEditableRetList=True):
     selectionModel = self._compTbl.selectionModel()
@@ -253,7 +253,6 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
       selectedCols = self._compMgr.editColIdxs
     else:
       selectedCols = np.arange(len(self._compMgr.colTitles))
-    numCols = len(self._compMgr.colTitles)
     for curId in ids:
       idRow = np.nonzero(self._compMgr.compDf.index == curId)[0][0]
       # Map this ID to its sorted position in the list
