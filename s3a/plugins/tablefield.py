@@ -52,7 +52,6 @@ class VerticesPlugin(TableFieldPlugin):
     paramLst = [CNST.TOOL_RESET_FOC_REGION, CNST.TOOL_FILL_FOC_REGION,
                 CNST.TOOL_CLEAR_FOC_REGION, CNST.TOOL_CLEAR_HISTORY]
     for func, param in zip(funcLst, paramLst):
-      param.opts['ownerObj'] = win.focusedImg
       self.registerFunc(func, btnOpts=param)
 
     win.focusedImg.registerDrawAction([CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self._run_drawAct)

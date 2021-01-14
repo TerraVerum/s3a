@@ -3,7 +3,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from enum import Flag, auto
 from pathlib import Path
-from typing import List, Dict, Any, Union, Tuple, Sequence, Callable, Set
+from typing import List, Dict, Any, Union, Tuple, Sequence, Callable, Set, Collection
 from warnings import warn
 
 from pyqtgraph.Qt import QtWidgets, QtCore
@@ -34,11 +34,19 @@ def clearUnwantedParamVals(paramState: dict):
   if paramState.get('value', True) is None:
     paramState.pop('value')
 
-def paramState_noDefaults(param: Parameter):
+def paramState_noDefaults(param: Parameter, extraKeys: Collection[str]=('value',), extraTypes: List[type]=None):
   parentDict = {}
   val = param.value()
+  if extraTypes is None:
+    extraTypes = set()
+  extraTypes = tuple(extraTypes)
   if val != param.defaultValue():
     parentDict['value'] = param.value()
+    if not extraTypes or isinstance(param, extraTypes):
+      for k in set(extraKeys):
+        # False positive
+        # noinspection PyUnresolvedReferences
+        parentDict[k] = param.opts[k]
   if param.hasChildren() and not parentDict:
     inner = {}
     for child in param:
@@ -50,13 +58,12 @@ def paramState_noDefaults(param: Parameter):
   return parentDict
 
 
-def params_flattened(param: Parameter, addList=None):
-  if addList is None:
-    addList = []
-  if not param.hasChildren():
+def params_flattened(param: Parameter):
+  addList = []
+  if 'group' not in param.type():
     addList.append(param)
   for child in param.children(): # type: Parameter
-    params_flattened(child, addList)
+    addList.extend(params_flattened(child))
   return addList
 
 def _mkRunDict(proc: ProcessStage, btnOpts: Union[FRParam, dict]):

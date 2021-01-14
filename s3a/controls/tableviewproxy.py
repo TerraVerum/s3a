@@ -198,47 +198,29 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     self.regionPlot.selectById(selectedIds)
     selectedComps = self._compMgr.compDf.loc[selectedIds]
     self.sigCompsSelected.emit(selectedComps)
-    self.scaleViewboxToSelectedIds()
 
-  def scaleViewboxToSelectedIds(self, selectedIds: OneDArr=None, onlyGrow=None,
-                                padding: int=None):
+  def scaleViewboxToSelectedIds(self, selectedIds: OneDArr=None, padding: int=None):
     """
     Rescales the main image viewbox to encompass the selection
 
     :param selectedIds: Ids to scale to. If *None*, this is the current selection
-    :param onlyGrow: If *True*, the viewbox will never shrink to the selection.
-      If *None*, the value is determined from the parameter editor.
-    :param padding: Padding around the selection. If *None*, defaults to pad value
-      in param editor.
+    :param padding: Padding around the selection. If *None*, defaults to
+      pyqtgraph padding behavior
     """
-    if onlyGrow is None:
-      onlyGrow = self._mainImgArea.onlyGrowViewbox
-    if padding is None:
-      if onlyGrow:
-        padding = 0
-      else:
-        padding = self._mainImgArea.compCropMargin
-        if self._mainImgArea.treatMarginAsPct:
-          padding = int(max(self._mainImgArea.image.shape[:2])*padding/100)
     if selectedIds is None:
       selectedIds = self.selectedIds
     if len(selectedIds) == 0: return
     # Calculate how big the viewbox needs to be
     selectedVerts = self._compMgr.compDf.loc[selectedIds, REQD_TBL_FIELDS.VERTICES]
     allVerts = np.vstack([v.stack() for v in selectedVerts])
-    mins = allVerts.min(0) - padding//2
-    maxs = allVerts.max(0) + padding//2
+    mins = allVerts.min(0)
+    maxs = allVerts.max(0)
+    if padding is not None:
+      mins -= padding//2
+      maxs += padding//2
     vb: pg.ViewBox = self._mainImgArea.getViewBox()
-    curXRange = vb.state['viewRange'][0]
-    curYRange = vb.state['viewRange'][1]
-    if onlyGrow:
-      mins[0] = np.min(curXRange + [mins[0]])
-      maxs[0] = np.max(curXRange + [maxs[0]])
-      mins[1] = np.min(curYRange + [mins[1]])
-      maxs[1] = np.max(curYRange + [maxs[1]])
     viewRect = QtCore.QRectF(*mins, *(maxs - mins))
-    vb.setRange(viewRect, padding=0)
-
+    vb.setRange(viewRect, padding=padding)
 
   def selectRowsById(self, ids: Sequence[int],
                      selectionMode=QISM.Rows|QISM.ClearAndSelect,
@@ -335,7 +317,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
       newComps.at[idx, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices(newVerts)
     # truncatedCompIds = np.unique(truncatedCompIds)
     if self.regionCopier.inCopyMode:
-      self._mainImgArea.sigCompsCreated.emit(newComps)
+      self._compMgr.addComps(newComps)
       self.activateRegionCopier(self.regionCopier.regionIds)
     else: # Move mode
       self.regionCopier.erase()

@@ -243,10 +243,14 @@ class AtomicProcess(ProcessStage):
 
 class GeneralProcess(ProcessStage):
 
-  def __init__(self, name: str=None):
+  def __init__(self, name: str=None, mainInputKeys: StrList=None, mainResultKeys: StrList=None):
     self.stages: t.List[ProcessStage] = []
     self.name = name
     self.allowDisable = True
+    if mainInputKeys is not None:
+      self.mainInputKeys = mainInputKeys
+    if mainResultKeys is not None:
+      self.mainResultKeys = mainResultKeys
 
   def addFunction(self, func: t.Callable, keySpec: t.Union[t.Type[GeneralProcess], GeneralProcess]=None, **kwargs):
     """

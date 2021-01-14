@@ -6,6 +6,7 @@ import pandas as pd
 from pyqtgraph.Qt import QtWidgets
 
 from s3a import parameditors as pe
+from s3a.parameditors import singleton
 from s3a.constants import PRJ_CONSTS
 from s3a.structures import FRParam, S3AException, AlgProcessorError
 from ..graphicsutils import create_addMenuAct, paramWindow
@@ -71,8 +72,6 @@ class ParamEditorPlugin(EditorPropsMixin):
     :param func: Function to register
     :param submenuName: If provided, this function is placed under a breakout menu with this name
     :param editor: If provided, the function is registered here instead of the plugin's tool editor
-    :param ownerObj: Registered functions with associated shortcuts must be scoped
-      to an owner object. This is not needed if no shortcut is associated with the button opts.
     :param kwargs: Forwarded to `ParamEditor.registerFunc`
     """
     if editor is None:
@@ -92,10 +91,12 @@ class ParamEditorPlugin(EditorPropsMixin):
       parentMenu = self.menu
     opts = kwargs.get('btnOpts', {})
     if isinstance(opts, FRParam): opts = opts.toPgDict()
-    opts.setdefault('ownerObj', self)
+    # Temporarily override value to prevent shortcut registration
+    oldVal = opts.get('value', None)
+    opts['value'] = None
     kwargs['btnOpts'] = opts
-
     proc = editor.registerFunc(func, **kwargs)
+    opts['value'] = oldVal
 
     if opts.get('guibtn', True):
       if 'name' in kwargs:
@@ -105,20 +106,22 @@ class ParamEditorPlugin(EditorPropsMixin):
       else:
         actName = proc.name
       act = parentMenu.addAction(actName)
+      opts.update(name=actName)
+      if oldVal:
+        singleton.FR_SINGLETON.shortcuts.registerMenuAction(FRParam(**opts), act,
+                                                            namePath=(self.__groupingName__,))
       act.triggered.connect(lambda: proc(win=self.win))
     return proc
 
   def registerPopoutFuncs(self, funcList: Sequence[Callable], nameList: Sequence[str]=None, groupName:str=None, btnOpts: FRParam=None):
     # TODO: I really don't like this. Consider any refactoring option that doesn't
     #   have an import inside a function
-    from s3a import FR_SINGLETON
     if groupName is None and btnOpts is None:
       raise S3AException('Must provide either group name or button options')
     if groupName is None:
       groupName = btnOpts.name
     act = self.menu.addAction(groupName, lambda: paramWindow(self.toolsEditor.params.child(groupName)))
-    act.click = act.triggered.emit
-    FR_SINGLETON.shortcuts.registerShortcut(btnOpts, btnOpts, overrideOwnerObj=self, baseBtn=act)
+    singleton.FR_SINGLETON.shortcuts.registerMenuAction(btnOpts, namePath=(self.__groupingName__,), action=act)
     if nameList is None:
       nameList = [None]*len(funcList)
     for title, func in zip(nameList, funcList):

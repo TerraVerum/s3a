@@ -1,6 +1,6 @@
 from functools import partial
 from pathlib import Path
-from typing import List
+from typing import List, Union, Any
 
 from pyqtgraph.Qt import QtGui, QtWidgets, QtCore
 from pyqtgraph.parametertree import parameterTypes, Parameter, ParameterTree
@@ -9,13 +9,22 @@ from pyqtgraph.parametertree.parameterTypes import ActionParameterItem, ActionPa
   TextParameterItem, TextParameter
 import pyqtgraph as pg
 import numpy as np
+import inspect
 
 from s3a.controls.drawctrl import RoiCollection
+from s3a.generalutils import pascalCaseToTitle
 from s3a.graphicsutils import PopupLineEditor, popupFilePicker
 
 from s3a.constants import PRJ_CONSTS as CNST
 from s3a.structures import S3AException, FRParam, XYVertices
 from s3a import parameditors
+
+def _clsNameOrGroup(cls: Union[type, Any]):
+  if not inspect.isclass(cls):
+    cls = type(cls)
+  if hasattr(cls, '__groupingName__'):
+    return cls.__groupingName__
+  return pascalCaseToTitle(cls.__name__)
 
 
 class MonkeyPatchedTextParameterItem(TextParameterItem):
@@ -106,10 +115,11 @@ class RegisteredActionParameterItem(ActionParameterItem):
     super().__init__(param, depth)
     btn: QtWidgets.QPushButton = self.button
     btn.setToolTip(param.opts.get('tip', ''))
+    owner = param.opts.get('ownerObj', 'Misc')
     if param.value() is None: return
     # Else: shortcut exists to be registered
     parameditors.FR_SINGLETON.shortcuts.createRegisteredButton(
-      FRParam(**param.opts), baseBtn=self.button
+      FRParam(**param.opts), baseBtn=self.button, namePath=(_clsNameOrGroup(owner),)
     )
     return
 
@@ -126,21 +136,13 @@ class ActionWithShortcutParameterItem(ActionParameterItem):
       param.opts['value'] = ''
     shortcutSeq = param.opts['value']
 
-    # shcLabel = QtWidgets.QLabel('Shortcut: ', self.layoutWidget)
-    # self.layout.addWidget(shcLabel)
-
     self.keySeqEdit = QtWidgets.QKeySequenceEdit(shortcutSeq)
-    # Without the main window as a parent, the shortcut will not activate when
-    # the quickloader is hidden
-    # TODO: Maybe it is desirable for shortcuts to only work when quickloader
-    self.shortcut = QtWidgets.QShortcut(shortcutSeq, None)
-    self.shortcut.activated.connect(self.buttonClicked)
     button: QtWidgets.QPushButton = self.button
     tip = self.param.opts.get('tip', None)
     if tip is not None:
       button.setToolTip(tip)
     def updateShortcut(newSeq: QtGui.QKeySequence):
-      self.shortcut.setKey(newSeq)
+      button.setShortcut(newSeq)
       param.opts['value'] = newSeq.toString()
     self.keySeqEdit.keySequenceChanged.connect(updateShortcut)
 

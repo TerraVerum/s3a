@@ -5,10 +5,11 @@ from warnings import warn
 
 import pandas as pd
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
-
 from s3a.constants import SHORTCUTS_DIR
-from s3a.generalutils import helpTextToRichText, getParamChild, pascalCaseToTitle
+from s3a.generalutils import helpTextToRichText, getParamChild
+from s3a.models.editorbase import params_flattened
 from s3a.structures import FRParam, ParamEditorError, S3AWarning
+
 from .genericeditor import ParamEditor
 
 
@@ -30,12 +31,6 @@ def _class_fnNamesFromFnQualname(qualname: str) -> (str, str):
     fnParentClass = qualname[:lastDotIdx]
     fnName = qualname[lastDotIdx+1:]
   return fnParentClass, fnName
-
-def _clsNameOrGroup(cls: type):
-  if hasattr(cls, '__groupingName__'):
-    return cls.__groupingName__
-  return pascalCaseToTitle(cls.__name__)
-
 
 class EditableShortcut(QtWidgets.QShortcut):
   paramIdx: Tuple[FRParam, FRParam]
@@ -75,16 +70,10 @@ class ShortcutsEditor(ParamEditor):
     # Allow global shortcuts
     self.globalParam = FRParam('Global')
 
-  def registerShortcut(self, func: Callable, shortcutOpts: Union[FRParam, dict],
-                   funcArgs: tuple=(), funcKwargs: dict=None,
-                   namePath:Tuple[str, ...]=(),
-                   overrideBasePath: Sequence[str]=None,
-                   overrideOwnerObj: Any=None,
-                   createBtn=True,
-                   baseBtn: QtWidgets.QPushButton=None,
-                   **kwargs):
-    if funcKwargs is None:
-      funcKwargs = {}
+  def _createSeq(self, shortcutOpts: Union[FRParam, dict],
+                 namePath: Sequence[str]=(),
+                 overrideBasePath: Sequence[str]=None,
+                 **kwargs):
     if overrideBasePath is None:
       namePath = tuple(self._baseRegisterPath) + tuple(namePath)
     else:
@@ -92,14 +81,17 @@ class ShortcutsEditor(ParamEditor):
     if isinstance(shortcutOpts, dict): shortcutOpts = FRParam(**shortcutOpts)
     shcForCreate = shortcutOpts.toPgDict()
     shcForCreate['type'] = 'shortcut'
-    param = getParamChild(self.params, *namePath, chOpts=shcForCreate)
+    return getParamChild(self.params, *namePath, chOpts=shcForCreate)
 
-    if createBtn:
-      self.createRegisteredButton(shortcutOpts, baseBtn)
-      return param
-
+  def registerShortcut(self, func: Callable, shortcutOpts: Union[FRParam, dict],
+                   funcArgs: tuple=(), funcKwargs: dict=None,
+                   overrideOwnerObj: Any=None,
+                   **kwargs):
+    if funcKwargs is None:
+      funcKwargs = {}
     if overrideOwnerObj is None:
       overrideOwnerObj = shortcutOpts.opts.get('ownerObj', None)
+    param = self._createSeq(shortcutOpts, **kwargs)
 
     seq = param.seqEdit.keySequence()
     key = (shortcutOpts, overrideOwnerObj)
@@ -112,7 +104,7 @@ class ShortcutsEditor(ParamEditor):
       newShortcut.disconnect()
       ctx = newShortcut.context()
     elif overrideOwnerObj is None or not isinstance(overrideOwnerObj, QtWidgets.QWidget):
-      newShortcut = QtWidgets.QShortcut(seq, self.parent())
+      newShortcut = QtWidgets.QShortcut(seq, QtWidgets.QApplication.desktop())
       ctx = QtCore.Qt.ApplicationShortcut
     else:
       newShortcut = QtWidgets.QShortcut(seq, overrideOwnerObj)
@@ -120,13 +112,26 @@ class ShortcutsEditor(ParamEditor):
     newShortcut.setContext(ctx)
     self.paramToShortcutMapping[key] = newShortcut
 
+    # Disconnect before connect in case this was already hooked up previously
+    param.sigValueChanged.disconnect(self.maybeAmbigWarning)
+    param.sigValueChanged.connect(self.maybeAmbigWarning)
+
     def onActivate():
       func(*funcArgs, **funcKwargs)
     newShortcut.activated.connect(onActivate)
-    newShortcut.activatedAmbiguously.connect(lambda: self.ambigWarning(overrideOwnerObj, newShortcut))
     param.sigValueChanged.connect(lambda param: newShortcut.setKey(param.seqEdit.keySequence()))
     return param
 
+  def registerMenuAction(self, btnOpts: FRParam, action: QtWidgets.QAction, **kwargs):
+    param = self._createSeq(btnOpts, **kwargs)
+    action.setToolTip(btnOpts.helpText)
+    def shcChanged(_param, newSeq: str):
+      action.setShortcut(newSeq)
+      self.maybeAmbigWarning(_param, newSeq)
+
+    param.sigValueChanged.connect(shcChanged)
+    shcChanged(None, btnOpts.value)
+    return action
 
   def createRegisteredButton(self, btnOpts: FRParam,
                              baseBtn: QtWidgets.QAbstractButton=None,
@@ -150,23 +155,28 @@ class ShortcutsEditor(ParamEditor):
       newBtn.setToolTip(tooltipText)
       return newBtn
     btnOpts.opts['tip'] = tooltipText
-    param = self.registerShortcut(newBtn.click, btnOpts, createBtn=False, **kwargs)
+
+    param = self._createSeq(btnOpts, **kwargs)
 
     def shcChanged(_param, newSeq: str):
       newTooltipText = f'Shortcut: {newSeq}'
       tip = param.opts.get('tip', '')
       tip = helpTextToRichText(tip, newTooltipText)
       newBtn.setToolTip(tip)
+      newBtn.setShortcut(newSeq)
+      self.maybeAmbigWarning(param, newSeq)
 
     param.sigValueChanged.connect(shcChanged)
     shcChanged(None, btnOpts.value)
     return newBtn
 
-  @staticmethod
-  def ambigWarning(ownerObj: QtWidgets.QWidget, shc: QtWidgets.QShortcut):
-    warn(f'{ownerObj.__class__} shortcut ambiguously activated: {shc.key().toString()}\n'
-         f'Perhaps multiple shortcuts are assigned the same key sequence?',
-         S3AWarning)
+  def maybeAmbigWarning(self, _param, shortcut: str):
+    conflicts = [p.name() for p in params_flattened(self.params) if p.value() == shortcut]
+    if len(conflicts) > 1:
+      warn(f'Ambiguous shortcut: {shortcut}\n'
+           f'Perhaps multiple shortcuts are assigned the same key sequence? Possible conflicts:\n'
+           f'{conflicts}',
+           S3AWarning)
 
   def setParent(self, parent: QtWidgets.QWidget, *args):
     super().setParent(parent, *args)

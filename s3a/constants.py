@@ -116,11 +116,6 @@ class _PrjConsts(FRParamGroup):
   # REGION-CREATION PARAMETERS
   # --------------------------
   PROP_MIN_COMP_SZ             : FRParam = newParam('Minimum New Component Size (px)', 50)
-  PROP_ONLY_GROW_MAIN_VB       : FRParam = newParam(
-    'Disallow shrink during selection', True,
-    helpText='When selecting components, this parameter determines whether the viewbox'
-             ' shrinks only to the current selection (if *False*)or just ensures the'
-             ' view contains the selected component (if *True*)')
   PROP_UNDO_BUF_SZ             : FRParam = newParam(
     'Size of Undo Buffer', 300, helpText='Increasing the buffer size will require more memory,'
                                          'but can save a larger record of past actions.')
@@ -159,6 +154,7 @@ class _PrjConsts(FRParamGroup):
   TOOL_TBL_SET_SAME_AS_FIRST : FRParam = newParam('Set Cells as First', 'Ctrl+D')
   TOOL_TBL_SET_AS            : FRParam = newParam('Set Cells As...', 'Ctrl+Shift+D')
   TOOL_TBL_DEL_ROWS          : FRParam = newParam('Delete Table Rows', 'Del')
+  TOOL_TBL_ZOOM_TO_COMPS     : FRParam = newParam('Zoom to Components', 'Ctrl+K,Z,C')
 
   # --------------------------
   # PROJECT

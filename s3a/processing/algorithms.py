@@ -14,7 +14,7 @@ from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVert
   dynamicDocstring, \
   pascalCaseToTitle, serAsFrame
 from s3a.constants import REQD_TBL_FIELDS as RTF
-from s3a.processing import AtomicProcess
+from s3a.processing import AtomicProcess, GeneralProcess
 from s3a.processing.processing import ProcessIO, ImageProcess, GlobalPredictionProcess
 from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg,\
   GrayImg, RgbImg, AlgProcessorError
@@ -153,7 +153,7 @@ def crop_to_local_area(image: NChanImg,
     allVerts = compVerts
   else:
     # viewbox or badly sized previous region/roi
-    allVerts = viewbox
+    allVerts = np.vstack([viewbox, roiVerts])
   # Lots of points, use their bounded area
   try:
     vertArea_rowCol = (allVerts.max(0)-allVerts.min(0))[::-1]
@@ -206,7 +206,7 @@ def return_to_full_size(image: NChanImg, origCompMask: BlackWhiteImg,
                         boundSlices: Tuple[slice]):
   out = np.zeros_like(origCompMask)
   if image.ndim > 2:
-    image = image.asGrayScale()
+    image = image.mean(2).astype(int)
   out[boundSlices] = image
   return ProcessIO(image=out)
 
@@ -292,7 +292,7 @@ def basic_shapes(image: NChanImg, fgVerts: XYVertices, penSize=1, penShape='circ
   else:
     for vert in fgVerts:
       drawFn(vert)
-  return ProcessIO(image=out > 0)
+  return out > 0
 
 def convert_to_squares(image: NChanImg):
   outMask = np.zeros(image.shape, dtype=bool)
@@ -315,11 +315,14 @@ def basicOpsCombo():
 def _grabcutResultToMask(gcResult):
   return np.where((gcResult==2)|(gcResult==0), False, True)
 
-def cv_grabcut(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
-               prevCompMask: BlackWhiteImg, noPrevMask: bool,
-               historyMask: GrayImg, iters=5):
+def cv_grabcut(image: NChanImg, prevCompMask: BlackWhiteImg, fgVerts: XYVertices,
+               noPrevMask: bool, historyMask: GrayImg,
+               iters=5, penSize=1):
   if image.size == 0:
     return ProcessIO(image=np.zeros_like(prevCompMask))
+  if len(fgVerts) == 1 and penSize > 1:
+    prevCompMask = prevCompMask.astype('uint8')
+    cv.circle(prevCompMask, tuple(fgVerts[0]), penSize, 1, -1)
   img = cv.cvtColor(image, cv.COLOR_RGB2BGR)
   # Turn foreground into x-y-width-height
   bgdModel = np.zeros((1,65),np.float64)
@@ -330,8 +333,7 @@ def cv_grabcut(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
   mask[historyMask == 2] = cv.GC_FGD
   mask[historyMask == 1] = cv.GC_BGD
 
-  allverts = np.vstack([fgVerts, bgVerts])
-  cvRect = np.array([allverts.min(0), allverts.max(0) - allverts.min(0)]).flatten()
+  cvRect = np.array([fgVerts.min(0), fgVerts.max(0) - fgVerts.min(0)]).flatten()
 
   if noPrevMask:
     if cvRect[2] == 0 or cvRect[3] == 0:
@@ -467,7 +469,7 @@ class TopLevelImageProcessors:
 
   @staticmethod
   def w_basicShapesProcessor():
-    proc = ImageProcess.fromFunction(basic_shapes)
+    proc = ImageProcess.fromFunction(basic_shapes, needsWrap=True)
     proc.disabledStages = [['Basic Region Operations', 'Open -> Close']]
     return proc
 
@@ -601,9 +603,9 @@ def nn_model_prediction(image: NChanImg, model=''):
     pType: list
     limits:
       - ''
-      - LinkNet
-      - SegNet
-      - DeepLab
+      - Tool 1
+      - Tool 2
+      - Tool 3
   """
   if not model:
     return None

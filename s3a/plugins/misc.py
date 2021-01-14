@@ -20,7 +20,7 @@ from s3a.processing import ProcessIO
 
 
 class MainImagePlugin(ParamEditorPlugin):
-  name = 'Main Image'
+  name = __groupingName__ = 'Main Image'
 
   def __init__(self):
     super().__init__()
@@ -88,7 +88,6 @@ class MainImagePlugin(ParamEditorPlugin):
     newComps[RTF.VERTICES] = [verts]
     self.win.add_focusComps(newComps)
 
-
 class CompTablePlugin(ParamEditorPlugin):
   name = 'Component Table'
 
@@ -102,9 +101,11 @@ class CompTablePlugin(ParamEditorPlugin):
 
     tbl = win.compTbl
     for func, param in zip(
-        [lambda: tbl.setSelectedCellsAs_gui(), tbl.removeSelectedRows_gui, tbl.setSelectedCellsAsFirst],
-        [CNST.TOOL_TBL_SET_AS, CNST.TOOL_TBL_DEL_ROWS, CNST.TOOL_TBL_SET_SAME_AS_FIRST]):
-      param.opts['ownerObj'] = win
+        [lambda: tbl.setSelectedCellsAs_gui(), tbl.removeSelectedRows_gui, tbl.setSelectedCellsAsFirst,
+         lambda: win.compDisplay.scaleViewboxToSelectedIds()],
+        [CNST.TOOL_TBL_SET_AS, CNST.TOOL_TBL_DEL_ROWS, CNST.TOOL_TBL_SET_SAME_AS_FIRST,
+         CNST.TOOL_TBL_ZOOM_TO_COMPS]):
+      param.opts['ownerObj'] = win.compTbl
       self.registerFunc(func, name=param.name, btnOpts=param)
     tbl.menu = menuFromEditorActions(self.toolsEditor, menuParent=tbl, nest=False)
     super().attachWinRef(win)

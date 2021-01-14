@@ -3,6 +3,8 @@ from typing import Tuple, Collection, Callable, Union, Iterable, Any, Dict, Sequ
   List, Optional
 
 from pyqtgraph.Qt import QtWidgets, QtGui, QtCore
+from pyqtgraph.parametertree import Parameter
+from s3a.models.editorbase import params_flattened
 
 from s3a.structures import FRParam
 from s3a import parameditors
@@ -33,7 +35,7 @@ class ButtonCollection(QtWidgets.QGroupBox):
     for param, fn in zip(btnParams, btnTriggerFns):
       self.create_addBtn(param, fn, **createOpts)
 
-  def create_addBtn(self, btnParam: FRParam, triggerFn: btnCallable, checkable=True, **registerOpts):
+  def create_addBtn(self, btnParam: FRParam, triggerFn: btnCallable, checkable=False, **registerOpts):
     if btnParam in self.paramToBtnMapping or not btnParam.opts.get('guibtn', True):
       # Either already exists or wasn't designed to be a button
       return
@@ -42,7 +44,7 @@ class ButtonCollection(QtWidgets.QGroupBox):
     if checkable:
       newBtn.setCheckable(True)
       oldTriggerFn = triggerFn
-      # If the button is chekcable, only call this function when the button is checked
+      # If the button is checkable, only call this function when the button is checked
       def newTriggerFn(param: FRParam):
         if newBtn.isChecked():
           oldTriggerFn(param)
@@ -82,47 +84,37 @@ class ButtonCollection(QtWidgets.QGroupBox):
     self.paramToFuncMapping[param](param)
     self.lastTriggered = param
 
+  def addByParam(self, param: Parameter, copy=True, **registerOpts):
+    """
+    Adds a button to a group based on the parameter. Also works for group params
+    that have an acttion nested.
+    """
+    for param in params_flattened(param):
+      curCopy = copy
+      if 'action' in param.type() and param.opts.get('guibtn', True):
+        existingBtn = None
+        try:
+          existingBtn = next(iter(param.items)).button
+        except (StopIteration, AttributeError):
+          curCopy = True
+        if curCopy:
+          self.create_addBtn(FRParam(**param.opts), lambda *args: param.activate(), **registerOpts)
+        else:
+          self.addBtn(FRParam(**param.opts), existingBtn, existingBtn.click)
+
   @classmethod
   def fromToolsEditors(cls,
-                       toolsEditors: Union[parameditors.ParamEditor,
-                       Sequence[parameditors.ParamEditor]],
+                       editors: Sequence[parameditors.ParamEditor],
                        title='Tools',
-                       checkable=True, ownerClctn: ButtonCollection=None):
-    toolParams = []
-    toolFns = []
-    sepIdxs = []
-    curSepIdx = 0
-    if not isinstance(toolsEditors, Sequence):
-      toolsEditors = [toolsEditors]
-    for toolsEditor in toolsEditors:
-      for param in toolsEditor.params.childs:
-        if 'action' in param.opts['type'] and param.opts.get('guibtn', True):
-          toolParams.append(FRParam(**param.opts))
-          toolFns.append(lambda *_args, _param=param: _param.sigActivated.emit(_param))
-          curSepIdx += 1
-      sepIdxs.append(curSepIdx)
+                       ownerClctn: ButtonCollection=None,
+                       **registerOpts):
     if ownerClctn is None:
       ownerClctn = ButtonCollection(title=title, exclusive=True)
-      # Don't create shortcuts since this will be done by the tool editor
-      returnClctn = True
-    else:
-      returnClctn = False
 
-    # TODO: Figure out separators inside a box layout
-    # numFns = len(toolFns)
-    for ii, (param, fn) in enumerate(zip(toolParams, toolFns)):
-      ownerClctn.create_addBtn(param, fn, checkable)
-    #   if ii in sepIdxs and (0 < ii < numFns-1):
-    #     # Add qframe as separator since separator doesn't exist for layouts
-    #     sep = QtWidgets.QFrame(ownerClctn)
-    #     sep.setFrameShape(sep.HLine)
-    #     sep.setFrameShadow(sep.Sunken)
-    #     sep.setFixedHeight(ownerClctn.height())
-    #     ownerClctn.uiLayout.addWidget(sep)
-    if returnClctn:
-      return ownerClctn
-    else:
-      return toolParams, toolFns
+    for editor in editors:
+      ownerClctn.addByParam(editor.params, **registerOpts)
+
+    return ownerClctn
 
   def toolbarFormat(self):
     """

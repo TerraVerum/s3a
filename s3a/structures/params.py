@@ -10,6 +10,9 @@ import numpy as np
 
 from .exceptions import ParamEditorError, S3AWarning
 
+class _UNSPECIFIED_DEFAULT: pass
+_specialKeys = ['name', 'value', 'helpText', 'pType']
+
 class FRParam:
   def __init__(self, name: str, value=None, pType: Optional[str]=None, helpText='',
                **opts):
@@ -67,7 +70,6 @@ class FRParam:
       paramOpts.update(children=self.value)
     else:
       paramOpts.update(value=self.value)
-    paramOpts.update(frParam=self)
     return paramOpts
 
   def __str__(self):
@@ -141,6 +143,25 @@ class FRParam:
       return numericVals, listLims
     return numericVals
 
+  def __getitem__(self, item):
+    if item in _specialKeys:
+      return getattr(self, item)
+    return self.opts[item]
+
+  def __setitem__(self, key, value):
+    if key in _specialKeys:
+      setattr(self, key, value)
+    else:
+      self.opts[key] = value
+
+  def get(self, item, default=_UNSPECIFIED_DEFAULT):
+    try:
+      return self[item]
+    except KeyError:
+      if default is _UNSPECIFIED_DEFAULT:
+        raise
+      return default
+
 @dataclass
 class FRParamGroup:
   """
@@ -176,7 +197,7 @@ class FRParamGroup:
     Allows user to create a :class:`FRParam` object from its string value (or a parameter that
     can equal one of the parameters in this list)
     """
-    param = str(param.lower())
+    param = str(param).lower()
     for matchParam in group:
       if matchParam.name.lower() == param:
         return matchParam

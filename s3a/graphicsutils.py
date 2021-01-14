@@ -730,7 +730,8 @@ def setParamTooltips(tree: ParameterTree, expandNameCol=True):
 
 def expandtreeParams(tree: ParameterTree, expandedVal=True):
   for item in tree.topLevelItems():
-    item.setExpanded(expandedVal)
+    for ii in range(item.childCount()):
+      item.child(ii).setExpanded(expandedVal)
   tree.resizeColumnToContents(0)
 
 def paramWindow(param: Parameter):

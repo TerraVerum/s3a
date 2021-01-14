@@ -52,11 +52,10 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
   def __initEditorParams__(cls):
     cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Region Tools')
 
-    cls.onlyGrowViewbox, cls.minCompSize = FR_SINGLETON.generalProps.registerProps(
-      [CNST.PROP_ONLY_GROW_MAIN_VB, CNST.PROP_MIN_COMP_SZ])
+    cls.minCompSize = FR_SINGLETON.generalProps.registerProps(
+      [CNST.PROP_MIN_COMP_SZ])
 
   def __init__(self, parent=None, drawShapes: Collection[FRParam]=None,
-               drawActions: Collection[FRParam]=(),
                imgSrc: Union[FilePath, NChanImg]=None,
                toolbar: QtWidgets.QToolBar=None,
                **kargs):
@@ -77,6 +76,8 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     self.setMouseEnabled(True)
     self._initGrid()
     FR_SINGLETON.colorScheme.registerFunc(self.updateGridScheme, runOpts=RunOpts.ON_CHANGED)
+
+    self.lastClickPos = QtCore.QPoint()
 
     self.toolbar = toolbar
 
@@ -107,12 +108,13 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
       lambda roiVerts: self.sigShapeFinished.emit(roiVerts, self.drawAction)
     )
 
-    # Make sure panning is allowed before creating draw widget
-    if CNST.DRAW_ACT_PAN not in drawActions:
-      drawActions += (CNST.DRAW_ACT_PAN,)
+    self.drawShapeGrp = ButtonCollection(self, 'Shapes', drawShapes, self.shapeAssignment,
+                                         namePath=(self.__groupingName__,),
+                                         checkable=True)
+    self.drawActGrp = ButtonCollection(self, 'Actions')
 
-    self.drawShapeGrp = ButtonCollection(self, 'Shapes', drawShapes, self.shapeAssignment)
-    self.drawActGrp = ButtonCollection(self, 'Actions', drawActions, self.actionAssignment)
+    # Make sure panning is allowed before creating draw widget
+    self.registerDrawAction(CNST.DRAW_ACT_PAN, lambda *args: self.actionAssignment(CNST.DRAW_ACT_PAN))
 
     # Initialize draw shape/action buttons
     self.drawActGrp.callFuncByParam(self.drawAction)
@@ -159,6 +161,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
   def mousePressEvent(self, ev: QtGui.QMouseEvent):
     self.maybeBuildRoi(ev)
     super().mousePressEvent(ev)
+    self.lastClickPos = ev.pos()
 
   def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent):
     if self.regionCopier.active:
@@ -192,14 +195,17 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     # Typical reaction is to right-click to cancel an roi
     if self.image is not None and QtCore.Qt.RightButton not in [ev.button(), ev.buttons()]:
       self.maybeBuildRoi(ev)
+
+      # Special case: Panning
+      if (self.lastClickPos == ev.pos()
+          and self.drawAction == CNST.DRAW_ACT_PAN
+          and not self.regionCopier.active):
+        pos = self.imgItem.mapFromScene(ev.pos())
+        xx, yy, = pos.x(), pos.y()
+        # Simulate a click-wide boundary selection so points can be registered in pan mode
+        pt = XYVertices([[xx, yy]], dtype=float)
+        self.shapeCollection.sigShapeFinished.emit(pt)
     super().mouseReleaseEvent(ev)
-    # Special case: Panning
-    if self.drawAction == CNST.DRAW_ACT_PAN and not self.regionCopier.active:
-      pos = self.imgItem.mapFromScene(ev.pos())
-      xx, yy, = pos.x(), pos.y()
-      # Simulate a click-wide boundary selection so points can be registered in pan mode
-      pt = XYVertices([[xx, yy]], dtype=float)
-      self.shapeCollection.sigShapeFinished.emit(pt)
     self.shapeCollection.removeLock(self)
 
   def clearCurRoi(self):
@@ -265,7 +271,8 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     else:
       self.imgItem.setImage(imgSrc)
 
-  def registerDrawAction(self, actParams: Union[FRParam, Sequence[FRParam]], func: DrawActFn):
+  def registerDrawAction(self, actParams: Union[FRParam, Sequence[FRParam]], func: DrawActFn,
+                         **registerOpts):
     """
     Adds specified action(s) to the list of allowable roi actions if any do not already
     exist. `func` is only triggered if a shape was finished and the current action matches
@@ -276,6 +283,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     :param func: Function to trigger when a shape is completed during the requested actions.
       If only one parameter is registered to this function, it is expected to only take
       roiVerts. If multiple are provided, it is expected to take roiVerts and the current draw action
+    :param registerOpts: Extra arguments for button registration
     """
     if isinstance(actParams, FRParam):
       actParams = [actParams]
@@ -288,9 +296,9 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
         else:
           func(roiVerts)
     self.sigShapeFinished.connect(wrapper)
-
     for actParam in actParams:
-      self.drawActGrp.create_addBtn(actParam, self.actionAssignment)
+      self.drawActGrp.create_addBtn(actParam, self.actionAssignment, checkable=True,
+                                    namePath=(self.__groupingName__,), **registerOpts)
 
   def localImage(self, margin: int=0):
     return getCroppedImg(self.image, self.compSer[RTF.VERTICES].stack(), margin, returnSlices=False)
@@ -304,12 +312,10 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     # self.toolsGrp.fromToolsEditors(self._focusedTools, checkable=False, ownerClctn=self.toolsGrp)
     retClctn = None
     if self.toolbar is not None:
-      def regenTools(editor: ParamEditor, grp: ButtonCollection):
-        grp.clear()
-        ButtonCollection.fromToolsEditors(editor, checkable=False, ownerClctn=grp)
-      retClctn = ButtonCollection.fromToolsEditors(
-        toolsEditor, checkable=False, title=toolsEditor.name)
-      toolsEditor.params.sigChildAdded.connect(lambda *args: regenTools(toolsEditor, retClctn))
+      retClctn = ButtonCollection.fromToolsEditors([toolsEditor], title=toolsEditor.name, copy=False)
+      toolsEditor.params.sigChildAdded.connect(
+        lambda _param, child, _idx: retClctn.addByParam(child, copy=False)
+      )
       self.toolbar.addWidget(retClctn)
     self.getViewBox().menu = self.menu
     return retClctn
@@ -340,79 +346,3 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     self.sigUpdatedFocusedComp.emit(newComp)
     yield
     self.updateFocusedComp(oldComp)
-
-  # def addActionsFromMenu(self, menu: QtWidgets.QMenu):
-  #   vb: pg.ViewBox = self.getViewBox()
-  #   menuCopy = QtWidgets.QMenu(self)
-  #   for action in menu.actions():
-  #     if action.isSeparator():
-  #       menuCopy.addSeparator()
-  #     else:
-  #       menuCopy.addAction(action.text(), action.trigger)
-  #   firstAct = menuCopy.actions()[0]
-  #   menuCopy.insertAction(firstAct, self.oldVbMenu.viewAll)
-  #   vb.menu = menuCopy
-  #   self.menu = menuCopy
-
-# class FocusedImage(MainImage):
-#   sigPluginChanged = Signal()
-#   sigUpdatedAll = Signal(object, object)
-#   """Main image, new component. Emitted during `updateFocusedComp()`"""
-#
-#   @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
-#   def updateAll(self, mainImg: NChanImg=None, newComp:Optional[pd.Series]=None,
-#                 _isAlreadyTrimmed=False):
-#     """
-#     Updates focused image and component from provided information. Useful for creating
-#     a 'zoomed-in' view that allows much faster processing than applying image processing
-#     algorithms to the entire image each iteration.
-#     :param mainImg: Image from the main view
-#     :param newComp: New component to edit using various plugins (See :class:`TableFieldPlugin`)
-#     :param _isAlreadyTrimmed: Used internally during undo. Generally shouldn't be set by the
-#       user
-#     """
-#     oldImg = self.image
-#     if oldImg is not None:
-#       oldImg = oldImg.copy()
-#     oldComp = self.compSer
-#
-#     if mainImg is None:
-#       self.imgItem.clear()
-#       self.shapeCollection.clearAllRois()
-#       self.compSer = FR_SINGLETON.tableData.makeCompSer()
-#     else:
-#       newVerts: ComplexXYVertices = newComp[RTF.VERTICES]
-#       # Since values INSIDE the dataframe are reset instead of modified, there is no
-#       # need to go through the trouble of deep copying
-#       self.compSer = newComp.copy(deep=False)
-#
-#       # Propagate all resultant changes
-#       if not _isAlreadyTrimmed:
-#         self._updateBbox(mainImg.shape, newVerts)
-#         bboxToUse = self.bbox
-#       else:
-#         bboxToUse = XYVertices([[0,0], mainImg.shape[:2]])
-#         self.bbox = bboxToUse
-#       if np.any(np.diff(self.bbox, axis=0) == 0):
-#         # Empty slice
-#         self.imgItem.clear()
-#       else:
-#         self.imgItem.setImage(mainImg)
-#     self.sigUpdatedAll.emit(mainImg, newComp)
-#     yield
-#     self.updateAll(oldImg, oldComp, True)
-#
-#   def changeCurrentPlugin(self, newPlugin: TableFieldPlugin, forceActivate=True):
-#     if newPlugin is self.currentPlugin:
-#       return
-#     if self.currentPlugin is not None:
-#       self.currentPlugin.active = False
-#     newEditors = [self.toolsEditor]
-#     if newPlugin is not None:
-#       newEditors.append(newPlugin.toolsEditor)
-#     self.menu = menuFromEditorActions(newEditors, menuParent=self)
-#     self.getViewBox().menu = self.menu
-#     self.currentPlugin = newPlugin
-#     if forceActivate and newPlugin is not None and not newPlugin.active:
-#       newPlugin.active = True
-#     self.sigPluginChanged.emit()
