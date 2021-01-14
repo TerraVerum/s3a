@@ -57,7 +57,8 @@ class ComponentIO:
   calling exporter.exportCsv, exportPkl, etc. for those objects / files respectively.
   """
   handledIoTypes = {'csv': 'CSV Files', 'pkl': 'Pickle Files',
-                    'id.png': 'ID Grayscale Image', 'class.png': 'Class Grayscale Image'}
+                    'id.png': 'ID Grayscale Image', 'class.png': 'Class Grayscale Image',
+                    'compimgs.folder': 'Component Images Folder'}
   """Dict of <type, description> for the file types this I/O obejct can handle"""
 
   # Dictionary comprehension doesn't work in a class scope
@@ -200,7 +201,7 @@ class ComponentIO:
   def exportCompimgsDf(cls, compDf: df, outFile: Union[str, Path]=None,
                        imgDir: FilePath=None, margin=0, marginAsPct=False,
                        includeCols=('instId', 'img', 'semanticMask', 'bboxMask', 'lbl', 'offset'),
-                       lblField='Class', **kwargs):
+                       lblField='Instance ID', **kwargs):
     """
     Creates a dataframe consisting of extracted images around each component
     :param compDf: Dataframe to export
@@ -384,7 +385,7 @@ class ComponentIO:
   def exportCompimgsFolders(cls, compDf: df, imgDir: FilePath=None, margin=0, marginAsPct=False,
                             colorMaskByClass=True, outDir: FilePath=None, dataDir='data',
                             semanticDir='masks_semantic', bboxDir: str=None,
-                            resizeShape: Sequence[int]=None):
+                            resizeShape: Sequence[int]=None, **kwargs):
     """
     From a component dataframe, creates output directories for component images and masks.
     This is useful for many neural networks etc. to read individual component images.
@@ -424,7 +425,7 @@ class ComponentIO:
                                             check_contrast=False)
 
     extractedImgs = cls.exportCompimgsDf(compDf, None, imgDir, margin, colorMaskByClass,
-                                         excludeCols)
+                                         excludeCols, **kwargs)
     for idx, row in extractedImgs.iterrows():
       saveName = f'{row.instId}.png'
       saveFn(outDir/dataDir/saveName, row.img)
