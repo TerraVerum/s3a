@@ -6,8 +6,8 @@ import pandas as pd
 from pyqtgraph.Qt import QtWidgets
 
 from s3a import parameditors as pe
-from s3a.parameditors import singleton
 from s3a.constants import PRJ_CONSTS
+from s3a.parameditors import singleton
 from s3a.structures import FRParam, S3AException, AlgProcessorError
 from ..graphicsutils import create_addMenuAct, paramWindow
 from ..parameditors import EditorPropsMixin
@@ -89,28 +89,23 @@ class ParamEditorPlugin(EditorPropsMixin):
         editor.params.addChild(dict(name=submenuName, type='group'))
     else:
       parentMenu = self.menu
-    opts = kwargs.get('btnOpts', {})
-    if isinstance(opts, FRParam): opts = opts.toPgDict()
-    # Temporarily override value to prevent shortcut registration
-    oldVal = opts.get('value', None)
-    opts['value'] = None
-    kwargs['btnOpts'] = opts
-    proc = editor.registerFunc(func, **kwargs)
-    opts['value'] = oldVal
 
-    if opts.get('guibtn', True):
-      if 'name' in kwargs:
-        actName = kwargs['name']
-      elif 'name' in opts:
-        actName = opts['name']
-      else:
-        actName = proc.name
-      act = parentMenu.addAction(actName)
-      opts.update(name=actName)
-      if oldVal:
-        singleton.FR_SINGLETON.shortcuts.registerMenuAction(FRParam(**opts), act,
-                                                            namePath=(self.__groupingName__,))
-      act.triggered.connect(lambda: proc(win=self.win))
+    shcValue = None
+    opts = None
+    if 'btnOpts' in kwargs:
+      opts = FRParam(**kwargs['btnOpts'])
+      opts.opts.setdefault('ownerObj', self)
+      kwargs.setdefault('name', opts.name)
+      kwargs['btnOpts'] = opts
+      shcValue = opts.value
+    proc = editor.registerFunc(func, **kwargs)
+    act = parentMenu.addAction(proc.name)
+    # TableFieldPlugins have their actions added to the GUI
+    if shcValue and not isinstance(self, TableFieldPlugin):
+      singleton.FR_SINGLETON.shortcuts.registerAction(opts, act,
+                                                          namePath=(self.__groupingName__,))
+
+    act.triggered.connect(lambda: proc(win=self.win))
     return proc
 
   def registerPopoutFuncs(self, funcList: Sequence[Callable], nameList: Sequence[str]=None, groupName:str=None, btnOpts: FRParam=None):
@@ -121,7 +116,7 @@ class ParamEditorPlugin(EditorPropsMixin):
     if groupName is None:
       groupName = btnOpts.name
     act = self.menu.addAction(groupName, lambda: paramWindow(self.toolsEditor.params.child(groupName)))
-    singleton.FR_SINGLETON.shortcuts.registerMenuAction(btnOpts, namePath=(self.__groupingName__,), action=act)
+    singleton.FR_SINGLETON.shortcuts.registerAction(btnOpts, namePath=(self.__groupingName__,), action=act)
     if nameList is None:
       nameList = [None]*len(funcList)
     for title, func in zip(nameList, funcList):

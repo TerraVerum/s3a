@@ -141,20 +141,20 @@ class _PrjConsts(FRParamGroup):
   TOOL_RESET_FOC_REGION   : FRParam = newParam('Reset', 'Ctrl+Shift+R')
   TOOL_FILL_FOC_REGION    : FRParam = newParam('Fill', 'Ctrl+Shift+F')
   TOOL_ACCEPT_FOC_REGION  : FRParam = newParam('Accept', 'Ctrl+Shift+A')
-  TOOL_CLEAR_ROI          : FRParam = newParam('Clear ROI', 'Esc', guibtn=False)
-  TOOL_CLEAR_HISTORY      : FRParam = newParam('Clear Processor History', 'Ctrl+Alt+C,H', guibtn=False)
-  TOOL_PROC_ANALYTICS     : FRParam = newParam('Show Analytics', 'Ctrl+K+S+P', guibtn=True)
+  TOOL_CLEAR_ROI          : FRParam = newParam('Clear ROI', 'Esc')
+  TOOL_CLEAR_HISTORY      : FRParam = newParam('Clear Processor History', 'Ctrl+Alt+C,H')
+  TOOL_PROC_ANALYTICS     : FRParam = newParam('Show Analytics', 'Ctrl+K+S+P')
 
   # --------------------------
   # WINDOW TOOLS
   # --------------------------
-  TOOL_ESTIMATE_BOUNDARIES   : FRParam = newParam('Estimate Boundaries', 'Ctrl+Alt+Shift+E', guibtn=False)
-  TOOL_CLEAR_BOUNDARIES      : FRParam = newParam('Clear Boundaries', 'Ctrl+Alt+Shift+C', guibtn=False)
-  TOOL_EXPORT_COMP_LIST      : FRParam = newParam('Export Table', 'Ctrl+Shift+S')
+  TOOL_ESTIMATE_BOUNDARIES   : FRParam = newParam('Estimate Boundaries', 'Ctrl+Alt+Shift+E')
+  TOOL_CLEAR_BOUNDARIES      : FRParam = newParam('Clear Boundaries', 'Ctrl+Alt+Shift+C')
+  TOOL_EXPORT_COMP_LIST      : FRParam = newParam('Export Current Table', 'Ctrl+K,E,T')
   TOOL_TBL_SET_SAME_AS_FIRST : FRParam = newParam('Set Cells as First', 'Ctrl+D')
   TOOL_TBL_SET_AS            : FRParam = newParam('Set Cells As...', 'Ctrl+Shift+D')
   TOOL_TBL_DEL_ROWS          : FRParam = newParam('Delete Table Rows', 'Del')
-  TOOL_TBL_ZOOM_TO_COMPS     : FRParam = newParam('Zoom to Components', 'Ctrl+K,Z,C')
+  TOOL_TBL_ZOOM_TO_COMPS     : FRParam = newParam('Zoom to Selection  ', 'Ctrl+K,Z,S')
 
   # --------------------------
   # PROJECT

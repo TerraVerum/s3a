@@ -545,8 +545,7 @@ class QAwesomeTooltipEventFilter(QtCore.QObject):
 
 
 def menuFromEditorActions(editors: Union[s3a.ParamEditor, Sequence[s3a.ParamEditor]],
-                          title: str=None, menuParent: QtWidgets.QWidget=None,
-                          onlyAddGuiBtns=False, nest=True):
+                          title: str=None, menuParent: QtWidgets.QWidget=None, nest=True):
   if not isinstance(editors, Sequence):
     editors = [editors]
   if title is None:
@@ -564,7 +563,7 @@ def menuFromEditorActions(editors: Union[s3a.ParamEditor, Sequence[s3a.ParamEdit
     def findActions(paramRoot: Parameter):
       for child in paramRoot.childs:
         findActions(child)
-      if 'action' in paramRoot.opts['type'] and (not onlyAddGuiBtns or paramRoot.opts.get('guibtn', True)):
+      if 'action' in paramRoot.opts['type']:
         actions.append(paramRoot)
         paramNames.append(paramRoot.name())
     findActions(editor.params)

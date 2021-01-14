@@ -44,11 +44,6 @@ class S3A(S3ABase):
     # customized loading functions also get called
     superLoaderArgs = {'author': startupSettings.pop('author', None)}
     super().__init__(parent, **superLoaderArgs)
-    for func, param in zip(
-        [self.clearBoundaries, self.exportAnnotations_gui],
-        [CNST.TOOL_CLEAR_BOUNDARIES, CNST.TOOL_EXPORT_COMP_LIST]):
-      param.opts['ownerObj'] = self
-      self.toolsEditor.registerFunc(func, btnOpts=param)
     if guiMode:
       warnings.simplefilter('error', S3AWarning)
       makeExceptionsShowDialogs(self)

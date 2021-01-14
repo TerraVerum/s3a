@@ -1,30 +1,22 @@
 from functools import partial
 from pathlib import Path
-from typing import List, Union, Any
+from typing import List
 
 from pyqtgraph.Qt import QtGui, QtWidgets, QtCore
-from pyqtgraph.parametertree import parameterTypes, Parameter, ParameterTree
+from pyqtgraph.parametertree import parameterTypes, Parameter
 from pyqtgraph.parametertree.Parameter import PARAM_TYPES
 from pyqtgraph.parametertree.parameterTypes import ActionParameterItem, ActionParameter, \
   TextParameterItem, TextParameter
 import pyqtgraph as pg
 import numpy as np
-import inspect
 
 from s3a.controls.drawctrl import RoiCollection
-from s3a.generalutils import pascalCaseToTitle
+from s3a.generalutils import clsNameOrGroup
 from s3a.graphicsutils import PopupLineEditor, popupFilePicker
 
 from s3a.constants import PRJ_CONSTS as CNST
 from s3a.structures import S3AException, FRParam, XYVertices
 from s3a import parameditors
-
-def _clsNameOrGroup(cls: Union[type, Any]):
-  if not inspect.isclass(cls):
-    cls = type(cls)
-  if hasattr(cls, '__groupingName__'):
-    return cls.__groupingName__
-  return pascalCaseToTitle(cls.__name__)
 
 
 class MonkeyPatchedTextParameterItem(TextParameterItem):
@@ -107,6 +99,8 @@ class ShortcutParameterItem(parameterTypes.WidgetParameterItem):
   #   menu.addAction(delAct)
   #   menu.exec(ev.globalPos())
 
+class _Global: pass
+
 class RegisteredActionParameterItem(ActionParameterItem):
 
   def __init__(self, param, depth):
@@ -115,11 +109,11 @@ class RegisteredActionParameterItem(ActionParameterItem):
     super().__init__(param, depth)
     btn: QtWidgets.QPushButton = self.button
     btn.setToolTip(param.opts.get('tip', ''))
-    owner = param.opts.get('ownerObj', 'Misc')
+    owner = param.opts.get('ownerObj', _Global)
     if param.value() is None: return
     # Else: shortcut exists to be registered
     parameditors.FR_SINGLETON.shortcuts.createRegisteredButton(
-      FRParam(**param.opts), baseBtn=self.button, namePath=(_clsNameOrGroup(owner),)
+      FRParam(**param.opts), baseBtn=self.button, namePath=(clsNameOrGroup(owner),)
     )
     return
 

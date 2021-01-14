@@ -6,7 +6,7 @@ from warnings import warn
 import pandas as pd
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from s3a.constants import SHORTCUTS_DIR
-from s3a.generalutils import helpTextToRichText, getParamChild
+from s3a.generalutils import helpTextToRichText, getParamChild, clsNameOrGroup
 from s3a.models.editorbase import params_flattened
 from s3a.structures import FRParam, ParamEditorError, S3AWarning
 
@@ -47,28 +47,20 @@ class ShortcutsEditor(ParamEditor):
 
   def __init__(self, parent=None):
 
-    self.paramToShortcutMapping: Dict[Tuple[FRParam, Any], QtWidgets.QShortcut] = {}
-    self.recordsDf = pd.DataFrame(columns=['param', 'owner', 'namePath', 'shortcut'])
-    """
-    Each shortcut must have a unique name, otherwise the registration process will
-    leave hanging, untriggerable shortcuts. However, shortcuts with the same name
-    under a *different* parent are fine. To catch these cases, the unique key for
-    each shortcut is a combination of its FRParam and parent/ownerObj.
-    """
+    self.paramToGlobalActsMapping: Dict[FRParam, QtWidgets.QAction] = {}
     # Unlike other param editors, these children don't get filled in until
     # after the top-level widget is passed to the shortcut editor
     super().__init__(parent, [], saveDir=SHORTCUTS_DIR, fileType='shortcut',
                      name='Tool Shortcuts')
 
-    # If the registered class is not a graphical widget, the shortcut
-    # needs a global context
-    self.mainWinRef = None
-    self.boundFnsPerQualname: Dict[FRParam, List[BoundFnParams]] = defaultdict(list)
-    self.objToShortcutParamMapping: DefaultDict[Any, List[FRParam]] = defaultdict(list)
-    """Holds which objects have what shortcuts. Useful for avoiding duplicate shortcuts
-    for the same action on one class"""
     # Allow global shortcuts
     self.globalParam = FRParam('Global')
+
+  def _checkUniqueShortcut(self, shortcutOpts: FRParam):
+    # TODO: Find way to preserve old shortcuts, in case multuple other operations
+    #   were bound to this shortcut and lost
+    if any(shortcutOpts.name == p.name() for p in params_flattened(self.params)):
+      self.deleteShortcut(shortcutOpts)
 
   def _createSeq(self, shortcutOpts: Union[FRParam, dict],
                  namePath: Sequence[str]=(),
@@ -78,64 +70,62 @@ class ShortcutsEditor(ParamEditor):
       namePath = tuple(self._baseRegisterPath) + tuple(namePath)
     else:
       namePath = tuple(overrideBasePath) + tuple(namePath)
+    # Round-trip to set helptext, ensure all values are present
     if isinstance(shortcutOpts, dict): shortcutOpts = FRParam(**shortcutOpts)
     shcForCreate = shortcutOpts.toPgDict()
     shcForCreate['type'] = 'shortcut'
-    return getParamChild(self.params, *namePath, chOpts=shcForCreate)
+    param = getParamChild(self.params, *namePath, chOpts=shcForCreate)
+    param.sigValueChanged.connect(lambda _p, val: self.maybeAmbigWarning(val))
+    self.maybeAmbigWarning(param.value())
 
-  def registerShortcut(self, func: Callable, shortcutOpts: Union[FRParam, dict],
-                   funcArgs: tuple=(), funcKwargs: dict=None,
-                   overrideOwnerObj: Any=None,
+    return param
+
+  def registerShortcut(self, shortcutOpts: FRParam, func: Callable,
+                   funcArgs: tuple=(), funcKwargs: dict=None, overrideOwnerObj: Any=None,
                    **kwargs):
+    self._checkUniqueShortcut(shortcutOpts)
     if funcKwargs is None:
       funcKwargs = {}
     if overrideOwnerObj is None:
       overrideOwnerObj = shortcutOpts.opts.get('ownerObj', None)
+    if overrideOwnerObj is None:
+      raise ValueError('Solo functions registered to shortcuts must have an owner.\n'
+                       f'This is not the case for {func}')
+    kwargs.setdefault('namePath', (clsNameOrGroup(overrideOwnerObj),))
     param = self._createSeq(shortcutOpts, **kwargs)
+    shc = QtWidgets.QShortcut(overrideOwnerObj)
+    shc.setContext(QtCore.Qt.WidgetWithChildrenShortcut)
 
-    seq = param.seqEdit.keySequence()
-    key = (shortcutOpts, overrideOwnerObj)
-    if key in self.paramToShortcutMapping:
-      # Can't recycle old key sequence signals because C++ lifecycle is not in sync
-      # Without `disconnect`, "wrapped c/c++ object deleted" errors appear
-      # TODO: Find way to preserve this, in case multuple other operations
-      #   were bound to this shortcut and lost
-      newShortcut = self.paramToShortcutMapping[key]
-      newShortcut.disconnect()
-      ctx = newShortcut.context()
-    elif overrideOwnerObj is None or not isinstance(overrideOwnerObj, QtWidgets.QWidget):
-      newShortcut = QtWidgets.QShortcut(seq, QtWidgets.QApplication.desktop())
-      ctx = QtCore.Qt.ApplicationShortcut
-    else:
-      newShortcut = QtWidgets.QShortcut(seq, overrideOwnerObj)
-      ctx = QtCore.Qt.WidgetWithChildrenShortcut
-    newShortcut.setContext(ctx)
-    self.paramToShortcutMapping[key] = newShortcut
+    shc.activatedAmbiguously.connect(lambda: self.maybeAmbigWarning(param.value()))
 
-    # Disconnect before connect in case this was already hooked up previously
-    param.sigValueChanged.disconnect(self.maybeAmbigWarning)
-    param.sigValueChanged.connect(self.maybeAmbigWarning)
+    def onChange(_param, key):
+      shc.setKey(key)
+      self.maybeAmbigWarning(key)
+    param.sigValueChanged.connect(onChange)
+    onChange(param, param.value())
 
     def onActivate():
       func(*funcArgs, **funcKwargs)
-    newShortcut.activated.connect(onActivate)
-    param.sigValueChanged.connect(lambda param: newShortcut.setKey(param.seqEdit.keySequence()))
+    shc.activated.connect(onActivate)
+
     return param
 
-  def registerMenuAction(self, btnOpts: FRParam, action: QtWidgets.QAction, **kwargs):
+  def registerAction(self, btnOpts: FRParam, action: QtWidgets.QAction, **kwargs):
+    self._checkUniqueShortcut(btnOpts)
+
     param = self._createSeq(btnOpts, **kwargs)
     action.setToolTip(btnOpts.helpText)
     def shcChanged(_param, newSeq: str):
       action.setShortcut(newSeq)
-      self.maybeAmbigWarning(_param, newSeq)
 
     param.sigValueChanged.connect(shcChanged)
     shcChanged(None, btnOpts.value)
-    return action
+    return param
 
   def createRegisteredButton(self, btnOpts: FRParam,
                              baseBtn: QtWidgets.QAbstractButton=None,
                              asToolBtn=False, **kwargs):
+    self._checkUniqueShortcut(btnOpts)
     if asToolBtn:
       btnType = QtWidgets.QToolButton
     else:
@@ -163,14 +153,12 @@ class ShortcutsEditor(ParamEditor):
       tip = param.opts.get('tip', '')
       tip = helpTextToRichText(tip, newTooltipText)
       newBtn.setToolTip(tip)
-      newBtn.setShortcut(newSeq)
-      self.maybeAmbigWarning(param, newSeq)
-
+    newBtn.setShortcut(param.seqEdit.keySequence())
     param.sigValueChanged.connect(shcChanged)
     shcChanged(None, btnOpts.value)
     return newBtn
 
-  def maybeAmbigWarning(self, _param, shortcut: str):
+  def maybeAmbigWarning(self, shortcut: str):
     conflicts = [p.name() for p in params_flattened(self.params) if p.value() == shortcut]
     if len(conflicts) > 1:
       warn(f'Ambiguous shortcut: {shortcut}\n'
@@ -178,12 +166,18 @@ class ShortcutsEditor(ParamEditor):
            f'{conflicts}',
            S3AWarning)
 
-  def setParent(self, parent: QtWidgets.QWidget, *args):
-    super().setParent(parent, *args)
-    # When this parent is set, make sure application-level shortcuts have that parent
-    for shortcut in self.paramToShortcutMapping.values():
-      if shortcut.context() == QtCore.Qt.ApplicationShortcut:
-        shortcut.setParent(parent)
+  def deleteShortcut(self, shortcutParam: FRParam):
+    matches = [p for p in params_flattened(self.params) if p.name() == shortcutParam['name']]
+
+    formatted = f'<{shortcutParam["name"]}: {shortcutParam["value"]}>'
+    if len(matches) == 0:
+      warn(f'Shortcut param {formatted} does not exist. No delete performed.')
+      return
+    for match in matches:
+      # Set shortcut key to nothing to prevent its activation
+      match.setValue('')
+      match.remove()
+
 
   def registerProp(self, *args, **etxraOpts):
     """

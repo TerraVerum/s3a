@@ -1,3 +1,4 @@
+import inspect
 import re
 from ast import literal_eval
 from contextlib import contextmanager
@@ -454,3 +455,11 @@ def monkeyPatch(obj, toChange: str, newVal):
     delattr(obj, toChange)
   else:
     setattr(obj, toChange, oldVal)
+
+
+def clsNameOrGroup(cls: Union[type, Any]):
+  if not inspect.isclass(cls):
+    cls = type(cls)
+  if hasattr(cls, '__groupingName__'):
+    return cls.__groupingName__
+  return pascalCaseToTitle(cls.__name__)

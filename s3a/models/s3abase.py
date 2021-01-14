@@ -53,9 +53,10 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     self.statBar = QtWidgets.QStatusBar(self)
     self.menuBar_ = self.menuBar()
 
-    opt = copy(PRJ_CONSTS.TOOL_CLEAR_ROI)
-    opt.opts['ownerObj'] = self.mainImg
-    self.focusedImg.toolsEditor.registerFunc(self.focusedImg.clearCurRoi, btnOpts=opt)
+    FR_SINGLETON.shortcuts.registerShortcut(PRJ_CONSTS.TOOL_CLEAR_ROI,
+                                            self.focusedImg.clearCurRoi,
+                                            overrideOwnerObj=self.mainImg
+                                            )
 
     self.compMgr = ComponentMgr()
     # Register exporter to allow user parameters
@@ -150,6 +151,8 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
 
   def _handleNewPlugin(self, plugin: ParamEditorPlugin):
     plugin.attachWinRef(self)
+    if plugin.dock:
+      plugin.dock.setParent(self)
 
   @staticmethod
   def saveAllEditorDefaults():

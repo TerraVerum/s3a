@@ -52,7 +52,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
   def __initEditorParams__(cls):
     cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Region Tools')
 
-    cls.minCompSize = FR_SINGLETON.generalProps.registerProps(
+    cls.minCompSize, = FR_SINGLETON.generalProps.registerProps(
       [CNST.PROP_MIN_COMP_SZ])
 
   def __init__(self, parent=None, drawShapes: Collection[FRParam]=None,
@@ -88,7 +88,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     self.imgItem.setZValue(-100)
     self.addItem(self.imgItem)
     self.toolsEditor.registerFunc(lambda: self.oldVbMenu.viewAll.trigger(),
-                                         name='Reset Zoom', btnOpts={'guibtn':False})
+                                         name='Reset Zoom')
     # -----
     # FOCUSED COMPONENT INFORMATION
     # -----
@@ -124,10 +124,11 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     if imgSrc is not None:
       self.setImage(imgSrc)
 
+    self.toolsGrp = None
     if toolbar is not None:
       toolbar.addWidget(self.drawShapeGrp)
       toolbar.addWidget(self.drawActGrp)
-      self.addTools(self.toolsEditor)
+      self.toolsGrp = self.addTools(self.toolsEditor)
 
   @property
   def compSer_asFrame(self):

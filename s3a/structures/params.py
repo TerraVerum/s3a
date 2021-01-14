@@ -162,6 +162,12 @@ class FRParam:
         raise
       return default
 
+  def keys(self):
+    return list(self.opts.keys()) + _specialKeys
+
+  def __contains__(self, item):
+    return item in _specialKeys or item in self.opts
+
 @dataclass
 class FRParamGroup:
   """

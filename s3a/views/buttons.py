@@ -36,7 +36,7 @@ class ButtonCollection(QtWidgets.QGroupBox):
       self.create_addBtn(param, fn, **createOpts)
 
   def create_addBtn(self, btnParam: FRParam, triggerFn: btnCallable, checkable=False, **registerOpts):
-    if btnParam in self.paramToBtnMapping or not btnParam.opts.get('guibtn', True):
+    if btnParam in self.paramToBtnMapping:
       # Either already exists or wasn't designed to be a button
       return
     registerOpts.setdefault('asToolBtn', self.asToolBtn)

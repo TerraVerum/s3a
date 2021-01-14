@@ -66,6 +66,7 @@ class MainImagePlugin(ParamEditorPlugin):
 
     win.mainImg.registerDrawAction(CNST.DRAW_ACT_CREATE, self.createComponent)
     win.mainImg.addTools(self.toolsEditor)
+
     # No need for a dropdown menu
     self.dock = None
     super().attachWinRef(win)
@@ -143,6 +144,7 @@ class RandomToolsPlugin(ParamEditorPlugin):
     super().attachWinRef(win)
 
     self.registerFunc(self.showDevConsole)
+    self.registerFunc(win.clearBoundaries, btnOpts=CNST.TOOL_CLEAR_BOUNDARIES)
 
   def showDevConsole(self):
     """
