@@ -505,7 +505,7 @@ class ProjectData(QtCore.QObject):
       cfg = {}
     parent.loadCfg(name, cfg)
 
-    tdName = parent.tableData.cfgFname
+    tdName = Path(parent.tableData.cfgFname)
     if tdName.resolve() != parent.cfgFname:
       tdName = tdName.name
       saveToFile(parent.tableData.cfg, location / tdName, True)
