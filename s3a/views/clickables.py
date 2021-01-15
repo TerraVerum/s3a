@@ -71,31 +71,17 @@ class BoundScatterPlot(pg.ScatterPlotItem):
         pts.append(spot)
     return pts[::-1]
 
-  def measureSpotSizes(self, dataSet):
-    """
-    Override the method so that it takes symbol size into account
-    """
-    for rec in dataSet:
-      ## keep track of the maximum spot size and pixel size
-      symbol, size, pen, brush = self.getSpotOpts(rec)
-      try:
+  def _updateMaxSpotSizes(self, **kwargs):
+    w = -1
+    try:
+      for symbol in self.data['symbol']:
         br = symbol.boundingRect()
-      except AttributeError:
-        # normal symbol
-        return super().measureSpotSizes(dataSet)
-      size = max(br.width(), br.height())*2
-      width = 0
-      pxWidth = 0
-      if self.opts['pxMode']:
-        pxWidth = size + pen.widthF()
-      else:
-        width = size
-        if pen.isCosmetic():
-          pxWidth += pen.widthF()
-        else:
-          width += pen.widthF()
-      self._maxSpotWidth = max(self._maxSpotWidth, width)
-      self._maxSpotPxWidth = max(self._maxSpotPxWidth, pxWidth)
+        w = max(w, br.width()*2, br.height()*2)
+    except AttributeError:
+      # Don't have a painter symbol
+      return super()._updateMaxSpotSizes(**kwargs)
+    self._maxSpotWidth = max(self._maxSpotPxWidth, w)
+    self._maxSpotPxWidth = w
     self.bounds = [None, None]
 
 class RightPanViewBox(pg.ViewBox):
