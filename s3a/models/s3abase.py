@@ -245,7 +245,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       self.mainImg.setImage(fileName)
     self.srcImgFname = fileName
 
-    self.changeFocusedComp()
+    self.clearBoundaries()
     self.mainImg.plotItem.vb.autoRange()
     self.filePlg.addImage(fileName)
     self.loadNewAnnotations()
