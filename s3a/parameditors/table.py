@@ -16,7 +16,7 @@ from s3a.constants import TABLE_DIR, REQD_TBL_FIELDS, DATE_FORMAT, \
   PRJ_CONSTS, BASE_DIR
 from s3a.generalutils import resolveYamlDict, hierarchicalUpdate
 from s3a.parameditors import ParamEditor
-from s3a.structures import FRParam, FilePath, FRParamGroup, S3AException, S3AWarning
+from s3a.structures import PrjParam, FilePath, PrjParamGroup, S3AException, S3AWarning
 
 yaml = YAML()
 
@@ -24,7 +24,7 @@ def genParamList(nameIter, paramType, defaultVal, defaultParam='value'):
   """Helper for generating children elements"""
   return [{'name': name, 'type': paramType, defaultParam: defaultVal} for name in nameIter]
 
-def _filterForParam(param: FRParam):
+def _filterForParam(param: PrjParam):
   """Constructs a filter for the parameter based on its type"""
   children = []
   pType = param.pType.lower()
@@ -35,8 +35,8 @@ def _filterForParam(param: FRParam):
     retVal[0]['value'] = -sys.maxsize
     retVal[1]['value'] = sys.maxsize
     children.extend(retVal)
-  elif pType in ['frparam', 'enum', 'list', 'popuplineeditor', 'bool']:
-    if pType == 'frparam':
+  elif pType in ['prjparam', 'enum', 'list', 'popuplineeditor', 'bool']:
+    if pType == 'prjparam':
       iterGroup = [param.name for param in param.value.group]
     elif pType == 'enum':
       iterGroup = [param for param in param.value]
@@ -55,7 +55,7 @@ def _filterForParam(param: FRParam):
     paramWithChildren.addChildren(actions)
     paramWithChildren.addChild(optsParam)
   elif 'xyvertices' in pType:
-    minMax = _filterForParam(FRParam('', 5))
+    minMax = _filterForParam(PrjParam('', 5))
     minMax.removeChild(minMax.childs[0])
     minMax = minMax.saveState()['children']
     xyVerts = genParamList(['X Bounds', 'Y Bounds'], 'group', minMax, 'children')
@@ -72,7 +72,7 @@ def _filterForParam(param: FRParam):
   return paramWithChildren
 
 class TableFilterEditor(ParamEditor):
-  def __init__(self, paramList: List[FRParam]=None, parent=None):
+  def __init__(self, paramList: List[PrjParam]=None, parent=None):
     if paramList is None:
       paramList = []
     _FILTER_PARAMS = [
@@ -81,7 +81,7 @@ class TableFilterEditor(ParamEditor):
     super().__init__(parent, paramList=_FILTER_PARAMS, saveDir=TABLE_DIR,
                      fileType='filter', name='&Component Table Filter')
 
-  def updateParamList(self, paramList: List[FRParam]):
+  def updateParamList(self, paramList: List[PrjParam]):
     newParams = []
     badCols = []
     for param in paramList:
@@ -127,7 +127,7 @@ class TableData(QtCore.QObject):
     self.cfgFname: Optional[Path] = None
     self.cfg: Optional[dict] = None
 
-    self.allFields: List[FRParam] = []
+    self.allFields: List[PrjParam] = []
     self.resetLists()
 
   def makeCompDf(self, numRows=1) -> df:
@@ -202,18 +202,18 @@ class TableData(QtCore.QObject):
     self.allFields.clear()
     self.allFields.extend(REQD_TBL_FIELDS)
 
-  def fieldFromName(self, name: Union[str, FRParam]):
+  def fieldFromName(self, name: Union[str, PrjParam]):
     """
-    Helper function to retrieve the FRParam corresponding to the field with this name
+    Helper function to retrieve the PrjParam corresponding to the field with this name
     """
-    return FRParamGroup.fieldFromParam(self.allFields, name)
+    return PrjParamGroup.fieldFromParam(self.allFields, name)
 
 NestedIndexer = Union[str, Tuple[Union[str,int],...]]
 class YamlParser:
   def __init__(self, cfg: dict):
     self.cfg = cfg
 
-  def parseParamList(self, listName: NestedIndexer, groupOwner: Union[List, FRParamGroup]=None):
+  def parseParamList(self, listName: NestedIndexer, groupOwner: Union[List, PrjParamGroup]=None):
     """
     A simple list is only a list of strings. A complex list is a dict, where each
     (key, val) pair is a list element. See the structural setup in pg.ListParameter.
@@ -243,16 +243,16 @@ class YamlParser:
       parsedParam = self.parseLeaf(leafName, value)
     else:
       value = value.copy()
-      # Format nicely for FRParam creation
+      # Format nicely for PrjParam creation
       nameArgs = {'value': value.pop('value', None),
                   'pType': value.pop('pType', 'NoneType'),
                   'helpText': value.pop('helpText', '')}
       # Forward additional args if they exist
-      parsedParam = FRParam(leafName, **nameArgs, **value)
+      parsedParam = PrjParam(leafName, **nameArgs, **value)
     return parsedParam
 
   def parseLeaf(self, paramName: str, value: Any):
-    leafParam = FRParam(paramName, value)
+    leafParam = PrjParam(paramName, value)
     value = leafParam.value
     if isinstance(value, bool):
       pass

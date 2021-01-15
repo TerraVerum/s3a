@@ -10,7 +10,7 @@ from pyqtgraph.parametertree import Parameter
 from s3a.generalutils import pascalCaseToTitle
 from s3a.graphicsutils import dialogGetSaveFileName, addDirItemsToMenu
 from s3a.models.editorbase import ParamEditorBase
-from s3a.structures import FRParam, FilePath
+from s3a.structures import PrjParam, FilePath
 
 Signal = QtCore.Signal
 
@@ -20,9 +20,9 @@ def clearUnwantedParamVals(paramState: dict):
   if paramState.get('value', True) is None:
     paramState.pop('value')
 
-_childTuple_asValue = Tuple[FRParam,...]
-childTuple_asParam = Tuple[Tuple[FRParam,...], bool]
-_keyType = Union[FRParam, Union[_childTuple_asValue, childTuple_asParam]]
+_childTuple_asValue = Tuple[PrjParam,...]
+childTuple_asParam = Tuple[Tuple[PrjParam,...], bool]
+_keyType = Union[PrjParam, Union[_childTuple_asValue, childTuple_asParam]]
 class ParamEditor(ParamEditorBase):
   """
   GUI controls for user-interactive parameters within S3A. Each window consists of

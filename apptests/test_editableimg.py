@@ -8,7 +8,7 @@ from s3a.constants import PRJ_CONSTS
 from s3a.controls.drawctrl import RoiCollection
 from s3a.parameditors.algcollection import AlgParamEditor
 from s3a.processing import ProcessIO, ImageProcess, ImgProcWrapper
-from s3a.structures import XYVertices, ComplexXYVertices, FRParam, S3AWarning, NChanImg
+from s3a.structures import XYVertices, ComplexXYVertices, PrjParam, S3AWarning, NChanImg
 
 def leftClickGen(pos: XYVertices, dbclick=False):
   Ev = QtCore.QEvent
@@ -25,7 +25,7 @@ def leftClickGen(pos: XYVertices, dbclick=False):
 def roiFactory(app):
   clctn = RoiCollection((PRJ_CONSTS.DRAW_SHAPE_POLY, PRJ_CONSTS.DRAW_SHAPE_RECT),
                         app.focusedImg)
-  def _polyRoi(pts: XYVertices, shape: FRParam=PRJ_CONSTS.DRAW_SHAPE_RECT):
+  def _polyRoi(pts: XYVertices, shape: PrjParam=PRJ_CONSTS.DRAW_SHAPE_RECT):
     clctn.curShapeParam = shape
     for pt in pts:
       ev = leftClickGen(pt)

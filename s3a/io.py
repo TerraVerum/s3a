@@ -17,8 +17,8 @@ from typing_extensions import Literal
 from s3a.constants import REQD_TBL_FIELDS as RTF
 from s3a.generalutils import augmentException, getCroppedImg, resize_pad
 from s3a.parameditors.table import TableData
-from s3a.structures import FRParamGroup, S3AWarning, S3AIOError, FilePath, GrayImg, \
-  ComplexXYVertices, FRParam
+from s3a.structures import PrjParamGroup, S3AWarning, S3AIOError, FilePath, GrayImg, \
+  ComplexXYVertices, PrjParam
 
 FilePathOrDf = Union[FilePath, pd.DataFrame]
 
@@ -30,7 +30,7 @@ def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> pd.Series:
     np.ndarray        : lambda strVal: np.array(literal_eval(strVal)),
     ComplexXYVertices : ComplexXYVertices.deserialize,
     bool              : lambda strVal: strVal.lower() == 'true',
-    FRParam           : lambda strVal: FRParamGroup.fieldFromParam(paramVal.group, strVal)
+    PrjParam           : lambda strVal: PrjParamGroup.fieldFromParam(paramVal.group, strVal)
   }
   defaultFunc = lambda strVal: paramType(strVal)
   funcToUse = funcMap.get(paramType, defaultFunc)
@@ -305,7 +305,7 @@ class ComponentIO:
 
   @classmethod
   def exportLblPng(cls, compDf: df, outFile: FilePath=None, imShape: Tuple[int]=None,
-                   lblField: Union[FRParam, str]='Instance ID', bgColor=0, allowOffset=None,
+                   lblField: Union[PrjParam, str]='Instance ID', bgColor=0, allowOffset=None,
                    rescaleOutput=False, returnLblMapping=False,
                    **kwargs):
     """
@@ -314,13 +314,13 @@ class ComponentIO:
     :param imShape: MxN shape of image containing these annotations
     :param lblField: Data field to use as an index label. E.g. "Class" will use the 'class'
       column, but any other column can be specified. The output ground truth masks
-      will be colored according to this field.  See :meth:`FRParam.toNumeric` for details.
+      will be colored according to this field.  See :meth:`PrjParam.toNumeric` for details.
       If `lblField` is *None*, the foreground mask will be boolean instead of integer-colored.
     :param bgColor: Color of the mask background. Must be an integer.
     :param allowOffset: Some label fields may have 0-based starting values. In cases
       where `bgColor` is also 0, an offset is required to prevent those field values
       from being considered background. `allowOffset` determines whether this change
-      can be made to the data. See `FRParam.toNumeric` for detailed description.
+      can be made to the data. See `PrjParam.toNumeric` for detailed description.
     :param rescaleOutput: For images designed for human use, it is helpful to have
       outputs rescaled to the entire intensity range. Otherwise, they usually end
       up looking pure black and it is difficult to see components in the image.
@@ -471,7 +471,7 @@ class ComponentIO:
       the index doesn't need to be retained.
     :return: Tuple: DF that will be exported if successful extraction
     """
-    field = FRParam('None', None)
+    field = PrjParam('None', None)
     try:
       if isinstance(inFileOrDf, df):
         csvDf = inFileOrDf

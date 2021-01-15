@@ -10,7 +10,7 @@ from conftest import stack
 from helperclasses import CompDfTester
 from s3a import appInst, FR_SINGLETON, S3A
 from s3a.constants import REQD_TBL_FIELDS, PRJ_CONSTS
-from s3a.structures import ComplexXYVertices, FRParam, XYVertices, S3AWarning
+from s3a.structures import ComplexXYVertices, PrjParam, XYVertices, S3AWarning
 from s3a.views.tableview import CompTableView
 
 

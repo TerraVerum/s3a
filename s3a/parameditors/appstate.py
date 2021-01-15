@@ -8,7 +8,7 @@ from pyqtgraph.parametertree import Parameter
 from s3a.generalutils import safeCallFuncList
 from s3a.graphicsutils import raiseErrorLater
 from s3a.constants import APP_STATE_DIR
-from s3a.structures import FilePath, FRParam, S3AIOError
+from s3a.structures import FilePath, PrjParam, S3AIOError
 from s3a.parameditors import ParamEditor
 from s3a import FR_SINGLETON
 

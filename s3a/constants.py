@@ -62,188 +62,188 @@ class _PrjEnums(Enum):
 
 PRJ_ENUMS = _PrjEnums
 
-from s3a.structures import ComplexXYVertices, FRParam, FRParamGroup, newParam
+from s3a.structures import ComplexXYVertices, PrjParam, PrjParamGroup, newParam
 
 @dataclass
-class _ReqdTableFields(FRParamGroup):
-  INST_ID          : FRParam = newParam('Instance ID', -1)
-  VERTICES         : FRParam = newParam('Vertices', ComplexXYVertices())
-  ANN_AUTHOR       : FRParam = newParam('Author', "")
-  SRC_IMG_FILENAME : FRParam = newParam('Source Image Filename', "")
-  ANN_TIMESTAMP    : FRParam = newParam('Timestamp', "")
+class _ReqdTableFields(PrjParamGroup):
+  INST_ID          : PrjParam = newParam('Instance ID', -1)
+  VERTICES         : PrjParam = newParam('Vertices', ComplexXYVertices())
+  ANN_AUTHOR       : PrjParam = newParam('Author', "")
+  SRC_IMG_FILENAME : PrjParam = newParam('Source Image Filename', "")
+  ANN_TIMESTAMP    : PrjParam = newParam('Timestamp', "")
 REQD_TBL_FIELDS = _ReqdTableFields()
 
 
 @dataclass
-class _PrjConsts(FRParamGroup):
+class _PrjConsts(PrjParamGroup):
   # --------------------------
   # CLASS NAMES
   # --------------------------
-  CLS_ANNOTATOR        : FRParam = newParam('S3A Window')
-  CLS_S3A_MODEL        : FRParam = newParam('S3A Model')
+  CLS_ANNOTATOR        : PrjParam = newParam('S3A Window')
+  CLS_S3A_MODEL        : PrjParam = newParam('S3A Model')
 
-  CLS_COMP_TBL         : FRParam = newParam('Component Table')
-  CLS_COMP_MGR         : FRParam = newParam('Component Manager')
-  CLS_COMP_EXPORTER    : FRParam = newParam('Component Exporter')
+  CLS_COMP_TBL         : PrjParam = newParam('Component Table')
+  CLS_COMP_MGR         : PrjParam = newParam('Component Manager')
+  CLS_COMP_EXPORTER    : PrjParam = newParam('Component Exporter')
 
-  CLS_VERT_IMG         : FRParam = newParam('Focused Image Graphics')
-  CLS_MULT_REG_PLT     : FRParam = newParam('Component Plot')
-  CLS_ROI_CLCTN        : FRParam = newParam('ROI Shapes')
+  CLS_VERT_IMG         : PrjParam = newParam('Focused Image Graphics')
+  CLS_MULT_REG_PLT     : PrjParam = newParam('Component Plot')
+  CLS_ROI_CLCTN        : PrjParam = newParam('ROI Shapes')
 
-  CLS_REGION_BUF       : FRParam = newParam('Region Modification Buffer')
+  CLS_REGION_BUF       : PrjParam = newParam('Region Modification Buffer')
 
-  CLS_IMG_AREA         : FRParam = newParam('Base Image Area')
-  CLS_MAIN_IMG_AREA    : FRParam = newParam('Main Image Area')
-  CLS_FOCUSED_IMG_AREA : FRParam = newParam('Focused Image Area')
+  CLS_IMG_AREA         : PrjParam = newParam('Base Image Area')
+  CLS_MAIN_IMG_AREA    : PrjParam = newParam('Main Image Area')
+  CLS_FOCUSED_IMG_AREA : PrjParam = newParam('Focused Image Area')
   # --------------------------
   # SCHEME PARAMETERS
   # --------------------------
-  SCHEME_USE_DARK_THEME  : FRParam = newParam('Use dark theme', False)
-  SCHEME_BOUND_CLR       : FRParam = newParam('Normal Boundary Color', 'ff0', 'color')
-  SCHEME_SEL_BOUND_CLR   : FRParam = newParam('Selected Boundary Color', '00f', 'color')
-  SCHEME_FOC_BRUSH_CLR   : FRParam = newParam('Focused Brush Color', 'f007', 'color')
-  SCHEME_BOUND_WIDTH     : FRParam = newParam('Boundary Width', 7)
-  SCHEME_REG_VERT_COLOR  : FRParam = newParam('Vertex Color', '0f0', 'color')
-  SCHEME_REG_FILL_COLOR  : FRParam = newParam('Fill Color', '00ff0046', 'color')
-  SCHEME_ROI_LINE_CLR    : FRParam = newParam('ROI Line Color', 'fff', 'color')
-  SCHEME_ROI_LINE_WIDTH  : FRParam = newParam('ROI Line Width', 1)
-  SCHEME_GRID_LINE_WIDTH : FRParam = newParam('Grid Line Width', 1)
-  SCHEME_GRID_CLR        : FRParam = newParam('Grid Line Color', 'fff', 'color')
-  SCHEME_SHOW_GRID       : FRParam = newParam('Show Grid', False)
-  SCHEME_LBL_COL         : FRParam = newParam('Labeling Column', REQD_TBL_FIELDS.INST_ID.name, pType='list', limits=[])
+  SCHEME_USE_DARK_THEME  : PrjParam = newParam('Use dark theme', False)
+  SCHEME_BOUND_CLR       : PrjParam = newParam('Normal Boundary Color', 'ff0', 'color')
+  SCHEME_SEL_BOUND_CLR   : PrjParam = newParam('Selected Boundary Color', '00f', 'color')
+  SCHEME_FOC_BRUSH_CLR   : PrjParam = newParam('Focused Brush Color', 'f007', 'color')
+  SCHEME_BOUND_WIDTH     : PrjParam = newParam('Boundary Width', 7)
+  SCHEME_REG_VERT_COLOR  : PrjParam = newParam('Vertex Color', '0f0', 'color')
+  SCHEME_REG_FILL_COLOR  : PrjParam = newParam('Fill Color', '00ff0046', 'color')
+  SCHEME_ROI_LINE_CLR    : PrjParam = newParam('ROI Line Color', 'fff', 'color')
+  SCHEME_ROI_LINE_WIDTH  : PrjParam = newParam('ROI Line Width', 1)
+  SCHEME_GRID_LINE_WIDTH : PrjParam = newParam('Grid Line Width', 1)
+  SCHEME_GRID_CLR        : PrjParam = newParam('Grid Line Color', 'fff', 'color')
+  SCHEME_SHOW_GRID       : PrjParam = newParam('Show Grid', False)
+  SCHEME_LBL_COL         : PrjParam = newParam('Labeling Column', REQD_TBL_FIELDS.INST_ID.name, pType='list', limits=[])
 
   # --------------------------
   # REGION-CREATION PARAMETERS
   # --------------------------
-  PROP_MIN_COMP_SZ             : FRParam = newParam('Minimum New Component Size (px)', 50)
-  PROP_UNDO_BUF_SZ             : FRParam = newParam(
+  PROP_MIN_COMP_SZ             : PrjParam = newParam('Minimum New Component Size (px)', 50)
+  PROP_UNDO_BUF_SZ             : PrjParam = newParam(
     'Size of Undo Buffer', 300, helpText='Increasing the buffer size will require more memory,'
                                          'but can save a larger record of past actions.')
-  PROP_COMP_SEL_BHV            : FRParam = newParam(
+  PROP_COMP_SEL_BHV            : PrjParam = newParam(
     'Component Selection Behavior', 'Entire Component', 'list', limits=['Boundary Only', 'Entire Component'],
     helpText='When `Boundary Only`, components are selected when clicking on their boundaries.\n'
              'When `Entire Component`, clicking anywhere within the component'
              ' will select it')
-  PROP_SHOW_TBL_ON_COMP_CREATE : FRParam = newParam('Show popup table when creating component', False)
+  PROP_SHOW_TBL_ON_COMP_CREATE : PrjParam = newParam('Show popup table when creating component', False)
   # --------------------------
   # MISC TOOLS
   # --------------------------
-  TOOL_UNDO               : FRParam =  newParam('Undo', 'Ctrl+Z')
-  TOOL_REDO               : FRParam =  newParam('Redo', 'Ctrl+Y')
+  TOOL_UNDO               : PrjParam =  newParam('Undo', 'Ctrl+Z')
+  TOOL_REDO               : PrjParam =  newParam('Redo', 'Ctrl+Y')
   # --------------------------
   # IMAGE TOOLS
   # --------------------------
-  TOOL_MERGE_COMPS        : FRParam = newParam('Merge Selected', 'Ctrl+Alt+G')
-  TOOL_SPLIT_COMPS        : FRParam = newParam('Split Selected', 'Ctrl+Alt+S')
-  TOOL_COPY_REGIONS       : FRParam = newParam('Copy Selected', 'Ctrl+Alt+C')
-  TOOL_MOVE_REGIONS       : FRParam = newParam('Move Selected', 'Ctrl+Alt+V')
-  TOOL_CLEAR_FOC_REGION   : FRParam = newParam('Clear', 'Ctrl+Shift+C')
-  TOOL_RESET_FOC_REGION   : FRParam = newParam('Reset', 'Ctrl+Shift+R')
-  TOOL_FILL_FOC_REGION    : FRParam = newParam('Fill', 'Ctrl+Shift+F')
-  TOOL_ACCEPT_FOC_REGION  : FRParam = newParam('Accept', 'Ctrl+Shift+A')
-  TOOL_CLEAR_ROI          : FRParam = newParam('Clear ROI', 'Esc')
-  TOOL_CLEAR_HISTORY      : FRParam = newParam('Clear Processor History', 'Ctrl+Alt+C,H')
-  TOOL_PROC_ANALYTICS     : FRParam = newParam('Show Analytics', 'Ctrl+K+S+P')
+  TOOL_MERGE_COMPS        : PrjParam = newParam('Merge Selected', 'Ctrl+Alt+G')
+  TOOL_SPLIT_COMPS        : PrjParam = newParam('Split Selected', 'Ctrl+Alt+S')
+  TOOL_COPY_REGIONS       : PrjParam = newParam('Copy Selected', 'Ctrl+Alt+C')
+  TOOL_MOVE_REGIONS       : PrjParam = newParam('Move Selected', 'Ctrl+Alt+V')
+  TOOL_CLEAR_FOC_REGION   : PrjParam = newParam('Clear', 'Ctrl+Shift+C')
+  TOOL_RESET_FOC_REGION   : PrjParam = newParam('Reset', 'Ctrl+Shift+R')
+  TOOL_FILL_FOC_REGION    : PrjParam = newParam('Fill', 'Ctrl+Shift+F')
+  TOOL_ACCEPT_FOC_REGION  : PrjParam = newParam('Accept', 'Ctrl+Shift+A')
+  TOOL_CLEAR_ROI          : PrjParam = newParam('Clear ROI', 'Esc')
+  TOOL_CLEAR_HISTORY      : PrjParam = newParam('Clear Processor History', 'Ctrl+Alt+C,H')
+  TOOL_PROC_ANALYTICS     : PrjParam = newParam('Show Analytics', 'Ctrl+K+S+P')
 
   # --------------------------
   # WINDOW TOOLS
   # --------------------------
-  TOOL_ESTIMATE_BOUNDARIES   : FRParam = newParam('Estimate Boundaries', 'Ctrl+Alt+Shift+E')
-  TOOL_CLEAR_BOUNDARIES      : FRParam = newParam('Clear Boundaries', 'Ctrl+Alt+Shift+C')
-  TOOL_EXPORT_COMP_LIST      : FRParam = newParam('Export Current Table', 'Ctrl+K,E,T')
-  TOOL_TBL_SET_SAME_AS_FIRST : FRParam = newParam('Set Cells as First', 'Ctrl+D')
-  TOOL_TBL_SET_AS            : FRParam = newParam('Set Cells As...', 'Ctrl+Shift+D')
-  TOOL_TBL_DEL_ROWS          : FRParam = newParam('Delete Table Rows', 'Del')
-  TOOL_TBL_ZOOM_TO_COMPS     : FRParam = newParam('Zoom to Selection  ', 'Ctrl+K,Z,S')
+  TOOL_ESTIMATE_BOUNDARIES   : PrjParam = newParam('Estimate Boundaries', 'Ctrl+Alt+Shift+E')
+  TOOL_CLEAR_BOUNDARIES      : PrjParam = newParam('Clear Boundaries', 'Ctrl+Alt+Shift+C')
+  TOOL_EXPORT_COMP_LIST      : PrjParam = newParam('Export Current Table', 'Ctrl+K,E,T')
+  TOOL_TBL_SET_SAME_AS_FIRST : PrjParam = newParam('Set Cells as First', 'Ctrl+D')
+  TOOL_TBL_SET_AS            : PrjParam = newParam('Set Cells As...', 'Ctrl+Shift+D')
+  TOOL_TBL_DEL_ROWS          : PrjParam = newParam('Delete Table Rows', 'Del')
+  TOOL_TBL_ZOOM_TO_COMPS     : PrjParam = newParam('Zoom to Selection  ', 'Ctrl+K,Z,S')
 
   # --------------------------
   # PROJECT
   # --------------------------
-  TOOL_PROJ_SAVE     : FRParam = newParam('Save', 'Ctrl+S')
-  TOOL_PROJ_OPEN     : FRParam = newParam('Open Project', 'Ctrl+K,P,O')
-  TOOL_PROJ_OPEN_IMG : FRParam = newParam('Open Project Image', 'Ctrl+K,I,O')
-  TOOL_PROJ_CREATE   : FRParam = newParam('Create Project', 'Ctrl+K,P,C')
-  TOOL_PROJ_ADD_IMG  : FRParam = newParam('Add New Image', 'Ctrl+K,I,A')
-  TOOL_PROJ_ADD_ANN  : FRParam = newParam('Add New Annotation', 'Ctrl+K,A,A')
-  TOOL_PROJ_SETTINGS : FRParam = newParam('Project Settings...', 'Ctrl+K,P,S')
-  TOOL_PROJ_EXPORT   : FRParam = newParam('Export...', 'Ctrl+K,P,E')
-  TOOL_AUTOSAVE      : FRParam = newParam('Autosave...', 'Ctrl+K,A,O')
+  TOOL_PROJ_SAVE     : PrjParam = newParam('Save', 'Ctrl+S')
+  TOOL_PROJ_OPEN     : PrjParam = newParam('Open Project', 'Ctrl+K,P,O')
+  TOOL_PROJ_OPEN_IMG : PrjParam = newParam('Open Project Image', 'Ctrl+K,I,O')
+  TOOL_PROJ_CREATE   : PrjParam = newParam('Create Project', 'Ctrl+K,P,C')
+  TOOL_PROJ_ADD_IMG  : PrjParam = newParam('Add New Image', 'Ctrl+K,I,A')
+  TOOL_PROJ_ADD_ANN  : PrjParam = newParam('Add New Annotation', 'Ctrl+K,A,A')
+  TOOL_PROJ_SETTINGS : PrjParam = newParam('Project Settings...', 'Ctrl+K,P,S')
+  TOOL_PROJ_EXPORT   : PrjParam = newParam('Export...', 'Ctrl+K,P,E')
+  TOOL_AUTOSAVE      : PrjParam = newParam('Autosave...', 'Ctrl+K,A,O')
 
   # --------------------------
   # GLOBAL PREDICTIONS
   # --------------------------
-  TOOL_PRED_SEL     : FRParam = newParam('Global Estimate From Selection', 'Ctrl+K,G,S')
-  TOOL_PRED_DEL_GRP : FRParam = newParam('Delete Selected Groups', 'Ctrl+K,G,D')
+  TOOL_PRED_SEL     : PrjParam = newParam('Global Estimate From Selection', 'Ctrl+K,G,S')
+  TOOL_PRED_DEL_GRP : PrjParam = newParam('Delete Selected Groups', 'Ctrl+K,G,D')
 
 
   # --------------------------
   # COMPONENT EXPORT PARAMETERS
   # --------------------------
-  EXP_ONLY_VISIBLE   : FRParam = newParam(
+  EXP_ONLY_VISIBLE   : PrjParam = newParam(
     'Only Export Visible Components', False,
     helpText='If *True*, only components showing on the main image will be included in'
              ' file exports.')
-  INCLUDE_FNAME_PATH : FRParam = newParam('Include full image path on export', False,
+  INCLUDE_FNAME_PATH : PrjParam = newParam('Include full image path on export', False,
   None, 'If *False*, only the image name is included in export information, e.g. <img>.png.'
         ' Otherwise, the full filepath is included, e.g. "C:/Users/.../<img>.png')
 
   # --------------------------
   # COMPONENT EXPORT PARAMETERS
   # --------------------------
-  ANN_CUR_FILE_INDICATOR: FRParam = newParam('Current image file string', 'Newly Added')
+  ANN_CUR_FILE_INDICATOR: PrjParam = newParam('Current image file string', 'Newly Added')
 
   # --------------------------
   # DRAWING
   # -------------------
   # Modes
-  DRAW_MODE_FOCUSED : FRParam = newParam(
+  DRAW_MODE_FOCUSED : PrjParam = newParam(
     'Activate "Edit" draw mode', 'Ctrl+K,D,E', 'registeredaction',
     icon=str(ICON_DIR/'edit.svg'))
 
   # Shapes
-  DRAW_SHAPE_RECT : FRParam = newParam(
+  DRAW_SHAPE_RECT : PrjParam = newParam(
     'Activate "Rectangular" draw shape', 'Ctrl+K,D,R', 'registeredaction',
     icon=str(ICON_DIR/'rectangle.svg'))
-  DRAW_SHAPE_POLY : FRParam = newParam(
+  DRAW_SHAPE_POLY : PrjParam = newParam(
     'Activate "Polygon" draw shape', 'Ctrl+K,D,Y', 'registeredaction',
     icon=str(ICON_DIR/'polygon.svg'))
-  DRAW_SHAPE_ELLIPSE : FRParam = newParam(
+  DRAW_SHAPE_ELLIPSE : PrjParam = newParam(
     'Activate "Ellipse" draw shape', 'Ctrl+K,D,L', 'registeredaction',
     icon=str(ICON_DIR/'ellipse.svg'))
-  DRAW_SHAPE_FREE : FRParam = newParam('Activate "Freehand" draw shape', 'Ctrl+K,D,H',
+  DRAW_SHAPE_FREE : PrjParam = newParam('Activate "Freehand" draw shape', 'Ctrl+K,D,H',
                                        icon=str(ICON_DIR/'freehand.svg'))
-  DRAW_SHAPE_POINT: FRParam = newParam(
+  DRAW_SHAPE_POINT: PrjParam = newParam(
     'Activate "Point" draw shape', 'Ctrl+K,D,N', icon=str(ICON_DIR/'point.svg'))
-  DRAW_SHAPE_NONE : FRParam = newParam('None')
+  DRAW_SHAPE_NONE : PrjParam = newParam('None')
 
   # Actions
-  DRAW_ACT_CREATE    : FRParam = newParam(
+  DRAW_ACT_CREATE    : PrjParam = newParam(
     'Activate "Create Component" action', 'Ctrl+K,D,C', 'registeredaction',
     icon=str(ICON_DIR/'create.svg'),
     helpText='When an ROI is created, the image processor will attempt to make a new'
              ' component at that location. Right-click and drag to pan.')
-  DRAW_ACT_ADD    : FRParam = newParam(
+  DRAW_ACT_ADD    : PrjParam = newParam(
     'Activate "Add to Foreground" action', 'Ctrl+K,D,F', 'registeredaction',
     icon=str(ICON_DIR/'foreground.svg'),
     helpText='When an ROI is created, the image processor will attempt to make a new'
              ' component at that location. Right-click and drag to pan.')
-  DRAW_ACT_REM    : FRParam = newParam(
+  DRAW_ACT_REM    : PrjParam = newParam(
     'Activate "Add to Background" action', 'Ctrl+K,D, B', 'registeredaction',
     icon=str(ICON_DIR/'background.svg'),
     helpText='When an ROI is created, the image processor will attempt to take the enclosed'
              ' area away from the current component shape. Right-click and drag to pan.')
-  DRAW_ACT_SELECT : FRParam = newParam(
+  DRAW_ACT_SELECT : PrjParam = newParam(
     'Activate "Select" draw action', 'Ctrl+K,D, S', 'registeredaction', icon=str(ICON_DIR/'select.svg'),
     helpText='When component boundaries are enclosed by this ROI, they will be selected'
              ' in the component table. Right-click and drag to pan.')
-  DRAW_ACT_PAN    : FRParam = newParam(
+  DRAW_ACT_PAN    : PrjParam = newParam(
     'Activate "Pan" draw action', 'Ctrl+K,D,P', 'registeredaction', icon=str(ICON_DIR/'pan.svg'),
     helpText='No ROI will be drawn in this mode. Right- or left-click and drag to pan.')
 PRJ_CONSTS = _PrjConsts()
 
 # from ruamel.yaml import YAML
 # yaml = YAML()
-# for cls in FRParam, FRParamGroup, _PrjConsts:
+# for cls in PrjParam, PrjParamGroup, _PrjConsts:
 #   yaml.register_class(cls)
 # for p in PRJ_CONSTS:
 #   p.group = []

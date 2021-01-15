@@ -65,7 +65,7 @@ class _FRSingleton(QtCore.QObject):
 
   def addPlugin(self, pluginCls: Type[base.ParamEditorPlugin], *args, **kwargs):
     """
-    From a class inheriting the *FRParamEditorPlugin*, creates a plugin object
+    From a class inheriting the *PrjParamEditorPlugin*, creates a plugin object
     that will appear in the S3A toolbar. An entry is created with dropdown options
     for each editor in *pluginCls*'s *editors* attribute.
 

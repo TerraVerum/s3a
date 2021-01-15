@@ -15,7 +15,7 @@ from s3a.graphicsutils import saveToFile, flexibleParamTree, setParamTooltips, \
   expandtreeParams
 from s3a.processing import AtomicProcess, ProcessIO, GeneralProcWrapper, ProcessStage, GeneralProcess
 from s3a.processing.guiwrapper import docParser
-from s3a.structures import FRParam, FilePath, ParamEditorError, S3AWarning
+from s3a.structures import PrjParam, FilePath, ParamEditorError, S3AWarning
 
 __all__ = ['ParamEditorBase']
 
@@ -66,9 +66,9 @@ def params_flattened(param: Parameter):
     addList.extend(params_flattened(child))
   return addList
 
-def _mkRunDict(proc: ProcessStage, btnOpts: Union[FRParam, dict]):
+def _mkRunDict(proc: ProcessStage, btnOpts: Union[PrjParam, dict]):
   defaultBtnOpts = dict(name=proc.name, type='registeredaction')
-  if isinstance(btnOpts, FRParam):
+  if isinstance(btnOpts, PrjParam):
     # Replace falsy helptext with func signature
     btnOpts = btnOpts.toPgDict()
   if btnOpts is not None:
@@ -83,9 +83,9 @@ def _mkRunDict(proc: ProcessStage, btnOpts: Union[FRParam, dict]):
     defaultBtnOpts['name'] = 'Run'
   return defaultBtnOpts
 
-oneOrMultChildren = Union[Sequence[FRParam], FRParam]
-_childTuple_asValue = Tuple[FRParam, oneOrMultChildren]
-childTuple_asParam = Tuple[FRParam, oneOrMultChildren, bool]
+oneOrMultChildren = Union[Sequence[PrjParam], PrjParam]
+_childTuple_asValue = Tuple[PrjParam, oneOrMultChildren]
+childTuple_asParam = Tuple[PrjParam, oneOrMultChildren, bool]
 _keyType = Union[_childTuple_asValue, childTuple_asParam]
 
 """
@@ -143,7 +143,7 @@ class ParamEditorBase(QtWidgets.QDockWidget):
       except ValueError:
         name = "Parameter Editor"
 
-    self.registeredFrParams: List[FRParam] = []
+    self.registeredPrjParams: List[PrjParam] = []
     """
     Keeps track of all parameters registerd as properties in this editor. Useful for
     inspecting which parameters are in an editor without traversing the parameter tree
@@ -203,7 +203,7 @@ class ParamEditorBase(QtWidgets.QDockWidget):
   def __getitem__(self, keys: _keyType):
     """
     Convenience function for accessing child parameters within a parameter editor.
-      - If :param:`keys` is a single :class:`FRParam`, the value at that parameter is
+      - If :param:`keys` is a single :class:`PrjParam`, the value at that parameter is
         extracted and returned to the user.
       - If :param:`keys` is a :class:`tuple`:
 
@@ -213,8 +213,8 @@ class ParamEditorBase(QtWidgets.QDockWidget):
           you must first specify the group parent for that parameter:
             >>> margin = FR_SINGLETON.generalProps[PRJ_CONSTS.CLS_FOCUSED_IMG_AREA,
             >>>   PRJ_CONSTS.MARGIN]
-        * The second parameter must be a single :class:`FRParam` object or a sequence
-          of :class:`FRParam` objects. If a sequence is given, a list of output values
+        * The second parameter must be a single :class:`PrjParam` object or a sequence
+          of :class:`PrjParam` objects. If a sequence is given, a list of output values
           respecting input order is provided.
         * The third parameter is optional. If provided, the :class:`Parameter<pyqtgraph.Parameter>`
           object is returned instead of the :func:`value()<Parameter.value>` data
@@ -242,7 +242,7 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     if not extractObj:
       oldExtractFunc = extractFunc
       extractFunc = lambda name: oldExtractFunc(name).value()
-    for curKey in keys: # type: FRParam
+    for curKey in keys: # type: PrjParam
       outVals.append(extractFunc(curKey.name))
     if returnSingle:
       return outVals[0]
@@ -382,11 +382,11 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     filename.unlink()
     self.sigParamStateDeleted.emit(stateName)
 
-  def registerProps(self, constParams: List[FRParam], namePath:Sequence[str]=(),
+  def registerProps(self, constParams: List[PrjParam], namePath:Sequence[str]=(),
                      asProperty=True, **extraOpts):
     """
     Registers a list of proerties and returns an array of each. For parameter descriptions,
-    see :func:`FRParamEditor.registerProp`.
+    see :func:`PrjParamEditor.registerProp`.
     """
     outProps = []
     with self.params.treeChangeBlocker():
@@ -394,7 +394,7 @@ class ParamEditorBase(QtWidgets.QDockWidget):
         outProps.append(self.registerProp(param, namePath, asProperty, **extraOpts))
     return outProps
 
-  def registerProp(self, constParam: FRParam=None, namePath: Sequence[str]=(),
+  def registerProp(self, constParam: PrjParam=None, namePath: Sequence[str]=(),
                    asProperty=True, overrideBasePath: Sequence[str]=None, **etxraOpts):
     """
     Registers a property defined by *constParam* that will appear in the respective
@@ -427,7 +427,7 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     if constParam.name not in paramForCls.names:
       paramForCls.addChild(paramForEditor)
 
-    self.registeredFrParams.append(constParam)
+    self.registeredPrjParams.append(constParam)
     if not asProperty:
       return paramForEditor
 
@@ -446,7 +446,7 @@ class ParamEditorBase(QtWidgets.QDockWidget):
                    namePath:Tuple[str, ...]=(),
                    paramFormat = pascalCaseToTitle,
                    overrideBasePath: Sequence[str]=None,
-                   btnOpts: Union[FRParam, dict]=None,
+                   btnOpts: Union[PrjParam, dict]=None,
                    nest=True,
                    returnParam=False,
                    **kwargs):

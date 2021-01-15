@@ -185,7 +185,7 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
       if curType == 'enum':
         paramDict['type'] = 'list'
         paramDict.update(values=list(type(curval)))
-      elif curType == 'frparam':
+      elif curType == 'prjparam':
         paramDict['type'] = 'list'
         paramDict.update(values=list(curval.group))
       elif curType == 'bool':

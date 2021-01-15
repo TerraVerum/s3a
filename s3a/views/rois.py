@@ -6,7 +6,7 @@ from pyqtgraph.Qt import QtCore, QtGui
 from skimage.draw import draw
 
 from s3a.constants import PRJ_CONSTS
-from s3a.structures import FRParam
+from s3a.structures import PrjParam
 from s3a.structures import XYVertices, ComplexXYVertices
 
 __all__ = ['RectROI', 'PlotDataROI', 'PolygonROI', 'PointROI', 'SHAPE_ROI_MAPPING']
@@ -161,7 +161,7 @@ class EllipseROI(PlotDataROI):
     mask[filled[0], filled[1]] = True
     return ComplexXYVertices.fromBwMask(mask, externOnly=True).stack()
 
-SHAPE_ROI_MAPPING: Dict[FRParam, Callable[[], PlotDataROI]] = {
+SHAPE_ROI_MAPPING: Dict[PrjParam, Callable[[], PlotDataROI]] = {
   PRJ_CONSTS.DRAW_SHAPE_RECT: RectROI,
   PRJ_CONSTS.DRAW_SHAPE_FREE: PlotDataROI,
   PRJ_CONSTS.DRAW_SHAPE_POLY: PolygonROI,

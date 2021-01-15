@@ -8,7 +8,7 @@ from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from s3a.constants import SHORTCUTS_DIR
 from s3a.generalutils import helpTextToRichText, getParamChild, clsNameOrGroup
 from s3a.models.editorbase import params_flattened
-from s3a.structures import FRParam, ParamEditorError, S3AWarning
+from s3a.structures import PrjParam, ParamEditorError, S3AWarning
 
 from .genericeditor import ParamEditor
 
@@ -33,12 +33,12 @@ def _class_fnNamesFromFnQualname(qualname: str) -> (str, str):
   return fnParentClass, fnName
 
 class EditableShortcut(QtWidgets.QShortcut):
-  paramIdx: Tuple[FRParam, FRParam]
+  paramIdx: Tuple[PrjParam, PrjParam]
 
 
 @dataclass
 class BoundFnParams:
-  param: FRParam
+  param: PrjParam
   func: Callable
   defaultFnArgs: list
 
@@ -47,22 +47,22 @@ class ShortcutsEditor(ParamEditor):
 
   def __init__(self, parent=None):
 
-    self.paramToGlobalActsMapping: Dict[FRParam, QtWidgets.QAction] = {}
+    self.paramToGlobalActsMapping: Dict[PrjParam, QtWidgets.QAction] = {}
     # Unlike other param editors, these children don't get filled in until
     # after the top-level widget is passed to the shortcut editor
     super().__init__(parent, [], saveDir=SHORTCUTS_DIR, fileType='shortcut',
                      name='Tool Shortcuts')
 
     # Allow global shortcuts
-    self.globalParam = FRParam('Global')
+    self.globalParam = PrjParam('Global')
 
-  def _checkUniqueShortcut(self, shortcutOpts: FRParam):
+  def _checkUniqueShortcut(self, shortcutOpts: PrjParam):
     # TODO: Find way to preserve old shortcuts, in case multuple other operations
     #   were bound to this shortcut and lost
     if any(shortcutOpts.name == p.name() for p in params_flattened(self.params)):
       self.deleteShortcut(shortcutOpts)
 
-  def _createSeq(self, shortcutOpts: Union[FRParam, dict],
+  def _createSeq(self, shortcutOpts: Union[PrjParam, dict],
                  namePath: Sequence[str]=(),
                  overrideBasePath: Sequence[str]=None,
                  **kwargs):
@@ -71,7 +71,7 @@ class ShortcutsEditor(ParamEditor):
     else:
       namePath = tuple(overrideBasePath) + tuple(namePath)
     # Round-trip to set helptext, ensure all values are present
-    if isinstance(shortcutOpts, dict): shortcutOpts = FRParam(**shortcutOpts)
+    if isinstance(shortcutOpts, dict): shortcutOpts = PrjParam(**shortcutOpts)
     shcForCreate = shortcutOpts.toPgDict()
     shcForCreate['type'] = 'shortcut'
     param = getParamChild(self.params, *namePath, chOpts=shcForCreate)
@@ -80,7 +80,7 @@ class ShortcutsEditor(ParamEditor):
 
     return param
 
-  def registerShortcut(self, shortcutOpts: FRParam, func: Callable,
+  def registerShortcut(self, shortcutOpts: PrjParam, func: Callable,
                    funcArgs: tuple=(), funcKwargs: dict=None, overrideOwnerObj: Any=None,
                    **kwargs):
     self._checkUniqueShortcut(shortcutOpts)
@@ -110,7 +110,7 @@ class ShortcutsEditor(ParamEditor):
 
     return param
 
-  def registerAction(self, btnOpts: FRParam, action: QtWidgets.QAction, **kwargs):
+  def registerAction(self, btnOpts: PrjParam, action: QtWidgets.QAction, **kwargs):
     self._checkUniqueShortcut(btnOpts)
 
     param = self._createSeq(btnOpts, **kwargs)
@@ -122,7 +122,7 @@ class ShortcutsEditor(ParamEditor):
     shcChanged(None, btnOpts.value)
     return param
 
-  def createRegisteredButton(self, btnOpts: FRParam,
+  def createRegisteredButton(self, btnOpts: PrjParam,
                              baseBtn: QtWidgets.QAbstractButton=None,
                              asToolBtn=False, **kwargs):
     self._checkUniqueShortcut(btnOpts)
@@ -166,7 +166,7 @@ class ShortcutsEditor(ParamEditor):
            f'{conflicts}',
            S3AWarning)
 
-  def deleteShortcut(self, shortcutParam: FRParam):
+  def deleteShortcut(self, shortcutParam: PrjParam):
     matches = [p for p in params_flattened(self.params) if p.name() == shortcutParam['name']]
 
     formatted = f'<{shortcutParam["name"]}: {shortcutParam["value"]}>'

@@ -16,7 +16,7 @@ from pyqtgraph.parametertree import Parameter
 from s3a.constants import ANN_AUTH_DIR
 from s3a.graphicsutils import yaml
 from s3a.structures.typeoverloads import TwoDArr, FilePath
-from .structures import XYVertices, FRParam, ComplexXYVertices, NChanImg
+from .structures import XYVertices, PrjParam, ComplexXYVertices, NChanImg
 
 
 def stackedVertsPlusConnections(vertList: ComplexXYVertices) -> (XYVertices, np.ndarray):
@@ -85,7 +85,7 @@ def getClippedBbox(arrShape: tuple, bbox: TwoDArr, margin: int):
   arrShape = arrShape[:2]
   return np.clip(bbox, 0, arrShape[::-1])
 
-def coerceDfTypes(dataframe: df, constParams: Collection[FRParam]=None):
+def coerceDfTypes(dataframe: df, constParams: Collection[PrjParam]=None):
   """
   Pandas currently has a bug where datatypes are not preserved after update operations.
   Current workaround is to coerce all types to their original values after each operation

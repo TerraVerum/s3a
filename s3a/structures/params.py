@@ -13,7 +13,7 @@ from .exceptions import ParamEditorError, S3AWarning
 class _UNSPECIFIED_DEFAULT: pass
 _specialKeys = ['name', 'value', 'helpText', 'pType']
 
-class FRParam:
+class PrjParam:
   def __init__(self, name: str, value=None, pType: Optional[str]=None, helpText='',
                **opts):
     """
@@ -25,7 +25,7 @@ class FRParam:
     :param pType: Type of the variable if not easily inferrable from the value itself.
       For instance, class:`FRShortcutParameter<s3a.views.parameditors.FRShortcutParameter>`
       is indicated with string values (e.g. 'Ctrl+D'), so the user must explicitly specify
-      that such an :class:`FRParam` is of type 'shortcut' (as defined in
+      that such an :class:`PrjParam` is of type 'shortcut' (as defined in
       :class:`FRShortcutParameter<s3a.views.parameditors.FRShortcutParameter>`)
       If the type *is* easily inferrable, this may be left blank.
     :param helpText: Additional documentation for this parameter.
@@ -49,15 +49,15 @@ class FRParam:
     self.helpText = helpText
     self.opts = opts
 
-    self.group: Optional[Collection[FRParam]] = None
+    self.group: Optional[Collection[PrjParam]] = None
     """
-    FRParamGroup to which this parameter belongs, if this parameter is part of
-      a group. This is set by the FRParamGroup, not manually
+    PrjParamGroup to which this parameter belongs, if this parameter is part of
+      a group. This is set by the PrjParamGroup, not manually
     """
 
   def toPgDict(self):
     """
-    Simple conversion function from FRParams used internally to the dictionary form expected
+    Simple conversion function from PrjParams used internally to the dictionary form expected
     by pyqtgraph parameters
     """
     opts = self.opts.copy()
@@ -82,14 +82,14 @@ class FRParam:
     """
     Required for sorting by value in component table. Defer to alphabetic
     sorting
-    :param other: Other :class:`FRParam` member for comparison
+    :param other: Other :class:`PrjParam` member for comparison
     :return: Whether `self` is less than `other`
     """
     return str(self) < str(other)
 
   def __eq__(self, other):
     # TODO: Highly naive implementation. Be sure to make this more robust if it needs to be
-    #   for now assume only other frparams will be passed in
+    #   for now assume only other prjparamss will be passed in
     return repr(self) == repr(other)
 
   def __hash__(self):
@@ -169,7 +169,7 @@ class FRParam:
     return item in _specialKeys or item in self.opts
 
 @dataclass
-class FRParamGroup:
+class PrjParamGroup:
   """
   Hosts all child parameters and offers convenience function for iterating over them
   """
@@ -197,10 +197,10 @@ class FRParamGroup:
       param.group = weakref.proxy(self)
 
   @staticmethod
-  def fieldFromParam(group: Union[Collection[FRParam], FRParamGroup], param: Union[str, FRParam],
-                     default: FRParam=None):
+  def fieldFromParam(group: Union[Collection[PrjParam], PrjParamGroup], param: Union[str, PrjParam],
+                     default: PrjParam=None):
     """
-    Allows user to create a :class:`FRParam` object from its string value (or a parameter that
+    Allows user to create a :class:`PrjParam` object from its string value (or a parameter that
     can equal one of the parameters in this list)
     """
     param = str(param).lower()
@@ -219,7 +219,7 @@ class FRParamGroup:
     return default
 
   @classmethod
-  def getDefault(cls) -> Optional[FRParam]:
+  def getDefault(cls) -> Optional[PrjParam]:
     """
     Returns the default Param from the group. This can be overloaded in derived classes to yield a safe
     fallback class if the :func:`fieldFromParam` method fails.
@@ -229,10 +229,10 @@ class FRParamGroup:
 
 def newParam(name: str, val: Any=None, pType: str=None, helpText='', **opts):
   """
-  Factory for creating new parameters within a :class:`FRParamGroup`.
+  Factory for creating new parameters within a :class:`PrjParamGroup`.
 
-  See parameter documentation from :class:FRParam for arguments.
+  See parameter documentation from :class:PrjParam for arguments.
 
-  :return: Field that can be inserted within the :class:`FRParamGroup` dataclass.
+  :return: Field that can be inserted within the :class:`PrjParamGroup` dataclass.
   """
-  return field(default_factory=lambda: FRParam(name, val, pType, helpText, **opts))
+  return field(default_factory=lambda: PrjParam(name, val, pType, helpText, **opts))

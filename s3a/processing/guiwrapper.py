@@ -17,7 +17,7 @@ from s3a.generalutils import augmentException, getParamChild
 from s3a.parameditors.pgregistered import CustomMenuParameter
 from s3a.processing.algorithms import crop_to_local_area, apply_process_result, \
   basicOpsCombo, return_to_full_size, format_vertices
-from s3a.structures import FRParam, ComplexXYVertices, AlgProcessorError, XYVertices, \
+from s3a.structures import PrjParam, ComplexXYVertices, AlgProcessorError, XYVertices, \
   S3AWarning, CompositionMixin
 from ..processing.processing import *
 
@@ -41,7 +41,7 @@ def docParser(docstring: str):
       paramDoc = {'helpText': paramDoc}
     if paramDoc is None:
       continue
-    out[param.arg_name] = FRParam(name=param.arg_name, **paramDoc)
+    out[param.arg_name] = PrjParam(name=param.arg_name, **paramDoc)
     if 'pType' not in paramDoc:
       out[param.arg_name].pType = None
   out['top-descr'] = descr
@@ -86,7 +86,7 @@ def addAtomicToParam(stage: AtomicProcess, parentParam: Parameter,
     val = stage.input[key]
     curParam = docParams.get(key, None)
     if curParam is None:
-      curParam = FRParam(name=key, value=val)
+      curParam = PrjParam(name=key, value=val)
     else:
       # Default value should be overridden by func signature, if it is provided.
       # Mostly needed during "forceKeys" usage
@@ -124,7 +124,7 @@ def addGeneralToParam(stage: GeneralProcess, parentParam: Parameter, nestHyperpa
     if childStage.allowDisable:
       pType = 'procgroup'
     if nestHyperparams:
-      paramDict = FRParam(name=childStage.name, pType=pType, value=[],
+      paramDict = PrjParam(name=childStage.name, pType=pType, value=[],
                           enabled=not childStage.disabled).toPgDict()
       parentParam = _attemptCreateChild(outerParent, paramDict)
     else:

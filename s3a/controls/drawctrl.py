@@ -3,7 +3,7 @@ from typing import Dict, Collection
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 
-from s3a.structures import FRParam, XYVertices
+from s3a.structures import PrjParam, XYVertices
 from s3a.views.rois import SHAPE_ROI_MAPPING, PlotDataROI, PointROI
 from s3a.parameditors import singleton, EditorPropsMixin
 from s3a.models import editorbase
@@ -14,7 +14,7 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
   # Signal(ExtendedROI)
   sigShapeFinished = QtCore.Signal(object) # roiVerts : XYVertices
 
-  def __init__(self, allowableShapes: Collection[FRParam]=(), parent: pg.GraphicsView=None):
+  def __init__(self, allowableShapes: Collection[PrjParam]=(), parent: pg.GraphicsView=None):
     super().__init__(parent)
     singleton.FR_SINGLETON.colorScheme.registerFunc(
       PointROI.updateRadius, name='Point ROI Features', runOpts=editorbase.RunOpts.ON_CHANGED, namePath=(self.__groupingName__,),
@@ -24,7 +24,7 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
       allowableShapes = set()
     self.shapeVerts = XYVertices()
     # Make a new graphics item for each roi type
-    self.roiForShape: Dict[FRParam, PlotDataROI] = {}
+    self.roiForShape: Dict[PrjParam, PlotDataROI] = {}
     self._curShape = next(iter(allowableShapes)) if len(allowableShapes) > 0 else None
 
     self._locks = set()
@@ -114,7 +114,7 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
   @property
   def curShapeParam(self): return self._curShape
   @curShapeParam.setter
-  def curShapeParam(self, newShape: FRParam):
+  def curShapeParam(self, newShape: PrjParam):
     """
     When the shape is changed, be sure to reset the underlying ROIs
     :param newShape: New shape

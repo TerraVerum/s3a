@@ -14,7 +14,7 @@ from pyqtgraph.Qt import QtGui, QtCore
 from s3a import FR_SINGLETON, ComponentIO as frio
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_CONSTS, PRJ_ENUMS
 from s3a.generalutils import stackedVertsPlusConnections, dynamicDocstring
-from s3a.structures import FRParam, XYVertices, ComplexXYVertices, OneDArr, BlackWhiteImg
+from s3a.structures import PrjParam, XYVertices, ComplexXYVertices, OneDArr, BlackWhiteImg
 from s3a.structures.typeoverloads import GrayImg
 from . import imageareas
 from .clickables import BoundScatterPlot
@@ -28,7 +28,7 @@ Signal = QtCore.Signal
 
 def makeMultiRegionDf(numRows=1, idList: Sequence[int]=None, selected:Sequence[bool]=None,
                       focused: Sequence[bool]=None,
-                      vertices: Sequence[ComplexXYVertices]=None, lblField: FRParam=None):
+                      vertices: Sequence[ComplexXYVertices]=None, lblField: PrjParam=None):
   """
   Helper for creating new dataframe holding information determining color data.
   `selected` and `focused` must be boolean arrays indicating whether or not each component
@@ -105,7 +105,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     self.sigPointsClicked = None
 
   def resetRegionList(self, newRegionDf: Optional[df]=None,
-                      lblField:FRParam=RTF.INST_ID):
+                      lblField:PrjParam=RTF.INST_ID):
     idList = None
     if (newRegionDf is not None
         and lblField in newRegionDf.columns):

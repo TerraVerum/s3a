@@ -13,7 +13,7 @@ from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_CONSTS as CNST
 from s3a.controls.drawctrl import RoiCollection
 from s3a.generalutils import getCroppedImg, coerceDfTypes, serAsFrame
 from s3a.models.editorbase import RunOpts
-from s3a.structures import FRParam, XYVertices, ComplexXYVertices, FilePath, \
+from s3a.structures import PrjParam, XYVertices, ComplexXYVertices, FilePath, \
   CompositionMixin
 from s3a.structures import NChanImg
 from .buttons import ButtonCollection
@@ -29,12 +29,12 @@ __all__ = ['MainImage']
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
 
-DrawActFn = Union[Callable[[XYVertices, FRParam], Any], Callable[[XYVertices], Any]]
+DrawActFn = Union[Callable[[XYVertices, PrjParam], Any], Callable[[XYVertices], Any]]
 
 class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
   sigShapeFinished = Signal(object, object)
   """
-  (XYVertices, FRParam) emitted when a shape is finished
+  (XYVertices, PrjParam) emitted when a shape is finished
   - XYVerts from roi, re-thrown from self.shapeCollection
   - Current draw action
   """
@@ -55,7 +55,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     cls.minCompSize, = FR_SINGLETON.generalProps.registerProps(
       [CNST.PROP_MIN_COMP_SZ])
 
-  def __init__(self, parent=None, drawShapes: Collection[FRParam]=None,
+  def __init__(self, parent=None, drawShapes: Collection[PrjParam]=None,
                imgSrc: Union[FilePath, NChanImg]=None,
                toolbar: QtWidgets.QToolBar=None,
                **kargs):
@@ -102,7 +102,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     # -----
     self.regionCopier = RegionCopierPlot(self)
 
-    self.drawAction: FRParam = CNST.DRAW_ACT_PAN
+    self.drawAction: PrjParam = CNST.DRAW_ACT_PAN
     self.shapeCollection = RoiCollection(drawShapes, self)
     self.shapeCollection.sigShapeFinished.connect(
       lambda roiVerts: self.sigShapeFinished.emit(roiVerts, self.drawAction)
@@ -134,12 +134,12 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
   def compSer_asFrame(self):
       return coerceDfTypes(serAsFrame(self.compSer))
 
-  def shapeAssignment(self, newShapeParam: FRParam):
+  def shapeAssignment(self, newShapeParam: PrjParam):
     self.shapeCollection.curShapeParam = newShapeParam
     if self.regionCopier.active:
       self.regionCopier.erase()
 
-  def actionAssignment(self, newActionParam: FRParam):
+  def actionAssignment(self, newActionParam: PrjParam):
     self.drawAction = newActionParam
     if self.regionCopier.active:
       self.regionCopier.erase()
@@ -155,7 +155,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
       ev.accept()
     return finished
 
-  def switchBtnMode(self, newMode: FRParam):
+  def switchBtnMode(self, newMode: PrjParam):
     # EAFP
     try:
       self.drawActGrp.callFuncByParam(newMode)
@@ -278,25 +278,25 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     else:
       self.imgItem.setImage(imgSrc)
 
-  def registerDrawAction(self, actParams: Union[FRParam, Sequence[FRParam]], func: DrawActFn,
+  def registerDrawAction(self, actParams: Union[PrjParam, Sequence[PrjParam]], func: DrawActFn,
                          **registerOpts):
     """
     Adds specified action(s) to the list of allowable roi actions if any do not already
     exist. `func` is only triggered if a shape was finished and the current action matches
     any of the specified `actParams`
 
-    :param actParams: Single :py:class:`~s3a.structures.FRParam` or multiple FRParams that are allowed
+    :param actParams: Single :py:class:`~s3a.structures.PrjParam` or multiple PrjParams that are allowed
       to trigger this funciton
     :param func: Function to trigger when a shape is completed during the requested actions.
       If only one parameter is registered to this function, it is expected to only take
       roiVerts. If multiple are provided, it is expected to take roiVerts and the current draw action
     :param registerOpts: Extra arguments for button registration
     """
-    if isinstance(actParams, FRParam):
+    if isinstance(actParams, PrjParam):
       actParams = [actParams]
 
     @wraps(func)
-    def wrapper(roiVerts: XYVertices, param: FRParam):
+    def wrapper(roiVerts: XYVertices, param: PrjParam):
       if param in actParams:
         if len(actParams) > 1:
           func(roiVerts, param)

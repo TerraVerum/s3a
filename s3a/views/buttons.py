@@ -6,25 +6,25 @@ from pyqtgraph.Qt import QtWidgets, QtGui, QtCore
 from pyqtgraph.parametertree import Parameter
 from s3a.models.editorbase import params_flattened
 
-from s3a.structures import FRParam
+from s3a.structures import PrjParam
 from s3a import parameditors
 
 __all__ = ['ButtonCollection']
 
 class _DEFAULT_OWNER: pass
 """None is a valid owner, so create a sentinel that's not valid"""
-btnCallable = Callable[[FRParam], Any]
+btnCallable = Callable[[PrjParam], Any]
 class ButtonCollection(QtWidgets.QGroupBox):
-  def __init__(self, parent=None, title: str=None, btnParams: Collection[FRParam]=(),
+  def __init__(self, parent=None, title: str=None, btnParams: Collection[PrjParam]=(),
                btnTriggerFns: Union[btnCallable, Collection[btnCallable]]=(),
                exclusive=True, asToolBtn=True,
                **createOpts):
     super().__init__(parent)
-    self.lastTriggered: Optional[FRParam] = None
+    self.lastTriggered: Optional[PrjParam] = None
     self.uiLayout = QtWidgets.QHBoxLayout(self)
     self.btnGroup = QtWidgets.QButtonGroup(self)
-    self.paramToFuncMapping: Dict[FRParam, btnCallable] = dict()
-    self.paramToBtnMapping: Dict[FRParam, QtWidgets.QPushButton] = dict()
+    self.paramToFuncMapping: Dict[PrjParam, btnCallable] = dict()
+    self.paramToBtnMapping: Dict[PrjParam, QtWidgets.QPushButton] = dict()
     self.asToolBtn = asToolBtn
     if title is not None:
       self.setTitle(title)
@@ -35,7 +35,7 @@ class ButtonCollection(QtWidgets.QGroupBox):
     for param, fn in zip(btnParams, btnTriggerFns):
       self.create_addBtn(param, fn, **createOpts)
 
-  def create_addBtn(self, btnParam: FRParam, triggerFn: btnCallable, checkable=False, **registerOpts):
+  def create_addBtn(self, btnParam: PrjParam, triggerFn: btnCallable, checkable=False, **registerOpts):
     if btnParam in self.paramToBtnMapping:
       # Either already exists or wasn't designed to be a button
       return
@@ -45,7 +45,7 @@ class ButtonCollection(QtWidgets.QGroupBox):
       newBtn.setCheckable(True)
       oldTriggerFn = triggerFn
       # If the button is checkable, only call this function when the button is checked
-      def newTriggerFn(param: FRParam):
+      def newTriggerFn(param: PrjParam):
         if newBtn.isChecked():
           oldTriggerFn(param)
       triggerFn = newTriggerFn
@@ -62,19 +62,19 @@ class ButtonCollection(QtWidgets.QGroupBox):
     self.paramToBtnMapping.clear()
     self.paramToFuncMapping.clear()
 
-  def addFromExisting(self, other: ButtonCollection, which: Collection[FRParam]=None):
+  def addFromExisting(self, other: ButtonCollection, which: Collection[PrjParam]=None):
     for (param, btn), func in zip(other.paramToBtnMapping.items(), other.paramToFuncMapping.values()):
       if which is None or param in which:
         self.addBtn(param, btn, func)
 
-  def addBtn(self, param: FRParam, btn: QtWidgets.QPushButton, func: btnCallable):
+  def addBtn(self, param: PrjParam, btn: QtWidgets.QPushButton, func: btnCallable):
     self.btnGroup.addButton(btn)
     self.uiLayout.addWidget(btn)
     self.paramToFuncMapping[param] = func
     self.paramToBtnMapping[param] = btn
 
 
-  def callFuncByParam(self, param: FRParam):
+  def callFuncByParam(self, param: PrjParam):
     if param is None:
       return
     # Ensure function is called in the event it requires a button to be checked
@@ -98,9 +98,9 @@ class ButtonCollection(QtWidgets.QGroupBox):
         except (StopIteration, AttributeError):
           curCopy = True
         if curCopy:
-          self.create_addBtn(FRParam(**param.opts), lambda *args: param.activate(), **registerOpts)
+          self.create_addBtn(PrjParam(**param.opts), lambda *args: param.activate(), **registerOpts)
         else:
-          self.addBtn(FRParam(**param.opts), existingBtn, existingBtn.click)
+          self.addBtn(PrjParam(**param.opts), existingBtn, existingBtn.click)
 
   @classmethod
   def fromToolsEditors(cls,

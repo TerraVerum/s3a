@@ -10,7 +10,7 @@ from s3a import FR_SINGLETON, RunOpts
 from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
 from s3a.models.tablemodel import ComponentMgr
 from s3a.parameditors import EditorPropsMixin
-from s3a.structures import XYVertices, FRParam, S3AWarning, \
+from s3a.structures import XYVertices, PrjParam, S3AWarning, \
   ComplexXYVertices
 from s3a.structures.typeoverloads import OneDArr
 from s3a.views import tableview
@@ -283,8 +283,8 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
   def _populateDisplayedIds(self):
     curComps = self._compMgr.compDf.copy()
     for fieldName, opts in self._filter.activeFilters.items():
-      frParam = FR_SINGLETON.tableData.fieldFromName(fieldName)
-      curComps = self.filterByParamType(curComps, frParam, opts)
+      prjParam = FR_SINGLETON.tableData.fieldFromName(fieldName)
+      curComps = self.filterByParamType(curComps, prjParam, opts)
 
     # Give self the id list of surviving comps
     self.displayedIds = curComps[REQD_TBL_FIELDS.INST_ID]
@@ -345,7 +345,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
   #          S3AWarning)
   #   return filterableCols
 
-  def filterByParamType(self, compDf: df, column: FRParam, filterOpts: dict):
+  def filterByParamType(self, compDf: df, column: PrjParam, filterOpts: dict):
     # TODO: Each type should probably know how to filter itself. That is,
     #  find some way of keeping this logic from just being an if/else tree...
     pType = column.pType
@@ -366,11 +366,11 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
         compDf = compDf.loc[~validList]
       if not allowFalse:
         compDf = compDf.loc[validList]
-    elif pType in ['FRParam', 'list', 'popuplineeditor']:
+    elif pType in ['PrjParam', 'list', 'popuplineeditor']:
       existingParams = np.array(dfAtParam)
       allowedParams = []
       filterOpts = filterOpts['Options']['children']
-      if pType == 'FRParam':
+      if pType == 'PrjParam':
         groupSubParams = [p.name for p in column.value.group]
       else:
         groupSubParams = column.opts['limits']

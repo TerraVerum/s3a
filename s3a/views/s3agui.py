@@ -9,7 +9,7 @@ import qdarkstyle
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
-from s3a import RunOpts, FRParam
+from s3a import RunOpts, PrjParam
 from s3a.constants import PRJ_ENUMS
 from s3a.constants import LAYOUTS_DIR, PRJ_CONSTS as CNST, REQD_TBL_FIELDS
 from s3a.generalutils import attemptFileLoad
@@ -84,7 +84,7 @@ class S3A(S3ABase):
     self.setCentralWidget(centralWidget)
     layout = QtWidgets.QVBoxLayout(centralWidget)
 
-    self.toolbarWidgets: Dict[FRParam, List[QtWidgets.QAction]] = defaultdict(list)
+    self.toolbarWidgets: Dict[PrjParam, List[QtWidgets.QAction]] = defaultdict(list)
     layout.addWidget(self.mainImg)
 
     self.tblFieldToolbar.setObjectName('Table Field Plugins')

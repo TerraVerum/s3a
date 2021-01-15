@@ -8,7 +8,7 @@ from pyqtgraph.Qt import QtWidgets
 from s3a import parameditors as pe
 from s3a.constants import PRJ_CONSTS
 from s3a.parameditors import singleton
-from s3a.structures import FRParam, S3AException, AlgProcessorError
+from s3a.structures import PrjParam, S3AException, AlgProcessorError
 from ..graphicsutils import create_addMenuAct, paramWindow
 from ..parameditors import EditorPropsMixin
 from ..processing import GeneralProcWrapper
@@ -35,7 +35,7 @@ class ParamEditorPlugin(EditorPropsMixin):
   """
   Docks that should be shown in S3A's menu bar. By default, just the toolsEditor is shown.
   If multiple param editors must be visible, manually set this property to a
-  :class:`FRParamEditorDockGrouping` as performed in :class:`XYVerticesPlugin`.
+  :class:`PrjParamEditorDockGrouping` as performed in :class:`XYVerticesPlugin`.
   """
   toolsEditor: pe.ParamEditor
   """Param Editor window which holds user-editable properties exposed by the programmer"""
@@ -93,7 +93,7 @@ class ParamEditorPlugin(EditorPropsMixin):
     shcValue = None
     opts = None
     if 'btnOpts' in kwargs:
-      opts = FRParam(**kwargs['btnOpts'])
+      opts = PrjParam(**kwargs['btnOpts'])
       opts.opts.setdefault('ownerObj', self)
       kwargs.setdefault('name', opts.name)
       kwargs['btnOpts'] = opts
@@ -108,7 +108,7 @@ class ParamEditorPlugin(EditorPropsMixin):
     act.triggered.connect(lambda: proc(win=self.win))
     return proc
 
-  def registerPopoutFuncs(self, funcList: Sequence[Callable], nameList: Sequence[str]=None, groupName:str=None, btnOpts: FRParam=None):
+  def registerPopoutFuncs(self, funcList: Sequence[Callable], nameList: Sequence[str]=None, groupName:str=None, btnOpts: PrjParam=None):
     # TODO: I really don't like this. Consider any refactoring option that doesn't
     #   have an import inside a function
     if groupName is None and btnOpts is None:

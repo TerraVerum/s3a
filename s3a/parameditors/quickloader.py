@@ -44,7 +44,7 @@ class EditorListModel(QtCore.QAbstractListModel):
     self.editorList.append(editor)
     self.layoutChanged.emit()
 
-  # def updateEditorOpts(self, editor: FRParamEditor):
+  # def updateEditorOpts(self, editor: PrjParamEditor):
   #   self.layoutAboutToBeChanged.emit()
   #   for ii in range(len(self.paramStatesLst) - 1, -1, -1):
   #     if self.editorList[ii] is editor:

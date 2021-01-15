@@ -14,7 +14,7 @@ from s3a.generalutils import clsNameOrGroup
 from s3a.graphicsutils import PopupLineEditor, popupFilePicker
 
 from s3a.constants import PRJ_CONSTS as CNST
-from s3a.structures import S3AException, FRParam, XYVertices
+from s3a.structures import S3AException, PrjParam, XYVertices
 from s3a import parameditors
 
 
@@ -112,7 +112,7 @@ class RegisteredActionParameterItem(ActionParameterItem):
     if param.value() is None: return
     # Else: shortcut exists to be registered
     parameditors.FR_SINGLETON.shortcuts.createRegisteredButton(
-      FRParam(**param.opts), baseBtn=self.button, namePath=(clsNameOrGroup(owner),)
+      PrjParam(**param.opts), baseBtn=self.button, namePath=(clsNameOrGroup(owner),)
     )
     return
 

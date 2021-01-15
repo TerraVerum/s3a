@@ -32,7 +32,7 @@ def test_change_img_none(app):
 """For some reason, the test below works if performed manually. However, I can't
 seem to get the programmatically allocated keystrokes to work."""
 # def test_ambig_shc(qtbot):
-#   param = FRParam('Dummy', 'T', 'registeredaction')
+#   param = PrjParam('Dummy', 'T', 'registeredaction')
 #
 #   p2 = copy(param)
 #   p2.name = 'dummy2'
