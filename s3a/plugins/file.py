@@ -713,7 +713,7 @@ class ProjectData(QtCore.QObject):
 
   def _copyImgToProj(self, name: Path, data: NChanImg=None, overwrite=False):
     newName = self.imagesDir/name.name
-    if (newName.exists() and not overwrite) or newName == name:
+    if newName.exists() and (not overwrite or newName == name):
       # Already in the project, no need to copy
       return newName
     if name.exists() and data is None:

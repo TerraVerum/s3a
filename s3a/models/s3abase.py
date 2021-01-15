@@ -256,8 +256,9 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       return
     srcImg_proj = self.filePlg.imagesDir/srcImg.name
     if srcImg_proj.exists() and not allowOverwrite and srcImg_proj != srcImg:
-      warn(f'Image {srcImg.name} already present in project images. Using'
-           f' existing image instead of current data.', S3AWarning)
+      # warn(f'Image {srcImg.name} already present in project images. Using'
+      #      f' existing image instead of current data.', S3AWarning)
+      pass
     else:
       self.filePlg.addImage(name=srcImg, data=self.mainImg.image, copyToProj=True,
                             allowOverwrite=True)

@@ -80,6 +80,7 @@ class VerticesPlugin(TableFieldPlugin):
     # noinspection PyTypeChecker
     verts : XYVertices = verts.astype(int)
     if param == CNST.DRAW_ACT_ADD:
+      self.firstRun = True
       self.run(fgVerts=verts)
     else:
       self.run(bgVerts=verts)
