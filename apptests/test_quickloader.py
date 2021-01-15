@@ -48,7 +48,7 @@ def test_invalid_line_edit_add():
 def test_bad_user_profile():
   invalidFileDict = {'colorscheme': 'doesnt exist'}
   with pytest.warns(S3AWarning):
-    ql.buildFromUserProfile(invalidFileDict)
+    ql.buildFromStartupParams(invalidFileDict)
 
 def test_bad_load_state(qtbot):
   badLoad = dict(name='Non-existent editor', type='group',

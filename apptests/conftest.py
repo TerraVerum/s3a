@@ -18,7 +18,6 @@ FR_SINGLETON.tableData.annAuthor = TEST_AUTHOR
 
 dfTester = CompDfTester(NUM_COMPS)
 dfTester.fillRandomVerts(imShape=SAMPLE_IMG.shape)
-dfTester.fillRandomClasses()
 
 # @pytest.fixture(scope='session', autouse=True)
 # def cfg_warnings():
@@ -40,14 +39,14 @@ def sampleComps():
 
 # Assign temporary project directory
 @pytest.fixture(scope="session", autouse=True)
-def app(tmpdir_factory, filePlg):
-  filePlg.projData.create(name=str(tmpdir_factory.mktemp('proj')), parent=filePlg.projData)
+def app(tmpdir_factory):
   app_ = S3A(Image=SAMPLE_IMG_FNAME, guiMode=False, loadLastState=False, author=TEST_AUTHOR)
+  app_.filePlg.projData.create(name=str(tmpdir_factory.mktemp('proj')), parent=app_.filePlg.projData)
   return app_
 
 @pytest.fixture(scope='session')
-def filePlg():
-  plg: FilePlugin = FR_SINGLETON.clsToPluginMapping[FilePlugin]
+def filePlg(app):
+  plg: FilePlugin = app.filePlg
   return plg
 
 @pytest.fixture(scope="session")
@@ -60,8 +59,6 @@ def vertsPlugin(app):
     plg = FR_SINGLETON.clsToPluginMapping[VerticesPlugin]
   except KeyError:
     raise S3AException('Vertices plugin was not provided. Some tests are guaranteed to fail.')
-
-  app.focusedImg.changeCurrentPlugin(plg)
 
   plg.procCollection.switchActiveProcessor('Basic Shapes')
   proc = plg.curProcessor
@@ -88,7 +85,6 @@ def resetApp_tester(request, app, filePlg, mgr):
     app.setMainImg(SAMPLE_IMG_FNAME, SAMPLE_IMG)
   if 'withcomps' in request.keywords:
     dfTester.fillRandomVerts(app.mainImg.image.shape)
-    dfTester.fillRandomClasses()
     mgr.addComps(dfTester.compDf.copy())
   yield
   stack.clear()

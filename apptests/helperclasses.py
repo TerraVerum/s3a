@@ -17,7 +17,6 @@ class CompDfTester:
     self.compDf.set_index(np.arange(numComps, dtype=int), inplace=True)
     self.numComps = numComps
     if fillInfo:
-      self.fillRandomClasses()
       self.fillRandomVerts()
 
 
@@ -40,18 +39,6 @@ class CompDfTester:
       retVal.append(verts)
       mask.fill(0)
     return retVal
-
-  def fillRandomClasses(self, compDf: df=None):
-    if compDf is None:
-      compDf = self.compDf
-    # Encapsulate in np array for random indexing
-    npClasses = np.array(FR_SINGLETON.tableData.compClasses)
-    randomIdxs = RND.integers(0, len(npClasses), size=len(compDf))
-
-    newClasses = npClasses[randomIdxs]
-    compDf.loc[:, REQD_TBL_FIELDS.COMP_CLASS] = newClasses
-    return newClasses
-
 
 def clearTmpFiles(exceptFiles: List[Path] =None):
   if exceptFiles is None:

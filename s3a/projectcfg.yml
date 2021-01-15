@@ -5,6 +5,4 @@ table-cfg: {}
 
 annotation-format: "pkl"
 
-startup:
-  image:
-  state:
+startup: {}

@@ -10,7 +10,7 @@ from pyqtgraph.parametertree import Parameter
 from s3a.generalutils import pascalCaseToTitle
 from s3a.graphicsutils import dialogGetSaveFileName, addDirItemsToMenu
 from s3a.models.editorbase import ParamEditorBase
-from s3a.structures import FRParam, FilePath
+from s3a.structures import PrjParam, FilePath
 
 Signal = QtCore.Signal
 
@@ -20,19 +20,19 @@ def clearUnwantedParamVals(paramState: dict):
   if paramState.get('value', True) is None:
     paramState.pop('value')
 
-_childTuple_asValue = Tuple[FRParam,...]
-childTuple_asParam = Tuple[Tuple[FRParam,...], bool]
-_keyType = Union[FRParam, Union[_childTuple_asValue, childTuple_asParam]]
+_childTuple_asValue = Tuple[PrjParam,...]
+childTuple_asParam = Tuple[Tuple[PrjParam,...], bool]
+_keyType = Union[PrjParam, Union[_childTuple_asValue, childTuple_asParam]]
 class ParamEditor(ParamEditorBase):
   """
   GUI controls for user-interactive parameters within S3A. Each window consists of
   a parameter tree and basic saving capabilities.
   """
-  def __init__(self, parent=None, paramList: List[Dict]=None, saveDir: Optional[FilePath]='.',
-               fileType='param', name=None, topTreeChild: Parameter=None,
-               registerCls: Type=None, registerParam: FRParam=None, **registerGroupOpts):
+  def __init__(self, parent=None, paramList: List[Dict] = None,
+               saveDir: Optional[FilePath] = '.', fileType='param', name=None,
+               topTreeChild: Parameter = None, **kwargs):
     super().__init__(parent, paramList, saveDir, fileType, name, topTreeChild,
-                     registerCls, registerParam, **registerGroupOpts)
+                     **kwargs)
     self.dock = self
     self.hide()
     self.setWindowTitle(self.name)
@@ -72,9 +72,6 @@ class ParamEditor(ParamEditorBase):
     self.saveAsBtn.clicked.connect(self.saveParamState_gui)
     self.applyBtn.clicked.connect(self.applyChanges)
 
-    if registerCls is not None:
-      self.registerGroup(registerParam)(registerCls)
-
   def __repr__(self):
     selfCls = type(self)
     oldName: str = super().__repr__()
@@ -112,10 +109,9 @@ class ParamEditor(ParamEditorBase):
     lowerGroupName = groupName.lower()
     if name is None:
       name = groupName + ' Tools'
-    toolsEditor = ParamEditor(
-      saveDir=None, fileType=lowerGroupName.replace(' ', '') + 'tools',
-      name=name, registerCls=cls, useNewInit=False
-    )
+    toolsEditor = ParamEditor(saveDir=None,
+                              fileType=lowerGroupName.replace(' ', '') + 'toolsEditor',
+                              name=name, useNewInit=False)
     for btn in (toolsEditor.saveAsBtn, toolsEditor.applyBtn, toolsEditor.expandAllBtn,
                 toolsEditor.collapseAllBtn):
       btn.hide()
@@ -190,7 +186,7 @@ class ParamEditorDockGrouping(QtWidgets.QDockWidget):
     for editor in editors:
       editor.tree.resizeColumnToContents(0)
       if editor.width() > minWidth:
-        minWidth = editor.width()
+        minWidth = int(editor.width()*0.8)
       # "Main Image Settings" -> "Settings"
       tabName = self.getTabName(editor)
       self.tabs.addTab(editor.dockContentsWidget, tabName)
@@ -231,3 +227,24 @@ class ParamEditorDockGrouping(QtWidgets.QDockWidget):
       nameWithoutBase = tabName
       editor.createMenuOpt(overrideName=nameWithoutBase, parentMenu=parentMenu)
     return parentMenu
+
+
+class EditorPropsMixin:
+  __groupingName__: str = None
+
+  REGISTERED_GROUPINGS = set()
+  def __new__(cls, *args, **kwargs):
+    if cls.__groupingName__ is None:
+      cls.__groupingName__ = pascalCaseToTitle(cls.__name__)
+    if cls not in cls.REGISTERED_GROUPINGS:
+      basePath = (cls.__groupingName__,)
+      if basePath[0] == '':
+        basePath = ()
+      with ParamEditor.setBaseRegisterPath(*basePath):
+        cls.__initEditorParams__()
+      cls.REGISTERED_GROUPINGS.add(cls)
+    return super().__new__(cls, *args, **kwargs)
+
+  @classmethod
+  def __initEditorParams__(cls):
+    pass

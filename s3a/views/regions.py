@@ -1,22 +1,20 @@
 from __future__ import annotations
 
-from functools import wraps
-from typing import Tuple, Sequence, Optional, Any, List
+from typing import Tuple, Sequence, Optional, List
 
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
+from matplotlib import cm
+from matplotlib.pyplot import colormaps
 from pandas import DataFrame as df
 from pyqtgraph import arrayToQPath
 from pyqtgraph.Qt import QtGui, QtCore
-from skimage import color
-from matplotlib import cm
-from matplotlib.pyplot import colormaps
 
 from s3a import FR_SINGLETON, ComponentIO as frio
-from s3a.constants import REQD_TBL_FIELDS as RTF, FR_CONSTS
-from s3a.generalutils import coerceDfTypes, stackedVertsPlusConnections, dynamicDocstring
-from s3a.structures import FRParam, XYVertices, ComplexXYVertices, OneDArr, BlackWhiteImg
+from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_CONSTS, PRJ_ENUMS
+from s3a.generalutils import stackedVertsPlusConnections, dynamicDocstring
+from s3a.structures import PrjParam, XYVertices, ComplexXYVertices, OneDArr, BlackWhiteImg
 from s3a.structures.typeoverloads import GrayImg
 from . import imageareas
 from .clickables import BoundScatterPlot
@@ -24,49 +22,39 @@ from .clickables import BoundScatterPlot
 __all__ = ['MultiRegionPlot', 'VertexDefinedImg', 'RegionCopierPlot']
 
 from ..models.editorbase import RunOpts
-from ..processing import AtomicProcess
+from ..parameditors import EditorPropsMixin
 
 Signal = QtCore.Signal
 
 def makeMultiRegionDf(numRows=1, idList: Sequence[int]=None, selected:Sequence[bool]=None,
-                      focused: Sequence[bool]=None, compClasses: Sequence[str]=None,
-                      vertices: Sequence[ComplexXYVertices]=None, convertClasses=True):
+                      focused: Sequence[bool]=None,
+                      vertices: Sequence[ComplexXYVertices]=None, lblField: PrjParam=None):
   """
   Helper for creating new dataframe holding information determining color data.
   `selected` and `focused` must be boolean arrays indicating whether or not each component
   is selected or focused, respectively.
-  If `convertClasses` is `True`, converts string list of component classes into
-  their integer index into `tableData`.
+  If `lblField` is given, it is used as a value to color the components
   """
   outDict = {}
   if selected is None:
     selected = np.zeros(numRows, bool)
-  outDict['selected'] = selected
+  outDict[PRJ_ENUMS.FIELD_SELECTED] = selected
   if focused is None:
     focused = np.zeros(numRows, bool)
-  outDict['focused'] = focused
-  if compClasses is None:
-    compClasses = np.zeros(numRows, int)
-  elif convertClasses:
-    compClasses = compClassToIndex(compClasses)
-  outDict[RTF.COMP_CLASS] = compClasses
+  outDict[PRJ_ENUMS.FIELD_FOCUSED] = focused
+  if lblField is not None:
+    labels_tmp = np.tile(lblField.value, numRows)
+    labels = lblField.toNumeric(labels_tmp, rescale=True)
+  else:
+    labels = np.zeros(numRows)
+  outDict[PRJ_ENUMS.FIELD_LABEL] = labels
   if vertices is None:
     vertices = [RTF.VERTICES.value for _ in range(numRows)]
   outDict[RTF.VERTICES] = vertices
   outDf = pd.DataFrame(outDict)
   if idList is not None:
-    outDf = outDf.set_index(idList)
+    outDf = outDf.set_index(idList, drop=True)
   return outDf
-
-def compClassToIndex(compClasses: Sequence[str]):
-  """
-  Converts class names into integer indices
-  :param compClasses: List of string class names
-  :return: List of indices where each index corresponds to the class index from
-    `tableData`.
-  """
-  return np.fromiter(map(FR_SINGLETON.tableData.compClasses.index, compClasses),
-              dtype=int, count=len(compClasses))
 
 def _makeTxtSymbol(txt: str, fontSize: int):
   outSymbol = QtGui.QPainterPath()
@@ -86,14 +74,20 @@ def _makeBoundSymbol(verts: XYVertices):
   path = arrayToQPath(*verts.T, connect='finite')
   return path
 
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MULT_REG_PLT)
-class MultiRegionPlot(BoundScatterPlot):
+class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
+  __groupingName__ = PRJ_CONSTS.CLS_MULT_REG_PLT.name
+
+  @classmethod
+  def __initEditorParams__(cls):
+    super().__initEditorParams__()
+
   def __init__(self, parent=None):
     super().__init__(size=1, pxMode=False)
     # Wrapping in atomic process means when users make changes to properties, these are maintained when calling the
     # function internally with no parameters
-    self.updateColors = AtomicProcess(self.updateColors, name=FR_CONSTS.CLS_MULT_REG_PLT.name)
-    FR_SINGLETON.colorScheme.registerFunc(self.updateColors, runOpts=RunOpts.ON_CHANGED)
+    with FR_SINGLETON.colorScheme.setBaseRegisterPath(self.__groupingName__):
+      self.updateColors = FR_SINGLETON.colorScheme.registerFunc(
+        self.updateColors, runOpts=RunOpts.ON_CHANGED, nest=False, ignoreKeys=['hideFocused'])
     self.setParent(parent)
     self.setZValue(50)
     self.regionData = makeMultiRegionDf(0)
@@ -111,15 +105,16 @@ class MultiRegionPlot(BoundScatterPlot):
     self.sigPointsClicked = None
 
   def resetRegionList(self, newRegionDf: Optional[df]=None,
-                      convertClasses=True):
+                      lblField:PrjParam=RTF.INST_ID):
     idList = None
-    if convertClasses and newRegionDf is not None and RTF.COMP_CLASS in newRegionDf.columns:
+    if (newRegionDf is not None
+        and lblField in newRegionDf.columns):
       newRegionDf = newRegionDf.copy()
-      newRegionDf[RTF.COMP_CLASS] = compClassToIndex(newRegionDf[RTF.COMP_CLASS])
+      newRegionDf[PRJ_ENUMS.FIELD_LABEL] = lblField.toNumeric(newRegionDf[lblField], rescale=True)
     numRows = len(newRegionDf)
     if newRegionDf is not None:
       idList = newRegionDf.index
-    self.regionData = makeMultiRegionDf(numRows, idList=idList)
+    self.regionData = makeMultiRegionDf(numRows, idList=idList, lblField=lblField)
     if newRegionDf is not None:
       self.regionData.update(newRegionDf)
     self.updatePlot()
@@ -148,6 +143,7 @@ class MultiRegionPlot(BoundScatterPlot):
     for col, idList in zip(self.regionData.columns, [selectedIds, focusedIds]):
       if idList is None: continue
       self.regionData[col] = False
+      idList = np.intersect1d(self.regionData.index, idList)
       self.regionData.loc[idList, col] = True
     self.updateColors()
 
@@ -161,7 +157,7 @@ class MultiRegionPlot(BoundScatterPlot):
       self.setData(x=[], y=[], data=[])
       return
 
-    for region, _id in zip(self.regionData.loc[:, RTF.VERTICES],
+    for region, _id in zip(self.regionData[RTF.VERTICES],
                            self.regionData.index):
       concatRegion, isfinite = stackedVertsPlusConnections(region)
       boundLoc = np.nanmin(concatRegion, 0, keepdims=True)
@@ -176,11 +172,17 @@ class MultiRegionPlot(BoundScatterPlot):
     self.updateColors()
 
   def toGrayImg(self, imShape: Sequence[int]=None):
-    return frio.exportClassPng(self.regionData, imShape=imShape)
+    uint16Max = 2**16-2 # Subtract 1 extra so there's room for offset
+    labels = (self.regionData[PRJ_ENUMS.FIELD_LABEL]*uint16Max).astype('uint16')
+    labelDf = pd.DataFrame()
+    labelDf[RTF.VERTICES] = self.regionData[RTF.VERTICES]
+    # Override id column to avoid an extra parameter
+    labelDf[RTF.INST_ID] = labels
+    return frio.exportLblPng(labelDf, imShape=imShape, allowOffset=True)
 
   @dynamicDocstring(cmapVals=colormaps() + ['None'])
-  def updateColors(self, penWidth=0, penColor='w', selectedFill='00f', focusedFill='f00', classColormap='tab10',
-                   fillAlpha=0.7):
+  def updateColors(self, penWidth=0, penColor='w', selectedFill='00f', focusedFill='f00', labelColormap='tab10',
+                   fillAlpha=0.7, hideFocused=False):
     """
     Assigns colors from the specified colormap to each unique class
     :param penWidth: Width of the pen in pixels
@@ -193,29 +195,28 @@ class MultiRegionPlot(BoundScatterPlot):
     :param focusedFill:
       helpText: Fill color for the component currently in the focused image
       pType: color
-    :param classColormap:
-      helpText: "Colormap to use for fill colors by component class. If `None` is selected,
+    :param labelColormap:
+      helpText: "Colormap to use for fill colors by component label. If `None` is selected,
         the fill will be transparent."
-
       pType: popuplineeditor
       limits: {cmapVals}
     :param fillAlpha:
       helpText: Transparency of fill color (0 is totally transparent, 1 is totally opaque)
       limits: [0,1]
       step: 0.1
+    :param hideFocused: Many plugins alter the visual behavior of focused regions, so it
+      is helpful to have a flag which will cause focused regions to be hidden.
     """
     if len(self.regionData) == 0 or len(self.data) == 0:
       return
-    classes = FR_SINGLETON.tableData.compClasses
-    nClasses = len(classes)
-    def colorsWithAlpha(_classIdxs: Sequence[int]):
+    def colorsWithAlpha(_numericLbls: np.ndarray):
       useAlpha = fillAlpha
-      if classColormap == 'None':
+      if labelColormap == 'None':
         cmap = lambda _classes: np.zeros((len(_classes), 4))
         useAlpha = 0.0
       else:
-        cmap = cm.get_cmap(classColormap, nClasses)
-      colors = cmap(_classIdxs)
+        cmap = cm.get_cmap(labelColormap)
+      colors = cmap(_numericLbls)
       colors[:,-1] = useAlpha
       return colors
     selectedFill = pg.Color(selectedFill)
@@ -228,13 +229,14 @@ class MultiRegionPlot(BoundScatterPlot):
     selectedFill = np.array(pg.Color(selectedFill).getRgbF())
     selectedFill[-1] = fillAlpha
     # combinedFill = (focusedFill + selectedFill)/2
-    fillColors = colorsWithAlpha(self.regionData[RTF.COMP_CLASS])
-    selected = self.regionData['selected'].to_numpy()
-    focused = self.regionData['focused'].to_numpy()
+    lbls = self.regionData[PRJ_ENUMS.FIELD_LABEL].to_numpy()
+    fillColors = colorsWithAlpha(lbls)
+    selected = self.regionData[PRJ_ENUMS.FIELD_SELECTED].to_numpy()
+    focused = self.regionData[PRJ_ENUMS.FIELD_FOCUSED].to_numpy()
     fillColors[selected] = selectedFill
     fillColors[focused] = focusedFill
     # fillColors[focused & selected] = combinedFill
-
+    penColors = np.tile(penColor, len(lbls))
     self.setPen(penColors)
     self.setBrush([pg.Color(f*255) for f in fillColors])
     self.invalidate()
@@ -253,13 +255,15 @@ class MultiRegionPlot(BoundScatterPlot):
     return list(bounds[:,ax])
 
 
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_VERT_IMG)
-class VertexDefinedImg(pg.ImageItem):
+class VertexDefinedImg(EditorPropsMixin, pg.ImageItem):
   sigRegionReverted = Signal(object) # new GrayImg
+
+  __groupingName__ = 'Focused Image Graphics'
+
   @classmethod
   def __initEditorParams__(cls):
     cls.fillClr, cls.vertClr = FR_SINGLETON.colorScheme.registerProps(
-      cls, [FR_CONSTS.SCHEME_REG_FILL_COLOR, FR_CONSTS.SCHEME_REG_VERT_COLOR])
+      [PRJ_CONSTS.SCHEME_REG_FILL_COLOR, PRJ_CONSTS.SCHEME_REG_VERT_COLOR])
 
   def __init__(self):
     super().__init__()
@@ -319,7 +323,7 @@ class RegionCopierPlot(pg.PlotCurveItem):
   sigCopyStarted = QtCore.Signal()
   sigCopyStopped = QtCore.Signal()
 
-  def __init__(self, mainImg: imageareas.EditableImgBase=None, parent=None):
+  def __init__(self, mainImg: imageareas.MainImage=None, parent=None):
     super().__init__(parent)
     self.active = False
     self.inCopyMode = True

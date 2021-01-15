@@ -8,17 +8,15 @@ from warnings import warn
 
 import numpy as np
 from pandas import DataFrame as df
-from ruamel.yaml import YAML
+from pyqtgraph.Qt import QtCore
 from pyqtgraph.parametertree import Parameter
-from pyqtgraph.Qt import QtWidgets
+from ruamel.yaml import YAML
 
-from s3a.graphicsutils import raiseErrorLater
-from s3a.generalutils import attemptFileLoad, resolveYamlDict
 from s3a.constants import TABLE_DIR, REQD_TBL_FIELDS, DATE_FORMAT, \
-  FR_CONSTS
-from s3a.structures import FRParam, FilePath, FRParamGroup, ParamEditorError, \
-  S3AException, S3AWarning
+  PRJ_CONSTS, BASE_DIR
+from s3a.generalutils import resolveYamlDict, hierarchicalUpdate
 from s3a.parameditors import ParamEditor
+from s3a.structures import PrjParam, FilePath, PrjParamGroup, S3AException, S3AWarning
 
 yaml = YAML()
 
@@ -26,10 +24,10 @@ def genParamList(nameIter, paramType, defaultVal, defaultParam='value'):
   """Helper for generating children elements"""
   return [{'name': name, 'type': paramType, defaultParam: defaultVal} for name in nameIter]
 
-def _filterForParam(param: FRParam):
+def _filterForParam(param: PrjParam):
   """Constructs a filter for the parameter based on its type"""
   children = []
-  pType = param.pType
+  pType = param.pType.lower()
   paramWithChildren = {'name': param.name, 'type': 'group', 'children': children}
   children.append(dict(name='Active', type='bool', value=False))
   if pType in ['int', 'float']:
@@ -37,10 +35,10 @@ def _filterForParam(param: FRParam):
     retVal[0]['value'] = -sys.maxsize
     retVal[1]['value'] = sys.maxsize
     children.extend(retVal)
-  elif pType in ['FRParam', 'Enum', 'list', 'popuplineeditor', 'bool']:
-    if pType == 'FRParam':
+  elif pType in ['prjparam', 'enum', 'list', 'popuplineeditor', 'bool']:
+    if pType == 'prjparam':
       iterGroup = [param.name for param in param.value.group]
-    elif pType == 'Enum':
+    elif pType == 'enum':
       iterGroup = [param for param in param.value]
     elif pType == 'bool':
       iterGroup = [f'{param.name}', f'Not {param.name}']
@@ -56,8 +54,8 @@ def _filterForParam(param: FRParam):
     actions[1].sigActivated.connect(lambda: changeOpts(False))
     paramWithChildren.addChildren(actions)
     paramWithChildren.addChild(optsParam)
-  elif pType == 'ComplexXYVertices':
-    minMax = _filterForParam(FRParam('', 5))
+  elif 'xyvertices' in pType:
+    minMax = _filterForParam(PrjParam('', 5))
     minMax.removeChild(minMax.childs[0])
     minMax = minMax.saveState()['children']
     xyVerts = genParamList(['X Bounds', 'Y Bounds'], 'group', minMax, 'children')
@@ -74,16 +72,16 @@ def _filterForParam(param: FRParam):
   return paramWithChildren
 
 class TableFilterEditor(ParamEditor):
-  def __init__(self, paramList: List[FRParam]=None, parent=None):
+  def __init__(self, paramList: List[PrjParam]=None, parent=None):
     if paramList is None:
       paramList = []
     _FILTER_PARAMS = [
       _filterForParam(param) for param in paramList
     ]
-    super().__init__(parent, paramList=_FILTER_PARAMS, saveDir=TABLE_DIR, fileType='filter',
-                     name='&Component Table Filter')
+    super().__init__(parent, paramList=_FILTER_PARAMS, saveDir=TABLE_DIR,
+                     fileType='filter', name='&Component Table Filter')
 
-  def updateParamList(self, paramList: List[FRParam]):
+  def updateParamList(self, paramList: List[PrjParam]):
     newParams = []
     badCols = []
     for param in paramList:
@@ -116,9 +114,12 @@ class TableFilterEditor(ParamEditor):
     return filters
 
 
-class TableData:
+class TableData(QtCore.QObject):
+  sigCfgUpdated = QtCore.Signal(object)
+  """dict (self.cfg) during update"""
 
   def __init__(self, annAuthor: str=None):
+    super().__init__()
     self.filter = TableFilterEditor()
     self.paramParser: Optional[YamlParser] = None
 
@@ -126,8 +127,7 @@ class TableData:
     self.cfgFname: Optional[Path] = None
     self.cfg: Optional[dict] = None
 
-    self.allFields: List[FRParam] = []
-    self.compClasses: List[str] = []
+    self.allFields: List[PrjParam] = []
     self.resetLists()
 
   def makeCompDf(self, numRows=1) -> df:
@@ -150,7 +150,7 @@ class TableData:
     # Set the metadata for this application run
     outDf[REQD_TBL_FIELDS.ANN_AUTHOR] = self.annAuthor
     outDf[REQD_TBL_FIELDS.ANN_TIMESTAMP] = datetime.now().strftime(DATE_FORMAT)
-    outDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME] = FR_CONSTS.ANN_CUR_FILE_INDICATOR.value
+    outDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME] = PRJ_CONSTS.ANN_CUR_FILE_INDICATOR.value
     if dropRow:
       outDf = outDf.drop(index=REQD_TBL_FIELDS.INST_ID.value)
     return outDf
@@ -158,7 +158,7 @@ class TableData:
   def makeCompSer(self):
     return self.makeCompDf().squeeze()
 
-  def loadCfg(self, cfgFname: FilePath=None, cfgDict: dict=None):
+  def loadCfg(self, cfgFname: FilePath=None, cfgDict: dict=None, force=False):
     """
     Lodas the specified table configuration file for S3A. Alternatively, a name
     and dict pair can be supplied instead.
@@ -167,73 +167,53 @@ class TableData:
       configuration name assiciated with the given dictionary.
     :param cfgDict: If not *None*, this is the config data used instad of
       reading *cfgFname* as a file.
+    :param force: If *True*, the new config will be loaded even if it is the same name as the
+    current config
     """
 
-    if cfgFname is None:
-      cfgFname = 'default.yml'
-      cfgDict = {}
-    self.cfgFname, cfg = resolveYamlDict(cfgFname, cfgDict)
+    _, baseCfgDict = resolveYamlDict(BASE_DIR/'tablecfg.yml')
+    cfgFname, cfgDict = resolveYamlDict(cfgFname, cfgDict)
+    cfgFname = cfgFname.resolve()
+    if not force and self.cfgFname == cfgFname:
+      return None
+    hierarchicalUpdate(baseCfgDict, cfgDict)
+
+    cfg = baseCfgDict
     if cfg == self.cfg:
       # No need to update things
       return
+
+    self.cfgFname = cfgFname
     self.cfg = cfg
     self.paramParser = YamlParser(cfg)
-    newClasses = []
-    if 'classes' in cfg:
-      classParam = self.paramParser['classes']
-      if isinstance(classParam, FRParam):
-        if classParam.value is not None:
-          REQD_TBL_FIELDS.COMP_CLASS.value = classParam.value
-        if classParam.pType is not None:
-          REQD_TBL_FIELDS.COMP_CLASS.pType = classParam.pType
-        classParam = classParam.opts['limits']
-      else:
-        REQD_TBL_FIELDS.COMP_CLASS.pType = 'list'
-      newClasses.extend(classParam)
-    if REQD_TBL_FIELDS.COMP_CLASS.value not in newClasses:
-      newClasses.append(REQD_TBL_FIELDS.COMP_CLASS.value)
-    REQD_TBL_FIELDS.COMP_CLASS.opts['limits'] = newClasses.copy()
-    # for compCls in cfg.get('classes', []):
-    #   newParam = FRParam(compCls, group=self.compClasses)
-    #   self.compClasses.append(newParam)
     self.resetLists()
-    for field in cfg.get('opt-tbl-fields', {}):
-      param = self.paramParser['opt-tbl-fields', field]
+    for field in cfg.get('fields', {}):
+      param = self.paramParser['fields', field]
       param.group = self.allFields
       self.allFields.append(param)
 
-    for field in cfg.get('hidden-cols', []):
-      try:
-        FRParamGroup.fromString(self.allFields, field).opts['colHidden'] = True
-      except S3AException:
-        # Specified field to hide isn't in all table fields
-        pass
-
     self.filter.updateParamList(self.allFields)
+    self.sigCfgUpdated.emit(self.cfg)
 
   def clear(self):
     self.loadCfg(cfgDict={})
 
   def resetLists(self):
-    for lst in self.allFields, self.compClasses:
-      lst.clear()
-    self.allFields.extend(list(REQD_TBL_FIELDS))
-    self.compClasses.extend(REQD_TBL_FIELDS.COMP_CLASS.opts['limits'])
+    self.allFields.clear()
+    self.allFields.extend(REQD_TBL_FIELDS)
 
-  def fieldFromName(self, name: str):
+  def fieldFromName(self, name: Union[str, PrjParam]):
     """
-    Helper function to retrieve the FRParam corresponding to the field with this name
+    Helper function to retrieve the PrjParam corresponding to the field with this name
     """
-    return FRParamGroup.fromString(self.allFields, name)
-
-
+    return PrjParamGroup.fieldFromParam(self.allFields, name)
 
 NestedIndexer = Union[str, Tuple[Union[str,int],...]]
 class YamlParser:
   def __init__(self, cfg: dict):
     self.cfg = cfg
 
-  def parseParamList(self, listName: NestedIndexer, groupOwner: Union[List, FRParamGroup]=None):
+  def parseParamList(self, listName: NestedIndexer, groupOwner: Union[List, PrjParamGroup]=None):
     """
     A simple list is only a list of strings. A complex list is a dict, where each
     (key, val) pair is a list element. See the structural setup in pg.ListParameter.
@@ -263,16 +243,16 @@ class YamlParser:
       parsedParam = self.parseLeaf(leafName, value)
     else:
       value = value.copy()
-      # Format nicely for FRParam creation
+      # Format nicely for PrjParam creation
       nameArgs = {'value': value.pop('value', None),
                   'pType': value.pop('pType', 'NoneType'),
                   'helpText': value.pop('helpText', '')}
       # Forward additional args if they exist
-      parsedParam = FRParam(leafName, **nameArgs, **value)
+      parsedParam = PrjParam(leafName, **nameArgs, **value)
     return parsedParam
 
   def parseLeaf(self, paramName: str, value: Any):
-    leafParam = FRParam(paramName, value)
+    leafParam = PrjParam(paramName, value)
     value = leafParam.value
     if isinstance(value, bool):
       pass

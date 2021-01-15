@@ -7,10 +7,14 @@ from pyqtgraph.parametertree import parameterTypes, Parameter
 from pyqtgraph.parametertree.Parameter import PARAM_TYPES
 from pyqtgraph.parametertree.parameterTypes import ActionParameterItem, ActionParameter, \
   TextParameterItem, TextParameter
+import pyqtgraph as pg
 import numpy as np
+
+from s3a.generalutils import clsNameOrGroup
 from s3a.graphicsutils import PopupLineEditor, popupFilePicker
 
-from s3a.structures import S3AException, FRParam
+from s3a.constants import PRJ_CONSTS as CNST
+from s3a.structures import S3AException, PrjParam, XYVertices
 from s3a import parameditors
 
 
@@ -32,16 +36,20 @@ class PgParamDelegate(QtWidgets.QStyledItemDelegate):
     if paramDict['type'] not in PARAM_TYPES:
       raise S3AException(errMsg)
     paramDict.update(name='dummy')
-    param = Parameter.create(**paramDict)
+    self.param = param = Parameter.create(**paramDict)
     if hasattr(param.itemClass, 'makeWidget'):
       self.item = param.itemClass(param, 0)
     else:
       raise S3AException(errMsg)
 
+    # TODO: Deal with params that go out of scope before yielding a value
+    self._indirectItem = isinstance(self.item.makeWidget(), QtWidgets.QPushButton)
+
   def createEditor(self, parent, option, index: QtCore.QModelIndex):
-    editor = self.item.makeWidget()
-    editor.setParent(parent)
-    editor.setMaximumSize(option.rect.width(), option.rect.height())
+    if not self._indirectItem:
+      editor = self.item.makeWidget()
+      editor.setParent(parent)
+      editor.setMaximumSize(option.rect.width(), option.rect.height())
     return editor
 
   def setModelData(self, editor: QtWidgets.QWidget,
@@ -90,6 +98,8 @@ class ShortcutParameterItem(parameterTypes.WidgetParameterItem):
   #   menu.addAction(delAct)
   #   menu.exec(ev.globalPos())
 
+class _Global: pass
+
 class RegisteredActionParameterItem(ActionParameterItem):
 
   def __init__(self, param, depth):
@@ -98,21 +108,16 @@ class RegisteredActionParameterItem(ActionParameterItem):
     super().__init__(param, depth)
     btn: QtWidgets.QPushButton = self.button
     btn.setToolTip(param.opts.get('tip', ''))
+    owner = param.opts.get('ownerObj', _Global)
     if param.value() is None: return
     # Else: shortcut exists to be registered
-    cls = param.opts.get('ownerObj', type(None))
-    frParam = param.opts.get('frParam', None)
-    if frParam is None:
-      frParam = FRParam(param.name(), param.value(), param.type(), param.opts['tip'])
-      param.opts['frParam'] = frParam
-    self.button = parameditors.FR_SINGLETON.shortcuts.createRegisteredButton(
-      frParam, cls, baseBtn=self.button
+    parameditors.FR_SINGLETON.shortcuts.createRegisteredButton(
+      PrjParam(**param.opts), baseBtn=self.button, namePath=(clsNameOrGroup(owner),)
     )
     return
 
 class RegisteredActionParameter(ActionParameter):
   itemClass = RegisteredActionParameterItem
-
 
 class ShortcutParameter(Parameter):
   itemClass = ShortcutParameterItem
@@ -124,21 +129,13 @@ class ActionWithShortcutParameterItem(ActionParameterItem):
       param.opts['value'] = ''
     shortcutSeq = param.opts['value']
 
-    # shcLabel = QtWidgets.QLabel('Shortcut: ', self.layoutWidget)
-    # self.layout.addWidget(shcLabel)
-
     self.keySeqEdit = QtWidgets.QKeySequenceEdit(shortcutSeq)
-    # Without the main window as a parent, the shortcut will not activate when
-    # the quickloader is hidden
-    # TODO: Maybe it is desirable for shortcuts to only work when quickloader
-    self.shortcut = QtWidgets.QShortcut(shortcutSeq, None)
-    self.shortcut.activated.connect(self.buttonClicked)
     button: QtWidgets.QPushButton = self.button
     tip = self.param.opts.get('tip', None)
     if tip is not None:
       button.setToolTip(tip)
     def updateShortcut(newSeq: QtGui.QKeySequence):
-      self.shortcut.setKey(newSeq)
+      button.setShortcut(newSeq)
       param.opts['value'] = newSeq.toString()
     self.keySeqEdit.keySequenceChanged.connect(updateShortcut)
 
@@ -255,7 +252,6 @@ class _DummySignal:
   def disconnect(self, *args): pass
 
 class FilePickerParameterItem(parameterTypes.WidgetParameterItem):
-
   def makeWidget(self):
     param = self.param
     if param.opts['value'] is None:
@@ -264,10 +260,9 @@ class FilePickerParameterItem(parameterTypes.WidgetParameterItem):
     param.opts.setdefault('asFolder', False)
     param.opts.setdefault('existing', True)
     button = QtWidgets.QPushButton()
-    param.sigValueChanged.connect(lambda param, val: button.setText(val))
     button.setValue = button.setText
-    button.value = button.text
     button.sigChanged = _DummySignal()
+    button.value = button.text
     button.setText(fpath)
     button.clicked.connect(self._retrieveFolderName_gui)
 
@@ -275,12 +270,13 @@ class FilePickerParameterItem(parameterTypes.WidgetParameterItem):
 
   def _retrieveFolderName_gui(self):
     curVal = self.param.value()
-    if len(curVal) > 0:
+    if curVal:
       useDir = curVal
     else:
-      useDir = None
+      useDir = str(Path.cwd())
     opts = self.param.opts
-    fname = popupFilePicker(None, 'Select File', asFolder=opts['asFolder'], asOpen=opts['existing'], startDir=useDir)
+    opts['startDir'] = str(Path(useDir).absolute())
+    fname = popupFilePicker(None, 'Select File', **opts)
     if fname is None:
       return
     self.param.setValue(fname)
@@ -360,7 +356,60 @@ class SliderParameterItem(parameterTypes.WidgetParameterItem):
 class SliderParameter(Parameter):
   itemClass = SliderParameterItem
 
+class ChecklistParameter(parameterTypes.GroupParameter):
 
+  def __init__(self, **opts):
+    opts.setdefault('exclusive', False)
+    super().__init__(**opts)
+
+  def setLimits(self, limits):
+    super().setLimits(limits)
+    exclusive = self.opts['exclusive']
+    self.clearChildren()
+    for chOpts in limits:
+      if isinstance(chOpts, str):
+        chOpts = dict(name=chOpts, value=not exclusive)
+      child = self.create(type='bool', **chOpts)
+      self._hookupParam(child, exclusive)
+      self.addChild(child)
+    if exclusive and len(self.value()) != 1:
+      self.setValue([limits[-1]])
+
+  def _hookupParam(self, param, exclusive):
+    def onChange_exclusive(_param, value):
+      if value:
+        self.setValue([param.name()])
+    def onChange_default(_param, value):
+      self.sigValueChanged.emit(self, self.value())
+    if exclusive:
+      param.sigValueChanged.connect(onChange_exclusive)
+    else:
+      param.sigValueChanged.connect(onChange_default)
+
+  def setOpts(self, **opts):
+    if 'exclusive' in opts and 'limits' not in opts:
+      self.setLimits(self.opts['limits'])
+    super().setOpts(**opts)
+
+  def value(self):
+    vals = [p.name() for p in self.children() if p.value()]
+    if self.opts['exclusive']:
+      return vals[0]
+    return vals
+
+  def setValue(self, value, blockSignal=None):
+    exclusive = self.opts['exclusive']
+    # Will emit at the end, so no problem discarding existing changes
+    value = [v for v in value if v in self.names]
+    if value == self.value():
+      return value
+    for chParam in self.childs:
+      chParam.setValue(chParam.name() in value)
+      if exclusive:
+        chParam.setReadonly(chParam.value())
+    newVal = self.value()
+    self.sigValueChanged.emit(self, newVal)
+    return newVal
 
 class NoneParameter(parameterTypes.SimpleParameter):
 
@@ -378,3 +427,4 @@ parameterTypes.registerParameterType('registeredaction', RegisteredActionParamet
 parameterTypes.registerParameterType('popuplineeditor', PopupLineEditorParameter)
 parameterTypes.registerParameterType('filepicker', FilePickerParameter)
 parameterTypes.registerParameterType('slider', SliderParameter)
+parameterTypes.registerParameterType('checklist', ChecklistParameter)

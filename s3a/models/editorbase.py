@@ -1,20 +1,21 @@
 import weakref
+from collections import defaultdict
+from contextlib import contextmanager
 from enum import Flag, auto
-from functools import wraps
-from inspect import isclass
 from pathlib import Path
-from typing import List, Dict, Any, Union, Collection, Type, Tuple, Sequence, Optional, \
-  Callable
+from typing import List, Dict, Any, Union, Tuple, Sequence, Callable, Set, Collection
 from warnings import warn
 
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree import Parameter
+from pyqtgraph.parametertree.parameterTypes import GroupParameter
 
-from s3a.generalutils import pascalCaseToTitle, frParamToPgParamDict, resolveYamlDict
-from s3a.graphicsutils import saveToFile, flexibleParamTree, setParamTooltips, expandtreeParams
-from s3a.processing import AtomicProcess, ProcessIO, GeneralProcWrapper
+from s3a.generalutils import pascalCaseToTitle, resolveYamlDict, getParamChild
+from s3a.graphicsutils import saveToFile, flexibleParamTree, setParamTooltips, \
+  expandtreeParams
+from s3a.processing import AtomicProcess, ProcessIO, GeneralProcWrapper, ProcessStage, GeneralProcess
 from s3a.processing.guiwrapper import docParser
-from s3a.structures import FRParam, ContainsSharedProps, FilePath, S3AWarning
+from s3a.structures import PrjParam, FilePath, ParamEditorError, S3AWarning
 
 __all__ = ['ParamEditorBase']
 
@@ -33,37 +34,58 @@ def clearUnwantedParamVals(paramState: dict):
   if paramState.get('value', True) is None:
     paramState.pop('value')
 
-def _mkRunBtn(proc: AtomicProcess, btnOpts: Union[FRParam, dict]):
+def paramState_noDefaults(param: Parameter, extraKeys: Collection[str]=('value',), extraTypes: List[type]=None):
+  parentDict = {}
+  val = param.value()
+  if extraTypes is None:
+    extraTypes = set()
+  extraTypes = tuple(extraTypes)
+  if val != param.defaultValue():
+    parentDict['value'] = param.value()
+    if not extraTypes or isinstance(param, extraTypes):
+      for k in set(extraKeys):
+        # False positive
+        # noinspection PyUnresolvedReferences
+        parentDict[k] = param.opts[k]
+  if param.hasChildren() and not parentDict:
+    inner = {}
+    for child in param:
+      chDict = paramState_noDefaults(child)
+      if len(chDict) > 0:
+        inner[child.name()] = paramState_noDefaults(child)
+    if len(inner) > 0:
+      parentDict['children'] = inner
+  return parentDict
+
+
+def params_flattened(param: Parameter):
+  addList = []
+  if 'group' not in param.type():
+    addList.append(param)
+  for child in param.children(): # type: Parameter
+    addList.extend(params_flattened(child))
+  return addList
+
+def _mkRunDict(proc: ProcessStage, btnOpts: Union[PrjParam, dict]):
   defaultBtnOpts = dict(name=proc.name, type='registeredaction')
-  if isinstance(btnOpts, FRParam):
+  if isinstance(btnOpts, PrjParam):
     # Replace falsy helptext with func signature
-    btnOpts = frParamToPgParamDict(btnOpts)
+    btnOpts = btnOpts.toPgDict()
+  if btnOpts is not None:
     # Make sure param type is not overridden
     btnOpts.pop('type', None)
-  if btnOpts is not None:
     defaultBtnOpts.update(btnOpts)
-  if len(defaultBtnOpts.get('tip', '')) == 0:
+  if len(defaultBtnOpts.get('tip', '')) == 0 and isinstance(proc, AtomicProcess):
     defaultBtnOpts['tip'] = docParser(proc.func.__doc__)['top-descr']
   if len(proc.input.hyperParamKeys) > 0:
     # In this case, a descriptive name isn't needed since the func name will be
     # present in the parameter group
     defaultBtnOpts['name'] = 'Run'
-  runBtn = Parameter.create(**defaultBtnOpts)
-  return runBtn
+  return defaultBtnOpts
 
-def _getOrCreateChild(param: Parameter, *childPath, **groupOpts):
-  while childPath and childPath[0] in param.names:
-    param = param.child(childPath[0])
-    childPath = childPath[1:]
-  # All future children must be created
-  for chName in childPath:
-    param = param.addChild(dict(name=chName, type='group', **groupOpts))
-    childPath = childPath[1:]
-  return param
-
-oneOrMultChildren = Union[Sequence[FRParam], FRParam]
-_childTuple_asValue = Tuple[FRParam, oneOrMultChildren]
-childTuple_asParam = Tuple[FRParam, oneOrMultChildren, bool]
+oneOrMultChildren = Union[Sequence[PrjParam], PrjParam]
+_childTuple_asValue = Tuple[PrjParam, oneOrMultChildren]
+childTuple_asParam = Tuple[PrjParam, oneOrMultChildren, bool]
 _keyType = Union[_childTuple_asValue, childTuple_asParam]
 
 """
@@ -83,9 +105,16 @@ class ParamEditorBase(QtWidgets.QDockWidget):
   sigParamStateUpdated = Signal(dict)
   sigParamStateDeleted = Signal(str)
 
-  def __init__(self, parent=None, paramList: List[Dict]=None, saveDir: FilePath='.',
-               fileType='param', name=None, topTreeChild: Parameter=None,
-               registerCls: Type=None, registerParam: FRParam=None, **registerGroupOpts):
+  _baseRegisterPath: Sequence[str] = ()
+  """
+  Classes typically register all their properites in bulk under the same group of
+  parameters. This property will be overridden (see :meth:`setBaseRegisterPath`) by
+  the class name of whatever class is currently registering properties.
+  """
+
+  def __init__(self, parent=None, paramList: List[Dict] = None, saveDir: FilePath = '.',
+               fileType='param', name=None, topTreeChild: Parameter = None,
+               **kwargs):
     """
     GUI controls for user-interactive parameters within S3A. Each window consists of
     a parameter tree and basic saving capabilities.
@@ -100,13 +129,6 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     :param name: User-readable name of this parameter editor
     :param topTreeChild: Generally for internal use. If provided, it will
       be inserted into the parameter tree instead of a newly created parameter.
-    :param registerCls: If this editor was created to hold parameters for a specific
-      class, then that class must be provided here. It will ensure registered
-      parameters actually appear in this editor. See :func:`FRParamEditor.registerGroup`
-    :param registerParam: The grouping parameter to hold registered parameters
-      for the regiseterd class. See :func:`FRParamEditor.registerGroup`
-    :param registerGroupOpts: These parameters are directly passed as kwargs
-      to :func:`FRParamEditor.registerGroup`.
     """
     super().__init__(parent)
     cls = type(self)
@@ -121,23 +143,17 @@ class ParamEditorBase(QtWidgets.QDockWidget):
       except ValueError:
         name = "Parameter Editor"
 
-    self.groupingToParamMapping: Dict[Any, Optional[FRParam]] = {}
-    """
-    Allows the editor to associate a class name with its human-readable parameter
-    name
-    """
-
-    self.registeredFrParams: List[FRParam] = []
+    self.registeredPrjParams: List[PrjParam] = []
     """
     Keeps track of all parameters registerd as properties in this editor. Useful for
     inspecting which parameters are in an editor without traversing the parameter tree
     and reconstructing the name, tooltip, etc.
     """
 
-    self.registeredProcs: Dict[str, AtomicProcess] = {}
+    self.procToParamsMapping: Dict[ProcessStage, GroupParameter] = {}
     """
-    Keeps track of registered functions which have been converted to processes so their
-    arguments can be exposed to the user
+    Keeps track of registered functions (or prcesses) and their associated
+    gui parameters
     """
 
     self.instantiatedClassTypes = set()
@@ -178,8 +194,6 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     self.setAllExpanded = lambda expandedVal=True: expandtreeParams(self.tree, expandedVal)
     self.setParamTooltips = lambda expandNameCol=True: setParamTooltips(self.tree, expandNameCol)
 
-    if registerCls is not None:
-      self.registerGroup(registerParam, **registerGroupOpts)(registerCls)
     SPAWNED_EDITORS.append(weakref.proxy(self))
 
   def _paramTreeChanged(self, rootParam: Parameter, changeDesc: str, data: Tuple[Parameter, int]):
@@ -189,7 +203,7 @@ class ParamEditorBase(QtWidgets.QDockWidget):
   def __getitem__(self, keys: _keyType):
     """
     Convenience function for accessing child parameters within a parameter editor.
-      - If :param:`keys` is a single :class:`FRParam`, the value at that parameter is
+      - If :param:`keys` is a single :class:`PrjParam`, the value at that parameter is
         extracted and returned to the user.
       - If :param:`keys` is a :class:`tuple`:
 
@@ -197,10 +211,10 @@ class ParamEditorBase(QtWidgets.QDockWidget):
           parameter grouping in order to properly extract the corresponding children.
           For instance, to extract MARGIN from :class:`GeneralPropertiesEditor`,
           you must first specify the group parent for that parameter:
-            >>> margin = FR_SINGLETON.generalProps[FR_CONSTS.CLS_FOCUSED_IMG_AREA,
-            >>>   FR_CONSTS.MARGIN]
-        * The second parameter must be a single :class:`FRParam` object or a sequence
-          of :class:`FRParam` objects. If a sequence is given, a list of output values
+            >>> margin = FR_SINGLETON.generalProps[PRJ_CONSTS.CLS_FOCUSED_IMG_AREA,
+            >>>   PRJ_CONSTS.MARGIN]
+        * The second parameter must be a single :class:`PrjParam` object or a sequence
+          of :class:`PrjParam` objects. If a sequence is given, a list of output values
           respecting input order is provided.
         * The third parameter is optional. If provided, the :class:`Parameter<pyqtgraph.Parameter>`
           object is returned instead of the :func:`value()<Parameter.value>` data
@@ -228,7 +242,7 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     if not extractObj:
       oldExtractFunc = extractFunc
       extractFunc = lambda name: oldExtractFunc(name).value()
-    for curKey in keys: # type: FRParam
+    for curKey in keys: # type: PrjParam
       outVals.append(extractFunc(curKey.name))
     if returnSingle:
       return outVals[0]
@@ -246,17 +260,20 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     return outDict
 
   def saveParamState(self, saveName: str=None, paramState: dict=None,
-                     allowOverwriteDefault=False, blockWrite=False):
+                     allowOverwriteDefault=False, blockWrite=False,
+                     saveChangedOnly=True):
     """
     * Returns dict on successful parameter save and emits sigParamStateCreated.
     * Returns None if no save name was given
     """
     if saveName is None or self.saveDir is None:
       return None
-    if paramState is None:
+    if paramState is None and allowOverwriteDefault:
       paramState = self.params.saveState(filter='user')
+      clearUnwantedParamVals(paramState)
+    elif paramState is None:
+      paramState = paramState_noDefaults(self.params)
     # Remove non-useful values
-    clearUnwantedParamVals(paramState)
     if not blockWrite and self.saveDir is not None:
       self.saveDir.mkdir(parents=True, exist_ok=True)
       saveToFile(paramState, self.formatFileName(saveName),
@@ -307,7 +324,6 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     addCustomOpts(paramDict, self.params)
     return paramDict
 
-
   def loadParamState(self, stateName: Union[str, Path], stateDict: dict=None,
                      addChildren=False, removeChildren=False, applyChanges=True):
     loadDict = self._parseStateDict(stateName, stateDict)
@@ -316,6 +332,35 @@ class ParamEditorBase(QtWidgets.QDockWidget):
       self.applyChanges()
     self.lastAppliedName = stateName
     return loadDict
+
+  def loadFromPartialNames(self, stateName: Union[str, Path],
+                           stateDict: dict=None,
+                           candidateParams: List[Parameter]=None,
+                           applyChanges=True):
+    loadDict = self._parseStateDict(stateName, stateDict)
+    if candidateParams is None:
+      candidateParams = params_flattened(self.params)
+    def titleOrName(param):
+      return param.opts['title'] or param.name()
+    for kk, vv in loadDict.items():
+      if isinstance(vv, dict):
+        # Successively traverse down child tree
+        candidateParams = [p for p in candidateParams if titleOrName(p.parent()) == kk]
+        self.loadFromPartialNames('', vv, candidateParams)
+        del loadDict[kk]
+    with self.params.treeChangeBlocker():
+      for kk, vv in loadDict.items():
+        matches = [p for p in candidateParams if titleOrName(p) == kk]
+        if len(matches) == 1:
+          matches[0].setValue(vv)
+        elif len(matches) == 0:
+          warn(f'No matching parameters for key {kk}. Ignoring.', S3AWarning)
+        else:
+          raise ParamEditorError(f'Multiple matching parameters for key {kk}:\n'
+                                 f'{matches}')
+    if applyChanges:
+      self.applyChanges()
+
 
   def formatFileName(self, stateName: Union[str, Path]=None):
     stateName = Path(stateName)
@@ -337,105 +382,81 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     filename.unlink()
     self.sigParamStateDeleted.emit(stateName)
 
-  def registerProps(self, groupingName: Union[type, str], constParams: List[FRParam],
-                    parentParamPath:Collection[str]=None, asProperty=True, **extraOpts):
+  def registerProps(self, constParams: List[PrjParam], namePath:Sequence[str]=(),
+                     asProperty=True, **extraOpts):
     """
     Registers a list of proerties and returns an array of each. For parameter descriptions,
-    see :func:`FRParamEditor.registerProp`.
+    see :func:`PrjParamEditor.registerProp`.
     """
     outProps = []
     with self.params.treeChangeBlocker():
       for param in constParams:
-        outProps.append(self.registerProp(groupingName, param, parentParamPath,
-                                          asProperty, **extraOpts))
+        outProps.append(self.registerProp(param, namePath, asProperty, **extraOpts))
     return outProps
 
-  def registerProp(self, grouping: Union[type, Any], constParam: FRParam,
-                   parentParamPath:Collection[str]=None, asProperty=True,
-                   objForAssignment=None, **etxraOpts):
+  def registerProp(self, constParam: PrjParam=None, namePath: Sequence[str]=(),
+                   asProperty=True, overrideBasePath: Sequence[str]=None, **etxraOpts):
     """
     Registers a property defined by *constParam* that will appear in the respective
     parameter editor.
 
-    :param grouping: If *type* it must be a class. In this case, this parameter will
-      be listed under the registered class of the same exact name.
-      If *str*, *groupingName* must match the exact same string name passed in during
-      :func:`registerGroup <FRParamEditor.registerGroup>`. Otherwise, an error will
-      occur.
     :param constParam: Object holding parameter attributes such as name, type,
-      help text, eREQD_TBL_FIELDS.
-    :param parentParamPath: If None, defaults to the top level of the parameters for the
-      current class (or paramHolder). *parentParamPath* represents the parent group
+      help text, etc. If *None*, defaults to a 'group' type
+    :param namePath: If None, defaults to the top level of the parameters for the
+      current class (or paramHolder). *namePath* represents the parent group
       to whom the newly registered parameter should be added
     :param asProperty: If True, creates a property object bound to getter and setter
       for the new param. Otherwise, returns the param itself. If asProperty is false,
       the returned parameter must be evaluated to obtain a value, e.g.
       x = registerProp(..., asProperty=False); myVal = x.value()
+    :param overrideBasePath: Whether to use the base path specified by ParamEditor._baseRegisterPath
+      (if *None*) or this specified override
     :param etxraOpts: Extra options passed directly to the created :class:`pyqtgraph.Parameter`
+
     :return: Property bound to this value in the parameter editor
     """
-    paramOpts = frParamToPgParamDict(constParam)
+    paramOpts = constParam.toPgDict()
     paramOpts.update(etxraOpts)
     paramForEditor = Parameter.create(**paramOpts)
-
-    if grouping not in self.groupingToParamMapping:
-      warn(f'The provided grouping "{grouping}" was not recognized, perhaps because '
-           f' `registerGroup()` was never called with this grouping. Registering now'
-           f' as a top-level grouping.', S3AWarning)
-      self.registerGroup(None)(grouping)
-    groupParam = self.groupingToParamMapping[grouping]
-
-    if groupParam is None:
-      paramForCls = self.params
+    if overrideBasePath is None:
+      namePath = tuple(self._baseRegisterPath) + tuple(namePath)
     else:
-      paramName = groupParam.name
-      paramPath = groupParam.opts.get('parentPath', ()) + (paramName,)
-      paramForCls = _getOrCreateChild(self.params, *paramPath)
+      namePath = tuple(overrideBasePath) + tuple(namePath)
+    paramForCls = getParamChild(self.params, *namePath)
 
-    if parentParamPath is not None and len(parentParamPath) > 0:
-      paramForCls = paramForCls.param(*parentParamPath)
     if constParam.name not in paramForCls.names:
       paramForCls.addChild(paramForEditor)
 
-    self.registeredFrParams.append(constParam)
+    self.registeredPrjParams.append(constParam)
     if not asProperty:
       return paramForEditor
 
-    # Else, create a property and return that instead
-    def getAccessorPath():
-      parentGrp = self.groupingToParamMapping[grouping]
-      accessPath = []
-      if parentGrp is not None:
-        accessPath.append(parentGrp.name)
-      if parentParamPath is not None:
-        accessPath.extend(parentParamPath)
-      accessPath.append(constParam.name)
-      return accessPath
-
     @property
     def paramAccessor(clsObj):
-      accessPath = getAccessorPath()
-      return self.params.child(*accessPath).value()
+      return self.params.child(*namePath, constParam.name).value()
 
     @paramAccessor.setter
     def paramAccessor(clsObj, newVal):
-      accessPath = getAccessorPath()
-      param = self.params.child(*accessPath)
+      param = self.params.child(*namePath, constParam.name)
       param.setValue(newVal)
 
     return paramAccessor
 
   def registerFunc(self, func: Callable, *, runOpts=RunOpts.BTN,
-                   paramPath:Tuple[str,...]=(),
+                   namePath:Tuple[str, ...]=(),
                    paramFormat = pascalCaseToTitle,
-                   btnOpts: Union[FRParam, dict]=None, **kwargs):
+                   overrideBasePath: Sequence[str]=None,
+                   btnOpts: Union[PrjParam, dict]=None,
+                   nest=True,
+                   returnParam=False,
+                   **kwargs):
     """
     Like `registerProp`, but for functions instead along with interactive parameters
     for each argument. A button is added for the user to force run this function as
     well. In the case of a function with no parameters, the button will be named
     the same as the function itself for simplicity
 
-    :param paramPath:  See `registerProp`
+    :param namePath:  See `registerProp`
     :param func: Function to make interactive
     :param runOpts: Combination of ways this function can be run. Multiple of these
       options can be selected at the same time using the `|` operator.
@@ -447,17 +468,20 @@ class ParamEditorBase(QtWidgets.QDockWidget):
     :param paramFormat: Formatter which turns variable names into display names. The default takes variables in pascal
       case (e.g. variableName) or snake case (e.g. variable_name) and converts to Title Case (e.g. Variable Name).
       Custom functions must have the signature (str) -> str.
+    :param overrideBasePath: See :meth:`~ParamEditor.registerProp`
     :param btnOpts: Overrides defaults for button used to run this function. If
       `RunOpts.BTN` is not in `RunOpts`, these values are ignored.
+    :param nest: If *True*, functions with multiple default arguments will have these nested
+      inside a group parameter bearing the function name. Otherwise, they will be added
+      directly to the parent parameter specified by `namePath` + `baseRegisterPath`
+    :param returnParam: Whether to return the parent parameter associated with this newly
+      registered function
     :param kwargs: All additional kwargs are passed to AtomicProcess when wrapping the function.
     """
-    if not isinstance(func, AtomicProcess):
-      proc = AtomicProcess(func, **kwargs)
-      fnName = func.__name__
+    if not isinstance(func, ProcessStage):
+      proc: ProcessStage = AtomicProcess(func, **kwargs)
     else:
       proc = func
-      fnName = func.func.__name__
-    self.registeredProcs[fnName] = proc
     # Define caller out here that takes no params so qt signal binding doesn't
     # screw up auto parameter population
     def runProc():
@@ -467,120 +491,46 @@ class ParamEditorBase(QtWidgets.QDockWidget):
       forwardedOpts = ProcessIO(**{_param.name(): newVal})
       return proc.run(forwardedOpts)
 
-    topParam = _getOrCreateChild(self.params, *paramPath)
+    if overrideBasePath is None:
+      namePath = tuple(self._baseRegisterPath) + tuple(namePath)
+    else:
+      namePath = tuple(overrideBasePath) + tuple(namePath)
+
+    topParam = getParamChild(self.params, *namePath)
     if len(proc.input.hyperParamKeys) > 0:
       # Check if proc params already exist from a previous addition
-      GeneralProcWrapper(proc, self, paramPath, paramFormat)
-      parentParam = topParam.child(proc.name)
+      wrapped = GeneralProcWrapper(proc, topParam, paramFormat, treatAsAtomic=True, nestHyperparams=nest)
+      parentParam = wrapped.parentParam
       for param in parentParam:
         if runOpts & RunOpts.ON_CHANGED:
           param.sigValueChanged.connect(runProc)
         if runOpts & RunOpts.ON_CHANGING:
           param.sigValueChanging.connect(runpProc_changing)
     else:
-      parentParam = topParam
+      parentParam: GroupParameter = topParam
     if runOpts & RunOpts.BTN:
-      runBtn = _mkRunBtn(proc, btnOpts)
-      if runBtn.name() in parentParam.names:
-        # Bind to existing button intsead
-        runBtn = parentParam.child(runBtn.name())
-      else:
-        parentParam.addChild(runBtn)
+      runBtnDict = _mkRunDict(proc, btnOpts)
+      if not nest:
+        # Make sure button name is correct
+        runBtnDict['name'] = proc.name
+      runBtn = getParamChild(parentParam, chOpts=runBtnDict)
       runBtn.sigActivated.connect(runProc)
     try:
       self.setParamTooltips(False)
     except AttributeError:
       pass
+    self.procToParamsMapping[proc] = parentParam
+
+    if returnParam:
+      return proc, parentParam
     return proc
 
-  def registerGroup(self, groupParam: FRParam=None, **opts):
-    """
-    Intended for use as a class decorator. Registers a class as able to hold
-    customizable shortcuts.
+  @classmethod
+  @contextmanager
+  def setBaseRegisterPath(cls, *path: str):
+    oldPath = cls._baseRegisterPath
+    cls._baseRegisterPath = path
+    yield
+    cls._baseRegisterPath = oldPath
 
-    :param groupParam: Parameter holding the name of this class as it should appear
-      in this parameter editor. As such, it should be human readable.
-      If *None*, params will be shown at the top-level of the parameter tree
-    :param opts: Additional registration options. Accepted values:
-      :key nameFromParam: This is available so objects without a dedicated class can
-        also be registered. In that case, a spoof class is registered under the name
-        'groupParam.name' instead of '[decorated class].__qualname__'.
-      :key forceCreate: Normally, the class is not registered until at least one property
-        (or method) is registered to it. That way, classes registered for other editors
-        don't erroneously appear. *forceCreate* will override this rule, creating this
-        parameter immediately.
-      :key useNewInit: When a class is passed in as a group to register, it is often
-        beneficial to ensure its __initEditorParams__ method is called (if it exists) and
-        other setup procedures are followed. However, if a param editor is created *inside*
-        __initEditorParams__ (or in other circumstances where the class is already initialized
-        but an editor is created dynamically), this is an unnecessary and even harmful step.
-        Passing *useNewInit*=False will ensure the __init__ method for the registered class
-        is *not* altered.
-      :key parentPath: If provided, the new group will be created as a child of this
-        specified parameter instead of being created as a top level group.
-    :return: Undecorated class, but with a new __init__ method which initializes
-      all shared properties contained in the '__initEditorParams__' method, if it exists
-      in the class. For exceptions to this rule see `key:useNewInit`.
-    """
-    opts.setdefault('nameFromParam', False)
-    def groupingDecorator(grouping: Union[Type, Any]=None):
-      if grouping is None or opts['nameFromParam']:
-        # In this case nameFromParam must be provided. Use a dummy class for the
-        # rest of the proceedings
-        grouping = groupParam
-      self.groupingToParamMapping.setdefault(grouping, groupParam)
-
-      isAClass = isclass(grouping)
-
-
-      if isAClass and grouping not in REGISTERED_GROUPINGS:
-        REGISTERED_GROUPINGS.add(grouping)
-        oldInit = grouping.__init__
-        @wraps(oldInit)
-        def newInit(clsObj, *args, **kwargs):
-          grouping = type(clsObj)
-          # groupParam could be inaccurate when initializing base class
-          groupParam = self.groupingToParamMapping[grouping]
-          if grouping not in INITIALIZED_GROUPINGS and issubclass(grouping, ContainsSharedProps):
-            INITIALIZED_GROUPINGS.add(grouping)
-            clsObj.__initEditorParams__()
-          oldInit(clsObj, *args, **kwargs)
-          for editor in SPAWNED_EDITORS:
-            try:
-              editor._extendedClassInit(clsObj, groupParam)
-            except ReferenceError:
-              pass
-        grouping.__init__ = newInit
-
-      self._extendedGroupingDecorator(grouping, groupParam, **opts)
-
-      parentPath = opts.get('parentPath', ())
-      if groupParam is not None:
-        groupParam.opts['parentPath'] = parentPath
-      if (opts.get('forceCreate', False)
-          or len(parentPath) > 0):
-        _getOrCreateChild(self.params, parentPath + (groupParam.name,))
-
-      return grouping
-    if opts['nameFromParam']:
-      groupingDecorator()
-    return groupingDecorator
-
-  def _extendedClassInit(self, clsObj: Any, groupParam: FRParam):
-    """
-    For editors that need to perform any initializations within the decorated class,
-      they must be able to access the decorated class' *init* function and modify it.
-      Allow this by providing an overloadable stub that is inserted into the decorated
-      class *init*.
-    """
-    return
-
-  def _extendedGroupingDecorator(self, cls: Any, groupParam: FRParam, **opts):
-    """
-    Editors needing additional class decorator boilerplates will place it in this overloaded function
-    """
-
-
-INITIALIZED_GROUPINGS = set()
-REGISTERED_GROUPINGS = set()
 SPAWNED_EDITORS: List[ParamEditorBase] = []

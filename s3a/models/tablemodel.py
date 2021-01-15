@@ -10,7 +10,7 @@ from pyqtgraph.Qt import QtCore
 from s3a import FR_SINGLETON
 from s3a.generalutils import coerceDfTypes
 from s3a.constants import REQD_TBL_FIELDS as RTF
-from s3a.constants import FR_CONSTS, FR_ENUMS
+from s3a.constants import PRJ_ENUMS
 from s3a.structures import ComplexXYVertices
 from s3a.structures import OneDArr, S3AWarning
 
@@ -77,7 +77,13 @@ class CompTableModel(QtCore.QAbstractTableModel):
     # Also, pandas iloc unnecessarily coerces to 2D ndarray when setting, so iloc will fail
     # when assigning an array to a single location. Not sure how to prevent this...
     # For now, checking this on export
-    if self.compDf.iloc[row, [col, col-1]].values[0] != self.compDf.iat[row, col]:
+    cmp = self.compDf.iloc[row, [col, col-1]].values[0] != self.compDf.iat[row, col]
+    try:
+      cmp = bool(cmp)
+    except ValueError:
+      # Numpy array-like
+      cmp = np.any(cmp)
+    if cmp:
       warn('Warning! An error occurred setting this value. Please try again using a'
            ' <em>multi-cell</em> edit. E.g. do not just set this value, set it along with'
            ' at least one other selected cell.', S3AWarning)
@@ -100,25 +106,21 @@ class CompTableModel(QtCore.QAbstractTableModel):
 
     self.compDf = FR_SINGLETON.tableData.makeCompDf(0)
 
-    noEditParams = set(RTF) - {RTF.COMP_CLASS}
+    noEditParams = set(RTF)
     self.noEditColIdxs = [self.colTitles.index(col.name) for col in noEditParams]
     self.editColIdxs = np.setdiff1d(np.arange(len(self.colTitles)), self.noEditColIdxs)
     self.sigFieldsChanged.emit()
 
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_COMP_MGR)
 class ComponentMgr(CompTableModel):
   _nextCompId = 0
   compDf: pd.DataFrame
-
-  def __init__(self):
-    super().__init__()
 
   def resetFields(self):
     super().resetFields()
     self._nextCompId = 0
 
   @FR_SINGLETON.actionStack.undoable('Add Components')
-  def addComps(self, newCompsDf: df, addtype: FR_ENUMS = FR_ENUMS.COMP_ADD_AS_NEW, emitChange=True):
+  def addComps(self, newCompsDf: df, addtype: PRJ_ENUMS = PRJ_ENUMS.COMP_ADD_AS_NEW, emitChange=True):
     toEmit = self.defaultEmitDict.copy()
     existingIds = self.compDf.index
 
@@ -133,12 +135,17 @@ class ComponentMgr(CompTableModel):
     newCompsDf.drop(index=dropIds, inplace=True)
 
 
-    if addtype == FR_ENUMS.COMP_ADD_AS_NEW:
+    if addtype == PRJ_ENUMS.COMP_ADD_AS_NEW:
       # Treat all comps as new -> set their IDs to guaranteed new values
       newIds = np.arange(self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int)
-      newCompsDf.loc[:,RTF.INST_ID] = newIds
+      newCompsDf[RTF.INST_ID] = newIds
       newCompsDf.set_index(newIds, inplace=True)
       dropIds = np.array([], dtype=int)
+    else:
+      # Merge may have been performed with new comps (id -1) mixed in
+      needsUpdatedId = newCompsDf.index == RTF.INST_ID.value
+      newIds = np.arange(self._nextCompId, self._nextCompId + np.sum(needsUpdatedId), dtype=int)
+      newCompsDf.loc[needsUpdatedId, RTF.INST_ID] = newIds
 
     # Track dropped data for undo
     alteredIdxs = np.concatenate([newCompsDf.index.values, dropIds])
@@ -175,18 +182,18 @@ class ComponentMgr(CompTableModel):
     yield toEmit
 
     # Undo add by deleting new components and un-updating existing ones
-    self.addComps(alteredDataDf, FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.addComps(alteredDataDf, PRJ_ENUMS.COMP_ADD_AS_MERGE)
     addedCompIdxs = toEmit['added']
     if len(addedCompIdxs) > 0:
       self.rmComps(toEmit['added'])
 
   @FR_SINGLETON.actionStack.undoable('Remove Components')
-  def rmComps(self, idsToRemove: Union[np.ndarray, type(FR_ENUMS)] = FR_ENUMS.COMP_RM_ALL,
+  def rmComps(self, idsToRemove: Union[np.ndarray, type(PRJ_ENUMS)] = PRJ_ENUMS.COMP_RM_ALL,
               emitChange=True) -> dict:
     toEmit = self.defaultEmitDict.copy()
     # Generate ID list
     existingCompIds = self.compDf.index
-    if idsToRemove is FR_ENUMS.COMP_RM_ALL:
+    if idsToRemove is PRJ_ENUMS.COMP_RM_ALL:
       idsToRemove = existingCompIds
     elif not hasattr(idsToRemove, '__iter__'):
       # single number passed in
@@ -229,7 +236,7 @@ class ComponentMgr(CompTableModel):
       return toEmit
 
     # Undo code
-    self.addComps(removedData, FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.addComps(removedData, PRJ_ENUMS.COMP_ADD_AS_MERGE)
 
   @FR_SINGLETON.actionStack.undoable('Merge Components')
   def mergeCompVertsById(self, mergeIds: OneDArr=None, keepId: int=None):
@@ -259,9 +266,9 @@ class ComponentMgr(CompTableModel):
     keepInfo[RTF.VERTICES] = newVerts
 
     self.rmComps(mergeComps.index)
-    self.addComps(keepInfo.to_frame().T, FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.addComps(keepInfo.to_frame().T, PRJ_ENUMS.COMP_ADD_AS_MERGE)
     yield
-    self.addComps(mergeComps, FR_ENUMS.COMP_ADD_AS_MERGE)
+    self.addComps(mergeComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
 
   @FR_SINGLETON.actionStack.undoable('Split Components')
   def splitCompVertsById(self, splitIds: OneDArr):
@@ -274,7 +281,7 @@ class ComponentMgr(CompTableModel):
 
     :param splitIds: Ids of components to split up
     """
-    splitComps = self.compDf.loc[splitIds, :].copy()
+    splitComps = self.compDf.loc[splitIds].copy()
     newComps_lst = []
     for _, comp in splitComps.iterrows():
       verts: ComplexXYVertices = comp[RTF.VERTICES]
@@ -284,7 +291,7 @@ class ComponentMgr(CompTableModel):
       for ii in range(1, nComps):
         newVerts.append(ComplexXYVertices.fromBwMask(ccompImg == ii))
       childComps = pd.concat([comp.to_frame().T]*(nComps-1))
-      childComps.loc[:, RTF.VERTICES] = newVerts
+      childComps[RTF.VERTICES] = newVerts
       newComps_lst.append(childComps)
     newComps = pd.concat(newComps_lst)
     # Keep track of which comps were removed and added by this op
@@ -292,5 +299,5 @@ class ComponentMgr(CompTableModel):
     outDict.update(self.addComps(newComps))
     yield outDict
     undoDict = self.rmComps(newComps.index)
-    undoDict.update(self.addComps(splitComps, FR_ENUMS.COMP_ADD_AS_MERGE))
+    undoDict.update(self.addComps(splitComps, PRJ_ENUMS.COMP_ADD_AS_MERGE))
     return undoDict

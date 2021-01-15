@@ -1,17 +1,21 @@
+from functools import wraps, lru_cache
 from typing import Tuple, List
 
 import cv2 as cv
 import numpy as np
 import pandas as pd
-from scipy.ndimage import binary_fill_holes
+from scipy.ndimage import binary_fill_holes, maximum_filter
 from skimage.measure import regionprops, label, regionprops_table
 from skimage.morphology import flood, disk
 from skimage import morphology as morph
 from skimage.segmentation import quickshift
 
-from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices
-from s3a.processing import GeneralProcess
-from s3a.processing.processing import ProcessIO, ImageProcess
+from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices, \
+  dynamicDocstring, \
+  pascalCaseToTitle, serAsFrame
+from s3a.constants import REQD_TBL_FIELDS as RTF
+from s3a.processing import AtomicProcess, GeneralProcess
+from s3a.processing.processing import ProcessIO, ImageProcess, GlobalPredictionProcess
 from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg,\
   GrayImg, RgbImg, AlgProcessorError
 
@@ -116,20 +120,47 @@ def format_vertices(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
   # Default to bound slices that encompass the whole image
   bounds = np.array([[0, 0], image.shape[:2][::-1]])
   boundSlices = slice(*bounds[:,1]), slice(*bounds[:,0])
-  return ProcessIO(image=image, fgVerts=fgVerts, bgVerts=bgVerts, asForeground=asForeground,
+  return ProcessIO(image=image, summaryInfo=None, fgVerts=fgVerts, bgVerts=bgVerts, asForeground=asForeground,
                    historyMask=curHistory, prevCompMask=foregroundAdjustedCompMask,
                    origCompMask=prevCompMask, boundSlices=boundSlices)
 
-def crop_to_local_area(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
-                       prevCompMask: BlackWhiteImg, historyMask: GrayImg, margin_pctRoiSize=10):
-  allVerts = np.vstack([fgVerts, bgVerts])
-  if len(allVerts) == 1:
-    # Single point, use image size as reference shape
-    vertArea_rowCol = image.shape[:2]
+def crop_to_local_area(image: NChanImg,
+                       fgVerts: XYVertices,
+                       bgVerts: XYVertices,
+                       prevCompMask: BlackWhiteImg,
+                       prevCompVerts: ComplexXYVertices,
+                       viewbox: XYVertices,
+                       historyMask: GrayImg,
+                       reference='viewbox',
+                       margin_pct=10
+                       ):
+  """
+  :param reference:
+    pType: list
+    limits:
+      - image
+      - component
+      - viewbox
+      - roi
+  """
+  roiVerts = np.vstack([fgVerts, bgVerts])
+  compVerts = np.vstack([prevCompVerts + [roiVerts]])
+  if reference == 'image':
+    allVerts = np.array([[0, 0], image.shape[:2]])
+  elif reference == 'roi' and len(roiVerts) > 1:
+    allVerts = roiVerts
+  elif reference == 'component' and len(compVerts) > 1:
+    allVerts = compVerts
   else:
-    # Lots of points, use their bounded area
+    # viewbox or badly sized previous region/roi
+    allVerts = np.vstack([viewbox, roiVerts])
+  # Lots of points, use their bounded area
+  try:
     vertArea_rowCol = (allVerts.max(0)-allVerts.min(0))[::-1]
-  margin = int(round(max(vertArea_rowCol) * (margin_pctRoiSize / 100)))
+  except ValueError:
+    # 0-sized
+    vertArea_rowCol = 0
+  margin = int(round(max(vertArea_rowCol) * (margin_pct / 100)))
   cropped, bounds = getCroppedImg(image, allVerts, margin)
   vertOffset = bounds.min(0)
   for vertList in fgVerts, bgVerts:
@@ -175,7 +206,7 @@ def return_to_full_size(image: NChanImg, origCompMask: BlackWhiteImg,
                         boundSlices: Tuple[slice]):
   out = np.zeros_like(origCompMask)
   if image.ndim > 2:
-    image = image.asGrayScale()
+    image = image.mean(2).astype(int)
   out[boundSlices] = image
   return ProcessIO(image=out)
 
@@ -256,12 +287,12 @@ def basic_shapes(image: NChanImg, fgVerts: XYVertices, penSize=1, penShape='circ
   except KeyError:
     raise AlgProcessorError(f"Can't understand shape {penShape}. Must be one of:\n"
                               f"{','.join(drawFns)}")
-  if len(fgVerts) > 1:
+  if len(fgVerts) > 1 and penSize > 1:
     ComplexXYVertices([fgVerts]).toMask(out, 1, False, warnIfTooSmall=False)
   else:
     for vert in fgVerts:
       drawFn(vert)
-  return ProcessIO(image=out > 0)
+  return out > 0
 
 def convert_to_squares(image: NChanImg):
   outMask = np.zeros(image.shape, dtype=bool)
@@ -284,23 +315,24 @@ def basicOpsCombo():
 def _grabcutResultToMask(gcResult):
   return np.where((gcResult==2)|(gcResult==0), False, True)
 
-def cv_grabcut(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
-               prevCompMask: BlackWhiteImg, noPrevMask: bool,
-               historyMask: GrayImg, iters=5):
+def cv_grabcut(image: NChanImg, prevCompMask: BlackWhiteImg, fgVerts: XYVertices,
+               noPrevMask: bool, historyMask: GrayImg, iters=5):
   if image.size == 0:
     return ProcessIO(image=np.zeros_like(prevCompMask))
   img = cv.cvtColor(image, cv.COLOR_RGB2BGR)
   # Turn foreground into x-y-width-height
   bgdModel = np.zeros((1,65),np.float64)
   fgdModel = np.zeros((1,65),np.float64)
+  historyMask = historyMask.copy()
+  historyMask[fgVerts.rows, fgVerts.cols] = 2
+
   mask = np.zeros(prevCompMask.shape, dtype='uint8')
   mask[prevCompMask == 1] = cv.GC_PR_FGD
   mask[prevCompMask == 0] = cv.GC_PR_BGD
   mask[historyMask == 2] = cv.GC_FGD
   mask[historyMask == 1] = cv.GC_BGD
 
-  allverts = np.vstack([fgVerts, bgVerts])
-  cvRect = np.array([allverts.min(0), allverts.max(0) - allverts.min(0)]).flatten()
+  cvRect = np.array([fgVerts.min(0), fgVerts.max(0) - fgVerts.min(0)]).flatten()
 
   if noPrevMask:
     if cvRect[2] == 0 or cvRect[3] == 0:
@@ -431,13 +463,158 @@ class TopLevelImageProcessors:
   @staticmethod
   def a_grabCutProcessor():
     proc = ImageProcess.fromFunction(cv_grabcut, name='Primitive Grab Cut')
+    proc.addProcess(ImageProcess.fromFunction(keep_regions_touching_roi, needsWrap=True))
     return proc
 
   @staticmethod
   def w_basicShapesProcessor():
-    proc = ImageProcess.fromFunction(basic_shapes)
+    def basic_shapes(image: np.ndarray, fgVerts: XYVertices):
+      return ProcessIO(image=ComplexXYVertices([fgVerts]).toMask(image.shape[:2], asBool=True))
+    proc = ImageProcess.fromFunction(basic_shapes, name='Basic Shapes')
     proc.disabledStages = [['Basic Region Operations', 'Open -> Close']]
     return proc
 
-class TopLevelCategoricalProcessors:
-  pass
+
+# -----
+# GLOBAL PROCESSING
+# -----
+def get_component_images(image: np.ndarray, components: pd.DataFrame):
+  """
+  From a main image and dataframe of components, adds an 'img' column to `components` which holds the
+  subregion within the image each component occupies.
+  """
+  imgs = [getCroppedImg(image, verts.stack(), 0) for verts in components[RTF.VERTICES]]
+  return ProcessIO(subimages=imgs)
+
+def dispatchedTemplateMatcher(func):
+  inputSpec = ProcessIO.fromFunction(func, ignoreKeys=['template'])
+  inputSpec['components'] = inputSpec.FROM_PREV_IO
+  def dispatcher(image: np.ndarray, components: pd.DataFrame, **kwargs):
+    out = ProcessIO()
+    allComps = []
+    for ii, comp in components.iterrows():
+      verts = comp[RTF.VERTICES].stack()
+      template = getCroppedImg(image, verts, 0, returnSlices=False)
+      result = func(image=image, template=template, **kwargs)
+      if isinstance(result, ProcessIO):
+        pts = result['matchPts']
+        out.update(**result)
+        out.pop('components', None)
+      else:
+        pts = result
+      allComps.append(pts_to_components(pts, comp))
+    outComps = pd.concat(allComps, ignore_index=True)
+    out['components'] = outComps
+    return out
+  dispatcher.__doc__ = func.__doc__
+  proc = GlobalPredictionProcess(pascalCaseToTitle(func.__name__))
+  proc.addFunction(dispatcher)
+  proc.stages[0].input = inputSpec
+  return proc
+
+def dispatchedFocusedProcessor(func):
+  inputSpec = ProcessIO.fromFunction(func)
+  inputSpec['components'] = inputSpec.FROM_PREV_IO
+  def dispatcher(image: np.ndarray, components: pd.DataFrame, **kwargs):
+    out = ProcessIO()
+    allComps = []
+    for ii, comp in components.iterrows():
+      verts = comp[RTF.VERTICES].stack()
+      focusedImage = getCroppedImg(image, verts, 0, returnSlices=False)
+      result = func(image=focusedImage, **kwargs)
+      if isinstance(result, ProcessIO):
+        mask = result['image']
+        out.update(**result)
+        out.pop('components', None)
+      else:
+        mask = result
+      newComp = comp.copy()
+      if mask is not None:
+        newComp[RTF.VERTICES] = ComplexXYVertices.fromBwMask(mask)
+      allComps.append(serAsFrame(newComp))
+    outComps = pd.concat(allComps, ignore_index=True)
+    out['components'] = outComps
+    return out
+  dispatcher.__doc__ = func.__doc__
+  proc = GlobalPredictionProcess(pascalCaseToTitle(func.__name__))
+  proc.addFunction(dispatcher)
+  proc.stages[0].input = inputSpec
+  return proc
+
+
+@dynamicDocstring(metricTypes=[d for d in dir(cv) if d.startswith('TM')])
+def cv_template_match(template: np.ndarray, image: np.ndarray, threshold=0.8, metric='TM_CCOEFF_NORMED'):
+  """
+  Performs template matching using default opencv functions
+  :param template: Template image
+  :param image: Main image
+  :param threshold:
+    helpText: Cutoff point to consider a matched template
+    limits: [0, 1]
+    step: 0.1
+  :param metric:
+    helpText: Template maching metric
+    pType: list
+    limits: {metricTypes}
+  """
+  if image.ndim < 3:
+    grayImg = image
+  else:
+    grayImg = cv.cvtColor(image, cv.COLOR_RGB2GRAY)
+  if template.ndim > 2:
+    template = cv.cvtColor(template, cv.COLOR_RGB2GRAY)
+
+  metric = getattr(cv, metric)
+  res = cv.matchTemplate(grayImg, template, metric)
+  maxFilter = maximum_filter(res, template.shape[:2])
+  # Non-max suppression to remove close-together peaks
+  res[maxFilter > res] = 0
+  loc = np.nonzero(res >= threshold)
+  scores = res[loc]
+  matchPts = np.c_[loc[::-1]]
+  return ProcessIO(matchPts=matchPts, scores=scores, matchImg=maxFilter)
+
+
+def pts_to_components(matchPts: np.ndarray, component: pd.Series):
+  numOutComps = len(matchPts)
+  # Explicit copy otherwise all rows point to the same component
+  outComps = pd.concat([serAsFrame(component)]*numOutComps, ignore_index=True).copy()
+  origOffset = component[RTF.VERTICES].stack().min(0)
+  allNewverts = []
+  for ii, pt in zip(outComps.index, matchPts):
+    newVerts = []
+    for verts in outComps.at[ii, RTF.VERTICES]:
+      newVerts.append(verts-origOffset+pt)
+    allNewverts.append(ComplexXYVertices(newVerts))
+  outComps[RTF.VERTICES] = allNewverts
+  return outComps
+
+
+@lru_cache()
+def _modelFromFile(model: str):
+  fname = MODEL_DIR/model
+  return tf.load(fname)
+
+def nn_model_prediction(image: NChanImg, model=''):
+  """
+
+  :param image:
+  :param fgVerts:
+  :param model:
+    pType: list
+    limits:
+      - ''
+      - Tool 1
+      - Tool 2
+      - Tool 3
+  """
+  if not model:
+    return None
+  nnModel = _modelFromFile(model)
+
+  return np.random.random((image.shape[:2])) > 0
+
+TOP_GLOBAL_PROCESSOR_FUNCS = [
+  lambda: dispatchedTemplateMatcher(cv_template_match),
+  lambda: dispatchedFocusedProcessor(nn_model_prediction)
+]

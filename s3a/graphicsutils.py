@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import html
 import sys
 from functools import partial
@@ -19,10 +20,9 @@ import s3a
 from s3a.constants import ANN_AUTH_DIR
 from s3a.structures import S3AIOError, S3AException, S3AWarning
 
-yaml = YAML()
-
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
+yaml = YAML()
 
 def disableAppDuringFunc(func):
   @wraps(func)
@@ -36,14 +36,32 @@ def disableAppDuringFunc(func):
       mainWin.setEnabled(True)
   return disableApp
 
-def popupFilePicker(parent=None, winTitle: str='', fileFilter: str='', asOpen=True, asFolder=False,
-                    selectMultiple=False, startDir: str=None) -> Optional[Union[str, List[str]]]:
-  fileDlg = QtWidgets.QFileDialog()
+def popupFilePicker(parent=None, winTitle: str='', fileFilter: str='', existing=True, asFolder=False,
+                    selectMultiple=False, startDir: str=None, **kwargs) -> Optional[Union[str, List[str]]]:
+  """
+  Thin wrapper around Qt file picker dialog. Used internally so all options are consistent
+  among all requests for external file information
+
+  :param parent: Dialog parent
+  :param winTitle: Title of dialog window
+  :param fileFilter: File filter as required by the Qt dialog
+  :param existing: Whether the file is already existing, or is being newly created
+  :param asFolder: Whether the dialog should select folders or files
+  :param selectMultiple: Whether multiple files can be selected. If `asFolder` is
+    *True*, this parameter is ignored.
+  :param startDir: Where in the file system to open this dialog
+  :param kwargs: Consumes additional arguments so dictionary unpacking can be used
+    with the lengthy file signature. In the future, this may allow additional config
+    options.
+  """
+  fileDlg = QtWidgets.QFileDialog(parent)
   fileMode = fileDlg.AnyFile
   opts = fileDlg.DontUseNativeDialog
-  if asOpen:
+  if existing:
     # Existing files only
     fileMode = fileDlg.ExistingFiles if selectMultiple else fileDlg.ExistingFile
+  else:
+    fileDlg.setAcceptMode(fileDlg.AcceptSave)
   if asFolder:
     fileMode = fileDlg.Directory
     opts |= fileDlg.ShowDirsOnly
@@ -56,10 +74,12 @@ def popupFilePicker(parent=None, winTitle: str='', fileFilter: str='', asOpen=Tr
 
   fileDlg.setOption(fileDlg.DontUseNativeDialog, True)
   fileDlg.setWindowTitle(winTitle)
-  parent = QtWidgets.QApplication.desktop()
-  fileDlg.setParent(parent)
 
   if fileDlg.exec_():
+    # Append filter type
+    suffMatch = re.search(r'\*\.?(\w+)', fileDlg.selectedNameFilter())
+    if suffMatch:
+      fileDlg.setDefaultSuffix(suffMatch.group(1))
     fList = fileDlg.selectedFiles()
   else:
     fList = []
@@ -525,27 +545,31 @@ class QAwesomeTooltipEventFilter(QtCore.QObject):
 
 
 def menuFromEditorActions(editors: Union[s3a.ParamEditor, Sequence[s3a.ParamEditor]],
-                          title: str=None, menuParent: QtWidgets.QWidget=None):
+                          title: str=None, menuParent: QtWidgets.QWidget=None, nest=True):
   if not isinstance(editors, Sequence):
     editors = [editors]
   if title is None:
-    title = editors[0].name
+    title = editors[0].dock.name
 
-  menu = QtWidgets.QMenu(title, menuParent)
+  outerMenu = QtWidgets.QMenu(title, menuParent)
   for editor in editors:
+    if nest:
+      menu = QtWidgets.QMenu(editor.dock.name, outerMenu)
+      outerMenu.addMenu(menu)
+    else:
+      menu = outerMenu
     actions = []
     paramNames = []
     def findActions(paramRoot: Parameter):
       for child in paramRoot.childs:
         findActions(child)
-      if 'action' in paramRoot.opts['type'] and paramRoot.opts.get('guibtn', True):
+      if 'action' in paramRoot.opts['type']:
         actions.append(paramRoot)
         paramNames.append(paramRoot.name())
     findActions(editor.params)
     for action, name in zip(actions, paramNames):
       menu.addAction(name, action.activate)
-
-  return menu
+  return outerMenu
 
 class ThumbnailViewer(QtWidgets.QListWidget):
   sigDeleteRequested = QtCore.Signal(object)
@@ -705,7 +729,8 @@ def setParamTooltips(tree: ParameterTree, expandNameCol=True):
 
 def expandtreeParams(tree: ParameterTree, expandedVal=True):
   for item in tree.topLevelItems():
-    item.setExpanded(expandedVal)
+    for ii in range(item.childCount()):
+      item.child(ii).setExpanded(expandedVal)
   tree.resizeColumnToContents(0)
 
 def paramWindow(param: Parameter):

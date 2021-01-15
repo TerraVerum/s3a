@@ -7,29 +7,23 @@ from typing import Optional, Dict, List, Callable, Union, Type
 from pyqtgraph.Qt import QtCore
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.parameterTypes import ListParameter
-
 from s3a.constants import MENU_OPTS_DIR
-from s3a.structures import FRParam, \
-  AlgProcessorError, ParamEditorError
+from s3a.generalutils import pascalCaseToTitle
+from s3a.structures import AlgProcessorError
+
 from .genericeditor import ParamEditor
 from .pgregistered import ProcGroupParameter
-from s3a.generalutils import pascalCaseToTitle
 from ..processing import GeneralProcWrapper, GeneralProcess
-from ..processing.processing import ImageProcess
 
 Signal = QtCore.Signal
 
 class AlgCtorCollection(ParamEditor):
   # sigProcessorCreated = Signal(object) # Signal(AlgCollectionEditor)
   def __init__(self, procWrapType: Type[GeneralProcWrapper], parent=None):
-    super().__init__(parent, fileType='', saveDir='')
-    self.processorCtors : List[Callable[[], ImageProcess]] = []
+    super().__init__(parent, saveDir='', fileType='')
+    self.processorCtors : List[Callable[[], GeneralProcess]] = []
     self.spawnedCollections : List[AlgParamEditor] = []
     self.procWrapType = procWrapType
-
-  def registerGroup(self, groupParam: FRParam = None, **opts):
-    raise ParamEditorError("Individual processors shouldn't be registered as groups."
-                             " They should be spawned from an AlgCollectionEditor.")
 
   def createProcessorForClass(self, clsObj, editorName='Processor') -> AlgParamEditor:
     if not isclass(clsObj):
@@ -48,13 +42,18 @@ class AlgCtorCollection(ParamEditor):
     # self.sigProcessorCreated.emit(newEditor)
     return newEditor
 
-  def addProcessCtor(self, procCtor: Callable[[], ImageProcess]):
+  def addProcessCtor(self, procCtor: Callable[[], GeneralProcess]):
     self.processorCtors.append(procCtor)
     for algCollection in self.spawnedCollections:
       algCollection.addProcessor(procCtor())
 
+  def addProcessFunction(self, func: Callable, procType: Type[GeneralProcess], name:str=None, **kwargs):
+    def ctor():
+      return procType.fromFunction(func, name=name, **kwargs)
+    self.addProcessCtor(ctor)
+
 class AlgParamEditor(ParamEditor):
-  def __init__(self, saveDir, procCtors: List[Callable[[], ImageProcess]],
+  def __init__(self, saveDir, procCtors: List[Callable[[], GeneralProcess]],
                procWrapType: Type[GeneralProcWrapper], name=None, parent=None):
     algOptDict = {
       'name': 'Algorithm', 'type':  'list', 'values': [], 'value': 'N/A'
@@ -82,15 +81,14 @@ class AlgParamEditor(ParamEditor):
     # self.saveParamState('Default', allowOverwriteDefault=True)
 
   def addProcessor(self, newProc: GeneralProcess):
-    processor = self.procWrapType(newProc, self)
+    processor = self.procWrapType(newProc, parentParam=self.params)
     self.tree.addParameters(self.params.child(processor.algName))
 
     self.nameToProcMapping.update({processor.algName: processor})
     self.algOpts.setLimits(self.nameToProcMapping.copy())
     return processor
 
-  def saveParamState(self, saveName: str=None, paramState: dict=None,
-                     allowOverwriteDefault=False, blockWrite=False):
+  def saveParamState(self, saveName: str=None, paramState: dict=None, **kwargs):
     """
     The algorithm editor also needs to store information about the selected algorithm, so lump
     this in with the other parameter information before calling default save.
@@ -100,7 +98,7 @@ class AlgParamEditor(ParamEditor):
                                          removeList=['value'])
       paramState = {'Selected Algorithm': self.algOpts.value().algName,
                     'Parameters': paramDict}
-    return super().saveParamState(saveName, paramState, allowOverwriteDefault, blockWrite)
+    return super().saveParamState(saveName, paramState, **kwargs)
 
   def loadParamState(self, stateName: Union[str, Path], stateDict: dict=None,
                      addChildren=False, removeChildren=False, applyChanges=True):

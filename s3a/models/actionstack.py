@@ -223,10 +223,15 @@ class ActionStack:
     """ Return *True* if redos are available """
     return len(self.actions) > 0 and not self.actions[0].treatAsUndo
 
-  def resizeStack(self, newMaxLen: int):
-    if newMaxLen == self.actions.maxlen:
+  def resizeStack(self, maxLength: int):
+    """
+    Updates buffer size to the new specification. If the new size is smaller,
+    only the most recent actions are kept.
+    :param maxLength:
+    """
+    if maxLength == self.actions.maxlen:
       return
-    newDeque: Deque[Action] = deque(maxlen=newMaxLen)
+    newDeque: Deque[Action] = deque(maxlen=maxLength)
     newDeque.extend(self.actions)
     receiverNeedsReset = True if self._curReceiver is self.actions else False
     self.actions = newDeque

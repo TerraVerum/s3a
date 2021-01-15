@@ -1,28 +1,31 @@
-from typing import Tuple, Dict, Union, Collection
+from typing import Dict, Collection
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 
-from s3a import FR_SINGLETON
-from s3a.constants import FR_CONSTS
-from s3a.structures import FRParam, XYVertices
-from s3a.views.rois import ExtendedROI, SHAPE_ROI_MAPPING
+from s3a.structures import PrjParam, XYVertices
+from s3a.views.rois import SHAPE_ROI_MAPPING, PlotDataROI, PointROI
+from s3a.parameditors import singleton, EditorPropsMixin
+from s3a.models import editorbase
 
 __all__ = ['RoiCollection']
 
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_ROI_CLCTN)
-class RoiCollection(QtCore.QObject):
+class RoiCollection(EditorPropsMixin, QtCore.QObject):
   # Signal(ExtendedROI)
   sigShapeFinished = QtCore.Signal(object) # roiVerts : XYVertices
 
-  def __init__(self, allowableShapes: Collection[FRParam]=(), parent: pg.GraphicsView=None):
+  def __init__(self, allowableShapes: Collection[PrjParam]=(), parent: pg.GraphicsView=None):
     super().__init__(parent)
+    singleton.FR_SINGLETON.colorScheme.registerFunc(
+      PointROI.updateRadius, name='Point ROI Features', runOpts=editorbase.RunOpts.ON_CHANGED, namePath=(self.__groupingName__,),
+
+    )
     if allowableShapes is None:
       allowableShapes = set()
     self.shapeVerts = XYVertices()
     # Make a new graphics item for each roi type
-    self.roiForShape: Dict[FRParam, Union[pg.ROI, ExtendedROI]] = {}
-    self._curShape = allowableShapes[0] if len(allowableShapes) > 0 else None
+    self.roiForShape: Dict[PrjParam, PlotDataROI] = {}
+    self._curShape = next(iter(allowableShapes)) if len(allowableShapes) > 0 else None
 
     self._locks = set()
     self.addLock(self)
@@ -32,6 +35,7 @@ class RoiCollection(QtCore.QObject):
       newRoi = SHAPE_ROI_MAPPING[shape]()
       newRoi.setZValue(1000)
       self.roiForShape[shape] = newRoi
+      newRoi.setRoiPoints()
       newRoi.hide()
     self.addRoisToView(parent)
 
@@ -43,8 +47,8 @@ class RoiCollection(QtCore.QObject):
         view.addItem(roi)
 
   def clearAllRois(self):
-    for roi in self.roiForShape.values(): # type: ExtendedROI
-      roi.clear()
+    for roi in self.roiForShape.values(): # type: PlotDataROI
+      roi.setRoiPoints()
       roi.hide()
       self.addLock(self)
 
@@ -85,7 +89,7 @@ class RoiCollection(QtCore.QObject):
         and ev.type() == ev.MouseButtonPress
         and ev.button() == QtCore.Qt.LeftButton):
       self.removeLock(self)
-    if self.locked: return
+    if self.locked: return False
     if imgItem is not None:
       posRelToImg = imgItem.mapFromScene(ev.pos())
     else:
@@ -100,16 +104,17 @@ class RoiCollection(QtCore.QObject):
 
     if not constructingRoi:
       # Vertices from the completed shape are already stored, so clean up the shapes.
+      curRoi.setRoiPoints()
       curRoi.hide()
-      self.curShape.clear()
     else:
       # Still constructing ROI. Show it
       curRoi.show()
+    return constructingRoi
 
   @property
   def curShapeParam(self): return self._curShape
   @curShapeParam.setter
-  def curShapeParam(self, newShape: FRParam):
+  def curShapeParam(self, newShape: PrjParam):
     """
     When the shape is changed, be sure to reset the underlying ROIs
     :param newShape: New shape

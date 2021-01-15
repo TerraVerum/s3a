@@ -1,26 +1,25 @@
 from __future__ import annotations
 
-from abc import ABC
 from copy import deepcopy
+from functools import singledispatch
 from functools import wraps
 from io import StringIO
-from typing import Tuple, List, Sequence, Union, Callable
+from typing import List, Sequence, Union, Callable
 from warnings import warn
 
-import numpy as np
-from ..processing.processing import *
-from pyqtgraph.parametertree import Parameter
 import docstring_parser as dp
-from ruamel.yaml import YAML
-yaml = YAML()
+import numpy as np
+from pyqtgraph.parametertree import Parameter
+from pyqtgraph.parametertree.parameterTypes import GroupParameter
+from ruamel import yaml
 
-from s3a.generalutils import augmentException, frParamToPgParamDict
-from s3a.processing.algorithms import crop_to_local_area, apply_process_result, basicOpsCombo, \
-  return_to_full_size, format_vertices
-from s3a.structures import FRParam, ComplexXYVertices, AlgProcessorError, XYVertices, \
-  S3AWarning
+from s3a.generalutils import augmentException, getParamChild
 from s3a.parameditors.pgregistered import CustomMenuParameter
-from s3a.models import editorbase
+from s3a.processing.algorithms import crop_to_local_area, apply_process_result, \
+  basicOpsCombo, return_to_full_size, format_vertices
+from s3a.structures import PrjParam, ComplexXYVertices, AlgProcessorError, XYVertices, \
+  S3AWarning, CompositionMixin
+from ..processing.processing import *
 
 __all__ = ['ImgProcWrapper', 'GeneralProcWrapper']
 
@@ -37,18 +36,18 @@ def docParser(docstring: str):
   out = {}
   for param in parsed.params:
     stream = StringIO(param.description)
-    paramDoc = yaml.load(stream)
+    paramDoc = yaml.safe_load(stream)
     if isinstance(paramDoc, str):
       paramDoc = {'helpText': paramDoc}
     if paramDoc is None:
       continue
-    out[param.arg_name] = FRParam(name=param.arg_name, **paramDoc)
+    out[param.arg_name] = PrjParam(name=param.arg_name, **paramDoc)
     if 'pType' not in paramDoc:
       out[param.arg_name].pType = None
   out['top-descr'] = descr
   return out
 
-def _attemptCreateChild(parent: Parameter, child: Union[Parameter, dict]):
+def _attemptCreateChild(parent: Parameter, child: Union[Parameter, dict]) -> Parameter:
   try:
     cname = child.opts['name']
   except AttributeError:
@@ -60,85 +59,102 @@ def _attemptCreateChild(parent: Parameter, child: Union[Parameter, dict]):
 def atomicRunWrapper(proc: AtomicProcess, names: Sequence[str], params: Sequence[Parameter]):
   oldRun = proc.run
   @wraps(oldRun)
-  def newRun(io: ProcessIO = None, disable=False) -> ProcessIO:
+  def newRun(io: ProcessIO = None, disable=False, **runKwargs) -> ProcessIO:
     newIo = {name: param.value() for name, param in zip(names, params)}
     proc.input.update(**newIo)
-    return oldRun(io, disable)
+    return oldRun(io, disable, **runKwargs)
   return newRun
 
 def procRunWrapper(proc: GeneralProcess, groupParam: Parameter):
   oldRun = proc.run
   @wraps(oldRun)
-  def newRun(io: ProcessIO = None, disable=False):
+  def newRun(io: ProcessIO = None, disable=False, **runKwargs):
     proc.disabled = not groupParam.opts['enabled']
-    return oldRun(io, disable=disable)
+    return oldRun(io, disable=disable, **runKwargs)
   return newRun
 
-class GeneralProcWrapper(ABC):
-  def __init__(self, processor: ProcessStage, editor: editorbase.ParamEditorBase, paramPath: Tuple[str, ...]=(),
-               paramFormat: Callable[[str], str] = None):
-    self.processor = processor
+@singledispatch
+def addStageToParam(stage: ProcessStage, parentParam: Parameter, **kwargs):
+  pass
+
+@addStageToParam.register
+def addAtomicToParam(stage: AtomicProcess, parentParam: Parameter,
+                 argNameFormat: Callable[[str], str]=None, **kwargs):
+  docParams = docParser(stage.func.__doc__)
+  params: List[Parameter] = []
+  for key in stage.input.hyperParamKeys:
+    val = stage.input[key]
+    curParam = docParams.get(key, None)
+    if curParam is None:
+      curParam = PrjParam(name=key, value=val)
+    else:
+      # Default value should be overridden by func signature, if it is provided.
+      # Mostly needed during "forceKeys" usage
+      if val is not stage.input.FROM_PREV_IO:
+        curParam.value = val
+      if curParam.pType is None:
+        curParam.pType = type(val).__name__
+    paramDict = curParam.toPgDict()
+    if argNameFormat is not None and 'title' not in paramDict:
+      paramDict['title'] = argNameFormat(key)
+    pgParam = _attemptCreateChild(parentParam, paramDict)
+    params.append(pgParam)
+  stage.run = atomicRunWrapper(stage, stage.input.hyperParamKeys, params)
+  return stage
+
+@addStageToParam.register
+def addGeneralToParam(stage: GeneralProcess, parentParam: Parameter, nestHyperparams=True,
+                      argNameFormat: Callable[[str], str]=None, treatAsAtomic=False, **kwargs):
+  if treatAsAtomic:
+    collapsed = AtomicProcess(stage.run, stage.name, mainResultKeys=stage.mainResultKeys,
+                              mainInputKeys=stage.mainInputKeys)
+    collapsed.input = stage.input
+    addAtomicToParam(collapsed, parentParam, argNameFormat)
+    return
+  stage.run = procRunWrapper(stage, parentParam)
+  # Special case of a process comprised of just one atomic function
+  if len(stage.stages) == 1 and isinstance(stage.stages[0], AtomicProcess):
+    # isinstance ensures the type will be correct
+    # noinspection PyTypeChecker
+    addAtomicToParam(stage.stages[0], parentParam)
+    return
+  outerParent = parentParam
+  for childStage in stage.stages:
+    pType = 'atomicgroup'
+    if childStage.allowDisable:
+      pType = 'procgroup'
+    if nestHyperparams:
+      paramDict = PrjParam(name=childStage.name, pType=pType, value=[],
+                          enabled=not childStage.disabled).toPgDict()
+      parentParam = _attemptCreateChild(outerParent, paramDict)
+    else:
+      parentParam = outerParent
+    addStageToParam(childStage, parentParam)
+
+class GeneralProcWrapper(CompositionMixin):
+  def __init__(self, processor: ProcessStage, parentParam: GroupParameter=None,
+               argNameFormat: Callable[[str], str] = None, treatAsAtomic=False, nestHyperparams=True):
+    self.processor = self.exposes(processor)
     self.algName = processor.name
-    self.algParam = FRParam(self.algName)
-    self.output = np.zeros((0,0), bool)
-    self.paramFormat = paramFormat
+    self.argNameFormat = argNameFormat
+    self.treatAsAtomic = treatAsAtomic
+    self.nestHyperparams = nestHyperparams
+    if parentParam is None:
+      parentParam = Parameter.create(name=self.algName, type='group')
+    elif nestHyperparams:
+      parentParam = getParamChild(parentParam, self.algName)
+    self.parentParam : GroupParameter = parentParam
+    self.addStage(self.processor)
 
-    self.editor = editor
-    parentParam = editor.params
-    if len(paramPath) > 0:
-      parentParam = parentParam.child(*paramPath)
-    _attemptCreateChild(parentParam, dict(name=self.algName, type='group'))
-    self._outerParamPath = paramPath
-    self.unpackStages(self.processor)
-
-  def unpackStages(self, stage: ProcessStage, parentPath: Tuple[str, ...]=()):
-    paramParent: Parameter = self.editor.params.child(*self._outerParamPath, self.algName, *parentPath)
-    if isinstance(stage, AtomicProcess):
-      stage: AtomicProcess
-      docParams = docParser(stage.func.__doc__)
-      params: List[Parameter] = []
-      for key in stage.input.hyperParamKeys:
-        val = stage.input[key]
-        curParam = docParams.get(key, None)
-        if curParam is None:
-          curParam = FRParam(name=key, value=val)
-        else:
-          # Default value should be overridden by func signature
-          curParam.value = val
-          if curParam.pType is None:
-            curParam.pType = type(val).__name__
-        paramDict = frParamToPgParamDict(curParam)
-        if self.paramFormat is not None and 'title' not in paramDict:
-          paramDict['title'] = self.paramFormat(key)
-        pgParam = _attemptCreateChild(paramParent, paramDict)
-        params.append(pgParam)
-      stage.run = atomicRunWrapper(stage, stage.input.hyperParamKeys, params)
-      return
-    # else: # Process
-    stage: GeneralProcess
-    stage.run = procRunWrapper(stage, paramParent)
-    # Special case of a process comprised of just one atomic function
-    if len(stage.stages) == 1 and isinstance(stage.stages[0], AtomicProcess):
-      self.unpackStages(stage.stages[0], parentPath=parentPath)
-      return
-    for childStage in stage.stages:
-      pType = 'atomicgroup'
-      if childStage.allowDisable:
-        pType = 'procgroup'
-      curGroup = FRParam(name=childStage.name, pType=pType, value=[],)
-      paramDict = frParamToPgParamDict(curGroup)
-      paramDict['enabled'] = not childStage.disabled
-      _attemptCreateChild(paramParent, paramDict)
-      self.unpackStages(childStage, parentPath=parentPath + (childStage.name,))
+  def addStage(self, stage: ProcessStage):
+    addStageToParam(stage, self.parentParam, argNameFormat=self.argNameFormat,
+                    treatAsAtomic=self.treatAsAtomic, nestHyperparams=self.nestHyperparams)
 
   def setStageEnabled(self, stageIdx: Sequence[str], enabled: bool):
-    paramForStage: CustomMenuParameter = self.editor.params.child(self.algName, *stageIdx)
+    paramForStage: CustomMenuParameter = self.parentParam.child(*stageIdx)
     prevEnabled = paramForStage.opts['enabled']
     if prevEnabled != enabled:
       paramForStage.menuActTriggered('Toggle Enable')
-
-  def run(self, **kwargs):
-    raise NotImplementedError
 
   def __repr__(self) -> str:
     selfCls = type(self)
@@ -175,16 +191,18 @@ def _appendFuncs():
   return [applyStage, basicOpsCombo(), resizeStage]
 
 class ImgProcWrapper(GeneralProcWrapper):
-  prependProcs = _prependFuncs()
-  appendedProcs = _appendFuncs()
+  preProcStages = _prependFuncs()
+  postProcStages = _appendFuncs()
 
-  def __init__(self, processor: ImageProcess, editor: editorbase.ParamEditorBase,
-               excludedStages: List[List[str]]=None, disabledStages: List[List[str]]=None):
+  def __init__(self, processor: ImageProcess, *,
+               excludedStages: List[List[str]]=None, disabledStages: List[List[str]]=None,
+               **kwargs):
     # Each processor is encapsulated in processes that crop the image to the region of
     # interest specified by the user, and re-expand the area after processing
+    self.output = np.zeros((0,0), bool)
 
-    preStages = [*map(deepcopy, self.prependProcs)]
-    finalStages = [*map(deepcopy, self.appendedProcs)]
+    preStages = [*map(deepcopy, self.preProcStages)]
+    finalStages = [*map(deepcopy, self.postProcStages)]
     processor.stages = preStages + processor.stages + finalStages
 
     if disabledStages is None:
@@ -203,7 +221,7 @@ class ImgProcWrapper(GeneralProcWrapper):
     for namePath in excludedStages: # type: List[str]
       parentProc = self.getNestedName(processor, namePath[:-1])
       parentProc.stages.remove(self.getNestedName(parentProc, [namePath[-1]]))
-    super().__init__(processor, editor)
+    super().__init__(processor, **kwargs)
 
   def run(self, **kwargs):
     newIo = self._ioDictFromRunKwargs(kwargs)

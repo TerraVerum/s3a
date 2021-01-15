@@ -9,15 +9,17 @@ from warnings import warn
 
 import numpy as np
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore
+from pyqtgraph.Qt import QtCore, QtWidgets
 
-from s3a.generalutils import pascalCaseToTitle
+from s3a.generalutils import pascalCaseToTitle, coerceAnnotation
 from s3a.structures import S3AWarning, AlgProcessorError
 
 __all__ = ['ProcessIO', 'ProcessStage', 'GeneralProcess', 'ImageProcess',
            'AtomicProcess']
 
 _infoType = t.List[t.Union[t.List, t.Dict[str, t.Any]]]
+StrList = t.List[str]
+StrCol = t.Collection[str]
 class _DUPLICATE_INFO: pass
 
 class ProcessIO(dict):
@@ -61,7 +63,8 @@ class ProcessIO(dict):
     self.keysFromPrevIO = set(self.keys()) - set(self.hyperParamKeys)
 
   @classmethod
-  def fromFunction(cls, func: t.Callable, ignoreKeys: t.Collection[str]=None, **overriddenDefaults):
+  def fromFunction(cls, func: t.Callable, ignoreKeys: StrCol=None, forceKeys: StrCol=None,
+                   **overriddenDefaults):
     """
     In the ProcessIO scheme, default arguments in a function signature constitute algorithm
     hyperparameters, while required arguments must be provided each time the function is
@@ -70,17 +73,25 @@ class ProcessIO(dict):
     :param func: Function whose input signature should be parsed
     :param ignoreKeys: Keys to disregard entirely from the incoming function. This is useful for cases like adding
       a function at the class instead of instance level and `self` shouldn't be regarded by the parser.
+    :param forceKeys: Keys without defaults but that should count as hyperparameters.
+      It is strongly advised that `overriddenDefaults` should be provided for these values,
+      or the value should be specified in the parameter's docstring
     :param overriddenDefaults: Keys here that match default argument names in `func` will
       override those defaults
     """
     if ignoreKeys is None:
       ignoreKeys = []
+    if forceKeys is None:
+      forceKeys = []
     outDict = {}
     hyperParamKeys = []
     spec = inspect.signature(func).parameters
     for k, v in spec.items():
       if k in ignoreKeys: continue
       formattedV = overriddenDefaults.get(k, v.default)
+      if formattedV is v.empty and k in forceKeys:
+        # Replace with *None* as described in func doc
+        formattedV = coerceAnnotation(v.annotation)
       if formattedV is v.empty:
         formattedV = cls.FROM_PREV_IO
         # Not a hyperparameter
@@ -103,7 +114,8 @@ class ProcessStage(ABC):
   allowDisable = False
   disabled = False
   result: ProcessIO = None
-  mainResultKeys: t.List[str] = None
+  mainResultKeys: StrList = None
+  mainInputKeys: StrList = None
 
 
   def __repr__(self) -> str:
@@ -117,14 +129,14 @@ class ProcessStage(ABC):
   def __str__(self) -> str:
     return repr(self)
 
-  def updateInput(self, prevIo: ProcessIO):
+  def updateInput(self, prevIo: ProcessIO, **kwargs):
     """
     Helper function to update current inputs from previous ones while ignoring leading
     underscores.
     """
     selfFmtToUnfmt = {k.lstrip('_'): k for k in self.input}
     requiredKeyFmt = {k: v for k, v in selfFmtToUnfmt.items() if v in self.input.keysFromPrevIO}
-    prevIoKeyToFmt = {k.lstrip('_'): k for k in prevIo}
+    prevIoKeyToFmt = {k.lstrip('_'): k for k in {**prevIo, **kwargs}}
     missingKeys = []
     for fmtK, trueK in selfFmtToUnfmt.items():
       if fmtK in prevIoKeyToFmt:
@@ -134,7 +146,7 @@ class ProcessStage(ABC):
     if len(missingKeys) > 0:
       raise AlgProcessorError(f'Missing Following keys from {self}: {missingKeys}')
 
-  def run(self, io: ProcessIO=None, disable=False):
+  def run(self, io: ProcessIO=None, disable=False, **runKwargs):
     raise NotImplementedError
 
   def __call__(self, **kwargs):
@@ -152,8 +164,9 @@ class AtomicProcess(ProcessStage):
   be assigned to that result.
   """
 
-  def __init__(self, func: t.Callable, name:str=None, needsWrap=False,
-               mainResultKeys: t.List[str]=None, ignoreKeys: t.Collection[str]=None, **overriddenDefaults):
+  def __init__(self, func: t.Callable, name:str=None, *, needsWrap=False,
+               mainResultKeys: StrList=None, mainInputKeys: StrList=None,
+               **procIoKwargs):
     """
     :param func: Function to wrap
     :param name: Name of this process. If `None`, defaults to the function name with
@@ -167,25 +180,33 @@ class AtomicProcess(ProcessStage):
     function is assumed to be that key. I.e. in the case where `len(cls.mainResultKeys) == 1`,
     the output is expected to be the direct result, not a sequence of results per key.
     :param mainResultKeys: Set by parent process as needed
-    :param ignoreKeys: See `ProcessIO.fromFunction`
-    :param overriddenDefaults: Passed directly to ProcessIO when creating this function's
-      input specifications.
+    :param mainInputKeys: Set by parent process as needed
+    :param procIoKwargs: Passed to ProcessIO.fromFunction
     """
     if name is None:
       name = pascalCaseToTitle(func.__name__)
     if mainResultKeys is not None:
       self.mainResultKeys = mainResultKeys
+    if mainInputKeys is not None:
+      self.mainInputKeys = mainInputKeys
 
     self.name = name
-    self.input = ProcessIO.fromFunction(func, ignoreKeys, **overriddenDefaults)
+    self.input = ProcessIO.fromFunction(func, **procIoKwargs)
     self.result: t.Optional[ProcessIO] = None
+
+    if mainInputKeys is not None:
+      keys = set(self.input.keys())
+      missingKeys = set(mainInputKeys) - keys
+      if missingKeys:
+        raise AlgProcessorError(f'{name} input signature is missing the following required input keys:\n'
+                                f'{missingKeys}')
 
     if needsWrap:
       func = self._wrappedFunc(func, self.mainResultKeys)
     self.func = func
 
   @classmethod
-  def _wrappedFunc(cls, func, mainResultKeys: t.List[str]=None):
+  def _wrappedFunc(cls, func, mainResultKeys: StrList=None, mainInputKeys: StrList=None):
     """
     Wraps a function returining either a result or list of results, instead making the
     return value an `FRProcessIO` object where each `cls.mainResultkey` corresponds
@@ -207,9 +228,9 @@ class AtomicProcess(ProcessStage):
   def keysFromPrevIO(self):
     return self.input.keysFromPrevIO
 
-  def run(self, prevIO: ProcessIO=None, disable=False):
+  def run(self, prevIO: ProcessIO=None, disable=False, **runKwargs):
     if prevIO is not None:
-      self.updateInput(prevIO)
+      self.updateInput(prevIO, **runKwargs)
     if not disable:
       self.result = self.func(**self.input)
     else:
@@ -220,17 +241,29 @@ class AtomicProcess(ProcessStage):
   def stages_flattened(self):
     return [self]
 
-
 class GeneralProcess(ProcessStage):
 
-  def __init__(self, name: str=None):
+  def __init__(self, name: str=None, mainInputKeys: StrList=None, mainResultKeys: StrList=None):
     self.stages: t.List[ProcessStage] = []
     self.name = name
     self.allowDisable = True
+    if mainInputKeys is not None:
+      self.mainInputKeys = mainInputKeys
+    if mainResultKeys is not None:
+      self.mainResultKeys = mainResultKeys
 
-  def addFunction(self, func: t.Callable, **kwargs):
-    """See function signature for AtomicProcess for input explanation"""
-    atomic = AtomicProcess(func, mainResultKeys=self.mainResultKeys, **kwargs)
+  def addFunction(self, func: t.Callable, keySpec: t.Union[t.Type[GeneralProcess], GeneralProcess]=None, **kwargs):
+    """
+    Wraps the provided function in an AtomicProcess and adds it to the current process.
+    :param func: Forwarded to AtomicProcess
+    :param kwargs: Forwarded to AtomicProcess
+    :param keySpec: This argument should have 'mainInputKeys' and 'mainResultKeys' that are used
+      when adding a function to this process. This can be beneficial when an Atomic Process
+      is added with different keys than the current process type
+    """
+    if keySpec is None:
+      keySpec = self
+    atomic = AtomicProcess(func, mainResultKeys=keySpec.mainResultKeys, mainInputKeys=keySpec.mainInputKeys, **kwargs)
     numSameNames = 0
     for stage in self.stages:
       if atomic.name == stage.name.split('#')[0]:
@@ -249,21 +282,23 @@ class GeneralProcess(ProcessStage):
     out.addFunction(func, **kwargs)
     return out
 
-  def addProcess(self, process: GeneralProcess):
+  def addProcess(self, process: ProcessStage):
     if self.name is None:
       self.name = process.name
     self.stages.append(process)
     return process
 
-  def run(self, io: ProcessIO = None, disable=False):
+  def run(self, io: ProcessIO = None, disable=False, **runKwargs):
     if io is None:
       _activeIO = ProcessIO()
     else:
       _activeIO = copy.copy(io)
+    _activeIO.update(runKwargs)
 
     for i, stage in enumerate(self.stages):
       newIO = stage.run(_activeIO, disable=self.disabled or disable)
-      _activeIO.update(newIO)
+      if isinstance(newIO, ProcessIO):
+        _activeIO.update(newIO)
 
     return self.result
 
@@ -310,6 +345,10 @@ class GeneralProcess(ProcessStage):
     lastInfos = []
     for stage in self._nonDisabledStages_flattened():
       res = stage.result
+      if not isinstance(res, ProcessIO): continue
+      if any(k not in res for k in self.mainResultKeys):
+        # Missing required keys, not sure how to turn into summary info. Skip
+        continue
       if 'summaryInfo' not in res:
         defaultSummaryInfo = {k: res[k] for k in self.mainResultKeys}
         defaultSummaryInfo.update(name=stage.name)
@@ -352,6 +391,7 @@ class GeneralProcess(ProcessStage):
     return validInfos
 
 class ImageProcess(GeneralProcess):
+  mainInputKeys = ['image']
   mainResultKeys = ['image']
 
   @classmethod
@@ -413,6 +453,11 @@ class ImageProcess(GeneralProcess):
     return infos
 
 _winRefs = {}
+
+class GlobalPredictionProcess(ImageProcess):
+  def _stageSummaryWidget(self):
+    return QtWidgets.QWidget()
+  mainResultKeys = ['components']
 
 class CategoricalProcess(GeneralProcess):
   def _stageSummaryWidget(self):

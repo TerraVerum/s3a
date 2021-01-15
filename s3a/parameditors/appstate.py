@@ -5,10 +5,10 @@ import pandas as pd
 import numpy as np
 from pyqtgraph.parametertree import Parameter
 
-from s3a.generalutils import _safeCallFuncList
+from s3a.generalutils import safeCallFuncList
 from s3a.graphicsutils import raiseErrorLater
 from s3a.constants import APP_STATE_DIR
-from s3a.structures import FilePath, FRParam, S3AIOError
+from s3a.structures import FilePath, PrjParam, S3AIOError
 from s3a.parameditors import ParamEditor
 from s3a import FR_SINGLETON
 
@@ -17,15 +17,12 @@ class AppStateEditor(ParamEditor):
 
   def __init__(self, parent=None, paramList: List[Dict] = None,
                saveDir: FilePath = APP_STATE_DIR, fileType='param', name=None,
-               topTreeChild: Parameter = None, registerCls: Type = None,
-               registerParam: FRParam = None):
+               topTreeChild: Parameter = None):
     # TODO: Add params to choose which features are saved, etc.
-    super().__init__(parent, paramList, saveDir, fileType, name, topTreeChild,
-                     registerCls, registerParam)
+    super().__init__(parent, paramList, saveDir, fileType, name, topTreeChild)
     self._stateFuncsDf = pd.DataFrame(columns=['importFuncs', 'exportFuncs'])
 
-  def saveParamState(self, saveName: str=None, paramState: dict=None,
-                     allowOverwriteDefault=False, blockWrite=False):
+  def saveParamState(self, saveName: str=None, paramState: dict=None, **kwargs):
     if saveName is None:
       saveName = self.RECENT_STATE_FNAME
     if paramState is None:
@@ -34,7 +31,7 @@ class AppStateEditor(ParamEditor):
       exportFuncs = self._stateFuncsDf.exportFuncs
       saveOnExitDir = self.saveDir/'saved_on_exit'
       saveOnExitDir.mkdir(exist_ok=True)
-      rets, errs = _safeCallFuncList(legitKeys, exportFuncs, [[saveOnExitDir]]*len(legitKeys))
+      rets, errs = safeCallFuncList(legitKeys, exportFuncs, [[saveOnExitDir]] * len(legitKeys))
       updateDict = {k: ret for k, ret in zip(legitKeys, rets) if ret is not None}
       paramState = dict(Parameters=paramState, **updateDict)
       for editor in FR_SINGLETON.quickLoader.listModel.uniqueEditors:
@@ -48,15 +45,16 @@ class AppStateEditor(ParamEditor):
     else:
       errs = []
 
-    ret = super().saveParamState(saveName, paramState, allowOverwriteDefault, blockWrite)
+    ret = super().saveParamState(saveName, paramState, **kwargs)
     self.raiseErrMsgIfNeeded(errs)
     return ret
 
   def loadParamState(self, stateName: Union[str, Path]=None, stateDict: dict = None,
-                     addChildren=False, removeChildren=False, applyChanges=True,
-                     overrideDict: dict=None):
+                     overrideDict: dict=None, **kwargs):
     if stateName is None:
       stateName = self.RECENT_STATE_FNAME
+    if not stateName.exists() and stateDict is None:
+      stateDict = {}
     if isinstance(stateDict, str):
       stateDict = {'quickloader': stateDict}
     stateDict = self._parseStateDict(stateName, stateDict)
@@ -68,12 +66,11 @@ class AppStateEditor(ParamEditor):
     importFuncs = self._stateFuncsDf.loc[legitKeys, 'importFuncs']
     args = []
     for k in legitKeys:
-      args.append((stateDict.pop(k),))
-    _, errs = _safeCallFuncList(legitKeys, importFuncs, args)
-    if len(np.setdiff1d(stateDictKeys, legitKeys)) > 0:
-      FR_SINGLETON.quickLoader.buildFromUserProfile(stateDict)
-    ret = super().loadParamState(stateName, paramDict, addChildren, removeChildren,
-                                 applyChanges)
+      args.append((stateDict.pop(k, None),))
+    _, errs = safeCallFuncList(legitKeys, importFuncs, args)
+    if len(np.setdiff1d(stateDict.keys(), legitKeys)) > 0:
+      FR_SINGLETON.quickLoader.buildFromStartupParams(stateDict)
+    ret = super().loadParamState(stateName, paramDict, **kwargs)
     return ret
 
   @staticmethod

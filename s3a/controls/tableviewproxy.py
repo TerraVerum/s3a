@@ -1,18 +1,16 @@
-from functools import wraps
-from typing import Union
+from typing import Union, Sequence
 from warnings import warn
 
 import numpy as np
-from pandas import DataFrame as df
 import pyqtgraph as pg
+from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui
 
-from s3a import FR_SINGLETON
-from s3a.generalutils import cornersToFullBoundary
+from s3a import FR_SINGLETON, RunOpts
+from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
 from s3a.models.tablemodel import ComponentMgr
-from s3a.constants import FR_CONSTS, REQD_TBL_FIELDS, FR_ENUMS
-from s3a.processing import AtomicProcess
-from s3a.structures import XYVertices, FRParam, ParamEditorError, S3AWarning, \
+from s3a.parameditors import EditorPropsMixin
+from s3a.structures import XYVertices, PrjParam, S3AWarning, \
   ComplexXYVertices
 from s3a.structures.typeoverloads import OneDArr
 from s3a.views import tableview
@@ -31,7 +29,7 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
     super().__init__(parent)
     self.setSourceModel(compMgr)
     # TODO: Move code for filtering into the proxy too. It will be more efficient and
-    #  easier to generalize than the current solution in FRCompDisplayFilter.
+    #  easier to generalize than the current solution in CompDisplayFilter.
 
 
   def sort(self, column: int, order: QtCore.Qt.SortOrder=...) -> None:
@@ -52,14 +50,15 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
       # If that doesn't work, default to stringified comparison
       return str(leftObj) < str(rightObj)
 
-@FR_SINGLETON.registerGroup(FR_CONSTS.CLS_MAIN_IMG_AREA)
-class CompDisplayFilter(QtCore.QObject):
+class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
   sigCompsSelected = Signal(object)
+
+  __groupingName__ = 'Main Image Area'
 
   @classmethod
   def __initEditorParams__(cls):
     cls.pltClickBehav: str = FR_SINGLETON.generalProps.registerProp(
-      cls, FR_CONSTS.PROP_COMP_SEL_BHV)
+      PRJ_CONSTS.PROP_COMP_SEL_BHV)
 
   def __init__(self, compMgr: ComponentMgr, mainImg: MainImage,
                compTbl: tableview.CompTableView, parent=None):
@@ -69,12 +68,22 @@ class CompDisplayFilter(QtCore.QObject):
     self._filter = filterEditor
     self._compTbl = compTbl
     self._compMgr = compMgr
-
     self.regionPlot = MultiRegionPlot()
     self.displayedIds = np.array([], dtype=int)
     self.selectedIds = np.array([], dtype=int)
+    self.labelCol = REQD_TBL_FIELDS.INST_ID
+    self.updateLabelCol()
 
     self.regionCopier = mainImg.regionCopier
+
+    with FR_SINGLETON.colorScheme.setBaseRegisterPath(self.regionPlot.__groupingName__):
+      proc, argsParam = FR_SINGLETON.colorScheme.registerFunc(
+        self.updateLabelCol, runOpts=RunOpts.ON_CHANGED, returnParam=True, nest=False)
+    def updateLblList():
+      fields = FR_SINGLETON.tableData.allFields
+      # TODO: Filter out non-viable field types
+      argsParam.child('labelCol').setLimits([f.name for f in fields])
+    FR_SINGLETON.tableData.sigCfgUpdated.connect(updateLblList)
 
     # Attach to UI signals
     def _maybeRedraw():
@@ -86,7 +95,6 @@ class CompDisplayFilter(QtCore.QObject):
         self.redrawComps()
     self._filter.sigParamStateUpdated.connect(_maybeRedraw)
 
-    mainImg.sigSelectionBoundsMade.connect(self._reflectSelectionBoundsMade)
     self.regionCopier.sigCopyStarted.connect(lambda *args: self.activateRegionCopier())
     self.regionCopier.sigCopyStopped.connect(lambda *args: self.finishRegionCopier())
 
@@ -98,6 +106,20 @@ class CompDisplayFilter(QtCore.QObject):
     mainImg.addItem(self.regionCopier)
 
     # self.filterableCols = self.findFilterableCols()
+
+  def updateLabelCol(self, labelCol=REQD_TBL_FIELDS.INST_ID.name):
+    """
+    Changes the data column used to label (color) the region plot data
+    :param labelCol:
+      helpText: New column to use
+      title: Labeling Column
+      pType: list
+    """
+    self.labelCol = FR_SINGLETON.tableData.fieldFromName(labelCol)
+    newLblData = self.labelCol.toNumeric(self._compMgr.compDf[self.labelCol], rescale=True)
+
+    self.regionPlot.regionData[PRJ_ENUMS.FIELD_LABEL] = newLblData
+    self.regionPlot.updateColors()
 
   def redrawComps(self, idLists=None):
     # Following mix of cases are possible:
@@ -111,7 +133,6 @@ class CompDisplayFilter(QtCore.QObject):
     # Update and add changed/new components
     # TODO: Find out why this isn't working. For now, just reset the whole comp list
     #  each time components are changed, since the overhead isn't too terrible.
-    regCols = (REQD_TBL_FIELDS.VERTICES,REQD_TBL_FIELDS.COMP_CLASS)
     # changedIds = np.concatenate((idLists['added'], idLists['changed']))
     # self._regionPlots[changedIds, regCols] = compDf.loc[changedIds, compCols]
 
@@ -128,7 +149,7 @@ class CompDisplayFilter(QtCore.QObject):
     # Remove all IDs that aren't displayed
     # FIXME: This isn't working correctly at the moment
     # self._regionPlots.drop(np.setdiff1d(self._regionPlots.data.index, self._displayedIds))
-    self.regionPlot.resetRegionList(compDf.loc[self.displayedIds, regCols])
+    self.regionPlot.resetRegionList(compDf.loc[self.displayedIds], lblField=self.labelCol)
     # noinspection PyTypeChecker
     # self._reflectTableSelectionChange(np.intersect1d(self.displayedIds, self.selectedIds))
 
@@ -138,6 +159,7 @@ class CompDisplayFilter(QtCore.QObject):
       xpondingIdx = model.mapFromSource(self._compMgr.index(rowId,0)).row()
       self._compTbl.showRow(xpondingIdx)
 
+  @FR_SINGLETON.actionStack.undoable('Split Components', asGroup=True)
   def splitSelectedComps(self):
     """Makes a separate component for each distinct boundary of all selected components"""
     selection = self._compTbl.ids_rows_colsFromSelection(excludeNoEditCols=False,
@@ -147,6 +169,7 @@ class CompDisplayFilter(QtCore.QObject):
     changes = self._compMgr.splitCompVertsById(np.unique(selection[:,0]))
     self.selectRowsById(changes['added'], QISM.ClearAndSelect)
 
+  @FR_SINGLETON.actionStack.undoable('Merge Components', asGroup=True)
   def mergeSelectedComps(self, keepId=-1):
     """
     Merges the selected components into one, keeping all properties of the first in the selection
@@ -175,51 +198,33 @@ class CompDisplayFilter(QtCore.QObject):
   def _reflectTableSelectionChange(self, selectedIds: OneDArr):
     self.selectedIds = selectedIds
     self.regionPlot.selectById(selectedIds)
-    selectedComps = self._compMgr.compDf.loc[selectedIds, :]
+    selectedComps = self._compMgr.compDf.loc[selectedIds]
     self.sigCompsSelected.emit(selectedComps)
-    self.scaleViewboxToSelectedIds()
 
-  def scaleViewboxToSelectedIds(self, selectedIds: OneDArr=None, onlyGrow=None,
-                                padding: int=None):
+  def scaleViewboxToSelectedIds(self, selectedIds: OneDArr=None, padding: int=None):
     """
     Rescales the main image viewbox to encompass the selection
 
     :param selectedIds: Ids to scale to. If *None*, this is the current selection
-    :param onlyGrow: If *True*, the viewbox will never shrink to the selection.
-      If *None*, the value is determined from the parameter editor.
-    :param padding: Padding around the selection. If *None*, defaults to pad value
-      in param editor.
+    :param padding: Padding around the selection. If *None*, defaults to
+      pyqtgraph padding behavior
     """
-    if onlyGrow is None:
-      onlyGrow = self._mainImgArea.onlyGrowViewbox
-    if padding is None:
-      if onlyGrow:
-        padding = 0
-      else:
-        padding = self._mainImgArea.compCropMargin
-        if self._mainImgArea.treatMarginAsPct:
-          padding = int(max(self._mainImgArea.image.shape[:2])*padding/100)
     if selectedIds is None:
       selectedIds = self.selectedIds
     if len(selectedIds) == 0: return
     # Calculate how big the viewbox needs to be
     selectedVerts = self._compMgr.compDf.loc[selectedIds, REQD_TBL_FIELDS.VERTICES]
     allVerts = np.vstack([v.stack() for v in selectedVerts])
-    mins = allVerts.min(0) - padding//2
-    maxs = allVerts.max(0) + padding//2
+    mins = allVerts.min(0)
+    maxs = allVerts.max(0)
+    if padding is not None:
+      mins -= padding//2
+      maxs += padding//2
     vb: pg.ViewBox = self._mainImgArea.getViewBox()
-    curXRange = vb.state['viewRange'][0]
-    curYRange = vb.state['viewRange'][1]
-    if onlyGrow:
-      mins[0] = np.min(curXRange + [mins[0]])
-      maxs[0] = np.max(curXRange + [maxs[0]])
-      mins[1] = np.min(curYRange + [mins[1]])
-      maxs[1] = np.max(curYRange + [maxs[1]])
     viewRect = QtCore.QRectF(*mins, *(maxs - mins))
-    vb.setRange(viewRect, padding=0)
+    vb.setRange(viewRect, padding=padding)
 
-
-  def selectRowsById(self, ids: OneDArr,
+  def selectRowsById(self, ids: Sequence[int],
                      selectionMode=QISM.Rows|QISM.ClearAndSelect,
                      onlyEditableRetList=True):
     selectionModel = self._compTbl.selectionModel()
@@ -232,7 +237,6 @@ class CompDisplayFilter(QtCore.QObject):
       selectedCols = self._compMgr.editColIdxs
     else:
       selectedCols = np.arange(len(self._compMgr.colTitles))
-    numCols = len(self._compMgr.colTitles)
     for curId in ids:
       idRow = np.nonzero(self._compMgr.compDf.index == curId)[0][0]
       # Map this ID to its sorted position in the list
@@ -252,11 +256,12 @@ class CompDisplayFilter(QtCore.QObject):
     #   self.selectedIds = np.concatenate([self.selectedIds, ids])
 
 
-  def _reflectSelectionBoundsMade(self, selection: Union[OneDArr, XYVertices]):
+  def reflectSelectionBoundsMade(self, selection: Union[OneDArr, XYVertices]):
     """
     :param selection: bounding box of user selection: [xmin ymin; xmax ymax]
     """
     # If min and max are the same, just check for points at mouse position
+    if selection.size == 0: return
     if len(selection) == 1 or np.abs(selection[0] - selection[1]).sum() < 0.01:
       qtPoint = QtCore.QPointF(*selection[0])
       selectedSpots = self.regionPlot.pointsAt(qtPoint, self.pltClickBehav=='Boundary Only')
@@ -281,8 +286,8 @@ class CompDisplayFilter(QtCore.QObject):
   def _populateDisplayedIds(self):
     curComps = self._compMgr.compDf.copy()
     for fieldName, opts in self._filter.activeFilters.items():
-      frParam = FR_SINGLETON.tableData.fieldFromName(fieldName)
-      curComps = self.filterByParamType(curComps, frParam, opts)
+      prjParam = FR_SINGLETON.tableData.fieldFromName(fieldName)
+      curComps = self.filterByParamType(curComps, prjParam, opts)
 
     # Give self the id list of surviving comps
     self.displayedIds = curComps[REQD_TBL_FIELDS.INST_ID]
@@ -315,11 +320,11 @@ class CompDisplayFilter(QtCore.QObject):
       newComps.at[idx, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices(newVerts)
     # truncatedCompIds = np.unique(truncatedCompIds)
     if self.regionCopier.inCopyMode:
-      self._mainImgArea.sigCompsCreated.emit(newComps)
+      self._compMgr.addComps(newComps)
       self.activateRegionCopier(self.regionCopier.regionIds)
     else: # Move mode
       self.regionCopier.erase()
-      self._compMgr.addComps(newComps, FR_ENUMS.COMP_ADD_AS_MERGE)
+      self._compMgr.addComps(newComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
     # if len(truncatedCompIds) > 0:
     #   warn(f'Some regions extended beyond image dimensions. Boundaries for the following'
     #        f' components were altered: {truncatedCompIds}', S3AWarning)
@@ -343,7 +348,7 @@ class CompDisplayFilter(QtCore.QObject):
   #          S3AWarning)
   #   return filterableCols
 
-  def filterByParamType(self, compDf: df, column: FRParam, filterOpts: dict):
+  def filterByParamType(self, compDf: df, column: PrjParam, filterOpts: dict):
     # TODO: Each type should probably know how to filter itself. That is,
     #  find some way of keeping this logic from just being an if/else tree...
     pType = column.pType
@@ -353,7 +358,7 @@ class CompDisplayFilter(QtCore.QObject):
     if pType in ['int', 'float']:
       curmin, curmax = [filterOpts[name]['value'] for name in ['min', 'max']]
 
-      compDf = compDf.loc[(dfAtParam >= curmin) & (dfAtParam <= curmax),:]
+      compDf = compDf.loc[(dfAtParam >= curmin) & (dfAtParam <= curmax)]
     elif pType == 'bool':
       filterOpts = filterOpts['Options']['children']
       allowTrue, allowFalse = [filterOpts[name]['value'] for name in
@@ -361,14 +366,14 @@ class CompDisplayFilter(QtCore.QObject):
 
       validList = np.array(dfAtParam, dtype=bool)
       if not allowTrue:
-        compDf = compDf.loc[~validList, :]
+        compDf = compDf.loc[~validList]
       if not allowFalse:
-        compDf = compDf.loc[validList, :]
-    elif pType in ['FRParam', 'list', 'popuplineeditor']:
+        compDf = compDf.loc[validList]
+    elif pType in ['PrjParam', 'list', 'popuplineeditor']:
       existingParams = np.array(dfAtParam)
       allowedParams = []
       filterOpts = filterOpts['Options']['children']
-      if pType == 'FRParam':
+      if pType == 'PrjParam':
         groupSubParams = [p.name for p in column.value.group]
       else:
         groupSubParams = column.opts['limits']
@@ -376,11 +381,11 @@ class CompDisplayFilter(QtCore.QObject):
         isAllowed = filterOpts[groupSubParam]['value']
         if isAllowed:
           allowedParams.append(groupSubParam)
-      compDf = compDf.loc[np.isin(existingParams, allowedParams),:]
+      compDf = compDf.loc[np.isin(existingParams, allowedParams)]
     elif pType in ['str', 'text']:
       allowedRegex = filterOpts['Regex Value']['value']
       isCompAllowed = dfAtParam.str.contains(allowedRegex, regex=True, case=False)
-      compDf = compDf.loc[isCompAllowed,:]
+      compDf = compDf.loc[isCompAllowed]
     elif pType == 'ComplexXYVertices':
       vertsAllowed = np.ones(len(dfAtParam), dtype=bool)
 
@@ -394,7 +399,7 @@ class CompDisplayFilter(QtCore.QObject):
         isAllowed = np.all((xVerts >= xmin) & (xVerts <= xmax)) & \
                     np.all((yVerts >= ymin) & (yVerts <= ymax))
         vertsAllowed[vertIdx] = isAllowed
-      compDf = compDf.loc[vertsAllowed,:]
+      compDf = compDf.loc[vertsAllowed]
     else:
       warn('No filter type exists for parameters of type ' f'{pType}.'
            f' Did not filter column {column.name}.',

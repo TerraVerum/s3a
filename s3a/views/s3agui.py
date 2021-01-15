@@ -1,6 +1,7 @@
 import warnings
+from collections import defaultdict
 from pathlib import Path
-from typing import Union
+from typing import Union, Dict, List
 
 import numpy as np
 import pyqtgraph as pg
@@ -8,48 +9,41 @@ import qdarkstyle
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
-import s3a.plugins.tablefield
-from s3a import RunOpts
-from s3a.constants import FR_ENUMS
-from s3a.constants import LAYOUTS_DIR, FR_CONSTS as FRC, REQD_TBL_FIELDS
+from s3a import RunOpts, PrjParam
+from s3a.constants import PRJ_ENUMS
+from s3a.constants import LAYOUTS_DIR, REQD_TBL_FIELDS
 from s3a.generalutils import attemptFileLoad
-from s3a.graphicsutils import create_addMenuAct, makeExceptionsShowDialogs, \
-  popupFilePicker, \
-  disableAppDuringFunc, saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
+from s3a.graphicsutils import makeExceptionsShowDialogs, popupFilePicker, \
+  saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
   restoreExceptionBehavior, menuFromEditorActions
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import ParamEditor, FR_SINGLETON
-from s3a.plugins.base import ParamEditorPlugin, dummyPluginFactory
-from s3a.plugins.misc import RandomToolsPlugin, MainImagePlugin, CompTablePlugin
+from s3a.plugins.base import ParamEditorPlugin
 from s3a.plugins.file import FilePlugin
+from s3a.plugins.misc import RandomToolsPlugin, MainImagePlugin, CompTablePlugin
 from s3a.structures import S3AWarning, XYVertices, FilePath, NChanImg
-from s3a.views.buttons import ButtonCollection
 
 __all__ = ['S3A']
 
 _MENU_PLUGINS = [RandomToolsPlugin]
 
-@FR_SINGLETON.registerGroup(FRC.CLS_ANNOTATOR)
 class S3A(S3ABase):
   sigLayoutSaved = QtCore.Signal()
   S3A_INST = None
+
+  __groupingName__ = 'Application'
 
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
     cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Main Window')
 
-  def __init__(self, parent=None, guiMode=True, loadLastState=None,
-               **quickLoaderArgs):
+  def __init__(self, parent=None, guiMode=True, loadLastState=False,
+               **startupSettings):
     # Wait to import quick loader profiles until after self initialization so
     # customized loading functions also get called
-    superLoaderArgs = {'author': quickLoaderArgs.pop('author', None)}
+    superLoaderArgs = {'author': startupSettings.pop('author', None)}
     super().__init__(parent, **superLoaderArgs)
-    for func, param in zip(
-        [self.estimateBoundaries_gui, self.clearBoundaries, self.exportAnnotations_gui],
-        [FRC.TOOL_ESTIMATE_BOUNDARIES, FRC.TOOL_CLEAR_BOUNDARIES, FRC.TOOL_EXPORT_COMP_LIST]):
-      param.opts['ownerObj'] = self
-      self.toolsEditor.registerFunc(func, btnOpts=param)
     if guiMode:
       warnings.simplefilter('error', S3AWarning)
       makeExceptionsShowDialogs(self)
@@ -72,66 +66,36 @@ class S3A(S3ABase):
     self._buildMenu()
     self._hookupSignals()
 
-    self.focusedImg.sigPluginChanged.connect(lambda: self.updateFocusedToolsGrp())
-    # TODO: Config option for which plugin to load by default?
-    self.focusedImg.changeCurrentPlugin(FR_SINGLETON.clsToPluginMapping[
-                                          s3a.plugins.tablefield.VerticesPlugin])
-
     # Load layout options
     self.saveLayout('Default', allowOverwriteDefault=True)
-
-    if len(quickLoaderArgs) > 0:
-      self.appStateEditor.loadParamState(stateDict=quickLoaderArgs)
-
-    if guiMode:
-      QtCore.QTimer.singleShot(0, lambda: self._maybeLoadLastState_gui(loadLastState, quickLoaderArgs))
-    elif loadLastState:
-      self.loadLastState(quickLoaderArgs)
-    # Needs to be reset if loading last state also added new components, but no user changes
-    # were made
-    self.hasUnsavedChanges = False
+    stateDict = None if loadLastState else {}
+    with pg.BusyCursor():
+      self.appStateEditor.loadParamState(stateDict=stateDict, overrideDict=startupSettings)
 
   def _hookupSignals(self):
-    FR_SINGLETON.colorScheme.registerFunc(self.updateTheme, name=FRC.CLS_ANNOTATOR.name, runOpts=RunOpts.ON_CHANGED)
+    FR_SINGLETON.colorScheme.registerFunc(self.updateTheme, runOpts=RunOpts.ON_CHANGED, nest=False)
     # EDIT
     self.saveAllEditorDefaults()
 
   def _buildGui(self):
-    self.setDockNestingEnabled(True)
+    self.setDockOptions(self.ForceTabbedDocks)
     self.setTabPosition(QtCore.Qt.AllDockWidgetAreas, QtWidgets.QTabWidget.North)
+    centralWidget = QtWidgets.QWidget()
+    self.setCentralWidget(centralWidget)
+    layout = QtWidgets.QVBoxLayout(centralWidget)
+
+    self.toolbarWidgets: Dict[PrjParam, List[QtWidgets.QAction]] = defaultdict(list)
+    layout.addWidget(self.mainImg)
 
     self.tblFieldToolbar.setObjectName('Table Field Plugins')
     self.addToolBar(self.tblFieldToolbar)
-
-    centralwidget = QtWidgets.QWidget(self)
-    self.mainImg.setParent(centralwidget)
-    layout = QtWidgets.QVBoxLayout(centralwidget)
-
-    self.setCentralWidget(centralwidget)
-    layout.addWidget(self.mainImg.drawOptsWidget)
-    layout.addWidget(self.mainImg.toolsGrp)
-    layout.addWidget(self.mainImg)
-
-    focusedImgDock = QtWidgets.QDockWidget('Focused Image Window', self)
-    focusedImgDock.setFeatures(focusedImgDock.DockWidgetMovable|focusedImgDock.DockWidgetFloatable)
-    focusedImgContents = QtWidgets.QWidget(self)
-    self.focusedImg.setParent(focusedImgContents)
-    focusedImgDock.setWidget(focusedImgContents)
-    focusedImgDock.setObjectName('Focused Image Dock')
-    self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, focusedImgDock)
-
-
-    focusedLayout = QtWidgets.QVBoxLayout(focusedImgContents)
-    focusedLayout.addWidget(self.focusedImg.drawOptsWidget)
-    focusedLayout.addWidget(self.focusedImg.toolsGrp)
-    focusedLayout.addWidget(self.curCompIdLbl, 0, QtCore.Qt.AlignHCenter)
-    focusedLayout.addWidget(self.focusedImg)
-    self._focusedLayout = focusedLayout
+    self.generalToolbar.setObjectName('General')
+    self.addToolBar(self.generalToolbar)
 
     _plugins = [FR_SINGLETON.clsToPluginMapping[c] for c in [MainImagePlugin, CompTablePlugin]]
     parents = [self.mainImg, self.compTbl]
     for plugin, parent in zip(_plugins, reversed(parents)):
-      parent.menu.addMenu(menuFromEditorActions([plugin.toolsEditor], plugin.name, menuParent=parent))
+      parent.menu.addMenu(menuFromEditorActions([plugin.toolsEditor], plugin.name, menuParent=parent, nest=False))
 
 
     tableDock = QtWidgets.QDockWidget('Component Table Window', self)
@@ -161,33 +125,15 @@ class S3A(S3ABase):
     self.statBar.addWidget(self.mouseCoords)
     self.statBar.addWidget(self.pxColor)
 
-
-  def changeFocusedComp(self, newComps: df, forceKeepLastChange=False):
+  def changeFocusedComp(self, newComps: df=None, forceKeepLastChange=False):
     ret = super().changeFocusedComp(newComps, forceKeepLastChange)
     self.curCompIdLbl.setText(f'Component ID: {self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]}')
     return ret
-
-  def updateFocusedToolsGrp(self):
-    newPlugin = self.focusedImg.currentPlugin
-    newEditors = [self.focusedImg.toolsEditor]
-    if newPlugin is not None:
-      newEditors.append(newPlugin.toolsEditor)
-    newTools = ButtonCollection.fromToolsEditors(newEditors, self.focusedImg)
-    try:
-      self._focusedLayout.replaceWidget(self.focusedImg.toolsGrp, newTools)
-      self.focusedImg.toolsGrp.deleteLater()
-      self.focusedImg.toolsGrp = newTools
-    except AttributeError:
-      # Fails when window is not yet constructed
-      pass
-    if len(newTools.paramToBtnMapping) == 0:
-      newTools.hide()
 
   def resetTblFields_gui(self):
     outFname = popupFilePicker(None, 'Select Table Config File', 'All Files (*.*);; Config Files (*.yml)')
     if outFname is not None:
       FR_SINGLETON.tableData.loadCfg(outFname)
-      self.resetTblFields()
 
   def _buildMenu(self):
     # TODO: Find a better way of fixing up menu order
@@ -201,7 +147,7 @@ class S3A(S3ABase):
     if dock is None:
       return
     FR_SINGLETON.quickLoader.addDock(dock)
-    self._tabbifyEditorDocks([dock])
+    self.addTabbedDock(QtCore.Qt.RightDockWidgetArea, dock)
 
     if plugin.menu is None:
       # No need to add menu and graphics options
@@ -212,24 +158,22 @@ class S3A(S3ABase):
     self.createMenuOptForPlugin(plugin, parentToolbarOrMenu=parentTb)
 
   def _maybeLoadLastState_gui(self, loadLastState: bool=None,
-                              quickLoaderArgs:dict=None):
+                              startupSettings:dict=None):
     """
     Helper function to determine whether the last application state should be loaded,
     and loads the last state if desired.
     :param loadLastState: If *None*, the user will be prompted via dialog for whether
       to load the last application state. Otherwise, its boolean value is used.
-    :param quickLoaderArgs: Additional dict arguments which if supplied will override
+    :param startupSettings: Additional dict arguments which if supplied will override
       the default options where applicable.
     """
-    if not self.appStateEditor.RECENT_STATE_FNAME.exists():
-      return
     if loadLastState is None:
       loadLastState = QtWidgets.QMessageBox.question(
         self, 'Load Previous State', 'Do you want to load all previous app'
                                      ' settings (image, annotations, algorithms, etc.)?',
         QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No) == QtWidgets.QMessageBox.Yes
     if loadLastState:
-      self.loadLastState_gui(quickLoaderArgs)
+      self.loadLastState_gui(startupSettings)
 
   def loadLayout(self, layoutName: Union[str, Path]):
     layoutName = Path(layoutName)
@@ -268,9 +212,9 @@ class S3A(S3ABase):
   def exportAnnotations_gui(self):
     """Saves the component table to a file"""
     fileFilters = self.compIo.handledIoTypes_fileFilter(**{'*': 'All Files'})
-    outFname = popupFilePicker(None, 'Select Save File', fileFilters, asOpen=False)
+    outFname = popupFilePicker(None, 'Select Save File', fileFilters, existing=False)
     if outFname is not None:
-      super().exportAnnotations(outFname)
+      super().exportCurAnnotation(outFname)
 
   def openAnnotation_gui(self):
     # TODO: See note about exporting comps. Delegate the filepicker activity to importer
@@ -289,25 +233,6 @@ class S3A(S3ABase):
   # ---------------
   # BUTTON CALLBACKS
   # ---------------
-  @disableAppDuringFunc
-  def estimateBoundaries_gui(self):
-    """
-    Estimates component boundaries for the whole image. This is functionally
-    equivalent to using a square ROI over the whole image while selecting *New
-    component for each separate boundary*=True
-    """
-    self.estimateBoundaries()
-
-  def loadLastState_gui(self, quickLoaderArgs: dict=None):
-    with pg.BusyCursor():
-      # TODO: Also show a progress bar, which is the main reason for using a
-      #  separate gui function
-      self.loadLastState(quickLoaderArgs)
-
-  def loadLastState(self, quickLoaderArgs: dict=None):
-    self.appStateEditor.loadParamState(overrideDict=quickLoaderArgs)
-
-
   def closeEvent(self, ev: QtGui.QCloseEvent):
     # Confirm all components have been saved
     shouldExit = False
@@ -335,14 +260,6 @@ class S3A(S3ABase):
     self.hasUnsavedChanges = False
     self.close()
 
-  def _tabbifyEditorDocks(self, docks):
-    dock = None
-    for dock in [FR_SINGLETON.docks[0]] + docks:
-      dock.setParent(self)
-      self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
-    for nextEditor in docks[:-1]:
-      self.tabifyDockWidget(dock, nextEditor)
-
   def createMenuOptForPlugin(self, plugin: ParamEditorPlugin, parentToolbarOrMenu=None):
     if isinstance(parentToolbarOrMenu, QtWidgets.QToolBar):
       btn = QtWidgets.QToolButton()
@@ -356,6 +273,8 @@ class S3A(S3ABase):
     oldShow = plugin.dock.showEvent
     def show_fixDockWidth(ev):
       oldShow(ev)
+      plugin.dock.raise_()
+      plugin.dock.activateWindow()
       if plugin.dock.width() < plugin.dock.biggestMinWidth + 100:
         self.resizeDocks([plugin.dock], [plugin.dock.biggestMinWidth + 100], QtCore.Qt.Horizontal)
     plugin.dock.showEvent = show_fixDockWidth
@@ -394,10 +313,8 @@ class S3A(S3ABase):
     if useDarkTheme:
       style = qdarkstyle.load_stylesheet()
     self.setStyleSheet(style)
-    for opts in self.focusedImg.drawOptsWidget, self.mainImg.drawOptsWidget:
-      opts.horizWidth = opts.layout().minimumSize().width()
 
-  def add_focusComps(self, newComps: df, addType=FR_ENUMS.COMP_ADD_AS_NEW):
+  def add_focusComps(self, newComps: df, addType=PRJ_ENUMS.COMP_ADD_AS_NEW):
     ret = super().add_focusComps(newComps, addType=addType)
     selection = self.compDisplay.selectRowsById(newComps[REQD_TBL_FIELDS.INST_ID])
     if self.isVisible() and self.compTbl.showOnCreate:

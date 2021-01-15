@@ -1,25 +1,31 @@
 from __future__ import annotations
-from typing import Tuple, Collection, Callable, Union, Iterable, Any, Dict, Sequence
+from typing import Tuple, Collection, Callable, Union, Iterable, Any, Dict, Sequence, \
+  List, Optional
 
 from pyqtgraph.Qt import QtWidgets, QtGui, QtCore
+from pyqtgraph.parametertree import Parameter
+from s3a.models.editorbase import params_flattened
 
-from s3a.structures import FRParam
+from s3a.structures import PrjParam
 from s3a import parameditors
 
-__all__ = ['DrawOpts', 'ButtonCollection']
+__all__ = ['ButtonCollection']
 
 class _DEFAULT_OWNER: pass
 """None is a valid owner, so create a sentinel that's not valid"""
-btnCallable = Callable[[FRParam], Any]
+btnCallable = Callable[[PrjParam], Any]
 class ButtonCollection(QtWidgets.QGroupBox):
-  def __init__(self, parent=None, title: str=None, btnParams: Collection[FRParam]=(),
+  def __init__(self, parent=None, title: str=None, btnParams: Collection[PrjParam]=(),
                btnTriggerFns: Union[btnCallable, Collection[btnCallable]]=(),
-               exclusive=True, checkable=True, ownerObj=_DEFAULT_OWNER):
+               exclusive=True, asToolBtn=True,
+               **createOpts):
     super().__init__(parent)
+    self.lastTriggered: Optional[PrjParam] = None
     self.uiLayout = QtWidgets.QHBoxLayout(self)
     self.btnGroup = QtWidgets.QButtonGroup(self)
-    self.paramToFuncMapping: Dict[FRParam, btnCallable] = dict()
-    self.paramToBtnMapping: Dict[FRParam, QtWidgets.QPushButton] = dict()
+    self.paramToFuncMapping: Dict[PrjParam, btnCallable] = dict()
+    self.paramToBtnMapping: Dict[PrjParam, QtWidgets.QPushButton] = dict()
+    self.asToolBtn = asToolBtn
     if title is not None:
       self.setTitle(title)
     self.btnGroup.setExclusive(exclusive)
@@ -27,31 +33,48 @@ class ButtonCollection(QtWidgets.QGroupBox):
     if not isinstance(btnTriggerFns, Iterable):
       btnTriggerFns = [btnTriggerFns]*len(btnParams)
     for param, fn in zip(btnParams, btnTriggerFns):
-      self.create_addBtn(param, fn, checkable, ownerObj)
+      self.create_addBtn(param, fn, **createOpts)
 
-  def create_addBtn(self, btnParam: FRParam, triggerFn: btnCallable, checkable=True,
-                    ownerObj: Union[type, Any]=_DEFAULT_OWNER):
-    if not btnParam.opts.get('guibtn', True):
+  def create_addBtn(self, btnParam: PrjParam, triggerFn: btnCallable, checkable=False, **registerOpts):
+    if btnParam in self.paramToBtnMapping:
+      # Either already exists or wasn't designed to be a button
       return
-    if ownerObj is _DEFAULT_OWNER:
-      ownerObj = self.parent()
-    newBtn = parameditors.FR_SINGLETON.shortcuts.createRegisteredButton(btnParam, ownerObj)
+    registerOpts.setdefault('asToolBtn', self.asToolBtn)
+    newBtn = parameditors.FR_SINGLETON.shortcuts.createRegisteredButton(btnParam, **registerOpts)
     if checkable:
       newBtn.setCheckable(True)
       oldTriggerFn = triggerFn
-      # If the button is chekcable, only call this function when the button is checked
-      def newTriggerFn(param: FRParam):
+      # If the button is checkable, only call this function when the button is checked
+      def newTriggerFn(param: PrjParam):
         if newBtn.isChecked():
           oldTriggerFn(param)
       triggerFn = newTriggerFn
     newBtn.clicked.connect(lambda: self.callFuncByParam(btnParam))
 
-    self.btnGroup.addButton(newBtn)
-    self.uiLayout.addWidget(newBtn)
-    self.paramToFuncMapping[btnParam] = triggerFn
-    self.paramToBtnMapping[btnParam] = newBtn
+    self.addBtn(btnParam, newBtn, triggerFn)
 
-  def callFuncByParam(self, param: FRParam):
+  def clear(self):
+    for button in self.paramToBtnMapping.values():
+      self.btnGroup.removeButton(button)
+      self.uiLayout.removeWidget(button)
+      button.deleteLater()
+
+    self.paramToBtnMapping.clear()
+    self.paramToFuncMapping.clear()
+
+  def addFromExisting(self, other: ButtonCollection, which: Collection[PrjParam]=None):
+    for (param, btn), func in zip(other.paramToBtnMapping.items(), other.paramToFuncMapping.values()):
+      if which is None or param in which:
+        self.addBtn(param, btn, func)
+
+  def addBtn(self, param: PrjParam, btn: QtWidgets.QPushButton, func: btnCallable):
+    self.btnGroup.addButton(btn)
+    self.uiLayout.addWidget(btn)
+    self.paramToFuncMapping[param] = func
+    self.paramToBtnMapping[param] = btn
+
+
+  def callFuncByParam(self, param: PrjParam):
     if param is None:
       return
     # Ensure function is called in the event it requires a button to be checked
@@ -59,65 +82,47 @@ class ButtonCollection(QtWidgets.QGroupBox):
     if btn.isCheckable():
       btn.setChecked(True)
     self.paramToFuncMapping[param](param)
+    self.lastTriggered = param
+
+  def addByParam(self, param: Parameter, copy=True, **registerOpts):
+    """
+    Adds a button to a group based on the parameter. Also works for group params
+    that have an acttion nested.
+    """
+    for param in params_flattened(param):
+      curCopy = copy
+      if 'action' in param.type() and param.opts.get('guibtn', True):
+        existingBtn = None
+        try:
+          existingBtn = next(iter(param.items)).button
+        except (StopIteration, AttributeError):
+          curCopy = True
+        if curCopy:
+          self.create_addBtn(PrjParam(**param.opts), lambda *args: param.activate(), **registerOpts)
+        else:
+          self.addBtn(PrjParam(**param.opts), existingBtn, existingBtn.click)
 
   @classmethod
   def fromToolsEditors(cls,
-                       toolsEditors: Union[parameditors.ParamEditor,
-                       Sequence[parameditors.ParamEditor]],
-                       parent=None):
-    toolParams = []
-    toolFns = []
-    if not isinstance(toolsEditors, Sequence):
-      toolsEditors = [toolsEditors]
-    for toolsEditor in toolsEditors:
-      for param in toolsEditor.params.childs:
-        if 'action' in param.opts['type'] and param.opts.get('guibtn', True):
-          toolParams.append(param.opts['frParam'])
-          toolFns.append(lambda *_args, _param=param: _param.sigActivated.emit(_param))
-    # Don't create shortcuts since this will be done by the tool editor
-    return ButtonCollection(parent, title='Tools', btnParams=toolParams,
-                            btnTriggerFns=toolFns, exclusive=False, checkable=False)
+                       editors: Sequence[parameditors.ParamEditor],
+                       title='Tools',
+                       ownerClctn: ButtonCollection=None,
+                       **registerOpts):
+    if ownerClctn is None:
+      ownerClctn = ButtonCollection(title=title, exclusive=True)
 
-class DrawOpts(QtWidgets.QWidget):
-  def __init__(self, shapeGrp: ButtonCollection, actGrp: ButtonCollection,
-               parent: QtWidgets.QWidget=None):
+    for editor in editors:
+      ownerClctn.addByParam(editor.params, **registerOpts)
+
+    return ownerClctn
+
+  def toolbarFormat(self):
     """
-    Creates a draw options widget hosting both shape and action selection buttons.
-    :param parent: UI widget whose destruction will also destroy these widgets
-    :param shapeGrp: Shape options that will appear in the widget
-    :param actGrp: Action optiosn that will appear in the widget
+    Returns a list of buttons + title in a format that's easier to add to a toolbar, e.g.
+    doesn't require as much horizontal space
     """
-    super().__init__(parent)
-    # Create 2 layout versions so on resize the group boxes can 'wrap'
-    self.topLayout = QtWidgets.QHBoxLayout()
-    self.setLayout(self.topLayout)
-
-    # SHAPES
-
-    self.topLayout.addWidget(shapeGrp)
-    # ACTIONS
-    self.topLayout.addWidget(actGrp)
-    self.topLayout.setDirection(self.topLayout.LeftToRight)
-    self.horizWidth = self.layout().minimumSize().width()
-
-  def resizeEvent(self, ev: QtGui.QResizeEvent) -> None:
-    if self.width() < self.horizWidth + 30:
-      self.topLayout.setDirection(self.topLayout.TopToBottom)
-    else:
-      self.topLayout.setDirection(self.topLayout.LeftToRight)
-    super().resizeEvent(ev)
-
-  def selectOpt(self, shapeOrAction: FRParam):
-    """
-    Programmatically selects a shape or action from the existing button group.
-    Whether a shape or action is passed in is inferred from which button group
-    :param:`shapeOrAction` belongs to
-
-    :param shapeOrAction: The button to select
-    :return: None
-    """
-    # TODO: This should probably be more robust
-    if shapeOrAction in self.shapeBtnParamMap.inverse:
-      self.shapeBtnParamMap.inverse[shapeOrAction].setChecked(True)
-    elif shapeOrAction in self.actionBtnParamMap.inverse:
-      self.actionBtnParamMap.inverse[shapeOrAction].setChecked(True)
+    title = self.title()
+    out: List[QtWidgets.QWidget] = [] if title is None else [QtWidgets.QLabel(self.title())]
+    for btn in self.paramToBtnMapping.values():
+      out.append(btn)
+    return out

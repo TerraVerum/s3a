@@ -1,20 +1,20 @@
 from __future__ import annotations
 
-from abc import ABC
 from typing import Optional, Callable, Sequence, Union
 
 import pandas as pd
 from pyqtgraph.Qt import QtWidgets
 
-from s3a import models
 from s3a import parameditors as pe
-from s3a.structures import NChanImg, XYVertices, FRParam, S3AException
-from ..generalutils import frParamToPgParamDict
+from s3a.constants import PRJ_CONSTS
+from s3a.parameditors import singleton
+from s3a.structures import PrjParam, S3AException, AlgProcessorError
 from ..graphicsutils import create_addMenuAct, paramWindow
-from ..processing import ImgProcWrapper
+from ..parameditors import EditorPropsMixin
+from ..processing import GeneralProcWrapper
 
 
-class ParamEditorPlugin(ABC):
+class ParamEditorPlugin(EditorPropsMixin):
   """
   Primitive plugin which can interface with S3A functionality. When this class is overloaded,
   the child class is given a reference to the main S3A window and S3A is made aware of the
@@ -35,7 +35,7 @@ class ParamEditorPlugin(ABC):
   """
   Docks that should be shown in S3A's menu bar. By default, just the toolsEditor is shown.
   If multiple param editors must be visible, manually set this property to a
-  :class:`FRParamEditorDockGrouping` as performed in :class:`XYVerticesPlugin`.
+  :class:`PrjParamEditorDockGrouping` as performed in :class:`XYVerticesPlugin`.
   """
   toolsEditor: pe.ParamEditor
   """Param Editor window which holds user-editable properties exposed by the programmer"""
@@ -43,7 +43,7 @@ class ParamEditorPlugin(ABC):
   _showFuncDetails=False
   """If *True*, a menu option will be added to edit parameters for functions that need them"""
 
-  win: QtWidgets.QMainWindow=None
+  win = None
   """Reference to the application main window"""
 
   @property
@@ -71,8 +71,8 @@ class ParamEditorPlugin(ABC):
     """
     :param func: Function to register
     :param submenuName: If provided, this function is placed under a breakout menu with this name
-    :param kwargs: Forwarded to `ParamEditor.registerFunc`
     :param editor: If provided, the function is registered here instead of the plugin's tool editor
+    :param kwargs: Forwarded to `ParamEditor.registerFunc`
     """
     if editor is None:
       editor = self.toolsEditor
@@ -89,42 +89,42 @@ class ParamEditorPlugin(ABC):
         editor.params.addChild(dict(name=submenuName, type='group'))
     else:
       parentMenu = self.menu
-    opts = kwargs.get('btnOpts', {})
-    if isinstance(opts, FRParam): opts = frParamToPgParamDict(opts)
-    kwargs.setdefault('ownerObj', self)
 
+    shcValue = None
+    opts = None
+    if 'btnOpts' in kwargs:
+      opts = PrjParam(**kwargs['btnOpts'])
+      opts.opts.setdefault('ownerObj', self)
+      kwargs.setdefault('name', opts.name)
+      kwargs['btnOpts'] = opts
+      shcValue = opts.value
     proc = editor.registerFunc(func, **kwargs)
+    act = parentMenu.addAction(proc.name)
+    # TableFieldPlugins have their actions added to the GUI
+    if shcValue and not isinstance(self, TableFieldPlugin):
+      singleton.FR_SINGLETON.shortcuts.registerAction(opts, act,
+                                                          namePath=(self.__groupingName__,))
 
-    if opts.get('guibtn', True):
-      if 'name' in kwargs:
-        actName = kwargs['name']
-      elif 'name' in opts:
-        actName = opts['name']
-      else:
-        actName = proc.name
-      act = parentMenu.addAction(actName)
-      act.triggered.connect(lambda: proc(win=self.win))
+    act.triggered.connect(lambda: proc(win=self.win))
     return proc
 
-  def registerPopoutFuncs(self, funcList: Sequence[Callable], nameList: Sequence[str]=None, groupName:str=None, btnOpts: FRParam=None):
+  def registerPopoutFuncs(self, funcList: Sequence[Callable], nameList: Sequence[str]=None, groupName:str=None, btnOpts: PrjParam=None):
     # TODO: I really don't like this. Consider any refactoring option that doesn't
     #   have an import inside a function
-    from s3a import FR_SINGLETON
     if groupName is None and btnOpts is None:
       raise S3AException('Must provide either group name or button options')
     if groupName is None:
       groupName = btnOpts.name
     act = self.menu.addAction(groupName, lambda: paramWindow(self.toolsEditor.params.child(groupName)))
-    act.clicked = act.triggered
-    FR_SINGLETON.shortcuts.createRegisteredButton(btnOpts, self, baseBtn=act)
+    singleton.FR_SINGLETON.shortcuts.registerAction(btnOpts, namePath=(self.__groupingName__,), action=act)
     if nameList is None:
       nameList = [None]*len(funcList)
     for title, func in zip(nameList, funcList):
-      self.toolsEditor.registerFunc(func, name=title, paramPath=(groupName,))
+      self.toolsEditor.registerFunc(func, name=title, namePath=(groupName,))
     self.menu.addSeparator()
 
 
-  def attachWinRef(self, win: QtWidgets.QMainWindow):
+  def attachWinRef(self, win):
     self.win = win
     self.menu.setParent(self.parentMenu, self.menu.windowFlags())
 
@@ -141,20 +141,23 @@ def dummyPluginFactory(name_: str=None, editors: Sequence[pe.ParamEditor]=None):
   return DummyPlugin
 
 
-class TableFieldPlugin(ParamEditorPlugin):
-  """
-  Primary method for providing algorithmic refinement of table field data. For
-  instance, the :class:`XYVerticesPlugin` class can refine initial bounding
-  box estimates of component vertices using custom image processing algorithms.
-  """
-
-  procCollection: pe.algcollection.AlgParamEditor= None
+class ProcessorPlugin(ParamEditorPlugin):
+  procCollection: pe.algcollection.AlgParamEditor = None
   """
   Most table field plugins will use some sort of processor to infer field data.
   This property holds spawned collections. See :class:`XYVerticesPlugin` for
   an example.
   """
 
+  @property
+  def curProcessor(self):
+    return self.procCollection.curProcessor
+
+  @curProcessor.setter
+  def curProcessor(self, newProcessor: Union[str, GeneralProcWrapper]):
+    self.procCollection.switchActiveProcessor(newProcessor)
+
+class TableFieldPlugin(ProcessorPlugin):
   focusedImg = None
   """
   Holds a reference to the focused image and set when the s3a reference is set. This
@@ -168,36 +171,29 @@ class TableFieldPlugin(ParamEditorPlugin):
   def parentMenu(self):
     return self.win.tblFieldToolbar
 
-  def __init__(self):
-    super().__init__()
-    def activate():
-      self.focusedImg.changeCurrentPlugin(self)
-    self.registerFunc(activate, btnOpts={'guibtn':False})
-
-  def attachWinRef(self, win: models.s3abase.S3ABase):
+  def attachWinRef(self, win):
     super().attachWinRef(win)
     self.focusedImg = focusedImg = win.focusedImg
     win.sigRegionAccepted.connect(self.acceptChanges)
-    focusedImg.sigUpdatedAll.connect(self.updateAll)
+    focusedImg.sigUpdatedFocusedComp.connect(self.updateFocusedComp)
+    self.active = True
+    self.registerFunc(self.processorAnalytics, btnOpts=PRJ_CONSTS.TOOL_PROC_ANALYTICS)
 
-    def maybeHandleShapeFinished(roiVerts):
-      if self.active:
-        self.handleShapeFinished(roiVerts)
-    focusedImg.sigShapeFinished.connect(maybeHandleShapeFinished)
+  def processorAnalytics(self):
+    proc = self.curProcessor
+    try:
+      proc.processor.stageSummary_gui()
+    except NotImplementedError:
+      raise AlgProcessorError(f'Processor type {type(proc)} does not implement'
+                              f' summary analytics.')
 
-  def updateAll(self, mainImg: Optional[NChanImg], newComp: Optional[pd.Series] = None):
+
+  def updateFocusedComp(self, newComp: pd.Series = None):
     """
     This function is called when a new component is created or the focused image is updated
-    from the main view. See :meth:`FocusedImage.updateAll` for parameters.
+    from the main view. See :meth:`MainImage.updateFocusedComp` for parameters.
     """
-    raise NotImplementedError
-
-  def handleShapeFinished(self, roiVerts: XYVertices):
-    """
-    Called whenever a user completes a shape in the focused image. See
-    :meth:`FocusedImage.handleShapeFinished` for parameters.
-    """
-    raise NotImplementedError
+    pass
 
   def acceptChanges(self):
     """
@@ -227,10 +223,3 @@ class TableFieldPlugin(ParamEditorPlugin):
 
   def _onDeactivate(self):
     """Overloaded by plugin classes to tear down when the plugin is no longer in use"""
-
-  @property
-  def curProcessor(self):
-    return self.procCollection.curProcessor
-  @curProcessor.setter
-  def curProcessor(self, newProcessor: Union[str, ImgProcWrapper]):
-    self.procCollection.switchActiveProcessor(newProcessor)

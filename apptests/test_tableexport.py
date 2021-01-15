@@ -8,13 +8,13 @@ from s3a.generalutils import augmentException
 from s3a import ComponentIO
 from s3a.structures import S3AIOError
 
-
+@pytest.mark.withcomps
 def test_normal_export(sampleComps, tmp_path, app):
   io = app.compIo
   io.exportOnlyVis = False
   for ftype in io.handledIoTypes:
     curPath = tmp_path / f'normalExport - All IDs.{ftype}'
-    doAndAssertExport(app, curPath, io, sampleComps.copy(), 'Normal export with all IDs not successful.')
+    doAndAssertExport(app, curPath, io, app.exportableDf, 'Normal export with all IDs not successful.')
 
 @pytest.mark.withcomps
 def test_filter_export(tmp_path, monkeypatch, app):
