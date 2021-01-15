@@ -36,56 +36,53 @@ def roiFactory(app):
 
 @pytest.mark.withcomps
 def test_update(app, mgr, vertsPlugin):
-  fImg = app.focusedImg
-  oldPlugin = fImg.currentPlugin
-  fImg.changeCurrentPlugin(vertsPlugin)
-  assert fImg.image is None
+  mImg = app.focusedImg
   focusedId = NUM_COMPS-1
   newCompSer = mgr.compDf.loc[focusedId]
   # Action 1
-  fImg.updateFocusedComp(newCompSer)
-  assert fImg.image is not None
-  assert fImg.compSer.equals(newCompSer)
-  assert np.array_equal(fImg.bbox[1,:] - fImg.bbox[0,:], fImg.image.shape[:2][::-1])
+  mImg.updateFocusedComp(newCompSer)
+  assert mImg.compSer.equals(newCompSer)
 
   # Action 2
   newerSer = mgr.compDf.loc[0]
-  fImg.updateFocusedComp(newerSer)
+  mImg.updateFocusedComp(newerSer)
 
   FR_SINGLETON.actionStack.undo()
-  assert fImg.compSer.equals(newCompSer)
+  assert mImg.compSer.equals(newCompSer)
   FR_SINGLETON.actionStack.undo()
-  assert fImg.image is None
-
+  assert mImg.compSer[REQD_TBL_FIELDS.INST_ID] == -1
   FR_SINGLETON.actionStack.redo()
-  assert fImg.compSer.equals(newCompSer)
+  assert mImg.compSer.equals(newCompSer)
   FR_SINGLETON.actionStack.redo()
-  assert fImg.compSer.equals(newerSer)
-  fImg.changeCurrentPlugin(oldPlugin)
+  assert mImg.compSer.equals(newerSer)
 
 def test_region_modify(sampleComps, app, mgr, vertsPlugin):
-  fImg = app.focusedImg
+  mImg = app.focusedImg
   app.add_focusComps(sampleComps)
-  shapeBnds = fImg.image.shape[:2]
+  shapeBnds = mImg.image.shape[:2]
   reach = np.min(shapeBnds)
   oldData = vertsPlugin.region.regionData
-  fImg.shapeCollection.curShapeParam = PRJ_CONSTS.DRAW_SHAPE_POLY
-  fImg.drawAction = PRJ_CONSTS.DRAW_ACT_ADD
+  mImg.shapeCollection.curShapeParam = PRJ_CONSTS.DRAW_SHAPE_POLY
+  mImg.drawAction = PRJ_CONSTS.DRAW_ACT_ADD
   imsum = lambda: vertsPlugin.region.toGrayImg(shapeBnds).sum()
 
   # 1st action
-  vertsPlugin.updateRegionFromDf(None)
-  # assert imsum() == 0
+  app.focusedImg.updateFocusedComp(None)
+  assert imsum() == 0
 
   newVerts = XYVertices([[5,5], [reach, reach], [reach, 5], [5,5]])
   cplxVerts = ComplexXYVertices([newVerts])
-  newMask = cplxVerts.toMask(shapeBnds, asBool=False, fillColor=fImg.classIdx+1)
+  newMask = cplxVerts.toMask(shapeBnds, asBool=False) > 0
 
   # 2nd action
-  fImg.handleShapeFinished(newVerts)
-  assert np.array_equal(vertsPlugin.region.toGrayImg(shapeBnds), newMask)
+  app.mainImg.updateFocusedComp(sampleComps.iloc[-1])
+  mImg.shapeCollection.sigShapeFinished.emit(newVerts)
+  checkpointMask = vertsPlugin.region.toGrayImg(shapeBnds) > 0
+  assert np.any(checkpointMask)
 
   FR_SINGLETON.actionStack.undo()
+  FR_SINGLETON.actionStack.undo()
+  # Once for the shape, again for the focus
   # Cmp to first action
   assert imsum() == 0
   FR_SINGLETON.actionStack.undo()
@@ -95,9 +92,9 @@ def test_region_modify(sampleComps, app, mgr, vertsPlugin):
   FR_SINGLETON.actionStack.redo()
   assert imsum() == 0
   FR_SINGLETON.actionStack.redo()
+  FR_SINGLETON.actionStack.redo()
   pluginMask = vertsPlugin.region.toGrayImg(shapeBnds)
-  assert np.array_equal(pluginMask, newMask)
-
+  assert np.array_equal(pluginMask, checkpointMask)
 
 @pytest.mark.withcomps
 def test_selectionbounds_all(app, mgr):
@@ -106,7 +103,7 @@ def test_selectionbounds_all(app, mgr):
                        [0, imBounds[1]],
                        [imBounds[0], imBounds[1]],
                         [imBounds[0], 0]])
-  app.mainImg.sigSelectionBoundsMade.emit(bounds)
+  app.compDisplay.reflectSelectionBoundsMade(bounds)
   assert len(app.compDisplay.selectedIds) == len(mgr.compDf)
 
 @pytest.mark.withcomps
@@ -114,7 +111,7 @@ def test_selectionbounds_none(app):
   app.compTbl.clearSelection()
   app.compDisplay.selectedIds = np.array([], dtype=int)
   # Selection in negative area ensures no comps will be selected
-  app.mainImg.sigSelectionBoundsMade.emit(XYVertices([[-100,-100]]))
+  app.compDisplay.reflectSelectionBoundsMade(XYVertices([[-100,-100]]))
   assert len(app.compDisplay.selectedIds) == 0
 
 def test_proc_err(tmp_path):

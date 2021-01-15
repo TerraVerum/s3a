@@ -136,6 +136,7 @@ class PointROI(PlotDataROI):
       success = True
       self.setData(*xyEvCoords.T, size=self.roiRadius*2)
       verts = XYVertices(np.column_stack(draw.disk(xyEvCoords[0], self.roiRadius)))
+      self.vertices = verts
       constructingRoi = True
 
     if success:

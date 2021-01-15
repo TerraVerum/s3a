@@ -159,6 +159,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
       xpondingIdx = model.mapFromSource(self._compMgr.index(rowId,0)).row()
       self._compTbl.showRow(xpondingIdx)
 
+  @FR_SINGLETON.actionStack.undoable('Split Components', asGroup=True)
   def splitSelectedComps(self):
     """Makes a separate component for each distinct boundary of all selected components"""
     selection = self._compTbl.ids_rows_colsFromSelection(excludeNoEditCols=False,
@@ -168,6 +169,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     changes = self._compMgr.splitCompVertsById(np.unique(selection[:,0]))
     self.selectRowsById(changes['added'], QISM.ClearAndSelect)
 
+  @FR_SINGLETON.actionStack.undoable('Merge Components', asGroup=True)
   def mergeSelectedComps(self, keepId=-1):
     """
     Merges the selected components into one, keeping all properties of the first in the selection
@@ -259,6 +261,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     :param selection: bounding box of user selection: [xmin ymin; xmax ymax]
     """
     # If min and max are the same, just check for points at mouse position
+    if selection.size == 0: return
     if len(selection) == 1 or np.abs(selection[0] - selection[1]).sum() < 0.01:
       qtPoint = QtCore.QPointF(*selection[0])
       selectedSpots = self.regionPlot.pointsAt(qtPoint, self.pltClickBehav=='Boundary Only')

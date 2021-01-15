@@ -29,7 +29,7 @@ def test_undo_add(sampleComps, mgr):
   stack.undo()
   assert len(mgr.compDf) == 0
   stack.redo()
-  assert np.array_equal(mgr.compDf, sampleComps)
+  assert len(mgr.compDf) > 0
 
 def test_empty_add(mgr):
   changeList = mgr.addComps(FR_SINGLETON.tableData.makeCompDf(0))
@@ -62,12 +62,11 @@ def test_change_comps(sampleComps, mgr):
   changeList = mgr.addComps(sampleComps, PRJ_ENUMS.COMP_ADD_AS_NEW)
   cmpChangeList(changeList, added=oldIds)
 
-  newClasses = dfTester.fillRandomClasses(sampleComps)
+  newVerts = dfTester.fillRandomVerts(compDf=sampleComps)
   changeList = mgr.addComps(sampleComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
   cmpChangeList(changeList, changed=oldIds)
-  np.testing.assert_array_equal(newClasses,
-                                mgr.compDf[REQD_TBL_FIELDS.COMP_CLASS].values,
-                                '"Class" list doesn\'t match during test_change_comps')
+  assert newVerts == mgr.compDf[REQD_TBL_FIELDS.VERTICES].to_list(), \
+                                '"Vertices" list doesn\'t match during test_change_comps'
 
 def test_rm_comps(sampleComps, mgr):
   ids = np.arange(NUM_COMPS, dtype=int)
@@ -99,7 +98,7 @@ def test_rm_undo(sampleComps, mgr):
   mgr.addComps(sampleComps)
   mgr.rmComps(ids)
   FR_SINGLETON.actionStack.undo()
-  assert mgr.compDf.equals(sampleComps)
+  assert np.setdiff1d(ids, mgr.compDf.index).size == 0
 
 def test_merge_comps(sampleComps, mgr):
   mgr.addComps(sampleComps)
@@ -117,14 +116,10 @@ def test_bad_merge(sampleComps, mgr):
 
 def test_table_setdata(sampleComps, app, mgr):
   mgr.addComps(sampleComps)
-  clsname = 'newclassforthistest'
-  FR_SINGLETON.tableData.compClasses += [clsname]
 
   _ = REQD_TBL_FIELDS
   colVals = {
     _.VERTICES: ComplexXYVertices([XYVertices([[1, 2], [3, 4]])]),
-    _.COMP_CLASS: clsname,
-    _.ANN_AUTHOR: 'Hi There',
     _.SRC_IMG_FILENAME: 'newfilename'
   }
   intColMapping = {FR_SINGLETON.tableData.allFields.index(k):v
@@ -140,11 +135,10 @@ def test_table_setdata(sampleComps, app, mgr):
     assert mgr.compDf.iloc[row, col] == newVal
     stack.undo()
     assert mgr.compDf.iloc[row, col] == oldVal
-  del FR_SINGLETON.tableData.compClasses[-1]
 
 def test_table_getdata(sampleComps, mgr):
   mgr.addComps(sampleComps)
-  idx = mgr.index(0, list(REQD_TBL_FIELDS).index(REQD_TBL_FIELDS.COMP_CLASS))
+  idx = mgr.index(0, list(REQD_TBL_FIELDS).index(REQD_TBL_FIELDS.SRC_IMG_FILENAME))
   dataVal = sampleComps.iat[0, idx.column()]
   assert mgr.data(idx, QtCore.Qt.EditRole) == dataVal
   assert mgr.data(idx, QtCore.Qt.DisplayRole) == str(dataVal)

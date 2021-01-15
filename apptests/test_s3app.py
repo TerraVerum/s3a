@@ -6,10 +6,10 @@ import numpy as np
 import pytest
 
 from conftest import NUM_COMPS, dfTester, assertExInList
-from s3a import FR_SINGLETON, appInst
+from s3a import FR_SINGLETON, appInst, PRJ_CONSTS
 from s3a.constants import REQD_TBL_FIELDS, LAYOUTS_DIR, ANN_AUTH_DIR
 from s3a.generalutils import resolveAuthorName, imgCornerVertices
-from s3a.models.s3abase import S3ABase
+from s3a import S3A
 from s3a.structures import AlgProcessorError, S3AException, XYVertices, \
   ComplexXYVertices, S3AWarning
 from testingconsts import RND, SAMPLE_IMG, SAMPLE_IMG_FNAME
@@ -81,14 +81,14 @@ def test_import_large_verts(sampleComps, tmp_path, app):
 
 def test_change_comp(app, mgr):
   stack = FR_SINGLETON.actionStack
-  fImg = app.focusedImg
+  mImg = app.mainImg
   mgr.addComps(dfTester.compDf.copy())
   comp = mgr.compDf.loc[[RND.integers(NUM_COMPS)]]
   app.changeFocusedComp(comp)
   assert app.focusedImg.compSer.equals(comp.squeeze())
-  assert fImg.image is not None
+  assert mImg.image is not None
   stack.undo()
-  assert fImg.image is None
+  assert app.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID] == -1
 
 def test_save_layout(app):
   with pytest.raises(S3AException):
@@ -112,7 +112,6 @@ def test_autosave(tmp_path, app, filePlg):
   filePlg.autosaveTimer.timeout.emit()
   appInst.processEvents()
 
-  dfTester.fillRandomClasses(app.compMgr.compDf)
   testComps3 = testComps2.append(dfTester.compDf.copy())
   app.compMgr.addComps(testComps3)
   filePlg.autosaveTimer.timeout.emit()
@@ -120,21 +119,24 @@ def test_autosave(tmp_path, app, filePlg):
   savedFiles = list(tmp_path.glob('autosave*.pkl'))
   assert len(savedFiles) >= 3, 'Not enough autosaves generated'
 
+@pytest.mark.withcomps
 def test_stage_plotting(monkeypatch, app, vertsPlugin):
-  app.mainImg.handleShapeFinished(imgCornerVertices(app.mainImg.image))
-  app.focusedImg.currentPlugin.procCollection = FR_SINGLETON.imgProcClctn.createProcessorForClass(app.focusedImg)
-  with pytest.raises(AlgProcessorError):
-    app.showModCompAnalytics()
-  # Make a component so modofications can be tested
-  focImg = app.focusedImg
+  mainImg = app.focusedImg
+  mainImg.drawActGrp.callFuncByParam(PRJ_CONSTS.DRAW_ACT_CREATE)
   vertsPlugin.procCollection.switchActiveProcessor('Basic Shapes')
-  focImg.handleShapeFinished(XYVertices())
+  oldSz = mainImg.minCompSize
+  mainImg.minCompSize = 0
+  mainImg.shapeCollection.sigShapeFinished.emit(XYVertices([[0, 0], [5, 5]]))
+  assert len(app.compMgr.compDf) > 0
+  app.changeFocusedComp(app.compMgr.compDf.iloc[[0]])
   assert app.focusedImg.compSer.loc[REQD_TBL_FIELDS.INST_ID] >= 0
+  mainImg.minCompSize = oldSz
 
-  focImg = app.focusedImg
   vertsPlugin.procCollection.switchActiveProcessor('Basic Shapes')
-  focImg.handleShapeFinished(XYVertices())
-  proc = focImg.currentPlugin.curProcessor.processor
+  mainImg.drawActGrp.callFuncByParam(PRJ_CONSTS.DRAW_ACT_ADD)
+
+  mainImg.shapeCollection.sigShapeFinished.emit(XYVertices([[0, 0], [10, 10]]))
+  proc = vertsPlugin.curProcessor.processor
   oldMakeWidget = proc._stageSummaryWidget
   def patchedWidget():
     widget = oldMakeWidget()
@@ -142,13 +144,13 @@ def test_stage_plotting(monkeypatch, app, vertsPlugin):
     return widget
   with monkeypatch.context() as m:
     m.setattr(proc, '_stageSummaryWidget', patchedWidget)
-    app.showModCompAnalytics()
+    vertsPlugin.processorAnalytics()
 
 def test_no_author(app):
   p = Path(ANN_AUTH_DIR/'defaultAuthor.txt')
   p.unlink()
   with pytest.raises(SystemExit):
-    S3ABase()
+    S3A(guiMode=False)
   # Now plugin s3a refs are screwed up, so fix them
   for plg in FR_SINGLETON.clsToPluginMapping.values():
     plg.win = app
@@ -157,9 +159,7 @@ def test_no_author(app):
 def test_unsaved_changes(sampleComps, tmp_path, app):
   app.compMgr.addComps(sampleComps)
   assert app.hasUnsavedChanges
-  from s3a.plugins.file import FilePlugin
-  plg = FR_SINGLETON.clsToPluginMapping[FilePlugin]
-  plg.saveCurAnnotation()
+  app.saveCurAnnotation()
   assert not app.hasUnsavedChanges
 
 def test_set_colorinfo(app):
@@ -181,7 +181,7 @@ def test_quickload_profile(tmp_path, app):
   outfile = tmp_path/'tmp.csv'
   app.exportCurAnnotation(outfile)
   app.appStateEditor.loadParamState(
-    stateDict=dict(image=str(SAMPLE_IMG_FNAME), layout='Default', annotations=str(outfile),
+    stateDict=dict(layout='Default', annotations=str(outfile),
     mainimageprocessor='Default', focusedimageprocessor='Default',
     colorscheme='Default', tablefilter='Default', mainimagetools='Default',
     focusedimagetools='Default', generalproperties='Default', shortcuts='Default'

@@ -1,5 +1,4 @@
 import sys
-from copy import copy
 from pathlib import Path
 from typing import Optional, Union, Type
 from warnings import warn
@@ -20,8 +19,7 @@ from s3a.parameditors import FR_SINGLETON, EditorPropsMixin
 from s3a.parameditors.appstate import AppStateEditor
 from s3a.plugins.base import ParamEditorPlugin
 from s3a.plugins.file import FilePlugin
-from s3a.structures import FilePath, NChanImg, S3AIOError, \
-  AlgProcessorError, S3AWarning
+from s3a.structures import FilePath, NChanImg, S3AIOError, S3AWarning
 from s3a.views.imageareas import MainImage
 from s3a.views.tableview import CompTableView
 
@@ -202,7 +200,6 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     self.compMgr.addComps(modifiedDf, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)
     def undo():
       self.add_focusComps(oldComp, addType=PRJ_ENUMS.COMP_ADD_AS_MERGE)
-      self.changeFocusedComp(oldComp.iloc[0])
     return undo
 
 
@@ -247,7 +244,8 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
 
     self.clearBoundaries()
     self.mainImg.plotItem.vb.autoRange()
-    self.filePlg.addImage(fileName)
+    if fileName is not None:
+      self.filePlg.addImage(fileName)
     self.loadNewAnnotations()
     yield
     self.setMainImg(oldFile, oldData, clearExistingComps)
@@ -334,19 +332,6 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     newComps = self.compIo.buildByFileType(inFname, self.mainImg.image.shape)
     self.compMgr.addComps(newComps, loadType)
 
-  def showModCompAnalytics(self):
-    """
-    Shows the result of each process stage for most recent result of the currently
-    selected plugin
-    """
-    try:
-      proc = self.focusedImg.currentPlugin.curProcessor
-      proc.processor.stageSummary_gui()
-    except AttributeError:
-      # Processor or proc collection not set
-      raise AlgProcessorError('Either no plugin is activated or the activated plugin'
-                                ' has no processors')
-
   @FR_SINGLETON.actionStack.undoable('Create New Comp', asGroup=True)
   def add_focusComps(self, newComps: df, addType=PRJ_ENUMS.COMP_ADD_AS_NEW):
     changeDict = self.compMgr.addComps(newComps, addType)
@@ -381,6 +366,17 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       stack.actions.pop()
     yield
     if oldImg is not None and len(oldSer.loc[REQD_TBL_FIELDS.VERTICES]) > 0:
-      self.changeFocusedComp(oldSer.to_frame().T, forceKeepLastChange=True)
+      self.changeFocusedComp(serAsFrame(oldSer), forceKeepLastChange=True)
     else:
       self.changeFocusedComp()
+
+  # Stolen and adapted for python from https://stackoverflow.com/a/42910109/9463643
+  # noinspection PyTypeChecker
+  def addTabbedDock(self, area: QtCore.Qt.DockWidgetArea, dockwidget: QtWidgets.QDockWidget):
+    curAreaWidgets = [d for d in self.findChildren(QtWidgets.QDockWidget)
+                      if self.dockWidgetArea(d) == area]
+    try:
+      self.tabifyDockWidget(curAreaWidgets[-1], dockwidget)
+    except IndexError:
+      # First dock in area
+      self.addDockWidget(area, dockwidget)

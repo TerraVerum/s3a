@@ -468,7 +468,9 @@ class TopLevelImageProcessors:
 
   @staticmethod
   def w_basicShapesProcessor():
-    proc = ImageProcess('Basic Shapes')
+    def basic_shapes(image: np.ndarray, fgVerts: XYVertices):
+      return ProcessIO(image=ComplexXYVertices([fgVerts]).toMask(image.shape[:2], asBool=True))
+    proc = ImageProcess.fromFunction(basic_shapes, name='Basic Shapes')
     proc.disabledStages = [['Basic Region Operations', 'Open -> Close']]
     return proc
 

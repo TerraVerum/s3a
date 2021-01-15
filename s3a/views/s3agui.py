@@ -11,10 +11,10 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
 from s3a import RunOpts, PrjParam
 from s3a.constants import PRJ_ENUMS
-from s3a.constants import LAYOUTS_DIR, PRJ_CONSTS as CNST, REQD_TBL_FIELDS
+from s3a.constants import LAYOUTS_DIR, REQD_TBL_FIELDS
 from s3a.generalutils import attemptFileLoad
 from s3a.graphicsutils import makeExceptionsShowDialogs, popupFilePicker, \
-  disableAppDuringFunc, saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
+  saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
   restoreExceptionBehavior, menuFromEditorActions
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import ParamEditor, FR_SINGLETON
@@ -259,17 +259,6 @@ class S3A(S3ABase):
     """
     self.hasUnsavedChanges = False
     self.close()
-
-  # Stolen and adapted for python from https://stackoverflow.com/a/42910109/9463643
-  # noinspection PyTypeChecker
-  def addTabbedDock(self, area: QtCore.Qt.DockWidgetArea, dockwidget: QtWidgets.QDockWidget):
-    curAreaWidgets = [d for d in self.findChildren(QtWidgets.QDockWidget)
-                      if self.dockWidgetArea(d) == area]
-    try:
-      self.tabifyDockWidget(curAreaWidgets[-1], dockwidget)
-    except IndexError:
-      # First dock in area
-      self.addDockWidget(area, dockwidget)
 
   def createMenuOptForPlugin(self, plugin: ParamEditorPlugin, parentToolbarOrMenu=None):
     if isinstance(parentToolbarOrMenu, QtWidgets.QToolBar):

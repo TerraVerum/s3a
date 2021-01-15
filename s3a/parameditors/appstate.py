@@ -66,9 +66,9 @@ class AppStateEditor(ParamEditor):
     importFuncs = self._stateFuncsDf.loc[legitKeys, 'importFuncs']
     args = []
     for k in legitKeys:
-      args.append((stateDict.pop(k),))
+      args.append((stateDict.pop(k, None),))
     _, errs = safeCallFuncList(legitKeys, importFuncs, args)
-    if len(np.setdiff1d(stateDictKeys, legitKeys)) > 0:
+    if len(np.setdiff1d(stateDict.keys(), legitKeys)) > 0:
       FR_SINGLETON.quickLoader.buildFromStartupParams(stateDict)
     ret = super().loadParamState(stateName, paramDict, **kwargs)
     return ret

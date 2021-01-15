@@ -547,7 +547,7 @@ class ProjectData(QtCore.QObject):
     # 'Ann' folder is always added on startup so no need to record it here. However,
     # if it is shown explicitly the user is aware.
     self.cfg['annotations'] = [self.annotationsDir.name]
-    tblName = self.tableData.cfgFname.absolute()
+    tblName = Path(self.tableData.cfgFname).absolute()
     if tblName !=  self.cfgFname:
       if tblName.parent == self.location:
         tblName = tblName.name
