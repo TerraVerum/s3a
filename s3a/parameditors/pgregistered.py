@@ -10,7 +10,6 @@ from pyqtgraph.parametertree.parameterTypes import ActionParameterItem, ActionPa
 import pyqtgraph as pg
 import numpy as np
 
-from s3a.controls.drawctrl import RoiCollection
 from s3a.generalutils import clsNameOrGroup
 from s3a.graphicsutils import PopupLineEditor, popupFilePicker
 
@@ -412,54 +411,6 @@ class ChecklistParameter(parameterTypes.GroupParameter):
     self.sigValueChanged.emit(self, newVal)
     return newVal
 
-class _CustomRoiCollection(RoiCollection):
-  sigShapeCleared = QtCore.Signal()
-  def clearAllRois(self):
-    super().clearAllRois()
-    self.sigShapeCleared.emit()
-
-class XYVerticesParameterItem(parameterTypes.WidgetParameterItem):
-  def makeWidget(self):
-    param = self.param
-
-    self.verts = XYVertices()
-    self.shapes = _CustomRoiCollection((CNST.DRAW_SHAPE_POLY,))
-
-    button = QtWidgets.QPushButton()
-    button.value = lambda: self.verts
-    def setter(verts: np.ndarray):
-      try:
-        button.setText(str(verts))
-      except RuntimeError:
-        # Button no longer in C++ scope
-        pass
-      self.verts = np.asarray(verts, dtype=XYVertices)
-    button.setValue = setter
-    button.sigChanged = _DummySignal()
-
-    self.item = param.opts.get('item', self.param.sceneItem)
-    self.shapes.addRoisToView(self.item)
-    oldClctn = self.item.shapeCollection
-
-    def resetClctn():
-      self.item.shapeCollection = oldClctn
-    def onFinish(roiVerts):
-      setter(roiVerts)
-      # self.shapes.clearAllRois()
-    def onStart():
-      self.item.shapeCollection = self.shapes
-
-    self.shapes.sigShapeCleared.connect(resetClctn)
-    self.shapes.sigShapeFinished.connect(onFinish)
-    button.clicked.connect(onStart)
-
-    return button
-
-class XYVerticesParameter(Parameter):
-  itemClass = XYVerticesParameterItem
-  sceneItem: pg.PlotWidget = None
-
-
 class NoneParameter(parameterTypes.SimpleParameter):
 
   def __init__(self, **opts):
@@ -476,5 +427,4 @@ parameterTypes.registerParameterType('registeredaction', RegisteredActionParamet
 parameterTypes.registerParameterType('popuplineeditor', PopupLineEditorParameter)
 parameterTypes.registerParameterType('filepicker', FilePickerParameter)
 parameterTypes.registerParameterType('slider', SliderParameter)
-parameterTypes.registerParameterType('xyvertices', XYVerticesParameter)
 parameterTypes.registerParameterType('checklist', ChecklistParameter)

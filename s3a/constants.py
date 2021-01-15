@@ -88,13 +88,13 @@ class _PrjConsts(FRParamGroup):
 
   CLS_VERT_IMG         : FRParam = newParam('Focused Image Graphics')
   CLS_MULT_REG_PLT     : FRParam = newParam('Component Plot')
+  CLS_ROI_CLCTN        : FRParam = newParam('ROI Shapes')
 
   CLS_REGION_BUF       : FRParam = newParam('Region Modification Buffer')
 
   CLS_IMG_AREA         : FRParam = newParam('Base Image Area')
   CLS_MAIN_IMG_AREA    : FRParam = newParam('Main Image Area')
   CLS_FOCUSED_IMG_AREA : FRParam = newParam('Focused Image Area')
-  CLS_ROI_CLCTN        : FRParam = newParam('Draw-able Shapes')
   # --------------------------
   # SCHEME PARAMETERS
   # --------------------------
@@ -210,9 +210,10 @@ class _PrjConsts(FRParamGroup):
   DRAW_SHAPE_ELLIPSE : FRParam = newParam(
     'Activate "Ellipse" draw shape', 'Ctrl+K,D,L', 'registeredaction',
     icon=str(ICON_DIR/'ellipse.svg'))
-  DRAW_SHAPE_FREE : FRParam = newParam('Activate "Freehand" draw shape', 'Ctrl+K,D,H')
-  DRAW_SHAPE_PAINT: FRParam = newParam(
-    'Activate "Paint" draw shape', 'Ctrl+K,D,N', icon=str(ICON_DIR/'paint.svg'))
+  DRAW_SHAPE_FREE : FRParam = newParam('Activate "Freehand" draw shape', 'Ctrl+K,D,H',
+                                       icon=str(ICON_DIR/'freehand.svg'))
+  DRAW_SHAPE_POINT: FRParam = newParam(
+    'Activate "Point" draw shape', 'Ctrl+K,D,N', icon=str(ICON_DIR/'point.svg'))
   DRAW_SHAPE_NONE : FRParam = newParam('None')
 
   # Actions

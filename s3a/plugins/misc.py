@@ -47,6 +47,7 @@ class MainImagePlugin(ParamEditorPlugin):
 
     self.registerFunc(startMove, btnOpts=CNST.TOOL_MOVE_REGIONS)
     self.registerFunc(startCopy, btnOpts=CNST.TOOL_COPY_REGIONS)
+    copier.sigCopyStopped.connect(win.mainImg.updateFocusedComp)
 
 
     disp = win.compDisplay

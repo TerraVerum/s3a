@@ -145,12 +145,15 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
       self.regionCopier.erase()
 
   def maybeBuildRoi(self, ev: QtGui.QMouseEvent):
+    ev.ignore()
     if (QtCore.Qt.LeftButton not in [ev.buttons(), ev.button()]
         or self.drawAction == CNST.DRAW_ACT_PAN
         or self.regionCopier.active):
-      return
-    self.shapeCollection.buildRoi(ev, self.imgItem)
-    ev.accept()
+      return False
+    finished = self.shapeCollection.buildRoi(ev, self.imgItem)
+    if not finished:
+      ev.accept()
+    return finished
 
   def switchBtnMode(self, newMode: FRParam):
     # EAFP
@@ -161,7 +164,8 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
 
   def mousePressEvent(self, ev: QtGui.QMouseEvent):
     self.maybeBuildRoi(ev)
-    super().mousePressEvent(ev)
+    if not ev.isAccepted():
+      super().mousePressEvent(ev)
     self.lastClickPos = ev.pos()
 
   def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent):
@@ -170,15 +174,17 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
       ev.accept()
       self.shapeCollection.addLock(self)
     self.maybeBuildRoi(ev)
-    super().mouseDoubleClickEvent(ev)
+    if not ev.isAccepted():
+      super().mouseDoubleClickEvent(ev)
 
   def mouseMoveEvent(self, ev: QtGui.QMouseEvent):
     """
     Mouse move behavior is contingent on which shape is currently selected,
     unless we are panning
     """
-    super().mouseMoveEvent(ev)
     self.maybeBuildRoi(ev)
+    if not ev.isAccepted():
+      super().mouseMoveEvent(ev)
     posRelToImage = self.imgItem.mapFromScene(ev.pos())
     pxY = int(posRelToImage.y())
     pxX = int(posRelToImage.x())

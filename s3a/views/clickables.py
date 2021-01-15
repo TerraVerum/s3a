@@ -78,7 +78,11 @@ class BoundScatterPlot(pg.ScatterPlotItem):
     for rec in dataSet:
       ## keep track of the maximum spot size and pixel size
       symbol, size, pen, brush = self.getSpotOpts(rec)
-      br = symbol.boundingRect()
+      try:
+        br = symbol.boundingRect()
+      except AttributeError:
+        # normal symbol
+        return super().measureSpotSizes(dataSet)
       size = max(br.width(), br.height())*2
       width = 0
       pxWidth = 0
