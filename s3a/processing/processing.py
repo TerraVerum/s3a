@@ -282,7 +282,7 @@ class GeneralProcess(ProcessStage):
     out.addFunction(func, **kwargs)
     return out
 
-  def addProcess(self, process: GeneralProcess):
+  def addProcess(self, process: ProcessStage):
     if self.name is None:
       self.name = process.name
     self.stages.append(process)
@@ -345,6 +345,10 @@ class GeneralProcess(ProcessStage):
     lastInfos = []
     for stage in self._nonDisabledStages_flattened():
       res = stage.result
+      if not isinstance(res, ProcessIO): continue
+      if any(k not in res for k in self.mainResultKeys):
+        # Missing required keys, not sure how to turn into summary info. Skip
+        continue
       if 'summaryInfo' not in res:
         defaultSummaryInfo = {k: res[k] for k in self.mainResultKeys}
         defaultSummaryInfo.update(name=stage.name)

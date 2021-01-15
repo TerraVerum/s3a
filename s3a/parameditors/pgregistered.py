@@ -360,12 +360,13 @@ class SliderParameter(Parameter):
 class ChecklistParameter(parameterTypes.GroupParameter):
 
   def __init__(self, **opts):
+    opts.setdefault('exclusive', False)
     super().__init__(**opts)
 
   def setLimits(self, limits):
     super().setLimits(limits)
+    exclusive = self.opts['exclusive']
     self.clearChildren()
-    exclusive = self.opts.get('exclusive', False)
     for chOpts in limits:
       if isinstance(chOpts, str):
         chOpts = dict(name=chOpts, value=not exclusive)
@@ -392,7 +393,10 @@ class ChecklistParameter(parameterTypes.GroupParameter):
     super().setOpts(**opts)
 
   def value(self):
-    return [p.name() for p in self.children() if p.value()]
+    vals = [p.name() for p in self.children() if p.value()]
+    if self.opts['exclusive']:
+      return vals[0]
+    return vals
 
   def setValue(self, value, blockSignal=None):
     exclusive = self.opts['exclusive']

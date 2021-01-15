@@ -287,7 +287,7 @@ def basic_shapes(image: NChanImg, fgVerts: XYVertices, penSize=1, penShape='circ
   except KeyError:
     raise AlgProcessorError(f"Can't understand shape {penShape}. Must be one of:\n"
                               f"{','.join(drawFns)}")
-  if len(fgVerts) > 1:
+  if len(fgVerts) > 1 and penSize > 1:
     ComplexXYVertices([fgVerts]).toMask(out, 1, False, warnIfTooSmall=False)
   else:
     for vert in fgVerts:
@@ -316,17 +316,17 @@ def _grabcutResultToMask(gcResult):
   return np.where((gcResult==2)|(gcResult==0), False, True)
 
 def cv_grabcut(image: NChanImg, prevCompMask: BlackWhiteImg, fgVerts: XYVertices,
-               noPrevMask: bool, historyMask: GrayImg,
-               iters=5, penSize=1):
+               noPrevMask: bool, historyMask: GrayImg, thickVertsMask: BlackWhiteImg,
+               iters=5):
   if image.size == 0:
     return ProcessIO(image=np.zeros_like(prevCompMask))
-  if len(fgVerts) == 1 and penSize > 1:
-    prevCompMask = prevCompMask.astype('uint8')
-    cv.circle(prevCompMask, tuple(fgVerts[0]), penSize, 1, -1)
   img = cv.cvtColor(image, cv.COLOR_RGB2BGR)
   # Turn foreground into x-y-width-height
   bgdModel = np.zeros((1,65),np.float64)
   fgdModel = np.zeros((1,65),np.float64)
+  historyMask = historyMask.copy()
+  historyMask[thickVertsMask] = 2
+
   mask = np.zeros(prevCompMask.shape, dtype='uint8')
   mask[prevCompMask == 1] = cv.GC_PR_FGD
   mask[prevCompMask == 0] = cv.GC_PR_BGD
@@ -463,7 +463,10 @@ class TopLevelImageProcessors:
 
   @staticmethod
   def a_grabCutProcessor():
-    proc = ImageProcess.fromFunction(cv_grabcut, name='Primitive Grab Cut')
+    prepped = AtomicProcess(basic_shapes, mainResultKeys=['thickVertsMask'], needsWrap=True)
+    proc = ImageProcess('Primitive Grab Cut')
+    proc.addProcess(prepped)
+    proc.addFunction(cv_grabcut)
     proc.addProcess(ImageProcess.fromFunction(keep_regions_touching_roi, needsWrap=True))
     return proc
 
