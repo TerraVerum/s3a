@@ -57,8 +57,7 @@ class ComponentIO:
   calling exporter.exportCsv, exportPkl, etc. for those objects / files respectively.
   """
   handledIoTypes = {'csv': 'CSV Files', 'pkl': 'Pickle Files',
-                    'id.png': 'ID Grayscale Image', 'class.png': 'Class Grayscale Image',
-                    'compimgs.folder': 'Component Images Folder'}
+                    'id.png': 'ID Grayscale Image'}
   """Dict of <type, description> for the file types this I/O obejct can handle"""
 
   # Dictionary comprehension doesn't work in a class scope

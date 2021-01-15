@@ -229,7 +229,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     selectedFill = np.array(pg.Color(selectedFill).getRgbF())
     selectedFill[-1] = fillAlpha
     # combinedFill = (focusedFill + selectedFill)/2
-    lbls = self.regionData[PRJ_ENUMS.FIELD_LABEL]
+    lbls = self.regionData[PRJ_ENUMS.FIELD_LABEL].to_numpy()
     fillColors = colorsWithAlpha(lbls)
     selected = self.regionData[PRJ_ENUMS.FIELD_SELECTED].to_numpy()
     focused = self.regionData[PRJ_ENUMS.FIELD_FOCUSED].to_numpy()
