@@ -119,7 +119,7 @@ class S3A(S3ABase):
     self.pxColor = QtWidgets.QLabel("Pixel Color")
 
     self.mainImg.sigMousePosChanged.connect(lambda pos, pxColor: self.setInfo(pos, pxColor))
-    # self.focusedImg.sigMousePosChanged.connect(lambda info: setInfo(info))
+    # self.mainImg.sigMousePosChanged.connect(lambda info: setInfo(info))
     self.statBar.show()
     self.statBar.addWidget(self.imageLbl)
     self.statBar.addWidget(self.mouseCoords)
@@ -127,7 +127,7 @@ class S3A(S3ABase):
 
   def changeFocusedComp(self, newComps: df=None, forceKeepLastChange=False):
     ret = super().changeFocusedComp(newComps, forceKeepLastChange)
-    self.curCompIdLbl.setText(f'Component ID: {self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]}')
+    self.curCompIdLbl.setText(f'Component ID: {self.mainImg.compSer[REQD_TBL_FIELDS.INST_ID]}')
     return ret
 
   def resetTblFields_gui(self):

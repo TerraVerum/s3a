@@ -9,7 +9,7 @@ from testingconsts import SAMPLE_SMALL_IMG_FNAME, SAMPLE_SMALL_IMG
 
 @pytest.mark.smallimage
 def test_algs_working(app, vertsPlugin):
-  mImg = app.focusedImg
+  mImg = app.mainImg
   pc = vertsPlugin.procCollection
   allAlgs = pc.nameToProcMapping.keys()
 

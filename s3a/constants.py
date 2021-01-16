@@ -4,7 +4,7 @@ from pathlib import Path
 
 __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR', 'QUICK_LOAD_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'TABLE_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
-           'MAIN_IMG_DIR', 'FOC_IMG_DIR', 'APP_STATE_DIR',
+           'MAIN_IMG_DIR', 'APP_STATE_DIR',
            'DATE_FORMAT', 'REQD_TBL_FIELDS', 'PRJ_CONSTS', 'PRJ_ENUMS', 'PROJ_FILE_TYPE']
 BASE_DIR = Path(__file__).parent
 MENU_OPTS_DIR = BASE_DIR/'menuopts'
@@ -21,7 +21,6 @@ QUICK_LOAD_DIR = MENU_OPTS_DIR/'quickloaders'
 SCHEMES_DIR = MENU_OPTS_DIR/'schemes'
 GEN_PROPS_DIR = MENU_OPTS_DIR/'genprops'
 SHORTCUTS_DIR = MENU_OPTS_DIR/'shortcuts'
-FOC_IMG_DIR = MENU_OPTS_DIR/'focusedimg'
 MAIN_IMG_DIR = MENU_OPTS_DIR/'mainimg'
 TABLE_DIR = MENU_OPTS_DIR/'table'
 APP_STATE_DIR = Path.home()/'.s3a'

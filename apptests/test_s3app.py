@@ -85,10 +85,10 @@ def test_change_comp(app, mgr):
   mgr.addComps(dfTester.compDf.copy())
   comp = mgr.compDf.loc[[RND.integers(NUM_COMPS)]]
   app.changeFocusedComp(comp)
-  assert app.focusedImg.compSer.equals(comp.squeeze())
+  assert app.mainImg.compSer.equals(comp.squeeze())
   assert mImg.image is not None
   stack.undo()
-  assert app.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID] == -1
+  assert app.mainImg.compSer[REQD_TBL_FIELDS.INST_ID] == -1
 
 def test_save_layout(app):
   with pytest.raises(S3AException):
@@ -121,7 +121,7 @@ def test_autosave(tmp_path, app, filePlg):
 
 @pytest.mark.withcomps
 def test_stage_plotting(monkeypatch, app, vertsPlugin):
-  mainImg = app.focusedImg
+  mainImg = app.mainImg
   mainImg.drawActGrp.callFuncByParam(PRJ_CONSTS.DRAW_ACT_CREATE)
   vertsPlugin.procCollection.switchActiveProcessor('Basic Shapes')
   oldSz = mainImg.minCompSize
@@ -129,7 +129,7 @@ def test_stage_plotting(monkeypatch, app, vertsPlugin):
   mainImg.shapeCollection.sigShapeFinished.emit(XYVertices([[0, 0], [5, 5]]))
   assert len(app.compMgr.compDf) > 0
   app.changeFocusedComp(app.compMgr.compDf.iloc[[0]])
-  assert app.focusedImg.compSer.loc[REQD_TBL_FIELDS.INST_ID] >= 0
+  assert app.mainImg.compSer.loc[REQD_TBL_FIELDS.INST_ID] >= 0
   mainImg.minCompSize = oldSz
 
   vertsPlugin.procCollection.switchActiveProcessor('Basic Shapes')

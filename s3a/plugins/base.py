@@ -158,10 +158,10 @@ class ProcessorPlugin(ParamEditorPlugin):
     self.procCollection.switchActiveProcessor(newProcessor)
 
 class TableFieldPlugin(ProcessorPlugin):
-  focusedImg = None
+  mainImg = None
   """
   Holds a reference to the focused image and set when the s3a reference is set. This
-  is useful for most table field plugins, since focusedImg will hold a reference to the
+  is useful for most table field plugins, since mainImg will hold a reference to the
   component series that is modified by the plugins.
   """
 
@@ -173,9 +173,9 @@ class TableFieldPlugin(ProcessorPlugin):
 
   def attachWinRef(self, win):
     super().attachWinRef(win)
-    self.focusedImg = focusedImg = win.focusedImg
+    self.mainImg = mainImg = win.mainImg
     win.sigRegionAccepted.connect(self.acceptChanges)
-    focusedImg.sigUpdatedFocusedComp.connect(self.updateFocusedComp)
+    mainImg.sigUpdatedFocusedComp.connect(self.updateFocusedComp)
     self.active = True
     self.registerFunc(self.processorAnalytics, btnOpts=PRJ_CONSTS.TOOL_PROC_ANALYTICS)
 

@@ -28,12 +28,12 @@ class VerticesPlugin(TableFieldPlugin):
     self.firstRun = True
 
   def attachWinRef(self, win: S3ABase):
-    win.focusedImg.addItem(self.region)
+    win.mainImg.addItem(self.region)
 
     def fill():
       """Completely fill the focused region mask"""
-      if self.focusedImg.compSer is None: return
-      filledImg = np.ones(self.focusedImg.image.shape[:2], dtype='uint16')
+      if self.mainImg.compSer is None: return
+      filledImg = np.ones(self.mainImg.image.shape[:2], dtype='uint16')
       self.updateRegionFromMask(filledImg)
     def clear():
       """
@@ -54,16 +54,16 @@ class VerticesPlugin(TableFieldPlugin):
     for func, param in zip(funcLst, paramLst):
       self.registerFunc(func, btnOpts=param)
 
-    win.focusedImg.registerDrawAction([CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self._run_drawAct)
-    win.focusedImg.addTools(self.toolsEditor)
-    self.vb: pg.ViewBox = win.focusedImg.getViewBox()
+    win.mainImg.registerDrawAction([CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self._run_drawAct)
+    win.mainImg.addTools(self.toolsEditor)
+    self.vb: pg.ViewBox = win.mainImg.getViewBox()
     super().attachWinRef(win)
 
   def updateFocusedComp(self, newComp:pd.Series = None):
-    if self.focusedImg.compSer[RTF.INST_ID] == -1:
+    if self.mainImg.compSer[RTF.INST_ID] == -1:
       self.updateRegionFromDf(None)
       return
-    self.updateRegionFromDf(self.focusedImg.compSer_asFrame)
+    self.updateRegionFromDf(self.mainImg.compSer_asFrame)
     self.clearFocusedPen_Fill()
     self.firstRun = True
 
@@ -91,7 +91,7 @@ class VerticesPlugin(TableFieldPlugin):
       vertsDict['fgVerts'] = fgVerts
     if bgVerts is not None:
       vertsDict['bgVerts'] = bgVerts
-    img = self.focusedImg.image
+    img = self.mainImg.image
     if img is None:
       compGrayscale = None
       compMask = None
@@ -114,7 +114,7 @@ class VerticesPlugin(TableFieldPlugin):
       **vertsDict,
       firstRun=self.firstRun,
       viewbox=XYVertices(viewbox),
-      prevCompVerts=self.focusedImg.compSer[RTF.VERTICES]
+      prevCompVerts=self.mainImg.compSer[RTF.VERTICES]
     ).astype('uint8')
 
     self.firstRun = False
@@ -130,7 +130,7 @@ class VerticesPlugin(TableFieldPlugin):
       see `makeMultiRegionDf`
     :param offset: Offset of newVerts relative to main image coordinates
     """
-    fImg = self.focusedImg
+    fImg = self.mainImg
     if newData is None or np.all(newData[RTF.VERTICES].apply(ComplexXYVertices.isEmpty)):
       newData = makeMultiRegionDf(0)
     if fImg.image is None:
@@ -163,7 +163,7 @@ class VerticesPlugin(TableFieldPlugin):
       yield
     if (fImg.compSer.loc[RTF.INST_ID] != oldSer.loc[RTF.INST_ID]
         or fImg.image is None):
-      self.win.updateFocusedImg(oldSer)
+      self.win.changeFocusedComp(oldSer)
     self.region.resetRegionList(oldData)
 
   def updateRegionFromMask(self, mask: BlackWhiteImg, offset=None):
@@ -175,7 +175,7 @@ class VerticesPlugin(TableFieldPlugin):
   def acceptChanges(self, overrideVerts: ComplexXYVertices=None):
     # Add in offset from main image to VertexRegion vertices
     newVerts = overrideVerts or self.collapseRegionVerts()
-    ser = self.focusedImg.compSer
+    ser = self.mainImg.compSer
     ser[RTF.VERTICES] = newVerts
     self.updateFocusedComp()
 
@@ -197,15 +197,15 @@ class VerticesPlugin(TableFieldPlugin):
   def clearFocusedRegion(self):
     # Reset drawn comp vertices to nothing
     # Only perform action if image currently exists
-    if self.focusedImg.compSer is None:
+    if self.mainImg.compSer is None:
       return
     self.updateRegionFromDf(None)
 
   def resetFocusedRegion(self):
     """Reset the focused image by restoring the region mask to the last saved state"""
-    if self.focusedImg.compSer is None:
+    if self.mainImg.compSer is None:
       return
-    self.updateRegionFromDf(self.focusedImg.compSer_asFrame)
+    self.updateRegionFromDf(self.mainImg.compSer_asFrame)
 
   def _onActivate(self):
     self.region.show()

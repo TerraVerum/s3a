@@ -40,10 +40,9 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     self.generalToolbar = QtWidgets.QToolBar('General')
 
     self.mainImg = MainImage(toolbar=self.generalToolbar)
-    self.focusedImg = self.mainImg
-    PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION.opts['ownerObj'] = self.focusedImg
-    self.focusedImg.toolsEditor.registerFunc(self.acceptFocusedRegion,
-                                             btnOpts=PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION)
+    PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION.opts['ownerObj'] = self.mainImg
+    self.mainImg.toolsEditor.registerFunc(self.acceptFocusedRegion,
+                                          btnOpts=PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION)
     FR_SINGLETON.generalProps.registerFunc(FR_SINGLETON.actionStack.resizeStack,
                                            name=PRJ_CONSTS.PROP_UNDO_BUF_SZ.name,
                                            runOpts=RunOpts.ON_CHANGED,
@@ -52,7 +51,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     self.menuBar_ = self.menuBar()
 
     FR_SINGLETON.shortcuts.registerShortcut(PRJ_CONSTS.TOOL_CLEAR_ROI,
-                                            self.focusedImg.clearCurRoi,
+                                            self.mainImg.clearCurRoi,
                                             overrideOwnerObj=self.mainImg
                                             )
 
@@ -104,7 +103,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     # MAIN IMAGE
     # -----
     def handleCompsChanged(changedDict: dict):
-      focusedId = self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]
+      focusedId = self.mainImg.compSer[REQD_TBL_FIELDS.INST_ID]
       if focusedId in changedDict['deleted']:
         self.changeFocusedComp()
     self.compMgr.sigCompsChanged.connect(handleCompsChanged)
@@ -162,7 +161,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     """Applies the focused image vertices to the corresponding component in the table"""
     # If the component was deleted
     mgr = self.compMgr
-    focusedId = self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]
+    focusedId = self.mainImg.compSer[REQD_TBL_FIELDS.INST_ID]
     exists = focusedId in mgr.compDf.index
     if not exists and focusedId != REQD_TBL_FIELDS.INST_ID.value:
       # Could be a brand new component, allow in that case
@@ -171,7 +170,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
 
     self.sigRegionAccepted.emit()
 
-    ser = self.focusedImg.compSer
+    ser = self.mainImg.compSer
     if ser[REQD_TBL_FIELDS.VERTICES].isEmpty():
       # Component should be erased. Since new components will not match existing
       # IDs the same function will work regardless of whether this was new or existing
@@ -345,10 +344,10 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
 
   @FR_SINGLETON.actionStack.undoable('Change Focused Component')
   def changeFocusedComp(self, newComps: df=None, forceKeepLastChange=False):
-    oldSer = self.focusedImg.compSer.copy()
-    oldImg = self.focusedImg.image
+    oldSer = self.mainImg.compSer.copy()
+    oldImg = self.mainImg.image
     if newComps is None or len(newComps) == 0:
-      self.focusedImg.updateFocusedComp()
+      self.mainImg.updateFocusedComp()
       self.compDisplay.regionPlot.focusById([])
       self.compDisplay.selectRowsById([])
     else:
@@ -359,7 +358,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       newComp: pd.Series = newComps.iloc[-1,:]
       newCompId = newComp[REQD_TBL_FIELDS.INST_ID]
       self.compDisplay.regionPlot.focusById([newCompId])
-      self.focusedImg.updateFocusedComp(newComp)
+      self.mainImg.updateFocusedComp(newComp)
     # Nothing happened since the last component change, so just replace it instead of
     # adding a distinct action to the buffer queue
     stack = FR_SINGLETON.actionStack
