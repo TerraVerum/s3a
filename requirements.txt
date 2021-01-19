@@ -13,5 +13,5 @@ ruamel.yaml
 docstring_parser
 pytest
 matplotlib
-utiltys
+utilitys
 
