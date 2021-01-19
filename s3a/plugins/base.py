@@ -35,6 +35,8 @@ class TableFieldPlugin(ProcessorPlugin):
 
   _active=False
 
+  _makeMenuShortcuts = False
+
   @property
   def parentMenu(self):
     return self.win.tblFieldToolbar

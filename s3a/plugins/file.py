@@ -575,8 +575,7 @@ class ProjectData(QtCore.QObject):
       ret = [] if ret is None else [ret]
     return ret
 
-  @FR_SINGLETON.actionStack.undoable('Add Project Image')
-  def addImage(self, name: FilePath, data: NChanImg=None, copyToProj=False, allowOverwrite=False) -> FilePath:
+  def addImage(self, name: FilePath, data: NChanImg=None, copyToProj=False, allowOverwrite=False) -> Optional[FilePath]:
     name = Path(name)
     if not name.is_absolute():
       name = self.imagesDir/name
@@ -587,8 +586,10 @@ class ProjectData(QtCore.QObject):
       return None
     self.images.append(name)
     self._maybeEmit(self.sigImagesAdded, [name])
-    yield name
-    self.removeImage(name)
+    return name
+    # TODO: Create less hazardous undo operation
+    # yield name
+    # self.removeImage(name)
 
   def changeImgPath(self, oldName: Path, newName: Path=None):
     oldIdx = self.images.index(oldName)
@@ -646,7 +647,6 @@ class ProjectData(QtCore.QObject):
     if fname is not None:
       self.addImage(fname, copyToProj=copyToProject)
 
-  @FR_SINGLETON.actionStack.undoable('Remove Project Image')
   def removeImage(self, imgName: FilePath):
     imgName = Path(imgName).resolve()
     if imgName not in self.images:
@@ -659,15 +659,15 @@ class ProjectData(QtCore.QObject):
     self._maybeEmit(self.sigImagesRemoved, [imgName])
     if imgName.parent == self.imagesDir:
       imgName.unlink()
-    yield
-    if imgName.parent == self.imagesDir:
-      # TODO: Cache removed images in a temp dir, then move them to that temp dir instead of unlinking
-      #  on delete. This will make 'remove' undoable
-      raise IOError('Can only undo undo image removal when the image was outside the project.'
-                       f' Image {imgName.name} was either annotated or directly placed in the project images'
-                       f' directory, and was deleted during removal. To re-add, do so from the original image'
-                       f' location outside the project directory.')
-    self.addImage(imgName)
+    # yield
+    # if imgName.parent == self.imagesDir:
+    #   # TODO: Cache removed images in a temp dir, then move them to that temp dir instead of unlinking
+    #   #  on delete. This will make 'remove' undoable
+    #   raise IOError('Can only undo undo image removal when the image was outside the project.'
+    #                    f' Image {imgName.name} was either annotated or directly placed in the project images'
+    #                    f' directory, and was deleted during removal. To re-add, do so from the original image'
+    #                    f' location outside the project directory.')
+    # self.addImage(imgName)
 
   def removeAnnotation(self, annName: FilePath):
     annName = Path(annName).resolve()

@@ -18,6 +18,7 @@ from s3a.plugins.base import ProcessorPlugin
 
 class MainImagePlugin(ParamEditorPlugin):
   name = __groupingName__ = 'Main Image'
+  _makeMenuShortcuts = False
 
   def __init__(self):
     super().__init__()
