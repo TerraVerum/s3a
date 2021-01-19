@@ -340,7 +340,7 @@ class ComponentIO:
 
     labels = compDf[lblField]
     labels_numeric = lblField.toNumeric(labels, allowOffset)
-    asBool = np.issubdtype(labels_numeric.dtype, np.bool)
+    asBool = np.issubdtype(labels_numeric.dtype, np.bool_)
 
     if rescaleOutput:
       labels_numeric = rescale_intensity(labels_numeric, out_range='uint16')
