@@ -1,27 +1,26 @@
 from __future__ import annotations
 
 import shutil
-from _warnings import warn
 from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
-from typing import Dict, Optional, List, Set, Union, Tuple, Sequence
+from typing import Optional, Set, List, Dict, Sequence, Union, Tuple
+from warnings import warn
 
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtCore
 from skimage import io
+from utilitys import CompositionMixin, AtomicProcess
+from utilitys import fns
+from utilitys.params import *
 
-from s3a import ParamEditor, FR_SINGLETON, PRJ_CONSTS as CNST, ComponentIO, models, REQD_TBL_FIELDS
-from s3a.generalutils import attemptFileLoad, dynamicDocstring, resolveYamlDict, \
-  hierarchicalUpdate
-from s3a.graphicsutils import popupFilePicker, DropList, \
-  ThumbnailViewer, saveToFile
-from s3a.structures import FilePath, S3AWarning, NChanImg, S3AIOError, CompositionMixin
-from .base import ParamEditorPlugin
+from s3a import FR_SINGLETON, PRJ_CONSTS as CNST, ComponentIO, models, REQD_TBL_FIELDS
+from s3a.generalutils import hierarchicalUpdate
+from s3a.graphicsutils import DropList, ThumbnailViewer
+from s3a.structures import FilePath, NChanImg
 from ..constants import APP_STATE_DIR, PROJ_FILE_TYPE, BASE_DIR
-from ..processing import AtomicProcess
 
 
 class FilePlugin(CompositionMixin, ParamEditorPlugin):
@@ -75,7 +74,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
           continue
         self._imgThumbnails.removeThumbnail(name.name)
       if delCurrent:
-        raise S3AIOError(f'Cannot delete {self.win.srcImgFname.name} since it is currently'
+        raise IOError(f'Cannot delete {self.win.srcImgFname.name} since it is currently'
              f' being annotated. Change the image and try again.')
     self.projData.sigImagesAdded.connect(onAdd)
     self.projData.sigImagesMoved.connect(onMove)
@@ -113,7 +112,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     win.appStateEditor.addImportExportOpts('image', startImg, lambda *args: None, 1)
 
     doctored = AtomicProcess(self.win.exportCurAnnotation, 'Current Annotation',
-                             forceKeys=['outFname'])
+                             outFname='')
     self.registerPopoutFuncs([self.projData.exportProj, self.projData.exportAnnotations, doctored],
                          ['Project', 'All Annotations', 'Current Annotation'], btnOpts=CNST.TOOL_PROJ_EXPORT)
 
@@ -131,10 +130,10 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     self.projData.loadCfg(name)
     self._updateProjLbl()
     # Other arguments are consumed by app state editor
-    self.win.appStateEditor.loadParamState(stateDict={}, overrideDict=self.projData.startup)
+    self.win.appStateEditor.loadParamValues(stateDict={}, overrideDict=self.projData.startup)
 
   def open_gui(self):
-    fname = popupFilePicker(None, 'Select Project File', f'S3A Project (*.{PROJ_FILE_TYPE})')
+    fname = fns.popupFilePicker(None, 'Select Project File', f'S3A Project (*.{PROJ_FILE_TYPE})')
     if fname is not None:
       self.win.setMainImg(None)
       with pg.BusyCursor():
@@ -144,7 +143,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     self.win.saveCurAnnotation()
     self.projData.saveCfg()
 
-  @dynamicDocstring(ioTypes=['<Unchanged>'] + list(ComponentIO.handledIoTypes))
+  @fns.dynamicDocstring(ioTypes=['<Unchanged>'] + list(ComponentIO.handledIoTypes))
   def updateProjectProperties(self, tableConfig:FilePath=None, annotationFormat:str=None):
     """
     Updates the specified project properties, for each one that is provided
@@ -164,7 +163,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       self.projData.cfg['annotation-format'] = annotationFormat
 
 
-  @dynamicDocstring(ioTypes=list(ComponentIO.handledIoTypes))
+  @fns.dynamicDocstring(ioTypes=list(ComponentIO.handledIoTypes))
   def startAutosave(self, interval=5, backupFolder='', baseName='autosave', exportType='pkl'):
     """
     Saves the current annotation set evert *interval* minutes
@@ -219,7 +218,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     if len(self.projData.images) == 0:
       warn('This project does not have any images yet. You can add them either in\n'
            '<code>File > Project Settings... > Add Image Files</code> or\n'
-           '<code>File > Add New Image</code>.', S3AWarning)
+           '<code>File > Add New Image</code>.', UserWarning)
       return
     self._projImgMgr.show()
     self._projImgMgr.raise_()
@@ -254,7 +253,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     projName = settings['Name']
     prevTemplate = settings['Template Project']
     if prevTemplate is not None and len(prevTemplate) > 0:
-      baseCfg = attemptFileLoad(prevTemplate)
+      baseCfg = fns.attemptFileLoad(prevTemplate)
       if not settings['Keep Existing Images'] or 'images' not in baseCfg:
         baseCfg['images'] = []
       if not settings['Keep Existing Annotations' or 'annotations' not in baseCfg]:
@@ -437,8 +436,8 @@ class ProjectData(QtCore.QObject):
     :param force: If *True*, the new config will be loaded even if it is the same name as the
       current config
     """
-    _, baseCfgDict = resolveYamlDict(BASE_DIR/'projectcfg.yml')
-    cfgFname, cfgDict = resolveYamlDict(cfgFname, cfgDict)
+    _, baseCfgDict = fns.resolveYamlDict(BASE_DIR/'projectcfg.yml')
+    cfgFname, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
     cfgFname = cfgFname.resolve()
     if not force and self.cfgFname == cfgFname:
       return None
@@ -508,7 +507,7 @@ class ProjectData(QtCore.QObject):
     tdName = Path(parent.tableData.cfgFname)
     if tdName.resolve() != parent.cfgFname:
       tdName = tdName.name
-      saveToFile(parent.tableData.cfg, location / tdName, True)
+      fns.saveToFile(parent.tableData.cfg, location / tdName, True)
       parent.tableData.cfgFname = tdName
       parent.cfg['table-cfg'] = tdName
 
@@ -542,7 +541,7 @@ class ProjectData(QtCore.QObject):
     if len(offendingAnns) > 0:
       warn('Encountered annotation(s) in project config, but not officially added. Adding them now.'
            '  Offending files:\n'
-           + ',\n'.join(offendingAnns), S3AWarning)
+           + ',\n'.join(offendingAnns), UserWarning)
     self.cfg['images'] = strImgNames
     # 'Ann' folder is always added on startup so no need to record it here. However,
     # if it is shown explicitly the user is aware.
@@ -552,7 +551,7 @@ class ProjectData(QtCore.QObject):
       if tblName.parent == self.location:
         tblName = tblName.name
       self.cfg['table-cfg'] = str(tblName)
-    saveToFile(self.cfg, self.cfgFname)
+    fns.saveToFile(self.cfg, self.cfgFname)
 
   def addImageByPath(self, name: FilePath, copyToProj=False):
     """
@@ -565,7 +564,7 @@ class ProjectData(QtCore.QObject):
     if not image.is_absolute():
       image = self.location/image
     if not image.exists():
-      warn(f'Provided image path does not exist: {image}\nNo action performed.', S3AWarning)
+      warn(f'Provided image path does not exist: {image}\nNo action performed.', UserWarning)
       return []
     if image.is_dir():
       ret = self.addImageFolder(image, copyToProj)
@@ -627,7 +626,7 @@ class ProjectData(QtCore.QObject):
     if not name.is_absolute():
       name = self.location/name
     if not name.exists():
-      warn(f'Provided annotation path does not exist: {name}\nNo action performed.', S3AWarning)
+      warn(f'Provided annotation path does not exist: {name}\nNo action performed.', )
       return
     if name.is_dir():
       self.addAnnotationFolder(name)
@@ -641,7 +640,7 @@ class ProjectData(QtCore.QObject):
 
   def addImage_gui(self, copyToProject=True):
     fileFilter = "Image Files (*.png *.tif *.jpg *.jpeg *.bmp *.jfif);;All files(*.*)"
-    fname = popupFilePicker(None, 'Add Image to Project', fileFilter)
+    fname = fns.popupFilePicker(None, 'Add Image to Project', fileFilter)
     if fname is not None:
       self.addImage(fname, copyToProj=copyToProject)
 
@@ -662,7 +661,7 @@ class ProjectData(QtCore.QObject):
     if imgName.parent == self.imagesDir:
       # TODO: Cache removed images in a temp dir, then move them to that temp dir instead of unlinking
       #  on delete. This will make 'remove' undoable
-      raise S3AIOError('Can only undo undo image removal when the image was outside the project.'
+      raise IOError('Can only undo undo image removal when the image was outside the project.'
                        f' Image {imgName.name} was either annotated or directly placed in the project images'
                        f' directory, and was deleted during removal. To re-add, do so from the original image'
                        f' location outside the project directory.')
@@ -681,7 +680,7 @@ class ProjectData(QtCore.QObject):
                     overwriteOld=False):
     # Housekeeping for default arguments
     if name is None and data is None:
-      raise S3AIOError('`name` and `data` cannot both be `None`')
+      raise IOError('`name` and `data` cannot both be `None`')
     elif name in self.imgToAnnMapping.values() and not overwriteOld:
       # Already present, shouldn't be added
       return
@@ -723,7 +722,7 @@ class ProjectData(QtCore.QObject):
       # noinspection PyTypeChecker
       io.imsave(newName, data)
     else:
-      raise S3AIOError(f'No image data associated with {name.name}. Either the file does not exist or no'
+      raise IOError(f'No image data associated with {name.name}. Either the file does not exist or no'
                        f' image information was provided.')
     if name in self.images:
       self.changeImgPath(name, newName)
@@ -768,7 +767,7 @@ class ProjectData(QtCore.QObject):
         msg += '.'
       else:
         msg += f':\n{", ".join([c.name for c in candidates])}'
-      raise S3AIOError(msg)
+      raise IOError(msg)
     return candidates.pop()
 
   def exportProj(self, outputFolder: FilePath= 's3a-export'):
@@ -781,7 +780,7 @@ class ProjectData(QtCore.QObject):
     """
     shutil.copytree(self.location, outputFolder)
 
-  @dynamicDocstring(fileTypes=ComponentIO.handledIoTypes_fileFilter().split(';;'))
+  @fns.dynamicDocstring(fileTypes=ComponentIO.handledIoTypes_fileFilter().split(';;'))
   def exportAnnotations(self, outputFolder:FilePath= 's3a-export', annotationFormat='csv', combine=False, includeImages=True):
     """
     Exports project annotations, optionally including their source images

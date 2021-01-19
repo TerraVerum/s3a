@@ -6,7 +6,8 @@ from s3a import FR_SINGLETON, PRJ_CONSTS as CNST, XYVertices, REQD_TBL_FIELDS as
   ComplexXYVertices
 from s3a.models.s3abase import S3ABase
 from s3a.processing.algorithms import _historyMaskHolder
-from s3a.structures import PrjParam, BlackWhiteImg
+from s3a.structures import BlackWhiteImg
+from utilitys import PrjParam
 from s3a.views.regions import MultiRegionPlot, makeMultiRegionDf
 from .base import TableFieldPlugin
 from ..constants import PRJ_ENUMS

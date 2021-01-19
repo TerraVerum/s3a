@@ -6,7 +6,6 @@ import pytest
 
 from s3a.generalutils import augmentException
 from s3a import ComponentIO
-from s3a.structures import S3AIOError
 
 @pytest.mark.withcomps
 def test_normal_export(sampleComps, tmp_path, app):
@@ -68,7 +67,7 @@ def doAndAssertExport(app, fpath: Path, io: ComponentIO, compDf: pd.DataFrame, f
 
 def test_impossible_io(tmp_path, sampleComps, app):
   io = app.compIo
-  with pytest.raises(S3AIOError):
+  with pytest.raises(IOError):
     io.exportByFileType(sampleComps, './nopossible.exporttype$')
-  with pytest.raises(S3AIOError):
+  with pytest.raises(IOError):
     io.buildByFileType('./nopossible.importtype$')

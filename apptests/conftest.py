@@ -9,7 +9,6 @@ from s3a import FR_SINGLETON
 from s3a.views.s3agui import S3A
 from testingconsts import SAMPLE_IMG, SAMPLE_IMG_FNAME, NUM_COMPS, \
   SAMPLE_SMALL_IMG, SAMPLE_SMALL_IMG_FNAME, TEST_AUTHOR
-from s3a.structures import S3AException
 from s3a.plugins.tablefield import VerticesPlugin
 from s3a.plugins.file import FilePlugin
 
@@ -58,7 +57,7 @@ def vertsPlugin(app):
   try:
     plg = FR_SINGLETON.clsToPluginMapping[VerticesPlugin]
   except KeyError:
-    raise S3AException('Vertices plugin was not provided. Some tests are guaranteed to fail.')
+    raise RuntimeError('Vertices plugin was not provided. Some tests are guaranteed to fail.')
 
   plg.procCollection.switchActiveProcessor('Basic Shapes')
   proc = plg.curProcessor
@@ -76,7 +75,7 @@ def resetApp_tester(request, app, filePlg, mgr):
     try:
       if img != app.srcImgFname:
         filePlg.projData.removeImage(img)
-    except (FileNotFoundError, S3AException):
+    except (FileNotFoundError,):
       pass
   app.mainImg.shapeCollection.forceUnlock()
   if 'smallimage' in request.keywords:
@@ -90,5 +89,5 @@ def resetApp_tester(request, app, filePlg, mgr):
   stack.clear()
   app.clearBoundaries()
 
-def assertExInList(exList, typ: Type[Exception]=S3AException):
+def assertExInList(exList, typ: Type[Exception]=Exception):
   assert any(issubclass(ex[0], typ) for ex in exList)

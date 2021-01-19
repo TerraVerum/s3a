@@ -1,23 +1,22 @@
-from functools import wraps, lru_cache
+from functools import lru_cache
 from typing import Tuple, List
 
 import cv2 as cv
 import numpy as np
 import pandas as pd
 from scipy.ndimage import binary_fill_holes, maximum_filter
-from skimage.measure import regionprops, label, regionprops_table
-from skimage.morphology import flood, disk
 from skimage import morphology as morph
+from skimage.measure import regionprops, label, regionprops_table
+from skimage.morphology import flood
 from skimage.segmentation import quickshift
+from utilitys.processing import *
+from utilitys import fns
 
-from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices, \
-  dynamicDocstring, \
-  pascalCaseToTitle, serAsFrame
 from s3a.constants import REQD_TBL_FIELDS as RTF
-from s3a.processing import AtomicProcess, GeneralProcess
-from s3a.processing.processing import ProcessIO, ImageProcess, GlobalPredictionProcess
-from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg,\
-  GrayImg, RgbImg, AlgProcessorError
+from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices
+from s3a.processing.processing import ImageProcess, GlobalPredictionProcess
+from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg
+from s3a.structures import GrayImg, RgbImg
 
 
 def growSeedpoint(img: NChanImg, seeds: XYVertices, thresh: float) -> BlackWhiteImg:
@@ -215,7 +214,7 @@ def fill_holes(image: NChanImg):
 
 def disallow_paint_tool(_image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices):
   if len(np.vstack([fgVerts, bgVerts])) < 2:
-    raise AlgProcessorError('This algorithm requires an enclosed area to work.'
+    raise ValueError('This algorithm requires an enclosed area to work.'
                               ' Only one vertex was given as an input.')
   return ProcessIO(image=_image)
 
@@ -285,7 +284,7 @@ def basic_shapes(image: NChanImg, fgVerts: XYVertices, penSize=1, penShape='circ
   try:
     drawFn = drawFns[penShape]
   except KeyError:
-    raise AlgProcessorError(f"Can't understand shape {penShape}. Must be one of:\n"
+    raise ValueError(f"Can't understand shape {penShape}. Must be one of:\n"
                               f"{','.join(drawFns)}")
   if len(fgVerts) > 1 and penSize > 1:
     ComplexXYVertices([fgVerts]).toMask(out, 1, False, warnIfTooSmall=False)
@@ -373,7 +372,7 @@ def keep_regions_touching_roi(image: BlackWhiteImg, fgVerts: XYVertices):
   a wide variety of operations behave similarly to region growing.
   """
   if image.ndim > 2:
-    raise AlgProcessorError('Cannot handle multichannel images.\n'
+    raise ValueError('Cannot handle multichannel images.\n'
                               f'(image.shape={image.shape})')
   out = np.zeros_like(image)
   seeds = fgVerts[:,::-1]
@@ -507,7 +506,7 @@ def dispatchedTemplateMatcher(func):
     out['components'] = outComps
     return out
   dispatcher.__doc__ = func.__doc__
-  proc = GlobalPredictionProcess(pascalCaseToTitle(func.__name__))
+  proc = GlobalPredictionProcess(fns.nameFormatter(func.__name__))
   proc.addFunction(dispatcher)
   proc.stages[0].input = inputSpec
   return proc
@@ -531,18 +530,18 @@ def dispatchedFocusedProcessor(func):
       newComp = comp.copy()
       if mask is not None:
         newComp[RTF.VERTICES] = ComplexXYVertices.fromBwMask(mask)
-      allComps.append(serAsFrame(newComp))
+      allComps.append(fns.serAsFrame(newComp))
     outComps = pd.concat(allComps, ignore_index=True)
     out['components'] = outComps
     return out
   dispatcher.__doc__ = func.__doc__
-  proc = GlobalPredictionProcess(pascalCaseToTitle(func.__name__))
+  proc = GlobalPredictionProcess(fns.nameFormatter(func.__name__))
   proc.addFunction(dispatcher)
   proc.stages[0].input = inputSpec
   return proc
 
 
-@dynamicDocstring(metricTypes=[d for d in dir(cv) if d.startswith('TM')])
+@fns.dynamicDocstring(metricTypes=[d for d in dir(cv) if d.startswith('TM')])
 def cv_template_match(template: np.ndarray, image: np.ndarray, threshold=0.8, metric='TM_CCOEFF_NORMED'):
   """
   Performs template matching using default opencv functions
@@ -578,7 +577,7 @@ def cv_template_match(template: np.ndarray, image: np.ndarray, threshold=0.8, me
 def pts_to_components(matchPts: np.ndarray, component: pd.Series):
   numOutComps = len(matchPts)
   # Explicit copy otherwise all rows point to the same component
-  outComps = pd.concat([serAsFrame(component)]*numOutComps, ignore_index=True).copy()
+  outComps = pd.concat([fns.serAsFrame(component)]*numOutComps, ignore_index=True).copy()
   origOffset = component[RTF.VERTICES].stack().min(0)
   allNewverts = []
   for ii, pt in zip(outComps.index, matchPts):

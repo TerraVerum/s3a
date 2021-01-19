@@ -5,14 +5,13 @@ import numpy as np
 import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui
+from utilitys import EditorPropsMixin, PrjParam, RunOpts
+from s3a.structures import OneDArr
 
-from s3a import FR_SINGLETON, RunOpts
+from s3a import FR_SINGLETON
 from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
 from s3a.models.tablemodel import ComponentMgr
-from s3a.parameditors import EditorPropsMixin
-from s3a.structures import XYVertices, PrjParam, S3AWarning, \
-  ComplexXYVertices
-from s3a.structures.typeoverloads import OneDArr
+from s3a.structures import XYVertices, ComplexXYVertices
 from s3a.views import tableview
 from s3a.views.imageareas import MainImage
 from s3a.views.regions import MultiRegionPlot
@@ -93,7 +92,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
       """
       if np.array_equal(FR_SINGLETON.tableData.allFields, self._compMgr.compDf.columns):
         self.redrawComps()
-    self._filter.sigParamStateUpdated.connect(_maybeRedraw)
+    self._filter.sigChangesApplied.connect(_maybeRedraw)
 
     self.regionCopier.sigCopyStarted.connect(lambda *args: self.activateRegionCopier())
     self.regionCopier.sigCopyStopped.connect(lambda *args: self.finishRegionCopier())
@@ -186,7 +185,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
       keepId = selection[0,0]
     try:
       self._compMgr.mergeCompVertsById(np.unique(selection[:,0]), keepId)
-    except S3AWarning:
+    except UserWarning:
       # No merge was performed, don't alter the table selection
       raise
     else:
@@ -327,7 +326,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
       self._compMgr.addComps(newComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
     # if len(truncatedCompIds) > 0:
     #   warn(f'Some regions extended beyond image dimensions. Boundaries for the following'
-    #        f' components were altered: {truncatedCompIds}', S3AWarning)
+    #        f' components were altered: {truncatedCompIds}', UserWarning)
 
   # def findFilterableCols(self):
   #   curComps = self._compMgr.compDf.copy()
@@ -345,7 +344,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
   #     warn(f'The table filter does not know how to handle'
   #          f' columns {", ".join(badCols)} since no'
   #          f' filter exists for types {", ".join(badTypes)}',
-  #          S3AWarning)
+  #          UserWarning)
   #   return filterableCols
 
   def filterByParamType(self, compDf: df, column: PrjParam, filterOpts: dict):
@@ -403,7 +402,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     else:
       warn('No filter type exists for parameters of type ' f'{pType}.'
            f' Did not filter column {column.name}.',
-           S3AWarning)
+           UserWarning)
     return compDf
 
 

@@ -8,7 +8,7 @@ from s3a.constants import PRJ_CONSTS
 from s3a.controls.drawctrl import RoiCollection
 from s3a.parameditors.algcollection import AlgParamEditor
 from s3a.processing import ProcessIO, ImageProcess, ImgProcWrapper
-from s3a.structures import XYVertices, ComplexXYVertices, PrjParam, S3AWarning, NChanImg
+from s3a.structures import XYVertices, ComplexXYVertices, PrjParam, NChanImg
 
 def leftClickGen(pos: XYVertices, dbclick=False):
   Ev = QtCore.QEvent
@@ -121,5 +121,5 @@ def test_proc_err(tmp_path):
   newClctn = AlgParamEditor(tmp_path, [newCtor], ImgProcWrapper)
 
   newClctn.switchActiveProcessor('Bad')
-  with pytest.warns(S3AWarning):
+  with pytest.warns(UserWarning):
     newClctn.curProcessor.run(image=np.array([[True]], dtype=bool), fgVerts=XYVertices([[0,0]]))

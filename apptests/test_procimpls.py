@@ -4,9 +4,6 @@ from s3a.generalutils import imgCornerVertices
 from s3a.processing import ImageProcess
 from s3a.structures import XYVertices
 
-# Use a small image for faster testing
-from testingconsts import SAMPLE_SMALL_IMG_FNAME, SAMPLE_SMALL_IMG
-
 @pytest.mark.smallimage
 def test_algs_working(app, vertsPlugin):
   mImg = app.mainImg

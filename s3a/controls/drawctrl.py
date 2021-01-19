@@ -2,11 +2,11 @@ from typing import Dict, Collection
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
+from utilitys import EditorPropsMixin, RunOpts
 
+from s3a.parameditors import singleton
 from s3a.structures import PrjParam, XYVertices
 from s3a.views.rois import SHAPE_ROI_MAPPING, PlotDataROI, PointROI
-from s3a.parameditors import singleton, EditorPropsMixin
-from s3a.models import editorbase
 
 __all__ = ['RoiCollection']
 
@@ -17,7 +17,7 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
   def __init__(self, allowableShapes: Collection[PrjParam]=(), parent: pg.GraphicsView=None):
     super().__init__(parent)
     singleton.FR_SINGLETON.colorScheme.registerFunc(
-      PointROI.updateRadius, name='Point ROI Features', runOpts=editorbase.RunOpts.ON_CHANGED, namePath=(self.__groupingName__,),
+      PointROI.updateRadius, name='Point ROI Features', runOpts=RunOpts.ON_CHANGED, namePath=(self.__groupingName__,),
 
     )
     if allowableShapes is None:

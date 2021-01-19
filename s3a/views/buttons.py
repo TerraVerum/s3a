@@ -1,12 +1,11 @@
 from __future__ import annotations
-from typing import Tuple, Collection, Callable, Union, Iterable, Any, Dict, Sequence, \
-  List, Optional
 
-from pyqtgraph.Qt import QtWidgets, QtGui, QtCore
+from typing import Collection, Callable, Union, Iterable, Any, Dict, Sequence, List, Optional
+
+from pyqtgraph.Qt import QtWidgets
 from pyqtgraph.parametertree import Parameter
-from s3a.models.editorbase import params_flattened
+from utilitys import fns, PrjParam, ParamEditor
 
-from s3a.structures import PrjParam
 from s3a import parameditors
 
 __all__ = ['ButtonCollection']
@@ -89,9 +88,9 @@ class ButtonCollection(QtWidgets.QGroupBox):
     Adds a button to a group based on the parameter. Also works for group params
     that have an acttion nested.
     """
-    for param in params_flattened(param):
+    for param in fns.params_flattened(param):
       curCopy = copy
-      if 'action' in param.type() and param.opts.get('guibtn', True):
+      if param.type() in ['action', 'shortcut'] and param.opts.get('guibtn', True):
         existingBtn = None
         try:
           existingBtn = next(iter(param.items)).button
@@ -104,7 +103,7 @@ class ButtonCollection(QtWidgets.QGroupBox):
 
   @classmethod
   def fromToolsEditors(cls,
-                       editors: Sequence[parameditors.ParamEditor],
+                       editors: Sequence[ParamEditor],
                        title='Tools',
                        ownerClctn: ButtonCollection=None,
                        **registerOpts):

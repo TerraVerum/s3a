@@ -11,12 +11,12 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 from pyqtgraph.parametertree import Parameter
 from ruamel.yaml import YAML
+from utilitys import ParamEditor, PrjParam
 
-from s3a.constants import TABLE_DIR, REQD_TBL_FIELDS, DATE_FORMAT, \
-  PRJ_CONSTS, BASE_DIR
-from s3a.generalutils import resolveYamlDict, hierarchicalUpdate
-from s3a.parameditors import ParamEditor
-from s3a.structures import PrjParam, FilePath, PrjParamGroup, S3AException, S3AWarning
+from s3a.constants import TABLE_DIR, REQD_TBL_FIELDS, DATE_FORMAT, PRJ_CONSTS, BASE_DIR
+from s3a.structures import PrjParamGroup, FilePath
+from s3a.generalutils import hierarchicalUpdate
+from utilitys import fns
 
 yaml = YAML()
 
@@ -99,7 +99,7 @@ class TableFilterEditor(ParamEditor):
       colNames = [f'"{col}"' for col in badCols]
       colTypes = np.unique([f'"{col.pType}"' for col in badCols])
       warn(f'The table does not know how to create a filter for fields {", ".join(colNames)}'
-            f' since types {", ".join(colTypes)} do not have corresponding filters', S3AWarning)
+            f' since types {", ".join(colTypes)} do not have corresponding filters', UserWarning)
     self.applyChanges()
 
   @property
@@ -171,8 +171,8 @@ class TableData(QtCore.QObject):
     current config
     """
 
-    _, baseCfgDict = resolveYamlDict(BASE_DIR/'tablecfg.yml')
-    cfgFname, cfgDict = resolveYamlDict(cfgFname, cfgDict)
+    _, baseCfgDict = fns.resolveYamlDict(BASE_DIR/'tablecfg.yml')
+    cfgFname, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
     cfgFname = cfgFname.resolve()
     if not force and self.cfgFname == cfgFname:
       return None

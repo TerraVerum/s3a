@@ -10,19 +10,17 @@ from matplotlib.pyplot import colormaps
 from pandas import DataFrame as df
 from pyqtgraph import arrayToQPath
 from pyqtgraph.Qt import QtGui, QtCore
+from utilitys import PrjParam, RunOpts, EditorPropsMixin, fns
 
 from s3a import FR_SINGLETON, ComponentIO as frio
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_CONSTS, PRJ_ENUMS
-from s3a.generalutils import stackedVertsPlusConnections, dynamicDocstring
-from s3a.structures import PrjParam, XYVertices, ComplexXYVertices, OneDArr, BlackWhiteImg
-from s3a.structures.typeoverloads import GrayImg
+from s3a.generalutils import stackedVertsPlusConnections
+from s3a.structures import GrayImg, OneDArr, BlackWhiteImg
+from s3a.structures import XYVertices, ComplexXYVertices
 from . import imageareas
 from .clickables import BoundScatterPlot
 
 __all__ = ['MultiRegionPlot', 'VertexDefinedImg', 'RegionCopierPlot']
-
-from ..models.editorbase import RunOpts
-from ..parameditors import EditorPropsMixin
 
 Signal = QtCore.Signal
 
@@ -180,7 +178,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     labelDf[RTF.INST_ID] = labels
     return frio.exportLblPng(labelDf, imShape=imShape, allowOffset=True)
 
-  @dynamicDocstring(cmapVals=colormaps() + ['None'])
+  @fns.dynamicDocstring(cmapVals=colormaps() + ['None'])
   def updateColors(self, penWidth=0, penColor='w', selectedFill='00f', focusedFill='f00', labelColormap='tab10',
                    fillAlpha=0.7, hideFocused=False):
     """
@@ -268,7 +266,7 @@ class VertexDefinedImg(EditorPropsMixin, pg.ImageItem):
   def __init__(self):
     super().__init__()
     self.verts = ComplexXYVertices()
-    FR_SINGLETON.colorScheme.sigParamStateUpdated.connect(lambda: self.setImage(
+    FR_SINGLETON.colorScheme.sigChangesApplied.connect(lambda: self.setImage(
       lut=self.getLUTFromScheme()))
 
   def embedMaskInImg(self, toEmbedShape: Tuple[int, int]):

@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Union, Optional, Collection, Callable, Any, Sequence, List
+from typing import Union, Collection, Callable, Any, Sequence, List
 
 import numpy as np
 import pandas as pd
@@ -7,22 +7,18 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyqtgraph.graphicsItems.ViewBox.ViewBoxMenu import ViewBoxMenu
 from skimage.io import imread
+from utilitys import ParamEditor, EditorPropsMixin, PrjParam, RunOpts, CompositionMixin, fns
 
 from s3a import FR_SINGLETON
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_CONSTS as CNST
 from s3a.controls.drawctrl import RoiCollection
-from s3a.generalutils import getCroppedImg, coerceDfTypes, serAsFrame
-from s3a.models.editorbase import RunOpts
-from s3a.structures import PrjParam, XYVertices, ComplexXYVertices, FilePath, \
-  CompositionMixin
-from s3a.structures import NChanImg
+from s3a.generalutils import getCroppedImg, coerceDfTypes
+from s3a.structures import NChanImg, FilePath
+from s3a.structures import XYVertices
 from .buttons import ButtonCollection
 from .clickables import RightPanViewBox
 from .regions import RegionCopierPlot
 from .rois import SHAPE_ROI_MAPPING
-from ..graphicsutils import menuFromEditorActions
-from ..parameditors import ParamEditor, EditorPropsMixin
-from ..plugins.base import TableFieldPlugin
 
 __all__ = ['MainImage']
 
@@ -132,7 +128,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
 
   @property
   def compSer_asFrame(self):
-      return coerceDfTypes(serAsFrame(self.compSer))
+      return coerceDfTypes(fns.serAsFrame(self.compSer))
 
   def shapeAssignment(self, newShapeParam: PrjParam):
     self.shapeCollection.curShapeParam = newShapeParam
@@ -313,8 +309,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
   def addTools(self, toolsEditor: ParamEditor):
     if toolsEditor in self._focusedTools:
       return
-    self._focusedTools.append(toolsEditor)
-    self.menu = menuFromEditorActions(self._focusedTools, menuParent=self)
+    toolsEditor.actionsMenuFromProcs(outerMenu=self.menu, parent=self)
     # self.toolsGrp.clear()
     # self.toolsGrp.fromToolsEditors(self._focusedTools, checkable=False, ownerClctn=self.toolsGrp)
     retClctn = None
@@ -333,7 +328,6 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     Updates focused image and component from provided information. Useful for creating
     a 'zoomed-in' view that allows much faster processing than applying image processing
     algorithms to the entire image each iteration.
-    :param mainImg: Image from the main view
     :param newComp: New component to edit using various plugins (See :class:`TableFieldPlugin`)
     """
     oldComp = self.compSer

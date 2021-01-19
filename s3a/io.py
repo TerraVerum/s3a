@@ -1,10 +1,9 @@
-import contextlib
 import pickle
 import sys
 from ast import literal_eval
 from pathlib import Path
 from stat import S_IREAD, S_IRGRP, S_IROTH
-from typing import Any, Optional, Union, Tuple, Callable, Sequence
+from typing import Any, Optional, Union, Tuple, Callable
 from warnings import warn
 
 import numpy as np
@@ -17,7 +16,7 @@ from typing_extensions import Literal
 from s3a.constants import REQD_TBL_FIELDS as RTF
 from s3a.generalutils import augmentException, getCroppedImg, resize_pad
 from s3a.parameditors.table import TableData
-from s3a.structures import PrjParamGroup, S3AWarning, S3AIOError, FilePath, GrayImg, \
+from s3a.structures import PrjParamGroup, FilePath, GrayImg, \
   ComplexXYVertices, PrjParam
 
 FilePathOrDf = Union[FilePath, pd.DataFrame]
@@ -113,7 +112,7 @@ class ComponentIO:
              ' table values. To rectify this, a multi-cell overwrite was performed'
              ' for the following cells (shown as <id>: <column>):\n'
              + f'{problemMsg}\n'
-               f'Please try exporting again to confirm the cleanup was successful.', S3AWarning)
+               f'Please try exporting again to confirm the cleanup was successful.', UserWarning)
     return ret
 
   @classmethod
@@ -133,7 +132,7 @@ class ComponentIO:
     cmpTypes = np.array(list(cls.handledIoTypes.keys()))
     typIdx = [typ in fname for typ in cmpTypes]
     if not any(typIdx):
-      raise S3AIOError(f'Not sure how to handle file {fpath.stem}')
+      raise IOError(f'Not sure how to handle file {fpath.stem}')
     fnNameSuffix = cmpTypes[typIdx][-1].title().replace('.', '')
     return getattr(cls, buildOrExport+fnNameSuffix, None)
 
@@ -333,11 +332,11 @@ class ComponentIO:
     lblField = cls.tableData.fieldFromName(lblField)
 
     if lblField not in cls.tableData.allFields:
-      raise S3AIOError(f'Specified label field {lblField} does not exist in the table'
+      raise IOError(f'Specified label field {lblField} does not exist in the table'
                        f' fields. Must be one of:\n'
                        f'{[f.name for f in cls.tableData.allFields]}')
     if bgColor < 0:
-      raise S3AIOError(f'Background color must be >= 0, was {bgColor}')
+      raise IOError(f'Background color must be >= 0, was {bgColor}')
 
     labels = compDf[lblField]
     labels_numeric = lblField.toNumeric(labels, allowOffset)
@@ -384,7 +383,7 @@ class ComponentIO:
   def exportCompimgsFolders(cls, compDf: df, imgDir: FilePath=None, margin=0, marginAsPct=False,
                             colorMaskByClass=True, outDir: FilePath=None, dataDir='data',
                             semanticDir='masks_semantic', bboxDir: str=None,
-                            resizeShape: Sequence[int]=None, **kwargs):
+                            resizeShape: Tuple[int, int]=None, **kwargs):
     """
     From a component dataframe, creates output directories for component images and masks.
     This is useful for many neural networks etc. to read individual component images.
@@ -617,7 +616,7 @@ class ComponentIO:
     if len(offendingIds) > 0:
       warn(f'Vertices on some components extend beyond image dimensions. '
            f'Perhaps this export came from a different image?\n'
-           f'Offending IDs: {offendingIds}', S3AWarning)
+           f'Offending IDs: {offendingIds}', UserWarning)
 
   @classmethod
   def _idImgToDf(cls, idImg: GrayImg):

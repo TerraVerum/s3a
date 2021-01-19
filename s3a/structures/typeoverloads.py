@@ -1,10 +1,7 @@
-import typing
-from typing import Union
+# noinspection PyUnresolvedReferences
+from utilitys.typeoverloads import FilePath
 
 from numpy import ndarray
-from os import PathLike
-from pathlib import Path
-
 """
 Functions that just return a `np.ndarray` are often hard to interpret. Is the output a simple array, image, 
 etc.? If it _is_ an image, what is the output shape? Developers and users will have to comb through the function body
@@ -20,6 +17,3 @@ NChanImg = ndarray
 OneDArr = ndarray
 TwoDArr = ndarray
 ThreeDArr = ndarray
-
-FilePath = Union[PathLike, str, Path]
-

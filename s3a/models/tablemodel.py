@@ -9,10 +9,8 @@ from pyqtgraph.Qt import QtCore
 
 from s3a import FR_SINGLETON
 from s3a.generalutils import coerceDfTypes
-from s3a.constants import REQD_TBL_FIELDS as RTF
-from s3a.constants import PRJ_ENUMS
-from s3a.structures import ComplexXYVertices
-from s3a.structures import OneDArr, S3AWarning
+from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
+from s3a.structures import ComplexXYVertices, OneDArr
 
 __all__ = ['ComponentMgr', 'CompTableModel']
 
@@ -86,7 +84,7 @@ class CompTableModel(QtCore.QAbstractTableModel):
     if cmp:
       warn('Warning! An error occurred setting this value. Please try again using a'
            ' <em>multi-cell</em> edit. E.g. do not just set this value, set it along with'
-           ' at least one other selected cell.', S3AWarning)
+           ' at least one other selected cell.', UserWarning)
     toEmit = self.defaultEmitDict.copy()
     toEmit['changed'] = np.array([self.compDf.index[index.row()]])
     self.sigCompsChanged.emit(toEmit)
@@ -250,7 +248,7 @@ class ComponentMgr(CompTableModel):
       this will default to the first component in the selection.
     """
     if mergeIds is None or len(mergeIds) < 2:
-      warn(f'Less than two components are selected, so "merge" is a no-op.', S3AWarning)
+      warn(f'Less than two components are selected, so "merge" is a no-op.', UserWarning)
       return
     mergeComps: df = self.compDf.loc[mergeIds].copy()
     if keepId is None:

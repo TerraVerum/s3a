@@ -1,22 +1,19 @@
 from __future__ import annotations
 
-from typing import Callable, Sequence, List, Set
+from typing import Callable, Sequence
 
 import cv2 as cv
 import numpy as np
 import pandas as pd
-import pyqtgraph as pg
 from pyqtgraph import console as pg_console
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
+from utilitys import ParamEditorPlugin, ProcessIO, widgets as uw
 
 from s3a import models, XYVertices, ComplexXYVertices
-from s3a.constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF, PRJ_ENUMS
-from s3a.controls.tableviewproxy import CompDisplayFilter
-from s3a.graphicsutils import ConsoleWidget, menuFromEditorActions
+from s3a.constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
 from s3a.models import s3abase
 from s3a.parameditors import FR_SINGLETON
-from s3a.plugins.base import ParamEditorPlugin, ProcessorPlugin
-from s3a.processing import ProcessIO
+from s3a.plugins.base import ProcessorPlugin
 
 
 class MainImagePlugin(ParamEditorPlugin):
@@ -109,7 +106,7 @@ class CompTablePlugin(ParamEditorPlugin):
          CNST.TOOL_TBL_ZOOM_TO_COMPS]):
       param.opts['ownerObj'] = win.compTbl
       self.registerFunc(func, name=param.name, btnOpts=param)
-    tbl.menu = menuFromEditorActions(self.toolsEditor, menuParent=tbl, nest=False)
+    tbl.menu = self.toolsEditor.actionsMenuFromProcs(parent=tbl, nest=False)
     super().attachWinRef(win)
 
 class EditPlugin(ParamEditorPlugin):
@@ -159,9 +156,12 @@ class RandomToolsPlugin(ParamEditorPlugin):
     nsPrintout = [f"{k}: {v}" for k, v in namespace.items()]
     text = f'Starting console with variables:\n' \
            f'{nsPrintout}'
+    # Broad exception is fine, fallback is good enough. Too many edge cases to properly diagnose when Pycharm's event
+    # loop is sync-able with the Jupyter dev console
+    # noinspection PyBroadException
     try:
-      console = ConsoleWidget(parent=self.win, namespace=namespace, text=text)
-    except Exception as ex:
+      console = uw.ConsoleWidget(parent=self.win, namespace=namespace, text=text)
+    except Exception:
       # Ipy kernel can have issues for many different reasons. Always be ready to fall back to traditional console
       console = pg_console.ConsoleWidget(parent=self.win, namespace=namespace, text=text)
     console.setWindowFlags(QtCore.Qt.Window)
@@ -177,7 +177,7 @@ class HelpPlugin(ParamEditorPlugin):
     self.registerFunc(lambda: QtWidgets.QMessageBox.aboutQt(win, 'About Qt'), name='About Qt')
 
 def miscFuncsPluginFactory(name_: str=None, regFuncs: Sequence[Callable]=None, titles: Sequence[str]=None, showFuncDetails=False):
-  class DummyFuncsPlugin(ParamEditorPlugin):
+  class FuncContainerPlugin(ParamEditorPlugin):
     name = name_
     _showFuncDetails = showFuncDetails
 
@@ -192,7 +192,7 @@ def miscFuncsPluginFactory(name_: str=None, regFuncs: Sequence[Callable]=None, t
       for func, title in zip(regFuncs, titles):
         self.registerFunc(func, title)
 
-  return DummyFuncsPlugin
+  return FuncContainerPlugin
 
 
 class GlobalPredictionsPlugin(ProcessorPlugin):

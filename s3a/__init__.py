@@ -7,8 +7,8 @@ import os
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 
-__all__ = ['appInst', 'FR_SINGLETON', 'S3A', 'ParamEditor', 'PrjParam', 'REQD_TBL_FIELDS',
-           'ComplexXYVertices', 'XYVertices', 'PRJ_CONSTS', 'ComponentIO', 'RunOpts',
+__all__ = ['appInst', 'FR_SINGLETON', 'S3A', 'REQD_TBL_FIELDS',
+           'ComplexXYVertices', 'XYVertices', 'PRJ_CONSTS', 'ComponentIO',
            '__version__']
 
 pg.setConfigOptions(imageAxisOrder='row-major')
@@ -38,11 +38,10 @@ from . import graphicsutils as gutils
 import s3a.constants
 import s3a.structures
 
-from s3a.parameditors import FR_SINGLETON, ParamEditor
-from s3a.models.editorbase import RunOpts
+from s3a.parameditors import FR_SINGLETON
 from .io import ComponentIO
 from s3a.processing.algorithms import TopLevelImageProcessors, TOP_GLOBAL_PROCESSOR_FUNCS
-from s3a.structures import XYVertices, ComplexXYVertices, PrjParam
+from s3a.structures import XYVertices, ComplexXYVertices
 from s3a.constants import REQD_TBL_FIELDS, PRJ_CONSTS
 
 # -----
@@ -54,12 +53,7 @@ for name, func in inspect.getmembers(TopLevelImageProcessors, inspect.isfunction
 for ctor in TOP_GLOBAL_PROCESSOR_FUNCS:
   FR_SINGLETON.globalPredClctn.addProcessCtor(ctor)
 
-# Minimal means no GUI is needed. Things work faster when they don't have to be
-# shown through the comp display filter
-if customPlatform is not None:
-  from .models.s3abase import S3ABase as S3A
-else:
-  from .views.s3agui import S3A
+from .views.s3agui import S3A
 
 from s3a.plugins import ALL_PLUGINS
 from s3a.plugins.misc import RandomToolsPlugin
