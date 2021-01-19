@@ -97,7 +97,9 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     win.statBar.addWidget(self.projNameLbl)
     def handleExport(_dir):
       saveImg = win.srcImgFname
-      if saveImg.parent == self.projData.imagesDir:
+      if not saveImg:
+        return
+      if saveImg and saveImg.parent == self.projData.imagesDir:
         saveImg = saveImg.name
       self.projData.startup['image'] = str(saveImg)
       self.save()
@@ -575,7 +577,7 @@ class ProjectData(QtCore.QObject):
 
   @FR_SINGLETON.actionStack.undoable('Add Project Image')
   def addImage(self, name: FilePath, data: NChanImg=None, copyToProj=False, allowOverwrite=False) -> FilePath:
-    name = Path(name).resolve()
+    name = Path(name)
     if not name.is_absolute():
       name = self.imagesDir/name
     if copyToProj or data is not None:
