@@ -1,18 +1,15 @@
 from pathlib import Path
-from typing import List, Union, Sequence
+from typing import List, Union
 from warnings import warn
 
 from pyqtgraph.Qt import QtCore, QtWidgets
 from pyqtgraph.parametertree.parameterTypes import GroupParameter, Parameter
+from utilitys import ParamEditor, ParamEditorDockGrouping, fns, widgets as uw
+from utilitys.params.pgregistered import ShortcutKeySeqParameter as ShcKeySeq
 
-from s3a.graphicsutils import PopupLineEditor, raiseErrorLater
+
 from s3a.constants import QUICK_LOAD_DIR
-from . import ParamEditorDockGrouping
-from .genericeditor import ParamEditor
-from .pgregistered import ActionWithShortcutParameter as ActWithShc
-from s3a.structures import ParamEditorError, S3AWarning
 from ..generalutils import lower_NoSpaces
-
 
 class EditorListModel(QtCore.QAbstractListModel):
   def __init__(self, editorList: List[ParamEditor], parent: QtWidgets.QWidget=None):
@@ -105,17 +102,18 @@ class QuickLoaderEditor(ParamEditor):
     if editorList is None:
       editorList = []
     self.listModel = EditorListModel(editorList, self)
+    # TODO: Get quickloader working
+    self.saveAsBtn.hide()
 
-    self.addNewParamState = PopupLineEditor(self, self.listModel, clearOnComplete=False)
+    self.addNewParamState = uw.PopupLineEditor(self, self.listModel, clearOnComplete=False)
     self.centralLayout.insertWidget(0, self.addNewParamState)
 
     # self.addNewParamState.completer().activated.connect(self.addFromLineEdit)
     self.addNewParamState.editingFinished.connect(self.addFromLineEdit)
 
-  def loadParamState(self, stateName: Union[str, Path], stateDict: dict=None,
+  def _loadParamState(self, stateName: Union[str, Path], stateDict: dict=None,
                      addChildren=False, removeChildren=False, applyChanges=True):
-    ret = super().loadParamState(stateName, stateDict, addChildren=True, removeChildren=True,
-                                 applyChanges=False)
+    ret = super()._loadParamState(stateName, stateDict, applyChanges=False)
     invalidGrps = []
     editorNames = [e.name for e in self.listModel.uniqueEditors]
     hasInvalidEntries = False
@@ -129,7 +127,7 @@ class QuickLoaderEditor(ParamEditor):
         invalidGrps.append(grp)
         hasInvalidEntries = True
         continue
-      for act in grp: # type: ActWithShc
+      for act in grp: # type: ShcKeySeq
         self.addActForEditor(editor, act.name(), act)
     for grp in invalidGrps:
       grp.remove()
@@ -138,7 +136,7 @@ class QuickLoaderEditor(ParamEditor):
                f"{[grp.name() for grp in invalidGrps]}\n" \
                f"Must be one of:\n" \
                f"{[e.name for e in self.listModel.uniqueEditors]}"
-      warn(errMsg, S3AWarning)
+      warn(errMsg, UserWarning)
     if applyChanges:
       self.applyChanges()
     return ret
@@ -154,14 +152,14 @@ class QuickLoaderEditor(ParamEditor):
       paramStateInfo: Union[dict, str] = startupSrc.get(lower_NoSpaces(editor.name), None)
       try:
         if isinstance(paramStateInfo, dict):
-          editor.loadFromPartialNames(self.lastAppliedName, paramStateInfo)
+          editor.loadParamValues(self.lastAppliedName, paramStateInfo)
         elif paramStateInfo is not None:
-          editor.loadParamState(paramStateInfo)
+          editor.loadParamValues(paramStateInfo)
       except Exception as ex:
         errSettings.append(f'{editor.name}: {ex}')
     if len(errSettings) > 0:
       warn('The following settings could not be loaded (shown as <setting>: <exception>)\n'
-           + "\n\n".join(errSettings), S3AWarning)
+           + "\n\n".join(errSettings), UserWarning)
     return startupSrc
 
   def addDock(self, dock: Union[ParamEditor, ParamEditorDockGrouping]):
@@ -170,18 +168,22 @@ class QuickLoaderEditor(ParamEditor):
     else:
       self.listModel.addEditors([dock])
 
-  def saveParamState(self, saveName: str=None, paramState: dict=None, **kwargs):
-    stateDict = self.paramDictWithOpts(['type'], [ActWithShc, GroupParameter],
-                                       paramDict=paramState)
-    kwargs['paramState'] = stateDict
-    super().saveParamState(saveName, **kwargs)
+  def saveCurStateAsDefault(self):
+    # TODO: Get quickloader working
+    return
+    super().saveCurStateAsDefault()
 
+  def saveParamValues(self, saveName: str=None, paramState: dict=None, **kwargs):
+    # TODO: Get quickloader working
+    # stateDict = fns.paramDictWithOpts(self.params, ['type'], [ShcKeySeq, GroupParameter])
+    kwargs['paramState'] = {}
+    super().saveParamValues(saveName, **kwargs)
 
   def applyChanges(self):
     super().applyChanges()
     for grp in self.params.childs: # type: GroupParameter
       if grp.hasChildren():
-        act: ActWithShc = next(iter(grp))
+        act: ShcKeySeq = next(iter(grp))
         act.activate()
 
   def addFromLineEdit(self):
@@ -202,7 +204,7 @@ class QuickLoaderEditor(ParamEditor):
     self.addNewParamState.clear()
 
 
-  def addActForEditor(self, editor: ParamEditor, paramState: str, act: ActWithShc=None):
+  def addActForEditor(self, editor: ParamEditor, paramState: str, act: ShcKeySeq=None):
     if editor.name not in self.params.names:
       curGroup = self.params.addChild(dict(name=editor.name, type='group', removable=True))
     else:
@@ -218,28 +220,28 @@ class QuickLoaderEditor(ParamEditor):
       return
     curGroup.opts['removable'] = True
     if act is None:
-      act = ActWithShc(name=paramState, removable=True, type='actionwithshortcut')
+      act = ShcKeySeq(name=paramState, value='', removable=True, type='shortcutkeyseq')
     curGroup.addChild(act)
 
     act.opts['removable'] = True
     _addRmOption(act)
     act.sigActivated.connect(
-      lambda _act: self._safeLoadParamState(_act, editor, paramState))
+      lambda _act: self._safeLoadParamValues(_act, editor, paramState))
     act.isActivateConnected = True
 
-  def _safeLoadParamState(self, action: ActWithShc, editor: ParamEditor,
-                          paramState: str):
+  def _safeLoadParamValues(self, action: ShcKeySeq, editor: ParamEditor,
+                           paramState: str):
     """
     It is possible for the quick loader to refer to a param state that no longer
     exists. When this happens, failure should be graceful and the action should be
     deleted
     """
     try:
-      editor.loadParamState(paramState)
+      editor.loadParamValues(paramState)
     except FileNotFoundError:
       action.remove()
       # Wait until end of process cycle to raise error
       formattedState = self.listModel.displayFormat.format(editor=editor, stateName=paramState)
-      raiseErrorLater(ParamEditorError(
+      fns.raiseErrorLater(ValueError(
         f'Attempted to load {formattedState} but the setting was not found.'
       ))

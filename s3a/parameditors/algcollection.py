@@ -7,21 +7,19 @@ from typing import Optional, Dict, List, Callable, Union, Type
 from pyqtgraph.Qt import QtCore
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.parameterTypes import ListParameter
-from s3a.constants import MENU_OPTS_DIR
-from s3a.generalutils import pascalCaseToTitle
-from s3a.structures import AlgProcessorError
+from utilitys import ParamEditor, NestedProcWrapper, fns
+from utilitys.params.pgregistered import ProcGroupParameter
+from utilitys import NestedProcess
 
-from .genericeditor import ParamEditor
-from .pgregistered import ProcGroupParameter
-from ..processing import GeneralProcWrapper, GeneralProcess
+from s3a.constants import MENU_OPTS_DIR
 
 Signal = QtCore.Signal
 
 class AlgCtorCollection(ParamEditor):
   # sigProcessorCreated = Signal(object) # Signal(AlgCollectionEditor)
-  def __init__(self, procWrapType: Type[GeneralProcWrapper], parent=None):
+  def __init__(self, procWrapType: Type[NestedProcWrapper], parent=None):
     super().__init__(parent, saveDir='', fileType='')
-    self.processorCtors : List[Callable[[], GeneralProcess]] = []
+    self.processorCtors : List[Callable[[], NestedProcess]] = []
     self.spawnedCollections : List[AlgParamEditor] = []
     self.procWrapType = procWrapType
 
@@ -29,7 +27,7 @@ class AlgCtorCollection(ParamEditor):
     if not isclass(clsObj):
       clsObj = type(clsObj)
     clsName = clsObj.__name__
-    formattedClsName = pascalCaseToTitle(clsName)
+    formattedClsName = fns.pascalCaseToTitle(clsName)
     editorDir = MENU_OPTS_DIR/formattedClsName.lower()
     newEditor = AlgParamEditor(editorDir, self.processorCtors, self.procWrapType, name=editorName)
     self.spawnedCollections.append(newEditor)
@@ -42,19 +40,19 @@ class AlgCtorCollection(ParamEditor):
     # self.sigProcessorCreated.emit(newEditor)
     return newEditor
 
-  def addProcessCtor(self, procCtor: Callable[[], GeneralProcess]):
+  def addProcessCtor(self, procCtor: Callable[[], NestedProcess]):
     self.processorCtors.append(procCtor)
     for algCollection in self.spawnedCollections:
       algCollection.addProcessor(procCtor())
 
-  def addProcessFunction(self, func: Callable, procType: Type[GeneralProcess], name:str=None, **kwargs):
+  def addProcessFunction(self, func: Callable, procType: Type[NestedProcess], name:str=None, **kwargs):
     def ctor():
       return procType.fromFunction(func, name=name, **kwargs)
     self.addProcessCtor(ctor)
 
 class AlgParamEditor(ParamEditor):
-  def __init__(self, saveDir, procCtors: List[Callable[[], GeneralProcess]],
-               procWrapType: Type[GeneralProcWrapper], name=None, parent=None):
+  def __init__(self, saveDir, procCtors: List[Callable[[], NestedProcess]],
+               procWrapType: Type[NestedProcWrapper], name=None, parent=None):
     algOptDict = {
       'name': 'Algorithm', 'type':  'list', 'values': [], 'value': 'N/A'
     }
@@ -68,19 +66,19 @@ class AlgParamEditor(ParamEditor):
 
     self.saveDir.mkdir(parents=True, exist_ok=True)
 
-    self.curProcessor: Optional[GeneralProcWrapper] = None
+    self.curProcessor: Optional[NestedProcWrapper] = None
     self.procWrapType = procWrapType
-    self.nameToProcMapping: Dict[str, GeneralProcWrapper] = {}
+    self.nameToProcMapping: Dict[str, NestedProcWrapper] = {}
 
-    wrapped : Optional[GeneralProcWrapper] = None
+    wrapped : Optional[NestedProcWrapper] = None
     for processorCtor in procCtors:
       # Retrieve proc so default can be set after
       wrapped = self.addProcessor(processorCtor())
     self.algOpts.setDefault(wrapped)
     self.switchActiveProcessor(proc=wrapped)
-    # self.saveParamState('Default', allowOverwriteDefault=True)
+    # self.saveParamValues('Default', allowOverwriteDefault=True)
 
-  def addProcessor(self, newProc: GeneralProcess):
+  def addProcessor(self, newProc: NestedProcess):
     processor = self.procWrapType(newProc, parentParam=self.params)
     self.tree.addParameters(self.params.child(processor.algName))
 
@@ -88,34 +86,34 @@ class AlgParamEditor(ParamEditor):
     self.algOpts.setLimits(self.nameToProcMapping.copy())
     return processor
 
-  def saveParamState(self, saveName: str=None, paramState: dict=None, **kwargs):
+  def saveParamValues(self, saveName: str=None, paramState: dict=None, **kwargs):
     """
     The algorithm editor also needs to store information about the selected algorithm, so lump
     this in with the other parameter information before calling default save.
     """
     if paramState is None:
-      paramDict = self.paramDictWithOpts(addList=['enabled'], addTo=[ProcGroupParameter],
+      paramDict = fns.paramDictWithOpts(self.params, addList=['enabled'], addTo=[ProcGroupParameter],
                                          removeList=['value'])
       paramState = {'Selected Algorithm': self.algOpts.value().algName,
                     'Parameters': paramDict}
-    return super().saveParamState(saveName, paramState, **kwargs)
+    return super().saveParamValues(saveName, paramState, **kwargs)
 
-  def loadParamState(self, stateName: Union[str, Path], stateDict: dict=None,
-                     addChildren=False, removeChildren=False, applyChanges=True):
+  def loadParamValues(self, stateName: Union[str, Path],
+                      stateDict: dict=None, **kwargs):
     stateDict = self._parseStateDict(stateName, stateDict)
     selectedOpt = stateDict.get('Selected Algorithm', None)
     # Get the impl associated with this option name
     isLegitSelection = selectedOpt in self.algOpts.opts['limits']
     if not isLegitSelection:
       selectedImpl = self.algOpts.value()
-      raise AlgProcessorError(f'Selection {selectedOpt} does'
+      raise ValueError(f'Selection {selectedOpt} does'
                                 f' not match the list of available algorithms. Defaulting to {selectedImpl}')
     else:
       selectedImpl = self.algOpts.opts['limits'][selectedOpt]
     self.algOpts.setValue(selectedImpl)
-    super().loadParamState(stateName, stateDict['Parameters'])
+    super().loadParamValues(stateName, stateDict['Parameters'])
 
-  def switchActiveProcessor(self, proc: Union[str, GeneralProcWrapper]):
+  def switchActiveProcessor(self, proc: Union[str, NestedProcWrapper]):
     """
     Changes which processor is active. if ImgProcWrapper, uses that as the processor.
     If str, looks for that name in current processors and uses that

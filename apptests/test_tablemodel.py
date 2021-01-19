@@ -8,7 +8,7 @@ from testingconsts import RND
 from s3a import FR_SINGLETON
 from s3a.constants import PRJ_ENUMS
 from s3a.constants import REQD_TBL_FIELDS
-from s3a.structures import ComplexXYVertices, S3AWarning, XYVertices
+from s3a.structures import ComplexXYVertices, XYVertices
 
 oldIds = np.arange(NUM_COMPS, dtype=int)
 
@@ -109,9 +109,9 @@ def test_merge_comps(sampleComps, mgr):
 
 def test_bad_merge(sampleComps, mgr):
   mgr.addComps(sampleComps)
-  with pytest.warns(S3AWarning):
+  with pytest.warns(UserWarning):
     mgr.mergeCompVertsById([0])
-  with pytest.warns(S3AWarning):
+  with pytest.warns(UserWarning):
     mgr.mergeCompVertsById([])
 
 def test_table_setdata(sampleComps, app, mgr):

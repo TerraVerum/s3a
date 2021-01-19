@@ -1,8 +1,5 @@
-from pathlib import Path
-
 from apptests.testingconsts import SAMPLE_SMALL_IMG_FNAME
 from apptests.conftest import dfTester
-from s3a import ComponentIO
 from s3a.plugins.file import ProjectData
 
 

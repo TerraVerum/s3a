@@ -1,17 +1,15 @@
 from pathlib import Path
-from typing import List, Dict, Type, Union, Callable, Any
+from typing import List, Dict, Union, Callable, Any
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from pyqtgraph.parametertree import Parameter
+from utilitys import ParamEditor, fns
 
-from s3a.generalutils import safeCallFuncList
-from s3a.graphicsutils import raiseErrorLater
-from s3a.constants import APP_STATE_DIR
-from s3a.structures import FilePath, PrjParam, S3AIOError
-from s3a.parameditors import ParamEditor
 from s3a import FR_SINGLETON
-
+from s3a.constants import APP_STATE_DIR
+from s3a.generalutils import safeCallFuncList
+from s3a.structures import FilePath
 
 class AppStateEditor(ParamEditor):
 
@@ -22,7 +20,7 @@ class AppStateEditor(ParamEditor):
     super().__init__(parent, paramList, saveDir, fileType, name, topTreeChild)
     self._stateFuncsDf = pd.DataFrame(columns=['importFuncs', 'exportFuncs'])
 
-  def saveParamState(self, saveName: str=None, paramState: dict=None, **kwargs):
+  def saveParamValues(self, saveName: str=None, paramState: dict=None, **kwargs):
     if saveName is None:
       saveName = self.RECENT_STATE_FNAME
     if paramState is None:
@@ -40,16 +38,16 @@ class AppStateEditor(ParamEditor):
           continue
         curSaveName = str(saveOnExitDir/editor.name)
         formattedName = editor.name.replace(' ', '').lower()
-        editor.saveParamState(curSaveName, blockWrite=False)
+        editor.saveParamValues(curSaveName, blockWrite=False)
         paramState.update({formattedName: curSaveName})
     else:
       errs = []
 
-    ret = super().saveParamState(saveName, paramState, **kwargs)
+    ret = super().saveParamValues(saveName, paramState, **kwargs)
     self.raiseErrMsgIfNeeded(errs)
     return ret
 
-  def loadParamState(self, stateName: Union[str, Path]=None, stateDict: dict = None,
+  def loadParamValues(self, stateName: Union[str, Path]=None, stateDict: dict = None,
                      overrideDict: dict=None, **kwargs):
     if stateName is None:
       stateName = self.RECENT_STATE_FNAME
@@ -60,7 +58,7 @@ class AppStateEditor(ParamEditor):
     stateDict = self._parseStateDict(stateName, stateDict)
     if overrideDict is not None:
       stateDict.update(overrideDict)
-    paramDict = stateDict.pop('Parameters', {})
+    paramDict = stateDict.pop('Parameters', {}) or {}
     stateDictKeys = list(stateDict.keys())
     legitKeys = self._stateFuncsDf.index.intersection(stateDictKeys)
     importFuncs = self._stateFuncsDf.loc[legitKeys, 'importFuncs']
@@ -70,16 +68,16 @@ class AppStateEditor(ParamEditor):
     _, errs = safeCallFuncList(legitKeys, importFuncs, args)
     if len(np.setdiff1d(stateDict.keys(), legitKeys)) > 0:
       FR_SINGLETON.quickLoader.buildFromStartupParams(stateDict)
-    ret = super().loadParamState(stateName, paramDict, **kwargs)
+    ret = super().loadParamValues(stateName, paramDict, **kwargs)
     return ret
 
   @staticmethod
   def raiseErrMsgIfNeeded(errMsgs: List[str]):
     if len(errMsgs) > 0:
-      err = S3AIOError('Errors were encountered for the following parameters'
+      err = IOError('Errors were encountered for the following parameters'
                          ' (shown as <parameter>: <exception>)\n'
                        + "\n\n".join(errMsgs))
-      raiseErrorLater(err)
+      fns.raiseErrorLater(err)
 
 
   def addImportExportOpts(self, optName: str, importFunc: Callable[[str], Any],

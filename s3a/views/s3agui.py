@@ -8,20 +8,15 @@ import pyqtgraph as pg
 import qdarkstyle
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
+from utilitys import ParamEditor, ParamEditorPlugin, RunOpts, PrjParam, fns
 
-from s3a import RunOpts, PrjParam
-from s3a.constants import PRJ_ENUMS
 from s3a.constants import LAYOUTS_DIR, REQD_TBL_FIELDS
-from s3a.generalutils import attemptFileLoad
-from s3a.graphicsutils import makeExceptionsShowDialogs, popupFilePicker, \
-  saveToFile, dialogGetSaveFileName, addDirItemsToMenu, \
-  restoreExceptionBehavior, menuFromEditorActions
+from s3a.constants import PRJ_ENUMS
 from s3a.models.s3abase import S3ABase
-from s3a.parameditors import ParamEditor, FR_SINGLETON
-from s3a.plugins.base import ParamEditorPlugin
+from s3a.parameditors import FR_SINGLETON
 from s3a.plugins.file import FilePlugin
 from s3a.plugins.misc import RandomToolsPlugin, MainImagePlugin, CompTablePlugin
-from s3a.structures import S3AWarning, XYVertices, FilePath, NChanImg
+from s3a.structures import XYVertices, FilePath, NChanImg
 
 __all__ = ['S3A']
 
@@ -45,8 +40,8 @@ class S3A(S3ABase):
     superLoaderArgs = {'author': startupSettings.pop('author', None)}
     super().__init__(parent, **superLoaderArgs)
     if guiMode:
-      warnings.simplefilter('error', S3AWarning)
-      makeExceptionsShowDialogs(self)
+      warnings.simplefilter('error', UserWarning)
+      fns.makeExceptionsShowDialogs(self)
     def saveRecentLayout(_folderName: Path):
       outFile = _folderName/'savedLayout'
       self.saveLayout(outFile)
@@ -61,6 +56,7 @@ class S3A(S3ABase):
     # Dummy editor for layout options since it doesn't really have editable settings
     # Maybe later this can be elevated to have more options
     self.layoutEditor = ParamEditor(self, None, LAYOUTS_DIR, 'dockstate', 'Layout')
+    self.layoutEditor.loadParamValues = self.loadLayout
 
     self._buildGui()
     self._buildMenu()
@@ -70,7 +66,7 @@ class S3A(S3ABase):
     self.saveLayout('Default', allowOverwriteDefault=True)
     stateDict = None if loadLastState else {}
     with pg.BusyCursor():
-      self.appStateEditor.loadParamState(stateDict=stateDict, overrideDict=startupSettings)
+      self.appStateEditor.loadParamValues(stateDict=stateDict, overrideDict=startupSettings)
 
   def _hookupSignals(self):
     FR_SINGLETON.colorScheme.registerFunc(self.updateTheme, runOpts=RunOpts.ON_CHANGED, nest=False)
@@ -95,7 +91,7 @@ class S3A(S3ABase):
     _plugins = [FR_SINGLETON.clsToPluginMapping[c] for c in [MainImagePlugin, CompTablePlugin]]
     parents = [self.mainImg, self.compTbl]
     for plugin, parent in zip(_plugins, reversed(parents)):
-      parent.menu.addMenu(menuFromEditorActions([plugin.toolsEditor], plugin.name, menuParent=parent, nest=False))
+      plugin.toolsEditor.actionsMenuFromProcs(plugin.name, nest=False, parent=parent, outerMenu=parent.menu)
 
 
     tableDock = QtWidgets.QDockWidget('Component Table Window', self)
@@ -119,7 +115,7 @@ class S3A(S3ABase):
     self.pxColor = QtWidgets.QLabel("Pixel Color")
 
     self.mainImg.sigMousePosChanged.connect(lambda pos, pxColor: self.setInfo(pos, pxColor))
-    # self.focusedImg.sigMousePosChanged.connect(lambda info: setInfo(info))
+    # self.mainImg.sigMousePosChanged.connect(lambda info: setInfo(info))
     self.statBar.show()
     self.statBar.addWidget(self.imageLbl)
     self.statBar.addWidget(self.mouseCoords)
@@ -127,11 +123,11 @@ class S3A(S3ABase):
 
   def changeFocusedComp(self, newComps: df=None, forceKeepLastChange=False):
     ret = super().changeFocusedComp(newComps, forceKeepLastChange)
-    self.curCompIdLbl.setText(f'Component ID: {self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]}')
+    self.curCompIdLbl.setText(f'Component ID: {self.mainImg.compSer[REQD_TBL_FIELDS.INST_ID]}')
     return ret
 
   def resetTblFields_gui(self):
-    outFname = popupFilePicker(None, 'Select Table Config File', 'All Files (*.*);; Config Files (*.yml)')
+    outFname = fns.popupFilePicker(None, 'Select Table Config File', 'All Files (*.*);; Config Files (*.yml)')
     if outFname is not None:
       FR_SINGLETON.tableData.loadCfg(outFname)
 
@@ -179,7 +175,7 @@ class S3A(S3ABase):
     layoutName = Path(layoutName)
     if not layoutName.is_absolute():
       layoutName = LAYOUTS_DIR/f'{layoutName}.dockstate'
-    self.restoreState(attemptFileLoad(layoutName))
+    self.restoreState(fns.attemptFileLoad(layoutName))
 
   def saveLayout(self, layoutName: Union[str, Path]=None, allowOverwriteDefault=False):
     dockStates = self.saveState().data()
@@ -188,7 +184,7 @@ class S3A(S3ABase):
     else:
       savePathPlusStem = LAYOUTS_DIR/layoutName
     saveFile = savePathPlusStem.with_suffix(f'.dockstate')
-    saveToFile(dockStates, saveFile,
+    fns.saveToFile(dockStates, saveFile,
                allowOverwriteDefault=allowOverwriteDefault)
     self.sigLayoutSaved.emit()
 
@@ -204,7 +200,7 @@ class S3A(S3ABase):
 
   def setMainImg_gui(self):
     fileFilter = "Image Files (*.png *.tif *.jpg *.jpeg *.bmp *.jfif);;All files(*.*)"
-    fname = popupFilePicker(None, 'Select Main Image', fileFilter)
+    fname = fns.popupFilePicker(None, 'Select Main Image', fileFilter)
     if fname is not None:
       with pg.BusyCursor():
         self.setMainImg(fname)
@@ -212,20 +208,20 @@ class S3A(S3ABase):
   def exportAnnotations_gui(self):
     """Saves the component table to a file"""
     fileFilters = self.compIo.handledIoTypes_fileFilter(**{'*': 'All Files'})
-    outFname = popupFilePicker(None, 'Select Save File', fileFilters, existing=False)
+    outFname = fns.popupFilePicker(None, 'Select Save File', fileFilters, existing=False)
     if outFname is not None:
       super().exportCurAnnotation(outFname)
 
   def openAnnotation_gui(self):
     # TODO: See note about exporting comps. Delegate the filepicker activity to importer
     fileFilter = self.compIo.handledIoTypes_fileFilter()
-    fname = popupFilePicker(None, 'Select Load File', fileFilter)
+    fname = fns.popupFilePicker(None, 'Select Load File', fileFilter)
     if fname is None:
       return
     self.openAnnotations(fname)
 
   def saveLayout_gui(self):
-    outName = dialogGetSaveFileName(self, 'Layout Name')
+    outName = fns.dialogGetSaveFileName(self, 'Layout Name')
     if outName is None or outName == '':
       return
     self.saveLayout(outName)
@@ -249,8 +245,8 @@ class S3A(S3ABase):
       # Clean up all editor windows, which could potentially be left open
       ev.accept()
       FR_SINGLETON.close()
-      restoreExceptionBehavior()
-      self.appStateEditor.saveParamState()
+      fns.restoreExceptionBehavior()
+      self.appStateEditor.saveParamValues()
 
   def forceClose(self):
     """
@@ -280,8 +276,7 @@ class S3A(S3ABase):
     plugin.dock.showEvent = show_fixDockWidth
 
   def _populateLoadLayoutOptions(self):
-    layoutGlob = LAYOUTS_DIR.glob('*.dockstate')
-    addDirItemsToMenu(self.menuLayout, layoutGlob, self.loadLayout)
+    self.layoutEditor.addDirItemsToMenu(self.menuLayout)
 
   def setInfo(self, xyPos: XYVertices, pxColor: np.ndarray):
     if pxColor is None: return

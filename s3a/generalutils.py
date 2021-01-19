@@ -1,22 +1,14 @@
-import inspect
-import re
-from ast import literal_eval
-from contextlib import contextmanager
-from inspect import isclass
 from pathlib import Path
-from typing import Any, Optional, List, Collection, Callable, Tuple, Union, Sequence
-import typing as t
+from typing import Any, Optional, Callable, Tuple, Union, Sequence, List, Collection
+from contextlib import contextmanager
 
-import numpy as np
-import pandas as pd
-from pandas import DataFrame as df
 import cv2 as cv
-from pyqtgraph.parametertree import Parameter
+import numpy as np
+from pandas import DataFrame as df
+from utilitys import PrjParam
 
 from s3a.constants import ANN_AUTH_DIR
-from s3a.graphicsutils import yaml
-from s3a.structures.typeoverloads import TwoDArr, FilePath
-from .structures import XYVertices, PrjParam, ComplexXYVertices, NChanImg
+from .structures import TwoDArr, XYVertices, ComplexXYVertices, NChanImg
 
 
 def stackedVertsPlusConnections(vertList: ComplexXYVertices) -> (XYVertices, np.ndarray):
@@ -108,21 +100,6 @@ def largestList(verts: List[XYVertices]) -> XYVertices:
   # vertList += cropOffset[0:2]
   return XYVertices(maxLenList)
 
-def helpTextToRichText(helpText: str, prependText='', postfixText=''):
-  # Outside <qt> tags
-  if helpText.startswith('<qt>'):
-    unwrappedHelpText = helpText[4:-5]
-  else:
-    unwrappedHelpText = helpText
-  if len(prependText) > 0 and len(helpText) > 0 or len(postfixText) > 0:
-    prependText += '<br>'
-  curText = prependText + unwrappedHelpText
-  if len(postfixText) > 0:
-    curText += '<br>' + postfixText
-  newHelpText = f'<qt>{curText}</qt>'
-  return newHelpText
-
-
 def resolveAuthorName(providedAuthName: Optional[str]) -> Optional[str]:
   authPath = Path(ANN_AUTH_DIR)
   authFile = authPath.joinpath('defaultAuthor.txt')
@@ -166,25 +143,6 @@ def makeUniqueBaseClass(obj: Any):
   obj.__class__ = mixin
   return mixin
 
-
-def pascalCaseToTitle(name: str, addSpaces=True) -> str:
-  """
-  Helper utility to turn a PascalCase name to a 'Title Case' title
-  :param name: camel-cased name
-  :param addSpaces: Whether to add spaces in the final result
-  :return: Space-separated, properly capitalized version of :param:`Name`
-  """
-  if not name:
-    return name
-  if name.startswith('FR'):
-    name = name[2:]
-  if addSpaces:
-    replace = r'\1 \2'
-  else:
-    replace = r'\1\2'
-  name = re.sub(r'(\w)([A-Z])', replace, name)
-  name = name.replace('_', ' ')
-  return name.title()
 
 def lower_NoSpaces(name: str):
   return name.replace(' ', '').lower()
@@ -313,84 +271,15 @@ def resize_pad(img: NChanImg, newSize: Tuple[int, int], interp=cv.INTER_NEAREST,
     paddedImg = cv.rotate(paddedImg, cv.ROTATE_90_COUNTERCLOCKWISE)
   return paddedImg
 
-def dynamicDocstring(**kwargs):
-  """
-  Docstrings must be known at compile time. However this prevents expressions like
-
-  ```
-  x = ['dog', 'cat', 'squirrel']
-  def a(animal: str):
-    \"\"\"
-    :param animal: must be one of {x}
-    \"\"\"
-  ```
-
-  from compiling. This can make some featurs of s3a difficult, like dynamically generating
-  limits for a docstring list. `dynamicDocstring` wrapps a docstring and provides kwargs
-  for string formatting.
-  Retrieved from https://stackoverflow.com/a/10308363/9463643
-
-  :param kwargs: List of kwargs to pass to formatted docstring
-  """
-  def wrapper(obj):
-    obj.__doc__ = obj.__doc__.format(**kwargs)
-    return obj
-  return wrapper
-
-def resolveYamlDict(cfgFname: FilePath, cfgDict: dict=None):
-  if cfgDict is not None:
-    cfg = cfgDict
+@contextmanager
+def monkeyPatch(obj, toChange: str, newVal):
+  oldVal = getattr(obj, toChange, None)
+  setattr(obj, toChange, newVal)
+  yield
+  if oldVal is None:
+    delattr(obj, toChange)
   else:
-    cfg = attemptFileLoad(cfgFname)
-  return Path(cfgFname), cfg
-
-def serAsFrame(ser: pd.Series):
-  return ser.to_frame().T
-
-def attemptFileLoad(fpath: FilePath , openMode='r') -> Union[dict, bytes]:
-  with open(fpath, openMode) as ifile:
-    loadObj = yaml.load(ifile)
-  return loadObj
-
-
-def getParamChild(param: Parameter, *childPath: Sequence[str], allowCreate=True, groupOpts:dict=None,
-                  chOpts: dict=None):
-  if groupOpts is None:
-    groupOpts = {}
-  groupOpts.setdefault('type', 'group')
-  while childPath and childPath[0] in param.names:
-    param = param.child(childPath[0])
-    childPath = childPath[1:]
-  # All future children must be created
-  if allowCreate:
-    for chName in childPath:
-      param = param.addChild(dict(name=chName, **groupOpts))
-      childPath = childPath[1:]
-  elif len(childPath) > 0:
-    # Child doesn't exist
-    raise KeyError(f'Children {childPath} do not exist in param {param}')
-  if chOpts is not None:
-    if chOpts['name'] in param.names:
-      param = param.child(chOpts['name'])
-    else:
-      param = param.addChild(chOpts)
-  return param
-
-
-def getAllBases(cls):
-  baseClasses = [cls]
-  nextClsPtr = 0
-  if not isclass(cls):
-    return baseClasses
-  # Get all bases of bases, too
-  while nextClsPtr < len(baseClasses):
-    curCls = baseClasses[nextClsPtr]
-    curBases = curCls.__bases__
-    # Only add base classes that haven't already been added to prevent infinite recursion
-    baseClasses.extend([tmpCls for tmpCls in curBases if tmpCls not in baseClasses])
-    nextClsPtr += 1
-  return baseClasses
-
+    setattr(obj, toChange, oldVal)
 
 def hierarchicalUpdate(curDict: dict, other: dict):
   """Dictionary update that allows nested keys to be updated without deleting the non-updated keys"""
@@ -404,62 +293,3 @@ def hierarchicalUpdate(curDict: dict, other: dict):
       curVal.extend(v)
     else:
       curDict[k] = v
-
-def coerceAnnotation(ann: Any):
-  """
-  From a function argument annotation, attempts to find a default value matching
-  that annotation. E.g. for the function signature
-  `def a(param: int)`
-  `inspect` is used to find the signature, and `param`'s annotation would be `int`.
-  This function would turn that into `int()`, or 0. Attempts are as follows:
-    - If the annotation is a string, attempts are made to convert it to a value, e.g.
-      `def a(param: 'int')` will follow the flow of `def a(param: int).Note this
-       will fail if the annotation is for a class not in scope upon evaluation.
-    - If direct conversion works as described in the docstring, the value is returned.
-
-       * If this fails due to *TypeError*, the following cases are examined:
-         * typing.Union (flow is followed for each union type until non-None is
-         returned or all types have been examined)
-         * typing.List, Tuple, Dict, <builtim>: That builtin is returned
-
-     - All other cases result in *None* being returned.
-  """
-  if isinstance(ann, str):
-    ann = literal_eval(ann)
-  try:
-    return ann()
-  except TypeError:
-    # Check for typing types
-    if getattr(ann, '__module__', None) == t.__name__:
-      if ann.__origin__ is t.Union:
-        ann: t.Union
-        for arg in ann.__args__:
-          ret = coerceAnnotation(arg)
-          if ret is not None:
-            return ret
-      else:
-        # Check for typing instances of builtins
-        if hasattr(ann, '_name'):
-          try:
-            return literal_eval(ann._name.lower())
-          except Exception as ex:
-            pass
-  return None
-
-@contextmanager
-def monkeyPatch(obj, toChange: str, newVal):
-  oldVal = getattr(obj, toChange, None)
-  setattr(obj, toChange, newVal)
-  yield
-  if oldVal is None:
-    delattr(obj, toChange)
-  else:
-    setattr(obj, toChange, oldVal)
-
-
-def clsNameOrGroup(cls: Union[type, Any]):
-  if not inspect.isclass(cls):
-    cls = type(cls)
-  if hasattr(cls, '__groupingName__'):
-    return cls.__groupingName__
-  return pascalCaseToTitle(cls.__name__)

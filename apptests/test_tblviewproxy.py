@@ -1,15 +1,12 @@
-from io import StringIO
-from pathlib import Path
-
+import cv2 as cv
 import numpy as np
 import pandas as pd
-import cv2 as cv
 import pytest
 
 from conftest import stack
-from s3a import appInst, FR_SINGLETON, S3A
-from s3a.constants import REQD_TBL_FIELDS, PRJ_CONSTS
-from s3a.structures import ComplexXYVertices, PrjParam, XYVertices, S3AWarning
+from s3a import appInst, FR_SINGLETON
+from s3a.constants import REQD_TBL_FIELDS
+from s3a.structures import ComplexXYVertices, XYVertices
 from s3a.views.tableview import CompTableView
 
 

@@ -1,12 +1,12 @@
 import sys
 from typing import Optional
-from .structures import FilePath
 
 import fire
 from pyqtgraph.Qt import QtCore
 
 from . import appInst, FR_SINGLETON
 from .views.s3agui import S3A
+from utilitys.fns import makeExceptionsShowDialogs
 
 
 def main(guiMode=True, loadLastState=None, **profileArgs) -> Optional[S3A]:
@@ -39,6 +39,7 @@ def main(guiMode=True, loadLastState=None, **profileArgs) -> Optional[S3A]:
     FR_SINGLETON.tableData.loadCfg(tableCfg)
   win = S3A(guiMode=guiMode, loadLastState=loadLastState, **profileArgs)
   if guiMode:
+    makeExceptionsShowDialogs(win)
     QtCore.QTimer.singleShot(0, win.showMaximized)
     sys.exit(appInst.exec_())
   else:

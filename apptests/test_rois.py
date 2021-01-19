@@ -1,7 +1,7 @@
 import pytest
 from typing import Tuple
 
-from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
+from pyqtgraph.Qt import QtCore, QtGui
 import numpy as np
 
 from s3a.views.imageareas import MainImage

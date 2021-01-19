@@ -7,17 +7,15 @@ import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
-from s3a import FR_SINGLETON, RunOpts
+from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
 from s3a.models.tablemodel import ComponentMgr
-from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS
-from s3a.constants import PRJ_ENUMS
-from s3a.structures import S3AException, S3AWarning, TwoDArr
+from s3a.parameditors.singleton import FR_SINGLETON
+from s3a.structures import TwoDArr
 
 __all__ = ['CompTableView']
 
-from ..parameditors import pgregistered, ParamEditor, ParamEditorDockGrouping
-from ..parameditors import EditorPropsMixin
-from ..graphicsutils import menuFromEditorActions
+from utilitys import ParamEditor, EditorPropsMixin, RunOpts
+from utilitys.params.pgregistered import PgParamDelegate
 
 Signal = QtCore.Signal
 
@@ -152,7 +150,7 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
     with FR_SINGLETON.generalProps.setBaseRegisterPath(self.__groupingName__):
       proc, params = FR_SINGLETON.generalProps.registerFunc(
         self.setVisibleColumns, runOpts=RunOpts.ON_CHANGED, nest=False,
-        returnParam=True, forceKeys=['visibleColumns'])
+        returnParam=True, visibleColumns=[])
     def onChange(*_args):
       params.child('visibleColumns').setLimits([f.name for f in TBL_FIELDS])
     onChange()
@@ -194,13 +192,13 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
         paramDict['type'] = 'list'
         paramDict.update(values={'True': True, 'False': False})
       try:
-        self.setItemDelegateForColumn(ii, pgregistered.PgParamDelegate(paramDict, self))
-      except S3AException:
+        self.setItemDelegateForColumn(ii, PgParamDelegate(paramDict, self))
+      except TypeError:
         # Parameter doesn't have a registered pyqtgraph editor, so default to
         # generic text editor
         paramDict['type'] = 'text'
         paramDict['default'] = str(curval)
-        self.setItemDelegateForColumn(ii, pgregistered.PgParamDelegate(paramDict, self))
+        self.setItemDelegateForColumn(ii, PgParamDelegate(paramDict, self))
 
     self.horizontalHeader().setSectionsMovable(True)
 
@@ -263,7 +261,7 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
       # duplicates
       retLists = retLists[~np.isin(retLists[:,2], self.mgr.noEditColIdxs)]
     if warnNoneSelection and len(retLists) == 0:
-      warn('No editable columns selected.', S3AWarning)
+      warn('No editable columns selected.', UserWarning)
     return retLists
 
   def setSelectedCellsAsFirst(self):

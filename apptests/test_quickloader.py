@@ -1,7 +1,6 @@
 import pytest
 
 from conftest import assertExInList
-from s3a.structures import S3AWarning, S3AException
 from s3a.parameditors import *
 
 ql = FR_SINGLETON.quickLoader
@@ -47,12 +46,12 @@ def test_invalid_line_edit_add():
 
 def test_bad_user_profile():
   invalidFileDict = {'colorscheme': 'doesnt exist'}
-  with pytest.warns(S3AWarning):
+  with pytest.warns(UserWarning):
     ql.buildFromStartupParams(invalidFileDict)
-
-def test_bad_load_state(qtbot):
-  badLoad = dict(name='Non-existent editor', type='group',
-                 children=[dict(name='bad action', type='actionwithshortcut', value='Test')])
-  pstate = dict(name='test', type='group', children=[badLoad])
-  with pytest.warns(S3AWarning):
-    ql.loadParamState('bad state', pstate)
+#
+# def test_bad_load_state(qtbot):
+#   badLoad = dict(name='Non-existent editor', type='group',
+#                  children=[dict(name='bad action', type='shortcutkeyseq', value='Test')])
+#   pstate = dict(name='test', type='group', children=[badLoad])
+#   with pytest.warns(UserWarning):
+#     ql.loadParamValues('bad state', pstate)

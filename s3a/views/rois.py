@@ -4,9 +4,9 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 from skimage.draw import draw
+from utilitys import PrjParam
 
 from s3a.constants import PRJ_CONSTS
-from s3a.structures import PrjParam
 from s3a.structures import XYVertices, ComplexXYVertices
 
 __all__ = ['RectROI', 'PlotDataROI', 'PolygonROI', 'PointROI', 'SHAPE_ROI_MAPPING']

@@ -1,11 +1,9 @@
 import cv2 as cv
 import numpy as np
-from numpy import VisibleDeprecationWarning
 from skimage import data
 from skimage import io
 
 from s3a.constants import BASE_DIR, REQD_TBL_FIELDS
-from s3a.structures import S3AWarning
 
 TEST_AUTHOR = 'testauthor'
 
@@ -33,4 +31,4 @@ for impath, im in zip([SAMPLE_SMALL_IMG_FNAME, SAMPLE_IMG_FNAME],
 # from warnings import simplefilter
 # simplefilter('error', DeprecationWarning)
 # simplefilter('error', VisibleDeprecationWarning)
-# simplefilter('error', S3AWarning)
+# simplefilter('error', UserWarning)

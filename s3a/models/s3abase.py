@@ -7,19 +7,18 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
+from utilitys import EditorPropsMixin, RunOpts, ParamEditorPlugin, fns
 
-from s3a import ComponentIO, RunOpts
+from s3a import ComponentIO
 from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS
 from s3a.constants import PRJ_ENUMS
 from s3a.controls.tableviewproxy import CompDisplayFilter, CompSortFilter
-from s3a.generalutils import resolveAuthorName, dynamicDocstring, \
-  serAsFrame
+from s3a.generalutils import resolveAuthorName
 from s3a.models.tablemodel import ComponentMgr
-from s3a.parameditors import FR_SINGLETON, EditorPropsMixin
+from s3a.parameditors import FR_SINGLETON
 from s3a.parameditors.appstate import AppStateEditor
-from s3a.plugins.base import ParamEditorPlugin
 from s3a.plugins.file import FilePlugin
-from s3a.structures import FilePath, NChanImg, S3AIOError, S3AWarning
+from s3a.structures import FilePath, NChanImg
 from s3a.views.imageareas import MainImage
 from s3a.views.tableview import CompTableView
 
@@ -40,10 +39,9 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     self.generalToolbar = QtWidgets.QToolBar('General')
 
     self.mainImg = MainImage(toolbar=self.generalToolbar)
-    self.focusedImg = self.mainImg
-    PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION.opts['ownerObj'] = self.focusedImg
-    self.focusedImg.toolsEditor.registerFunc(self.acceptFocusedRegion,
-                                             btnOpts=PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION)
+    PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION.opts['ownerObj'] = self.mainImg
+    self.mainImg.toolsEditor.registerFunc(self.acceptFocusedRegion,
+                                          btnOpts=PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION)
     FR_SINGLETON.generalProps.registerFunc(FR_SINGLETON.actionStack.resizeStack,
                                            name=PRJ_CONSTS.PROP_UNDO_BUF_SZ.name,
                                            runOpts=RunOpts.ON_CHANGED,
@@ -52,7 +50,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     self.menuBar_ = self.menuBar()
 
     FR_SINGLETON.shortcuts.registerShortcut(PRJ_CONSTS.TOOL_CLEAR_ROI,
-                                            self.focusedImg.clearCurRoi,
+                                            self.mainImg.clearCurRoi,
                                             overrideOwnerObj=self.mainImg
                                             )
 
@@ -104,7 +102,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     # MAIN IMAGE
     # -----
     def handleCompsChanged(changedDict: dict):
-      focusedId = self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]
+      focusedId = self.mainImg.compSer[REQD_TBL_FIELDS.INST_ID]
       if focusedId in changedDict['deleted']:
         self.changeFocusedComp()
     self.compMgr.sigCompsChanged.connect(handleCompsChanged)
@@ -162,16 +160,16 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     """Applies the focused image vertices to the corresponding component in the table"""
     # If the component was deleted
     mgr = self.compMgr
-    focusedId = self.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID]
+    focusedId = self.mainImg.compSer[REQD_TBL_FIELDS.INST_ID]
     exists = focusedId in mgr.compDf.index
     if not exists and focusedId != REQD_TBL_FIELDS.INST_ID.value:
       # Could be a brand new component, allow in that case
-      warn('Cannot accept region as this component was deleted.', S3AWarning)
+      warn('Cannot accept region as this component was deleted.', UserWarning)
       return
 
     self.sigRegionAccepted.emit()
 
-    ser = self.focusedImg.compSer
+    ser = self.mainImg.compSer
     if ser[REQD_TBL_FIELDS.VERTICES].isEmpty():
       # Component should be erased. Since new components will not match existing
       # IDs the same function will work regardless of whether this was new or existing
@@ -189,14 +187,14 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
 
   def _acceptFocused_new(self, compSer: pd.Series):
     # New, make a brand new table entry
-    newIds = self.compMgr.addComps(serAsFrame(compSer))['added']
+    newIds = self.compMgr.addComps(fns.serAsFrame(compSer))['added']
     def undo():
       self.compMgr.rmComps(newIds)
     return undo
 
   def _acceptFocused_existing(self, compSer: pd.Series):
     oldComp = self.compMgr.compDf.loc[[compSer[REQD_TBL_FIELDS.INST_ID]]].copy()
-    modifiedDf = serAsFrame(compSer[[REQD_TBL_FIELDS.INST_ID, REQD_TBL_FIELDS.VERTICES]])
+    modifiedDf = fns.serAsFrame(compSer[[REQD_TBL_FIELDS.INST_ID, REQD_TBL_FIELDS.VERTICES]])
     self.compMgr.addComps(modifiedDf, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)
     def undo():
       self.add_focusComps(oldComp, addType=PRJ_ENUMS.COMP_ADD_AS_MERGE)
@@ -257,7 +255,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     srcImg_proj = self.filePlg.imagesDir/srcImg.name
     if srcImg_proj.exists() and not allowOverwrite and srcImg_proj != srcImg:
       # warn(f'Image {srcImg.name} already present in project images. Using'
-      #      f' existing image instead of current data.', S3AWarning)
+      #      f' existing image instead of current data.', UserWarning)
       pass
     else:
       self.filePlg.addImage(name=srcImg, data=self.mainImg.image, copyToProj=True,
@@ -279,7 +277,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       # 'hasUnsavedChanges' will be true after this, even though the changes are saved.
       self.hasUnsavedChanges = False
 
-  @dynamicDocstring(filters=ComponentIO.handledIoTypes_fileFilter())
+  @fns.dynamicDocstring(filters=ComponentIO.handledIoTypes_fileFilter())
   def exportCurAnnotation(self, outFname: Union[str, Path], readOnly=True, verifyIntegrity=True):
     """
     Exports current image annotations to a file. This may be more convenient than exporting
@@ -325,10 +323,10 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
   def openAnnotations(self, inFname: str, loadType=PRJ_ENUMS.COMP_ADD_AS_NEW):
     pathFname = Path(inFname)
     if self.mainImg.image is None:
-      raise S3AIOError('Cannot load components when no main image is set.')
+      raise IOError('Cannot load components when no main image is set.')
     fType = pathFname.suffix[1:]
     if not any(fType in typ for typ in self.compIo.handledIoTypes):
-      raise S3AIOError(f'Extension {fType} is not recognized. Must be one of:\n'
+      raise IOError(f'Extension {fType} is not recognized. Must be one of:\n'
                        + self.compIo.handledIoTypes_fileFilter())
     newComps = self.compIo.buildByFileType(inFname, self.mainImg.image.shape)
     self.compMgr.addComps(newComps, loadType)
@@ -345,10 +343,10 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
 
   @FR_SINGLETON.actionStack.undoable('Change Focused Component')
   def changeFocusedComp(self, newComps: df=None, forceKeepLastChange=False):
-    oldSer = self.focusedImg.compSer.copy()
-    oldImg = self.focusedImg.image
+    oldSer = self.mainImg.compSer.copy()
+    oldImg = self.mainImg.image
     if newComps is None or len(newComps) == 0:
-      self.focusedImg.updateFocusedComp()
+      self.mainImg.updateFocusedComp()
       self.compDisplay.regionPlot.focusById([])
       self.compDisplay.selectRowsById([])
     else:
@@ -359,7 +357,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       newComp: pd.Series = newComps.iloc[-1,:]
       newCompId = newComp[REQD_TBL_FIELDS.INST_ID]
       self.compDisplay.regionPlot.focusById([newCompId])
-      self.focusedImg.updateFocusedComp(newComp)
+      self.mainImg.updateFocusedComp(newComp)
     # Nothing happened since the last component change, so just replace it instead of
     # adding a distinct action to the buffer queue
     stack = FR_SINGLETON.actionStack
@@ -367,7 +365,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       stack.actions.pop()
     yield
     if oldImg is not None and len(oldSer.loc[REQD_TBL_FIELDS.VERTICES]) > 0:
-      self.changeFocusedComp(serAsFrame(oldSer), forceKeepLastChange=True)
+      self.changeFocusedComp(fns.serAsFrame(oldSer), forceKeepLastChange=True)
     else:
       self.changeFocusedComp()
 

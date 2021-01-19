@@ -2,11 +2,10 @@ import contextlib
 from pathlib import Path
 from typing import Union
 
-import numpy as np
 import pytest
 
-from s3a import FR_SINGLETON, REQD_TBL_FIELDS
 from conftest import dfTester
+from s3a import FR_SINGLETON, REQD_TBL_FIELDS
 
 td = FR_SINGLETON.tableData
 cfgDict = {

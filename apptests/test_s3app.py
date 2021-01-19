@@ -5,13 +5,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from conftest import NUM_COMPS, dfTester, assertExInList
-from s3a import FR_SINGLETON, appInst, PRJ_CONSTS
+from conftest import NUM_COMPS, dfTester
+from s3a import FR_SINGLETON, appInst, PRJ_CONSTS, S3A
 from s3a.constants import REQD_TBL_FIELDS, LAYOUTS_DIR, ANN_AUTH_DIR
-from s3a.generalutils import resolveAuthorName, imgCornerVertices
-from s3a import S3A
-from s3a.structures import AlgProcessorError, S3AException, XYVertices, \
-  ComplexXYVertices, S3AWarning
+from s3a.generalutils import resolveAuthorName
+from s3a.structures import XYVertices, ComplexXYVertices
 from testingconsts import RND, SAMPLE_IMG, SAMPLE_IMG_FNAME
 
 
@@ -39,7 +37,7 @@ seem to get the programmatically allocated keystrokes to work."""
 #   FR_SINGLETON.shortcuts.createRegisteredButton(param, app.mainImg)
 #   FR_SINGLETON.shortcuts.createRegisteredButton(p2, app.mainImg)
 #   keypress = QtGui.QKeyEvent(QtGui.QKeyEvent.KeyPress, QtCore.Qt.Key_T, QtCore.Qt.NoModifier, "T")
-#   with pytest.warns(S3AWarning):
+#   with pytest.warns(UserWarning):
 #     QtGui.QGuiApplication.sendEvent(app.mainImg, keypress)
 #     appInst.processEvents()
 
@@ -76,7 +74,7 @@ def test_import_large_verts(sampleComps, tmp_path, app):
   sampleComps.at[0, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices([XYVertices([[50e3, 50e3]])])
   io = app.compIo
   io.exportCsv(sampleComps, tmp_path/'Bad Verts.csv')
-  with pytest.warns(S3AWarning):
+  with pytest.warns(UserWarning):
     io.buildFromCsv(tmp_path/'Bad Verts.csv', app.mainImg.image.shape)
 
 def test_change_comp(app, mgr):
@@ -85,13 +83,13 @@ def test_change_comp(app, mgr):
   mgr.addComps(dfTester.compDf.copy())
   comp = mgr.compDf.loc[[RND.integers(NUM_COMPS)]]
   app.changeFocusedComp(comp)
-  assert app.focusedImg.compSer.equals(comp.squeeze())
+  assert app.mainImg.compSer.equals(comp.squeeze())
   assert mImg.image is not None
   stack.undo()
-  assert app.focusedImg.compSer[REQD_TBL_FIELDS.INST_ID] == -1
+  assert app.mainImg.compSer[REQD_TBL_FIELDS.INST_ID] == -1
 
 def test_save_layout(app):
-  with pytest.raises(S3AException):
+  with pytest.raises(IOError):
     app.saveLayout('default')
   app.saveLayout('tmp')
   savePath = LAYOUTS_DIR/f'tmp.dockstate'
@@ -121,7 +119,7 @@ def test_autosave(tmp_path, app, filePlg):
 
 @pytest.mark.withcomps
 def test_stage_plotting(monkeypatch, app, vertsPlugin):
-  mainImg = app.focusedImg
+  mainImg = app.mainImg
   mainImg.drawActGrp.callFuncByParam(PRJ_CONSTS.DRAW_ACT_CREATE)
   vertsPlugin.procCollection.switchActiveProcessor('Basic Shapes')
   oldSz = mainImg.minCompSize
@@ -129,7 +127,7 @@ def test_stage_plotting(monkeypatch, app, vertsPlugin):
   mainImg.shapeCollection.sigShapeFinished.emit(XYVertices([[0, 0], [5, 5]]))
   assert len(app.compMgr.compDf) > 0
   app.changeFocusedComp(app.compMgr.compDf.iloc[[0]])
-  assert app.focusedImg.compSer.loc[REQD_TBL_FIELDS.INST_ID] >= 0
+  assert app.mainImg.compSer.loc[REQD_TBL_FIELDS.INST_ID] >= 0
   mainImg.minCompSize = oldSz
 
   vertsPlugin.procCollection.switchActiveProcessor('Basic Shapes')
@@ -180,7 +178,7 @@ def test_set_colorinfo(app):
 def test_quickload_profile(tmp_path, app):
   outfile = tmp_path/'tmp.csv'
   app.exportCurAnnotation(outfile)
-  app.appStateEditor.loadParamState(
+  app.appStateEditor.loadParamValues(
     stateDict=dict(layout='Default', annotations=str(outfile),
     mainimageprocessor='Default', focusedimageprocessor='Default',
     colorscheme='Default', tablefilter='Default', mainimagetools='Default',
@@ -192,9 +190,9 @@ def test_load_last_settings(tmp_path, sampleComps, app):
   app.appStateEditor.saveDir = tmp_path
   app.setMainImg(SAMPLE_IMG_FNAME, SAMPLE_IMG)
   app.add_focusComps(sampleComps)
-  app.appStateEditor.saveParamState()
+  app.appStateEditor.saveParamValues()
   app.forceClose()
-  app.appStateEditor.loadParamState()
+  app.appStateEditor.loadParamValues()
   app.appStateEditor.saveDir = oldSaveDir
   assert np.array_equal(app.mainImg.image, SAMPLE_IMG)
   sampleComps[REQD_TBL_FIELDS.SRC_IMG_FILENAME] = SAMPLE_IMG_FNAME.name

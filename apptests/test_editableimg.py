@@ -8,7 +8,7 @@ from s3a.constants import PRJ_CONSTS
 from s3a.controls.drawctrl import RoiCollection
 from s3a.parameditors.algcollection import AlgParamEditor
 from s3a.processing import ProcessIO, ImageProcess, ImgProcWrapper
-from s3a.structures import XYVertices, ComplexXYVertices, PrjParam, S3AWarning, NChanImg
+from s3a.structures import XYVertices, ComplexXYVertices, PrjParam, NChanImg
 
 def leftClickGen(pos: XYVertices, dbclick=False):
   Ev = QtCore.QEvent
@@ -24,7 +24,7 @@ def leftClickGen(pos: XYVertices, dbclick=False):
 @pytest.fixture
 def roiFactory(app):
   clctn = RoiCollection((PRJ_CONSTS.DRAW_SHAPE_POLY, PRJ_CONSTS.DRAW_SHAPE_RECT),
-                        app.focusedImg)
+                        app.mainImg)
   def _polyRoi(pts: XYVertices, shape: PrjParam=PRJ_CONSTS.DRAW_SHAPE_RECT):
     clctn.curShapeParam = shape
     for pt in pts:
@@ -36,7 +36,7 @@ def roiFactory(app):
 
 @pytest.mark.withcomps
 def test_update(app, mgr, vertsPlugin):
-  mImg = app.focusedImg
+  mImg = app.mainImg
   focusedId = NUM_COMPS-1
   newCompSer = mgr.compDf.loc[focusedId]
   # Action 1
@@ -57,7 +57,7 @@ def test_update(app, mgr, vertsPlugin):
   assert mImg.compSer.equals(newerSer)
 
 def test_region_modify(sampleComps, app, mgr, vertsPlugin):
-  mImg = app.focusedImg
+  mImg = app.mainImg
   app.add_focusComps(sampleComps)
   shapeBnds = mImg.image.shape[:2]
   reach = np.min(shapeBnds)
@@ -67,7 +67,7 @@ def test_region_modify(sampleComps, app, mgr, vertsPlugin):
   imsum = lambda: vertsPlugin.region.toGrayImg(shapeBnds).sum()
 
   # 1st action
-  app.focusedImg.updateFocusedComp(None)
+  app.mainImg.updateFocusedComp(None)
   assert imsum() == 0
 
   newVerts = XYVertices([[5,5], [reach, reach], [reach, 5], [5,5]])
@@ -121,5 +121,5 @@ def test_proc_err(tmp_path):
   newClctn = AlgParamEditor(tmp_path, [newCtor], ImgProcWrapper)
 
   newClctn.switchActiveProcessor('Bad')
-  with pytest.warns(S3AWarning):
+  with pytest.warns(UserWarning):
     newClctn.curProcessor.run(image=np.array([[True]], dtype=bool), fgVerts=XYVertices([[0,0]]))

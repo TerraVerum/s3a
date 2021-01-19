@@ -7,8 +7,7 @@ from warnings import warn
 import cv2 as cv
 import numpy as np
 
-from .exceptions import IllFormedVerticesError
-from .typeoverloads import BlackWhiteImg, NChanImg
+from .typeoverloads import NChanImg, BlackWhiteImg
 
 class XYVertices(np.ndarray):
   connected = True
@@ -28,10 +27,10 @@ class XYVertices(np.ndarray):
     shapeLen = len(shape)
     # indicates point, so the one dimension must have only 2 elements
     if 1 < shapeLen < 2 and shape[0] != 2:
-      raise IllFormedVerticesError(f'A one-dimensional vertex array must be shape (2,).'
+      raise ValueError(f'A one-dimensional vertex array must be shape (2,).'
                                 f' Receieved array of shape {shape}')
     elif shapeLen > 2 or shapeLen > 1 and shape[1] != 2:
-      raise IllFormedVerticesError(f'Vertex list must be Nx2. Received shape {shape}.')
+      raise ValueError(f'Vertex list must be Nx2. Received shape {shape}.')
     if obj is None: return
     self.connected = getattr(obj, 'connected', True)
 
@@ -51,7 +50,7 @@ class XYVertices(np.ndarray):
       return self.reshape(-1)
     # Reaching here means the user requested vertices as point when
     # more than one point is in the list
-    raise IllFormedVerticesError(f'asPoint() can only be called when one vertex is in'
+    raise ValueError(f'asPoint() can only be called when one vertex is in'
                               f' the vertex list. Currently has shape {self.shape}')
 
   def asRowCol(self):
@@ -133,7 +132,7 @@ class ComplexXYVertices(list):
     if len(self) == 1:
       return self[0].asPoint()
     else:
-      raise IllFormedVerticesError(f'Can only treat ComplexXYVertices with one inner list as a point.'
+      raise ValueError(f'Can only treat ComplexXYVertices with one inner list as a point.'
                                 f' Current list has {len(self)} elements.')
 
   def stack(self, newDtype=int) -> XYVertices:

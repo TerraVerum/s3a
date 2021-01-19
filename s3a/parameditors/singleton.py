@@ -3,17 +3,15 @@ from __future__ import annotations
 from typing import List, Type, Dict
 
 from pyqtgraph.Qt import QtWidgets, QtCore
+from utilitys import ActionStack
+from utilitys import ParamEditor, ParamEditorDockGrouping, NestedProcWrapper, ParamEditorPlugin, dockPluginFactory
 
-from s3a.constants import GEN_PROPS_DIR, SCHEMES_DIR, BASE_DIR
-from s3a.models.actionstack import ActionStack
-from s3a.plugins import base
+from s3a.constants import GEN_PROPS_DIR, SCHEMES_DIR, SHORTCUTS_DIR
 from .algcollection import AlgCtorCollection
-from .genericeditor import ParamEditor, ParamEditorDockGrouping, EditorPropsMixin
 from .quickloader import QuickLoaderEditor
-from .shortcut import ShortcutsEditor
 from .table import TableData
-from ..generalutils import pascalCaseToTitle, getAllBases
-from ..processing import ImgProcWrapper, GeneralProcWrapper
+from ..processing import ImgProcWrapper
+from utilitys.params import ShortcutParameter
 
 Signal = QtCore.Signal
 
@@ -24,7 +22,7 @@ class _FRSingleton(QtCore.QObject):
   def __init__(self, parent=None):
     super().__init__(parent)
     self.actionStack = ActionStack()
-    self.clsToPluginMapping: Dict[Type[base.ParamEditorPlugin], base.ParamEditorPlugin] = {}
+    self.clsToPluginMapping: Dict[Type[ParamEditorPlugin], ParamEditorPlugin] = {}
 
     self.tableData = TableData()
     self.filter = self.tableData.filter
@@ -34,14 +32,14 @@ class _FRSingleton(QtCore.QObject):
                                     name='App Settings')
     self.colorScheme = ParamEditor(saveDir=SCHEMES_DIR, fileType='scheme',
                                    name='Color Scheme')
-    self.shortcuts = ShortcutsEditor()
+    self.shortcuts = ShortcutParameter.setRegistry(createIfNone=True, saveDir=SHORTCUTS_DIR)
     self.quickLoader = QuickLoaderEditor()
     self.imgProcClctn = AlgCtorCollection(ImgProcWrapper)
-    self.globalPredClctn = AlgCtorCollection(GeneralProcWrapper)
+    self.globalPredClctn = AlgCtorCollection(NestedProcWrapper)
 
     self.docks: List[QtWidgets.QDockWidget] = []
-    self.addPlugin(base.dummyPluginFactory('&Settings', [self.generalProps, self.colorScheme]))
-    self.addPlugin(base.dummyPluginFactory('Sho&rtcuts', [self.shortcuts, self.quickLoader]))
+    self.addPlugin(dockPluginFactory('&Settings', [self.generalProps, self.colorScheme]))
+    self.addPlugin(dockPluginFactory('Sho&rtcuts', [self.shortcuts, self.quickLoader]))
 
   @property
   def registerableEditors(self):
@@ -53,17 +51,7 @@ class _FRSingleton(QtCore.QObject):
         outList.append(editor)
     return outList
 
-  def registerGroup(self, grpName: str=None):
-    def deco(cls: type):
-      nonlocal grpName
-      if EditorPropsMixin not in getAllBases(cls):
-        cls.__bases__ = (EditorPropsMixin,) + cls.__bases__
-        if grpName is None:
-          grpName = pascalCaseToTitle(cls.__name__)
-      return cls
-    return deco
-
-  def addPlugin(self, pluginCls: Type[base.ParamEditorPlugin], *args, **kwargs):
+  def addPlugin(self, pluginCls: Type[ParamEditorPlugin], *args, **kwargs):
     """
     From a class inheriting the *PrjParamEditorPlugin*, creates a plugin object
     that will appear in the S3A toolbar. An entry is created with dropdown options
@@ -78,7 +66,7 @@ class _FRSingleton(QtCore.QObject):
       # by plugins. When these plugins register shortcuts, the group name will contain
       # ampersands which shouldn't show up in human readable menus
       pluginCls.__groupingName__ = pluginCls.name.replace('&', '')
-    plugin: base.ParamEditorPlugin = pluginCls(*args, **kwargs)
+    plugin: ParamEditorPlugin = pluginCls(*args, **kwargs)
     self.clsToPluginMapping[pluginCls] = plugin
     self.sigPluginAdded.emit(plugin)
     if plugin.dock is not None and plugin.dock not in self.docks:
