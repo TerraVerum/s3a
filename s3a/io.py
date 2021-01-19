@@ -349,10 +349,12 @@ class ComponentIO:
       vertMax = ComplexXYVertices.stackedMax(compDf[RTF.VERTICES])
       imShape = tuple(vertMax[::-1] + 1)
     maskType = 'uint16' if np.min(bgColor) >= 0 else 'int32'
-    outMask = np.full(imShape[:2], bgColor, maskType)
+    outMask = np.full(imShape[:2], bgColor, dtype=maskType)
     for fillClr, (_, comp) in zip(labels_numeric, compDf.iterrows()):
       verts: ComplexXYVertices = comp[RTF.VERTICES]
-      outMask = verts.toMask(outMask, int(fillClr), asBool, False)
+      outMask = verts.toMask(outMask, int(fillClr), False, False)
+    if asBool:
+      outMask = outMask > 0
 
     if outFile is not None:
       io.imsave(outFile, outMask.astype('uint16'), check_contrast=False)
@@ -377,7 +379,7 @@ class ComponentIO:
     :param outFile: Where to save the output. If *None*, no export is created.
     :return:
     """
-    return cls.exportLblPng(compDf, outFile, imShape, **kwargs)
+    return cls.exportLblPng(compDf, outFile, imShape, **kwargs, allowOffset=True)
 
   @classmethod
   def exportCompimgsFolders(cls, compDf: df, imgDir: FilePath=None, margin=0, marginAsPct=False,

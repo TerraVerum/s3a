@@ -57,7 +57,7 @@ def test_bad_import(tmp_path, app):
 def doAndAssertExport(app, fpath: Path, io: ComponentIO, compDf: pd.DataFrame, failMsg: str):
   fpath = Path(fpath)
   try:
-    io.exportByFileType(compDf, fpath)
+    io.exportByFileType(compDf, fpath, imShape=app.mainImg.image.shape[:2])
   except Exception as ex:
     augmentException(ex, f'{failMsg}\n')
     raise
