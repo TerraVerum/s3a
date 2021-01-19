@@ -58,7 +58,7 @@ class AppStateEditor(ParamEditor):
     stateDict = self._parseStateDict(stateName, stateDict)
     if overrideDict is not None:
       stateDict.update(overrideDict)
-    paramDict = stateDict.pop('Parameters', {})
+    paramDict = stateDict.pop('Parameters', {}) or {}
     stateDictKeys = list(stateDict.keys())
     legitKeys = self._stateFuncsDf.index.intersection(stateDictKeys)
     importFuncs = self._stateFuncsDf.loc[legitKeys, 'importFuncs']

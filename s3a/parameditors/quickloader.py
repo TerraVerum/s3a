@@ -175,8 +175,8 @@ class QuickLoaderEditor(ParamEditor):
 
   def saveParamValues(self, saveName: str=None, paramState: dict=None, **kwargs):
     # TODO: Get quickloader working
-    stateDict = fns.paramDictWithOpts(self.params, ['type'], [ShcKeySeq, GroupParameter])
-    kwargs['paramState'] = stateDict
+    # stateDict = fns.paramDictWithOpts(self.params, ['type'], [ShcKeySeq, GroupParameter])
+    kwargs['paramState'] = {}
     super().saveParamValues(saveName, **kwargs)
 
   def applyChanges(self):
