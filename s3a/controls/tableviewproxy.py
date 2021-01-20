@@ -4,13 +4,14 @@ from warnings import warn
 import numpy as np
 import pyqtgraph as pg
 from pandas import DataFrame as df
-from pyqtgraph.Qt import QtCore, QtGui
+from pyqtgraph.Qt import QtCore, QtGui, QtSvg, QtWidgets
 from utilitys import EditorPropsMixin, PrjParam, RunOpts
-from s3a.structures import OneDArr
+
 
 from s3a import FR_SINGLETON
 from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
 from s3a.models.tablemodel import ComponentMgr
+from s3a.structures import OneDArr
 from s3a.structures import XYVertices, ComplexXYVertices
 from s3a.views import tableview
 from s3a.views.imageareas import MainImage
@@ -404,6 +405,27 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
            f' Did not filter column {column.name}.',
            UserWarning)
     return compDf
+
+  def exportCompOverlay(self, outFile='', toClipboard=False):
+    """
+    :param outFile:
+      pType: filepicker
+      existing: False
+    """
+    pm = self._mainImgArea.imgItem.getPixmap()
+    painter = QtGui.QPainter(pm)
+    self.regionPlot.paint(painter)
+    if outFile:
+      # if outFile.endswith('svg'):
+      #   svgr = QtSvg.QSvgRenderer(outFile)
+      #   svgr.render(painter)
+      #   painter.end()
+      # else:
+      painter.end()
+      pm.save(outFile)
+    if toClipboard:
+      QtWidgets.QApplication.clipboard().setImage(pm.toImage())
+    return pm
 
 
   def resetCompBounds(self):

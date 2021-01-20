@@ -141,12 +141,14 @@ class EditPlugin(ParamEditorPlugin):
 
 class RandomToolsPlugin(ParamEditorPlugin):
   name = '&Tools'
+  _showFuncDetails = True
 
   def attachWinRef(self, win: s3abase.S3ABase):
     super().attachWinRef(win)
 
     self.registerFunc(self.showDevConsole)
     self.registerFunc(win.clearBoundaries, btnOpts=CNST.TOOL_CLEAR_BOUNDARIES)
+    self.registerFunc(win.compDisplay.exportCompOverlay)
 
   def showDevConsole(self):
     """
