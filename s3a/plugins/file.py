@@ -123,7 +123,11 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     win.addTabbedDock(QtCore.Qt.RightDockWidgetArea, self._projImgMgr)
 
   def _createDefaultProj(self):
-    self.projData.create(name=APP_STATE_DIR / PROJ_FILE_TYPE, parent=self.projData)
+    defaultName = APP_STATE_DIR / PROJ_FILE_TYPE
+    # Delete default prj on startup
+    for prj in defaultName.glob(f'*.{PROJ_FILE_TYPE}'):
+      prj.unlink()
+    self.projData.create(name=defaultName, parent=self.projData)
 
   def open(self, name: str):
     if Path(name).resolve() == self.projData.cfgFname:

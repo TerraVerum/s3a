@@ -4,6 +4,7 @@ from typing import Type
 import pytest
 
 os.environ['S3A_PLATFORM'] = 'minimal'
+from s3a import constants
 from helperclasses import CompDfTester
 from s3a import FR_SINGLETON
 from s3a.views.s3agui import S3A
@@ -39,6 +40,7 @@ def sampleComps():
 # Assign temporary project directory
 @pytest.fixture(scope="session", autouse=True)
 def app(tmpdir_factory):
+  constants.APP_STATE_DIR = tmpdir_factory.mktemp('settings')
   app_ = S3A(Image=SAMPLE_IMG_FNAME, guiMode=False, loadLastState=False, author=TEST_AUTHOR)
   app_.filePlg.projData.create(name=str(tmpdir_factory.mktemp('proj')), parent=app_.filePlg.projData)
   return app_

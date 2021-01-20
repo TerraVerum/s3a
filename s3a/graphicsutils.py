@@ -150,10 +150,13 @@ class ThumbnailViewer(QtWidgets.QListWidget):
     self.setResizeMode(self.Adjust)
     self.itemActivated.connect(lambda item: self.sigImageSelected.emit(self.nameToFullPathMapping[item.text()]))
 
-    def findDelImgs():
-      selection = self.selectedImages
-      self.sigDeleteRequested.emit(selection)
-    self.delShc = QtWidgets.QShortcut(QtCore.Qt.Key_Delete, self, findDelImgs)
+    # def findDelImgs():
+    #   selection = self.selectedImages
+    #   self.sigDeleteRequested.emit(selection)
+    # TODO: Incorporate deletion. Just using "delete" button isn't great since
+    #   when shortcuts conflict it is ambiguous as to whether an image will
+    #   actually be deleted
+    # self.delShc = QtWidgets.QShortcut(QtCore.Qt.Key_Delete, self, findDelImgs)
 
   def addThumbnail(self, fullName: Path, force=False):
     icon = QtGui.QIcon(str(fullName))
