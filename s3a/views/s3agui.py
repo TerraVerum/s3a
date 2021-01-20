@@ -91,7 +91,7 @@ class S3A(S3ABase):
     _plugins = [FR_SINGLETON.clsToPluginMapping[c] for c in [MainImagePlugin, CompTablePlugin]]
     parents = [self.mainImg, self.compTbl]
     for plugin, parent in zip(_plugins, reversed(parents)):
-      plugin.toolsEditor.actionsMenuFromProcs(plugin.name, nest=False, parent=parent, outerMenu=parent.menu)
+      plugin.toolsEditor.actionsMenuFromProcs(plugin.name, nest=True, parent=parent, outerMenu=parent.menu)
 
 
     tableDock = QtWidgets.QDockWidget('Component Table Window', self)

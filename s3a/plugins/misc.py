@@ -107,7 +107,7 @@ class CompTablePlugin(ParamEditorPlugin):
          CNST.TOOL_TBL_ZOOM_TO_COMPS]):
       param.opts['ownerObj'] = win.compTbl
       self.registerFunc(func, name=param.name, btnOpts=param)
-    tbl.menu = self.toolsEditor.actionsMenuFromProcs(parent=tbl, nest=False)
+    tbl.menu = self.toolsEditor.actionsMenuFromProcs(parent=tbl, nest=True)
     super().attachWinRef(win)
 
 class EditPlugin(ParamEditorPlugin):

@@ -61,7 +61,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
       drawShapes = SHAPE_ROI_MAPPING.keys()
 
     vb = self.getViewBox()
-    self.menu: QtWidgets.QMenu = vb.menu
+    self.menu: QtWidgets.QMenu = QtWidgets.QMenu(self)
     self.oldVbMenu: ViewBoxMenu = vb.menu
     # Disable default menus
     self.plotItem.ctrlMenu = None
@@ -309,7 +309,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
   def addTools(self, toolsEditor: ParamEditor):
     if toolsEditor in self._focusedTools:
       return
-    toolsEditor.actionsMenuFromProcs(outerMenu=self.menu, parent=self)
+    toolsEditor.actionsMenuFromProcs(outerMenu=self.menu, parent=self, nest=True)
     # self.toolsGrp.clear()
     # self.toolsGrp.fromToolsEditors(self._focusedTools, checkable=False, ownerClctn=self.toolsGrp)
     retClctn = None
