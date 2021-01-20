@@ -35,7 +35,7 @@ class _FRSingleton(QtCore.QObject):
     self.shortcuts = ShortcutParameter.setRegistry(createIfNone=True, saveDir=SHORTCUTS_DIR)
     self.quickLoader = QuickLoaderEditor()
     self.imgProcClctn = AlgCtorCollection(ImgProcWrapper)
-    self.globalPredClctn = AlgCtorCollection(NestedProcWrapper)
+    self.multiPredClctn = AlgCtorCollection(NestedProcWrapper)
 
     self.docks: List[QtWidgets.QDockWidget] = []
     self.addPlugin(dockPluginFactory('&Settings', [self.generalProps, self.colorScheme]))

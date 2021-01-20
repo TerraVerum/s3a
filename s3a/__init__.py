@@ -51,7 +51,7 @@ for name, func in inspect.getmembers(TopLevelImageProcessors, inspect.isfunction
   FR_SINGLETON.imgProcClctn.addProcessCtor(func)
 
 for ctor in TOP_GLOBAL_PROCESSOR_FUNCS:
-  FR_SINGLETON.globalPredClctn.addProcessCtor(ctor)
+  FR_SINGLETON.multiPredClctn.addProcessCtor(ctor)
 
 from .views.s3agui import S3A
 

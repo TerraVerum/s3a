@@ -10,7 +10,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from utilitys import ParamEditorPlugin, ProcessIO, widgets as uw
 
 from s3a import models, XYVertices, ComplexXYVertices
-from s3a.constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
+from s3a.constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF, PRJ_ENUMS
 from s3a.models import s3abase
 from s3a.parameditors import FR_SINGLETON
 from s3a.plugins.base import ProcessorPlugin
@@ -199,35 +199,42 @@ def miscFuncsPluginFactory(name_: str=None, regFuncs: Sequence[Callable]=None, t
   return FuncContainerPlugin
 
 
-class GlobalPredictionsPlugin(ProcessorPlugin):
-  name = 'Global Predictions'
+class MultiPredictionsPlugin(ProcessorPlugin):
+  name = 'Multi-Predictions'
 
   mgr: models.tablemodel.ComponentMgr
 
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
-    cls.procCollection = FR_SINGLETON.globalPredClctn.createProcessorForClass(cls, cls.name + ' Processor')
+    cls.procCollection = FR_SINGLETON.multiPredClctn.createProcessorForClass(cls, cls.name + ' Processor')
     cls.dock.addEditors([cls.procCollection])
 
   def __init__(self):
     super().__init__()
-    self.registerFunc(self.predictFromSelection, btnOpts=CNST.TOOL_PRED_SEL)
     self.registerFunc(self.lastRunAnalytics)
 
   def attachWinRef(self, win):
     super().attachWinRef(win)
     self.mgr = win.compMgr
     self.mainImg = win.mainImg
-    win.mainImg.toolsEditor.registerFunc(self.predictFromSelection)
+    win.mainImg.toolsEditor.registerFunc(self.predictFromSelection, btnOpts=CNST.TOOL_PRED_SEL)
 
   def makePrediction(self, comps: pd.DataFrame):
     if self.win.mainImg.image is None:
       return
-    newComps = self.curProcessor.run(components=comps, image=self.win.mainImg.image)
-    if isinstance(newComps, ProcessIO):
-      newComps = newComps['components']
-    self.mgr.addComps(newComps)
+    vbRange = np.array(self.mainImg.getViewBox().viewRange()).T
+    newComps = self.curProcessor.run(components=comps, image=self.win.mainImg.image,
+                                     viewbox=vbRange)
+    if not isinstance(newComps, ProcessIO):
+      newComps = ProcessIO(components=newComps)
+    compsToAdd = newComps['components']
+    addType = newComps.get('addType', PRJ_ENUMS.COMP_ADD_AS_NEW)
+    with FR_SINGLETON.actionStack.group('Add Components'):
+      if newComps.get('deleteOrig', False):
+        self.mgr.rmComps(comps.index)
+      self.mgr.addComps(compsToAdd, addType)
+
 
   def predictFromSelection(self):
     self.makePrediction(self.mgr.compDf.loc[self.win.compDisplay.selectedIds])

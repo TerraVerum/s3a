@@ -12,7 +12,7 @@ from skimage.segmentation import quickshift
 from utilitys.processing import *
 from utilitys import fns
 
-from s3a.constants import REQD_TBL_FIELDS as RTF
+from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
 from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices
 from s3a.processing.processing import ImageProcess, GlobalPredictionProcess
 from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg
@@ -143,7 +143,7 @@ def crop_to_local_area(image: NChanImg,
       - roi
   """
   roiVerts = np.vstack([fgVerts, bgVerts])
-  compVerts = np.vstack([prevCompVerts + [roiVerts]])
+  compVerts = np.vstack([prevCompVerts.stack(), roiVerts])
   if reference == 'image':
     allVerts = np.array([[0, 0], image.shape[:2]])
   elif reference == 'roi' and len(roiVerts) > 1:
@@ -504,6 +504,7 @@ def dispatchedTemplateMatcher(func):
       allComps.append(pts_to_components(pts, comp))
     outComps = pd.concat(allComps, ignore_index=True)
     out['components'] = outComps
+    out['deleteOrig'] = True
     return out
   dispatcher.__doc__ = func.__doc__
   proc = GlobalPredictionProcess(fns.nameFormatter(func.__name__))
@@ -531,8 +532,9 @@ def dispatchedFocusedProcessor(func):
       if mask is not None:
         newComp[RTF.VERTICES] = ComplexXYVertices.fromBwMask(mask)
       allComps.append(fns.serAsFrame(newComp))
-    outComps = pd.concat(allComps, ignore_index=True)
+    outComps = pd.concat(allComps)
     out['components'] = outComps
+    out['addType'] = PRJ_ENUMS.COMP_ADD_AS_MERGE
     return out
   dispatcher.__doc__ = func.__doc__
   proc = GlobalPredictionProcess(fns.nameFormatter(func.__name__))
@@ -542,7 +544,8 @@ def dispatchedFocusedProcessor(func):
 
 
 @fns.dynamicDocstring(metricTypes=[d for d in dir(cv) if d.startswith('TM')])
-def cv_template_match(template: np.ndarray, image: np.ndarray, threshold=0.8, metric='TM_CCOEFF_NORMED'):
+def cv_template_match(template: np.ndarray, image: np.ndarray, viewbox: np.ndarray,
+                      threshold=0.8, metric='TM_CCOEFF_NORMED', area='viewbox'):
   """
   Performs template matching using default opencv functions
   :param template: Template image
@@ -555,7 +558,17 @@ def cv_template_match(template: np.ndarray, image: np.ndarray, threshold=0.8, me
     helpText: Template maching metric
     pType: list
     limits: {metricTypes}
+  :param area:
+    helpText: Where to apply the new components
+    pType: list
+    limits:
+      - image
+      - viewbox
   """
+  if area == 'viewbox':
+    image, coords = getCroppedImg(image, viewbox, 0)
+  else:
+    coords = np.array([[0,0]])
   if image.ndim < 3:
     grayImg = image
   else:
@@ -570,7 +583,7 @@ def cv_template_match(template: np.ndarray, image: np.ndarray, threshold=0.8, me
   res[maxFilter > res] = 0
   loc = np.nonzero(res >= threshold)
   scores = res[loc]
-  matchPts = np.c_[loc[::-1]]
+  matchPts = np.c_[loc[::-1]] + coords[[0]]
   return ProcessIO(matchPts=matchPts, scores=scores, matchImg=maxFilter)
 
 
