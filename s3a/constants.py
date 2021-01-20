@@ -143,6 +143,7 @@ class _PrjConsts(PrjParamGroup):
   TOOL_CLEAR_ROI          : PrjParam = newParam('Clear ROI', 'Esc')
   TOOL_CLEAR_HISTORY      : PrjParam = newParam('Clear Processor History', 'Ctrl+Alt+C,H')
   TOOL_PROC_ANALYTICS     : PrjParam = newParam('Show Analytics', 'Ctrl+K+S+P')
+  TOOL_RESET_ZOOM         : PrjParam = newParam('Reset Zoom', 'Ctrl+K+Z+R')
 
   # --------------------------
   # WINDOW TOOLS
@@ -171,8 +172,7 @@ class _PrjConsts(PrjParamGroup):
   # --------------------------
   # GLOBAL PREDICTIONS
   # --------------------------
-  TOOL_PRED_SEL     : PrjParam = newParam('Global Estimate From Selection', 'Ctrl+K,G,S')
-  TOOL_PRED_DEL_GRP : PrjParam = newParam('Delete Selected Groups', 'Ctrl+K,G,D')
+  TOOL_PRED_SEL     : PrjParam = newParam('Predict From Selection', 'Ctrl+K,M,P')
 
 
   # --------------------------

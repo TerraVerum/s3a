@@ -125,6 +125,17 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
       toolbar.addWidget(self.drawActGrp)
       self.toolsGrp = self.addTools(self.toolsEditor)
 
+  def resetZoom(self):
+    """
+    Reimplement viewbox zooming since padding required for scatterplot with
+    dynamic uncached shapes means the viewbox overestimates required rect
+    """
+    if self.image is None:
+      return
+    imShape = self.image.shape
+    vb: RightPanViewBox = self.getViewBox()
+    vb.setRange(xRange=(0, imShape[1]), yRange=(0, imShape[0]))
+
   @property
   def compSer_asFrame(self):
       return coerceDfTypes(fns.serAsFrame(self.compSer))
