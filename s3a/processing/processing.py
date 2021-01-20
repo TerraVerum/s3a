@@ -13,7 +13,6 @@ __all__ = ['ProcessIO', 'ProcessStage', 'NestedProcess', 'ImageProcess',
 _infoType = t.List[t.Union[t.List, t.Dict[str, t.Any]]]
 StrList = t.List[str]
 StrCol = t.Collection[str]
-class _DUPLICATE_INFO: pass
 
 class ImageProcess(NestedProcess):
   mainInputKeys = ['image']
@@ -27,7 +26,7 @@ class ImageProcess(NestedProcess):
       info = validInfos[ii]
       duplicateKeys = {'name'}
       for k, v in info.items():
-        if v is _DUPLICATE_INFO:
+        if v is cls._DUPLICATE_INFO:
           duplicateKeys.add(k)
       if len(info.keys() - duplicateKeys) == 0:
         del validInfos[ii]

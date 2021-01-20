@@ -56,7 +56,10 @@ class MainImagePlugin(ParamEditorPlugin):
       if (param not in [CNST.DRAW_ACT_REM, CNST.DRAW_ACT_ADD]
           or  len(disp.selectedIds) == 0
       ):
-          disp.reflectSelectionBoundsMade(verts)
+        # Special case: Selection with point shape should be a point
+        if self.win.mainImg.shapeCollection.curShapeParam == CNST.DRAW_SHAPE_POINT:
+          verts = verts.mean(0, keepdims=True)
+        disp.reflectSelectionBoundsMade(verts)
 
     self.registerFunc(disp.mergeSelectedComps, btnOpts=CNST.TOOL_MERGE_COMPS, ignoreKeys=['keepId'])
     self.registerFunc(disp.splitSelectedComps, btnOpts=CNST.TOOL_SPLIT_COMPS)

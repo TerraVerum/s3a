@@ -83,8 +83,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     self.imgItem = self.exposes(pg.ImageItem())
     self.imgItem.setZValue(-100)
     self.addItem(self.imgItem)
-    self.toolsEditor.registerFunc(lambda: self.oldVbMenu.viewAll.trigger(),
-                                         name='Reset Zoom')
+    self.toolsEditor.registerFunc(self.resetZoom, btnOpts=CNST.TOOL_RESET_ZOOM)
     # -----
     # FOCUSED COMPONENT INFORMATION
     # -----
@@ -303,8 +302,16 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
       self.drawActGrp.create_addBtn(actParam, self.actionAssignment, checkable=True,
                                     namePath=(self.__groupingName__,), **registerOpts)
 
-  def localImage(self, margin: int=0):
+  def focusedCompImage(self, margin: int=0):
     return getCroppedImg(self.image, self.compSer[RTF.VERTICES].stack(), margin, returnSlices=False)
+
+  def viewboxSquare(self, margin=0):
+    vbRange = np.array(self.getViewBox().viewRange())
+    span = np.diff(vbRange).flatten()
+    center = vbRange[:,0]+span/2
+    minSpan = np.min(span) + margin
+    offset = center - minSpan/2
+    return minSpan*np.array([[0,0], [0,1], [1,1], [1,0]]) + offset
 
   def addTools(self, toolsEditor: ParamEditor):
     if toolsEditor in self._focusedTools:

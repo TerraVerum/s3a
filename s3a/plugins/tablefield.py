@@ -64,9 +64,11 @@ class VerticesPlugin(TableFieldPlugin):
     if self.mainImg.compSer[RTF.INST_ID] == -1:
       self.updateRegionFromDf(None)
       return
+    oldId = self.mainImg.compSer[RTF.INST_ID]
     self.updateRegionFromDf(self.mainImg.compSer_asFrame)
     self.clearFocusedPen_Fill()
-    self.firstRun = True
+    if newComp is None or oldId != newComp[RTF.INST_ID]:
+      self.firstRun = True
 
   def clearFocusedPen_Fill(self):
     plt: MultiRegionPlot = self.win.compDisplay.regionPlot
@@ -81,7 +83,6 @@ class VerticesPlugin(TableFieldPlugin):
     # noinspection PyTypeChecker
     verts : XYVertices = verts.astype(int)
     if param == CNST.DRAW_ACT_ADD:
-      self.firstRun = True
       self.run(fgVerts=verts)
     else:
       self.run(bgVerts=verts)
@@ -103,12 +104,7 @@ class VerticesPlugin(TableFieldPlugin):
     #  change will have to occur
     # Clip viewrange to min view axis area instead of max, which will happen internally
     # otherwise
-    vbRange = np.array(self.vb.viewRange())
-    span = np.diff(vbRange).flatten()
-    center = vbRange[:,0]+span/2
-    minSpan = np.min(span)
-    offset = center - minSpan/2
-    viewbox = minSpan*np.array([[0,0], [0,1], [1,1], [1,0]]) + offset
+    viewbox = self.mainImg.viewboxSquare()
     newGrayscale = self.curProcessor.run(
       image=img,
       prevCompMask=compMask,
