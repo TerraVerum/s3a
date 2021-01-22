@@ -196,9 +196,9 @@ class ComponentIO:
     return exportDf
 
   @classmethod
-  def exportCompimgsDf(cls, compDf: df, outFile: Union[str, Path]=None,
+  def exportCompImgsDf(cls, compDf: df, outFile: Union[str, Path]=None,
                        imgDir: FilePath=None, margin=0, marginAsPct=False,
-                       includeCols=('instId', 'img', 'semanticMask', 'bboxMask', 'lbl', 'offset'),
+                       includeCols=('instId', 'img', 'labelMask', 'label', 'offset'),
                        lblField='Instance ID', **kwargs):
     """
     Creates a dataframe consisting of extracted images around each component
@@ -217,9 +217,7 @@ class ComponentIO:
       - instId: The component's Instance ID
       - img: The (MxNxC) image corresponding to the component vertices, where MxN are
         the padded row sizes and C is the number of image channels
-      - semanticMask: Binary mask representing the component vertices
-      - bboxMask: Square box representing (min)->(max) component vertices. This is useful
-        for excluding the margin when a semantic mask is not desired and the margin was > 0.
+      - labelMask: Binary mask representing the component vertices
       - label: Field value of the component for the field specified by `lblField`
       - offset: Image (x,y) coordinate of the min component vertex.
     :param kwargs: Passed to ComponentIO.exportLblPng
@@ -232,21 +230,20 @@ class ComponentIO:
     uniqueImgs = np.unique(compDf[RTF.SRC_IMG_FILENAME])
     dfGroupingsByImg = []
     for imgName in uniqueImgs:
-      imgName = Path(imgName)
-      if not imgName.is_absolute():
-        imgName = imgDir/imgName
-      if imgName not in _imgCache:
-        _imgCache[imgName] = io.imread(imgName)
+      fullImgName = Path(imgName)
+      if not fullImgName.is_absolute():
+        fullImgName = imgDir / fullImgName
+      if fullImgName not in _imgCache:
+        _imgCache[fullImgName] = io.imread(fullImgName)
       dfGroupingsByImg.append(compDf[compDf[RTF.SRC_IMG_FILENAME] == imgName])
 
     useKeys = set(includeCols)
     outDf = {k: [] for k in useKeys}
     lblField = cls.tableData.fieldFromName(lblField)
-    bboxFills = lblField.toNumeric(compDf[lblField])
 
-    for miniDf, imgName in zip(dfGroupingsByImg, uniqueImgs):
-      imgName = imgDir/imgName
-      img = _imgCache[imgName]
+    for miniDf, fullImgName in zip(dfGroupingsByImg, uniqueImgs):
+      fullImgName = imgDir / fullImgName
+      img = _imgCache[fullImgName]
       lblImg = cls.exportLblPng(miniDf, imShape=img.shape[:2], lblField=lblField, **kwargs)
 
       for ii, (idx, row) in enumerate(miniDf.iterrows()):
@@ -269,15 +266,9 @@ class ComponentIO:
         if lblImg.ndim > 2:
           indexer += (...,)
         mask = lblImg[indexer]
-        if 'semanticMask' in useKeys:
+        if 'labelMask' in useKeys:
           # x-y to row-col, transpose to get min-max in axis 0 and row-col in axis 1
-          outDf['semanticMask'].append(mask)
-
-        if 'bboxMask' in useKeys:
-          bboxMask = np.zeros(compImg.shape[:2], dtype=lblImg.dtype)
-          bboxBounds = np.r_[allVerts.min(0, keepdims=True)+marginToUse, allVerts.max(0, keepdims=True)-marginToUse]
-          bboxMask[bboxBounds[0,1]:bboxBounds[1,1], bboxBounds[0,0]:bboxBounds[1,0]] = bboxFills[ii]
-          outDf['bboxMask'].append(bboxMask)
+          outDf['labelMask'].append(mask)
 
         if 'instId' in useKeys:
           outDf['instId'].append(idx)
@@ -343,7 +334,9 @@ class ComponentIO:
     asBool = np.issubdtype(labels_numeric.dtype, np.bool_)
 
     if rescaleOutput:
-      labels_numeric = rescale_intensity(labels_numeric, out_range='uint16')
+      lowBound = 1 if allowOffset else 0
+      upBound = np.iinfo(np.uint16).max
+      labels_numeric = rescale_intensity(labels_numeric, out_range=(lowBound, upBound))
 
     if imShape is None:
       vertMax = ComplexXYVertices.stackedMax(compDf[RTF.VERTICES])
@@ -382,57 +375,37 @@ class ComponentIO:
     return cls.exportLblPng(compDf, outFile, imShape, **kwargs, allowOffset=True)
 
   @classmethod
-  def exportCompimgsFolders(cls, compDf: df, imgDir: FilePath=None, margin=0, marginAsPct=False,
-                            colorMaskByClass=True, outDir: FilePath=None, dataDir='data',
-                            semanticDir='masks_semantic', bboxDir: str=None,
-                            resizeShape: Tuple[int, int]=None, **kwargs):
+  def exportCompimgsFolders(cls, compDf: df,
+                            outDir:FilePath='s3a-export',
+                            resizeShape: Tuple[int, int]=None,
+                            **kwargs):
     """
     From a component dataframe, creates output directories for component images and masks.
     This is useful for many neural networks etc. to read individual component images.
 
     :param compDf: Dataframe to export
-    :param imgDir: Passed to `exportCompimgsDf`
-    :param margin: Passed to `exportCompimgsDf`
-    :param marginAsPct: Passed to `exportCompimgsDf`
-    :param colorMaskByClass: Passed to `exportCompimgsDf`
     :param outDir: Where to make the output directories. If `None`, defaults to current
       directory>compimgs_<margin>_margin
-    :param dataDir: Where to export the component images
-    :param semanticDir: Where to export semantic masks. If `None`, no semantic masks
-      are exported.
-    :param bboxDir: Where to export bounding box masks. If `None`, no bounding box masks
-      are exported.
     :param resizeShape: If provided, it is the shape that all images will be resized to before
       being saved. This is useful for neural networks with a fixed input size which forces all
       inputs to be e.g. 100x100 pixels.
+    :param kwargs: Passed directly to :meth:`ComponentIO.exportCompImgsDf`
     """
-    if outDir is None:
-      outDir = Path('.')/f'compimgs_{margin}_margin'
-    (outDir/dataDir).mkdir(exist_ok=True, parents=True)
-    excludeCols = []
-    if semanticDir is None:
-      excludeCols.append('semanticMask')
-    else:
-      (outDir/semanticDir).mkdir(exist_ok=True)
-    if bboxDir is None:
-      excludeCols.append('bboxMask')
-    else:
-      (outDir/bboxDir).mkdir(exist_ok=True)
-
+    outDir = Path(outDir)
+    dataDir = outDir/'data'
+    labelsDir= outDir/'labels'
+    dataDir.mkdir(exist_ok=True, parents=True)
+    labelsDir.mkdir(exist_ok=True, parents=True)
     saveFn = lambda fname, img: io.imsave(fname, img, check_contrast=False)
     if resizeShape is not None:
       saveFn = lambda fname, img: io.imsave(fname, resize_pad(img, resizeShape),
                                             check_contrast=False)
 
-    extractedImgs = cls.exportCompimgsDf(compDf, None, imgDir, margin, colorMaskByClass,
-                                         excludeCols, **kwargs)
+    extractedImgs = cls.exportCompImgsDf(compDf, None, **kwargs)
     for idx, row in extractedImgs.iterrows():
       saveName = f'{row.instId}.png'
-      saveFn(outDir/dataDir/saveName, row.img)
-      if semanticDir is not None:
-        saveFn(outDir/semanticDir/saveName, row.semanticMask)
-      if bboxDir is not None:
-        saveFn(outDir/bboxDir/saveName, row.bboxMask)
+      saveFn(dataDir/saveName, row.img)
+      saveFn(labelsDir/saveName, row.labelMask)
 
   # -----
   # Import options
@@ -520,7 +493,7 @@ class ComponentIO:
     allVerts = []
 
     for idx, row in inDf.iterrows():
-      mask = cls._strToNpArray(row.semanticMask, dtype=bool)
+      mask = cls._strToNpArray(row.labelMask, dtype=bool)
       verts = ComplexXYVertices.fromBwMask(mask)
       offset = cls._strToNpArray(row.offset)
       for v in verts: v += offset

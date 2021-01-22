@@ -786,8 +786,12 @@ class ProjectData(QtCore.QObject):
     """
     shutil.copytree(self.location, outputFolder)
 
-  @fns.dynamicDocstring(fileTypes=ComponentIO.handledIoTypes_fileFilter().split(';;'))
-  def exportAnnotations(self, outputFolder:FilePath= 's3a-export', annotationFormat='csv', combine=False, includeImages=True):
+  @fns.dynamicDocstring(fileTypes=list(ComponentIO.handledIoTypes))
+  def exportAnnotations(self, outputFolder:FilePath= 's3a-export',
+                        annotationFormat='csv',
+                        combine=False,
+                        rescale=False,
+                        includeImages=True):
     """
     Exports project annotations, optionally including their source images
     :param outputFolder:
@@ -802,6 +806,10 @@ class ProjectData(QtCore.QObject):
       limits:
         {fileTypes}
     :param combine: If `True`, all annotation files will be combined into one exported file with name `annotations.<format>`
+    :param rescale:
+      helpText: "For image exports, this determines whether the ouptut should retain the same
+        values as their integer label or whether they should be scaled to entire range
+        of black -> white"
     :param includeImages: If `True`, the corresponding image for each annotation will also be exported into an `images`
       folder
     """
@@ -819,18 +827,19 @@ class ProjectData(QtCore.QObject):
         if self.imgToAnnMapping.get(img, None) is not None:
           shutil.copy(img, outImgDir)
 
+    ioArgs = {'imgDir': self.imagesDir, 'rescaleOutput': rescale}
     existingAnnFiles = [f for f in self.imgToAnnMapping.values() if f is not None]
     if combine:
       outAnn = pd.concat(map(self.compIo.buildByFileType, existingAnnFiles))
-      self.compIo.exportByFileType(outAnn, outputFolder / f'annotations.{annotationFormat}')
+      self.compIo.exportByFileType(outAnn, outputFolder / f'annotations.{annotationFormat}', **ioArgs)
     else:
       outAnnsDir = outputFolder / 'annotations'
+      outAnnsDir.mkdir(exist_ok=True)
       if self.cfg['annotation-format'] == annotationFormat:
         shutil.copytree(self.annotationsDir, outAnnsDir)
       else:
         for annFile in existingAnnFiles:
-          ioArgs = {'imgDir': self.imagesDir}
-          self.compIo.convert(annFile, outAnnsDir/f'{annFile.stem}.{annotationFormat}', ioArgs, ioArgs)
+          self.compIo.convert(annFile, outAnnsDir/f'{annFile.stem}.{annotationFormat}', importArgs=ioArgs, exportArgs=ioArgs)
 
   def _maybeEmit(self, signal: QtCore.Signal, emitList: Sequence[Union[Path, Tuple[Path, Path]]]):
     if not self._suppressSignals:
