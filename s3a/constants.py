@@ -32,6 +32,8 @@ PROJ_FILE_TYPE = 's3aprj'
 LAYOUTS_DIR.mkdir(parents=True, exist_ok=True)
 APP_STATE_DIR.mkdir(parents=True, exist_ok=True)
 
+_shc = 'Ctrl+Q'
+
 class _PrjEnums(Enum):
   # --------------------------
   # COMPONENTS
@@ -132,47 +134,48 @@ class _PrjConsts(PrjParamGroup):
   # --------------------------
   # IMAGE TOOLS
   # --------------------------
-  TOOL_MERGE_COMPS        : PrjParam = newParam('Merge Selected', 'Ctrl+Alt+G')
-  TOOL_SPLIT_COMPS        : PrjParam = newParam('Split Selected', 'Ctrl+Alt+S')
-  TOOL_COPY_REGIONS       : PrjParam = newParam('Copy Selected', 'Ctrl+Alt+C')
-  TOOL_MOVE_REGIONS       : PrjParam = newParam('Move Selected', 'Ctrl+Alt+V')
+  TOOL_MERGE_COMPS        : PrjParam = newParam('Merge Selected', f'{_shc},S,M', icon=str(ICON_DIR/'merge.svg'))
+  TOOL_SPLIT_COMPS        : PrjParam = newParam('Split Selected', f'{_shc},S,S', icon=str(ICON_DIR/'split.svg'))
+  TOOL_REM_OVERLAP        : PrjParam = newParam('Remove Component Overlap', f'{_shc},S,E', icon=str(ICON_DIR/'mutex.svg'))
+  TOOL_COPY_REGIONS       : PrjParam = newParam('Copy Selected', f'{_shc},S,C', icon=str(ICON_DIR/'copy.svg'))
+  TOOL_MOVE_REGIONS       : PrjParam = newParam('Move Selected', f'{_shc},S,V', icon=str(ICON_DIR/'move.svg'))
   TOOL_CLEAR_FOC_REGION   : PrjParam = newParam('Clear', 'Ctrl+Shift+C')
   TOOL_RESET_FOC_REGION   : PrjParam = newParam('Reset', 'Ctrl+Shift+R')
   TOOL_FILL_FOC_REGION    : PrjParam = newParam('Fill', 'Ctrl+Shift+F')
   TOOL_ACCEPT_FOC_REGION  : PrjParam = newParam('Accept', 'Ctrl+Shift+A')
   TOOL_CLEAR_ROI          : PrjParam = newParam('Clear ROI', 'Esc')
   TOOL_CLEAR_HISTORY      : PrjParam = newParam('Clear Processor History', 'Ctrl+Alt+C,H')
-  TOOL_PROC_ANALYTICS     : PrjParam = newParam('Show Analytics', 'Ctrl+K+S+P')
-  TOOL_RESET_ZOOM         : PrjParam = newParam('Reset Zoom', 'Ctrl+K+Z+R')
+  TOOL_PROC_ANALYTICS     : PrjParam = newParam('Show Analytics', f'{_shc},F,P')
+  TOOL_RESET_ZOOM         : PrjParam = newParam('Reset Zoom', f'{_shc},Z,R')
 
   # --------------------------
   # WINDOW TOOLS
   # --------------------------
   TOOL_ESTIMATE_BOUNDARIES   : PrjParam = newParam('Estimate Boundaries', 'Ctrl+Alt+Shift+E')
   TOOL_CLEAR_BOUNDARIES      : PrjParam = newParam('Clear Boundaries', 'Ctrl+Alt+Shift+C')
-  TOOL_EXPORT_COMP_LIST      : PrjParam = newParam('Export Current Table', 'Ctrl+K,E,T')
+  TOOL_EXPORT_COMP_LIST      : PrjParam = newParam('Export Current Table', f'{_shc},E,T')
   TOOL_TBL_SET_SAME_AS_FIRST : PrjParam = newParam('Set Cells as First', 'Ctrl+D')
   TOOL_TBL_SET_AS            : PrjParam = newParam('Set Cells As...', 'Ctrl+Shift+D')
   TOOL_TBL_DEL_ROWS          : PrjParam = newParam('Delete Table Rows', 'Del')
-  TOOL_TBL_ZOOM_TO_COMPS     : PrjParam = newParam('Zoom to Selection  ', 'Ctrl+K,Z,S')
+  TOOL_TBL_ZOOM_TO_COMPS     : PrjParam = newParam('Zoom to Selection  ', f'{_shc},Z,S')
 
   # --------------------------
   # PROJECT
   # --------------------------
   TOOL_PROJ_SAVE     : PrjParam = newParam('Save', 'Ctrl+S')
-  TOOL_PROJ_OPEN     : PrjParam = newParam('Open Project', 'Ctrl+K,P,O')
-  TOOL_PROJ_OPEN_IMG : PrjParam = newParam('Open Project Image', 'Ctrl+K,I,O')
-  TOOL_PROJ_CREATE   : PrjParam = newParam('Create Project', 'Ctrl+K,P,C')
-  TOOL_PROJ_ADD_IMG  : PrjParam = newParam('Add New Image', 'Ctrl+K,I,A')
-  TOOL_PROJ_ADD_ANN  : PrjParam = newParam('Add New Annotation', 'Ctrl+K,A,A')
-  TOOL_PROJ_SETTINGS : PrjParam = newParam('Project Settings...', 'Ctrl+K,P,S')
-  TOOL_PROJ_EXPORT   : PrjParam = newParam('Export...', 'Ctrl+K,P,E')
-  TOOL_AUTOSAVE      : PrjParam = newParam('Autosave...', 'Ctrl+K,A,O')
+  TOOL_PROJ_OPEN     : PrjParam = newParam('Open Project', f'{_shc},P,O')
+  TOOL_PROJ_OPEN_IMG : PrjParam = newParam('Open Project Image', f'{_shc},I,O')
+  TOOL_PROJ_CREATE   : PrjParam = newParam('Create Project', f'{_shc},P,C')
+  TOOL_PROJ_ADD_IMG  : PrjParam = newParam('Add New Image', f'{_shc},I,A')
+  TOOL_PROJ_ADD_ANN  : PrjParam = newParam('Add New Annotation', f'{_shc},A,A')
+  TOOL_PROJ_SETTINGS : PrjParam = newParam('Project Settings...', f'{_shc},P,S')
+  TOOL_PROJ_EXPORT   : PrjParam = newParam('Export...', f'{_shc},P,E')
+  TOOL_AUTOSAVE      : PrjParam = newParam('Autosave...', f'{_shc},A,O')
 
   # --------------------------
   # GLOBAL PREDICTIONS
   # --------------------------
-  TOOL_PRED_SEL     : PrjParam = newParam('Predict From Selection', 'Ctrl+K,M,P')
+  TOOL_PRED_SEL     : PrjParam = newParam('Predict From Selection', f'{_shc},M,P')
 
 
   # --------------------------
@@ -196,47 +199,47 @@ class _PrjConsts(PrjParamGroup):
   # -------------------
   # Modes
   DRAW_MODE_FOCUSED : PrjParam = newParam(
-    'Activate "Edit" draw mode', 'Ctrl+K,D,E', 'registeredaction',
+    'Activate "Edit" draw mode', f'{_shc},D,E', 'registeredaction',
     icon=str(ICON_DIR/'edit.svg'))
 
   # Shapes
   DRAW_SHAPE_RECT : PrjParam = newParam(
-    'Activate "Rectangular" draw shape', 'Ctrl+K,D,R', 'registeredaction',
+    'Activate "Rectangular" draw shape', f'{_shc},D,R', 'registeredaction',
     icon=str(ICON_DIR/'rectangle.svg'))
   DRAW_SHAPE_POLY : PrjParam = newParam(
-    'Activate "Polygon" draw shape', 'Ctrl+K,D,Y', 'registeredaction',
+    'Activate "Polygon" draw shape', f'{_shc},D,Y', 'registeredaction',
     icon=str(ICON_DIR/'polygon.svg'))
   DRAW_SHAPE_ELLIPSE : PrjParam = newParam(
-    'Activate "Ellipse" draw shape', 'Ctrl+K,D,L', 'registeredaction',
+    'Activate "Ellipse" draw shape', f'{_shc},D,L', 'registeredaction',
     icon=str(ICON_DIR/'ellipse.svg'))
-  DRAW_SHAPE_FREE : PrjParam = newParam('Activate "Freehand" draw shape', 'Ctrl+K,D,H',
+  DRAW_SHAPE_FREE : PrjParam = newParam('Activate "Freehand" draw shape', f'{_shc},D,H',
                                        icon=str(ICON_DIR/'freehand.svg'))
   DRAW_SHAPE_POINT: PrjParam = newParam(
-    'Activate "Point" draw shape', 'Ctrl+K,D,N', icon=str(ICON_DIR/'point.svg'))
+    'Activate "Point" draw shape', f'{_shc},D,N', icon=str(ICON_DIR/'point.svg'))
   DRAW_SHAPE_NONE : PrjParam = newParam('None')
 
   # Actions
   DRAW_ACT_CREATE    : PrjParam = newParam(
-    'Activate "Create Component" action', 'Ctrl+K,D,C', 'registeredaction',
+    'Activate "Create Component" action', f'{_shc},D,C', 'registeredaction',
     icon=str(ICON_DIR/'create.svg'),
     helpText='When an ROI is created, the image processor will attempt to make a new'
              ' component at that location. Right-click and drag to pan.')
   DRAW_ACT_ADD    : PrjParam = newParam(
-    'Activate "Add to Foreground" action', 'Ctrl+K,D,F', 'registeredaction',
+    'Activate "Add to Foreground" action', f'{_shc},D,F', 'registeredaction',
     icon=str(ICON_DIR/'foreground.svg'),
     helpText='When an ROI is created, the image processor will attempt to make a new'
              ' component at that location. Right-click and drag to pan.')
   DRAW_ACT_REM    : PrjParam = newParam(
-    'Activate "Add to Background" action', 'Ctrl+K,D, B', 'registeredaction',
+    'Activate "Add to Background" action', f'{_shc},D, B', 'registeredaction',
     icon=str(ICON_DIR/'background.svg'),
     helpText='When an ROI is created, the image processor will attempt to take the enclosed'
              ' area away from the current component shape. Right-click and drag to pan.')
   DRAW_ACT_SELECT : PrjParam = newParam(
-    'Activate "Select" draw action', 'Ctrl+K,D, S', 'registeredaction', icon=str(ICON_DIR/'select.svg'),
+    'Activate "Select" draw action', f'{_shc},D, S', 'registeredaction', icon=str(ICON_DIR/'select.svg'),
     helpText='When component boundaries are enclosed by this ROI, they will be selected'
              ' in the component table. Right-click and drag to pan.')
   DRAW_ACT_PAN    : PrjParam = newParam(
-    'Activate "Pan" draw action', 'Ctrl+K,D,P', 'registeredaction', icon=str(ICON_DIR/'pan.svg'),
+    'Activate "Pan" draw action', f'{_shc},D,P', 'registeredaction', icon=str(ICON_DIR/'pan.svg'),
     helpText='No ROI will be drawn in this mode. Right- or left-click and drag to pan.')
 PRJ_CONSTS = _PrjConsts()
 
