@@ -9,7 +9,7 @@ from pyqtgraph.graphicsItems.ViewBox.ViewBoxMenu import ViewBoxMenu
 from skimage.io import imread
 from utilitys import ParamEditor, EditorPropsMixin, PrjParam, RunOpts, CompositionMixin, fns
 
-from s3a import FR_SINGLETON
+from s3a import PRJ_SINGLETON
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_CONSTS as CNST
 from s3a.controls.drawctrl import RoiCollection
 from s3a.generalutils import getCroppedImg, coerceDfTypes
@@ -48,7 +48,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
   def __initEditorParams__(cls):
     cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Region Tools')
 
-    cls.minCompSize, = FR_SINGLETON.generalProps.registerProps(
+    cls.minCompSize, = PRJ_SINGLETON.generalProps.registerProps(
       [CNST.PROP_MIN_COMP_SZ])
 
   def __init__(self, parent=None, drawShapes: Collection[PrjParam]=None,
@@ -71,7 +71,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     vb.invertY()
     self.setMouseEnabled(True)
     self._initGrid()
-    FR_SINGLETON.colorScheme.registerFunc(self.updateGridScheme, runOpts=RunOpts.ON_CHANGED)
+    PRJ_SINGLETON.colorScheme.registerFunc(self.updateGridScheme, runOpts=RunOpts.ON_CHANGED)
 
     self.lastClickPos = QtCore.QPoint()
 
@@ -87,7 +87,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     # -----
     # FOCUSED COMPONENT INFORMATION
     # -----
-    self.compSer: pd.Series = FR_SINGLETON.tableData.makeCompSer()
+    self.compSer: pd.Series = PRJ_SINGLETON.tableData.makeCompSer()
     self._focusedTools: List[ParamEditor] = []
     """
     List of all toolsEditor that allow actions to be performed on the currently focused components
@@ -340,7 +340,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     self.getViewBox().menu = self.menu
     return retClctn
 
-  @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
+  @PRJ_SINGLETON.actionStack.undoable('Modify Focused Component')
   def updateFocusedComp(self, newComp: pd.Series=None):
     """
     Updates focused image and component from provided information. Useful for creating
@@ -351,7 +351,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     oldComp = self.compSer
     mainImg = self.image
     if newComp is None or mainImg is None:
-      newComp = FR_SINGLETON.tableData.makeCompSer()
+      newComp = PRJ_SINGLETON.tableData.makeCompSer()
     else:
       # Since values INSIDE the dataframe are reset instead of modified, there is no
       # need to go through the trouble of deep copying

@@ -8,7 +8,7 @@ from pyqtgraph.Qt import QtCore, QtGui, QtSvg, QtWidgets
 from utilitys import EditorPropsMixin, PrjParam, RunOpts
 
 
-from s3a import FR_SINGLETON
+from s3a import PRJ_SINGLETON
 from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
 from s3a.models.tablemodel import ComponentMgr
 from s3a.structures import OneDArr
@@ -20,7 +20,7 @@ from s3a.views.regions import MultiRegionPlot
 __all__ = ['CompSortFilter', 'CompDisplayFilter']
 
 Signal = QtCore.Signal
-TBL_FIELDS = FR_SINGLETON.tableData.allFields
+TBL_FIELDS = PRJ_SINGLETON.tableData.allFields
 QISM = QtCore.QItemSelectionModel
 
 class CompSortFilter(QtCore.QSortFilterProxyModel):
@@ -57,13 +57,13 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
 
   @classmethod
   def __initEditorParams__(cls):
-    cls.pltClickBehav: str = FR_SINGLETON.generalProps.registerProp(
+    cls.pltClickBehav: str = PRJ_SINGLETON.generalProps.registerProp(
       PRJ_CONSTS.PROP_COMP_SEL_BHV)
 
   def __init__(self, compMgr: ComponentMgr, mainImg: MainImage,
                compTbl: tableview.CompTableView, parent=None):
     super().__init__(parent)
-    filterEditor = FR_SINGLETON.filter
+    filterEditor = PRJ_SINGLETON.filter
     self._mainImgArea = mainImg
     self._filter = filterEditor
     self._compTbl = compTbl
@@ -76,14 +76,14 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
 
     self.regionCopier = mainImg.regionCopier
 
-    with FR_SINGLETON.colorScheme.setBaseRegisterPath(self.regionPlot.__groupingName__):
-      proc, argsParam = FR_SINGLETON.colorScheme.registerFunc(
+    with PRJ_SINGLETON.colorScheme.setBaseRegisterPath(self.regionPlot.__groupingName__):
+      proc, argsParam = PRJ_SINGLETON.colorScheme.registerFunc(
         self.updateLabelCol, runOpts=RunOpts.ON_CHANGED, returnParam=True, nest=False)
     def updateLblList():
-      fields = FR_SINGLETON.tableData.allFields
+      fields = PRJ_SINGLETON.tableData.allFields
       # TODO: Filter out non-viable field types
       argsParam.child('labelCol').setLimits([f.name for f in fields])
-    FR_SINGLETON.tableData.sigCfgUpdated.connect(updateLblList)
+    PRJ_SINGLETON.tableData.sigCfgUpdated.connect(updateLblList)
 
     # Attach to UI signals
     def _maybeRedraw():
@@ -91,7 +91,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
       Since an updated filter can also result from refreshed table fields, make sure not to update in that case
       (otherwise errors may occur from missing classes, etc.)
       """
-      if np.array_equal(FR_SINGLETON.tableData.allFields, self._compMgr.compDf.columns):
+      if np.array_equal(PRJ_SINGLETON.tableData.allFields, self._compMgr.compDf.columns):
         self.redrawComps()
     self._filter.sigChangesApplied.connect(_maybeRedraw)
 
@@ -115,7 +115,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
       title: Labeling Column
       pType: list
     """
-    self.labelCol = FR_SINGLETON.tableData.fieldFromName(labelCol)
+    self.labelCol = PRJ_SINGLETON.tableData.fieldFromName(labelCol)
     newLblData = self.labelCol.toNumeric(self._compMgr.compDf[self.labelCol], rescale=True)
 
     self.regionPlot.regionData[PRJ_ENUMS.FIELD_LABEL] = newLblData
@@ -159,7 +159,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
       xpondingIdx = model.mapFromSource(self._compMgr.index(rowId,0)).row()
       self._compTbl.showRow(xpondingIdx)
 
-  @FR_SINGLETON.actionStack.undoable('Split Components', asGroup=True)
+  @PRJ_SINGLETON.actionStack.undoable('Split Components', asGroup=True)
   def splitSelectedComps(self):
     """Makes a separate component for each distinct boundary of all selected components"""
     selection = self._compTbl.ids_rows_colsFromSelection(excludeNoEditCols=False,
@@ -169,7 +169,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     changes = self._compMgr.splitCompVertsById(np.unique(selection[:,0]))
     self.selectRowsById(changes['added'], QISM.ClearAndSelect)
 
-  @FR_SINGLETON.actionStack.undoable('Merge Components', asGroup=True)
+  @PRJ_SINGLETON.actionStack.undoable('Merge Components', asGroup=True)
   def mergeSelectedComps(self, keepId=-1):
     """
     Merges the selected components into one, keeping all properties of the first in the selection
@@ -297,7 +297,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
   def _populateDisplayedIds(self):
     curComps = self._compMgr.compDf.copy()
     for fieldName, opts in self._filter.activeFilters.items():
-      prjParam = FR_SINGLETON.tableData.fieldFromName(fieldName)
+      prjParam = PRJ_SINGLETON.tableData.fieldFromName(fieldName)
       curComps = self.filterByParamType(curComps, prjParam, opts)
 
     # Give self the id list of surviving comps

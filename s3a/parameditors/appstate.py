@@ -6,7 +6,7 @@ import pandas as pd
 from pyqtgraph.parametertree import Parameter
 from utilitys import ParamEditor, fns
 
-from s3a import FR_SINGLETON
+from s3a import PRJ_SINGLETON
 from s3a.constants import APP_STATE_DIR
 from s3a.generalutils import safeCallFuncList
 from s3a.structures import FilePath
@@ -32,7 +32,7 @@ class AppStateEditor(ParamEditor):
       rets, errs = safeCallFuncList(legitKeys, exportFuncs, [[saveOnExitDir]] * len(legitKeys))
       updateDict = {k: ret for k, ret in zip(legitKeys, rets) if ret is not None}
       paramState = dict(Parameters=paramState, **updateDict)
-      for editor in FR_SINGLETON.quickLoader.listModel.uniqueEditors:
+      for editor in PRJ_SINGLETON.quickLoader.listModel.uniqueEditors:
         editor.applyChanges()
         if editor.lastAppliedName == 'Default':
           continue
@@ -67,7 +67,7 @@ class AppStateEditor(ParamEditor):
       args.append((stateDict.pop(k, None),))
     _, errs = safeCallFuncList(legitKeys, importFuncs, args)
     if len(np.setdiff1d(stateDict.keys(), legitKeys)) > 0:
-      FR_SINGLETON.quickLoader.buildFromStartupParams(stateDict)
+      PRJ_SINGLETON.quickLoader.buildFromStartupParams(stateDict)
     ret = super().loadParamValues(stateName, paramDict, **kwargs)
     return ret
 

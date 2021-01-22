@@ -6,14 +6,14 @@ import cv2 as cv
 import numpy as np
 from pandas import DataFrame as df
 
-from s3a import FR_SINGLETON
+from s3a import PRJ_SINGLETON
 from s3a.constants import REQD_TBL_FIELDS
 from s3a.structures import ComplexXYVertices
 from testingconsts import RND, IMG_DIR
 
 class CompDfTester:
   def __init__(self, numComps, fillInfo=True):
-    self.compDf = FR_SINGLETON.tableData.makeCompDf(numComps)
+    self.compDf = PRJ_SINGLETON.tableData.makeCompDf(numComps)
     self.compDf.set_index(np.arange(numComps, dtype=int), inplace=True)
     self.numComps = numComps
     if fillInfo:

@@ -15,7 +15,7 @@ from s3a.constants import PRJ_ENUMS
 from s3a.controls.tableviewproxy import CompDisplayFilter, CompSortFilter
 from s3a.generalutils import resolveAuthorName
 from s3a.models.tablemodel import ComponentMgr
-from s3a.parameditors import FR_SINGLETON
+from s3a.parameditors import PRJ_SINGLETON
 from s3a.parameditors.appstate import AppStateEditor
 from s3a.plugins.file import FilePlugin
 from s3a.structures import FilePath, NChanImg
@@ -42,14 +42,14 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION.opts['ownerObj'] = self.mainImg
     self.mainImg.toolsEditor.registerFunc(self.acceptFocusedRegion,
                                           btnOpts=PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION)
-    FR_SINGLETON.generalProps.registerFunc(FR_SINGLETON.actionStack.resizeStack,
+    PRJ_SINGLETON.generalProps.registerFunc(PRJ_SINGLETON.actionStack.resizeStack,
                                            name=PRJ_CONSTS.PROP_UNDO_BUF_SZ.name,
                                            runOpts=RunOpts.ON_CHANGED,
                                            newMaxLen=300)
     self.statBar = QtWidgets.QStatusBar(self)
     self.menuBar_ = self.menuBar()
 
-    FR_SINGLETON.shortcuts.registerShortcut(PRJ_CONSTS.TOOL_CLEAR_ROI,
+    PRJ_SINGLETON.shortcuts.registerShortcut(PRJ_CONSTS.TOOL_CLEAR_ROI,
                                             self.mainImg.clearCurRoi,
                                             overrideOwnerObj=self.mainImg
                                             )
@@ -57,12 +57,12 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     self.compMgr = ComponentMgr()
     # Register exporter to allow user parameters
     ioCls = ComponentIO
-    with FR_SINGLETON.generalProps.setBaseRegisterPath(PRJ_CONSTS.CLS_COMP_EXPORTER.name):
+    with PRJ_SINGLETON.generalProps.setBaseRegisterPath(PRJ_CONSTS.CLS_COMP_EXPORTER.name):
       ioCls.exportOnlyVis, ioCls.includeFullSourceImgName = \
-        FR_SINGLETON.generalProps.registerProps(
+        PRJ_SINGLETON.generalProps.registerProps(
           [PRJ_CONSTS.EXP_ONLY_VISIBLE, PRJ_CONSTS.INCLUDE_FNAME_PATH])
     self.compIo: ComponentIO = ioCls()
-    ComponentIO.tableData = FR_SINGLETON.tableData
+    ComponentIO.tableData = PRJ_SINGLETON.tableData
 
     self.compTbl = CompTableView()
     self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl)
@@ -81,12 +81,12 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     # -----
     self.appStateEditor = AppStateEditor(self, name='App State Editor')
 
-    for plugin in FR_SINGLETON.clsToPluginMapping.values(): # type: ParamEditorPlugin
+    for plugin in PRJ_SINGLETON.clsToPluginMapping.values(): # type: ParamEditorPlugin
       # Plugins created before window was initialized may need their plugins forcefully
       # attached here
       if plugin.win is not self:
         self._handleNewPlugin(plugin)
-    FR_SINGLETON.sigPluginAdded.connect(self._handleNewPlugin)
+    PRJ_SINGLETON.sigPluginAdded.connect(self._handleNewPlugin)
 
     self.filePlg: FilePlugin = self.addPlugin(FilePlugin)
 
@@ -120,9 +120,9 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       sys.exit('No author name provided and no default author exists. Exiting.\n'
                'To start without error, provide an author name explicitly, e.g.\n'
                '"python -m s3a --author=<Author Name>"')
-    FR_SINGLETON.tableData.annAuthor = authorName
+    PRJ_SINGLETON.tableData.annAuthor = authorName
     self.saveAllEditorDefaults()
-    FR_SINGLETON.tableData.sigCfgUpdated.connect(lambda: self.resetTblFields())
+    PRJ_SINGLETON.tableData.sigCfgUpdated.connect(lambda: self.resetTblFields())
 
   def resetTblFields(self):
     """
@@ -135,7 +135,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     self.compTbl.popup.reflectDelegateChange()
     # Make sure this is necessary, first
     for mgr in self.compMgr, self.compTbl.popup.tbl.mgr:
-      if mgr.colTitles == list([f.name for f in FR_SINGLETON.tableData.allFields]):
+      if mgr.colTitles == list([f.name for f in PRJ_SINGLETON.tableData.allFields]):
         # Fields haven't changed since last reset. Types could be different, but nothing
         # will break. So, the table doesn't have to be completely reset
         return
@@ -152,10 +152,10 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
 
   @staticmethod
   def saveAllEditorDefaults():
-    for editor in FR_SINGLETON.registerableEditors:
+    for editor in PRJ_SINGLETON.registerableEditors:
       editor.saveCurStateAsDefault()
 
-  @FR_SINGLETON.actionStack.undoable('Accept Focused Region')
+  @PRJ_SINGLETON.actionStack.undoable('Accept Focused Region')
   def acceptFocusedRegion(self):
     """Applies the focused image vertices to the corresponding component in the table"""
     # If the component was deleted
@@ -206,11 +206,11 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     self.compMgr.rmComps()
 
   def addPlugin(self, pluginCls: Type[ParamEditorPlugin], *args, **kwargs):
-    """See FR_SINGLETON.addPlugin"""
-    plugin = FR_SINGLETON.addPlugin(pluginCls, *args, **kwargs)
+    """See PRJ_SINGLETON.addPlugin"""
+    plugin = PRJ_SINGLETON.addPlugin(pluginCls, *args, **kwargs)
     return plugin
 
-  @FR_SINGLETON.actionStack.undoable('Change Main Image')
+  @PRJ_SINGLETON.actionStack.undoable('Change Main Image')
   def setMainImg(self, fileName: FilePath=None, imgData: NChanImg=None,
                  clearExistingComps=True):
     """
@@ -331,7 +331,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     newComps = self.compIo.buildByFileType(inFname, self.mainImg.image.shape)
     self.compMgr.addComps(newComps, loadType)
 
-  @FR_SINGLETON.actionStack.undoable('Create New Comp', asGroup=True)
+  @PRJ_SINGLETON.actionStack.undoable('Create New Comp', asGroup=True)
   def add_focusComps(self, newComps: df, addType=PRJ_ENUMS.COMP_ADD_AS_NEW):
     changeDict = self.compMgr.addComps(newComps, addType)
     # Focus is performed by comp table
@@ -341,7 +341,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       return
     self.changeFocusedComp(self.compMgr.compDf.loc[[changeList[-1]]])
 
-  @FR_SINGLETON.actionStack.undoable('Change Focused Component')
+  @PRJ_SINGLETON.actionStack.undoable('Change Focused Component')
   def changeFocusedComp(self, newComps: df=None, forceKeepLastChange=False):
     oldSer = self.mainImg.compSer.copy()
     oldImg = self.mainImg.image
@@ -360,7 +360,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       self.mainImg.updateFocusedComp(newComp)
     # Nothing happened since the last component change, so just replace it instead of
     # adding a distinct action to the buffer queue
-    stack = FR_SINGLETON.actionStack
+    stack = PRJ_SINGLETON.actionStack
     if not forceKeepLastChange and stack.undoDescr == 'Change Focused Component':
       stack.actions.pop()
     yield

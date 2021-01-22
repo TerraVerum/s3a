@@ -3,8 +3,8 @@ import pytest
 from conftest import assertExInList
 from s3a.parameditors import *
 
-ql = FR_SINGLETON.quickLoader
-editor = FR_SINGLETON.colorScheme
+ql = PRJ_SINGLETON.quickLoader
+editor = PRJ_SINGLETON.colorScheme
 def test_normal_add():
   ql.addActForEditor(editor, 'Default')
   ql.applyChanges()

@@ -3,7 +3,7 @@ import pytest
 from pyqtgraph.Qt import QtGui, QtCore
 
 from testingconsts import NUM_COMPS
-from s3a import FR_SINGLETON, REQD_TBL_FIELDS
+from s3a import PRJ_SINGLETON, REQD_TBL_FIELDS
 from s3a.constants import PRJ_CONSTS
 from s3a.controls.drawctrl import RoiCollection
 from s3a.parameditors.algcollection import AlgParamEditor
@@ -47,13 +47,13 @@ def test_update(app, mgr, vertsPlugin):
   newerSer = mgr.compDf.loc[0]
   mImg.updateFocusedComp(newerSer)
 
-  FR_SINGLETON.actionStack.undo()
+  PRJ_SINGLETON.actionStack.undo()
   assert mImg.compSer.equals(newCompSer)
-  FR_SINGLETON.actionStack.undo()
+  PRJ_SINGLETON.actionStack.undo()
   assert mImg.compSer[REQD_TBL_FIELDS.INST_ID] == -1
-  FR_SINGLETON.actionStack.redo()
+  PRJ_SINGLETON.actionStack.redo()
   assert mImg.compSer.equals(newCompSer)
-  FR_SINGLETON.actionStack.redo()
+  PRJ_SINGLETON.actionStack.redo()
   assert mImg.compSer.equals(newerSer)
 
 def test_region_modify(sampleComps, app, mgr, vertsPlugin):
@@ -80,19 +80,19 @@ def test_region_modify(sampleComps, app, mgr, vertsPlugin):
   checkpointMask = vertsPlugin.region.toGrayImg(shapeBnds) > 0
   assert np.any(checkpointMask)
 
-  FR_SINGLETON.actionStack.undo()
-  FR_SINGLETON.actionStack.undo()
+  PRJ_SINGLETON.actionStack.undo()
+  PRJ_SINGLETON.actionStack.undo()
   # Once for the shape, again for the focus
   # Cmp to first action
   assert imsum() == 0
-  FR_SINGLETON.actionStack.undo()
+  PRJ_SINGLETON.actionStack.undo()
   # Cmp to original
   assert vertsPlugin.region.regionData[REQD_TBL_FIELDS.VERTICES].equals(oldData[REQD_TBL_FIELDS.VERTICES])
 
-  FR_SINGLETON.actionStack.redo()
+  PRJ_SINGLETON.actionStack.redo()
   assert imsum() == 0
-  FR_SINGLETON.actionStack.redo()
-  FR_SINGLETON.actionStack.redo()
+  PRJ_SINGLETON.actionStack.redo()
+  PRJ_SINGLETON.actionStack.redo()
   pluginMask = vertsPlugin.region.toGrayImg(shapeBnds)
   assert np.array_equal(pluginMask, checkpointMask)
 

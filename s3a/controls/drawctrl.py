@@ -16,7 +16,7 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
 
   def __init__(self, allowableShapes: Collection[PrjParam]=(), parent: pg.GraphicsView=None):
     super().__init__(parent)
-    singleton.FR_SINGLETON.colorScheme.registerFunc(
+    singleton.PRJ_SINGLETON.colorScheme.registerFunc(
       PointROI.updateRadius, name='Point ROI Features', runOpts=RunOpts.ON_CHANGED, namePath=(self.__groupingName__,),
 
     )

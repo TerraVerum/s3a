@@ -39,7 +39,7 @@ class ButtonCollection(QtWidgets.QGroupBox):
       # Either already exists or wasn't designed to be a button
       return
     registerOpts.setdefault('asToolBtn', self.asToolBtn)
-    newBtn = parameditors.FR_SINGLETON.shortcuts.createRegisteredButton(btnParam, **registerOpts)
+    newBtn = parameditors.PRJ_SINGLETON.shortcuts.createRegisteredButton(btnParam, **registerOpts)
     if checkable:
       newBtn.setCheckable(True)
       oldTriggerFn = triggerFn

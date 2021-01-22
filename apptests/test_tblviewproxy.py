@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from conftest import stack
-from s3a import appInst, FR_SINGLETON
+from s3a import appInst, PRJ_SINGLETON
 from s3a.constants import REQD_TBL_FIELDS
 from s3a.structures import ComplexXYVertices, XYVertices
 from s3a.views.tableview import CompTableView
@@ -32,7 +32,7 @@ def test_split_selected_comps(app, mgr):
   cv.rectangle(compMask, (21, 21), (30, 30), 1, -1)
   cv.rectangle(compMask, (46, 46), (60, 60), 1, -1)
   verts = ComplexXYVertices.fromBwMask(compMask > 0)
-  comp = FR_SINGLETON.tableData.makeCompDf()
+  comp = PRJ_SINGLETON.tableData.makeCompDf()
   comp.at[comp.index[0], REQD_TBL_FIELDS.VERTICES] = verts
   app.add_focusComps(comp)
 
@@ -54,7 +54,7 @@ def test_set_cells_as(app, mgr):
   # Ensure the overwrite data will be different from what it's overwriting
   newFile = 'TestFile.png'
   newDf = mgr.compDf.loc[[0]]
-  compClsIdx = FR_SINGLETON.tableData.allFields.index(REQD_TBL_FIELDS.SRC_IMG_FILENAME)
+  compClsIdx = PRJ_SINGLETON.tableData.allFields.index(REQD_TBL_FIELDS.SRC_IMG_FILENAME)
   newDf.iat[0, compClsIdx] = newFile
   oldMode = app.compTbl.selectionMode()
   app.compTbl.setSelectionMode(app.compTbl.MultiSelection)

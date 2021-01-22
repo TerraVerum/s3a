@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 
-from s3a import FR_SINGLETON, PRJ_CONSTS as CNST, XYVertices, REQD_TBL_FIELDS as RTF, \
+from s3a import PRJ_SINGLETON, PRJ_CONSTS as CNST, XYVertices, REQD_TBL_FIELDS as RTF, \
   ComplexXYVertices
 from s3a.models.s3abase import S3ABase
 from s3a.processing.algorithms import _historyMaskHolder
@@ -18,7 +18,7 @@ class VerticesPlugin(TableFieldPlugin):
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
-    cls.procCollection = FR_SINGLETON.imgProcClctn.createProcessorForClass(cls, cls.name + ' Processor')
+    cls.procCollection = PRJ_SINGLETON.imgProcClctn.createProcessorForClass(cls, cls.name + ' Processor')
 
     cls.dock.addEditors([cls.procCollection])
 
@@ -118,7 +118,7 @@ class VerticesPlugin(TableFieldPlugin):
     if not np.array_equal(newGrayscale, compGrayscale):
       self.updateRegionFromMask(newGrayscale)
 
-  @FR_SINGLETON.actionStack.undoable('Modify Focused Component')
+  @PRJ_SINGLETON.actionStack.undoable('Modify Focused Component')
   def updateRegionFromDf(self, newData: pd.DataFrame=None, offset: XYVertices=None):
     """
     Updates the current focused region using the new provided vertices

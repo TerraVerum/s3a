@@ -12,7 +12,7 @@ from utilitys import ParamEditorPlugin, ProcessIO, widgets as uw
 from s3a import models, XYVertices, ComplexXYVertices
 from s3a.constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF, PRJ_ENUMS
 from s3a.models import s3abase
-from s3a.parameditors import FR_SINGLETON
+from s3a.parameditors import PRJ_SINGLETON
 from s3a.plugins.base import ProcessorPlugin
 
 
@@ -88,7 +88,7 @@ class MainImagePlugin(ParamEditorPlugin):
 
     # noinspection PyTypeChecker
     verts = ComplexXYVertices([verts])
-    newComps = FR_SINGLETON.tableData.makeCompDf()
+    newComps = PRJ_SINGLETON.tableData.makeCompDf()
     newComps[RTF.VERTICES] = [verts]
     self.win.add_focusComps(newComps)
 
@@ -98,7 +98,7 @@ class CompTablePlugin(ParamEditorPlugin):
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
-    cls.dock.addEditors([FR_SINGLETON.filter])
+    cls.dock.addEditors([PRJ_SINGLETON.filter])
 
 
   def attachWinRef(self, win: s3abase.S3ABase):
@@ -120,7 +120,7 @@ class EditPlugin(ParamEditorPlugin):
 
   def attachWinRef(self, win: s3abase.S3ABase):
     super().attachWinRef(win)
-    stack = FR_SINGLETON.actionStack
+    stack = PRJ_SINGLETON.actionStack
 
     for param in CNST.TOOL_UNDO, CNST.TOOL_REDO: param.opts['ownerObj'] = win
     self.registerFunc(stack.undo, name='Undo', btnOpts=CNST.TOOL_UNDO)
@@ -157,7 +157,7 @@ class RandomToolsPlugin(ParamEditorPlugin):
     is on your system, a qt console will be loaded. Otherwise, a (less capable) standard
     pyqtgraph console will be used.
     """
-    namespace = dict(app=self.win, rtf=RTF, singleton=FR_SINGLETON)
+    namespace = dict(app=self.win, rtf=RTF, singleton=PRJ_SINGLETON)
     # "dict" default is to use repr instead of string for internal elements, so expanding
     # into string here ensures repr is not used
     nsPrintout = [f"{k}: {v}" for k, v in namespace.items()]
@@ -210,7 +210,7 @@ class MultiPredictionsPlugin(ProcessorPlugin):
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
-    cls.procCollection = FR_SINGLETON.multiPredClctn.createProcessorForClass(cls, cls.name + ' Processor')
+    cls.procCollection = PRJ_SINGLETON.multiPredClctn.createProcessorForClass(cls, cls.name + ' Processor')
     cls.dock.addEditors([cls.procCollection])
 
   def __init__(self):
@@ -233,7 +233,7 @@ class MultiPredictionsPlugin(ProcessorPlugin):
       newComps = ProcessIO(components=newComps)
     compsToAdd = newComps['components']
     addType = newComps.get('addType', PRJ_ENUMS.COMP_ADD_AS_NEW)
-    with FR_SINGLETON.actionStack.group('Add Components'):
+    with PRJ_SINGLETON.actionStack.group('Add Components'):
       if newComps.get('deleteOrig', False):
         self.mgr.rmComps(comps.index)
       self.mgr.addComps(compsToAdd, addType)

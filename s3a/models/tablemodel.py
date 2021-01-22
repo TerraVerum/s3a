@@ -7,7 +7,7 @@ import cv2 as cv
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 
-from s3a import FR_SINGLETON
+from s3a import PRJ_SINGLETON
 from s3a.generalutils import coerceDfTypes
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
 from s3a.structures import ComplexXYVertices, OneDArr
@@ -16,7 +16,7 @@ __all__ = ['ComponentMgr', 'CompTableModel']
 
 Signal = QtCore.Signal
 
-TBL_FIELDS = FR_SINGLETON.tableData.allFields
+TBL_FIELDS = PRJ_SINGLETON.tableData.allFields
 
 class CompTableModel(QtCore.QAbstractTableModel):
   # Emits 3-element dict: Deleted comp ids, changed comp ids, added comp ids
@@ -56,7 +56,7 @@ class CompTableModel(QtCore.QAbstractTableModel):
     else:
       return None
 
-  @FR_SINGLETON.actionStack.undoable('Alter Component Data')
+  @PRJ_SINGLETON.actionStack.undoable('Alter Component Data')
   def setData(self, index, value, role=QtCore.Qt.EditRole) -> bool:
     row = index.row()
     col = index.column()
@@ -102,7 +102,7 @@ class CompTableModel(QtCore.QAbstractTableModel):
   def resetFields(self):
     self.colTitles = [f.name for f in TBL_FIELDS]
 
-    self.compDf = FR_SINGLETON.tableData.makeCompDf(0)
+    self.compDf = PRJ_SINGLETON.tableData.makeCompDf(0)
 
     noEditParams = set(RTF)
     self.noEditColIdxs = [self.colTitles.index(col.name) for col in noEditParams]
@@ -117,7 +117,7 @@ class ComponentMgr(CompTableModel):
     super().resetFields()
     self._nextCompId = 0
 
-  @FR_SINGLETON.actionStack.undoable('Add Components')
+  @PRJ_SINGLETON.actionStack.undoable('Add Components')
   def addComps(self, newCompsDf: df, addtype: PRJ_ENUMS = PRJ_ENUMS.COMP_ADD_AS_NEW, emitChange=True):
     toEmit = self.defaultEmitDict.copy()
     existingIds = self.compDf.index
@@ -185,7 +185,7 @@ class ComponentMgr(CompTableModel):
     if len(addedCompIdxs) > 0:
       self.rmComps(toEmit['added'])
 
-  @FR_SINGLETON.actionStack.undoable('Remove Components')
+  @PRJ_SINGLETON.actionStack.undoable('Remove Components')
   def rmComps(self, idsToRemove: Union[np.ndarray, type(PRJ_ENUMS)] = PRJ_ENUMS.COMP_RM_ALL,
               emitChange=True) -> dict:
     toEmit = self.defaultEmitDict.copy()
@@ -236,7 +236,7 @@ class ComponentMgr(CompTableModel):
     # Undo code
     self.addComps(removedData, PRJ_ENUMS.COMP_ADD_AS_MERGE)
 
-  @FR_SINGLETON.actionStack.undoable('Merge Components')
+  @PRJ_SINGLETON.actionStack.undoable('Merge Components')
   def mergeCompVertsById(self, mergeIds: OneDArr=None, keepId: int=None):
     """
     Merges the selected components
@@ -268,7 +268,7 @@ class ComponentMgr(CompTableModel):
     yield
     self.addComps(mergeComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
 
-  @FR_SINGLETON.actionStack.undoable('Split Components')
+  @PRJ_SINGLETON.actionStack.undoable('Split Components')
   def splitCompVertsById(self, splitIds: OneDArr):
     """
     Makes a separate component for each distinct boundary in all selected components.

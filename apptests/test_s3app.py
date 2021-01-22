@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from conftest import NUM_COMPS, dfTester
-from s3a import FR_SINGLETON, appInst, PRJ_CONSTS, S3A
+from s3a import PRJ_SINGLETON, appInst, PRJ_CONSTS, S3A
 from s3a.constants import REQD_TBL_FIELDS, LAYOUTS_DIR, ANN_AUTH_DIR
 from s3a.generalutils import resolveAuthorName
 from s3a.structures import XYVertices, ComplexXYVertices
@@ -34,8 +34,8 @@ seem to get the programmatically allocated keystrokes to work."""
 #
 #   p2 = copy(param)
 #   p2.name = 'dummy2'
-#   FR_SINGLETON.shortcuts.createRegisteredButton(param, app.mainImg)
-#   FR_SINGLETON.shortcuts.createRegisteredButton(p2, app.mainImg)
+#   PRJ_SINGLETON.shortcuts.createRegisteredButton(param, app.mainImg)
+#   PRJ_SINGLETON.shortcuts.createRegisteredButton(p2, app.mainImg)
 #   keypress = QtGui.QKeyEvent(QtGui.QKeyEvent.KeyPress, QtCore.Qt.Key_T, QtCore.Qt.NoModifier, "T")
 #   with pytest.warns(UserWarning):
 #     QtGui.QGuiApplication.sendEvent(app.mainImg, keypress)
@@ -78,7 +78,7 @@ def test_import_large_verts(sampleComps, tmp_path, app):
     io.buildFromCsv(tmp_path/'Bad Verts.csv', app.mainImg.image.shape)
 
 def test_change_comp(app, mgr):
-  stack = FR_SINGLETON.actionStack
+  stack = PRJ_SINGLETON.actionStack
   mImg = app.mainImg
   mgr.addComps(dfTester.compDf.copy())
   comp = mgr.compDf.loc[[RND.integers(NUM_COMPS)]]
@@ -150,7 +150,7 @@ def test_no_author(app):
   with pytest.raises(SystemExit):
     S3A(guiMode=False)
   # Now plugin s3a refs are screwed up, so fix them
-  for plg in FR_SINGLETON.clsToPluginMapping.values():
+  for plg in PRJ_SINGLETON.clsToPluginMapping.values():
     plg.win = app
   resolveAuthorName('testauthor')
 

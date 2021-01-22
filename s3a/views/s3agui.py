@@ -13,7 +13,7 @@ from utilitys import ParamEditor, ParamEditorPlugin, RunOpts, PrjParam, fns
 from s3a.constants import LAYOUTS_DIR, REQD_TBL_FIELDS
 from s3a.constants import PRJ_ENUMS
 from s3a.models.s3abase import S3ABase
-from s3a.parameditors import FR_SINGLETON
+from s3a.parameditors import PRJ_SINGLETON
 from s3a.plugins.file import FilePlugin
 from s3a.plugins.misc import RandomToolsPlugin, MainImagePlugin, CompTablePlugin
 from s3a.structures import XYVertices, FilePath, NChanImg
@@ -69,7 +69,7 @@ class S3A(S3ABase):
       self.appStateEditor.loadParamValues(stateDict=stateDict, overrideDict=startupSettings)
 
   def _hookupSignals(self):
-    FR_SINGLETON.colorScheme.registerFunc(self.updateTheme, runOpts=RunOpts.ON_CHANGED, nest=False)
+    PRJ_SINGLETON.colorScheme.registerFunc(self.updateTheme, runOpts=RunOpts.ON_CHANGED, nest=False)
     # EDIT
     self.saveAllEditorDefaults()
 
@@ -88,7 +88,7 @@ class S3A(S3ABase):
     self.generalToolbar.setObjectName('General')
     self.addToolBar(self.generalToolbar)
 
-    _plugins = [FR_SINGLETON.clsToPluginMapping[c] for c in [MainImagePlugin, CompTablePlugin]]
+    _plugins = [PRJ_SINGLETON.clsToPluginMapping[c] for c in [MainImagePlugin, CompTablePlugin]]
     parents = [self.mainImg, self.compTbl]
     for plugin, parent in zip(_plugins, reversed(parents)):
       plugin.toolsEditor.actionsMenuFromProcs(plugin.name, nest=True, parent=parent, outerMenu=parent.menu)
@@ -108,7 +108,7 @@ class S3A(S3ABase):
     # STATUS BAR
     self.setStatusBar(self.statBar)
 
-    authorName = FR_SINGLETON.tableData.annAuthor
+    authorName = PRJ_SINGLETON.tableData.annAuthor
     self.mouseCoords = QtWidgets.QLabel(f"Author: {authorName} Mouse Coords")
     self.imageLbl = QtWidgets.QLabel(f"Image: None")
 
@@ -129,7 +129,7 @@ class S3A(S3ABase):
   def resetTblFields_gui(self):
     outFname = fns.popupFilePicker(None, 'Select Table Config File', 'All Files (*.*);; Config Files (*.yml)')
     if outFname is not None:
-      FR_SINGLETON.tableData.loadCfg(outFname)
+      PRJ_SINGLETON.tableData.loadCfg(outFname)
 
   def _buildMenu(self):
     # TODO: Find a better way of fixing up menu order
@@ -142,7 +142,7 @@ class S3A(S3ABase):
     dock = plugin.dock
     if dock is None:
       return
-    FR_SINGLETON.quickLoader.addDock(dock)
+    PRJ_SINGLETON.quickLoader.addDock(dock)
     self.addTabbedDock(QtCore.Qt.RightDockWidgetArea, dock)
 
     if plugin.menu is None:
@@ -244,7 +244,7 @@ class S3A(S3ABase):
     if shouldExit:
       # Clean up all editor windows, which could potentially be left open
       ev.accept()
-      FR_SINGLETON.close()
+      PRJ_SINGLETON.close()
       fns.restoreExceptionBehavior()
       self.appStateEditor.saveParamValues()
 
@@ -280,7 +280,7 @@ class S3A(S3ABase):
 
   def setInfo(self, xyPos: XYVertices, pxColor: np.ndarray):
     if pxColor is None: return
-    authorName = FR_SINGLETON.tableData.annAuthor
+    authorName = PRJ_SINGLETON.tableData.annAuthor
 
     self.mouseCoords.setText(f'Author: {authorName}'
                              f' | Mouse (x,y): {xyPos[0]}, {xyPos[1]}'

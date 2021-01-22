@@ -16,7 +16,7 @@ from utilitys import CompositionMixin, AtomicProcess
 from utilitys import fns
 from utilitys.params import *
 
-from s3a import FR_SINGLETON, PRJ_CONSTS as CNST, ComponentIO, models, REQD_TBL_FIELDS
+from s3a import PRJ_SINGLETON, PRJ_CONSTS as CNST, ComponentIO, models, REQD_TBL_FIELDS
 from s3a.generalutils import hierarchicalUpdate
 from s3a.graphicsutils import DropList, ThumbnailViewer
 from s3a.structures import FilePath, NChanImg
@@ -399,7 +399,7 @@ class ProjectData(QtCore.QObject):
 
   def __init__(self, cfgFname: FilePath=None, cfgDict: dict=None):
     super().__init__()
-    self.tableData = FR_SINGLETON.tableData
+    self.tableData = PRJ_SINGLETON.tableData
     self.cfg = {}
     self.cfgFname: Optional[Path] = None
     self.images: List[Path] = []

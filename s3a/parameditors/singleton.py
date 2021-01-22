@@ -16,7 +16,7 @@ from utilitys.params import ShortcutParameter
 Signal = QtCore.Signal
 
 
-class _FRSingleton(QtCore.QObject):
+class _PrjSingleton(QtCore.QObject):
   sigPluginAdded = Signal(object) # List[QtWidgets.QDockWidget]
 
   def __init__(self, parent=None):
@@ -79,4 +79,4 @@ class _FRSingleton(QtCore.QObject):
 
 INITIALIZED_GROUPINGS = set()
 REGISTERED_GROUPINGS = set()
-FR_SINGLETON = _FRSingleton()
+PRJ_SINGLETON = _PrjSingleton()

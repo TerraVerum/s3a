@@ -1,3 +1,3 @@
-from .singleton import FR_SINGLETON
+from .singleton import PRJ_SINGLETON
 
-__all__ = ['FR_SINGLETON']
+__all__ = ['PRJ_SINGLETON']

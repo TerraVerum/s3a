@@ -9,7 +9,7 @@ from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
 from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
 from s3a.models.tablemodel import ComponentMgr
-from s3a.parameditors.singleton import FR_SINGLETON
+from s3a.parameditors.singleton import PRJ_SINGLETON
 from s3a.structures import TwoDArr
 
 __all__ = ['CompTableView']
@@ -19,7 +19,7 @@ from utilitys.params.pgregistered import PgParamDelegate
 
 Signal = QtCore.Signal
 
-TBL_FIELDS = FR_SINGLETON.tableData.allFields
+TBL_FIELDS = PRJ_SINGLETON.tableData.allFields
 
 class PopupTableDialog(QtWidgets.QDialog):
   def __init__(self, *args):
@@ -125,7 +125,7 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
 
   @classmethod
   def __initEditorParams__(cls):
-    cls.showOnCreate = FR_SINGLETON.generalProps.registerProp(PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE)
+    cls.showOnCreate = PRJ_SINGLETON.generalProps.registerProp(PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE)
     cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, name='Component Table Tools')
 
   def __init__(self, *args, minimal=False):
@@ -147,14 +147,14 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
     self.setModel(self.mgr)
     self.setColDelegates()
 
-    with FR_SINGLETON.generalProps.setBaseRegisterPath(self.__groupingName__):
-      proc, params = FR_SINGLETON.generalProps.registerFunc(
+    with PRJ_SINGLETON.generalProps.setBaseRegisterPath(self.__groupingName__):
+      proc, params = PRJ_SINGLETON.generalProps.registerFunc(
         self.setVisibleColumns, runOpts=RunOpts.ON_CHANGED, nest=False,
         returnParam=True, visibleColumns=[])
     def onChange(*_args):
       params.child('visibleColumns').setLimits([f.name for f in TBL_FIELDS])
     onChange()
-    FR_SINGLETON.tableData.sigCfgUpdated.connect(onChange)
+    PRJ_SINGLETON.tableData.sigCfgUpdated.connect(onChange)
     proc.run()
 
     if not minimal:
@@ -281,7 +281,7 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
     if selectionIdxs is None:
       selectionIdxs = self.ids_rows_colsFromSelection()
     overwriteData = self.mgr.compDf.loc[[selectionIdxs[0,0]]].copy()
-    with FR_SINGLETON.actionStack.ignoreActions():
+    with PRJ_SINGLETON.actionStack.ignoreActions():
       self.popup.setData(overwriteData, pd.unique(selectionIdxs[:,2]))
       wasAccepted = self.popup.exec_()
     if not wasAccepted or len(self.popup.dirtyColIdxs) == 0:

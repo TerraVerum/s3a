@@ -5,9 +5,9 @@ from typing import Union
 import pytest
 
 from conftest import dfTester
-from s3a import FR_SINGLETON, REQD_TBL_FIELDS
+from s3a import PRJ_SINGLETON, REQD_TBL_FIELDS
 
-td = FR_SINGLETON.tableData
+td = PRJ_SINGLETON.tableData
 cfgDict = {
   'fields': {
     'Class': {
@@ -31,11 +31,11 @@ def newCfg(app):
 
 @pytest.mark.withcomps
 def test_no_opt_fields(app, newCfg):
-  FR_SINGLETON.tableData.loadCfg('testcfg', cfgDict, force=True)
+  PRJ_SINGLETON.tableData.loadCfg('testcfg', cfgDict, force=True)
   with newCfg('none', {}):
     assert len(app.compMgr.compDf) == 0
     assert app.compMgr.colTitles == list(map(str, REQD_TBL_FIELDS))
-    newComps = FR_SINGLETON.tableData.makeCompDf(3).reset_index(drop=True)
+    newComps = PRJ_SINGLETON.tableData.makeCompDf(3).reset_index(drop=True)
     dfTester.fillRandomVerts(compDf=newComps)
     # Just make sure no errors are thrown on adding comps
     app.add_focusComps(newComps)
@@ -43,7 +43,7 @@ def test_no_opt_fields(app, newCfg):
 
 def test_params_for_class(newCfg):
   with newCfg('testcfg', cfgDict):
-    assert 'Class' in [f.name for f in FR_SINGLETON.tableData.allFields]
+    assert 'Class' in [f.name for f in PRJ_SINGLETON.tableData.allFields]
 
 @pytest.mark.withcomps
 def test_no_change(app, newCfg):

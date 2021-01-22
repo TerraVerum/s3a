@@ -5,7 +5,7 @@ from pyqtgraph.Qt import QtCore
 from conftest import NUM_COMPS, stack, dfTester
 from helperclasses import clearTmpFiles
 from testingconsts import RND
-from s3a import FR_SINGLETON
+from s3a import PRJ_SINGLETON
 from s3a.constants import PRJ_ENUMS
 from s3a.constants import REQD_TBL_FIELDS
 from s3a.structures import ComplexXYVertices, XYVertices
@@ -32,7 +32,7 @@ def test_undo_add(sampleComps, mgr):
   assert len(mgr.compDf) > 0
 
 def test_empty_add(mgr):
-  changeList = mgr.addComps(FR_SINGLETON.tableData.makeCompDf(0))
+  changeList = mgr.addComps(PRJ_SINGLETON.tableData.makeCompDf(0))
   cmpChangeList(changeList)
 
 def test_rm_by_empty_vert_add(sampleComps, mgr):
@@ -97,14 +97,14 @@ def test_rm_undo(sampleComps, mgr):
   # Standard remove
   mgr.addComps(sampleComps)
   mgr.rmComps(ids)
-  FR_SINGLETON.actionStack.undo()
+  PRJ_SINGLETON.actionStack.undo()
   assert np.setdiff1d(ids, mgr.compDf.index).size == 0
 
 def test_merge_comps(sampleComps, mgr):
   mgr.addComps(sampleComps)
   mgr.mergeCompVertsById(sampleComps.index)
   assert len(mgr.compDf) == 1
-  FR_SINGLETON.actionStack.undo()
+  PRJ_SINGLETON.actionStack.undo()
   assert len(mgr.compDf) == len(sampleComps)
 
 def test_bad_merge(sampleComps, mgr):
@@ -122,7 +122,7 @@ def test_table_setdata(sampleComps, app, mgr):
     _.VERTICES: ComplexXYVertices([XYVertices([[1, 2], [3, 4]])]),
     _.SRC_IMG_FILENAME: 'newfilename'
   }
-  intColMapping = {FR_SINGLETON.tableData.allFields.index(k):v
+  intColMapping = {PRJ_SINGLETON.tableData.allFields.index(k):v
                    for k, v in colVals.items()}
 
   for col, newVal in intColMapping.items():

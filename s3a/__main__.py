@@ -4,7 +4,7 @@ from typing import Optional
 import fire
 from pyqtgraph.Qt import QtCore
 
-from . import appInst, FR_SINGLETON
+from . import appInst, PRJ_SINGLETON
 from .views.s3agui import S3A
 from utilitys.fns import makeExceptionsShowDialogs
 
@@ -36,7 +36,7 @@ def main(guiMode=True, loadLastState=None, **profileArgs) -> Optional[S3A]:
   # Handle here for faster bootup
   tableCfg = profileArgs.pop('tablecfg', None)
   if tableCfg is not None:
-    FR_SINGLETON.tableData.loadCfg(tableCfg)
+    PRJ_SINGLETON.tableData.loadCfg(tableCfg)
   win = S3A(guiMode=guiMode, loadLastState=loadLastState, **profileArgs)
   if guiMode:
     makeExceptionsShowDialogs(win)

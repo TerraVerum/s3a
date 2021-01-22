@@ -6,15 +6,15 @@ import pytest
 os.environ['S3A_PLATFORM'] = 'minimal'
 from s3a import constants
 from helperclasses import CompDfTester
-from s3a import FR_SINGLETON
+from s3a import PRJ_SINGLETON
 from s3a.views.s3agui import S3A
 from testingconsts import SAMPLE_IMG, SAMPLE_IMG_FNAME, NUM_COMPS, \
   SAMPLE_SMALL_IMG, SAMPLE_SMALL_IMG_FNAME, TEST_AUTHOR
 from s3a.plugins.tablefield import VerticesPlugin
 from s3a.plugins.file import FilePlugin
 
-stack = FR_SINGLETON.actionStack
-FR_SINGLETON.tableData.annAuthor = TEST_AUTHOR
+stack = PRJ_SINGLETON.actionStack
+PRJ_SINGLETON.tableData.annAuthor = TEST_AUTHOR
 
 dfTester = CompDfTester(NUM_COMPS)
 dfTester.fillRandomVerts(imShape=SAMPLE_IMG.shape)
@@ -57,7 +57,7 @@ def mgr(app):
 @pytest.fixture(scope='session', autouse=True)
 def vertsPlugin(app):
   try:
-    plg = FR_SINGLETON.clsToPluginMapping[VerticesPlugin]
+    plg = PRJ_SINGLETON.clsToPluginMapping[VerticesPlugin]
   except KeyError:
     raise RuntimeError('Vertices plugin was not provided. Some tests are guaranteed to fail.')
 
