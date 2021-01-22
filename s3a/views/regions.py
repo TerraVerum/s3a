@@ -180,7 +180,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
 
   @fns.dynamicDocstring(cmapVals=colormaps() + ['None'])
   def updateColors(self, penWidth=0, penColor='w', selectedFill='00f', focusedFill='f00', labelColormap='tab10',
-                   fillAlpha=0.7, hideFocused=False):
+                   fillAlpha=0.7):
     """
     Assigns colors from the specified colormap to each unique class
     :param penWidth: Width of the pen in pixels

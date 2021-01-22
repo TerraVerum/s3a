@@ -65,6 +65,7 @@ class MainImagePlugin(ParamEditorPlugin):
     self.registerFunc(disp.splitSelectedComps, btnOpts=CNST.TOOL_SPLIT_COMPS)
     win.mainImg.registerDrawAction([CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM, CNST.DRAW_ACT_SELECT, CNST.DRAW_ACT_PAN],
                                  actHandler)
+    self.registerFunc(disp.removeSelectedCompOverlap, btnOpts=CNST.TOOL_REM_OVERLAP)
 
     win.mainImg.registerDrawAction(CNST.DRAW_ACT_CREATE, self.createComponent)
     win.mainImg.addTools(self.toolsEditor)

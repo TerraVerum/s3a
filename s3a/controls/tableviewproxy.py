@@ -192,6 +192,17 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     else:
       self.selectRowsById(np.array([keepId]), QISM.ClearAndSelect)
 
+
+  def removeSelectedCompOverlap(self):
+    """
+    Makes sure all specified components have no overlap. Preference is given
+    in order of the selection, i.e. the last selected component in the list
+    is guaranteed to keep its full shape.
+    """
+    if self.selectedIds.size == 0:
+      return
+    self._compMgr.removeOverlapById(self.selectedIds)
+
   def _reflectFieldsChanged(self):
     self.redrawComps()
 

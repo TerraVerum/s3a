@@ -299,3 +299,20 @@ class ComponentMgr(CompTableModel):
     undoDict = self.rmComps(newComps.index)
     undoDict.update(self.addComps(splitComps, PRJ_ENUMS.COMP_ADD_AS_MERGE))
     return undoDict
+
+  def removeOverlapById(self, overlapIds: OneDArr):
+    """
+    Makes sure all specified components have no overlap. Preference is given
+    in order of the given IDs, i.e. the last ID in the list is guaranteed to
+    keep its full shape. If an area selection is made, priority is given to larger
+    IDs, i.e. the largest ID is guaranteed to keep its full original shape.
+    """
+    overlapComps = self.compDf.loc[overlapIds].copy()
+    allVerts = np.vstack([v.stack() for v in overlapComps[RTF.VERTICES]])
+    wholeMask = np.zeros(allVerts.max(0)[::-1], dtype='uint16')
+    for ii, (_, comp) in enumerate(overlapComps.iterrows(), 1):
+      comp[RTF.VERTICES].toMask(wholeMask, ii, asBool=False)
+    for ii, compId in enumerate(overlapIds, 1):
+      verts = ComplexXYVertices.fromBwMask(wholeMask == ii)
+      overlapComps.at[compId, RTF.VERTICES] = verts
+    self.addComps(overlapComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
