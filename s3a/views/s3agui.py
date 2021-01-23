@@ -10,7 +10,7 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from utilitys import ParamEditor, ParamEditorPlugin, RunOpts, PrjParam, fns
 
-from s3a.constants import LAYOUTS_DIR, REQD_TBL_FIELDS
+from s3a.constants import LAYOUTS_DIR, REQD_TBL_FIELDS, ICON_DIR
 from s3a.constants import PRJ_ENUMS
 from s3a.models.s3abase import S3ABase
 from s3a.parameditors import PRJ_SINGLETON
@@ -39,6 +39,7 @@ class S3A(S3ABase):
     # customized loading functions also get called
     superLoaderArgs = {'author': startupSettings.pop('author', None)}
     super().__init__(parent, **superLoaderArgs)
+    self.setWindowIcon(QtGui.QIcon(str(ICON_DIR/'s3alogo.svg')))
     if guiMode:
       warnings.simplefilter('error', UserWarning)
       fns.makeExceptionsShowDialogs(self)
@@ -50,6 +51,7 @@ class S3A(S3ABase):
     self.APP_TITLE = 'FICS Semi-Supervised Semantic Annotator'
     self.CUR_COMP_LBL = 'Current Component ID:'
     self.setWindowTitle(self.APP_TITLE)
+    self.setWindowIconText(self.APP_TITLE)
 
     self.curCompIdLbl = QtWidgets.QLabel(self.CUR_COMP_LBL)
 
