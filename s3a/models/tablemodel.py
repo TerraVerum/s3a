@@ -132,7 +132,6 @@ class ComponentMgr(CompTableModel):
     dropIds = newCompsDf.index[verts.map(ComplexXYVertices.isEmpty)]
     newCompsDf.drop(index=dropIds, inplace=True)
 
-
     if addtype == PRJ_ENUMS.COMP_ADD_AS_NEW:
       # Treat all comps as new -> set their IDs to guaranteed new values
       newIds = np.arange(self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int)
@@ -164,6 +163,11 @@ class ComponentMgr(CompTableModel):
 
     # Finally, add new comps
     compsToAdd = newCompsDf.iloc[~newChangedIdxs, :]
+    # Make sure all required data is present for new rows
+    missingCols = np.setdiff1d(self.compDf.columns, compsToAdd.columns)
+    if missingCols.size > 0 and len(compsToAdd) > 0:
+      embedInfo = PRJ_SINGLETON.tableData.makeCompDf(len(newCompsDf)).set_index(compsToAdd.index)
+      compsToAdd[missingCols] = embedInfo[missingCols]
     self.compDf = pd.concat((self.compDf, compsToAdd), sort=False)
     # Retain type information
     coerceDfTypes(self.compDf)
