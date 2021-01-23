@@ -233,10 +233,9 @@ class MultiPredictionsPlugin(ProcessorPlugin):
       newComps = ProcessIO(components=newComps)
     compsToAdd = newComps['components']
     addType = newComps.get('addType', PRJ_ENUMS.COMP_ADD_AS_NEW)
-    with PRJ_SINGLETON.actionStack.group('Add Components'):
-      if newComps.get('deleteOrig', False):
-        self.mgr.rmComps(comps.index)
-      self.mgr.addComps(compsToAdd, addType)
+    if newComps.get('deleteOrig', False):
+      self.mgr.rmComps(comps.index)
+    self.mgr.addComps(compsToAdd, addType)
 
 
   def predictFromSelection(self):

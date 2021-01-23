@@ -220,8 +220,6 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     selectedFill = pg.Color(selectedFill)
     focusedFill = pg.Color(focusedFill)
 
-    penColors = pg.mkPen(color=penColor, width=penWidth)
-
     focusedFill = np.array(pg.Color(focusedFill).getRgbF())
     focusedFill[-1] = fillAlpha
     selectedFill = np.array(pg.Color(selectedFill).getRgbF())

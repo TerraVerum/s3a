@@ -375,7 +375,7 @@ class ComponentIO:
     return cls.exportLblPng(compDf, outFile, imShape, **kwargs, allowOffset=True)
 
   @classmethod
-  def exportCompimgsFolders(cls, compDf: df,
+  def exportCompImgsFolders(cls, compDf: df,
                             outDir:FilePath='s3a-export',
                             resizeShape: Tuple[int, int]=None,
                             **kwargs):
