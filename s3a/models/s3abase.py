@@ -9,10 +9,10 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
 
 from s3a.generalutils import hierarchicalUpdate
-from utilitys import EditorPropsMixin, RunOpts, ParamEditorPlugin, fns
+from utilitys import EditorPropsMixin, RunOpts, ParamEditorPlugin, fns, ParamEditor
 
 from s3a import ComponentIO
-from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS
+from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, LAYOUTS_DIR
 from s3a.constants import PRJ_ENUMS
 from s3a.controls.tableviewproxy import CompDisplayFilter, CompSortFilter
 from s3a.models.tablemodel import ComponentMgr
@@ -44,16 +44,16 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     self.mainImg.toolsEditor.registerFunc(self.acceptFocusedRegion,
                                           btnOpts=PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION)
     PRJ_SINGLETON.generalProps.registerFunc(PRJ_SINGLETON.actionStack.resizeStack,
-                                           name=PRJ_CONSTS.PROP_UNDO_BUF_SZ.name,
-                                           runOpts=RunOpts.ON_CHANGED,
-                                           newMaxLen=300)
+                                            name=PRJ_CONSTS.PROP_UNDO_BUF_SZ.name,
+                                            runOpts=RunOpts.ON_CHANGED,
+                                            newMaxLen=300)
     self.statBar = QtWidgets.QStatusBar(self)
     self.menuBar_ = self.menuBar()
 
     PRJ_SINGLETON.shortcuts.registerShortcut(PRJ_CONSTS.TOOL_CLEAR_ROI,
-                                            self.mainImg.clearCurRoi,
-                                            overrideOwnerObj=self.mainImg
-                                            )
+                                             self.mainImg.clearCurRoi,
+                                             overrideOwnerObj=self.mainImg
+                                             )
 
     self.compMgr = ComponentMgr()
     # Register exporter to allow user parameters
@@ -77,11 +77,12 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     self.hasUnsavedChanges = False
     self.srcImgFname: Optional[Path] = None
 
+    self.appStateEditor = AppStateEditor(self, name='App State Editor')
+
     # -----
     # INTERFACE WITH QUICK LOADER / PLUGINS
     # -----
     PRJ_SINGLETON.tableData.sigCfgUpdated.connect(lambda: self.resetTblFields())
-    self.appStateEditor = AppStateEditor(self, name='App State Editor')
     self.filePlg: FilePlugin = self.addPlugin(FilePlugin)
 
     for plugin in PRJ_SINGLETON.clsToPluginMapping.values(): # type: ParamEditorPlugin
@@ -103,9 +104,12 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     # MAIN IMAGE
     # -----
     def handleCompsChanged(changedDict: dict):
-      focusedId = self.mainImg.compSer[REQD_TBL_FIELDS.INST_ID]
+      ser = self.mainImg.compSer
+      focusedId = ser[REQD_TBL_FIELDS.INST_ID]
       if focusedId in changedDict['deleted']:
         self.changeFocusedComp()
+      elif focusedId in changedDict['changed']:
+        ser.update(self.compMgr.compDf.loc[focusedId])
     self.compMgr.sigCompsChanged.connect(handleCompsChanged)
 
     # -----
@@ -189,7 +193,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
 
   def _acceptFocused_existing(self, compSer: pd.Series):
     oldComp = self.compMgr.compDf.loc[[compSer[REQD_TBL_FIELDS.INST_ID]]].copy()
-    modifiedDf = fns.serAsFrame(compSer[[REQD_TBL_FIELDS.INST_ID, REQD_TBL_FIELDS.VERTICES]])
+    modifiedDf = fns.serAsFrame(compSer)
     self.compMgr.addComps(modifiedDf, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)
     def undo():
       self.add_focusComps(oldComp, addType=PRJ_ENUMS.COMP_ADD_AS_MERGE)

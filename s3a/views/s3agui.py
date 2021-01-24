@@ -10,6 +10,7 @@ from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from utilitys import ParamEditor, ParamEditorPlugin, RunOpts, PrjParam, fns
 
+from s3a.generalutils import hierarchicalUpdate
 from s3a.constants import LAYOUTS_DIR, REQD_TBL_FIELDS, ICON_DIR
 from s3a.constants import PRJ_ENUMS
 from s3a.models.s3abase import S3ABase
@@ -41,11 +42,6 @@ class S3A(S3ABase):
     if guiMode:
       warnings.simplefilter('error', UserWarning)
       fns.makeExceptionsShowDialogs(self)
-    def saveRecentLayout(_folderName: Path):
-      outFile = _folderName/'savedLayout'
-      self.saveLayout(outFile)
-      return str(outFile)
-    self.appStateEditor.addImportExportOpts('layout', self.loadLayout, saveRecentLayout)
     self.APP_TITLE = 'FICS Semi-Supervised Semantic Annotator'
     self.CUR_COMP_LBL = 'Current Component ID:'
     self.setWindowTitle(self.APP_TITLE)
@@ -53,20 +49,36 @@ class S3A(S3ABase):
 
     self.curCompIdLbl = QtWidgets.QLabel(self.CUR_COMP_LBL)
 
+    # -----
+    # LAOYUT MANAGER
+    # -----
     # Dummy editor for layout options since it doesn't really have editable settings
     # Maybe later this can be elevated to have more options
     self.layoutEditor = ParamEditor(self, None, LAYOUTS_DIR, 'dockstate', 'Layout')
-    self.layoutEditor.loadParamValues = self.loadLayout
+    def loadLayout(layoutName: Union[str, Path]):
+      layoutName = Path(layoutName)
+      if not layoutName.is_absolute():
+        layoutName = LAYOUTS_DIR/f'{layoutName}.dockstate'
+      self.restoreState(fns.attemptFileLoad(layoutName))
+
+    def saveRecentLayout(_folderName: Path):
+      outFile = _folderName/'savedLayout.dockstate'
+      self.saveLayout(outFile)
+      return str(outFile)
+
+    self.layoutEditor.loadParamValues = loadLayout
+    self.layoutEditor.saveParamValues = saveRecentLayout
+    self.appStateEditor.addImportExportOpts('layout', loadLayout, saveRecentLayout)
+
 
     self._buildGui()
     self._buildMenu()
     self._hookupSignals()
 
-    self.saveLayout('Default', allowOverwriteDefault=True)
-
-    if startupSettings:
-      stateDict = None if loadLastState else {}
-      self.appStateEditor.loadParamValues(stateDict=stateDict, overrideDict=startupSettings)
+    # Load in startup settings
+    stateDict = None if loadLastState else {}
+    hierarchicalUpdate(self.appStateEditor.startupSettings, startupSettings)
+    self.appStateEditor.loadParamValues(stateDict=stateDict)
 
   def _hookupSignals(self):
     PRJ_SINGLETON.colorScheme.registerFunc(self.updateTheme, runOpts=RunOpts.ON_CHANGED, nest=False)
@@ -108,10 +120,10 @@ class S3A(S3ABase):
     # STATUS BAR
     self.setStatusBar(self.statBar)
 
-    self.mouseCoords = QtWidgets.QLabel(f"Mouse Coords:")
-    self.imageLbl = QtWidgets.QLabel(f"Image: None")
+    self.mouseCoords = QtWidgets.QLabel()
+    self.pxColor = QtWidgets.QLabel()
 
-    self.pxColor = QtWidgets.QLabel("Pixel Color")
+    self.imageLbl = QtWidgets.QLabel(f"Image: None")
 
     self.mainImg.sigMousePosChanged.connect(lambda pos, pxColor: self.setInfo(pos, pxColor))
     # self.mainImg.sigMousePosChanged.connect(lambda info: setInfo(info))
@@ -119,6 +131,17 @@ class S3A(S3ABase):
     self.statBar.addWidget(self.imageLbl)
     self.statBar.addWidget(self.mouseCoords)
     self.statBar.addWidget(self.pxColor)
+
+  def saveLayout(self, layoutName: Union[str, Path]=None, allowOverwriteDefault=False):
+    dockStates = self.saveState().data()
+    if Path(layoutName).is_absolute():
+      savePathPlusStem = layoutName
+    else:
+      savePathPlusStem = LAYOUTS_DIR/layoutName
+    saveFile = savePathPlusStem.with_suffix(f'.dockstate')
+    fns.saveToFile(dockStates, saveFile,
+                   allowOverwriteDefault=allowOverwriteDefault)
+    self.sigLayoutSaved.emit()
 
   def changeFocusedComp(self, newComps: df=None, forceKeepLastChange=False):
     ret = super().changeFocusedComp(newComps, forceKeepLastChange)
@@ -151,23 +174,6 @@ class S3A(S3ABase):
     parentTb = plugin.parentMenu
     if parentTb is not None:
       self.createMenuOptForPlugin(plugin, parentToolbarOrMenu=parentTb)
-
-  def loadLayout(self, layoutName: Union[str, Path]):
-    layoutName = Path(layoutName)
-    if not layoutName.is_absolute():
-      layoutName = LAYOUTS_DIR/f'{layoutName}.dockstate'
-    self.restoreState(fns.attemptFileLoad(layoutName))
-
-  def saveLayout(self, layoutName: Union[str, Path]=None, allowOverwriteDefault=False):
-    dockStates = self.saveState().data()
-    if Path(layoutName).is_absolute():
-      savePathPlusStem = layoutName
-    else:
-      savePathPlusStem = LAYOUTS_DIR/layoutName
-    saveFile = savePathPlusStem.with_suffix(f'.dockstate')
-    fns.saveToFile(dockStates, saveFile,
-               allowOverwriteDefault=allowOverwriteDefault)
-    self.sigLayoutSaved.emit()
 
   def setMainImg(self, fileName: FilePath = None, imgData: NChanImg = None,
                  clearExistingComps=True):
@@ -261,9 +267,8 @@ class S3A(S3ABase):
 
   def setInfo(self, xyPos: XYVertices, pxColor: np.ndarray):
     if pxColor is None: return
-    self.mouseCoords.setText(f' | Mouse (x,y): {xyPos[0]}, {xyPos[1]}'
-                             f' | Pixel Color: ')
-    self.pxColor.setText(f'{pxColor}')
+    self.mouseCoords.setText(f'Mouse (x,y): {xyPos[0]}, {xyPos[1]}')
+    self.pxColor.setText(f'Pixel Color: {pxColor}')
     if pxColor.dtype == float:
       # Turn to uint
       pxColor = (pxColor*255).astype('uint8')

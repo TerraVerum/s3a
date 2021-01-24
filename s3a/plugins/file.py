@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pydoc
 import shutil
 from contextlib import contextmanager
 from functools import partial
@@ -20,7 +21,7 @@ from s3a import PRJ_SINGLETON, PRJ_CONSTS as CNST, ComponentIO, models, REQD_TBL
 from s3a.generalutils import hierarchicalUpdate
 from s3a.graphicsutils import DropList, ThumbnailViewer
 from s3a.structures import FilePath, NChanImg
-from ..constants import APP_STATE_DIR, PROJ_FILE_TYPE, BASE_DIR
+from ..constants import APP_STATE_DIR, PROJ_FILE_TYPE, PROJ_BASE_TEMPLATE
 
 
 class FilePlugin(CompositionMixin, ParamEditorPlugin):
@@ -32,7 +33,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
 
   def __init__(self, startupName: FilePath=None, startupCfg: dict=None):
     super().__init__()
-    self.projData = self.exposes(ProjectData())
+    self.projData = self.exposes(ProjectData(startupName, startupCfg))
     self.autosaveTimer = QtCore.QTimer()
 
     self.registerFunc(self.save, btnOpts=CNST.TOOL_PROJ_SAVE)
@@ -85,12 +86,21 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       for img in delImgs:
         self.projData.removeImage(img)
     self._projImgMgr.sigDeleteRequested.connect(handleDelete)
+
+    def onCfgLoad():
+      for im in self._imgThumbnails.nameToFullPathMapping.values():
+        if im not in self.projData.images:
+          self._imgThumbnails.removeThumbnail(im.name)
+      self._updateProjLbl()
+      if self.win:
+        # Other arguments are consumed by app state editor
+        hierarchicalUpdate(self.win.appStateEditor.startupSettings, self.projData.startup)
+    self.projData.sigCfgLoaded.connect(onCfgLoad)
+
     self.projNameLbl = QtWidgets.QLabel()
 
     useDefault = startupName is None and startupCfg is None
     self._createDefaultProj(useDefault)
-    if not useDefault:
-      self.projData.loadCfg(startupName, startupCfg)
 
   def _updateProjLbl(self):
     self.projNameLbl.setText(f'Project: {self.projData.cfgFname.name}')
@@ -100,14 +110,16 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     win.statBar.addWidget(self.projNameLbl)
     def handleExport(_dir):
       saveImg = win.srcImgFname
+      ret = str(self.projData.cfgFname)
       if not saveImg:
-        return
+        self.projData.startup.pop('image', None)
+        return ret
       if saveImg and saveImg.parent == self.projData.imagesDir:
         saveImg = saveImg.name
       self.projData.startup['image'] = str(saveImg)
       self.save()
-      return str(self.projData.cfgFname)
-    win.appStateEditor.addImportExportOpts('project', self.open, handleExport, 0)
+      return ret
+    win.appStateEditor.addImportExportOpts('project', self.projData.loadCfg, handleExport, 0)
 
     def startImg(imgName: str):
       self.projData.addImage(imgName)
@@ -133,21 +145,12 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     parent = self.projData if setAsCur else None
     self.projData.create(name=defaultName, parent=parent)
 
-  def open(self, name: str):
-    if Path(name).resolve() == self.projData.cfgFname:
-      return
-    self._imgThumbnails.clear()
-    self.projData.loadCfg(name)
-    self._updateProjLbl()
-    # Other arguments are consumed by app state editor
-    self.win.appStateEditor.loadParamValues(stateDict={}, overrideDict=self.projData.startup)
-
   def open_gui(self):
     fname = fns.popupFilePicker(None, 'Select Project File', f'S3A Project (*.{PROJ_FILE_TYPE})')
     if fname is not None:
-      self.win.setMainImg(None)
       with pg.BusyCursor():
-        self.open(fname)
+        self.projData.loadCfg(fname)
+      self.win.setMainImg(None)
 
   def save(self):
     self.win.saveCurAnnotation()
@@ -273,8 +276,8 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     baseCfg['images'].extend(images)
     baseCfg['annotations'].extend(annotations)
     projPath = Path(wiz.projSettings['Location'])/projName
-    self.projData.create(name=projPath, cfg=baseCfg, parent=self.projData)
-    self._updateProjLbl()
+    outPrj = self.projData.create(name=projPath, cfg=baseCfg)
+    self.projData.loadCfg(outPrj.cfgFname)
 
 
 class NewProjectWizard(QtWidgets.QWizard):
@@ -384,6 +387,8 @@ class ProjectImageManager(QtWidgets.QDockWidget):
         item.setHidden(True)
 
 class ProjectData(QtCore.QObject):
+  sigCfgLoaded = QtCore.Signal()
+
   sigImagesAdded = QtCore.Signal(object)
   """List[Path] of added images"""
   sigImagesRemoved = QtCore.Signal(object)
@@ -404,7 +409,8 @@ class ProjectData(QtCore.QObject):
   def __init__(self, cfgFname: FilePath=None, cfgDict: dict=None):
     super().__init__()
     self.tableData = PRJ_SINGLETON.tableData
-    self.cfg = {}
+    self.templateName = PROJ_BASE_TEMPLATE
+    self.cfg = fns.attemptFileLoad(self.templateName)
     self.cfgFname: Optional[Path] = None
     self.images: List[Path] = []
     self.baseImgDirs: Set[Path] = set()
@@ -432,7 +438,7 @@ class ProjectData(QtCore.QObject):
   def startup(self):
     return self.cfg['startup']
   @property
-  def pluginCfg(self):
+  def pluginCfg(self) -> Dict[str, str]:
       return self.cfg['plugin-cfg']
 
   def clearImgs_anns(self):
@@ -449,17 +455,35 @@ class ProjectData(QtCore.QObject):
     :param force: If *True*, the new config will be loaded even if it is the same name as the
       current config
     """
-    _, baseCfgDict = fns.resolveYamlDict(BASE_DIR/'projectcfg.yml')
+    _, baseCfgDict = fns.resolveYamlDict(self.templateName)
     cfgFname, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
     cfgFname = cfgFname.resolve()
     if not force and self.cfgFname == cfgFname:
       return None
+
+    if self.pluginCfg:
+      raise ValueError('The previous project loaded custom plugins, which cannot easily'
+                       ' be removed. To load a new project, close and re-open S3A with'
+                       ' the new project instance instead.')
+
     hierarchicalUpdate(baseCfgDict, cfgDict)
     self.cfgFname = cfgFname
     cfg = self.cfg = baseCfgDict
     self.annotationsDir.mkdir(exist_ok=True)
     self.imagesDir.mkdir(exist_ok=True)
     self.clearImgs_anns()
+
+    warnPlgs = []
+    for plgName, plgPath in self.pluginCfg.items():
+      pluginCls = pydoc.locate(plgPath)
+      if pluginCls:
+        PRJ_SINGLETON.addPlugin(pluginCls)
+      else:
+        warnPlgs.append(plgPath)
+    if warnPlgs:
+      warn(f'Some project plugins were specified, but could not be found:\n'
+           f'{warnPlgs}', UserWarning)
+
     tableInfo = cfg.get('table-cfg', None)
     if isinstance(tableInfo, str):
       tableDict = None
@@ -495,6 +519,8 @@ class ProjectData(QtCore.QObject):
         else:
           self.addAnnotationByPath(annotation)
     self._maybeEmit(self.sigAnnotationsAdded, list(self.imgToAnnMapping.values()))
+
+    self.sigCfgLoaded.emit()
     return self.cfgFname
 
   @classmethod
@@ -505,6 +531,7 @@ class ProjectData(QtCore.QObject):
       helpText: Project Name. The parent directory of this name indicates the directory in which to create the project
       pType: filepicker
     :param cfg: see `ProjectData.loadCfg` for information
+    :param parent: Associated ProjectData instance for a non-classmethod version of this function
     """
     name = Path(name)
     name = name/f'{name.name}.{PROJ_FILE_TYPE}'
@@ -526,11 +553,6 @@ class ProjectData(QtCore.QObject):
 
     parent.saveCfg()
     return parent
-
-  @classmethod
-  def open(cls, name: FilePath):
-    proj = cls()
-    proj.loadCfg(name)
 
   def saveCfg(self):
     location = self.location

@@ -380,11 +380,11 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
         compDf = compDf.loc[~validList]
       if not allowFalse:
         compDf = compDf.loc[validList]
-    elif pType in ['PrjParam', 'list', 'popuplineeditor']:
+    elif pType in ['prjparam', 'list', 'popuplineeditor']:
       existingParams = np.array(dfAtParam)
       allowedParams = []
       filterOpts = filterOpts['Options']['children']
-      if pType == 'PrjParam':
+      if pType == 'prjparam':
         groupSubParams = [p.name for p in column.value.group]
       else:
         groupSubParams = column.opts['limits']
@@ -397,7 +397,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
       allowedRegex = filterOpts['Regex Value']['value']
       isCompAllowed = dfAtParam.str.contains(allowedRegex, regex=True, case=False)
       compDf = compDf.loc[isCompAllowed]
-    elif pType == 'ComplexXYVertices':
+    elif pType in ['complexxyvertices', 'xyvertices']:
       vertsAllowed = np.ones(len(dfAtParam), dtype=bool)
 
       xParam = filterOpts['X Bounds']['children']
@@ -405,7 +405,10 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
       xmin, xmax, ymin, ymax = [param[val]['value'] for param in (xParam, yParam) for val in ['min', 'max']]
 
       for vertIdx, verts in enumerate(dfAtParam):
-        stackedVerts: XYVertices = verts.stack()
+        if pType == 'complexxyvertices':
+          stackedVerts: XYVertices = verts.stack()
+        else:
+          stackedVerts = verts
         xVerts, yVerts = stackedVerts.x, stackedVerts.y
         isAllowed = np.all((xVerts >= xmin) & (xVerts <= xmax)) & \
                     np.all((yVerts >= ymin) & (yVerts <= ymax))

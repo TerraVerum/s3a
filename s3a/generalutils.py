@@ -136,12 +136,18 @@ def safeCallFuncList(fnNames: Collection[str], funcLst: List[Callable],
   if fnArgs is None:
     fnArgs = [()]*len(fnNames)
   for key, fn, args in zip(fnNames, funcLst, fnArgs):
-    try:
-      rets.append(fn(*args))
-    except Exception as ex:
-      errs.append(f'{key}: {ex}')
-      rets.append(None)
+    curRet, curErr = safeCallFunc(key, fn, *args)
+    rets.append(curRet)
+    if curErr: errs.append(curErr)
   return rets, errs
+
+def safeCallFunc(fnName: str, func: Callable, *fnArgs):
+  ret = err = None
+  try:
+    ret = func(*fnArgs)
+  except Exception as ex:
+    err = f'{fnName}: {ex}'
+  return ret, err
 
 def cornersToFullBoundary(cornerVerts: Union[XYVertices, ComplexXYVertices], sizeLimit: float=np.inf,
                           fillShape: Tuple[int]=None, stackResult=True) -> Union[XYVertices, ComplexXYVertices]:

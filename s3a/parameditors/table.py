@@ -206,6 +206,8 @@ class TableData(QtCore.QObject):
     self.resetLists()
     for field in cfg.get('fields', {}):
       param = self.paramParser['fields', field]
+      if param in self.allFields:
+        continue
       param.group = self.allFields
       self.allFields.append(param)
 

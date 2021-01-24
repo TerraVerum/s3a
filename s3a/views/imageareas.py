@@ -292,10 +292,10 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     any of the specified `actParams`
 
     :param actParams: Single :py:class:`~s3a.structures.PrjParam` or multiple PrjParams that are allowed
-      to trigger this funciton
+      to trigger this funciton. If empty, triggers on every parameter
     :param func: Function to trigger when a shape is completed during the requested actions.
       If only one parameter is registered to this function, it is expected to only take
-      roiVerts. If multiple are provided, it is expected to take roiVerts and the current draw action
+      roiVerts. If multiple or none are provided, it is expected to take roiVerts and the current draw action
     :param registerOpts: Extra arguments for button registration
     """
     if isinstance(actParams, PrjParam):
@@ -308,7 +308,10 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
           func(roiVerts, param)
         else:
           func(roiVerts)
-    self.sigShapeFinished.connect(wrapper)
+    if len(actParams) == 0:
+      self.sigShapeFinished.connect(func)
+    else:
+      self.sigShapeFinished.connect(wrapper)
     for actParam in actParams:
       self.drawActGrp.create_addBtn(actParam, self.actionAssignment, checkable=True,
                                     namePath=(self.__groupingName__,), **registerOpts)

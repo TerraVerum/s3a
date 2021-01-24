@@ -5,4 +5,6 @@ table-cfg: {}
 
 annotation-format: "pkl"
 
+plugin-cfg: {}
+
 startup: {}

@@ -3,4 +3,4 @@ def ALL_PLUGINS():
   from .file import FilePlugin
   from .tablefield import VerticesPlugin
 
-  return [VerticesPlugin, MultiPredictionsPlugin, EditPlugin, MainImagePlugin, CompTablePlugin, RandomToolsPlugin, HelpPlugin]
+  return [VerticesPlugin, EditPlugin, MultiPredictionsPlugin, MainImagePlugin, CompTablePlugin, RandomToolsPlugin, HelpPlugin]
