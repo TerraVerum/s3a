@@ -7,8 +7,7 @@ import pytest
 
 from conftest import NUM_COMPS, dfTester
 from s3a import PRJ_SINGLETON, appInst, PRJ_CONSTS, S3A
-from s3a.constants import REQD_TBL_FIELDS, LAYOUTS_DIR, ANN_AUTH_DIR
-from s3a.generalutils import resolveAuthorName
+from s3a.constants import REQD_TBL_FIELDS, LAYOUTS_DIR
 from s3a.structures import XYVertices, ComplexXYVertices
 from testingconsts import RND, SAMPLE_IMG, SAMPLE_IMG_FNAME
 
@@ -143,16 +142,6 @@ def test_stage_plotting(monkeypatch, app, vertsPlugin):
   with monkeypatch.context() as m:
     m.setattr(proc, '_stageSummaryWidget', patchedWidget)
     vertsPlugin.processorAnalytics()
-
-def test_no_author(app):
-  p = Path(ANN_AUTH_DIR/'defaultAuthor.txt')
-  p.unlink()
-  with pytest.raises(SystemExit):
-    S3A(guiMode=False)
-  # Now plugin s3a refs are screwed up, so fix them
-  for plg in PRJ_SINGLETON.clsToPluginMapping.values():
-    plg.win = app
-  resolveAuthorName('testauthor')
 
 def test_unsaved_changes(sampleComps, tmp_path, app):
   app.compMgr.addComps(sampleComps)

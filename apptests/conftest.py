@@ -9,12 +9,11 @@ from helperclasses import CompDfTester
 from s3a import PRJ_SINGLETON
 from s3a.views.s3agui import S3A
 from testingconsts import SAMPLE_IMG, SAMPLE_IMG_FNAME, NUM_COMPS, \
-  SAMPLE_SMALL_IMG, SAMPLE_SMALL_IMG_FNAME, TEST_AUTHOR
+  SAMPLE_SMALL_IMG, SAMPLE_SMALL_IMG_FNAME
 from s3a.plugins.tablefield import VerticesPlugin
 from s3a.plugins.file import FilePlugin
 
 stack = PRJ_SINGLETON.actionStack
-PRJ_SINGLETON.tableData.annAuthor = TEST_AUTHOR
 
 dfTester = CompDfTester(NUM_COMPS)
 dfTester.fillRandomVerts(imShape=SAMPLE_IMG.shape)
@@ -41,7 +40,7 @@ def sampleComps():
 @pytest.fixture(scope="session", autouse=True)
 def app(tmpdir_factory):
   constants.APP_STATE_DIR = tmpdir_factory.mktemp('settings')
-  app_ = S3A(Image=SAMPLE_IMG_FNAME, guiMode=False, loadLastState=False, author=TEST_AUTHOR)
+  app_ = S3A(Image=SAMPLE_IMG_FNAME, guiMode=False, loadLastState=False)
   app_.filePlg.projData.create(name=str(tmpdir_factory.mktemp('proj')), parent=app_.filePlg.projData)
   return app_
 

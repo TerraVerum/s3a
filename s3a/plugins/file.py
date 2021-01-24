@@ -30,7 +30,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
   def __initEditorParams__(cls):
     super().__initEditorParams__()
 
-  def __init__(self):
+  def __init__(self, startupName: FilePath=None, startupCfg: dict=None):
     super().__init__()
     self.projData = self.exposes(ProjectData())
     self.autosaveTimer = QtCore.QTimer()
@@ -87,7 +87,10 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     self._projImgMgr.sigDeleteRequested.connect(handleDelete)
     self.projNameLbl = QtWidgets.QLabel()
 
-    self._createDefaultProj()
+    useDefault = startupName is None and startupCfg is None
+    self._createDefaultProj(useDefault)
+    if not useDefault:
+      self.projData.loadCfg(startupName, startupCfg)
 
   def _updateProjLbl(self):
     self.projNameLbl.setText(f'Project: {self.projData.cfgFname.name}')
@@ -122,12 +125,13 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     self._updateProjLbl()
     win.addTabbedDock(QtCore.Qt.RightDockWidgetArea, self._projImgMgr)
 
-  def _createDefaultProj(self):
+  def _createDefaultProj(self, setAsCur=True):
     defaultName = APP_STATE_DIR / PROJ_FILE_TYPE
     # Delete default prj on startup
     for prj in defaultName.glob(f'*.{PROJ_FILE_TYPE}'):
       prj.unlink()
-    self.projData.create(name=defaultName, parent=self.projData)
+    parent = self.projData if setAsCur else None
+    self.projData.create(name=defaultName, parent=parent)
 
   def open(self, name: str):
     if Path(name).resolve() == self.projData.cfgFname:
@@ -427,6 +431,9 @@ class ProjectData(QtCore.QObject):
   @property
   def startup(self):
     return self.cfg['startup']
+  @property
+  def pluginCfg(self):
+      return self.cfg['plugin-cfg']
 
   def clearImgs_anns(self):
     oldImgs = self.images.copy()

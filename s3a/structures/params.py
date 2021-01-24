@@ -65,7 +65,6 @@ class PrjParamGroup:
     """
     return None
 
-
 def newParam(name: str, val: Any=None, pType: str=None, helpText='', **opts):
   """
   Factory for creating new parameters within a :class:`PrjParamGroup`.

@@ -2,16 +2,16 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
-__all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'ANN_AUTH_DIR', 'QUICK_LOAD_DIR',
+__all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'QUICK_LOAD_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'TABLE_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
            'MAIN_IMG_DIR', 'APP_STATE_DIR',
-           'DATE_FORMAT', 'REQD_TBL_FIELDS', 'PRJ_CONSTS', 'PRJ_ENUMS', 'PROJ_FILE_TYPE']
+           'REQD_TBL_FIELDS', 'PRJ_CONSTS', 'PRJ_ENUMS', 'PROJ_FILE_TYPE']
+
+from typing import Any
+
 BASE_DIR = Path(__file__).parent
 MENU_OPTS_DIR = BASE_DIR/'menuopts'
 ICON_DIR = BASE_DIR/'icons'
-ANN_AUTH_DIR = Path(MENU_OPTS_DIR)
-
-DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 # -----
 # EDITORS
@@ -67,11 +67,21 @@ from s3a.structures import ComplexXYVertices, PrjParam, PrjParamGroup, newParam
 
 @dataclass
 class _ReqdTableFields(PrjParamGroup):
+  _extraRequired = []
+
   INST_ID          : PrjParam = newParam('Instance ID', -1)
   VERTICES         : PrjParam = newParam('Vertices', ComplexXYVertices())
-  ANN_AUTHOR       : PrjParam = newParam('Author', "")
   SRC_IMG_FILENAME : PrjParam = newParam('Source Image Filename', "")
-  ANN_TIMESTAMP    : PrjParam = newParam('Timestamp', "")
+
+  def addField(self, field: PrjParam):
+    self._extraRequired.append(field)
+
+  def __iter__(self):
+    yield from super().__iter__()
+    for field in self._extraRequired:
+      yield field
+
+
 REQD_TBL_FIELDS = _ReqdTableFields()
 
 

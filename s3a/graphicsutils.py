@@ -9,8 +9,6 @@ from typing import Callable, Generator, Dict, Union
 
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
-from s3a.constants import ANN_AUTH_DIR
-
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
 
@@ -25,49 +23,6 @@ def disableAppDuringFunc(func):
     finally:
       mainWin.setEnabled(True)
   return disableApp
-
-def dialogGetAuthorName(parent: QtWidgets.QMainWindow) -> str:
-  """
-  Attempts to load the username from a default file if found on the system. Otherwise,
-  requests the user name.
-  :param parent:
-  :return:
-  """
-  annPath = Path(ANN_AUTH_DIR)
-  authorFname = annPath.joinpath('defaultAuthor.txt')
-  msgDlg = QtWidgets.QMessageBox(parent)
-  msgDlg.setModal(True)
-  if authorFname.exists():
-    with open(str(authorFname), 'r') as ifile:
-      lines = ifile.readlines()
-      if not lines:
-        reply = msgDlg.No
-      else:
-        name = lines[0]
-        reply = msgDlg.question(parent, 'Default Author',
-                  f'The default author for this application is\n{name}.\n'
-                     f'Is this you?', msgDlg.Yes, msgDlg.No)
-      if reply == msgDlg.Yes:
-        return name
-
-  dlg = QtWidgets.QInputDialog(parent)
-  dlg.setCancelButtonText('Quit')
-  dlg.setModal(True)
-  name = ''
-  ok = False
-  quitApp = False
-  while len(name) < 1 or not ok:
-    name, ok = dlg.getText(parent, 'Enter Username', 'Please enter your username: ',
-                           QtWidgets.QLineEdit.Normal)
-    if not ok:
-      reply = msgDlg.question(parent, 'Quit Application',
-                              f'Quit the application?', msgDlg.Yes, msgDlg.No)
-      if reply == msgDlg.Yes:
-        quitApp = True
-        break
-  if quitApp:
-    sys.exit(0)
-  return name
 
 def create_addMenuAct(mainWin: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, title: str, asMenu=False) \
     -> Union[QtWidgets.QMenu, QtWidgets.QAction]:

@@ -179,7 +179,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     return frio.exportLblPng(labelDf, imShape=imShape, allowOffset=True)
 
   @fns.dynamicDocstring(cmapVals=colormaps() + ['None'])
-  def updateColors(self, penWidth=0, penColor='w', selectedFill='00f', focusedFill='f00', labelColormap='tab10',
+  def updateColors(self, penWidth=0, penColor='w', selectedFill='00f', focusedFill='f00', labelColormap='viridis',
                    fillAlpha=0.7):
     """
     Assigns colors from the specified colormap to each unique class
@@ -232,7 +232,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     fillColors[selected] = selectedFill
     fillColors[focused] = focusedFill
     # fillColors[focused & selected] = combinedFill
-    penColors = np.tile(penColor, len(lbls))
+    penColors = np.tile(pg.mkPen(color=penColor, width=penWidth), len(lbls))
     self.setPen(penColors)
     self.setBrush([pg.Color(f*255) for f in fillColors])
     self.invalidate()

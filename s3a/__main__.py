@@ -26,8 +26,6 @@ def main(guiMode=True, loadLastState=None, **profileArgs) -> Optional[S3A]:
     these settings are restored on startup. If *False*, they aren't. If *None*, the
     user is prompted for whether the settings should be loaded.
 
-  :key author: Required if no default author exists for the application.
-    The default author is updated every time an author name is given.
   :key image: Optional initial image to be annotated
   :key annotations: Optional initial annotation file loaded.
   :key `param editor name`: Name of the parameter editor within S3A with a loadable state.

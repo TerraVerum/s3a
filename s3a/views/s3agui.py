@@ -33,12 +33,10 @@ class S3A(S3ABase):
     super().__initEditorParams__()
     cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Main Window')
 
-  def __init__(self, parent=None, guiMode=True, loadLastState=False,
-               **startupSettings):
+  def __init__(self, parent=None, guiMode=True, loadLastState=True, **startupSettings):
     # Wait to import quick loader profiles until after self initialization so
     # customized loading functions also get called
-    superLoaderArgs = {'author': startupSettings.pop('author', None)}
-    super().__init__(parent, **superLoaderArgs)
+    super().__init__(parent, **startupSettings)
     self.setWindowIcon(QtGui.QIcon(str(ICON_DIR/'s3alogo.svg')))
     if guiMode:
       warnings.simplefilter('error', UserWarning)
@@ -64,10 +62,10 @@ class S3A(S3ABase):
     self._buildMenu()
     self._hookupSignals()
 
-    # Load layout options
     self.saveLayout('Default', allowOverwriteDefault=True)
-    stateDict = None if loadLastState else {}
-    with pg.BusyCursor():
+
+    if startupSettings:
+      stateDict = None if loadLastState else {}
       self.appStateEditor.loadParamValues(stateDict=stateDict, overrideDict=startupSettings)
 
   def _hookupSignals(self):
@@ -110,8 +108,7 @@ class S3A(S3ABase):
     # STATUS BAR
     self.setStatusBar(self.statBar)
 
-    authorName = PRJ_SINGLETON.tableData.annAuthor
-    self.mouseCoords = QtWidgets.QLabel(f"Author: {authorName} Mouse Coords")
+    self.mouseCoords = QtWidgets.QLabel(f"Mouse Coords:")
     self.imageLbl = QtWidgets.QLabel(f"Image: None")
 
     self.pxColor = QtWidgets.QLabel("Pixel Color")
@@ -152,26 +149,8 @@ class S3A(S3ABase):
       return
 
     parentTb = plugin.parentMenu
-
-    self.createMenuOptForPlugin(plugin, parentToolbarOrMenu=parentTb)
-
-  def _maybeLoadLastState_gui(self, loadLastState: bool=None,
-                              startupSettings:dict=None):
-    """
-    Helper function to determine whether the last application state should be loaded,
-    and loads the last state if desired.
-    :param loadLastState: If *None*, the user will be prompted via dialog for whether
-      to load the last application state. Otherwise, its boolean value is used.
-    :param startupSettings: Additional dict arguments which if supplied will override
-      the default options where applicable.
-    """
-    if loadLastState is None:
-      loadLastState = QtWidgets.QMessageBox.question(
-        self, 'Load Previous State', 'Do you want to load all previous app'
-                                     ' settings (image, annotations, algorithms, etc.)?',
-        QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No) == QtWidgets.QMessageBox.Yes
-    if loadLastState:
-      self.loadLastState_gui(startupSettings)
+    if parentTb is not None:
+      self.createMenuOptForPlugin(plugin, parentToolbarOrMenu=parentTb)
 
   def loadLayout(self, layoutName: Union[str, Path]):
     layoutName = Path(layoutName)
@@ -282,10 +261,7 @@ class S3A(S3ABase):
 
   def setInfo(self, xyPos: XYVertices, pxColor: np.ndarray):
     if pxColor is None: return
-    authorName = PRJ_SINGLETON.tableData.annAuthor
-
-    self.mouseCoords.setText(f'Author: {authorName}'
-                             f' | Mouse (x,y): {xyPos[0]}, {xyPos[1]}'
+    self.mouseCoords.setText(f' | Mouse (x,y): {xyPos[0]}, {xyPos[1]}'
                              f' | Pixel Color: ')
     self.pxColor.setText(f'{pxColor}')
     if pxColor.dtype == float:
@@ -319,23 +295,6 @@ class S3A(S3ABase):
       # directly forward the selection here
       self.compTbl.setSelectedCellsAs_gui(selection)
     return ret
-
-  def savePlotScreenshot(self, outFname:FilePath=None):
-    """
-    Saves main image and the plot of components to a file
-    :param outFname:
-      helpText: Where to save the image
-      pType: filepicker
-      existing: False
-    """
-    if outFname is None:
-      return
-    outFname = Path(outFname)
-    pixmap = self.mainImg.imgItem.getPixmap()
-    painter = QtGui.QPainter(pixmap)
-    self.compDisplay.regionPlot.paint(painter)
-    painter.end()
-    self.mainImg.render()
 
 if __name__ == '__main__':
   import sys

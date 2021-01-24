@@ -1,3 +1,4 @@
+import typing as t
 from pathlib import Path
 from typing import List, Dict, Union, Callable, Any
 
@@ -10,6 +11,8 @@ from s3a import PRJ_SINGLETON
 from s3a.constants import APP_STATE_DIR
 from s3a.generalutils import safeCallFuncList
 from s3a.structures import FilePath
+from utilitys.fns import serAsFrame
+
 
 class AppStateEditor(ParamEditor):
 
@@ -18,7 +21,7 @@ class AppStateEditor(ParamEditor):
                topTreeChild: Parameter = None):
     # TODO: Add params to choose which features are saved, etc.
     super().__init__(parent, paramList, saveDir, fileType, name, topTreeChild)
-    self._stateFuncsDf = pd.DataFrame(columns=['importFuncs', 'exportFuncs'])
+    self._stateFuncsDf = pd.DataFrame(columns=['importFuncs', 'exportFuncs', 'required'])
 
   def saveParamValues(self, saveName: str=None, paramState: dict=None, **kwargs):
     if saveName is None:
@@ -55,7 +58,7 @@ class AppStateEditor(ParamEditor):
       stateDict = {}
     if isinstance(stateDict, str):
       stateDict = {'quickloader': stateDict}
-    stateDict = self._parseStateDict(stateName, stateDict)
+    stateDict = self._parseStateDict_includeRequired(stateName, stateDict)
     if overrideDict is not None:
       stateDict.update(overrideDict)
     paramDict = stateDict.pop('Parameters', {}) or {}
@@ -71,6 +74,15 @@ class AppStateEditor(ParamEditor):
     ret = super().loadParamValues(stateName, paramDict, **kwargs)
     return ret
 
+  def _parseStateDict_includeRequired(self, stateName: t.Union[str, Path], stateDict: dict = None):
+    try:
+      out = self._parseStateDict(stateName, stateDict)
+    except FileNotFoundError:
+      out = {}
+    for k in self._stateFuncsDf.index[self._stateFuncsDf['required']]:
+      out.setdefault(k, None)
+    return out
+
   @staticmethod
   def raiseErrMsgIfNeeded(errMsgs: List[str]):
     if len(errMsgs) > 0:
@@ -81,7 +93,8 @@ class AppStateEditor(ParamEditor):
 
 
   def addImportExportOpts(self, optName: str, importFunc: Callable[[str], Any],
-                          exportFunc: Callable[[Path], str], index:int=None):
+                          exportFunc: Callable[[Path], str], index:int=None,
+                          required=False):
     """
     Main interface to the app state editor. By providing import and export functions,
     various aspects of the program state can be loaded and saved on demand.
@@ -96,13 +109,16 @@ class AppStateEditor(ParamEditor):
     :param index: Where to place this function. In most cases, this won't matter. However, some imports must be
       performed first / last otherwise app behavior may be undefined. In these cases, passing a value for index ensures
       correct placement of the import/export pair. By default, the function is added to the end of the import/export list.
+    :param required: If *True*, this parameter is required every time param values are loaded.
+      In the case it is missing from a load, the param editor first attempts to fetch this option
+      from the most recent saved state.
     """
-    newRow = pd.Series([importFunc, exportFunc], name=optName,
+    newRow = pd.Series([importFunc, exportFunc, required], name=optName,
                        index=self._stateFuncsDf.columns)
     if index is not None:
       # First, shift old entries
       df = self._stateFuncsDf
-      self._stateFuncsDf = pd.concat([df.iloc[:index], newRow.to_frame().T, df.iloc[index:]])
+      self._stateFuncsDf = pd.concat([df.iloc[:index], serAsFrame(newRow), df.iloc[index:]])
     else:
       self._stateFuncsDf: pd.DataFrame = self._stateFuncsDf.append(newRow)
 

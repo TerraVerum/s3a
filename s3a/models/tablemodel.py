@@ -104,7 +104,8 @@ class CompTableModel(QtCore.QAbstractTableModel):
 
     self.compDf = PRJ_SINGLETON.tableData.makeCompDf(0)
 
-    noEditParams = set(RTF)
+    noEditParams = [f for f in PRJ_SINGLETON.tableData.allFields if f in RTF or f.opts.get('readOnly', False)]
+
     self.noEditColIdxs = [self.colTitles.index(col.name) for col in noEditParams]
     self.editColIdxs = np.setdiff1d(np.arange(len(self.colTitles)), self.noEditColIdxs)
     self.sigFieldsChanged.emit()

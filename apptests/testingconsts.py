@@ -5,8 +5,6 @@ from skimage import io
 
 from s3a.constants import BASE_DIR, REQD_TBL_FIELDS
 
-TEST_AUTHOR = 'testauthor'
-
 NUM_COMPS = 15
 TESTS_DIR = BASE_DIR.parent/'apptests'
 IMG_DIR = TESTS_DIR/'files'

@@ -7,7 +7,6 @@ import numpy as np
 from pandas import DataFrame as df
 from utilitys import PrjParam
 
-from s3a.constants import ANN_AUTH_DIR
 from .structures import TwoDArr, XYVertices, ComplexXYVertices, NChanImg
 
 
@@ -99,23 +98,6 @@ def largestList(verts: List[XYVertices]) -> XYVertices:
   # for vertList in newVerts:
   # vertList += cropOffset[0:2]
   return XYVertices(maxLenList)
-
-def resolveAuthorName(providedAuthName: Optional[str]) -> Optional[str]:
-  authPath = Path(ANN_AUTH_DIR)
-  authFile = authPath.joinpath('defaultAuthor.txt')
-  if providedAuthName is not None:
-    # New default author provided
-    with open(authFile.absolute(), 'w') as ofile:
-      ofile.write(providedAuthName)
-      return providedAuthName
-  # Fetch default author
-  if not authFile.exists():
-    authFile.touch()
-  with open(str(authFile), 'r') as ifile:
-    lines = ifile.readlines()
-    if not lines:
-      return None
-  return lines[0]
 
 def augmentException(ex: Exception, prependedMsg: str):
   ex.args = (prependedMsg + str(ex),)
@@ -284,7 +266,7 @@ def monkeyPatch(obj, toChange: str, newVal):
 def hierarchicalUpdate(curDict: dict, other: dict):
   """Dictionary update that allows nested keys to be updated without deleting the non-updated keys"""
   if other is None:
-    return
+    return curDict
   for k, v in other.items():
     curVal = curDict.get(k, None)
     if isinstance(curVal, dict) and isinstance(v, dict):
@@ -293,3 +275,4 @@ def hierarchicalUpdate(curDict: dict, other: dict):
       curVal.extend(v)
     else:
       curDict[k] = v
+  return curDict

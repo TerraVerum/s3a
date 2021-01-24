@@ -3,7 +3,7 @@ import sys
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Union, Tuple, Any, Optional
+from typing import List, Union, Tuple, Any, Optional, Callable, Dict
 from warnings import warn
 
 import numpy as np
@@ -13,7 +13,7 @@ from pyqtgraph.parametertree import Parameter
 from ruamel.yaml import YAML
 from utilitys import ParamEditor, PrjParam
 
-from s3a.constants import TABLE_DIR, REQD_TBL_FIELDS, DATE_FORMAT, PRJ_CONSTS, BASE_DIR
+from s3a.constants import TABLE_DIR, REQD_TBL_FIELDS, PRJ_CONSTS, BASE_DIR
 from s3a.structures import PrjParamGroup, FilePath
 from s3a.generalutils import hierarchicalUpdate
 from utilitys import fns
@@ -118,12 +118,13 @@ class TableData(QtCore.QObject):
   sigCfgUpdated = QtCore.Signal(object)
   """dict (self.cfg) during update"""
 
-  def __init__(self, annAuthor: str=None):
+  def __init__(self):
     super().__init__()
+    self._factories: Dict[PrjParam, Callable[[], Any]] = {}
+
     self.filter = TableFilterEditor()
     self.paramParser: Optional[YamlParser] = None
 
-    self.annAuthor = annAuthor
     self.cfgFname: Optional[Path] = None
     self.cfg: Optional[dict] = None
 
@@ -142,18 +143,34 @@ class TableData(QtCore.QObject):
       # dataframe
       numRows = 1
       dropRow = True
+    populators = []
+    for f in self.allFields:
+      if f in self._factories:
+        val = self._factories[f]()
+      else:
+        val = f.value
+      populators.append(val)
+
     for _ in range(numRows):
       # Make sure to construct a separate component instance for
       # each row no objects have the same reference
-      df_list.append([field.value for field in copy.copy(self.allFields)])
+      df_list.append(copy.copy(populators))
     outDf = df(df_list, columns=self.allFields).set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
     # Set the metadata for this application run
-    outDf[REQD_TBL_FIELDS.ANN_AUTHOR] = self.annAuthor
-    outDf[REQD_TBL_FIELDS.ANN_TIMESTAMP] = datetime.now().strftime(DATE_FORMAT)
     outDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME] = PRJ_CONSTS.ANN_CUR_FILE_INDICATOR.value
     if dropRow:
       outDf = outDf.drop(index=REQD_TBL_FIELDS.INST_ID.value)
     return outDf
+
+  def addFieldFactory(self, fieldLbl: PrjParam, factory: Callable[[], Any]):
+    """
+    For fields that are simple functions (i.e. don't require input from the user), a
+    factory can be used to create default values when instantiating new table rows.
+
+    :param fieldLbl: WHich field this factory is used for instead of just the default value
+    :param factory: Callable to use instead of field value. This is called with no parameters.
+    """
+    self._factories[fieldLbl] = factory
 
   def makeCompSer(self):
     return self.makeCompDf().squeeze()
@@ -245,7 +262,7 @@ class YamlParser:
       value = value.copy()
       # Format nicely for PrjParam creation
       nameArgs = {'value': value.pop('value', None),
-                  'pType': value.pop('pType', 'NoneType'),
+                  'pType': value.pop('pType', None),
                   'helpText': value.pop('helpText', '')}
       # Forward additional args if they exist
       parsedParam = PrjParam(leafName, **nameArgs, **value)

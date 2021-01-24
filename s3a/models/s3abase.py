@@ -7,13 +7,14 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
+
+from s3a.generalutils import hierarchicalUpdate
 from utilitys import EditorPropsMixin, RunOpts, ParamEditorPlugin, fns
 
 from s3a import ComponentIO
 from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS
 from s3a.constants import PRJ_ENUMS
 from s3a.controls.tableviewproxy import CompDisplayFilter, CompSortFilter
-from s3a.generalutils import resolveAuthorName
 from s3a.models.tablemodel import ComponentMgr
 from s3a.parameditors import PRJ_SINGLETON
 from s3a.parameditors.appstate import AppStateEditor
@@ -77,9 +78,11 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     self.srcImgFname: Optional[Path] = None
 
     # -----
-    # INTERFACE WITH QUICK LOADER
+    # INTERFACE WITH QUICK LOADER / PLUGINS
     # -----
+    PRJ_SINGLETON.tableData.sigCfgUpdated.connect(lambda: self.resetTblFields())
     self.appStateEditor = AppStateEditor(self, name='App State Editor')
+    self.filePlg: FilePlugin = self.addPlugin(FilePlugin)
 
     for plugin in PRJ_SINGLETON.clsToPluginMapping.values(): # type: ParamEditorPlugin
       # Plugins created before window was initialized may need their plugins forcefully
@@ -87,8 +90,6 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       if plugin.win is not self:
         self._handleNewPlugin(plugin)
     PRJ_SINGLETON.sigPluginAdded.connect(self._handleNewPlugin)
-
-    self.filePlg: FilePlugin = self.addPlugin(FilePlugin)
 
     # Connect signals
     # -----
@@ -115,12 +116,6 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     # -----
     # MISC
     # -----
-    authorName = resolveAuthorName(startupSettings.pop('author', None))
-    if authorName is None:
-      sys.exit('No author name provided and no default author exists. Exiting.\n'
-               'To start without error, provide an author name explicitly, e.g.\n'
-               '"python -m s3a --author=<Author Name>"')
-    PRJ_SINGLETON.tableData.annAuthor = authorName
     self.saveAllEditorDefaults()
     PRJ_SINGLETON.tableData.sigCfgUpdated.connect(lambda: self.resetTblFields())
 
