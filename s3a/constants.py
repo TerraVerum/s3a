@@ -139,14 +139,14 @@ class _PrjConsts(PrjParamGroup):
   TOOL_REM_OVERLAP        : PrjParam = newParam('Remove Component Overlap', f'{_shc},S,E', icon=str(ICON_DIR/'mutex.svg'))
   TOOL_COPY_REGIONS       : PrjParam = newParam('Copy Selected', f'{_shc},S,C', icon=str(ICON_DIR/'copy.svg'))
   TOOL_MOVE_REGIONS       : PrjParam = newParam('Move Selected', f'{_shc},S,V', icon=str(ICON_DIR/'move.svg'))
-  TOOL_CLEAR_FOC_REGION   : PrjParam = newParam('Clear', 'Ctrl+Shift+C')
-  TOOL_RESET_FOC_REGION   : PrjParam = newParam('Reset', 'Ctrl+Shift+R')
-  TOOL_FILL_FOC_REGION    : PrjParam = newParam('Fill', 'Ctrl+Shift+F')
-  TOOL_ACCEPT_FOC_REGION  : PrjParam = newParam('Accept', 'Ctrl+Shift+A')
+  TOOL_CLEAR_FOC_REGION   : PrjParam = newParam('Clear', 'Ctrl+Shift+C', icon=str(ICON_DIR/'clear.svg'))
+  TOOL_RESET_FOC_REGION   : PrjParam = newParam('Reset', 'Ctrl+Shift+R', icon=str(ICON_DIR/'reset.svg'))
+  TOOL_FILL_FOC_REGION    : PrjParam = newParam('Fill', 'Ctrl+Shift+F', icon=str(ICON_DIR/'fill.svg'))
+  TOOL_ACCEPT_FOC_REGION  : PrjParam = newParam('Accept', 'Ctrl+Shift+A', icon=str(ICON_DIR/'accept.svg'))
   TOOL_CLEAR_ROI          : PrjParam = newParam('Clear ROI', 'Esc')
-  TOOL_CLEAR_HISTORY      : PrjParam = newParam('Clear Processor History', 'Ctrl+Alt+C,H')
-  TOOL_PROC_ANALYTICS     : PrjParam = newParam('Show Analytics', f'{_shc},F,P')
-  TOOL_RESET_ZOOM         : PrjParam = newParam('Reset Zoom', f'{_shc},Z,R')
+  TOOL_CLEAR_HISTORY      : PrjParam = newParam('Clear Processor History', 'Ctrl+Alt+C,H', icon=str(ICON_DIR/'clear_history.svg'))
+  TOOL_PROC_ANALYTICS     : PrjParam = newParam('Show Analytics', f'{_shc},F,P', icon=str(ICON_DIR/'analytics.svg'))
+  TOOL_RESET_ZOOM         : PrjParam = newParam('Reset Zoom', f'{_shc},Z,R', icon=str(ICON_DIR/'reset_zoom.svg'))
 
   # --------------------------
   # WINDOW TOOLS
@@ -175,7 +175,7 @@ class _PrjConsts(PrjParamGroup):
   # --------------------------
   # GLOBAL PREDICTIONS
   # --------------------------
-  TOOL_PRED_SEL     : PrjParam = newParam('Predict From Selection', f'{_shc},M,P')
+  TOOL_PRED_SEL     : PrjParam = newParam('Predict From Selection', f'{_shc},M,P', icon=str(ICON_DIR/'predict.svg'))
 
 
   # --------------------------
