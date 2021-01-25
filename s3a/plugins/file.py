@@ -496,7 +496,7 @@ class ProjectData(QtCore.QObject):
     tableName = Path(tableName)
     if not tableName.is_absolute():
       tableName = self.location/tableName
-    self.tableData.loadCfg(tableName, tableDict)
+    self.tableData.loadCfg(tableName, tableDict, force=True)
 
     allAddedImages = []
     with self.suppressSignals():
