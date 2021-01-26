@@ -254,21 +254,21 @@ class VerticesPlugin(TableFieldPlugin):
     initialImg, slices = getCroppedImg(self.mainImg.image, allVerts)
     imShape = initialImg.shape[:2]
     offset = slices[0]
-    img = np.zeros(imShape, bool)
-    outImgs.append(img)
+    oldImg = np.zeros(imShape, bool)
     for singleRegionVerts in bufferRegions:
       # Copy to avoid screwing up undo buffer!
       copied = ComplexXYVertices([subV - offset for subV in singleRegionVerts])
       img = copied.toMask(imShape, warnIfTooSmall=False)
-      outImgs.append(img)
+      diff = showMaskDiff(oldImg, img)
+      oldImg = img
+      outImgs.append(diff)
+    # Add current state as final result
+    outImgs.append(np.tile(oldImg.astype('uint8')[...,None]*255, (1,1,3)))
     return initialImg, outImgs
 
 
   def playbackRegionHistory(self):
     initialImg, history = self.getRegionHistory()
-    diffs = [showMaskDiff(o, n) for (o, n) in zip(history, history[1:])]
-    # Add current state as final result
-    diffs.append(np.tile(history[-1].astype('uint8')[...,None]*255, (1,1,3)))
     if initialImg is None:
       warn('No edits found, nothing to do', UserWarning)
     self.playbackWindow.setImage(initialImg)
@@ -279,9 +279,9 @@ class VerticesPlugin(TableFieldPlugin):
     ii = 0
     def update():
       nonlocal ii
-      changingItem.setImage(diffs[ii])
+      changingItem.setImage(history[ii])
       ii += 1
-      if ii == len(diffs):
+      if ii == len(history):
         tim.stop()
         tim.deleteLater()
     tim = QtCore.QTimer()
