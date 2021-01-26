@@ -1,205 +1,35 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg
-   xmlns:dc="http://purl.org/dc/elements/1.1/"
-   xmlns:cc="http://creativecommons.org/ns#"
-   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-   xmlns:svg="http://www.w3.org/2000/svg"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   version="1.0"
-   width="87.942657mm"
-   height="70.797974mm"
-   id="svg20"
-   sodipodi:docname="move.svg"
-   inkscape:version="1.0.2 (e86c870879, 2021-01-15, custom)">
-  <metadata
-     id="metadata24">
-    <rdf:RDF>
-      <cc:Work
-         rdf:about="">
-        <dc:format>image/svg+xml</dc:format>
-        <dc:type
-           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
-      </cc:Work>
-    </rdf:RDF>
-  </metadata>
-  <sodipodi:namedview
-     pagecolor="#ffffff"
-     bordercolor="#666666"
-     borderopacity="1"
-     objecttolerance="10"
-     gridtolerance="10"
-     guidetolerance="10"
-     inkscape:pageopacity="0"
-     inkscape:pageshadow="2"
-     inkscape:window-width="1920"
-     inkscape:window-height="1017"
-     id="namedview22"
-     showgrid="false"
-     inkscape:zoom="1.4870603"
-     inkscape:cx="20.730379"
-     inkscape:cy="145.72457"
-     inkscape:window-x="-8"
-     inkscape:window-y="-8"
-     inkscape:window-maximized="1"
-     inkscape:current-layer="svg20"
-     inkscape:document-rotation="0" />
-  <defs
-     id="defs6">
-    <marker
-       style="overflow:visible"
-       id="TriangleOutS"
-       refX="0"
-       refY="0"
-       orient="auto"
-       inkscape:stockid="TriangleOutS"
-       inkscape:isstock="true">
-      <path
-         transform="scale(0.2)"
-         style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:1pt;stroke-opacity:1"
-         d="M 5.77,0 -2.88,5 V -5 Z"
-         id="path1126" />
-    </marker>
-    <marker
-       style="overflow:visible"
-       id="Arrow1Lend"
-       refX="0"
-       refY="0"
-       orient="auto"
-       inkscape:stockid="Arrow1Lend"
-       inkscape:isstock="true">
-      <path
-         transform="matrix(-0.8,0,0,-0.8,-10,0)"
-         style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:1pt;stroke-opacity:1"
-         d="M 0,0 5,-5 -12.5,0 5,5 Z"
-         id="path981" />
-    </marker>
-    <inkscape:path-effect
-       effect="powerclip"
-       id="path-effect974"
-       is_visible="true"
-       lpeversion="1"
-       inverse="true"
-       flatten="false"
-       hide_clip="false"
-       message="Use fill-rule evenodd on &lt;b&gt;fill and stroke&lt;/b&gt; dialog if no flatten result after convert clip to paths." />
-    <clipPath
-       clipPathUnits="userSpaceOnUse"
-       id="clipEmfPath1">
-      <path
-         d="m 76.59358,76.59358 h 295.1811 V 712.04846 H 76.59358 Z"
-         id="path2"
-         inkscape:connector-curvature="0" />
-    </clipPath>
-    <pattern
-       id="EMFhbasepattern"
-       patternUnits="userSpaceOnUse"
-       width="6"
-       height="6"
-       x="0"
-       y="0" />
-    <clipPath
-       id="clipEmfPath1-3"
-       clipPathUnits="userSpaceOnUse">
-      <path
-         id="path834"
-         d="m 76.59358,76.59358 h 295.1811 V 712.04846 H 76.59358 Z"
-         inkscape:connector-curvature="0" />
-    </clipPath>
-    <pattern
-       y="0"
-       x="0"
-       height="6"
-       width="6"
-       patternUnits="userSpaceOnUse"
-       id="EMFhbasepattern-3" />
-    <clipPath
-       id="clipEmfPath1-6"
-       clipPathUnits="userSpaceOnUse">
-      <path
-         id="path926"
-         d="M 76.59358,76.59358 H 504.49425 V 645.36887 H 76.59358 Z"
-         inkscape:connector-curvature="0" />
-    </clipPath>
-    <pattern
-       y="0"
-       x="0"
-       height="6"
-       width="6"
-       patternUnits="userSpaceOnUse"
-       id="EMFhbasepattern-0" />
-    <clipPath
-       id="clipEmfPath1-2"
-       clipPathUnits="userSpaceOnUse">
-      <path
-         id="path999"
-         d="M 76.59358,76.59358 H 504.49425 V 645.36887 H 76.59358 Z"
-         inkscape:connector-curvature="0" />
-    </clipPath>
-    <pattern
-       y="0"
-       x="0"
-       height="6"
-       width="6"
-       patternUnits="userSpaceOnUse"
-       id="EMFhbasepattern-4" />
-    <clipPath
-       id="clipEmfPath1-2-9"
-       clipPathUnits="userSpaceOnUse">
-      <path
-         inkscape:connector-curvature="0"
-         id="path999-6"
-         d="M 76.59358,76.59358 H 504.49425 V 645.36887 H 76.59358 Z" />
-    </clipPath>
-    <clipPath
-       id="clipPath1048"
-       clipPathUnits="userSpaceOnUse">
-      <path
-         inkscape:connector-curvature="0"
-         id="path1046"
-         d="M 76.59358,76.59358 H 504.49425 V 645.36887 H 76.59358 Z" />
-    </clipPath>
-    <clipPath
-       clipPathUnits="userSpaceOnUse"
-       id="clipPath2710">
-      <path
-         transform="translate(-180.69245,52.781219)"
-         id="path2712"
-         d="M 317.96729,88.186554 H 481.86796 V 304.69534 H 317.96729 Z"
-         clip-path="url(#clipEmfPath1-2-9)"
-         style="fill:none;stroke:#000000;stroke-width:22.0666px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:8;stroke-dasharray:none;stroke-opacity:1"
-         inkscape:connector-curvature="0" />
-    </clipPath>
-    <clipPath
-       id="clipEmfPath1-2-9-5"
-       clipPathUnits="userSpaceOnUse">
-      <path
-         inkscape:connector-curvature="0"
-         id="path999-6-0"
-         d="M 76.59358,76.59358 H 504.49425 V 645.36887 H 76.59358 Z" />
-    </clipPath>
-    <clipPath
-       clipPathUnits="userSpaceOnUse"
-       id="clipPath970">
-      <path
-         style="font-variation-settings:normal;display:block;opacity:1;vector-effect:none;fill:none;fill-opacity:1;stroke:#000000;stroke-width:26.167;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:8;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:normal;stop-color:#000000;stop-opacity:1"
-         id="path972"
-         width="182.91121"
-         height="241.41589"
-         x="112.3021"
-         y="89.438202"
-         sodipodi:type="rect"
-         d="M 112.3021,89.438202 H 295.21331 V 330.8541 H 112.3021 Z" />
-    </clipPath>
-  </defs>
-  <path
-     id="path966"
-     style="font-variation-settings:normal;vector-effect:none;fill:none;fill-opacity:1;stroke:#000000;stroke-width:26.167;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:8;stroke-dasharray:52.334, 52.334;stroke-dashoffset:91.5845;stroke-opacity:1;paint-order:normal;stop-color:#000000"
-     d="M 13.0835,13.0835 H 195.99471 V 254.49939 H 13.0835 Z" />
-  <path
-     style="font-variation-settings:normal;vector-effect:none;fill:none;fill-opacity:1;stroke:#000000;stroke-width:26.167;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:8;stroke-dasharray:none;stroke-dashoffset:18.3169;stroke-opacity:1;marker-end:url(#TriangleOutS);paint-order:normal;stop-color:#000000"
-     d="M 102.88755,131.80367 H 295.2133"
-     id="path1250" />
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Generator: Adobe Illustrator 21.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" id="Capa_1" x="0px" y="0px" viewBox="0 0 512 512" style="enable-background:new 0 0 512 512;" xml:space="preserve" width="512" height="512">
+<g>
+	<path d="M507.605,422.762l-87.503-87.517l42.422-42.422c3.677-3.677,5.186-8.994,3.999-14.048   c-1.201-5.068-4.922-9.141-9.858-10.781l-254.561-84.858c-5.376-1.846-11.338-0.381-15.352,3.618   c-4.014,4.014-5.42,9.961-3.618,15.352l84.858,254.561c1.641,4.937,5.713,8.657,10.781,9.858   c5.098,1.172,10.386-0.337,14.048-3.999l42.422-42.422l87.518,87.503c5.86,5.86,15.351,5.86,21.211,0l63.633-63.633   C513.465,438.113,513.465,428.621,507.605,422.762z"/>
+	<path d="M135,0h-30c-8.291,0-15,6.709-15,15s6.709,15,15,15h30c8.291,0,15-6.709,15-15S143.291,0,135,0z"/>
+	<path d="M195,30h30c8.291,0,15-6.709,15-15s-6.709-15-15-15h-30c-8.291,0-15,6.709-15,15S186.709,30,195,30z"/>
+	<path d="M285,30h30c8.291,0,15-6.709,15-15s-6.709-15-15-15h-30c-8.291,0-15,6.709-15,15S276.709,30,285,30z"/>
+	<path d="M135,390h-30c-8.291,0-15,6.709-15,15s6.709,15,15,15h30c8.291,0,15-6.709,15-15S143.291,390,135,390z"/>
+	<path d="M375,30h15v15c0,8.291,6.709,15,15,15s15-6.709,15-15V15c0-8.291-6.709-15-15-15h-30c-8.291,0-15,6.709-15,15   S366.709,30,375,30z"/>
+	<path d="M45,0H15C6.709,0,0,6.709,0,15v30c0,8.291,6.709,15,15,15s15-6.709,15-15V30h15c8.291,0,15-6.709,15-15S53.291,0,45,0z"/>
+	<path d="M15,150c8.291,0,15-6.709,15-15v-30c0-8.291-6.709-15-15-15S0,96.709,0,105v30C0,143.291,6.709,150,15,150z"/>
+	<path d="M15,240c8.291,0,15-6.709,15-15v-30c0-8.291-6.709-15-15-15s-15,6.709-15,15v30C0,233.291,6.709,240,15,240z"/>
+	<path d="M15,330c8.291,0,15-6.709,15-15v-30c0-8.291-6.709-15-15-15s-15,6.709-15,15v30C0,323.291,6.709,330,15,330z"/>
+	<path d="M420,105c0-8.291-6.709-15-15-15s-15,6.709-15,15v30c0,8.291,6.709,15,15,15s15-6.709,15-15V105z"/>
+	<path d="M405,180c-8.291,0-15,6.709-15,15v19.146l30,9.999V195C420,186.709,413.291,180,405,180z"/>
+	<path d="M45,390H30v-15c0-8.291-6.709-15-15-15s-15,6.709-15,15v30c0,8.291,6.709,15,15,15h30c8.291,0,15-6.709,15-15   S53.291,390,45,390z"/>
+	<path d="M195,390c-8.291,0-15,6.709-15,15s6.709,15,15,15h29.152l-10.001-30H195z"/>
+</g>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 </svg>
