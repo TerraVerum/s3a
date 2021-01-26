@@ -35,7 +35,11 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
   def sort(self, column: int, order: QtCore.Qt.SortOrder=...) -> None:
     # Do nothing if the user is trying to sort by vertices, since the intention of
     # sorting numpy arrays is somewhat ambiguous
-    if column == self.colTitles.index(REQD_TBL_FIELDS.VERTICES.name):
+    noSortCols = []
+    for ii, col in enumerate(PRJ_SINGLETON.tableData.allFields):
+      if isinstance(col.value, (list, np.ndarray)):
+        noSortCols.append(ii)
+    if column in noSortCols:
       return
     else:
       super().sort(column, order)
@@ -46,7 +50,7 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
     rightObj = right.data(QtCore.Qt.EditRole)
     try:
       return np.all(leftObj < rightObj)
-    except ValueError:
+    except (ValueError, TypeError):
       # If that doesn't work, default to stringified comparison
       return str(leftObj) < str(rightObj)
 

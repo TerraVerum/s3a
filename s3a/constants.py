@@ -142,6 +142,7 @@ class _PrjConsts(PrjParamGroup):
              'When `Entire Component`, clicking anywhere within the component'
              ' will select it')
   PROP_SHOW_TBL_ON_COMP_CREATE : PrjParam = newParam('Show popup table when creating component', False)
+  PROP_VERT_ANALYTIC_BUF_SZ : PrjParam = newParam('Number of recorded region edits', 50)
   # --------------------------
   # MISC TOOLS
   # --------------------------
@@ -161,7 +162,8 @@ class _PrjConsts(PrjParamGroup):
   TOOL_ACCEPT_FOC_REGION  : PrjParam = newParam('Accept', 'Ctrl+Shift+A')
   TOOL_CLEAR_ROI          : PrjParam = newParam('Clear ROI', 'Esc')
   TOOL_CLEAR_HISTORY      : PrjParam = newParam('Clear Processor History', 'Ctrl+Alt+C,H')
-  TOOL_PROC_ANALYTICS     : PrjParam = newParam('Show Analytics', f'{SHORTCUT_BASE},F,P')
+  TOOL_PROC_ANALYTICS     : PrjParam = newParam('Processor Analytics', f'{SHORTCUT_BASE},F,P')
+  TOOL_SHOW_REG_HISTORY   : PrjParam = newParam('Region History', f'{SHORTCUT_BASE},F,R')
   TOOL_RESET_ZOOM         : PrjParam = newParam('Reset Zoom', f'{SHORTCUT_BASE},Z,R')
 
   # --------------------------

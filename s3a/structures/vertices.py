@@ -178,7 +178,11 @@ class ComplexXYVertices(list):
     if warnIfTooSmall:
       cmpShape = maskShape if isinstance(maskShape, Sequence) else maskShape.shape[:2]
       # Wait until inside 'if' so max isn't unnecessarily calculated
-      vertMax = self.stack().max(0)[::-1]
+      # Edge case: Empty vertices set will trigger a value warning
+      if len(self) == 0:
+        vertMax = 0
+      else:
+        vertMax = self.stack().max(0)[::-1]
       if np.any(vertMax > np.array(cmpShape[:2])):
         warn('Vertices don\'t fit in the provided mask size.\n'
              f'Vertex shape: {vertMax}, mask shape: {cmpShape}')

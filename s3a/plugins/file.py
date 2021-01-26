@@ -461,12 +461,14 @@ class ProjectData(QtCore.QObject):
     if not force and self.cfgFname == cfgFname:
       return None
 
-    if self.pluginCfg:
+    hierarchicalUpdate(baseCfgDict, cfgDict)
+
+    newPlugins = baseCfgDict.get('plugin-cfg', {})
+    if self.pluginCfg and self.pluginCfg != newPlugins:
       raise ValueError('The previous project loaded custom plugins, which cannot easily'
                        ' be removed. To load a new project, close and re-open S3A with'
                        ' the new project instance instead.')
 
-    hierarchicalUpdate(baseCfgDict, cfgDict)
     self.cfgFname = cfgFname
     cfg = self.cfg = baseCfgDict
     self.annotationsDir.mkdir(exist_ok=True)

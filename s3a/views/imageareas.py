@@ -343,7 +343,7 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     self.getViewBox().menu = self.menu
     return retClctn
 
-  @PRJ_SINGLETON.actionStack.undoable('Modify Focused Component')
+  @PRJ_SINGLETON.actionStack.undoable('Update Focused Component')
   def updateFocusedComp(self, newComp: pd.Series=None):
     """
     Updates focused image and component from provided information. Useful for creating

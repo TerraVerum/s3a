@@ -7,7 +7,7 @@ import numpy as np
 from pandas import DataFrame as df
 from utilitys import PrjParam
 
-from .structures import TwoDArr, XYVertices, ComplexXYVertices, NChanImg
+from .structures import TwoDArr, XYVertices, ComplexXYVertices, NChanImg, BlackWhiteImg
 
 
 def stackedVertsPlusConnections(vertList: ComplexXYVertices) -> (XYVertices, np.ndarray):
@@ -185,7 +185,7 @@ def cornersToFullBoundary(cornerVerts: Union[XYVertices, ComplexXYVertices], siz
   return cornerVerts
 
 
-def getCroppedImg(image: NChanImg, verts: np.ndarray, margin: int, *otherBboxes: np.ndarray,
+def getCroppedImg(image: NChanImg, verts: np.ndarray, margin=0, *otherBboxes: np.ndarray,
                   coordsAsSlices=False, returnSlices=True) -> (np.ndarray, np.ndarray):
   verts = np.vstack(verts)
   img_np = image
@@ -282,3 +282,11 @@ def hierarchicalUpdate(curDict: dict, other: dict):
     else:
       curDict[k] = v
   return curDict
+
+def showMaskDiff(oldMask: BlackWhiteImg, newMask: BlackWhiteImg):
+  infoMask = np.tile(oldMask[...,None].astype('uint8')*255, (1,1,3))
+  # Was there, now it's not -- color red
+  infoMask[oldMask & ~newMask,:] = [255,0,0]
+  # Wasn't there, now it is -- color green
+  infoMask[~oldMask & newMask,:] = [0,255,0]
+  return infoMask

@@ -1,16 +1,22 @@
+from warnings import warn
+
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
+from pyqtgraph.Qt import QtCore
+from utilitys import PrjParam
+from utilitys.widgets import ImgViewer
 
 from s3a import PRJ_SINGLETON, PRJ_CONSTS as CNST, XYVertices, REQD_TBL_FIELDS as RTF, \
   ComplexXYVertices
 from s3a.models.s3abase import S3ABase
 from s3a.processing.algorithms import _historyMaskHolder
 from s3a.structures import BlackWhiteImg
-from utilitys import PrjParam
 from s3a.views.regions import MultiRegionPlot, makeMultiRegionDf
 from .base import TableFieldPlugin
 from ..constants import PRJ_ENUMS
+from ..generalutils import getCroppedImg, showMaskDiff
+
 
 class VerticesPlugin(TableFieldPlugin):
   name = 'Vertices'
@@ -27,6 +33,11 @@ class VerticesPlugin(TableFieldPlugin):
     self.region = MultiRegionPlot()
     self.region.hide()
     self.firstRun = True
+    self.playbackWindow = ImgViewer()
+    ci = self.playbackWindow.changingItem = pg.ImageItem()
+    self.playbackWindow.addItem(ci)
+    ci.setOpacity(0.5)
+
 
   def attachWinRef(self, win: S3ABase):
     win.mainImg.addItem(self.region)
@@ -54,6 +65,8 @@ class VerticesPlugin(TableFieldPlugin):
                 CNST.TOOL_CLEAR_FOC_REGION, CNST.TOOL_CLEAR_HISTORY]
     for func, param in zip(funcLst, paramLst):
       self.registerFunc(func, btnOpts=param)
+
+    self.registerFunc(self.playbackRegionHistory)
 
     win.mainImg.registerDrawAction([CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self._run_drawAct)
     win.mainImg.addTools(self.toolsEditor)
@@ -211,3 +224,66 @@ class VerticesPlugin(TableFieldPlugin):
   def _onDeactivate(self):
     self.region.hide()
     self.win.compDisplay.regionPlot.updateColors()
+
+  def getRegionHistory(self):
+    outImgs = []
+    stack = PRJ_SINGLETON.actionStack.actions
+    bufferRegions = []
+    for act in stack:
+      if act.descr == 'Change Focused Component':
+        # Signals a new chain of events, clear out the old
+        bufferRegions.clear()
+        continue
+      elif act.descr != 'Modify Focused Component':
+        continue
+      elif act.args[1] is None or len(act.args[1]) == 0:
+        # "None" occurrences  denote empty regions
+        bufferRegions.append(ComplexXYVertices())
+        continue
+      # newData = arg 1
+      regData = act.args[1].iloc[0]
+
+      bufferRegions.append(regData[RTF.VERTICES])
+
+    if not bufferRegions:
+      return None, []
+
+    # First find offset and img size so we don't
+    # have to keep copying a full image sized output every time
+    allVerts = np.vstack([v.stack() for v in bufferRegions])
+    initialImg, slices = getCroppedImg(self.mainImg.image, allVerts)
+    imShape = initialImg.shape[:2]
+    offset = slices[0]
+    img = np.zeros(imShape, bool)
+    outImgs.append(img)
+    for singleRegionVerts in bufferRegions:
+      # Copy to avoid screwing up undo buffer!
+      copied = ComplexXYVertices([subV - offset for subV in singleRegionVerts])
+      img = copied.toMask(imShape, warnIfTooSmall=False)
+      outImgs.append(img)
+    return initialImg, outImgs
+
+
+  def playbackRegionHistory(self):
+    initialImg, history = self.getRegionHistory()
+    diffs = [showMaskDiff(o, n) for (o, n) in zip(history, history[1:])]
+    # Add current state as final result
+    diffs.append(np.tile(history[-1].astype('uint8')[...,None]*255, (1,1,3)))
+    if initialImg is None:
+      warn('No edits found, nothing to do', UserWarning)
+    self.playbackWindow.setImage(initialImg)
+    changingItem = self.playbackWindow.changingItem
+    changingItem.clear()
+    self.playbackWindow.show()
+    # Add reference to avoid gc
+    ii = 0
+    def update():
+      nonlocal ii
+      changingItem.setImage(diffs[ii])
+      ii += 1
+      if ii == len(diffs):
+        tim.stop()
+        tim.deleteLater()
+    tim = QtCore.QTimer()
+    tim.timeout.connect(update)
+    tim.start(500)

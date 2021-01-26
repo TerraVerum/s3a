@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import sys
-from functools import partial
 from functools import wraps
-from os.path import basename
 from pathlib import Path
-from typing import Callable, Generator, Dict, Union
+from typing import Dict, Union, List
 
+import numpy as np
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
+import pyqtgraph as pg
+from utilitys.widgets import ImgViewer
 
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
@@ -175,3 +175,34 @@ class DropList(QtWidgets.QListWidget):
   def files(self):
     model = self.model()
     return [model.index(ii, 0).data() for ii in range(model.rowCount())]
+
+class RegionHistoryViewer(QtWidgets.QMainWindow):
+  def __init__(self, parent=None):
+    super().__init__(parent)
+    self.diffs: List[np.ndarray]
+    self.histTimer = QtCore.QTimer(self)
+
+    self.diffImg = pg.ImageItem()
+    self.displayPlt = ImgViewer()
+
+
+  def playHistory(self):
+    ii = 0
+    def update():
+      nonlocal ii
+      changingItem.setImage(diffs[ii])
+      ii += 1
+      if ii == len(diffs):
+        tim.stop()
+        tim.deleteLater()
+    self.histTimer.timeout.connect(update)
+    tim.start(500)
+
+  def updateImg(self, showSlice=0):
+    """
+
+    :param showSlice:
+      pType: slider
+      limits: [0,
+    :return:
+    """

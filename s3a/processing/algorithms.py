@@ -8,12 +8,13 @@ from scipy.ndimage import binary_fill_holes, maximum_filter
 from skimage import morphology as morph
 from skimage.measure import regionprops, label, regionprops_table
 from skimage.morphology import flood
-from skimage.segmentation import quickshift
+from skimage import segmentation
 from utilitys.processing import *
 from utilitys import fns
 
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
-from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices
+from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices, \
+  showMaskDiff
 from s3a.processing.processing import ImageProcess, GlobalPredictionProcess
 from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg
 from s3a.structures import GrayImg, RgbImg
@@ -99,7 +100,7 @@ def format_vertices(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
     # Give whole image as input
     fgVerts = imgCornerVertices(image)
     fgVerts = cornersToFullBoundary(fgVerts)
-    _historyMask[fgVerts.rows, fgVerts.cols] = True
+    _historyMask[fgVerts.rows, fgVerts.cols] = 1
   _historyMaskHolder[0] = _historyMask
   curHistory = _historyMask.copy()
   if fgVerts.empty:
@@ -188,7 +189,8 @@ def apply_process_result(image: NChanImg, asForeground: bool,
   # so expand the current area of interest only as much as needed. Returning to full size
   # now would incur unnecessary addtional processing times for the full-sized image
   outMask = origCompMask.copy()
-  outMask[boundSlices] = bitOperation(prevCompMask, image)
+  change = bitOperation(prevCompMask, image)
+  outMask[boundSlices] = change
   foregroundPixs = np.c_[np.nonzero(outMask)]
   # Keep algorithm from failing when no foreground pixels exist
   if len(foregroundPixs) == 0:
@@ -197,6 +199,7 @@ def apply_process_result(image: NChanImg, asForeground: bool,
   else:
     mins = foregroundPixs.min(0)
     maxs = foregroundPixs.max(0)
+
   # Add 1 to max slice so stopping value is last foreground pixel
   newSlices = (slice(mins[0], maxs[0]+1), slice(mins[1], maxs[1]+1))
   return ProcessIO(image=outMask[newSlices], boundSlices=newSlices)
@@ -207,7 +210,10 @@ def return_to_full_size(image: NChanImg, origCompMask: BlackWhiteImg,
   if image.ndim > 2:
     image = image.mean(2).astype(int)
   out[boundSlices] = image
-  return ProcessIO(image=out)
+
+  infoMask = showMaskDiff(origCompMask[boundSlices], image)
+
+  return ProcessIO(image=out, summaryInfo={'image': infoMask, 'name': 'Finalize Region'})
 
 def fill_holes(image: NChanImg):
   return ProcessIO(image=binary_fill_holes(image))
@@ -242,7 +248,7 @@ def openClose():
     outImg = cv.morphologyEx(image.copy(), cv.MORPH_OPEN, strel)
     outImg = cv.morphologyEx(outImg, cv.MORPH_CLOSE, strel)
     return outImg
-  proc.addFunction(perform_op, needsWrap=True)
+  proc.addFunction(perform_op, name='Open -> Close', needsWrap=True)
   return proc
 
 def keep_largest_comp(image: NChanImg):
@@ -341,15 +347,23 @@ def cv_grabcut(image: NChanImg, prevCompMask: BlackWhiteImg, fgVerts: XYVertices
     mode = cv.GC_INIT_WITH_MASK
   cv.grabCut(img, mask, cvRect, bgdModel, fgdModel, iters, mode=mode)
   outMask = np.where((mask==2)|(mask==0), False, True)
-  return ProcessIO(image=outMask, summaryInfo={'image': mask})
+  return ProcessIO(labels=outMask)
 
 def quickshift_seg(image: NChanImg, fgVerts: XYVertices, maxDist=10., kernelSize=5,
                    sigma=0.0):
   # For maxDist of 0, the input isn't changed and it takes a long time
   if maxDist == 0:
-    return image
-  segImg = quickshift(image, kernel_size=kernelSize, max_dist=maxDist,
-                      sigma=sigma)
+    # Make sure output is still 1-channel
+    if image.ndim > 2:
+      segImg = image.mean(2).astype(int)
+    else:
+      segImg = image
+  else:
+    segImg = segmentation.quickshift(image, kernel_size=kernelSize, max_dist=maxDist, sigma=sigma)
+  # Color in regions touching ROI verts
+
+  return ProcessIO(labels=segImg)
+
 
 def k_means(image: NChanImg, kVal=5, attempts=10):
   # Logic taken from https://docs.opencv.org/master/d1/d5c/tutorial_py_kmeans_opencv.html
@@ -363,23 +377,35 @@ def k_means(image: NChanImg, kVal=5, attempts=10):
   imgMeans = imgMeans.astype('uint8')
   lbls = lbls.reshape(image.shape[:2])
 
-  return ProcessIO(image=lbls, imgMeans=imgMeans, summaryInfo={'image': imgMeans[lbls]})
+  return ProcessIO(labels=lbls)
 
-def keep_regions_touching_roi(image: BlackWhiteImg, fgVerts: XYVertices):
+def keep_labels_touching_roi(image: NChanImg, labels: BlackWhiteImg, fgVerts: XYVertices,
+                             historyMask: BlackWhiteImg):
   """
   For a given binary image input, only keeps connected components that are directly in
   contact with at least one of the specified vertices. In essence, this function can make
   a wide variety of operations behave similarly to region growing.
   """
-  if image.ndim > 2:
-    raise ValueError('Cannot handle multichannel images.\n'
-                              f'(image.shape={image.shape})')
-  out = np.zeros_like(image)
+  if labels.ndim > 2:
+    raise ValueError('Cannot handle multichannel labels.\n'
+                              f'(labelss.shape={labels.shape})')
+  out = np.zeros_like(labels, dtype=bool)
   seeds = fgVerts[:,::-1]
-  seeds = np.clip(seeds, 0, np.array(image.shape)-1)
+  seeds = np.clip(seeds, 0, np.array(labels.shape)-1)
   for seed in seeds:
-    out |= flood(image, tuple(seed))
-  return out
+    out |= flood(labels, tuple(seed),)
+
+  # Zero out negative regions from previous runs
+  out[historyMask == 1] = False
+  summaryImg = segmentation.mark_boundaries(image, labels)
+  cv.drawContours(summaryImg, [fgVerts], -1, (1,0,0), 2)
+  return ProcessIO(image=out, summaryInfo={'image': summaryImg})
+
+def add_kltroi(proc: ImageProcess):
+  """Utility function for an atomic process version of keep_labels_touching_roi"""
+  # Wrap in process so it can be disabled
+  innerProc = ImageProcess.fromFunction(keep_labels_touching_roi)
+  proc.addProcess(innerProc)
 
 def binarize_kmeans(image: NChanImg, fgVerts: XYVertices, imgMeans: np.ndarray,
                     decisionMetric='Remove Boundary Labels'):
@@ -454,15 +480,20 @@ class TopLevelImageProcessors:
   @staticmethod
   def c_kMeansProcessor():
     proc = ImageProcess.fromFunction(k_means)
-    proc.addFunction(binarize_kmeans)
     # Add as process so it can be disabled
-    proc.addProcess(ImageProcess.fromFunction(keep_regions_touching_roi, needsWrap=True))
+    add_kltroi(proc)
     return proc
 
   @staticmethod
   def a_grabCutProcessor():
     proc = ImageProcess.fromFunction(cv_grabcut, name='Primitive Grab Cut')
-    proc.addProcess(ImageProcess.fromFunction(keep_regions_touching_roi, needsWrap=True))
+    add_kltroi(proc)
+    return proc
+
+  @staticmethod
+  def ab_slicProcessor():
+    proc = ImageProcess.fromFunction(quickshift_seg)
+    add_kltroi(proc)
     return proc
 
   @staticmethod

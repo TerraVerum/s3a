@@ -196,7 +196,7 @@ class TableData(QtCore.QObject):
     hierarchicalUpdate(baseCfgDict, cfgDict)
 
     cfg = baseCfgDict
-    if cfg == self.cfg:
+    if not force and cfg == self.cfg:
       # No need to update things
       return
 
