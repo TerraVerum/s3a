@@ -78,7 +78,6 @@ class VerticesPlugin(TableFieldPlugin):
     win.mainImg.registerDrawAction([CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self._run_drawAct)
     win.mainImg.addTools(self.toolsEditor)
     self.vb: pg.ViewBox = win.mainImg.getViewBox()
-    self.registerFunc(self.playbackRegionHistory)
     super().attachWinRef(win)
 
   def updateFocusedComp(self, newComp:pd.Series = None):
