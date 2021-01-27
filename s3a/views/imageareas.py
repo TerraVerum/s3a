@@ -5,17 +5,14 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from pyqtgraph.graphicsItems.ViewBox.ViewBoxMenu import ViewBoxMenu
-from skimage.io import imread
-from utilitys import ParamEditor, EditorPropsMixin, PrjParam, RunOpts, CompositionMixin, fns
 
 from s3a import PRJ_SINGLETON
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_CONSTS as CNST
 from s3a.controls.drawctrl import RoiCollection
 from s3a.generalutils import getCroppedImg, coerceDfTypes
-from s3a.structures import NChanImg, FilePath
 from s3a.structures import XYVertices
-from .buttons import ButtonCollection
+from utilitys import ParamEditor, PrjParam, RunOpts, fns
+from utilitys.widgets import ButtonCollection, ImgViewer
 from .clickables import RightPanViewBox
 from .regions import RegionCopierPlot
 from .rois import SHAPE_ROI_MAPPING
@@ -27,7 +24,7 @@ QCursor = QtGui.QCursor
 
 DrawActFn = Union[Callable[[XYVertices, PrjParam], Any], Callable[[XYVertices], Any]]
 
-class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
+class MainImage(ImgViewer):
   sigShapeFinished = Signal(object, object)
   """
   (XYVertices, PrjParam) emitted when a shape is finished
@@ -44,15 +41,15 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
   sigUpdatedFocusedComp = Signal(object)
   """pd.Series, newly focused component"""
 
+  minCompSize: int
+
   @classmethod
   def __initEditorParams__(cls):
-    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Region Tools')
+    super().__initEditorParams__()
 
-    cls.minCompSize, = PRJ_SINGLETON.generalProps.registerProps(
-      [CNST.PROP_MIN_COMP_SZ])
+    cls.minCompSize = PRJ_SINGLETON.generalProps.registerProp(CNST.PROP_MIN_COMP_SZ)
 
   def __init__(self, parent=None, drawShapes: Collection[PrjParam]=None,
-               imgSrc: Union[FilePath, NChanImg]=None,
                toolbar: QtWidgets.QToolBar=None,
                **kargs):
     super().__init__(parent, viewBox=RightPanViewBox(), **kargs)
@@ -60,30 +57,13 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     if drawShapes is None:
       drawShapes = SHAPE_ROI_MAPPING.keys()
 
-    vb = self.getViewBox()
-    self.menu: QtWidgets.QMenu = QtWidgets.QMenu(self)
-    self.oldVbMenu: ViewBoxMenu = vb.menu
-    # Disable default menus
-    self.plotItem.ctrlMenu = None
-    self.sceneObj.contextMenu = None
-
-    self.setAspectLocked(True)
-    vb.invertY()
-    self.setMouseEnabled(True)
     self._initGrid()
     PRJ_SINGLETON.colorScheme.registerFunc(self.updateGridScheme, runOpts=RunOpts.ON_CHANGED)
-
     self.lastClickPos = QtCore.QPoint()
-
     self.toolbar = toolbar
 
-    # -----
-    # IMAGE
-    # -----
-    self.imgItem = self.exposes(pg.ImageItem())
-    self.imgItem.setZValue(-100)
-    self.addItem(self.imgItem)
     self.toolsEditor.registerFunc(self.resetZoom, btnOpts=CNST.TOOL_RESET_ZOOM)
+
     # -----
     # FOCUSED COMPONENT INFORMATION
     # -----
@@ -114,10 +94,6 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     # Initialize draw shape/action buttons
     self.drawActGrp.callFuncByParam(self.drawAction)
     self.drawShapeGrp.callFuncByParam(self.shapeCollection.curShapeParam)
-
-    # Initialize image
-    if imgSrc is not None:
-      self.setImage(imgSrc)
 
     self.toolsGrp = None
     if toolbar is not None:
@@ -266,23 +242,6 @@ class MainImage(CompositionMixin, EditorPropsMixin, pg.PlotWidget):
     newPen = pg.mkPen(width=gridWidth, color=gridColor)
     for ax in axs:
       ax.setPen(newPen)
-
-  def setImage(self, imgSrc: Union[FilePath, np.ndarray]=None):
-    """
-    Allows the user to change the main image either from a filepath or array data
-    """
-    if isinstance(imgSrc, FilePath.__args__):
-      # TODO: Handle alpha channel images. For now, discard that data
-      imgSrc = imread(imgSrc)
-      if imgSrc.ndim == 3:
-        # Alpha channels cause unexpected results for most image processors. Avoid this
-        # by chopping it off until otherwise needed
-        imgSrc = imgSrc[:,:,0:3]
-
-    if imgSrc is None:
-      self.imgItem.clear()
-    else:
-      self.imgItem.setImage(imgSrc)
 
   def registerDrawAction(self, actParams: Union[PrjParam, Sequence[PrjParam]], func: DrawActFn,
                          **registerOpts):

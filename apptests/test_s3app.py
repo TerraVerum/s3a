@@ -33,8 +33,8 @@ seem to get the programmatically allocated keystrokes to work."""
 #
 #   p2 = copy(param)
 #   p2.name = 'dummy2'
-#   PRJ_SINGLETON.shortcuts.createRegisteredButton(param, app.mainImg)
-#   PRJ_SINGLETON.shortcuts.createRegisteredButton(p2, app.mainImg)
+#   PRJ_SINGLETON.shortcuts.registerButton(param, app.mainImg)
+#   PRJ_SINGLETON.shortcuts.registerButton(p2, app.mainImg)
 #   keypress = QtGui.QKeyEvent(QtGui.QKeyEvent.KeyPress, QtCore.Qt.Key_T, QtCore.Qt.NoModifier, "T")
 #   with pytest.warns(UserWarning):
 #     QtGui.QGuiApplication.sendEvent(app.mainImg, keypress)
