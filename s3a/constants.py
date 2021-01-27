@@ -133,9 +133,7 @@ class _PrjConsts(PrjParamGroup):
   # REGION-CREATION PARAMETERS
   # --------------------------
   PROP_MIN_COMP_SZ             : PrjParam = newParam('Minimum New Component Size (px)', 50)
-  PROP_UNDO_BUF_SZ             : PrjParam = newParam(
-    'Size of Undo Buffer', 300, helpText='Increasing the buffer size will require more memory,'
-                                         'but can save a larger record of past actions.')
+  PROP_UNDO_BUF_SZ             : PrjParam = newParam('Undo Buffer Size', 300)
   PROP_COMP_SEL_BHV            : PrjParam = newParam(
     'Component Selection Behavior', 'Entire Component', 'list', limits=['Boundary Only', 'Entire Component'],
     helpText='When `Boundary Only`, components are selected when clicking on their boundaries.\n'
@@ -155,12 +153,12 @@ class _PrjConsts(PrjParamGroup):
   TOOL_REM_OVERLAP        : PrjParam = newParam('Remove Component Overlap', f'{SHORTCUT_BASE},S,E', icon=str(ICON_DIR/'mutex.svg'))
   TOOL_COPY_REGIONS       : PrjParam = newParam('Copy Selected', f'{SHORTCUT_BASE},S,C', icon=str(ICON_DIR/'copy.svg'))
   TOOL_MOVE_REGIONS       : PrjParam = newParam('Move Selected', f'{SHORTCUT_BASE},S,V', icon=str(ICON_DIR/'move.svg'))
-  TOOL_CLEAR_FOC_REGION   : PrjParam = newParam('Clear', 'Ctrl+Shift+C', icon=str(ICON_DIR/'clear.svg'))
-  TOOL_RESET_FOC_REGION   : PrjParam = newParam('Reset', 'Ctrl+Shift+R', icon=str(ICON_DIR/'reset.svg'))
-  TOOL_FILL_FOC_REGION    : PrjParam = newParam('Fill', 'Ctrl+Shift+F', icon=str(ICON_DIR/'fill.svg'))
+  TOOL_CLEAR_FOC_REGION   : PrjParam = newParam('Clear', f'{SHORTCUT_BASE},V,C', icon=str(ICON_DIR/'clear.svg'))
+  TOOL_RESET_FOC_REGION   : PrjParam = newParam('Reset', f'{SHORTCUT_BASE},V,R', icon=str(ICON_DIR/'reset.svg'))
+  TOOL_FILL_FOC_REGION    : PrjParam = newParam('Fill', f'{SHORTCUT_BASE},V,F', icon=str(ICON_DIR/'fill.svg'))
   TOOL_ACCEPT_FOC_REGION  : PrjParam = newParam('Accept', 'Ctrl+Shift+A', icon=str(ICON_DIR/'accept.svg'))
   TOOL_CLEAR_ROI          : PrjParam = newParam('Clear ROI', 'Esc')
-  TOOL_CLEAR_HISTORY      : PrjParam = newParam('Clear Processor History', 'Ctrl+Alt+C,H', icon=str(ICON_DIR/'clear_history.svg'))
+  TOOL_CLEAR_HISTORY      : PrjParam = newParam('Clear Processor History', f'{SHORTCUT_BASE},V,H', icon=str(ICON_DIR/'clear_history.svg'))
   TOOL_PROC_ANALYTICS     : PrjParam = newParam('Show Analytics', f'{SHORTCUT_BASE},F,P', icon=str(ICON_DIR/'analytics.svg'))
   TOOL_RESET_ZOOM         : PrjParam = newParam('Reset Zoom', f'{SHORTCUT_BASE},Z,R', icon=str(ICON_DIR/'reset_zoom.svg'))
 
