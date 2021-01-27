@@ -43,10 +43,12 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION.opts['ownerObj'] = self.mainImg
     self.mainImg.toolsEditor.registerFunc(self.acceptFocusedRegion,
                                           btnOpts=PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION)
-    PRJ_SINGLETON.generalProps.registerFunc(PRJ_SINGLETON.actionStack.resizeStack,
-                                            name=PRJ_CONSTS.PROP_UNDO_BUF_SZ.name,
-                                            runOpts=RunOpts.ON_CHANGED,
-                                            newMaxLen=300)
+    _, param = PRJ_SINGLETON.generalProps.registerFunc(PRJ_SINGLETON.actionStack.resizeStack,
+                                                       name=self.__groupingName__,
+                                                       runOpts=RunOpts.ON_CHANGED,
+                                                       maxLength=PRJ_CONSTS.PROP_UNDO_BUF_SZ.value,
+                                                       returnParam=True)
+    param.child('maxLength').setOpts(title=PRJ_CONSTS.PROP_UNDO_BUF_SZ.name)
     self.statBar = QtWidgets.QStatusBar(self)
     self.menuBar_ = self.menuBar()
 

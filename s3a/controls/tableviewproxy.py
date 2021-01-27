@@ -57,7 +57,7 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
 class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
   sigCompsSelected = Signal(object)
 
-  __groupingName__ = 'Main Image Area'
+  __groupingName__ = 'Main Image'
 
   @classmethod
   def __initEditorParams__(cls):
