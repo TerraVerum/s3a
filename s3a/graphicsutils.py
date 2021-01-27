@@ -7,7 +7,9 @@ from typing import Dict, Union, List
 import numpy as np
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 import pyqtgraph as pg
-from utilitys.widgets import ImgViewer
+
+from utilitys import RunOpts
+from utilitys.widgets import ImgViewer, EasyWidget
 
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
@@ -177,32 +179,60 @@ class DropList(QtWidgets.QListWidget):
     return [model.index(ii, 0).data() for ii in range(model.rowCount())]
 
 class RegionHistoryViewer(QtWidgets.QMainWindow):
+  sigDiffsChanged = QtCore.Signal()
+
   def __init__(self, parent=None):
     super().__init__(parent)
-    self.diffs: List[np.ndarray]
+    self.diffs: List[np.ndarray] = []
     self.histTimer = QtCore.QTimer(self)
 
     self.diffImg = pg.ImageItem()
-    self.displayPlt = ImgViewer()
+    dp = self.displayPlt = ImgViewer()
+    self.displayPlt.addItem(self.diffImg)
+    self.diffImg.setOpacity(0.5)
+
+    _, param = dp.toolsEditor.registerFunc(self.updateImg, runOpts=RunOpts.ON_CHANGED,
+                                       returnParam=True)
+    self.slider = param.child('curSlice')
+    self.sigDiffsChanged.connect(lambda: self.slider.setLimits([0, len(self.diffs)-1]))
+    self.histTimer.timeout.connect(self.incrSlicer)
+
+    dp.toolsEditor.registerFunc(self.autoPlay)
+    dp.toolsEditor.registerFunc(lambda: self.histTimer.stop(), name='Stop Autoplay')
+    dp.toolsEditor.registerFunc(self.discardLeftEntries, name='Discard Entries Left of Slider')
+
+    EasyWidget.buildMainWin([dp, dp.toolsEditor], layout='H', win=self)
 
 
-  def playHistory(self):
-    ii = 0
-    def update():
-      nonlocal ii
-      changingItem.setImage(diffs[ii])
-      ii += 1
-      if ii == len(diffs):
-        tim.stop()
-        tim.deleteLater()
-    self.histTimer.timeout.connect(update)
-    tim.start(500)
+  def setDiffs(self, diffs: List[np.ndarray]):
+    self.diffs = diffs
+    self.sigDiffsChanged.emit()
 
-  def updateImg(self, showSlice=0):
+  def autoPlay(self, timestep=500):
     """
+    :param timestep:
+      title: Timestep (ms)
+    """
+    self.histTimer.start(timestep)
 
-    :param showSlice:
+  def incrSlicer(self):
+    if self.slider.value() < len(self.diffs)-1:
+      self.slider.setValue(self.slider.value()+1)
+    else:
+      self.histTimer.stop()
+
+  def show(self):
+    super().show()
+    self.displayPlt.toolsEditor.show()
+
+  def updateImg(self, curSlice=0):
+    """
+    :param curSlice:
       pType: slider
-      limits: [0,
+      limits: [0, 10]
     :return:
     """
+    self.diffImg.setImage(self.diffs[curSlice])
+
+  def discardLeftEntries(self):
+    self.setDiffs(self.diffs[self.slider.value():])

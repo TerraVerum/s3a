@@ -1,3 +1,4 @@
+from collections import deque, namedtuple
 from warnings import warn
 
 import numpy as np
@@ -16,7 +17,11 @@ from s3a.views.regions import MultiRegionPlot, makeMultiRegionDf
 from .base import TableFieldPlugin
 from ..constants import PRJ_ENUMS
 from ..generalutils import getCroppedImg, showMaskDiff
+from ..graphicsutils import RegionHistoryViewer
 
+
+class _REG_ACCEPTED: pass
+buffEntry = namedtuple('buffentry', 'id_ vertices')
 
 class VerticesPlugin(TableFieldPlugin):
   name = 'Vertices'
@@ -33,14 +38,18 @@ class VerticesPlugin(TableFieldPlugin):
     self.region = MultiRegionPlot()
     self.region.hide()
     self.firstRun = True
-    self.playbackWindow = ImgViewer()
-    ci = self.playbackWindow.changingItem = pg.ImageItem()
-    self.playbackWindow.addItem(ci)
-    ci.setOpacity(0.5)
-
+    self.playbackWindow = RegionHistoryViewer()
+    self.regionBuffer = deque(maxlen=CNST.PROP_UNDO_BUF_SZ.value)
 
   def attachWinRef(self, win: S3ABase):
     win.mainImg.addItem(self.region)
+
+    def resetRegBuff(_, newSize):
+      newBuff = deque(maxlen=newSize)
+      newBuff.extend(self.regionBuffer)
+      self.regionBuffer = newBuff
+    mainBufSize = PRJ_SINGLETON.generalProps.params.child(win.__groupingName__, 'maxLength')
+    mainBufSize.sigValueChanged.connect(resetRegBuff)
 
     def fill():
       """Completely fill the focused region mask"""
@@ -66,11 +75,10 @@ class VerticesPlugin(TableFieldPlugin):
     for func, param in zip(funcLst, paramLst):
       self.registerFunc(func, btnOpts=param)
 
-    self.registerFunc(self.playbackRegionHistory)
-
     win.mainImg.registerDrawAction([CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self._run_drawAct)
     win.mainImg.addTools(self.toolsEditor)
     self.vb: pg.ViewBox = win.mainImg.getViewBox()
+    self.registerFunc(self.playbackRegionHistory)
     super().attachWinRef(win)
 
   def updateFocusedComp(self, newComp:pd.Series = None):
@@ -141,14 +149,14 @@ class VerticesPlugin(TableFieldPlugin):
     :param offset: Offset of newVerts relative to main image coordinates
     """
     fImg = self.mainImg
+    oldSer = fImg.compSer
     if newData is None or np.all(newData[RTF.VERTICES].apply(ComplexXYVertices.isEmpty)):
       newData = makeMultiRegionDf(0)
     if fImg.image is None:
       self.region.clear()
+      self.regionBuffer.append(buffEntry(oldSer[RTF.INST_ID], ComplexXYVertices()))
       return
     oldData = self.region.regionData
-
-    oldSer = fImg.compSer
 
     if offset is None:
       offset = XYVertices([[0,0]])
@@ -170,11 +178,15 @@ class VerticesPlugin(TableFieldPlugin):
     else:
       self.region.resetRegionList(newRegionDf=centeredData)
       self.region.focusById(centeredData.index)
+      buffVerts = ComplexXYVertices()
+      for inner in centeredData[RTF.VERTICES]: buffVerts.extend(inner)
+      self.regionBuffer.append(buffEntry(oldSer[RTF.INST_ID], buffVerts))
       yield
     if (fImg.compSer.loc[RTF.INST_ID] != oldSer.loc[RTF.INST_ID]
         or fImg.image is None):
       self.win.changeFocusedComp(oldSer)
     self.region.resetRegionList(oldData)
+    self.regionBuffer.pop()
 
   def updateRegionFromMask(self, mask: BlackWhiteImg, offset=None):
     if offset is None:
@@ -227,23 +239,11 @@ class VerticesPlugin(TableFieldPlugin):
 
   def getRegionHistory(self):
     outImgs = []
-    stack = PRJ_SINGLETON.actionStack.actions
     bufferRegions = []
-    for act in stack:
-      if act.descr == 'Change Focused Component':
-        # Signals a new chain of events, clear out the old
-        bufferRegions.clear()
-        continue
-      elif act.descr != 'Modify Focused Component':
-        continue
-      elif act.args[1] is None or len(act.args[1]) == 0:
-        # "None" occurrences  denote empty regions
-        bufferRegions.append(ComplexXYVertices())
-        continue
-      # newData = arg 1
-      regData = act.args[1].iloc[0]
-
-      bufferRegions.append(regData[RTF.VERTICES])
+    if not self.regionBuffer:
+      return None, []
+    firstId = self.regionBuffer[-1].id_
+    bufferRegions = [buf.vertices for buf in self.regionBuffer if buf.id_ == firstId]
 
     if not bufferRegions:
       return None, []
@@ -254,16 +254,13 @@ class VerticesPlugin(TableFieldPlugin):
     initialImg, slices = getCroppedImg(self.mainImg.image, allVerts)
     imShape = initialImg.shape[:2]
     offset = slices[0]
-    oldImg = np.zeros(imShape, bool)
+    img = np.zeros(imShape, bool)
+    outImgs.append(img)
     for singleRegionVerts in bufferRegions:
       # Copy to avoid screwing up undo buffer!
       copied = ComplexXYVertices([subV - offset for subV in singleRegionVerts])
       img = copied.toMask(imShape, warnIfTooSmall=False)
-      diff = showMaskDiff(oldImg, img)
-      oldImg = img
-      outImgs.append(diff)
-    # Add current state as final result
-    outImgs.append(np.tile(oldImg.astype('uint8')[...,None]*255, (1,1,3)))
+      outImgs.append(img)
     return initialImg, outImgs
 
 
@@ -271,19 +268,11 @@ class VerticesPlugin(TableFieldPlugin):
     initialImg, history = self.getRegionHistory()
     if initialImg is None:
       warn('No edits found, nothing to do', UserWarning)
-    self.playbackWindow.setImage(initialImg)
-    changingItem = self.playbackWindow.changingItem
-    changingItem.clear()
+      return
+    # Add current state as final result
+    history += [history[-1]]
+    diffs = [showMaskDiff(o, n) for (o, n) in zip(history, history[1:])]
+    self.playbackWindow.setDiffs(diffs)
+    self.playbackWindow.displayPlt.setImage(initialImg)
     self.playbackWindow.show()
-    # Add reference to avoid gc
-    ii = 0
-    def update():
-      nonlocal ii
-      changingItem.setImage(history[ii])
-      ii += 1
-      if ii == len(history):
-        tim.stop()
-        tim.deleteLater()
-    tim = QtCore.QTimer()
-    tim.timeout.connect(update)
-    tim.start(500)
+    self.playbackWindow.raise_()
