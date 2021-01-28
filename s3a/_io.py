@@ -4,7 +4,6 @@ from ast import literal_eval
 from pathlib import Path
 from stat import S_IREAD, S_IRGRP, S_IROTH
 from typing import Any, Optional, Union, Tuple, Callable
-from warnings import warn
 
 import numpy as np
 import pandas as pd
@@ -12,6 +11,7 @@ from pandas import DataFrame as df
 from skimage import io, measure
 from skimage.exposure import rescale_intensity
 from typing_extensions import Literal
+from utilitys.fns import warnLater
 
 from s3a.constants import REQD_TBL_FIELDS as RTF
 from s3a.generalutils import augmentException, getCroppedImg, resize_pad
@@ -107,7 +107,7 @@ class ComponentIO:
         problemMsg = [f'{idx}: {col}' for idx, col in zip(problemIdxs, problemCols)]
         problemMsg = '\n'.join(problemMsg)
         # Try to fix the problem with an iloc write
-        warn('<b>Warning!</b> Saved components do not match current component'
+        warnLater('<b>Warning!</b> Saved components do not match current component'
              ' state. This can occur when pandas incorrectly caches some'
              ' table values. To rectify this, a multi-cell overwrite was performed'
              ' for the following cells (shown as <id>: <column>):\n'
@@ -130,7 +130,7 @@ class ComponentIO:
     fpath = Path(fpath)
     fname = fpath.name
     cmpTypes = np.array(list(cls.handledIoTypes.keys()))
-    typIdx = [typ in fname for typ in cmpTypes]
+    typIdx = [fname.endswith(typ) for typ in cmpTypes]
     if not any(typIdx):
       raise IOError(f'Not sure how to handle file {fpath.stem}')
     fnNameSuffix = cmpTypes[typIdx][-1].title().replace('.', '')
@@ -339,6 +339,9 @@ class ComponentIO:
       labels_numeric = rescale_intensity(labels_numeric, out_range=(lowBound, upBound))
 
     if imShape is None:
+      # Without any components the image is non-existant
+      if len(compDf) == 0:
+        raise ValueError('imShape cannot be *None* if no components are present')
       vertMax = ComplexXYVertices.stackedMax(compDf[RTF.VERTICES])
       imShape = tuple(vertMax[::-1] + 1)
     maskType = 'uint16' if np.min(bgColor) >= 0 else 'int32'
@@ -589,7 +592,7 @@ class ComponentIO:
     vertMaxs = np.vstack(vertMaxs)
     offendingIds = np.nonzero(np.any(vertMaxs >= imShape, axis=1))[0]
     if len(offendingIds) > 0:
-      warn(f'Vertices on some components extend beyond image dimensions. '
+      warnLater(f'Vertices on some components extend beyond image dimensions. '
            f'Perhaps this export came from a different image?\n'
            f'Offending IDs: {offendingIds}', UserWarning)
 

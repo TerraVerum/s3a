@@ -15,6 +15,7 @@ from pyqtgraph.Qt import QtWidgets, QtCore
 from skimage import io
 from utilitys import CompositionMixin, AtomicProcess
 from utilitys import fns
+from utilitys.fns import warnLater
 from utilitys.params import *
 
 from s3a import PRJ_SINGLETON, PRJ_CONSTS as CNST, ComponentIO, models, REQD_TBL_FIELDS
@@ -483,7 +484,7 @@ class ProjectData(QtCore.QObject):
       else:
         warnPlgs.append(plgPath)
     if warnPlgs:
-      warn(f'Some project plugins were specified, but could not be found:\n'
+      warnLater(f'Some project plugins were specified, but could not be found:\n'
            f'{warnPlgs}', UserWarning)
 
     tableInfo = cfg.get('table-cfg', None)
@@ -576,7 +577,8 @@ class ProjectData(QtCore.QObject):
         offendingAnns.append(str(ann))
         self.addAnnotation(ann)
     if len(offendingAnns) > 0:
-      warn('Encountered annotation(s) in project config, but not officially added. Adding them now.'
+      warnLater('Encountered annotation(s) in project config, but not officially added. '
+            'Adding them now.'
            '  Offending files:\n'
            + ',\n'.join(offendingAnns), UserWarning)
     self.cfg['images'] = strImgNames
@@ -601,7 +603,8 @@ class ProjectData(QtCore.QObject):
     if not image.is_absolute():
       image = self.location/image
     if not image.exists():
-      warn(f'Provided image path does not exist: {image}\nNo action performed.', UserWarning)
+      warnLater(f'Provided image path does not exist: {image}\nNo action performed.',
+            UserWarning)
       return []
     if image.is_dir():
       ret = self.addImageFolder(image, copyToProj)
@@ -664,7 +667,8 @@ class ProjectData(QtCore.QObject):
     if not name.is_absolute():
       name = self.location/name
     if not name.exists():
-      warn(f'Provided annotation path does not exist: {name}\nNo action performed.', )
+      warnLater(f'Provided annotation path does not exist: {name}\nNo action '
+                f'performed.', UserWarning)
       return
     if name.is_dir():
       self.addAnnotationFolder(name)

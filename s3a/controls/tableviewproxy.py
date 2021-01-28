@@ -6,7 +6,7 @@ import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui, QtSvg, QtWidgets
 from utilitys import EditorPropsMixin, PrjParam, RunOpts
-
+from utilitys.fns import warnLater
 
 from s3a import PRJ_SINGLETON
 from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
@@ -419,7 +419,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
         vertsAllowed[vertIdx] = isAllowed
       compDf = compDf.loc[vertsAllowed]
     else:
-      warn('No filter type exists for parameters of type ' f'{pType}.'
+      warnLater('No filter type exists for parameters of type ' f'{pType}.'
            f' Did not filter column {column.name}.',
            UserWarning)
     return compDf

@@ -17,6 +17,7 @@ from s3a.constants import TABLE_DIR, REQD_TBL_FIELDS, PRJ_CONSTS, BASE_DIR
 from s3a.structures import PrjParamGroup, FilePath
 from s3a.generalutils import hierarchicalUpdate
 from utilitys import fns
+from utilitys.fns import warnLater
 
 yaml = YAML()
 
@@ -98,7 +99,8 @@ class TableFilterEditor(ParamEditor):
     if len(badCols) > 0:
       colNames = [f'"{col}"' for col in badCols]
       colTypes = np.unique([f'"{col.pType}"' for col in badCols])
-      warn(f'The table does not know how to create a filter for fields {", ".join(colNames)}'
+      warnLater(f'The table does not know how to create a filter for fields'
+            f' {", ".join(colNames)}'
             f' since types {", ".join(colTypes)} do not have corresponding filters', UserWarning)
     self.applyChanges()
 

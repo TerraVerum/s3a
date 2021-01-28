@@ -14,6 +14,8 @@ from s3a.structures import ComplexXYVertices, OneDArr
 
 __all__ = ['ComponentMgr', 'CompTableModel']
 
+from utilitys.fns import warnLater
+
 Signal = QtCore.Signal
 
 TBL_FIELDS = PRJ_SINGLETON.tableData.allFields
@@ -82,7 +84,7 @@ class CompTableModel(QtCore.QAbstractTableModel):
       # Numpy array-like
       cmp = np.any(cmp)
     if cmp:
-      warn('Warning! An error occurred setting this value. Please try again using a'
+      warnLater('Warning! An error occurred setting this value. Please try again using a'
            ' <em>multi-cell</em> edit. E.g. do not just set this value, set it along with'
            ' at least one other selected cell.', UserWarning)
     toEmit = self.defaultEmitDict.copy()

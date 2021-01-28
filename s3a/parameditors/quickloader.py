@@ -5,6 +5,7 @@ from warnings import warn
 from pyqtgraph.Qt import QtCore, QtWidgets
 from pyqtgraph.parametertree.parameterTypes import GroupParameter, Parameter
 from utilitys import ParamEditor, ParamEditorDockGrouping, fns, widgets as uw
+from utilitys.fns import warnLater
 from utilitys.params.pgregistered import ShortcutKeySeqParameter as ShcKeySeq
 
 
@@ -136,7 +137,7 @@ class QuickLoaderEditor(ParamEditor):
                f"{[grp.name() for grp in invalidGrps]}\n" \
                f"Must be one of:\n" \
                f"{[e.name for e in self.listModel.uniqueEditors]}"
-      warn(errMsg, UserWarning)
+      warnLater(errMsg, UserWarning)
     if applyChanges:
       self.applyChanges()
     return ret
@@ -158,7 +159,7 @@ class QuickLoaderEditor(ParamEditor):
       except Exception as ex:
         errSettings.append(f'{editor.name}: {ex}')
     if len(errSettings) > 0:
-      warn('The following settings could not be loaded (shown as <setting>: <exception>)\n'
+      warnLater('The following settings could not be loaded (shown as <setting>: <exception>)\n'
            + "\n\n".join(errSettings), UserWarning)
     return startupSrc
 

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 from typing import List
-from warnings import warn
 
 import numpy as np
 from utilitys import NestedProcWrapper
+from utilitys.fns import warnLater
 
 from s3a.generalutils import augmentException
 from s3a.processing.algorithms import crop_to_local_area, apply_process_result, \
@@ -70,7 +70,7 @@ class ImgProcWrapper(NestedProcWrapper):
     except Exception as ex:
       augmentException(ex, 'Exception during processor run:\n')
       result = ProcessIO(image=kwargs['prevCompMask'])
-      warn(str(ex), UserWarning)
+      warnLater(str(ex), UserWarning)
 
     outImg = result['image'].astype(bool)
     if outImg.ndim > 2:
