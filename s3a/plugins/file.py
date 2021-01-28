@@ -95,7 +95,13 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       self._updateProjLbl()
       if self.win:
         # Other arguments are consumed by app state editor
-        hierarchicalUpdate(self.win.appStateEditor.startupSettings, self.projData.startup)
+        state = self.win.appStateEditor
+        if state.loading:
+          hierarchicalUpdate(state.startupSettings, self.projData.startup)
+        else:
+          # Opening a project after s3a is already loaded
+          state.loadParamValues(stateDict={}, **self.projData.startup)
+
     self.projData.sigCfgLoaded.connect(onCfgLoad)
 
     self.projNameLbl = QtWidgets.QLabel()

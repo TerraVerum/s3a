@@ -11,7 +11,7 @@ from s3a import PRJ_SINGLETON
 from s3a.constants import APP_STATE_DIR
 from s3a.generalutils import safeCallFuncList, hierarchicalUpdate, safeCallFunc
 from s3a.structures import FilePath
-from utilitys.fns import serAsFrame, attemptFileLoad
+from utilitys.fns import serAsFrame, attemptFileLoad, raiseErrorLater, warnLater
 
 
 class AppStateEditor(ParamEditor):
@@ -22,6 +22,7 @@ class AppStateEditor(ParamEditor):
     # TODO: Add params to choose which features are saved, etc.
     super().__init__(parent, paramList, saveDir, fileType, name, topTreeChild)
     self._stateFuncsDf = pd.DataFrame(columns=['importFuncs', 'exportFuncs', 'required'])
+    self.loading = False
 
     self.startupSettings = {}
 
@@ -53,37 +54,47 @@ class AppStateEditor(ParamEditor):
     return ret
 
   def loadParamValues(self, stateName: Union[str, Path]=None, stateDict: dict = None, **kwargs):
-    if stateName is None:
-      stateName = self.RECENT_STATE_FNAME
-    if not stateName.exists() and stateDict is None:
-      stateDict = {}
-    if isinstance(stateDict, str):
-      stateDict = {'quickloader': stateDict}
-    stateDict = self._parseStateDict_includeRequired(stateName, stateDict)
-    paramDict = stateDict.pop('Parameters', {}) or {}
+    self.loading = True
+    # Copy old settings to put them back after loading
+    oldStartup = self.startupSettings.copy()
+    try: # try block to ensure loading is false after
+      if stateName is None:
+        stateName = self.RECENT_STATE_FNAME
+      if not stateName.exists() and stateDict is None:
+        stateDict = {}
+      if isinstance(stateDict, str):
+        stateDict = {'quickloader': stateDict}
+      stateDict = self._parseStateDict_includeRequired(stateName, stateDict)
+      paramDict = stateDict.pop('Parameters', {}) or {}
 
-    # It's possible for some functions (e.g. project load) to add or remove startup args,
-    # so chack for this
-    def nextKey():
-      hierarchicalUpdate(stateDict, self.startupSettings)
-      self.startupSettings.clear()
-      legitKeys = self._stateFuncsDf.index.intersection(stateDict)
-      if legitKeys.size > 0:
-        return legitKeys[0]
+      # It's possible for some functions (e.g. project load) to add or remove startup args,
+      # so chack for this
+      hierarchicalUpdate(self.startupSettings, kwargs)
+      def nextKey():
+        hierarchicalUpdate(stateDict, self.startupSettings)
+        self.startupSettings.clear()
+        legitKeys = self._stateFuncsDf.index.intersection(stateDict)
+        if legitKeys.size > 0:
+          return legitKeys[0]
 
-    key = nextKey()
-    rets, errs = [], []
-    while key:
-      importFunc = self._stateFuncsDf.loc[key, 'importFuncs']
-      arg = stateDict.pop(key, None)
-      curRet, curErr = safeCallFunc(key, importFunc, arg)
-      rets.append(curRet)
-      if curErr: errs.append(curErr)
       key = nextKey()
-
-    if stateDict:
-      PRJ_SINGLETON.quickLoader.buildFromStartupParams(stateDict)
-    ret = super().loadParamValues(stateName, paramDict, **kwargs)
+      rets, errs = [], {}
+      while key:
+        importFunc = self._stateFuncsDf.loc[key, 'importFuncs']
+        arg = stateDict.pop(key, None)
+        curRet, curErr = safeCallFunc(key, importFunc, arg)
+        rets.append(curRet)
+        if curErr: errs[key] = curErr
+        key = nextKey()
+      if errs:
+        warnLater('The following settings could not be loaded (shown as <setting>: <exception>)\n'
+             + "\n\n".join(errs), UserWarning)
+      if stateDict:
+        PRJ_SINGLETON.quickLoader.buildFromStartupParams(stateDict)
+      ret = super().loadParamValues(stateName, paramDict)
+    finally:
+      self.loading = False
+      hierarchicalUpdate(self.startupSettings, oldStartup)
     return ret
 
   def _parseStateDict_includeRequired(self, stateName: t.Union[str, Path], stateDict: dict = None):
