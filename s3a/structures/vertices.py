@@ -42,8 +42,12 @@ class XYVertices(np.ndarray):
     return str(self.tolist())
 
   @classmethod
-  def deserializec(cls, strVal: str):
-    return cls(literal_eval(strVal))
+  def deserialize(cls, strVal: str):
+    out = cls(literal_eval(strVal))
+    if out.size == 0:
+      # Make sure size is 0x2
+      return cls()
+    return out
 
   def asPoint(self):
     if self.size == 2:

@@ -1,6 +1,7 @@
 import pickle
 import sys
 from ast import literal_eval
+from collections import defaultdict
 from pathlib import Path
 from stat import S_IREAD, S_IRGRP, S_IROTH
 from typing import Any, Optional, Union, Tuple, Callable
@@ -11,13 +12,14 @@ from pandas import DataFrame as df
 from skimage import io, measure
 from skimage.exposure import rescale_intensity
 from typing_extensions import Literal
+
 from utilitys.fns import warnLater
 
 from s3a.constants import REQD_TBL_FIELDS as RTF
 from s3a.generalutils import augmentException, getCroppedImg, resize_pad
 from s3a.parameditors.table import TableData
 from s3a.structures import PrjParamGroup, FilePath, GrayImg, \
-  ComplexXYVertices, PrjParam
+  ComplexXYVertices, PrjParam, XYVertices
 
 FilePathOrDf = Union[FilePath, pd.DataFrame]
 
@@ -28,8 +30,9 @@ def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> pd.Series:
     # Format string to look like a list, use ast to convert that string INTO a list, make a numpy array from the list
     np.ndarray        : lambda strVal: np.array(literal_eval(strVal)),
     ComplexXYVertices : ComplexXYVertices.deserialize,
+    XYVertices        : XYVertices.deserialize,
     bool              : lambda strVal: strVal.lower() == 'true',
-    PrjParam           : lambda strVal: PrjParamGroup.fieldFromParam(paramVal.group, strVal)
+    PrjParam          : lambda strVal: PrjParamGroup.fieldFromParam(paramVal.group, strVal)
   }
   defaultFunc = lambda strVal: paramType(strVal)
   funcToUse = funcMap.get(paramType, defaultFunc)
@@ -42,6 +45,7 @@ def _paramSerToStrSer(paramSer: pd.Series, paramVal: Any) -> pd.Series:
   funcMap = {
     # Format string to look like a list, use ast to convert that string INTO a list, make a numpy array from the list
     np.ndarray: lambda param: str(param.tolist()),
+    XYVertices: XYVertices.serialize,
     ComplexXYVertices: ComplexXYVertices.serialize,
   }
   defaultFunc = lambda param: str(param)
@@ -99,20 +103,25 @@ class ComponentIO:
       matchingCols = np.setdiff1d(compDf.columns, [RTF.INST_ID,
                                                    RTF.SRC_IMG_FILENAME])
       loadedDf = cls.buildByFileType(outFile)
-      dfCmp = loadedDf[matchingCols].values == compDf[matchingCols].values
-      if not np.all(dfCmp):
-        problemCells = np.nonzero(~dfCmp)
-        problemIdxs = compDf.index[problemCells[0]]
-        problemCols = matchingCols[problemCells[1]]
-        problemMsg = [f'{idx}: {col}' for idx, col in zip(problemIdxs, problemCols)]
+      dfCmp = loadedDf[matchingCols].equals(compDf[matchingCols])
+      problemCells = defaultdict(list)
+
+      if not dfCmp:
+        dfA = loadedDf[matchingCols]
+        dfB = compDf[matchingCols]
+        for ii in range(len(dfA)):
+          for jj in range(len(dfA.columns)):
+            if not np.array_equal(dfA.iat[ii, jj], dfB.iat[ii,jj]):
+              problemCells[compDf.at[dfB.index[ii], RTF.INST_ID]].append(str(matchingCols[jj]))
+        # The only way to prevent "truth value of array is ambiguous" is cell-by-cell iteration
+        problemMsg = [f'{idx}: {cols}' for idx, cols in problemCells.items()]
         problemMsg = '\n'.join(problemMsg)
         # Try to fix the problem with an iloc write
         warnLater('<b>Warning!</b> Saved components do not match current component'
              ' state. This can occur when pandas incorrectly caches some'
-             ' table values. To rectify this, a multi-cell overwrite was performed'
-             ' for the following cells (shown as <id>: <column>):\n'
+             ' table values. Problem cells (shown as <id>: <columns>):\n'
              + f'{problemMsg}\n'
-               f'Please try exporting again to confirm the cleanup was successful.', UserWarning)
+               f'Please try manually altering these values before exporting again.', UserWarning)
     return ret
 
   @classmethod
