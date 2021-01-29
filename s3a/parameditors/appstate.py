@@ -87,8 +87,9 @@ class AppStateEditor(ParamEditor):
         if curErr: errs[key] = curErr
         key = nextKey()
       if errs:
+        errPrint = [f'{k}: {v}' for (k, v) in errs.items()]
         warnLater('The following settings could not be loaded (shown as <setting>: <exception>)\n'
-             + "\n\n".join(errs), UserWarning)
+             + "\n\n".join(errPrint), UserWarning)
       if stateDict:
         PRJ_SINGLETON.quickLoader.buildFromStartupParams(stateDict)
       ret = super().loadParamValues(stateName, paramDict)
