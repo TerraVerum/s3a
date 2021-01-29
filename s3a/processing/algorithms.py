@@ -379,8 +379,8 @@ def k_means(image: NChanImg, kVal=5, attempts=10):
 
   return ProcessIO(labels=lbls)
 
-def keep_labels_touching_roi(image: NChanImg, labels: BlackWhiteImg, fgVerts: XYVertices,
-                             historyMask: BlackWhiteImg):
+def binarize_labels(image: NChanImg, labels: BlackWhiteImg, fgVerts: XYVertices,
+                    historyMask: BlackWhiteImg, touchingRoiOnly=True):
   """
   For a given binary image input, only keeps connected components that are directly in
   contact with at least one of the specified vertices. In essence, this function can make
@@ -389,23 +389,20 @@ def keep_labels_touching_roi(image: NChanImg, labels: BlackWhiteImg, fgVerts: XY
   if labels.ndim > 2:
     raise ValueError('Cannot handle multichannel labels.\n'
                               f'(labelss.shape={labels.shape})')
-  out = np.zeros_like(labels, dtype=bool)
   seeds = fgVerts[:,::-1]
   seeds = np.clip(seeds, 0, np.array(labels.shape)-1)
-  for seed in seeds:
-    out |= flood(labels, tuple(seed),)
-
+  if touchingRoiOnly:
+    out = np.zeros_like(labels, dtype=bool)
+    for seed in seeds:
+      out |= flood(labels, tuple(seed),)
+  else:
+    keepColors = labels[seeds[:,0], seeds[:,1]]
+    out = np.isin(labels, keepColors)
   # Zero out negative regions from previous runs
   out[historyMask == 1] = False
   summaryImg = segmentation.mark_boundaries(image, labels)
   cv.drawContours(summaryImg, [fgVerts], -1, (1,0,0), 2)
   return ProcessIO(image=out, summaryInfo={'image': summaryImg})
-
-def add_kltroi(proc: ImageProcess):
-  """Utility function for an atomic process version of keep_labels_touching_roi"""
-  # Wrap in process so it can be disabled
-  innerProc = ImageProcess.fromFunction(keep_labels_touching_roi)
-  proc.addProcess(innerProc)
 
 def binarize_kmeans(image: NChanImg, fgVerts: XYVertices, imgMeans: np.ndarray,
                     decisionMetric='Remove Boundary Labels'):
@@ -446,14 +443,6 @@ def region_growing(image: NChanImg, fgVerts: XYVertices, seedThresh=10):
   if np.all(fgVerts == fgVerts[0, :]):
     # Remove unnecessary redundant seedpoints
     fgVerts = fgVerts[[0], :]
-  if fgVerts.shape[0] == 1:
-    # Grow outward
-    growFunc = growSeedpoint
-    fgVerts.connected = False
-  else:
-    # Grow inward
-    growFunc = lambda *args: ~growSeedpoint(*args)
-
   # outMask = np.zeros(image.shape[0:2], bool)
   # For small enough shapes, get all boundary pixels instead of just shape vertices
   if fgVerts.connected:
@@ -463,7 +452,7 @@ def region_growing(image: NChanImg, fgVerts: XYVertices, seedThresh=10):
   # img_aoe, coords = getCroppedImg(image, fgVerts, areaOfEffect, coordsAsSlices=True)
   # Offset vertices before filling
   # seeds = fgVerts - [coords[1].start, coords[0].start]
-  outMask = growFunc(image, fgVerts, seedThresh)
+  outMask = growSeedpoint(image, fgVerts, seedThresh)
   # outMask[coords] = newRegion
   if fgVerts.connected:
     # For connected vertices, zero out region locations outside the user defined area
@@ -481,19 +470,19 @@ class TopLevelImageProcessors:
   def c_kMeansProcessor():
     proc = ImageProcess.fromFunction(k_means)
     # Add as process so it can be disabled
-    add_kltroi(proc)
+    proc.addFunction(binarize_labels)
     return proc
 
   @staticmethod
   def a_grabCutProcessor():
     proc = ImageProcess.fromFunction(cv_grabcut, name='Primitive Grab Cut')
-    add_kltroi(proc)
+    proc.addFunction(binarize_labels)
     return proc
 
   @staticmethod
   def ab_slicProcessor():
     proc = ImageProcess.fromFunction(quickshift_seg)
-    add_kltroi(proc)
+    proc.addFunction(binarize_labels)
     return proc
 
   @staticmethod
@@ -659,5 +648,5 @@ def nn_model_prediction(image: NChanImg, model=''):
 
 TOP_GLOBAL_PROCESSOR_FUNCS = [
   lambda: dispatchedTemplateMatcher(cv_template_match),
-  lambda: dispatchedFocusedProcessor(nn_model_prediction)
+  # lambda: dispatchedFocusedProcessor(nn_model_prediction)
 ]
