@@ -6,7 +6,6 @@ import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
 from utilitys import PrjParam
-from utilitys.widgets import ImgViewer
 
 from s3a import PRJ_SINGLETON, PRJ_CONSTS as CNST, XYVertices, REQD_TBL_FIELDS as RTF, \
   ComplexXYVertices

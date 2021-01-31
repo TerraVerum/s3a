@@ -377,7 +377,7 @@ def k_means(image: NChanImg, kVal=5, attempts=10):
   imgMeans = imgMeans.astype('uint8')
   lbls = lbls.reshape(image.shape[:2])
 
-  return ProcessIO(labels=lbls)
+  return ProcessIO(labels=lbls, means=imgMeans)
 
 def binarize_labels(image: NChanImg, labels: BlackWhiteImg, fgVerts: XYVertices,
                     historyMask: BlackWhiteImg, touchingRoiOnly=True):

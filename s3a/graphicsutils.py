@@ -9,7 +9,7 @@ from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 import pyqtgraph as pg
 
 from utilitys import RunOpts
-from utilitys.widgets import ImgViewer, EasyWidget
+from utilitys.widgets import ImageViewer, EasyWidget
 
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
@@ -187,7 +187,7 @@ class RegionHistoryViewer(QtWidgets.QMainWindow):
     self.histTimer = QtCore.QTimer(self)
 
     self.diffImg = pg.ImageItem()
-    dp = self.displayPlt = ImgViewer()
+    dp = self.displayPlt = ImageViewer()
     self.displayPlt.addItem(self.diffImg)
     self.diffImg.setOpacity(0.5)
 
@@ -201,7 +201,8 @@ class RegionHistoryViewer(QtWidgets.QMainWindow):
     dp.toolsEditor.registerFunc(lambda: self.histTimer.stop(), name='Stop Autoplay')
     dp.toolsEditor.registerFunc(self.discardLeftEntries, name='Discard Entries Left of Slider')
 
-    EasyWidget.buildMainWin([dp, dp.toolsEditor], layout='H', win=self)
+    EasyWidget.buildMainWin([dp], layout='H', win=self)
+    self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dp.toolsEditor)
 
 
   def setDiffs(self, diffs: List[np.ndarray]):

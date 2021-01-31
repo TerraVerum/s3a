@@ -6,11 +6,11 @@ pandas
 scipy
 scikit-image
 PyQt5>=5.11
-pyqtgraph
+pyqtgraph>=0.11.1
 Pillow
 qdarkstyle
 ruamel.yaml
 docstring_parser
 pytest
 matplotlib
-utilitys==0.1.9
+utilitys==0.1.10

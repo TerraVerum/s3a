@@ -11,8 +11,8 @@ from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_CONSTS as CNST
 from s3a.controls.drawctrl import RoiCollection
 from s3a.generalutils import getCroppedImg, coerceDfTypes
 from s3a.structures import XYVertices
-from utilitys import ParamEditor, PrjParam, RunOpts, fns
-from utilitys.widgets import ButtonCollection, ImgViewer
+from utilitys import ParamEditor, PrjParam, RunOpts, fns, EditorPropsMixin
+from utilitys.widgets import ButtonCollection, ImageViewer
 from .clickables import RightPanViewBox
 from .regions import RegionCopierPlot
 from .rois import SHAPE_ROI_MAPPING
@@ -24,7 +24,7 @@ QCursor = QtGui.QCursor
 
 DrawActFn = Union[Callable[[XYVertices, PrjParam], Any], Callable[[XYVertices], Any]]
 
-class MainImage(ImgViewer):
+class MainImage(EditorPropsMixin, ImageViewer):
   sigShapeFinished = Signal(object, object)
   """
   (XYVertices, PrjParam) emitted when a shape is finished
