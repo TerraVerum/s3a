@@ -12,7 +12,7 @@ from s3a.controls.drawctrl import RoiCollection
 from s3a.generalutils import getCroppedImg, coerceDfTypes
 from s3a.structures import XYVertices
 from utilitys import ParamEditor, PrjParam, RunOpts, fns, EditorPropsMixin
-from utilitys.widgets import ButtonCollection, ImageViewer
+from utilitys.widgets import ButtonCollection, ImageViewer, EasyWidget
 from .clickables import RightPanViewBox
 from .regions import RegionCopierPlot
 from .rois import SHAPE_ROI_MAPPING
@@ -30,12 +30,6 @@ class MainImage(EditorPropsMixin, ImageViewer):
   (XYVertices, PrjParam) emitted when a shape is finished
   - XYVerts from roi, re-thrown from self.shapeCollection
   - Current draw action
-  """
-
-  sigMousePosChanged = Signal(object, object)
-  """
-  XYVertices() coords, [[[img pixel]]] np.ndarray. If the mouse pos is outside
-  image bounds, the second param will be *None*.
   """
 
   sigUpdatedFocusedComp = Signal(object)
@@ -167,18 +161,6 @@ class MainImage(EditorPropsMixin, ImageViewer):
     self.maybeBuildRoi(ev)
     if not ev.isAccepted():
       super().mouseMoveEvent(ev)
-    posRelToImage = self.imgItem.mapFromScene(ev.pos())
-    pxY = int(posRelToImage.y())
-    pxX = int(posRelToImage.x())
-    pxColor = None
-    if (self.imgItem.image is not None
-        and 0 < pxX < self.imgItem.image.shape[1]
-        and 0 < pxY < self.imgItem.image.shape[0]):
-      pxColor = self.imgItem.image[pxY, pxX]
-      if pxColor.ndim == 0:
-        pxColor = np.array([pxColor])
-    pos = XYVertices([pxX, pxY])
-    self.sigMousePosChanged.emit(pos, pxColor)
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
     # Typical reaction is to right-click to cancel an roi
@@ -202,20 +184,8 @@ class MainImage(EditorPropsMixin, ImageViewer):
     self.shapeCollection.clearAllRois()
     self.regionCopier.erase()
 
-  def widgetContainer(self, parent=None):
-    """
-    Though this is a PlotWidget class, it has a lot of widget children (toolsEditor group, buttons) that are
-    not visible when spawning the widget. This is a convenience method that creates a new, outer widget
-    from all teh graphical elements of an EditableImage.
-    """
-    wid = QtWidgets.QWidget(parent)
-    layout = QtWidgets.QVBoxLayout()
-    wid.setLayout(layout)
-
-    layout.addWidget(self.drawActGrp)
-    layout.addWidget(self.drawShapeGrp)
-    layout.addWidget(self)
-    return wid
+  def _widgetContainerChildren(self):
+    return [self.drawActGrp, self.drawShapeGrp, self]
 
   def _initGrid(self):
     pi: pg.PlotItem = self.plotItem

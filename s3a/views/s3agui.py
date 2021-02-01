@@ -120,17 +120,19 @@ class S3A(S3ABase):
     # STATUS BAR
     self.setStatusBar(self.statBar)
 
-    self.mouseCoords = QtWidgets.QLabel()
-    self.pxColor = QtWidgets.QLabel()
+    self.mouseCoordsLbl = QtWidgets.QLabel()
+    self.pxColorLbl = QtWidgets.QLabel()
 
     self.imageLbl = QtWidgets.QLabel(f"Image: None")
 
-    self.mainImg.sigMousePosChanged.connect(lambda pos, pxColor: self.setInfo(pos, pxColor))
-    # self.mainImg.sigMousePosChanged.connect(lambda info: setInfo(info))
     self.statBar.show()
     self.statBar.addWidget(self.imageLbl)
-    self.statBar.addWidget(self.mouseCoords)
-    self.statBar.addWidget(self.pxColor)
+
+    self.statBar.addWidget(self.mouseCoordsLbl)
+    self.mainImg.mouseCoordsLbl = self.mouseCoordsLbl
+
+    self.statBar.addWidget(self.pxColorLbl)
+    self.mainImg.pxColorLbl = self.pxColorLbl
 
   def saveLayout(self, layoutName: Union[str, Path]=None, allowOverwriteDefault=False):
     dockStates = self.saveState().data()
@@ -264,27 +266,6 @@ class S3A(S3ABase):
 
   def _populateLoadLayoutOptions(self):
     self.layoutEditor.addDirItemsToMenu(self.menuLayout)
-
-  def setInfo(self, xyPos: XYVertices, pxColor: np.ndarray):
-    if pxColor is None: return
-    self.mouseCoords.setText(f'Mouse (x,y): {xyPos[0]}, {xyPos[1]}')
-    self.pxColor.setText(f'Pixel Color: {pxColor}')
-    if pxColor.dtype == float:
-      # Turn to uint
-      pxColor = (pxColor*255).astype('uint8')
-    # Regardless of the number of image channels, display as RGBA color
-    if pxColor.size == 1:
-      # noinspection PyTypeChecker
-      pxColor = np.array(pxColor.tolist()*3 + [255])
-    elif pxColor.size == 3:
-      pxColor = np.concatenate([pxColor, [255]])
-    # Else: assume already RGBA
-    # Determine text color based on background color
-    if np.mean(pxColor) > 127:
-      fontColor = 'black'
-    else:
-      fontColor = 'white'
-    self.pxColor.setStyleSheet(f'background:rgba{tuple(pxColor)}; color:{fontColor}')
 
   def updateTheme(self, useDarkTheme=False):
     style = ''

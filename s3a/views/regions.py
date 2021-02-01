@@ -338,9 +338,9 @@ class RegionCopierPlot(pg.PlotCurveItem):
     """
 
     self._connectivity = np.ndarray([], bool)
-    mainImg.sigMousePosChanged.connect(self.mainMouseMoved)
+    mainImg.sigMouseMoved.connect(self.mainMouseMoved)
 
-  def mainMouseMoved(self, xyPos: XYVertices, _pxColor: np.ndarray):
+  def mainMouseMoved(self, xyPos: np.ndarray):
     if not self.active: return
     newData = self.baseData + xyPos
     self.setData(newData[:,0], newData[:,1], connect=self._connectivity)

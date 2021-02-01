@@ -153,10 +153,10 @@ def test_set_colorinfo(app):
   # various number of channels in image
   for clr in [[5], [5,5,5], [4,4,4,4]]:
     clr = np.array(clr)
-    app.setInfo((100,100), clr)
-    assert '100, 100' in app.mouseCoords.text()
-    assert f'{clr}' in app.pxColor.text()
-    bgText = app.pxColor.styleSheet()
+    app.mainImg.updateCursorInfo((100,100), clr)
+    assert '100, 100' in app.mouseCoordsLbl.text()
+    assert f'{clr}' in app.pxColorLbl.text()
+    bgText = app.pxColorLbl.styleSheet()
     bgColor = re.search(r'\((.*)\)', bgText).group()
     # literal_eval turns str to tuple
     bgColor = np.array(literal_eval(bgColor))
