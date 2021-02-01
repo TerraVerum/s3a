@@ -522,7 +522,7 @@ class ProjectData(QtCore.QObject):
 
     with self.suppressSignals():
       self.addAnnotationFolder(self.annotationsDir)
-      for annotation in set(self.cfg['annotations']) - {self.imagesDir}:
+      for annotation in set(self.cfg['annotations']) - {self.annotationsDir}:
         if isinstance(annotation, dict):
           self.addAnnotation(**annotation)
         else:
