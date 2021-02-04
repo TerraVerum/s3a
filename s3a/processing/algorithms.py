@@ -5,10 +5,10 @@ import cv2 as cv
 import numpy as np
 import pandas as pd
 from scipy.ndimage import binary_fill_holes, maximum_filter
-from skimage import morphology as morph
+from skimage import morphology as morph, img_as_float
 from skimage.measure import regionprops, label, regionprops_table
 from skimage.morphology import flood
-from skimage import segmentation
+from skimage import segmentation as seg
 from utilitys.processing import *
 from utilitys import fns
 
@@ -18,7 +18,6 @@ from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVert
 from s3a.processing.processing import ImageProcess, GlobalPredictionProcess
 from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg
 from s3a.structures import GrayImg, RgbImg
-
 
 def growSeedpoint(img: NChanImg, seeds: XYVertices, thresh: float) -> BlackWhiteImg:
   shape = np.array(img.shape[0:2])
@@ -349,21 +348,40 @@ def cv_grabcut(image: NChanImg, prevCompMask: BlackWhiteImg, fgVerts: XYVertices
   outMask = np.where((mask==2)|(mask==0), False, True)
   return ProcessIO(labels=outMask)
 
-def quickshift_seg(image: NChanImg, fgVerts: XYVertices, maxDist=10., kernelSize=5,
+_quickshiftCache = {}
+_quickshiftImg = np.zeros((0,0,3))
+def quickshift_seg(image: NChanImg, max_dist=10., kernel_size=5,
                    sigma=0.0):
-  # For maxDist of 0, the input isn't changed and it takes a long time
-  if maxDist == 0:
+  global _quickshiftImg
+  # For max_dist of 0, the input isn't changed and it takes a long time
+  key = (max_dist, kernel_size, sigma)
+  if max_dist == 0:
     # Make sure output is still 1-channel
     if image.ndim > 2:
       segImg = image.mean(2).astype(int)
     else:
       segImg = image
   else:
-    segImg = segmentation.quickshift(image, kernel_size=kernelSize, max_dist=maxDist, sigma=sigma)
-  # Color in regions touching ROI verts
-
+    if image.ndim < 3:
+      image = np.tile(image[:,:,None], (1,1,3))
+    # First check if this image was the same as last time
+    if np.array_equal(image, _quickshiftImg) and key in _quickshiftCache:
+      segImg =  _quickshiftCache[key]
+    else:
+      segImg = seg.quickshift(image, kernel_size=kernel_size, max_dist=max_dist, sigma=sigma)
+  _quickshiftImg = image
+  _quickshiftCache[key] = segImg.copy()
   return ProcessIO(labels=segImg)
+quickshift_seg.__doc__ = seg.quickshift.__doc__
 
+# Taken from example page: https://scikit-image.org/docs/dev/auto_examples/segmentation/plot_morphsnakes.html
+def morph_acwe(image: NChanImg, initialCheckerSize=6, iters=35, smoothing=3):
+  image = img_as_float(image)
+  if image.ndim > 2:
+    image = image.mean(2)
+  initLs = seg.checkerboard_level_set(image.shape, initialCheckerSize)
+  outLevels = seg.morphological_chan_vese(image, iters, init_level_set=initLs, smoothing=smoothing)
+  return ProcessIO(labels=outLevels)
 
 def k_means(image: NChanImg, kVal=5, attempts=10):
   # Logic taken from https://docs.opencv.org/master/d1/d5c/tutorial_py_kmeans_opencv.html
@@ -379,18 +397,39 @@ def k_means(image: NChanImg, kVal=5, attempts=10):
 
   return ProcessIO(labels=lbls, means=imgMeans)
 
+def labelBoundaries_cv(labels: np.ndarray, thickness: int):
+  """Code stolen and reinterpreted for cv from skimage.segmentation.boundaries"""
+  if thickness % 2 == 0:
+    thickness += 1
+  thickness = max(thickness, 3)
+  if labels.dtype not in [np.uint8, np.uint16, np.int16, np.float16, np.float32]:
+    labels = labels.astype(np.uint16)
+  strel = cv.getStructuringElement(cv.MORPH_RECT, (thickness, thickness))
+  return cv.morphologyEx(labels, cv.MORPH_DILATE, strel) \
+               != cv.morphologyEx(labels, cv.MORPH_ERODE, strel)
+
 def binarize_labels(image: NChanImg, labels: BlackWhiteImg, fgVerts: XYVertices,
-                    historyMask: BlackWhiteImg, touchingRoiOnly=True):
+                    historyMask: BlackWhiteImg, touchingRoiOnly=True, useMeanColor=True,
+                    lineThickness=2):
   """
   For a given binary image input, only keeps connected components that are directly in
   contact with at least one of the specified vertices. In essence, this function can make
   a wide variety of operations behave similarly to region growing.
+
+  :param touchingRoiOnly: Whether to only keep labeled regions that are in contact
+    with the current ROI
+  :param useMeanColor: Whether to color the summary info image with mean values or
+    (if *False*) just draw the boundaries around each label.
+  :param lineThickness:
+    helpText: How thick to draw label boundary and ROI vertices lines
   """
   if labels.ndim > 2:
     raise ValueError('Cannot handle multichannel labels.\n'
-                              f'(labelss.shape={labels.shape})')
-  seeds = fgVerts[:,::-1]
+                     f'(labelss.shape={labels.shape})')
+  seeds = cornersToFullBoundary(fgVerts, 50e3)[:, ::-1]
   seeds = np.clip(seeds, 0, np.array(labels.shape)-1)
+  if image.ndim < 3:
+    image = image[...,None]
   if touchingRoiOnly:
     out = np.zeros_like(labels, dtype=bool)
     for seed in seeds:
@@ -400,42 +439,23 @@ def binarize_labels(image: NChanImg, labels: BlackWhiteImg, fgVerts: XYVertices,
     out = np.isin(labels, keepColors)
   # Zero out negative regions from previous runs
   out[historyMask == 1] = False
-  summaryImg = segmentation.mark_boundaries(image, labels)
-  cv.drawContours(summaryImg, [fgVerts], -1, (1,0,0), 2)
-  return ProcessIO(image=out, summaryInfo={'image': summaryImg})
-
-def binarize_kmeans(image: NChanImg, fgVerts: XYVertices, imgMeans: np.ndarray,
-                    decisionMetric='Remove Boundary Labels'):
-  """
-
-  :param image:
-  :param fgVerts:
-  :param imgMeans:
-  :param decisionMetric:
-    helpText: "How to binarize the result of a k-means process. If `Remove Boundary Labels`,
-      the binary foreground is whatever *didn't* intersect the ROI vertices for a polygon
-      and whatever *did* intersect for a point. If `Discard Largest Label`, the largest
-      label by area is removed."
-    pType: list
-    limits:
-      - Discard Largest Label
-      - Remove Boundary Labels
-  """
-  # Binarize by turning all boundary labels into background and keeping forground
-  out = np.zeros(image.shape, bool)
-  numLbls = imgMeans.shape[0]
-  if decisionMetric == 'Remove Boundary Labels':
-    discardLbls = np.unique(image[fgVerts.rows, fgVerts.cols])\
-    # For a single point vertex, invert this rule
-    if fgVerts.shape[0] == 1:
-      discardLbls = np.setdiff1d(np.arange(numLbls), discardLbls)
+  nChans = image.shape[2]
+  if useMeanColor:
+    summaryImg = np.zeros_like(image)
+    # Offset by 1 to avoid missing 0-labels
+    for lbl in regionprops(labels+1):
+      coords = lbl.coords
+      intensity = image[coords[:,0], coords[:,1],...].mean(0)
+      summaryImg[coords[:,0], coords[:,1], :] = intensity
   else:
-    discardLbls = np.argsort(np.histogram(image, numLbls)[0])[[-1]]
-  # if not asForeground:
-  #   discardLbls = np.setdiff1d(np.arange(numLbls), discardLbls)
-  keepMembership = ~np.isin(image, discardLbls)
-  out[keepMembership] = True
-  return ProcessIO(image=out)
+    if np.issubdtype(labels.dtype, np.bool_):
+      labels = labels.astype('uint8')
+    boundaries = labelBoundaries_cv(labels, lineThickness)
+    summaryImg = image.copy()
+    summaryImg[boundaries,...] = [255 for _ in range(nChans)]
+  color = (255,) + tuple(0 for _ in range(1, nChans))
+  cv.drawContours(summaryImg, [fgVerts], -1, color, lineThickness)
+  return ProcessIO(image=out, summaryInfo={'image': summaryImg})
 
 def region_growing(image: NChanImg, fgVerts: XYVertices, seedThresh=10):
   if image.size == 0:
@@ -480,10 +500,25 @@ class TopLevelImageProcessors:
     return proc
 
   @staticmethod
-  def ab_slicProcessor():
+  def ac_quickshiftProcessor():
     proc = ImageProcess.fromFunction(quickshift_seg)
-    proc.addFunction(binarize_labels)
+    proc.addFunction(binarize_labels, ignoreKeys=['touchingRoiOnly'])
     return proc
+
+  # @staticmethod
+  # def ad_morphAcweProcessor():
+  #   proc = ImageProcess.fromFunction(morph_acwe, name='Morph. ACWE Contours')
+  #   proc.addFunction(binarize_labels)
+  #   return proc
+
+  # @staticmethod
+  # def ab_slicProcessor():
+  #   def slic(image, n_segments=100, compactness=10.0, sigma=0, min_size_factor=0.5, max_size_factor=3):
+  #     return ProcessIO(labels=seg.slic(**locals(), start_label=1))
+  #   slic.__doc__ = seg.slic.__doc__
+  #   proc = ImageProcess.fromFunction(slic, name='SLIC')
+  #   proc.addFunction(binarize_labels)
+  #   return proc
 
   @staticmethod
   def w_basicShapesProcessor():

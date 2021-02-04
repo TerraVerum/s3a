@@ -8,6 +8,7 @@ from pyqtgraph.Qt import QtCore
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.parameterTypes import ListParameter
 from utilitys import ParamEditor, NestedProcWrapper, fns
+from utilitys.fns import setParamTooltips
 from utilitys.params.pgregistered import ProcGroupParameter
 from utilitys import NestedProcess
 
@@ -58,9 +59,10 @@ class AlgParamEditor(ParamEditor):
     }
     self.treeAlgOpts: Parameter = Parameter(name='Algorithm Selection', type='group', children=[algOptDict])
     self.algOpts: ListParameter = self.treeAlgOpts.children()[0]
-    self.algOpts.sigValueChanged.connect(lambda param, proc: self.switchActiveProcessor(proc))
+    self.nameToProcMapping: Dict[str, NestedProcWrapper] = {}
     super().__init__(parent, saveDir=saveDir, fileType='alg', name=name,
                      topTreeChild=self.algOpts)
+    self.algOpts.sigValueChanged.connect(lambda param, proc: self.switchActiveProcessor(proc))
     self.expandAllBtn.hide()
     self.collapseAllBtn.hide()
 
@@ -68,7 +70,6 @@ class AlgParamEditor(ParamEditor):
 
     self.curProcessor: Optional[NestedProcWrapper] = None
     self.procWrapType = procWrapType
-    self.nameToProcMapping: Dict[str, NestedProcWrapper] = {}
 
     wrapped : Optional[NestedProcWrapper] = None
     for processorCtor in procCtors:
@@ -81,6 +82,7 @@ class AlgParamEditor(ParamEditor):
   def addProcessor(self, newProc: NestedProcess):
     processor = self.procWrapType(newProc, parentParam=self.params)
     self.tree.addParameters(self.params.child(processor.algName))
+    setParamTooltips(self.tree)
 
     self.nameToProcMapping.update({processor.algName: processor})
     self.algOpts.setLimits(self.nameToProcMapping.copy())
