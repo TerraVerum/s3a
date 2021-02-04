@@ -119,7 +119,7 @@ class ComponentIO:
         # Try to fix the problem with an iloc write
         warnLater('<b>Warning!</b> Saved components do not match current component'
              ' state. This can occur when pandas incorrectly caches some'
-             ' table values. Problem cells (shown as <id>: <columns>):\n'
+             ' table values. Problem cells (shown as [id]: [columns]):\n'
              + f'{problemMsg}\n'
                f'Please try manually altering these values before exporting again.', UserWarning)
     return ret

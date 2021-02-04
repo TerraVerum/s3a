@@ -159,7 +159,7 @@ class QuickLoaderEditor(ParamEditor):
       except Exception as ex:
         errSettings.append(f'{editor.name}: {ex}')
     if len(errSettings) > 0:
-      warnLater('The following settings could not be loaded (shown as <setting>: <exception>)\n'
+      warnLater('The following settings could not be loaded (shown as [setting]: [exception])\n'
            + "\n\n".join(errSettings), UserWarning)
     return startupSrc
 

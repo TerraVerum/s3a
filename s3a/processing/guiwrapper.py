@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import traceback
 from copy import deepcopy
 from typing import List
 
@@ -68,7 +69,8 @@ class ImgProcWrapper(NestedProcWrapper):
     try:
       result = self.processor.run(newIo)
     except Exception as ex:
-      augmentException(ex, 'Exception during processor run:\n')
+      augmentException(ex, 'Exception during processor run:\n'
+                       + traceback.format_stack(limit=5))
       result = ProcessIO(image=kwargs['prevCompMask'])
       warnLater(str(ex), UserWarning)
 

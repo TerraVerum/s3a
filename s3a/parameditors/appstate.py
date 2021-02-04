@@ -88,7 +88,7 @@ class AppStateEditor(ParamEditor):
         key = nextKey()
       if errs:
         errPrint = [f'{k}: {v}' for (k, v) in errs.items()]
-        warnLater('The following settings could not be loaded (shown as <setting>: <exception>)\n'
+        warnLater('The following settings could not be loaded (shown as [setting]: [exception])\n'
              + "\n\n".join(errPrint), UserWarning)
       if stateDict:
         PRJ_SINGLETON.quickLoader.buildFromStartupParams(stateDict)
@@ -115,7 +115,7 @@ class AppStateEditor(ParamEditor):
   def raiseErrMsgIfNeeded(errMsgs: List[str]):
     if len(errMsgs) > 0:
       err = IOError('Errors were encountered for the following parameters'
-                         ' (shown as <parameter>: <exception>)\n'
+                         ' (shown as [parameter]: [exception])\n'
                        + "\n\n".join(errMsgs))
       fns.raiseErrorLater(err)
 
