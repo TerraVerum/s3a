@@ -155,9 +155,9 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
   def open_gui(self):
     fname = fns.popupFilePicker(None, 'Select Project File', f'S3A Project (*.{PROJ_FILE_TYPE})')
     if fname is not None:
+      self.win.setMainImg(None)
       with pg.BusyCursor():
         self.projData.loadCfg(fname)
-      self.win.setMainImg(None)
 
   def save(self):
     self.win.saveCurAnnotation()
