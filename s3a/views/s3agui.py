@@ -8,7 +8,8 @@ import pyqtgraph as pg
 import qdarkstyle
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-from utilitys import ParamEditor, ParamEditorPlugin, RunOpts, PrjParam, fns
+from utilitys import ParamEditor, ParamEditorPlugin, RunOpts, PrjParam, fns, \
+  ParamEditorDockGrouping
 
 from s3a.generalutils import hierarchicalUpdate
 from s3a.constants import LAYOUTS_DIR, REQD_TBL_FIELDS, ICON_DIR
@@ -70,6 +71,11 @@ class S3A(S3ABase):
     self.layoutEditor.saveParamValues = saveRecentLayout
     self.appStateEditor.addImportExportOpts('layout', loadLayout, saveRecentLayout)
 
+    # When docks are loaded via layout editor, they don't resize properly. Fix that here
+    for dock in PRJ_SINGLETON.docks:
+      editors = dock.editors if isinstance(dock, ParamEditorDockGrouping) else [dock]
+      for editor in editors:
+        editor.tree.resizeColumnToContents(0)
 
     self._buildGui()
     self._buildMenu()
@@ -258,10 +264,11 @@ class S3A(S3ABase):
     oldShow = plugin.dock.showEvent
     def show_fixDockWidth(ev):
       oldShow(ev)
-      plugin.dock.raise_()
-      plugin.dock.activateWindow()
-      if plugin.dock.width() < plugin.dock.biggestMinWidth + 100:
-        self.resizeDocks([plugin.dock], [plugin.dock.biggestMinWidth + 100], QtCore.Qt.Horizontal)
+      dock = plugin.dock
+      dock.raise_()
+      dock.activateWindow()
+      if dock.width() < dock.biggestMinWidth + 100:
+        self.resizeDocks([dock], [dock.biggestMinWidth + 100], QtCore.Qt.Horizontal)
     plugin.dock.showEvent = show_fixDockWidth
 
   def _populateLoadLayoutOptions(self):
