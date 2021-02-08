@@ -1,3 +1,4 @@
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Optional, Callable, Tuple, Union, Sequence, List, Collection
 from contextlib import contextmanager
@@ -290,3 +291,15 @@ def showMaskDiff(oldMask: BlackWhiteImg, newMask: BlackWhiteImg):
   # Wasn't there, now it is -- color green
   infoMask[~oldMask & newMask,:] = [0,255,0]
   return infoMask
+
+# Poor man's LRU dict, since I don't yet feel like including another pypi dependency
+class MaxSizeDict(dict):
+  def __init__(self, *args, maxsize:int=np.inf, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.maxsize = maxsize
+
+  def __setitem__(self, key, value):
+    if len(self) == self.maxsize:
+      # Evict oldest inserted entry
+      self.pop(next(iter(self.keys())))
+    super().__setitem__(key, value)

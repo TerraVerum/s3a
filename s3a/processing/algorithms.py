@@ -14,7 +14,7 @@ from utilitys import fns
 
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
 from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices, \
-  showMaskDiff
+  showMaskDiff, MaxSizeDict
 from s3a.processing.processing import ImageProcess, GlobalPredictionProcess
 from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg
 from s3a.structures import GrayImg, RgbImg
@@ -348,11 +348,12 @@ def cv_grabcut(image: NChanImg, prevCompMask: BlackWhiteImg, fgVerts: XYVertices
   outMask = np.where((mask==2)|(mask==0), False, True)
   return ProcessIO(labels=outMask)
 
-_quickshiftCache = {}
-_quickshiftImg = np.zeros((0,0,3))
+_qsInCache = MaxSizeDict(maxsize=5)
+_qsOutCache = MaxSizeDict(maxsize=5)
+
 def quickshift_seg(image: NChanImg, max_dist=10., kernel_size=5,
                    sigma=0.0):
-  global _quickshiftImg
+  global _qsInCache, _qsOutCache
   # For max_dist of 0, the input isn't changed and it takes a long time
   key = (max_dist, kernel_size, sigma)
   if max_dist == 0:
@@ -365,12 +366,12 @@ def quickshift_seg(image: NChanImg, max_dist=10., kernel_size=5,
     if image.ndim < 3:
       image = np.tile(image[:,:,None], (1,1,3))
     # First check if this image was the same as last time
-    if np.array_equal(image, _quickshiftImg) and key in _quickshiftCache:
-      segImg =  _quickshiftCache[key]
+    if np.array_equal(_qsInCache.get(key, None), image) and key in _qsOutCache:
+      segImg =  _qsOutCache[key]
     else:
       segImg = seg.quickshift(image, kernel_size=kernel_size, max_dist=max_dist, sigma=sigma)
-  _quickshiftImg = image
-  _quickshiftCache[key] = segImg.copy()
+  _qsInCache[key] = image
+  _qsOutCache[key] = segImg.copy()
   return ProcessIO(labels=segImg)
 quickshift_seg.__doc__ = seg.quickshift.__doc__
 
@@ -473,11 +474,6 @@ def region_growing(image: NChanImg, fgVerts: XYVertices, seedThresh=10):
   # Offset vertices before filling
   # seeds = fgVerts - [coords[1].start, coords[0].start]
   outMask = growSeedpoint(image, fgVerts, seedThresh)
-  # outMask[coords] = newRegion
-  if fgVerts.connected:
-    # For connected vertices, zero out region locations outside the user defined area
-    filledMask = cv.fillPoly(np.zeros_like(outMask, dtype='uint8'), [fgVerts], 1) > 0
-    outMask[~filledMask] = False
 
   return ProcessIO(image=outMask)
 
