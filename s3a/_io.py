@@ -16,7 +16,7 @@ from typing_extensions import Literal
 from utilitys.fns import warnLater
 
 from s3a.constants import REQD_TBL_FIELDS as RTF
-from s3a.generalutils import augmentException, getCroppedImg, resize_pad
+from s3a.generalutils import augmentException, getCroppedImg, resize_pad, cvImsave_rgb
 from s3a.parameditors.table import TableData
 from s3a.structures import PrjParamGroup, FilePath, GrayImg, \
   ComplexXYVertices, PrjParam, XYVertices
@@ -208,7 +208,7 @@ class ComponentIO:
   def exportCompImgsDf(cls, compDf: df, outFile: Union[str, Path]=None,
                        imgDir: FilePath=None, margin=0, marginAsPct=False,
                        includeCols=('instId', 'img', 'labelMask', 'label', 'offset'),
-                       lblField='Instance ID', **kwargs):
+                       lblField='Instance ID', allowOffset=True, **kwargs):
     """
     Creates a dataframe consisting of extracted images around each component
     :param compDf: Dataframe to export
@@ -222,6 +222,7 @@ class ComponentIO:
     :param includeCols: Which columns to include in the export list
     :param lblField: See ComponentIO.exportLblPng. This label is provided in the output dataframe
       as well, if specified.
+    :param allowOffset: See ComponentIO.exportLblPng. This ensures index labels start at 1
     :return: Dataframe with the following keys:
       - instId: The component's Instance ID
       - img: The (MxNxC) image corresponding to the component vertices, where MxN are
@@ -253,7 +254,8 @@ class ComponentIO:
     for miniDf, fullImgName in zip(dfGroupingsByImg, uniqueImgs):
       fullImgName = imgDir / fullImgName
       img = _imgCache[fullImgName]
-      lblImg = cls.exportLblPng(miniDf, imShape=img.shape[:2], lblField=lblField, **kwargs)
+      lblImg = cls.exportLblPng(miniDf, imShape=img.shape[:2], lblField=lblField,
+                                allowOffset=allowOffset, **kwargs)
 
       for ii, (idx, row) in enumerate(miniDf.iterrows()):
         allVerts = row[RTF.VERTICES].stack()
@@ -362,7 +364,7 @@ class ComponentIO:
       outMask = outMask > 0
 
     if outFile is not None:
-      io.imsave(outFile, outMask.astype('uint16'), check_contrast=False)
+      cvImsave_rgb(outFile, outMask.astype('uint16'))
     if returnLblMapping:
       mapping = pd.Series(data=labels_numeric, index=labels, name=lblField)
       return outMask, mapping
@@ -387,7 +389,7 @@ class ComponentIO:
     return cls.exportLblPng(compDf, outFile, imShape, **kwargs, allowOffset=True)
 
   @classmethod
-  def exportCompImgsFolders(cls, compDf: df,
+  def exportCompImgsZip(cls, compDf: df,
                             outDir:FilePath='s3a-export',
                             resizeShape: Tuple[int, int]=None,
                             **kwargs):
@@ -408,10 +410,9 @@ class ComponentIO:
     labelsDir= outDir/'labels'
     dataDir.mkdir(exist_ok=True, parents=True)
     labelsDir.mkdir(exist_ok=True, parents=True)
-    saveFn = lambda fname, img: io.imsave(fname, img, check_contrast=False)
+    saveFn = lambda fname, img: cvImsave_rgb(fname, img)
     if resizeShape is not None:
-      saveFn = lambda fname, img: io.imsave(fname, resize_pad(img, resizeShape),
-                                            check_contrast=False)
+      saveFn = lambda fname, img: cvImsave_rgb(fname, resize_pad(img, resizeShape))
 
     extractedImgs = cls.exportCompImgsDf(compDf, None, **kwargs)
     for idx, row in extractedImgs.iterrows():

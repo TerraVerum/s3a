@@ -159,7 +159,7 @@ class _PrjConsts(PrjParamGroup):
   TOOL_ACCEPT_FOC_REGION  : PrjParam = newParam('Accept', 'Ctrl+Shift+A', icon=str(ICON_DIR/'accept.svg'))
   TOOL_CLEAR_ROI          : PrjParam = newParam('Clear ROI', 'Esc')
   TOOL_CLEAR_HISTORY      : PrjParam = newParam('Clear Processor History', f'{SHORTCUT_BASE},V,H', icon=str(ICON_DIR/'clear_history.svg'))
-  TOOL_PROC_ANALYTICS     : PrjParam = newParam('Show Analytics', f'{SHORTCUT_BASE},F,P', icon=str(ICON_DIR/'analytics.svg'))
+  TOOL_PROC_ANALYTICS     : PrjParam = newParam('Show Analytics', icon=str(ICON_DIR/'analytics.svg'))
   TOOL_RESET_ZOOM         : PrjParam = newParam('Reset Zoom', f'{SHORTCUT_BASE},Z,R', icon=str(ICON_DIR/'reset_zoom.svg'))
 
   # --------------------------

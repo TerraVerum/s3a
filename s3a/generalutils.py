@@ -7,6 +7,7 @@ import cv2 as cv
 import numpy as np
 from pandas import DataFrame as df
 from utilitys import PrjParam
+from utilitys.typeoverloads import FilePath
 
 from .structures import TwoDArr, XYVertices, ComplexXYVertices, NChanImg, BlackWhiteImg
 
@@ -149,6 +150,18 @@ def safeCallFunc(fnName: str, func: Callable, *fnArgs):
   except Exception as ex:
     err = f'{fnName}: {ex}'
   return ret, err
+
+def cvImsave_rgb(fname: FilePath, image: np.ndarray, *args, **kwargs):
+  if image.ndim > 2:
+    if image.shape[0] == 1:
+      image = image[...,0]
+    if image.shape[2] >= 3:
+      lastAx = np.arange(image.shape[2], dtype='int')
+      # Swap B & R
+      lastAx[[0,2]] = [2,0]
+      image = image[...,lastAx]
+  cv.imwrite(str(fname), image, *args, **kwargs)
+
 
 def cornersToFullBoundary(cornerVerts: Union[XYVertices, ComplexXYVertices], sizeLimit: float=np.inf,
                           fillShape: Tuple[int]=None, stackResult=True) -> Union[XYVertices, ComplexXYVertices]:

@@ -259,7 +259,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       #      f' existing image instead of current data.', UserWarning)
       pass
     else:
-      self.filePlg.addImage(name=srcImg, data=self.mainImg.image, copyToProj=True,
+      self.filePlg.addImage(srcImg, data=self.mainImg.image, copyToProj=True,
                             allowOverwrite=True)
     # srcImg_proj is guaranteed to exist at this point
     self.filePlg.addAnnotation(data=self.exportableDf, image=srcImg_proj, overwriteOld=True)

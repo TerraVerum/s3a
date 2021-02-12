@@ -19,7 +19,7 @@ from utilitys.fns import warnLater
 from utilitys.params import *
 
 from s3a import PRJ_SINGLETON, PRJ_CONSTS as CNST, ComponentIO, models, REQD_TBL_FIELDS
-from s3a.generalutils import hierarchicalUpdate
+from s3a.generalutils import hierarchicalUpdate, cvImsave_rgb
 from s3a.graphicsutils import DropList, ThumbnailViewer
 from s3a.structures import FilePath, NChanImg
 from ..constants import APP_STATE_DIR, PROJ_FILE_TYPE, PROJ_BASE_TEMPLATE
@@ -126,7 +126,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       self.projData.startup['image'] = str(saveImg)
       self.save()
       return ret
-    win.appStateEditor.addImportExportOpts('project', self.projData.loadCfg, handleExport, 0)
+    win.appStateEditor.addImportExportOpts('project', self.open, handleExport, 0)
 
     def startImg(imgName: str):
       self.projData.addImage(imgName)
@@ -152,12 +152,15 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     parent = self.projData if setAsCur else None
     self.projData.create(name=defaultName, parent=parent)
 
+  def open(self, cfgFname: FilePath=None, cfgDict: dict=None):
+    if cfgFname is not None and Path(cfgFname).resolve() != self.projData.cfgFname:
+      self.win.setMainImg(None)
+      self.projData.loadCfg(cfgFname, cfgDict)
+
   def open_gui(self):
     fname = fns.popupFilePicker(None, 'Select Project File', f'S3A Project (*.{PROJ_FILE_TYPE})')
-    if fname is not None:
-      self.win.setMainImg(None)
-      with pg.BusyCursor():
-        self.projData.loadCfg(fname)
+    with pg.BusyCursor():
+      self.open(fname)
 
   def save(self):
     self.win.saveCurAnnotation()
@@ -276,7 +279,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       baseCfg = fns.attemptFileLoad(prevTemplate)
       if not settings['Keep Existing Images'] or 'images' not in baseCfg:
         baseCfg['images'] = []
-      if not settings['Keep Existing Annotations' or 'annotations' not in baseCfg]:
+      if not settings['Keep Existing Annotations'] or 'annotations' not in baseCfg:
         baseCfg['annotations'] = []
     else:
       baseCfg = {'images': [], 'annotations': []}
@@ -284,7 +287,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     baseCfg['annotations'].extend(annotations)
     projPath = Path(wiz.projSettings['Location'])/projName
     outPrj = self.projData.create(name=projPath, cfg=baseCfg)
-    self.projData.loadCfg(outPrj.cfgFname)
+    self.open(outPrj.cfgFname)
 
 
 class NewProjectWizard(QtWidgets.QWizard):
@@ -470,8 +473,9 @@ class ProjectData(QtCore.QObject):
 
     hierarchicalUpdate(baseCfgDict, cfgDict)
 
-    newPlugins = baseCfgDict.get('plugin-cfg', {})
-    if self.pluginCfg and self.pluginCfg != newPlugins:
+    loadPrjPlugins = baseCfgDict.get('plugin-cfg', {})
+    newPlugins = {k: v for (k, v) in loadPrjPlugins.items() if k not in self.pluginCfg}
+    if self.pluginCfg and newPlugins:
       raise ValueError('The previous project loaded custom plugins, which cannot easily'
                        ' be removed. To load a new project, close and re-open S3A with'
                        ' the new project instance instead.')
@@ -483,7 +487,7 @@ class ProjectData(QtCore.QObject):
     self.clearImgs_anns()
 
     warnPlgs = []
-    for plgName, plgPath in self.pluginCfg.items():
+    for plgName, plgPath in newPlugins.items():
       pluginCls = pydoc.locate(plgPath)
       if pluginCls:
         PRJ_SINGLETON.addPlugin(pluginCls)
@@ -620,17 +624,17 @@ class ProjectData(QtCore.QObject):
     return ret
 
   def addImage(self, name: FilePath, data: NChanImg=None, copyToProj=False, allowOverwrite=False) -> Optional[FilePath]:
-    name = Path(name)
-    if not name.is_absolute():
-      name = self.imagesDir/name
+    fullName = Path(name)
+    if not fullName.is_absolute():
+      fullName = self.imagesDir / fullName
     if copyToProj or data is not None:
-      name = self._copyImgToProj(name, data, allowOverwrite)
-    if name in self.images:
+      fullName = self._copyImgToProj(fullName, data, allowOverwrite)
+    if fullName.name in [i.name for i in self.images]:
       # Indicate the image was already present to calling scope
       return None
-    self.images.append(name)
-    self._maybeEmit(self.sigImagesAdded, [name])
-    return name
+    self.images.append(fullName)
+    self._maybeEmit(self.sigImagesAdded, [fullName])
+    return fullName
     # TODO: Create less hazardous undo operation
     # yield name
     # self.removeImage(name)
@@ -767,7 +771,7 @@ class ProjectData(QtCore.QObject):
     elif data is not None:
       # Programmatically created or not from a local file
       # noinspection PyTypeChecker
-      io.imsave(newName, data)
+      cvImsave_rgb(newName, data)
     else:
       raise IOError(f'No image data associated with {name.name}. Either the file does not exist or no'
                        f' image information was provided.')
