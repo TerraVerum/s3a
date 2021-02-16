@@ -523,7 +523,9 @@ class ComponentIO:
     """
     pklDf = pd.read_pickle(inFile)
     cls.checkVertBounds(pklDf[RTF.VERTICES], imShape)
-    return pklDf
+    templateDf = cls.tableData.makeCompDf(len(pklDf)).set_index(pklDf.index)
+    templateDf.update(pklDf)
+    return templateDf
 
   @classmethod
   def buildFromLblPng(cls, inFileOrImg: Union[FilePath, GrayImg],
