@@ -72,6 +72,67 @@ def _filterForParam(param: PrjParam):
     paramWithChildren = Parameter.create(**paramWithChildren)
   return paramWithChildren
 
+def filterParamCol(compDf: df, column: PrjParam, filterOpts: dict):
+  # TODO: Each type should probably know how to filter itself. That is,
+  #  find some way of keeping this logic from just being an if/else tree...
+  pType = column.pType
+  # idx 0 = value, 1 = children
+  dfAtParam = compDf.loc[:, column]
+
+  if pType in ['int', 'float']:
+    curmin, curmax = [filterOpts[name]['value'] for name in ['min', 'max']]
+
+    compDf = compDf.loc[(dfAtParam >= curmin) & (dfAtParam <= curmax)]
+  elif pType == 'bool':
+    filterOpts = filterOpts['Options']['children']
+    allowTrue, allowFalse = [filterOpts[name]['value'] for name in
+                             [f'{column.name}', f'Not {column.name}']]
+
+    validList = np.array(dfAtParam, dtype=bool)
+    if not allowTrue:
+      compDf = compDf.loc[~validList]
+    if not allowFalse:
+      compDf = compDf.loc[validList]
+  elif pType in ['prjparam', 'list', 'popuplineeditor']:
+    existingParams = np.array(dfAtParam)
+    allowedParams = []
+    filterOpts = filterOpts['Options']['children']
+    if pType == 'prjparam':
+      groupSubParams = [p.name for p in column.value.group]
+    else:
+      groupSubParams = column.opts['limits']
+    for groupSubParam in groupSubParams:
+      isAllowed = filterOpts[groupSubParam]['value']
+      if isAllowed:
+        allowedParams.append(groupSubParam)
+    compDf = compDf.loc[np.isin(existingParams, allowedParams)]
+  elif pType in ['str', 'text']:
+    allowedRegex = filterOpts['Regex Value']['value']
+    isCompAllowed = dfAtParam.str.contains(allowedRegex, regex=True, case=False)
+    compDf = compDf.loc[isCompAllowed]
+  elif pType in ['complexxyvertices', 'xyvertices']:
+    vertsAllowed = np.ones(len(dfAtParam), dtype=bool)
+
+    xParam = filterOpts['X Bounds']['children']
+    yParam = filterOpts['Y Bounds']['children']
+    xmin, xmax, ymin, ymax = [param[val]['value'] for param in (xParam, yParam) for val in ['min', 'max']]
+
+    for vertIdx, verts in enumerate(dfAtParam):
+      if pType == 'complexxyvertices':
+        stackedVerts = verts.stack()
+      else:
+        stackedVerts = verts
+      xVerts, yVerts = stackedVerts.x, stackedVerts.y
+      isAllowed = np.all((xVerts >= xmin) & (xVerts <= xmax)) & \
+                  np.all((yVerts >= ymin) & (yVerts <= ymax))
+      vertsAllowed[vertIdx] = isAllowed
+    compDf = compDf.loc[vertsAllowed]
+  else:
+    warnLater('No filter type exists for parameters of type ' f'{pType}.'
+              f' Did not filter column {column.name}.',
+              UserWarning)
+  return compDf
+
 class TableFilterEditor(ParamEditor):
   def __init__(self, paramList: List[PrjParam]=None, parent=None):
     if paramList is None:
@@ -115,6 +176,16 @@ class TableFilterEditor(ParamEditor):
         filters[child.name()] = keepChildren
     return filters
 
+  def filterCompDf(self, compDf: df):
+    strNames = [str(f) for f in compDf.columns]
+    for fieldName, opts in self.activeFilters.items():
+      try:
+        matchIdx = strNames.index(fieldName)
+      except IndexError:
+        continue
+      col = compDf.columns[matchIdx]
+      compDf = filterParamCol(compDf, col, opts)
+    return compDf
 
 class TableData(QtCore.QObject):
   sigCfgUpdated = QtCore.Signal(object)

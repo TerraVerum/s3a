@@ -149,7 +149,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     #idsToRm = idLists['deleted']
 
     # Update filter list: hide/unhide ids and verts as needed.
-    self._populateDisplayedIds()
+    self._updateDisplayedIds()
     # Remove all IDs that aren't displayed
     # FIXME: This isn't working correctly at the moment
     # self._regionPlots.drop(np.setdiff1d(self._regionPlots.data.index, self._displayedIds))
@@ -298,14 +298,11 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
       self.selectRowsById(selectedIds, mode)
     # TODO: Better management of widget focus here
 
-  def _populateDisplayedIds(self):
-    curComps = self._compMgr.compDf.copy()
-    for fieldName, opts in self._filter.activeFilters.items():
-      prjParam = PRJ_SINGLETON.tableData.fieldFromName(fieldName)
-      curComps = self.filterByParamType(curComps, prjParam, opts)
-
+  def _updateDisplayedIds(self):
+    curComps = self._filter.filterCompDf(self._compMgr.compDf.copy())
     # Give self the id list of surviving comps
     self.displayedIds = curComps[REQD_TBL_FIELDS.INST_ID]
+    return self.displayedIds
 
   def activateRegionCopier(self, selectedIds: OneDArr=None):
     if selectedIds is None:
@@ -343,86 +340,6 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     # if len(truncatedCompIds) > 0:
     #   warn(f'Some regions extended beyond image dimensions. Boundaries for the following'
     #        f' components were altered: {truncatedCompIds}', UserWarning)
-
-  # def findFilterableCols(self):
-  #   curComps = self._compMgr.compDf.copy()
-  #   filterableCols = []
-  #   badCols = []
-  #   for param in curComps.columns:
-  #     try:
-  #       curComps = self.filterByParamType(curComps, param)
-  #       filterableCols.append(param)
-  #     except ParamEditorError:
-  #       badCols.append(param)
-  #   if len(badCols) > 0:
-  #     badTypes = np.unique([f'"{col.pType}"' for col in badCols])
-  #     badCols = map(lambda val: f'"{val}"', badCols)
-  #     warn(f'The table filter does not know how to handle'
-  #          f' columns {", ".join(badCols)} since no'
-  #          f' filter exists for types {", ".join(badTypes)}',
-  #          UserWarning)
-  #   return filterableCols
-
-  def filterByParamType(self, compDf: df, column: PrjParam, filterOpts: dict):
-    # TODO: Each type should probably know how to filter itself. That is,
-    #  find some way of keeping this logic from just being an if/else tree...
-    pType = column.pType
-    # idx 0 = value, 1 = children
-    dfAtParam = compDf.loc[:, column]
-
-    if pType in ['int', 'float']:
-      curmin, curmax = [filterOpts[name]['value'] for name in ['min', 'max']]
-
-      compDf = compDf.loc[(dfAtParam >= curmin) & (dfAtParam <= curmax)]
-    elif pType == 'bool':
-      filterOpts = filterOpts['Options']['children']
-      allowTrue, allowFalse = [filterOpts[name]['value'] for name in
-                               [f'{column.name}', f'Not {column.name}']]
-
-      validList = np.array(dfAtParam, dtype=bool)
-      if not allowTrue:
-        compDf = compDf.loc[~validList]
-      if not allowFalse:
-        compDf = compDf.loc[validList]
-    elif pType in ['prjparam', 'list', 'popuplineeditor']:
-      existingParams = np.array(dfAtParam)
-      allowedParams = []
-      filterOpts = filterOpts['Options']['children']
-      if pType == 'prjparam':
-        groupSubParams = [p.name for p in column.value.group]
-      else:
-        groupSubParams = column.opts['limits']
-      for groupSubParam in groupSubParams:
-        isAllowed = filterOpts[groupSubParam]['value']
-        if isAllowed:
-          allowedParams.append(groupSubParam)
-      compDf = compDf.loc[np.isin(existingParams, allowedParams)]
-    elif pType in ['str', 'text']:
-      allowedRegex = filterOpts['Regex Value']['value']
-      isCompAllowed = dfAtParam.str.contains(allowedRegex, regex=True, case=False)
-      compDf = compDf.loc[isCompAllowed]
-    elif pType in ['complexxyvertices', 'xyvertices']:
-      vertsAllowed = np.ones(len(dfAtParam), dtype=bool)
-
-      xParam = filterOpts['X Bounds']['children']
-      yParam = filterOpts['Y Bounds']['children']
-      xmin, xmax, ymin, ymax = [param[val]['value'] for param in (xParam, yParam) for val in ['min', 'max']]
-
-      for vertIdx, verts in enumerate(dfAtParam):
-        if pType == 'complexxyvertices':
-          stackedVerts: XYVertices = verts.stack()
-        else:
-          stackedVerts = verts
-        xVerts, yVerts = stackedVerts.x, stackedVerts.y
-        isAllowed = np.all((xVerts >= xmin) & (xVerts <= xmax)) & \
-                    np.all((yVerts >= ymin) & (yVerts <= ymax))
-        vertsAllowed[vertIdx] = isAllowed
-      compDf = compDf.loc[vertsAllowed]
-    else:
-      warnLater('No filter type exists for parameters of type ' f'{pType}.'
-           f' Did not filter column {column.name}.',
-           UserWarning)
-    return compDf
 
   def exportCompOverlay(self, outFile='', toClipboard=False):
     """
