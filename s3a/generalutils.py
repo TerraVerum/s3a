@@ -151,7 +151,8 @@ def safeCallFunc(fnName: str, func: Callable, *fnArgs):
     err = f'{fnName}: {ex}'
   return ret, err
 
-def cvImsave_rgb(fname: FilePath, image: np.ndarray, *args, **kwargs):
+def _maybeBgrToRgb(image: np.ndarray):
+  """Treats 3/4-channel images as BGR/BGRA for opencv saving/reading"""
   if image.ndim > 2:
     if image.shape[0] == 1:
       image = image[...,0]
@@ -160,7 +161,15 @@ def cvImsave_rgb(fname: FilePath, image: np.ndarray, *args, **kwargs):
       # Swap B & R
       lastAx[[0,2]] = [2,0]
       image = image[...,lastAx]
+  return image
+
+def cvImsave_rgb(fname: FilePath, image: np.ndarray, *args, **kwargs):
+  image = _maybeBgrToRgb(image)
   cv.imwrite(str(fname), image, *args, **kwargs)
+
+def cvImread_rgb(fname: FilePath, *args, **kwargs):
+  image = cv.imread(str(fname), *args, **kwargs)
+  return _maybeBgrToRgb(image)
 
 
 def cornersToFullBoundary(cornerVerts: Union[XYVertices, ComplexXYVertices], sizeLimit: float=np.inf,
