@@ -149,7 +149,8 @@ class RandomToolsPlugin(ParamEditorPlugin):
 
     self.registerFunc(self.showDevConsole)
     self.registerFunc(win.clearBoundaries, btnOpts=CNST.TOOL_CLEAR_BOUNDARIES)
-    self.registerFunc(win.compDisplay.exportCompOverlay)
+    self.registerFunc(win.compDisplay.exportCompOverlay, name='Export Component Overlay', toClipboard=True)
+    self.registerFunc(lambda: win.setMainImg(None), name='Clear Current Image')
 
   def showDevConsole(self):
     """
