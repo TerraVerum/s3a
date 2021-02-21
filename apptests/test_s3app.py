@@ -156,12 +156,6 @@ def test_set_colorinfo(app):
     app.mainImg.updateCursorInfo((100,100), clr)
     assert '100, 100' in app.mouseCoordsLbl.text()
     assert f'{clr}' in app.pxColorLbl.text()
-    bgText = app.pxColorLbl.styleSheet()
-    bgColor = re.search(r'\((.*)\)', bgText).group()
-    # literal_eval turns str to tuple
-    bgColor = np.array(literal_eval(bgColor))
-    assert bgColor.size == 4
-    assert np.all(np.isin(clr, bgColor))
 
 @pytest.mark.withcomps
 def test_quickload_profile(tmp_path, app):
