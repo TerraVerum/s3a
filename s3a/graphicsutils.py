@@ -117,8 +117,11 @@ class ThumbnailViewer(QtWidgets.QListWidget):
 
   def addThumbnail(self, fullName: Path, force=False):
     icon = QtGui.QIcon(str(fullName))
-    if fullName.name in self.nameToFullPathMapping and not force:
-      raise IOError('Name already exists in image list')
+    if fullName.name in self.nameToFullPathMapping:
+      if force:
+        self.removeThumbnail(fullName.name)
+      else:
+        raise IOError('Name already exists in image list')
     newItem = QtWidgets.QListWidgetItem(fullName.name)
     newItem.setIcon(icon)
     self.addItem(newItem)

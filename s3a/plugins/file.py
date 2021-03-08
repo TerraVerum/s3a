@@ -70,8 +70,9 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         #                             f'{[i.name for i in imList]})') != QtWidgets.QMessageBox.Yes:
         return
       delCurrent = False
+
       for name in imList:
-        if name == self.win.srcImgFname:
+        if name == self.win.srcImgFname and self.win.srcImgFname.exists():
           delCurrent = True
           continue
         self._imgThumbnails.removeThumbnail(name.name)
@@ -129,8 +130,11 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     win.appStateEditor.addImportExportOpts('project', self.open, handleExport, 0)
 
     def startImg(imgName: str):
+      imgName = Path(imgName)
+      if not imgName.exists():
+        return
+      name = imgName.name
       self.projData.addImage(imgName)
-      name = Path(imgName).name
       fullName = self.nameToFullPathMapping[name]
       self.win.setMainImg(fullName)
     win.appStateEditor.addImportExportOpts('image', startImg, lambda *args: None, 1)
@@ -433,7 +437,40 @@ class ProjectData(QtCore.QObject):
     if cfgFname is not None or cfgDict is not None:
       self.loadCfg(cfgFname, cfgDict)
 
+    self.watcher = QtCore.QFileSystemWatcher()
+    self.watcher.directoryChanged.connect(self._handleDirChange)
+
     self.compIo = ComponentIO()
+
+  def _handleDirChange(self):
+    imgs = list(self.imagesDir.glob('*.*'))
+    # Images already in the project will be ignored on add
+    newImgs = []
+    for img in imgs:
+      new = self.addImage(img)
+      if new:
+        newImgs.append(img)
+    if newImgs:
+      self.sigImagesAdded.emit(newImgs)
+    # Handle removals
+    delImgs = []
+    delIdxs = []
+    for ii, img in enumerate(self.images):
+      if img.parent == self.imagesDir and img not in imgs:
+        delIdxs.append(ii)
+        delImgs.append(img)
+    for idx in delIdxs:
+      del self.images[idx]
+    self.sigImagesRemoved.emit(delImgs)
+
+    anns = list(self.annotationsDir.glob(f'*.{self.cfg["annotation-format"]}'))
+    # Images already in the project will be ignored on add
+    for ann in anns:
+      if ann not in self.imgToAnnMapping.values():
+        self.addannotation(ann)
+    for ann in self.imgToAnnMapping.values():
+      if ann not in anns:
+        self.removeAnnotation(ann)
 
   @property
   def location(self):
@@ -534,6 +571,10 @@ class ProjectData(QtCore.QObject):
     self._maybeEmit(self.sigAnnotationsAdded, list(self.imgToAnnMapping.values()))
 
     self.sigCfgLoaded.emit()
+    dirs = self.watcher.directories()
+    if dirs:
+      self.watcher.removePaths(dirs)
+    self.watcher.addPaths([str(self.imagesDir), str(self.annotationsDir)])
     return self.cfgFname
 
   @classmethod
@@ -813,7 +854,7 @@ class ProjectData(QtCore.QObject):
     numCandidates = len(candidates)
     if numCandidates != 1:
       msg = f'Exactly one corresponding image file must exist for a given annotation. However,' \
-            f' {numCandidates} candidate images were found'
+            f' {numCandidates} candidate images were found for image {name.name}'
       if numCandidates == 0:
         msg += '.'
       else:
