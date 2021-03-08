@@ -10,7 +10,7 @@ from utilitys import PrjParam
 from utilitys.typeoverloads import FilePath
 
 from .structures import TwoDArr, XYVertices, ComplexXYVertices, NChanImg, BlackWhiteImg
-
+from utilitys.fns import hierarchicalUpdate
 
 def stackedVertsPlusConnections(vertList: ComplexXYVertices) -> (XYVertices, np.ndarray):
   """
@@ -291,20 +291,6 @@ def monkeyPatch(obj, toChange: str, newVal):
     delattr(obj, toChange)
   else:
     setattr(obj, toChange, oldVal)
-
-def hierarchicalUpdate(curDict: dict, other: dict):
-  """Dictionary update that allows nested keys to be updated without deleting the non-updated keys"""
-  if other is None:
-    return curDict
-  for k, v in other.items():
-    curVal = curDict.get(k, None)
-    if isinstance(curVal, dict) and isinstance(v, dict):
-      hierarchicalUpdate(curVal, v)
-    elif isinstance(curVal, list) and isinstance(v, list):
-      curVal.extend(v)
-    else:
-      curDict[k] = v
-  return curDict
 
 def showMaskDiff(oldMask: BlackWhiteImg, newMask: BlackWhiteImg):
   infoMask = np.tile(oldMask[...,None].astype('uint8')*255, (1,1,3))

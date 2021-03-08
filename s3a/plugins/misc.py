@@ -122,7 +122,6 @@ class EditPlugin(ParamEditorPlugin):
     super().attachWinRef(win)
     stack = PRJ_SINGLETON.actionStack
 
-    for param in CNST.TOOL_UNDO, CNST.TOOL_REDO: param.opts['ownerObj'] = win
     self.registerFunc(stack.undo, name='Undo', btnOpts=CNST.TOOL_UNDO)
     self.registerFunc(stack.redo, name='Redo', btnOpts=CNST.TOOL_REDO)
 

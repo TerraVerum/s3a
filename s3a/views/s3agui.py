@@ -28,7 +28,7 @@ class S3A(S3ABase):
   sigLayoutSaved = QtCore.Signal()
   S3A_INST = None
 
-  __groupingName__ = 'Application'
+  __groupingName__ = 'Main Window'
 
   @classmethod
   def __initEditorParams__(cls):

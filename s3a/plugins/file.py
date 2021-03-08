@@ -467,7 +467,7 @@ class ProjectData(QtCore.QObject):
     # Images already in the project will be ignored on add
     for ann in anns:
       if ann not in self.imgToAnnMapping.values():
-        self.addannotation(ann)
+        self.addAnnotation(ann)
     for ann in self.imgToAnnMapping.values():
       if ann not in anns:
         self.removeAnnotation(ann)

@@ -98,7 +98,7 @@ def _addRmOption(param: Parameter):
 
 class QuickLoaderEditor(ParamEditor):
   def __init__(self, parent=None, editorList: List[ParamEditor]=None):
-    super().__init__(parent, paramList=[], saveDir=QUICK_LOAD_DIR, fileType='loader',
+    super().__init__(parent, paramList=[], saveDir=None, fileType='loader',
                      name='Editor State Shortcuts')
     if editorList is None:
       editorList = []
@@ -110,7 +110,7 @@ class QuickLoaderEditor(ParamEditor):
     self.centralLayout.insertWidget(0, self.addNewParamState)
 
     # self.addNewParamState.completer().activated.connect(self.addFromLineEdit)
-    self.addNewParamState.editingFinished.connect(self.addFromLineEdit)
+    self.addNewParamState.returnPressed.connect(self.addFromLineEdit)
 
   def _loadParamState(self, stateName: Union[str, Path], stateDict: dict=None,
                      addChildren=False, removeChildren=False, applyChanges=True):
@@ -202,7 +202,7 @@ class QuickLoaderEditor(ParamEditor):
     #   selectionIdx = completer.currentIndex()
     paramState, editor = qtSelectionIdx.data(QtCore.Qt.EditRole)
     self.addActForEditor(editor, paramState)
-    self.addNewParamState.clear()
+    # self.addNewParamState.clear()
 
 
   def addActForEditor(self, editor: ParamEditor, paramState: str, act: ShcKeySeq=None):
