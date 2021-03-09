@@ -786,6 +786,8 @@ class ProjectData(QtCore.QObject):
         self.addAnnotation(name, data[data[REQD_TBL_FIELDS.SRC_IMG_FILENAME] == img], img)
       return
     image = self._getFullImgName(Path(image))
+    # Force provided annotations to now belong to this image
+    data[REQD_TBL_FIELDS.SRC_IMG_FILENAME] = image.name
     # Since only one annotation file can exist per image, concatenate this with any existing files for the same image
     # if needed
     if image.parent != self.imagesDir:

@@ -5,10 +5,10 @@ from collections import defaultdict
 from pathlib import Path
 from stat import S_IREAD, S_IRGRP, S_IROTH
 from typing import Any, Optional, Union, Tuple, Callable
+import json
 
 import numpy as np
 import pandas as pd
-from pandas import DataFrame as df
 from skimage import io, measure
 from skimage.exposure import rescale_intensity
 from typing_extensions import Literal
@@ -60,7 +60,9 @@ class ComponentIO:
   calling exporter.exportCsv, exportPkl, etc. for those objects / files respectively.
   """
   handledIoTypes = {'csv': 'CSV Files', 'pkl': 'Pickle Files',
-                    'id.png': 'ID Grayscale Image'}
+                    'id.png': 'ID Grayscale Image', 'superannotate.json': 'Superannotate JSON File',
+                    'comp.imgs.zip': 'Separate Components Zip/Folder',
+                    'geojson': 'Geo JSON Files'}
   """Dict of <type, description> for the file types this I/O obejct can handle"""
 
   # Dictionary comprehension doesn't work in a class scope
@@ -95,7 +97,7 @@ class ComponentIO:
     return ';;'.join(fileFilters)
 
   @classmethod
-  def exportByFileType(cls, compDf: df, outFile: Union[str, Path], verifyIntegrity=True, **exportArgs):
+  def exportByFileType(cls, compDf: pd.DataFrame, outFile: Union[str, Path], verifyIntegrity=True, **exportArgs):
     outFile = Path(outFile)
     outFn = cls._ioFnFromFileType(outFile, 'export')
     ret = outFn(compDf, outFile, **exportArgs)
@@ -143,7 +145,10 @@ class ComponentIO:
     if not any(typIdx):
       raise IOError(f'Not sure how to handle file {fpath.stem}')
     fnNameSuffix = cmpTypes[typIdx][-1].title().replace('.', '')
-    return getattr(cls, buildOrExport+fnNameSuffix, None)
+    outFn =  getattr(cls, buildOrExport+fnNameSuffix, None)
+    if outFn is None:
+      raise ValueError(f'Full I/O specification missing for type {fnNameSuffix}')
+    return outFn
 
   @staticmethod
   def _strToNpArray(array_string: str, **opts):
@@ -175,7 +180,7 @@ class ComponentIO:
   # Export options
   # -----
   @classmethod
-  def exportCsv(cls, compDf: df, outFile: Union[str, Path]=None, readOnly=True, **pdExportArgs):
+  def exportCsv(cls, compDf: pd.DataFrame, outFile: Union[str, Path]=None, readOnly=True, **pdExportArgs):
     """
     :param compDf: Dataframe to export
     :param outFile: Name of the output file location. If *None*, no file is created. However,
@@ -205,7 +210,7 @@ class ComponentIO:
     return exportDf
 
   @classmethod
-  def exportCompImgsDf(cls, compDf: df, outFile: Union[str, Path]=None,
+  def exportCompImgsDf(cls, compDf: pd.DataFrame, outFile: Union[str, Path]=None,
                        imgDir: FilePath=None, margin=0, marginAsPct=False,
                        includeCols=('instId', 'img', 'labelMask', 'label', 'offset'),
                        lblField='Instance ID', allowOffset=True, **kwargs):
@@ -292,7 +297,7 @@ class ComponentIO:
     return outDf
 
   @classmethod
-  def exportPkl(cls, compDf: df, outFile: Union[str, Path]=None, **exportArgs) -> (Any, str):
+  def exportPkl(cls, compDf: pd.DataFrame, outFile: Union[str, Path]=None, **exportArgs) -> (Any, str):
     """
     See the function signature for :func:`exportCsv <ComponentIO.exportCsv>`
     """
@@ -304,7 +309,7 @@ class ComponentIO:
     return pklDf
 
   @classmethod
-  def exportLblPng(cls, compDf: df, outFile: FilePath=None, imShape: Tuple[int]=None,
+  def exportLblPng(cls, compDf: pd.DataFrame, outFile: FilePath=None, imShape: Tuple[int]=None,
                    lblField: Union[PrjParam, str]='Instance ID', bgColor=0, allowOffset=None,
                    rescaleOutput=False, returnLblMapping=False,
                    **kwargs):
@@ -371,12 +376,12 @@ class ComponentIO:
     return outMask
 
   @classmethod
-  def exportClassPng(cls, compDf: df, outFile: FilePath = None, imShape: Tuple[int]=None, **kwargs):
+  def exportClassPng(cls, compDf: pd.DataFrame, outFile: FilePath = None, imShape: Tuple[int]=None, **kwargs):
     # Create label to output mapping
     return cls.exportLblPng(compDf, outFile, imShape, 'Class', **kwargs)
 
   @classmethod
-  def exportIdPng(cls, compDf: df, outFile: FilePath=None,
+  def exportIdPng(cls, compDf: pd.DataFrame, outFile: FilePath=None,
                   imShape: Tuple[int]=None, **kwargs):
     """
     Creates a 2D grayscale image where each component is colored with its isntance ID + 1.
@@ -389,7 +394,7 @@ class ComponentIO:
     return cls.exportLblPng(compDf, outFile, imShape, **kwargs, allowOffset=True)
 
   @classmethod
-  def exportCompImgsZip(cls, compDf: df,
+  def exportCompImgsZip(cls, compDf: pd.DataFrame,
                             outDir:FilePath='s3a-export',
                             resizeShape: Tuple[int, int]=None,
                             **kwargs):
@@ -431,7 +436,7 @@ class ComponentIO:
       importArgs = {}
     if exportArgs is None:
       exportArgs = {}
-    if not isinstance(fromData, df):
+    if not isinstance(fromData, pd.DataFrame):
       fromData = cls.buildByFileType(fromData, **importArgs)
     exportFn = cls._ioFnFromFileType(toFile, 'export')
     if not doExport:
@@ -440,7 +445,7 @@ class ComponentIO:
 
   @classmethod
   def buildFromCsv(cls, inFileOrDf: FilePathOrDf, imShape: Tuple=None,
-                   reindex=False) -> df:
+                   reindex=False, **importArgs) -> pd.DataFrame:
     """
     Deserializes data from a csv file to create a Component :class:`DataFrame`.
     The input .csv should be the same format as one exported by
@@ -455,11 +460,11 @@ class ComponentIO:
     :param reindex: Whether to disregard the index of the incoming dataframe or file.
       This is useful when *inFileOrDf* is actually a conacatenated df of multiple files, and
       the index doesn't need to be retained.
-    :return: Tuple: DF that will be exported if successful extraction
+    :return: Tuple: pd.DataFrame that will be exported if successful extraction
     """
     field = PrjParam('None', None)
     try:
-      if isinstance(inFileOrDf, df):
+      if isinstance(inFileOrDf, pd.DataFrame):
         csvDf = inFileOrDf
       else:
         csvDf = pd.read_csv(inFileOrDf, keep_default_na=False)
@@ -497,6 +502,35 @@ class ComponentIO:
     return outDf
 
   @classmethod
+  def buildFromGeojson(cls, inFileOrDict: Union[FilePath, dict],  **importArgs):
+    if not isinstance(inFileOrDict, dict):
+      inFileOrDict = json.load(open(inFileOrDict, 'r'))
+    verts = []
+    for ann in inFileOrDict['features']:
+      geo = ann['geometry']
+      if geo['type'] == 'Polygon':
+        verts.append(ComplexXYVertices(geo['coordinates'], coerceListElements=True))
+    tmpDf = pd.DataFrame(verts, columns=[RTF.VERTICES.name])
+    return cls.buildFromCsv(tmpDf, **importArgs)
+
+
+  @classmethod
+  def buildFromSuperannotateJson(cls, inFileOrDict: Union[FilePath, dict], **importArgs):
+    if not isinstance(inFileOrDict, dict):
+      inFileOrDict = json.load(open(inFileOrDict, 'r'))
+    points = [i['points'] for i in inFileOrDict['instances']]
+    npPoints = []
+    for pts in points:
+      npPts = np.column_stack([pts[::2], pts[1::2]])
+      npPoints.append(npPts)
+    outDf = cls.tableData.makeCompDf(len(npPoints))
+    outDf[RTF.VERTICES] = [ComplexXYVertices([pts], coerceListElements=True) for pts in npPoints]
+    outDf[RTF.SRC_IMG_FILENAME] = inFileOrDict['metadata']['name']
+    imShape = (inFileOrDict['metadata']['height'], inFileOrDict['metadata']['width'])
+    cls.checkVertBounds(outDf[RTF.VERTICES], imShape)
+    return outDf
+
+  @classmethod
   def buildFromCompimgsDf(cls, inFile: FilePath, imShape: Tuple=None,
                           lblField='Class', **importArgs):
     lblField = cls.tableData.fieldFromName(lblField)
@@ -517,7 +551,7 @@ class ComponentIO:
     return outDf
 
   @classmethod
-  def buildFromPkl(cls, inFile: FilePath, imShape: Tuple=None, **importArgs) -> df:
+  def buildFromPkl(cls, inFile: FilePath, imShape: Tuple=None, **importArgs) -> pd.DataFrame:
     """
     See docstring for :func:`self.buildFromCsv`
     """
@@ -531,7 +565,7 @@ class ComponentIO:
   def buildFromLblPng(cls, inFileOrImg: Union[FilePath, GrayImg],
                       labelMapping: pd.Series=None,
                       useDistinctRegions=False,
-                      **importArgs) -> df:
+                      **importArgs) -> pd.DataFrame:
     if isinstance(inFileOrImg, GrayImg):
       labelImg = inFileOrImg
     else:
@@ -554,7 +588,7 @@ class ComponentIO:
 
 
   @classmethod
-  def buildFromIdPng(cls, inFileOrImg: Union[FilePath, GrayImg], imShape: Tuple=None, **importArgs) -> df:
+  def buildFromIdPng(cls, inFileOrImg: Union[FilePath, GrayImg], imShape: Tuple=None, **importArgs) -> pd.DataFrame:
     if isinstance(inFileOrImg, GrayImg):
       labelImg = inFileOrImg
     else:
@@ -564,7 +598,7 @@ class ComponentIO:
     return outDf
 
   @classmethod
-  def buildFromClassPng(cls, inFileOrImg: Union[FilePath, GrayImg], imShape: Tuple=None, **importArgs) -> df:
+  def buildFromClassPng(cls, inFileOrImg: Union[FilePath, GrayImg], imShape: Tuple=None, **importArgs) -> pd.DataFrame:
     if isinstance(inFileOrImg, GrayImg):
       clsImg = inFileOrImg
     else:

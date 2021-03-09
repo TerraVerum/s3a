@@ -58,12 +58,16 @@ def doAndAssertExport(app, fpath: Path, io: ComponentIO, compDf: pd.DataFrame, f
   fpath = Path(fpath)
   try:
     io.exportByFileType(compDf, fpath, imShape=app.mainImg.image.shape[:2])
+  except ValueError as ve:
+    if 'Full I/O' not in str(ve):
+      raise
   except Exception as ex:
     augmentException(ex, f'{failMsg}\n')
     raise
-  assert fpath.exists(), 'File doesn\'t exist despite export'
-  inDf = io.buildByFileType(fpath, app.mainImg.image.shape[:2])
-  assert len(inDf) > 0
+  else:
+    assert fpath.exists(), 'File doesn\'t exist despite export'
+    inDf = io.buildByFileType(fpath, app.mainImg.image.shape[:2])
+    assert len(inDf) > 0
 
 def test_impossible_io(tmp_path, sampleComps, app):
   io = app.compIo
