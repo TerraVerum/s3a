@@ -433,12 +433,11 @@ class ProjectData(QtCore.QObject):
 
     self._suppressSignals = False
     """If this is *True*, no signals will be emitted """
+    self.watcher = QtCore.QFileSystemWatcher()
+    self.watcher.directoryChanged.connect(self._handleDirChange)
 
     if cfgFname is not None or cfgDict is not None:
       self.loadCfg(cfgFname, cfgDict)
-
-    self.watcher = QtCore.QFileSystemWatcher()
-    self.watcher.directoryChanged.connect(self._handleDirChange)
 
     self.compIo = ComponentIO()
 
