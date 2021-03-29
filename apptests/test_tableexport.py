@@ -6,11 +6,13 @@ import pytest
 
 from s3a.generalutils import augmentException
 from s3a import ComponentIO
+from testingconsts import SAMPLE_IMG_FNAME
+
 
 @pytest.mark.withcomps
 def test_normal_export(sampleComps, tmp_path, app):
   io = app.compIo
-  io.exportOnlyVis = False
+  app.exportOnlyVis = False
   for ftype in io.handledIoTypes:
     curPath = tmp_path / f'normalExport - All IDs.{ftype}'
     doAndAssertExport(app, curPath, io, app.exportableDf, 'Normal export with all IDs not successful.')
@@ -23,7 +25,7 @@ def test_filter_export(tmp_path, monkeypatch, app):
   filterIds = np.array([0,3,2])
   sampleComps = app.compMgr.compDf
   with monkeypatch.context() as m:
-    m.setattr(io, 'exportOnlyVis', False)
+    m.setattr(app, 'exportOnlyVis', False)
     m.setattr(app.compDisplay, 'displayedIds', filterIds)
     exportDf = app.exportableDf
   np.testing.assert_array_equal(exportDf.index, sampleComps.index,
@@ -35,7 +37,7 @@ def test_filter_export(tmp_path, monkeypatch, app):
 
   curPath = tmp_path / 'normalExport - Filtered IDs export filtered.csv'
   with monkeypatch.context() as m:
-    m.setattr(io, 'exportOnlyVis', True)
+    m.setattr(app, 'exportOnlyVis', True)
     m.setattr(app.compDisplay, 'displayedIds', filterIds)
     exportDf = app.exportableDf
   np.testing.assert_array_equal(exportDf.index, filterIds,
@@ -57,7 +59,8 @@ def test_bad_import(tmp_path, app):
 def doAndAssertExport(app, fpath: Path, io: ComponentIO, compDf: pd.DataFrame, failMsg: str):
   fpath = Path(fpath)
   try:
-    io.exportByFileType(compDf, fpath, imShape=app.mainImg.image.shape[:2])
+    io.exportByFileType(compDf, fpath, imShape=app.mainImg.image.shape[:2],
+                        imgDir=SAMPLE_IMG_FNAME.parent)
   except ValueError as ve:
     if 'Full I/O' not in str(ve):
       raise
@@ -66,8 +69,11 @@ def doAndAssertExport(app, fpath: Path, io: ComponentIO, compDf: pd.DataFrame, f
     raise
   else:
     assert fpath.exists(), 'File doesn\'t exist despite export'
-    inDf = io.buildByFileType(fpath, app.mainImg.image.shape[:2])
-    assert len(inDf) > 0
+    try:
+      inDf = io.buildByFileType(fpath, app.mainImg.image.shape[:2])
+      assert len(inDf) > 0
+    except ValueError:
+      pass
 
 def test_impossible_io(tmp_path, sampleComps, app):
   io = app.compIo

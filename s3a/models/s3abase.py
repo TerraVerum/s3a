@@ -34,6 +34,13 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
 
   __groupingName__ = 'S3A Window'
 
+  @classmethod
+  def __initEditorParams__(cls):
+    with PRJ_SINGLETON.generalProps.setBaseRegisterPath(PRJ_CONSTS.CLS_COMP_EXPORTER.name):
+      cls.exportOnlyVis, cls.includeFullSourceImgName = \
+        PRJ_SINGLETON.generalProps.registerProps(
+          [PRJ_CONSTS.EXP_ONLY_VISIBLE, PRJ_CONSTS.INCLUDE_FNAME_PATH])
+
   def __init__(self, parent=None, **startupSettings):
     super().__init__(parent)
     self.tblFieldToolbar = QtWidgets.QToolBar('Table Field Plugins')
@@ -59,12 +66,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
 
     self.compMgr = ComponentMgr()
     # Register exporter to allow user parameters
-    ioCls = ComponentIO
-    with PRJ_SINGLETON.generalProps.setBaseRegisterPath(PRJ_CONSTS.CLS_COMP_EXPORTER.name):
-      ioCls.exportOnlyVis, ioCls.includeFullSourceImgName = \
-        PRJ_SINGLETON.generalProps.registerProps(
-          [PRJ_CONSTS.EXP_ONLY_VISIBLE, PRJ_CONSTS.INCLUDE_FNAME_PATH])
-    self.compIo: ComponentIO = ioCls()
+    self.compIo = ComponentIO()
     ComponentIO.tableData = PRJ_SINGLETON.tableData
 
     self.compTbl = CompTableView()
@@ -305,12 +307,12 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     """
     displayIds = self.compDisplay.displayedIds
     srcImgFname = self.srcImgFname
-    if self.compIo.exportOnlyVis and displayIds is not None:
+    if self.exportOnlyVis and displayIds is not None:
       exportIds = displayIds
     else:
       exportIds = self.compMgr.compDf.index
     exportDf: df = self.compMgr.compDf.loc[exportIds].copy()
-    if not self.compIo.includeFullSourceImgName and srcImgFname is not None:
+    if not self.includeFullSourceImgName and srcImgFname is not None:
       # Only use the file name, not the whole path
       srcImgFname = srcImgFname.name
     elif srcImgFname is not None:

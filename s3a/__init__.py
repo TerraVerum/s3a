@@ -39,7 +39,7 @@ import s3a.constants
 import s3a.structures
 
 from s3a.parameditors import PRJ_SINGLETON
-from ._io import ComponentIO
+from ._io import ComponentIO, defaultIo
 from s3a.processing.algorithms import TopLevelImageProcessors, TOP_GLOBAL_PROCESSOR_FUNCS
 from s3a.structures import XYVertices, ComplexXYVertices
 from s3a.constants import REQD_TBL_FIELDS, PRJ_CONSTS

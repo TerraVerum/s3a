@@ -1,17 +1,21 @@
+from __future__ import annotations
 import pickle
 import sys
 from ast import literal_eval
 from collections import defaultdict
+from functools import wraps
 from pathlib import Path
 from stat import S_IREAD, S_IRGRP, S_IROTH
-from typing import Any, Optional, Union, Tuple, Callable
+from typing import Any, Optional, Union, Tuple, Callable, Type
 import json
+import inspect
 
 import numpy as np
 import pandas as pd
 from skimage import io, measure
 from skimage.exposure import rescale_intensity
 from typing_extensions import Literal
+from utilitys import fns, ProcessIO
 
 from utilitys.fns import warnLater
 
@@ -22,6 +26,21 @@ from s3a.structures import PrjParamGroup, FilePath, GrayImg, \
   ComplexXYVertices, PrjParam, XYVertices
 
 FilePathOrDf = Union[FilePath, pd.DataFrame]
+_litLst = Literal['buildFrom', 'export']
+
+def _getPdExporters():
+  members = inspect.getmembers(pd.DataFrame, lambda meth: inspect.isfunction(meth) and meth.__name__.startswith('to_'))
+  return [mem[1].__name__.replace('to_', '') for mem in members]
+
+def buildWrapper(func):
+  @wraps(func)
+  def wrapper(*args, **kwargs):
+    self = args[0]
+    # Turn args into kwargs
+    fnKwargs = inspect.getcallargs(func, *args, **kwargs)
+    fnKwargs.update(self.buildOpts)
+    return func(**fnKwargs)
+  return wrapper
 
 def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> pd.Series:
   paramType = type(paramVal)
@@ -53,6 +72,12 @@ def _paramSerToStrSer(paramSer: pd.Series, paramVal: Any) -> pd.Series:
   funcToUse = funcMap.get(paramType, defaultFunc)
   return paramSer.apply(funcToUse)
 
+# Credit: https://stackoverflow.com/a/28238047/9463643
+# class classorinstancemethod(classmethod):
+#   def __get__(self, instance, type_):
+#     descr_get = super().__get__ if instance is None else self.__func__.__get__
+#     return descr_get(instance, type_)
+
 class ComponentIO:
   """
   Exporter responsible for saving Component information to a file or object.
@@ -78,6 +103,14 @@ class ComponentIO:
 
   tableData = TableData()
   """Table to use for import/export cross checks. This is how class and table field information is derived."""
+  buildOpts = {}
+  """
+  Propagated to every importByFileType call to provide user-specified defaults as desired
+  """
+  exportOpts = {}
+  """
+  Propagated to every exportByFileType call to provide user-specified defaults as desired
+  """
 
   @classmethod
   def handledIoTypes_fileFilter(cls, typeFilter='', **extraOpts):
@@ -96,15 +129,32 @@ class ComponentIO:
         fileFilters.append(f'{info} (*.{typ})')
     return ';;'.join(fileFilters)
 
-  @classmethod
-  def exportByFileType(cls, compDf: pd.DataFrame, outFile: Union[str, Path], verifyIntegrity=True, **exportArgs):
+  # @property
+  # def allOptions(self):
+  #   """
+  #   Returns all possible options from all import and export functions. This is useful
+  #   for showing the user editable values for various export types
+  #   """
+  #   opts = {}
+  #   opts.pop('top-descr', None)
+  #   for fnType in 'buildFrom', 'export':
+  #     opts[fnType] = {}
+  #     for ioType in self.handledIoTypes:
+  #       fn = self._ioFnFromFileType(ioType, fnType)
+  #       if fn is not None:
+  #         doc = fns.docParser(fn.__doc__)
+  #         opts[fnType][ioType] = doc
+  #   return opts
+
+  def exportByFileType(self, compDf: pd.DataFrame, outFile: Union[str, Path], verifyIntegrity=True, **exportArgs):
     outFile = Path(outFile)
-    outFn = cls._ioFnFromFileType(outFile, 'export')
+    outFn = self._ioFnFromFileType(outFile, 'export')
+
     ret = outFn(compDf, outFile, **exportArgs)
-    if verifyIntegrity and outFile.suffix[1:] in cls.roundTripIoTypes:
+    if verifyIntegrity and outFile.suffix[1:] in self.roundTripIoTypes:
       matchingCols = np.setdiff1d(compDf.columns, [RTF.INST_ID,
                                                    RTF.SRC_IMG_FILENAME])
-      loadedDf = cls.buildByFileType(outFile)
+      loadedDf = self.buildByFileType(outFile)
       dfCmp = loadedDf[matchingCols].equals(compDf[matchingCols])
       problemCells = defaultdict(list)
 
@@ -126,27 +176,26 @@ class ComponentIO:
                f'Please try manually altering these values before exporting again.', UserWarning)
     return ret
 
-  @classmethod
-  def buildByFileType(cls, inFile: Union[str, Path], imShape: Tuple[int]=None,
+  def buildByFileType(self, inFile: Union[str, Path], imShape: Tuple[int]=None,
                       strColumns=False, **importArgs):
-    buildFn = cls._ioFnFromFileType(inFile, 'buildFrom')
+    buildFn = self._ioFnFromFileType(inFile, 'buildFrom')
     outDf = buildFn(inFile, imShape=imShape, **importArgs)
     if strColumns:
       outDf.columns = list(map(str, outDf.columns))
     return outDf
 
-  @classmethod
-  def _ioFnFromFileType(cls, fpath: Union[str, Path],
-                        buildOrExport=Literal['buildFrom', 'export']) -> Optional[Callable]:
+  def _ioFnFromFileType(self, fpath: Union[str, Path],
+                        buildOrExport=_litLst,
+                        missingOk=False) -> Optional[Callable]:
     fpath = Path(fpath)
     fname = fpath.name
-    cmpTypes = np.array(list(cls.handledIoTypes.keys()))
+    cmpTypes = np.array(list(self.handledIoTypes.keys()))
     typIdx = [fname.endswith(typ) for typ in cmpTypes]
     if not any(typIdx):
       raise IOError(f'Not sure how to handle file {fpath.stem}')
     fnNameSuffix = cmpTypes[typIdx][-1].title().replace('.', '')
-    outFn =  getattr(cls, buildOrExport+fnNameSuffix, None)
-    if outFn is None:
+    outFn =  getattr(self, buildOrExport + fnNameSuffix, None)
+    if outFn is None and not missingOk:
       raise ValueError(f'Full I/O specification missing for type {fnNameSuffix}')
     return outFn
 
@@ -156,9 +205,8 @@ class ComponentIO:
     array_string = ','.join(array_string.replace('[ ', '[').split())
     return np.array(literal_eval(array_string), **opts)
 
-  @classmethod
-  def _pandasCsvExport(cls, exportDf: pd.DataFrame, outFile: Union[str, Path]=None,
-                       readOnly=True, **pdExportArgs):
+  def _pandasSerialExport(self, exportDf: pd.DataFrame, outFile: Union[str, Path]=None,
+                          exporter='csv', readOnly=True, **pdExportArgs):
     if outFile is None:
       return
 
@@ -171,22 +219,35 @@ class ComponentIO:
     outPath.parent.mkdir(exist_ok=True, parents=True)
 
     defaultExportParams.update(pdExportArgs)
+    exportFn = getattr(exportDf, f'to_{exporter}', None)
+    if exportFn is None:
+      raise ValueError(f'Exporter {exporter} not recognized. Acceptable options:'
+                       ','.join(_getPdExporters()))
+
     with np.printoptions(threshold=sys.maxsize):
-      exportDf.to_csv(outFile, index=False)
+      exportFn(outFile, index=False)
     if readOnly:
       outPath.chmod(S_IREAD|S_IRGRP|S_IROTH)
 
   # -----
   # Export options
   # -----
-  @classmethod
-  def exportCsv(cls, compDf: pd.DataFrame, outFile: Union[str, Path]=None, readOnly=True, **pdExportArgs):
+  def exportSerialized(self, compDf: pd.DataFrame, outFile: Union[str, Path]=None, exporter='csv', readOnly=True, **pdExportArgs):
     """
+    Converts dataframe into a string-serialized version and uses pandas to write it to disk.
+
     :param compDf: Dataframe to export
     :param outFile: Name of the output file location. If *None*, no file is created. However,
       the export object will still be created and returned.
+    :param exporter: Which pandas exporter to use. This can be csv, json, feather, etc.
+      Note: Do not include the `to_` prefix, simply specify the direct filetype.
+      Also note: pickle is a special case. In some cases, it is significantly more benficial
+      to export the raw dataframe compared to a serialized version. In these cases, use
+      ComponentIO.exportPkl. Otherwise, `pickle` is still a valid option here for a serialized
+      format. For a full list of export options, see
+      https://pandas.pydata.org/pandas-docs/stable/user_guide/io.html#io-tools-text-csv-hdf5
     :param pdExportArgs: Dictionary of values passed to underlying pandas export function.
-      These will overwrite the default options for :func:`exportToFile <ComponentMgr.exportToFile>`
+      These will overwrite the default options for :func:`exportToFile <ComponentMgr.exportByFileType>`
     :param readOnly: Whether this export should be read-only
     :return: Export version of the component data.
     """
@@ -202,15 +263,19 @@ class ComponentIO:
       for col in exportDf:
         if not isinstance(col.value, str):
           exportDf[col] = _paramSerToStrSer(exportDf[col], col.value)
-      cls._pandasCsvExport(exportDf, outFile, readOnly, **pdExportArgs)
+      self._pandasSerialExport(exportDf, outFile, exporter, readOnly, **pdExportArgs)
     except Exception as ex:
       errMsg = f'Error on parsing column "{col.name}"\n'
       augmentException(ex, errMsg)
       raise
     return exportDf
 
-  @classmethod
-  def exportCompImgsDf(cls, compDf: pd.DataFrame, outFile: Union[str, Path]=None,
+  @wraps(exportSerialized)
+  def exportCsv(self, *args, **kwargs):
+    """Deprecated in favor of exportSerialized"""
+    return self.exportSerialized(*args, **kwargs)
+
+  def exportCompImgsDf(self, compDf: pd.DataFrame, outFile: Union[str, Path]=None,
                        imgDir: FilePath=None, margin=0, marginAsPct=False,
                        includeCols=('instId', 'img', 'labelMask', 'label', 'offset'),
                        lblField='Instance ID', allowOffset=True, **kwargs):
@@ -254,13 +319,14 @@ class ComponentIO:
 
     useKeys = set(includeCols)
     outDf = {k: [] for k in useKeys}
-    lblField = cls.tableData.fieldFromName(lblField)
-
+    lblField = self.tableData.fieldFromName(lblField)
+    # imshape is automatically inferred by the exporter
+    kwargs.pop('imShape', None)
     for miniDf, fullImgName in zip(dfGroupingsByImg, uniqueImgs):
       fullImgName = imgDir / fullImgName
       img = _imgCache[fullImgName]
-      lblImg = cls.exportLblPng(miniDf, imShape=img.shape[:2], lblField=lblField,
-                                allowOffset=allowOffset, **kwargs)
+      lblImg = self.exportLblPng(miniDf, imShape=img.shape[:2], lblField=lblField,
+                                 allowOffset=allowOffset, **kwargs)
 
       for ii, (idx, row) in enumerate(miniDf.iterrows()):
         allVerts = row[RTF.VERTICES].stack()
@@ -296,8 +362,7 @@ class ComponentIO:
       outDf.to_pickle(outFile)
     return outDf
 
-  @classmethod
-  def exportPkl(cls, compDf: pd.DataFrame, outFile: Union[str, Path]=None, **exportArgs) -> (Any, str):
+  def exportPkl(self, compDf: pd.DataFrame, outFile: Union[str, Path]=None, **exportArgs) -> (Any, str):
     """
     See the function signature for :func:`exportCsv <ComponentIO.exportCsv>`
     """
@@ -308,8 +373,7 @@ class ComponentIO:
       compDf.to_pickle(outFile)
     return pklDf
 
-  @classmethod
-  def exportLblPng(cls, compDf: pd.DataFrame, outFile: FilePath=None, imShape: Tuple[int]=None,
+  def exportLblPng(self, compDf: pd.DataFrame, outFile: FilePath=None, imShape: Tuple[int]=None,
                    lblField: Union[PrjParam, str]='Instance ID', bgColor=0, allowOffset=None,
                    rescaleOutput=False, returnLblMapping=False,
                    **kwargs):
@@ -336,12 +400,12 @@ class ComponentIO:
     :return:
     """
 
-    lblField = cls.tableData.fieldFromName(lblField)
+    lblField = self.tableData.fieldFromName(lblField)
 
-    if lblField not in cls.tableData.allFields:
+    if lblField not in self.tableData.allFields:
       raise IOError(f'Specified label field {lblField} does not exist in the table'
                        f' fields. Must be one of:\n'
-                       f'{[f.name for f in cls.tableData.allFields]}')
+                       f'{[f.name for f in self.tableData.allFields]}')
     if bgColor < 0:
       raise IOError(f'Background color must be >= 0, was {bgColor}')
 
@@ -375,13 +439,11 @@ class ComponentIO:
       return outMask, mapping
     return outMask
 
-  @classmethod
-  def exportClassPng(cls, compDf: pd.DataFrame, outFile: FilePath = None, imShape: Tuple[int]=None, **kwargs):
+  def exportClassPng(self, compDf: pd.DataFrame, outFile: FilePath = None, imShape: Tuple[int]=None, **kwargs):
     # Create label to output mapping
-    return cls.exportLblPng(compDf, outFile, imShape, 'Class', **kwargs)
+    return self.exportLblPng(compDf, outFile, imShape, 'Class', **kwargs)
 
-  @classmethod
-  def exportIdPng(cls, compDf: pd.DataFrame, outFile: FilePath=None,
+  def exportIdPng(self, compDf: pd.DataFrame, outFile: FilePath=None,
                   imShape: Tuple[int]=None, **kwargs):
     """
     Creates a 2D grayscale image where each component is colored with its isntance ID + 1.
@@ -391,20 +453,21 @@ class ComponentIO:
     :param outFile: Where to save the output. If *None*, no export is created.
     :return:
     """
-    return cls.exportLblPng(compDf, outFile, imShape, **kwargs, allowOffset=True)
+    return self.exportLblPng(compDf, outFile, imShape, **kwargs, allowOffset=True)
 
-  @classmethod
-  def exportCompImgsZip(cls, compDf: pd.DataFrame,
-                            outDir:FilePath='s3a-export',
-                            resizeShape: Tuple[int, int]=None,
-                            **kwargs):
+  def exportCompImgsZip(self, compDf: pd.DataFrame,
+                        outDir:FilePath='s3a-export',
+                        resizeShape: Tuple[int, int]=None,
+                        **kwargs):
     """
     From a component dataframe, creates output directories for component images and masks.
     This is useful for many neural networks etc. to read individual component images.
 
     :param compDf: Dataframe to export
-    :param outDir: Where to make the output directories. If `None`, defaults to current
-      directory>compimgs_<margin>_margin
+    :param outDir:
+      helpText: "Where to make the output directories. If `None`, defaults to current
+      directory>compimgs_<margin>_margin"
+      pType: filepicker
     :param resizeShape: If provided, it is the shape that all images will be resized to before
       being saved. This is useful for neural networks with a fixed input size which forces all
       inputs to be e.g. 100x100 pixels.
@@ -419,7 +482,7 @@ class ComponentIO:
     if resizeShape is not None:
       saveFn = lambda fname, img: cvImsave_rgb(fname, resize_pad(img, resizeShape))
 
-    extractedImgs = cls.exportCompImgsDf(compDf, None, **kwargs)
+    extractedImgs = self.exportCompImgsDf(compDf, None, **kwargs)
     for idx, row in extractedImgs.iterrows():
       saveName = f'{row.instId}.png'
       saveFn(dataDir/saveName, row.img)
@@ -429,23 +492,21 @@ class ComponentIO:
   # Import options
   # -----
 
-  @classmethod
-  def convert(cls, fromData: FilePathOrDf, toFile: FilePath, doExport=True, importArgs: dict=None,
+  def convert(self, fromData: FilePathOrDf, toFile: FilePath, doExport=True, importArgs: dict=None,
               exportArgs: dict=None):
     if importArgs is None:
       importArgs = {}
     if exportArgs is None:
       exportArgs = {}
     if not isinstance(fromData, pd.DataFrame):
-      fromData = cls.buildByFileType(fromData, **importArgs)
-    exportFn = cls._ioFnFromFileType(toFile, 'export')
+      fromData = self.buildByFileType(fromData, **importArgs)
+    exportFn = self._ioFnFromFileType(toFile, 'export')
     if not doExport:
       toFile = None
     return exportFn(fromData, toFile, **exportArgs)
 
-  @classmethod
-  def buildFromCsv(cls, inFileOrDf: FilePathOrDf, imShape: Tuple=None,
-                   reindex=False, **importArgs) -> pd.DataFrame:
+  def buildFromSerialized(self, inFileOrDf: FilePathOrDf, imShape: Tuple=None,
+                          reindex=False, **importArgs):
     """
     Deserializes data from a csv file to create a Component :class:`DataFrame`.
     The input .csv should be the same format as one exported by
@@ -465,23 +526,23 @@ class ComponentIO:
     field = PrjParam('None', None)
     try:
       if isinstance(inFileOrDf, pd.DataFrame):
-        csvDf = inFileOrDf
+        serialDf = inFileOrDf
       else:
-        csvDf = pd.read_csv(inFileOrDf, keep_default_na=False)
+        serialDf = pd.read_csv(inFileOrDf, keep_default_na=False)
       if reindex:
-        csvDf[RTF.INST_ID.name] = np.arange(len(csvDf), dtype=int)
-        csvDf = csvDf.set_index(RTF.INST_ID.name, drop=False)
+        serialDf[RTF.INST_ID.name] = np.arange(len(serialDf), dtype=int)
+        serialDf = serialDf.set_index(RTF.INST_ID.name, drop=False)
       # Decouple index from instance ID until after transfer from csvDf is complete
       # This was causing very strange behavior without reset_index()...
-      outDf = cls.tableData.makeCompDf(len(csvDf)).reset_index(drop=True)
+      outDf = self.tableData.makeCompDf(len(serialDf)).reset_index(drop=True)
       # Objects in the original frame are represented as strings, so try to convert these
       # as needed
-      for field in cls.tableData.allFields:
-        if field.name in csvDf:
-          matchingCol = csvDf[field.name]
+      for field in self.tableData.allFields:
+        if field.name in serialDf:
+          matchingCol = serialDf[field.name]
           # 'Object' type results in false positives
           if matchingCol.dtype != object and type(field.value) == matchingCol.dtype:
-            outDf[field] = csvDf[field.name]
+            outDf[field] = serialDf[field.name]
           else:
             # Parsing functions only know how to convert from strings to themselves.
             # So, assume the exting types can first convert themselves to strings
@@ -490,7 +551,7 @@ class ComponentIO:
             outDf[field] = _strSerToParamSer(matchingCol, field.value)
       outDf = outDf.set_index(RTF.INST_ID, drop=False)
 
-      cls.checkVertBounds(outDf[RTF.VERTICES], imShape)
+      self.checkVertBounds(outDf[RTF.VERTICES], imShape)
     except Exception as ex:
       # Rethrow exception with insight about column number
       # Procedure copied from https://stackoverflow.com/a/6062677/9463643
@@ -501,8 +562,12 @@ class ComponentIO:
     #  rows to gracefully fall off the dataframe with some sort of warning message
     return outDf
 
-  @classmethod
-  def buildFromGeojson(cls, inFileOrDict: Union[FilePath, dict],  **importArgs):
+  @wraps(buildFromSerialized)
+  def buildFromCsv(self, *args, **kwargs):
+    """Deprecated in favor of ComponentIO.buildFromSerialized"""
+    return self.buildFromSerialized(*args, **kwargs)
+
+  def buildFromGeojson(self, inFileOrDict: Union[FilePath, dict], **importArgs):
     if not isinstance(inFileOrDict, dict):
       inFileOrDict = json.load(open(inFileOrDict, 'r'))
     verts = []
@@ -511,11 +576,9 @@ class ComponentIO:
       if geo['type'] == 'Polygon':
         verts.append(ComplexXYVertices(geo['coordinates'], coerceListElements=True))
     tmpDf = pd.DataFrame(verts, columns=[RTF.VERTICES.name])
-    return cls.buildFromCsv(tmpDf, **importArgs)
+    return self.buildFromCsv(tmpDf, **importArgs)
 
-
-  @classmethod
-  def buildFromSuperannotateJson(cls, inFileOrDict: Union[FilePath, dict], **importArgs):
+  def buildFromSuperannotateJson(self, inFileOrDict: Union[FilePath, dict], **importArgs):
     if not isinstance(inFileOrDict, dict):
       inFileOrDict = json.load(open(inFileOrDict, 'r'))
     points = [i['points'] for i in inFileOrDict['instances']]
@@ -523,46 +586,43 @@ class ComponentIO:
     for pts in points:
       npPts = np.column_stack([pts[::2], pts[1::2]])
       npPoints.append(npPts)
-    outDf = cls.tableData.makeCompDf(len(npPoints))
+    outDf = self.tableData.makeCompDf(len(npPoints))
     outDf[RTF.VERTICES] = [ComplexXYVertices([pts], coerceListElements=True) for pts in npPoints]
     outDf[RTF.SRC_IMG_FILENAME] = inFileOrDict['metadata']['name']
     imShape = (inFileOrDict['metadata']['height'], inFileOrDict['metadata']['width'])
-    cls.checkVertBounds(outDf[RTF.VERTICES], imShape)
+    self.checkVertBounds(outDf[RTF.VERTICES], imShape)
     return outDf
 
-  @classmethod
-  def buildFromCompimgsDf(cls, inFile: FilePath, imShape: Tuple=None,
+  def buildFromCompImgsDf(self, inFile: FilePath, imShape: Tuple=None,
                           lblField='Class', **importArgs):
-    lblField = cls.tableData.fieldFromName(lblField)
+    lblField = self.tableData.fieldFromName(lblField)
     inDf = pd.read_pickle(inFile)
-    outDf = cls.tableData.makeCompDf(len(inDf))
+    outDf = self.tableData.makeCompDf(len(inDf))
     outDf[RTF.INST_ID] = inDf['instId']
     allVerts = []
 
     for idx, row in inDf.iterrows():
-      mask = cls._strToNpArray(row.labelMask, dtype=bool)
+      mask = self._strToNpArray(row.labelMask, dtype=bool)
       verts = ComplexXYVertices.fromBwMask(mask)
-      offset = cls._strToNpArray(row.offset)
+      offset = self._strToNpArray(row.offset)
       for v in verts: v += offset
       allVerts.append(verts)
     outDf[RTF.VERTICES] = allVerts
     outDf[lblField] = inDf[lblField]
-    cls.checkVertBounds(outDf[RTF.VERTICES], imShape)
+    self.checkVertBounds(outDf[RTF.VERTICES], imShape)
     return outDf
 
-  @classmethod
-  def buildFromPkl(cls, inFile: FilePath, imShape: Tuple=None, **importArgs) -> pd.DataFrame:
+  def buildFromPkl(self, inFile: FilePath, imShape: Tuple=None, **importArgs) -> pd.DataFrame:
     """
     See docstring for :func:`self.buildFromCsv`
     """
     pklDf = pd.read_pickle(inFile)
-    cls.checkVertBounds(pklDf[RTF.VERTICES], imShape)
-    templateDf = cls.tableData.makeCompDf(len(pklDf)).set_index(pklDf.index)
+    self.checkVertBounds(pklDf[RTF.VERTICES], imShape)
+    templateDf = self.tableData.makeCompDf(len(pklDf)).set_index(pklDf.index)
     templateDf.update(pklDf)
     return templateDf
 
-  @classmethod
-  def buildFromLblPng(cls, inFileOrImg: Union[FilePath, GrayImg],
+  def buildFromLblPng(self, inFileOrImg: Union[FilePath, GrayImg],
                       labelMapping: pd.Series=None,
                       useDistinctRegions=False,
                       **importArgs) -> pd.DataFrame:
@@ -573,6 +633,7 @@ class ComponentIO:
     allVerts = []
     lblField_out = []
     for origVal, numericLbl in labelMapping.iteritems():
+      origVal: np.number # silence warning
       verts = ComplexXYVertices.fromBwMask(labelImg == numericLbl)
       if useDistinctRegions:
         allVerts.extend(verts)
@@ -581,38 +642,35 @@ class ComponentIO:
         allVerts.append(verts)
         orig = [origVal]
       lblField_out.extend(orig)
-    outDf = cls.tableData.makeCompDf(len(allVerts))
+    outDf = self.tableData.makeCompDf(len(allVerts))
     outDf[labelMapping.name] = lblField_out
     outDf[RTF.VERTICES] = allVerts
     return outDf
 
-
-  @classmethod
-  def buildFromIdPng(cls, inFileOrImg: Union[FilePath, GrayImg], imShape: Tuple=None, **importArgs) -> pd.DataFrame:
+  def buildFromIdPng(self, inFileOrImg: Union[FilePath, GrayImg], imShape: Tuple=None, **importArgs) -> pd.DataFrame:
     if isinstance(inFileOrImg, GrayImg):
       labelImg = inFileOrImg
     else:
       labelImg = io.imread(inFileOrImg, as_gray=True)
-    outDf = cls._idImgToDf(labelImg)
-    cls.checkVertBounds(outDf[RTF.VERTICES], imShape)
+    outDf = self._idImgToDf(labelImg)
+    self.checkVertBounds(outDf[RTF.VERTICES], imShape)
     return outDf
 
-  @classmethod
-  def buildFromClassPng(cls, inFileOrImg: Union[FilePath, GrayImg], imShape: Tuple=None, **importArgs) -> pd.DataFrame:
+  def buildFromClassPng(self, inFileOrImg: Union[FilePath, GrayImg], imShape: Tuple=None, **importArgs) -> pd.DataFrame:
     if isinstance(inFileOrImg, GrayImg):
       clsImg = inFileOrImg
     else:
       clsImg = io.imread(inFileOrImg)
-    clsParam = cls.tableData.fieldFromName('Class')
+    clsParam = self.tableData.fieldFromName('Class')
     clsArray = np.array(clsParam.opts['limits'])
     idImg = measure.label(clsImg)
-    outDf = cls.buildFromIdPng(idImg, imShape)
+    outDf = self.buildFromIdPng(idImg, imShape)
     outClasses = []
     for curId in outDf[RTF.INST_ID]+1:
       # All ID pixels should be the same class, so any representative will do
       curCls = clsImg[idImg == curId][0]
       outClasses.append(clsArray[curCls-1])
-    outDf[cls.tableData.fieldFromName('Class')] = outClasses
+    outDf[self.tableData.fieldFromName('Class')] = outClasses
     outDf.reset_index(inplace=True, drop=True)
     outDf[RTF.INST_ID] = outDf.index
     return outDf
@@ -642,8 +700,7 @@ class ComponentIO:
            f'Perhaps this export came from a different image?\n'
            f'Offending IDs: {offendingIds}', UserWarning)
 
-  @classmethod
-  def _idImgToDf(cls, idImg: GrayImg):
+  def _idImgToDf(self, idImg: GrayImg):
     # Skip 0 since it's indicative of background
     regionIds = np.unique(idImg)
     regionIds = regionIds[regionIds != 0]
@@ -651,8 +708,11 @@ class ComponentIO:
     for curId in regionIds:
       verts = ComplexXYVertices.fromBwMask(idImg == curId)
       allVerts.append(verts)
-    outDf = cls.tableData.makeCompDf(regionIds.size)
+    outDf = self.tableData.makeCompDf(regionIds.size)
     # Subtract 1 since instance ids are 0-indexed
     outDf[RTF.INST_ID] = regionIds-1
     outDf[RTF.VERTICES] = allVerts
     return outDf
+
+
+defaultIo = ComponentIO()

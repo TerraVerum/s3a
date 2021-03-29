@@ -12,7 +12,7 @@ from pyqtgraph import arrayToQPath
 from pyqtgraph.Qt import QtGui, QtCore
 from utilitys import PrjParam, RunOpts, EditorPropsMixin, fns
 
-from s3a import PRJ_SINGLETON, ComponentIO as frio
+from s3a import PRJ_SINGLETON
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_CONSTS, PRJ_ENUMS
 from s3a.generalutils import stackedVertsPlusConnections
 from s3a.structures import GrayImg, OneDArr, BlackWhiteImg
@@ -21,6 +21,8 @@ from . import imageareas
 from .clickables import BoundScatterPlot
 
 __all__ = ['MultiRegionPlot', 'VertexDefinedImg', 'RegionCopierPlot']
+
+from .._io import defaultIo
 
 Signal = QtCore.Signal
 
@@ -176,7 +178,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     labelDf[RTF.VERTICES] = self.regionData[RTF.VERTICES]
     # Override id column to avoid an extra parameter
     labelDf[RTF.INST_ID] = labels
-    return frio.exportLblPng(labelDf, imShape=imShape, allowOffset=True)
+    return defaultIo.exportLblPng(labelDf, imShape=imShape, allowOffset=True)
 
   @fns.dynamicDocstring(cmapVals=colormaps() + ['None'])
   def updateColors(self, penWidth=0, penColor='w', selectedFill='00f', focusedFill='f00', labelColormap='viridis',

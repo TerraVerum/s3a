@@ -23,7 +23,7 @@ from s3a.generalutils import hierarchicalUpdate, cvImsave_rgb
 from s3a.graphicsutils import DropList, ThumbnailViewer
 from s3a.structures import FilePath, NChanImg
 from ..constants import APP_STATE_DIR, PROJ_FILE_TYPE, PROJ_BASE_TEMPLATE
-
+from s3a._io import ComponentIO
 
 class FilePlugin(CompositionMixin, ParamEditorPlugin):
   name = '&File'
@@ -776,7 +776,7 @@ class ProjectData(QtCore.QObject):
       # Already present, shouldn't be added
       return
     if data is None:
-      data = ComponentIO.buildByFileType(name)
+      data = self.compIo.buildByFileType(name)
     if image is None:
       # If no explicit matching to an image is provided, try to determine based on annotation name
       xpondingImgs = np.unique(data[REQD_TBL_FIELDS.SRC_IMG_FILENAME].to_numpy())
@@ -794,13 +794,14 @@ class ProjectData(QtCore.QObject):
     annForImg = self.imgToAnnMapping.get(image, None)
     oldAnns = []
     if annForImg is not None and not overwriteOld:
-      oldAnns.append(ComponentIO.buildByFileType(annForImg))
+      oldAnns.append(self.compIo.buildByFileType(annForImg))
     combinedAnns = oldAnns + [data]
     outAnn = pd.concat(combinedAnns, ignore_index=True)
     outAnn[REQD_TBL_FIELDS.INST_ID] = outAnn.index
     outFmt = f".{self.cfg['annotation-format']}"
     outName = self.annotationsDir / f'{image.name}{outFmt}'
-    ComponentIO.exportByFileType(outAnn, outName, verifyIntegrity=False, readOnly=False, imgDir=self.imagesDir)
+    self.compIo.exportByFileType(outAnn, outName, verifyIntegrity=False, readOnly=False,
+                       imgDir=self.imagesDir)
     self.imgToAnnMapping[image] = outName
 
   def _copyImgToProj(self, name: Path, data: NChanImg=None, overwrite=False):
@@ -877,8 +878,8 @@ class ProjectData(QtCore.QObject):
   def exportAnnotations(self, outputFolder:FilePath= 's3a-export',
                         annotationFormat='csv',
                         combine=False,
-                        rescale=False,
-                        includeImages=True):
+                        includeImages=True,
+                        **exportOpts):
     """
     Exports project annotations, optionally including their source images
     :param outputFolder:
@@ -893,12 +894,9 @@ class ProjectData(QtCore.QObject):
       limits:
         {fileTypes}
     :param combine: If `True`, all annotation files will be combined into one exported file with name `annotations.<format>`
-    :param rescale:
-      helpText: "For image exports, this determines whether the ouptut should retain the same
-        values as their integer label or whether they should be scaled to entire range
-        of black -> white"
     :param includeImages: If `True`, the corresponding image for each annotation will also be exported into an `images`
       folder
+    :param exportOpts: Additional options passed to the exporting function
     """
     self.saveCfg()
     outputFolder = Path(outputFolder)
@@ -914,7 +912,7 @@ class ProjectData(QtCore.QObject):
         if self.imgToAnnMapping.get(img, None) is not None:
           shutil.copy(img, outImgDir)
 
-    ioArgs = {'imgDir': self.imagesDir, 'rescaleOutput': rescale}
+    ioArgs = {'imgDir': self.imagesDir, **exportOpts}
     existingAnnFiles = [f for f in self.imgToAnnMapping.values() if f is not None]
     if combine:
       outAnn = pd.concat(map(self.compIo.buildByFileType, existingAnnFiles))
