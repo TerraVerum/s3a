@@ -150,7 +150,9 @@ class ComponentIO:
     outFile = Path(outFile)
     outFn = self._ioFnFromFileType(outFile, 'export')
 
-    ret = outFn(compDf, outFile, **exportArgs)
+    useArgs = self.exportOpts.copy()
+    useArgs.update(exportArgs)
+    ret = outFn(compDf, outFile, **useArgs)
     if verifyIntegrity and outFile.suffix[1:] in self.roundTripIoTypes:
       matchingCols = np.setdiff1d(compDf.columns, [RTF.INST_ID,
                                                    RTF.SRC_IMG_FILENAME])
@@ -179,7 +181,9 @@ class ComponentIO:
   def buildByFileType(self, inFile: Union[str, Path], imShape: Tuple[int]=None,
                       strColumns=False, **importArgs):
     buildFn = self._ioFnFromFileType(inFile, 'buildFrom')
-    outDf = buildFn(inFile, imShape=imShape, **importArgs)
+    useArgs = self.buildOpts.copy()
+    useArgs.update(**importArgs)
+    outDf = buildFn(inFile, imShape=imShape, **useArgs)
     if strColumns:
       outDf.columns = list(map(str, outDf.columns))
     return outDf
