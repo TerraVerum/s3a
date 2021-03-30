@@ -18,7 +18,8 @@ from utilitys import fns
 from utilitys.fns import warnLater
 from utilitys.params import *
 
-from s3a import PRJ_SINGLETON, PRJ_CONSTS as CNST, ComponentIO, models, REQD_TBL_FIELDS
+from s3a import PRJ_SINGLETON, PRJ_CONSTS as CNST, ComponentIO, models, REQD_TBL_FIELDS, \
+  defaultIo
 from s3a.generalutils import hierarchicalUpdate, cvImsave_rgb
 from s3a.graphicsutils import DropList, ThumbnailViewer
 from s3a.structures import FilePath, NChanImg
@@ -131,6 +132,8 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
 
     def startImg(imgName: str):
       imgName = Path(imgName)
+      if not imgName.is_absolute():
+        imgName = self.projData.imagesDir/imgName
       if not imgName.exists():
         return
       name = imgName.name
@@ -422,7 +425,8 @@ class ProjectData(QtCore.QObject):
 
   def __init__(self, cfgFname: FilePath=None, cfgDict: dict=None):
     super().__init__()
-    self.tableData = PRJ_SINGLETON.tableData
+    self.compIo = defaultIo
+    self.tableData = self.compIo.tableData = PRJ_SINGLETON.tableData
     self.templateName = PROJ_BASE_TEMPLATE
     self.cfg = fns.attemptFileLoad(self.templateName)
     self.cfgFname: Optional[Path] = None
@@ -438,8 +442,6 @@ class ProjectData(QtCore.QObject):
 
     if cfgFname is not None or cfgDict is not None:
       self.loadCfg(cfgFname, cfgDict)
-
-    self.compIo = ComponentIO()
 
   def _handleDirChange(self):
     imgs = list(self.imagesDir.glob('*.*'))
@@ -574,6 +576,7 @@ class ProjectData(QtCore.QObject):
     if dirs:
       self.watcher.removePaths(dirs)
     self.watcher.addPaths([str(self.imagesDir), str(self.annotationsDir)])
+    self.compIo.buildOpts['imgDir'] = self.imagesDir
     return self.cfgFname
 
   @classmethod
@@ -912,11 +915,11 @@ class ProjectData(QtCore.QObject):
         if self.imgToAnnMapping.get(img, None) is not None:
           shutil.copy(img, outImgDir)
 
-    ioArgs = {'imgDir': self.imagesDir, **exportOpts}
     existingAnnFiles = [f for f in self.imgToAnnMapping.values() if f is not None]
     if combine:
       outAnn = pd.concat(map(self.compIo.buildByFileType, existingAnnFiles))
-      self.compIo.exportByFileType(outAnn, outputFolder / f'annotations.{annotationFormat}', **ioArgs)
+      self.compIo.exportByFileType(outAnn, outputFolder / f'annotations.'
+                                                          f'{annotationFormat}', **exportOpts)
     else:
       outAnnsDir = outputFolder / 'annotations'
       outAnnsDir.mkdir(exist_ok=True)
@@ -924,7 +927,8 @@ class ProjectData(QtCore.QObject):
         shutil.copytree(self.annotationsDir, outAnnsDir)
       else:
         for annFile in existingAnnFiles:
-          self.compIo.convert(annFile, outAnnsDir/f'{annFile.stem}.{annotationFormat}', importArgs=ioArgs, exportArgs=ioArgs)
+          self.compIo.convert(annFile, outAnnsDir/f'{annFile.stem}.{annotationFormat}',
+                              importArgs=exportOpts, exportArgs=exportOpts)
 
   def _maybeEmit(self, signal: QtCore.Signal, emitList: Sequence[Union[Path, Tuple[Path, Path]]]):
     if not self._suppressSignals:

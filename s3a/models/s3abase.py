@@ -66,7 +66,6 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
 
     self.compMgr = ComponentMgr()
     # Register exporter to allow user parameters
-    self.compIo = ComponentIO()
     ComponentIO.tableData = PRJ_SINGLETON.tableData
 
     self.compTbl = CompTableView()
@@ -88,6 +87,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     # -----
     PRJ_SINGLETON.tableData.sigCfgUpdated.connect(lambda: self.resetTblFields())
     self.filePlg: FilePlugin = self.addPlugin(FilePlugin)
+    self.compIo = self.filePlg.projData.compIo
 
     for plugin in PRJ_SINGLETON.clsToPluginMapping.values(): # type: ParamEditorPlugin
       # Plugins created before window was initialized may need their plugins forcefully
