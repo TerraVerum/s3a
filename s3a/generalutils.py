@@ -154,8 +154,8 @@ def safeCallFunc(fnName: str, func: Callable, *fnArgs):
 def _maybeBgrToRgb(image: np.ndarray):
   """Treats 3/4-channel images as BGR/BGRA for opencv saving/reading"""
   if image.ndim > 2:
-    if image.shape[0] == 1:
-      image = image[...,0]
+    # if image.shape[0] == 1:
+    #   image = image[...,0]
     if image.shape[2] >= 3:
       lastAx = np.arange(image.shape[2], dtype='int')
       # Swap B & R

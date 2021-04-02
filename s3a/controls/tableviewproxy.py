@@ -120,7 +120,8 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
       pType: list
     """
     self.labelCol = PRJ_SINGLETON.tableData.fieldFromName(labelCol)
-    newLblData = self.labelCol.toNumeric(self._compMgr.compDf[self.labelCol], rescale=True)
+    newLblData = self.labelCol.toNumeric(self._compMgr.compDf.loc[
+                                           self.displayedIds, self.labelCol], rescale=True)
 
     self.regionPlot.regionData[PRJ_ENUMS.FIELD_LABEL] = newLblData
     self.regionPlot.updateColors()

@@ -282,7 +282,7 @@ class ComponentIO:
   def exportCompImgsDf(self, compDf: pd.DataFrame, outFile: Union[str, Path]=None,
                        imgDir: FilePath=None, margin=0, marginAsPct=False,
                        includeCols=('instId', 'img', 'labelMask', 'label', 'offset'),
-                       lblField='Instance ID', allowOffset=True, **kwargs):
+                       lblField='Instance ID', asIndiv=False, allowOffset=True, **kwargs):
     """
     Creates a dataframe consisting of extracted images around each component
     :param compDf: Dataframe to export
@@ -296,6 +296,12 @@ class ComponentIO:
     :param includeCols: Which columns to include in the export list
     :param lblField: See ComponentIO.exportLblPng. This label is provided in the output dataframe
       as well, if specified.
+    :param asIndiv: Whether components should be exported as individual units (i.e.
+      neighbors are guaranteed never to show up in the ground truth label mask) or whether
+      a cropped area around the component should be used as the label mask. This will
+      include mask values of neighbors if they are within mask range. Note: This is
+      performed with preference toward higher ids, i.e. if a high ID is on top of a low ID,
+      the low ID will still be covered in its export mask
     :param allowOffset: See ComponentIO.exportLblPng. This ensures index labels start at 1
     :return: Dataframe with the following keys:
       - instId: The component's Instance ID
@@ -306,6 +312,7 @@ class ComponentIO:
       - offset: Image (x,y) coordinate of the min component vertex.
     :param kwargs: Passed to ComponentIO.exportLblPng
     """
+    bgColor = kwargs.get('bgColor', 0)
     _imgCache = {}
     if imgDir is None:
       imgDir = Path('.')
@@ -329,8 +336,23 @@ class ComponentIO:
     for miniDf, fullImgName in zip(dfGroupingsByImg, uniqueImgs):
       fullImgName = imgDir / fullImgName
       img = _imgCache[fullImgName]
-      lblImg = self.exportLblPng(miniDf, imShape=img.shape[:2], lblField=lblField,
-                                 allowOffset=allowOffset, **kwargs)
+      lblImg, mapping = self.exportLblPng(miniDf,
+                                          imShape=img.shape[:2],
+                                          lblField=lblField,
+                                          allowOffset=allowOffset,
+                                          returnLblMapping=True,
+                                          **kwargs)
+      if asIndiv:
+        # Also need an ID mask
+        if lblField == RTF.INST_ID:
+          idImg = lblImg.copy()
+        else:
+          idImg, mapping = self.exportLblPng(miniDf, imShape=img.shape[:2],
+                                             lblField=RTF.INST_ID,
+                                             allowOffset=True,
+                                             returnLblMapping=True)
+        mapping = mapping.astype(idImg.dtype)
+
 
       for ii, (idx, row) in enumerate(miniDf.iterrows()):
         allVerts = row[RTF.VERTICES].stack()
@@ -348,19 +370,27 @@ class ComponentIO:
         if 'label' in useKeys:
           outDf['label'].append(lbl)
 
+        # x-y to row-col, transpose to get min-max in axis 0 and row-col in axis 1
         indexer = tuple(slice(*b) for b in bounds[:, ::-1].T)
+        xyOffset = bounds[0,:]
         if lblImg.ndim > 2:
           indexer += (...,)
-        mask = lblImg[indexer]
         if 'labelMask' in useKeys:
-          # x-y to row-col, transpose to get min-max in axis 0 and row-col in axis 1
+          mask = lblImg[indexer]
+          if asIndiv:
+            # Need to black out every pixel not in the current component, copy to avoid
+            # in-place modification
+            mask = mask.copy()
+            idMask = idImg[indexer]
+            mask[idMask != mapping[idx]] = bgColor
+
           outDf['labelMask'].append(mask)
 
         if 'instId' in useKeys:
           outDf['instId'].append(idx)
 
         if 'offset' in useKeys:
-          outDf['offset'].append(bounds[0,:])
+          outDf['offset'].append(xyOffset)
     outDf = pd.DataFrame(outDf)
     if outFile is not None:
       outDf.to_pickle(outFile)
@@ -505,9 +535,11 @@ class ComponentIO:
     if not isinstance(fromData, pd.DataFrame):
       fromData = self.buildByFileType(fromData, **importArgs)
     exportFn = self._ioFnFromFileType(toFile, 'export')
+    useArgs = self.exportOpts.copy()
+    useArgs.update(exportArgs)
     if not doExport:
       toFile = None
-    return exportFn(fromData, toFile, **exportArgs)
+    return exportFn(fromData, toFile, **useArgs)
 
   def buildFromSerialized(self, inFileOrDf: FilePathOrDf, imShape: Tuple=None,
                           reindex=False, **importArgs):

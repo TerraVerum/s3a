@@ -60,4 +60,4 @@ from s3a.plugins.misc import RandomToolsPlugin
 for plugin in ALL_PLUGINS():
   PRJ_SINGLETON.addPlugin(plugin)
 
-miscPlugin = PRJ_SINGLETON.clsToPluginMapping[RandomToolsPlugin]
+miscPlugin: RandomToolsPlugin = PRJ_SINGLETON.clsToPluginMapping[RandomToolsPlugin]
