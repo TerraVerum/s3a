@@ -49,16 +49,16 @@ class XYVertices(np.ndarray):
       return cls()
     return out
 
-  def asPoint(self):
-    if self.size == 2:
-      return self.reshape(-1)
-    # Reaching here means the user requested vertices as point when
-    # more than one point is in the list
-    raise ValueError(f'asPoint() can only be called when one vertex is in'
-                              f' the vertex list. Currently has shape {self.shape}')
+  # def asPoint(self):
+  #   if self.size == 2:
+  #     return self.reshape(-1)
+  #   # Reaching here means the user requested vertices as point when
+  #   # more than one point is in the list
+  #   raise ValueError(f'asPoint() can only be called when one vertex is in'
+  #                             f' the vertex list. Currently has shape {self.shape}')
 
-  def asRowCol(self):
-    return np.fliplr(self)
+  # def asRowCol(self):
+  #   return np.fliplr(self)
 
   @property
   def x(self):
@@ -133,11 +133,12 @@ class ComplexXYVertices(list):
       lst.y = newLstY
 
   def asPoint(self):
-    if len(self) == 1:
-      return self[0].asPoint()
+    if len(self) == 1 and self[0].shape[0] == 1:
+      return self[0][0]
     else:
       raise ValueError(f'Can only treat ComplexXYVertices with one inner list as a point.'
-                                f' Current list has {len(self)} elements.')
+                       f' Current list has {len(self)} element(s), '
+                       f'where element 0 has shape {self[0].shape}.')
 
   def stack(self, newDtype=int) -> XYVertices:
     if len(self) == 0:

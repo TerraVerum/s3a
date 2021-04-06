@@ -17,7 +17,7 @@ def leftClickGen(pos: XYVertices, dbclick=False):
     typ = Ev.MouseButtonDblClick
   else:
     typ = Ev.MouseButtonPress
-  pos = QtCore.QPointF(*pos.asPoint())
+  pos = QtCore.QPointF(*pos.flatten())
   out = QtGui.QMouseEvent(typ, pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
   return out
 

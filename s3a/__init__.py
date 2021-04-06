@@ -9,7 +9,7 @@ from pyqtgraph.Qt import QtWidgets
 
 __all__ = ['appInst', 'PRJ_SINGLETON', 'S3A', 'REQD_TBL_FIELDS',
            'ComplexXYVertices', 'XYVertices', 'PRJ_CONSTS', 'ComponentIO',
-           '__version__']
+           'ProjectData', '__version__']
 
 pg.setConfigOptions(imageAxisOrder='row-major')
 
@@ -59,5 +59,5 @@ from s3a.plugins import ALL_PLUGINS
 from s3a.plugins.misc import RandomToolsPlugin
 for plugin in ALL_PLUGINS():
   PRJ_SINGLETON.addPlugin(plugin)
-
+from s3a.plugins.file import ProjectData
 miscPlugin: RandomToolsPlugin = PRJ_SINGLETON.clsToPluginMapping[RandomToolsPlugin]

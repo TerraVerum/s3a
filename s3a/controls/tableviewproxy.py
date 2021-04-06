@@ -2,6 +2,7 @@ from typing import Union, Sequence
 from warnings import warn
 
 import numpy as np
+import pandas as pd
 import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtGui, QtSvg, QtWidgets
@@ -292,10 +293,16 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     # Add to current selection depending on modifiers
     mode = QISM.Rows
     if QtGui.QGuiApplication.keyboardModifiers() == QtCore.Qt.ControlModifier:
+      # Toggle select on already active ids
+      toDeselect = np.intersect1d(self.selectedIds, selectedIds)
+      self.selectRowsById(toDeselect, mode|QISM.Deselect)
+      selectedIds = np.setdiff1d(selectedIds, toDeselect)
       mode |= QISM.Select
+
     else:
       mode |= QISM.ClearAndSelect
     if not self.regionCopier.active:
+      self.selectRowsById(selectedIds, mode)
       self.selectRowsById(selectedIds, mode)
     # TODO: Better management of widget focus here
 

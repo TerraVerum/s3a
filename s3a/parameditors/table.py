@@ -331,7 +331,11 @@ class YamlParser:
       paramName = (paramName,)
     leafName = paramName[-1]
     # Assume leaf until proven otherwise since most mechanics are still applicable
-    if not isinstance(value, dict):
+    if isinstance(value, PrjParam):
+      # Can happen with programmatically generated cfgs. Make a copy to
+      # ensure no funky business
+      parsedParam = copy.copy(value)
+    elif not isinstance(value, dict):
       parsedParam = self.parseLeaf(leafName, value)
     else:
       value = value.copy()
@@ -355,14 +359,17 @@ class YamlParser:
       leafParam.pType = 'int'
 
     elif isinstance(value, list):
+      leafParam.pType = 'list'
       # If inner values are dicts, it could be a complex list. Otherwise,
       # it is a primitive list
       testVal = value[0]
       if isinstance(testVal, dict):
-        leafParam = self.parseParamList(leafParam.name)[0]
+        leafParam.value = self.parseParamList(leafParam.name)[0]
       else:
-        # List of primitive values
-        leafParam = value
+        # list of simple values, implied these are the limits. Since no default
+        # is specified, it'll be the first in the list
+        leafParam.opts['limits'] = value
+        leafParam.value = testVal
     return leafParam
 
   def getNestedCfgName(self, namePath: NestedIndexer):

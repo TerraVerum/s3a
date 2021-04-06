@@ -630,7 +630,7 @@ class ComponentIO:
     return outDf
 
   def buildFromCompImgsDf(self, inFile: FilePath, imShape: Tuple=None,
-                          lblField='Class', **importArgs):
+                          lblField='Instance ID', **importArgs):
     lblField = self.tableData.fieldFromName(lblField)
     inDf = pd.read_pickle(inFile)
     outDf = self.tableData.makeCompDf(len(inDf))
