@@ -29,8 +29,13 @@ FilePathOrDf = Union[FilePath, pd.DataFrame]
 _litLst = Literal['buildFrom', 'export']
 
 def _getPdExporters():
-  members = inspect.getmembers(pd.DataFrame, lambda meth: inspect.isfunction(meth) and meth.__name__.startswith('to_'))
-  return [mem[1].__name__.replace('to_', '') for mem in members]
+  members = inspect.getmembers(
+    pd.DataFrame, lambda meth: inspect.isfunction(meth) and meth.__name__.startswith('to_'))
+  return [mem[0].replace('to_', '') for mem in members]
+def _getPdImporters():
+  members = inspect.getmembers(
+    pd.DataFrame,lambda meth: inspect.isfunction(meth) and meth.__name__.startswith('read_'))
+  return [mem[0].replace('read_', '') for mem in members]
 
 def buildWrapper(func):
   @wraps(func)
@@ -209,8 +214,25 @@ class ComponentIO:
     array_string = ','.join(array_string.replace('[ ', '[').split())
     return np.array(literal_eval(array_string), **opts)
 
+  def _pandasSerialImport(self, inFileOrDf: Union[str, Path, pd.DataFrame],
+                          **pdImportArgs):
+    if isinstance(inFileOrDf, pd.DataFrame):
+      serialDf = inFileOrDf
+    else:
+      fType = Path(inFileOrDf).suffix.lower().replace('.', '')
+      importFn = getattr(pd, f'read_{fType}', None)
+      if importFn is None:
+        raise ValueError(f'File type {fType} cannot be handled by the serial importer.'
+                         f' Must be one of {",".join(_getPdImporters())}')
+      # Special case: csv imports need to avoid interpreting nan results
+      pdImportArgs.update(keep_default_na=False)
+      acceptedArgs = inspect.signature(importFn).parameters
+      useArgs = pdImportArgs.keys() & acceptedArgs
+      serialDf = importFn(inFileOrDf, **{k: pdImportArgs[k] for k in useArgs})
+    return serialDf
+
   def _pandasSerialExport(self, exportDf: pd.DataFrame, outFile: Union[str, Path]=None,
-                          exporter='csv', readOnly=True, **pdExportArgs):
+                          readOnly=True, **pdExportArgs):
     if outFile is None:
       return
 
@@ -221,6 +243,7 @@ class ComponentIO:
     }
     outPath = Path(outFile)
     outPath.parent.mkdir(exist_ok=True, parents=True)
+    exporter = outPath.suffix.lower().replace('.', '')
 
     defaultExportParams.update(pdExportArgs)
     exportFn = getattr(exportDf, f'to_{exporter}', None)
@@ -236,20 +259,21 @@ class ComponentIO:
   # -----
   # Export options
   # -----
-  def exportSerialized(self, compDf: pd.DataFrame, outFile: Union[str, Path]=None, exporter='csv', readOnly=True, **pdExportArgs):
+  def exportSerialized(self, compDf: pd.DataFrame, outFile: Union[str, Path]=None,
+                       readOnly=True, **pdExportArgs):
     """
     Converts dataframe into a string-serialized version and uses pandas to write it to disk.
 
     :param compDf: Dataframe to export
     :param outFile: Name of the output file location. If *None*, no file is created. However,
-      the export object will still be created and returned.
-    :param exporter: Which pandas exporter to use. This can be csv, json, feather, etc.
-      Note: Do not include the `to_` prefix, simply specify the direct filetype.
-      Also note: pickle is a special case. In some cases, it is significantly more benficial
+      the export object (string dtype dataframe) will still be created and returned.
+      The file suffix can be any option supported by a pandas exporter. This can be
+      csv, json, feather, etc.
+      Note: pickle is a special case. In some cases, it is significantly more benficial
       to export the raw dataframe compared to a serialized version. In these cases, use
       ComponentIO.exportPkl. Otherwise, `pickle` is still a valid option here for a serialized
       format. For a full list of export options, see
-      https://pandas.pydata.org/pandas-docs/stable/user_guide/io.html#io-tools-text-csv-hdf5
+      `the documentation`https://pandas.pydata.org/pandas-docs/stable/user_guide/io.html`.
     :param pdExportArgs: Dictionary of values passed to underlying pandas export function.
       These will overwrite the default options for :func:`exportToFile <ComponentMgr.exportByFileType>`
     :param readOnly: Whether this export should be read-only
@@ -267,7 +291,7 @@ class ComponentIO:
       for col in exportDf:
         if not isinstance(col.value, str):
           exportDf[col] = _paramSerToStrSer(exportDf[col], col.value)
-      self._pandasSerialExport(exportDf, outFile, exporter, readOnly, **pdExportArgs)
+      self._pandasSerialExport(exportDf, outFile, readOnly, **pdExportArgs)
     except Exception as ex:
       errMsg = f'Error on parsing column "{col.name}"\n'
       augmentException(ex, errMsg)
@@ -282,7 +306,8 @@ class ComponentIO:
   def exportCompImgsDf(self, compDf: pd.DataFrame, outFile: Union[str, Path]=None,
                        imgDir: FilePath=None, margin=0, marginAsPct=False,
                        includeCols=('instId', 'img', 'labelMask', 'label', 'offset'),
-                       lblField='Instance ID', asIndiv=False, allowOffset=True, **kwargs):
+                       lblField='Instance ID', asIndiv=False, allowOffset=True,
+                       missingOk=False, **kwargs):
     """
     Creates a dataframe consisting of extracted images around each component
     :param compDf: Dataframe to export
@@ -303,6 +328,8 @@ class ComponentIO:
       performed with preference toward higher ids, i.e. if a high ID is on top of a low ID,
       the low ID will still be covered in its export mask
     :param allowOffset: See ComponentIO.exportLblPng. This ensures index labels start at 1
+    :param missingOk: Whether a missing image is acceptable. When no source image is found
+      for an annotation, this will simpy the 'image' output property
     :return: Dataframe with the following keys:
       - instId: The component's Instance ID
       - img: The (MxNxC) image corresponding to the component vertices, where MxN are
@@ -325,7 +352,10 @@ class ComponentIO:
       if not fullImgName.is_absolute():
         fullImgName = imgDir / fullImgName
       if fullImgName not in _imgCache:
-        _imgCache[fullImgName] = io.imread(fullImgName)
+        if not fullImgName.exists() and missingOk:
+          _imgCache[fullImgName] = None
+        else:
+          _imgCache[fullImgName] = io.imread(fullImgName)
       dfGroupingsByImg.append(compDf[compDf[RTF.SRC_IMG_FILENAME] == imgName])
 
     useKeys = set(includeCols)
@@ -336,12 +366,15 @@ class ComponentIO:
     for miniDf, fullImgName in zip(dfGroupingsByImg, uniqueImgs):
       fullImgName = imgDir / fullImgName
       img = _imgCache[fullImgName]
+      shape = img if img is None else img.shape[:2]
       lblImg, mapping = self.exportLblPng(miniDf,
-                                          imShape=img.shape[:2],
+                                          imShape=shape,
                                           lblField=lblField,
                                           allowOffset=allowOffset,
                                           returnLblMapping=True,
                                           **kwargs)
+      if img is None:
+        img = np.zeros_like(lblImg)
       if asIndiv:
         # Also need an ID mask
         if lblField == RTF.INST_ID:
@@ -352,6 +385,7 @@ class ComponentIO:
                                              allowOffset=True,
                                              returnLblMapping=True)
         mapping = mapping.astype(idImg.dtype)
+        invertedMap = pd.Series(mapping.index, mapping)
 
 
       for ii, (idx, row) in enumerate(miniDf.iterrows()):
@@ -382,7 +416,7 @@ class ComponentIO:
             # in-place modification
             mask = mask.copy()
             idMask = idImg[indexer]
-            mask[idMask != mapping[idx]] = bgColor
+            mask[idMask != invertedMap[idx]] = bgColor
 
           outDf['labelMask'].append(mask)
 
@@ -444,13 +478,19 @@ class ComponentIO:
       raise IOError(f'Background color must be >= 0, was {bgColor}')
 
     labels = compDf[lblField]
-    labels_numeric = lblField.toNumeric(labels, allowOffset)
+    labels_numeric = lblField.toNumeric(labels, allowOffset, rescaleOutput,
+                                        returnMapping=returnLblMapping)
+    if returnLblMapping:
+      labels_numeric, mapping = labels_numeric
+    else:
+      mapping = None
     asBool = np.issubdtype(labels_numeric.dtype, np.bool_)
 
     if rescaleOutput:
-      lowBound = 1 if allowOffset else 0
-      upBound = np.iinfo(np.uint16).max
-      labels_numeric = rescale_intensity(labels_numeric, out_range=(lowBound, upBound))
+      newMax = np.iinfo(np.uint16).max
+      labels_numeric = (labels_numeric*newMax).astype('uint16')
+      if mapping is not None:
+        mapping.index = (mapping.index*newMax).astype('uint16')
 
     if imShape is None:
       # Without any components the image is non-existant
@@ -469,7 +509,6 @@ class ComponentIO:
     if outFile is not None:
       cvImsave_rgb(outFile, outMask.astype('uint16'))
     if returnLblMapping:
-      mapping = pd.Series(data=labels_numeric, index=labels, name=lblField)
       return outMask, mapping
     return outMask
 
@@ -541,37 +580,37 @@ class ComponentIO:
       toFile = None
     return exportFn(fromData, toFile, **useArgs)
 
+  @fns.dynamicDocstring(availImporters=_getPdImporters())
   def buildFromSerialized(self, inFileOrDf: FilePathOrDf, imShape: Tuple=None,
                           reindex=False, **importArgs):
     """
-    Deserializes data from a csv file to create a Component :class:`DataFrame`.
-    The input .csv should be the same format as one exported by
-    :func:`csvImport <ComponentMgr.csvImport>`.
+    Deserializes data from a file or string dataframe to create a S3A Component
+    :class:`DataFrame`.
+    The input file or dataframe should be the same format as one exported by
+    :func:`exportSerialized <ComponentMgr.exportSerialized>`.
 
     :param imShape: If included, this ensures all imported components lie within imSize
            boundaries. If any components do not, an error is thrown since this is
            indicative of components that actually came from a different reference image.
-    :param inFileOrDf: Name of file to import, or dataframe if it was already read from this
-      file type. Useful if several csv's were concatenated into one dataframe and *that* is
-      being imported.
+    :param inFileOrDf: Name of file to import, or dataframe itself if it was already read
+    from this file. Note: avoid passing in a dataframe directly unless you know what
+    you're doing since null values and some converter types can produce misleading
+    values. Most file types supported by pandas (pandas.read_*) are supported here.
     :param reindex: Whether to disregard the index of the incoming dataframe or file.
       This is useful when *inFileOrDf* is actually a conacatenated df of multiple files, and
       the index doesn't need to be retained.
     :return: Tuple: pd.DataFrame that will be exported if successful extraction
     """
     field = PrjParam('None', None)
+    serialDf = self._pandasSerialImport(inFileOrDf, **importArgs)
+    if reindex:
+      serialDf[RTF.INST_ID.name] = np.arange(len(serialDf), dtype=int)
+      serialDf = serialDf.set_index(RTF.INST_ID.name, drop=False)
     try:
-      if isinstance(inFileOrDf, pd.DataFrame):
-        serialDf = inFileOrDf
-      else:
-        serialDf = pd.read_csv(inFileOrDf, keep_default_na=False)
-      if reindex:
-        serialDf[RTF.INST_ID.name] = np.arange(len(serialDf), dtype=int)
-        serialDf = serialDf.set_index(RTF.INST_ID.name, drop=False)
       # Decouple index from instance ID until after transfer from csvDf is complete
       # This was causing very strange behavior without reset_index()...
       outDf = self.tableData.makeCompDf(len(serialDf)).reset_index(drop=True)
-      # Objects in the original frame are represented as strings, so try to convert these
+      # Objects in the original frame are repre sented as strings, so try to convert these
       # as needed
       for field in self.tableData.allFields:
         if field.name in serialDf:
