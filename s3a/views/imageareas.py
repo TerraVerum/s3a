@@ -199,7 +199,7 @@ class MainImage(EditorPropsMixin, ImageViewer):
         newEvFn = lambda ev: ev.ignore()
         setattr(ax, evFn, newEvFn)
 
-  def updateGridScheme(self, showGrid=False, gridWidth=1, gridColor='fff'):
+  def updateGridScheme(self, showGrid=False, gridWidth=1, gridColor='#fff'):
     """
     :param showGrid:
     :param gridWidth:

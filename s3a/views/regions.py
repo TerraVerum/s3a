@@ -181,7 +181,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     return defaultIo.exportLblPng(labelDf, imShape=imShape, allowOffset=True)
 
   @fns.dynamicDocstring(cmapVals=colormaps() + ['None'])
-  def updateColors(self, penWidth=0, penColor='w', selectedFill='00f', focusedFill='f00', labelColormap='viridis',
+  def updateColors(self, penWidth=0, penColor='w', selectedFill='#00f', focusedFill='#f00', labelColormap='viridis',
                    fillAlpha=0.7):
     """
     Assigns colors from the specified colormap to each unique class

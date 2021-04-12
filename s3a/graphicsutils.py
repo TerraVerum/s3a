@@ -194,8 +194,7 @@ class RegionHistoryViewer(QtWidgets.QMainWindow):
     self.displayPlt.addItem(self.diffImg)
     self.diffImg.setOpacity(0.5)
 
-    _, param = dp.toolsEditor.registerFunc(self.updateImg, runOpts=RunOpts.ON_CHANGED,
-                                       returnParam=True)
+    _, param = dp.toolsEditor.registerFunc(self.updateImg, runOpts=RunOpts.ON_CHANGED, returnParam=True)
     self.slider = param.child('curSlice')
     self.sigDiffsChanged.connect(lambda: self.slider.setLimits([0, len(self.diffs)-1]))
     self.histTimer.timeout.connect(self.incrSlicer)

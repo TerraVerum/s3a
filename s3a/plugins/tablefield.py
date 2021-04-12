@@ -94,7 +94,7 @@ class VerticesPlugin(TableFieldPlugin):
     ids = plt.regionData[PRJ_ENUMS.FIELD_FOCUSED].to_numpy()
     for name, fn in zip(['pen', 'brush'], [pg.mkPen, pg.mkBrush]):
       clrs = plt.data[name]
-      clrs[ids] = fn('0000')
+      clrs[ids] = fn('#0000')
       plt.data[name] = clrs
     plt.updateSpots(plt.data)
 

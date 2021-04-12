@@ -116,16 +116,16 @@ class _PrjConsts(PrjParamGroup):
   # SCHEME PARAMETERS
   # --------------------------
   SCHEME_USE_DARK_THEME  : PrjParam = newParam('Use dark theme', False)
-  SCHEME_BOUND_CLR       : PrjParam = newParam('Normal Boundary Color', 'ff0', 'color')
-  SCHEME_SEL_BOUND_CLR   : PrjParam = newParam('Selected Boundary Color', '00f', 'color')
-  SCHEME_FOC_BRUSH_CLR   : PrjParam = newParam('Focused Brush Color', 'f007', 'color')
+  SCHEME_BOUND_CLR       : PrjParam = newParam('Normal Boundary Color', '#ff0', 'color')
+  SCHEME_SEL_BOUND_CLR   : PrjParam = newParam('Selected Boundary Color', '#00f', 'color')
+  SCHEME_FOC_BRUSH_CLR   : PrjParam = newParam('Focused Brush Color', '#f007', 'color')
   SCHEME_BOUND_WIDTH     : PrjParam = newParam('Boundary Width', 7)
-  SCHEME_REG_VERT_COLOR  : PrjParam = newParam('Vertex Color', '0f0', 'color')
-  SCHEME_REG_FILL_COLOR  : PrjParam = newParam('Fill Color', '00ff0046', 'color')
-  SCHEME_ROI_LINE_CLR    : PrjParam = newParam('ROI Line Color', 'fff', 'color')
+  SCHEME_REG_VERT_COLOR  : PrjParam = newParam('Vertex Color', '#0f0', 'color')
+  SCHEME_REG_FILL_COLOR  : PrjParam = newParam('Fill Color', '#00ff0046', 'color')
+  SCHEME_ROI_LINE_CLR    : PrjParam = newParam('ROI Line Color', '#fff', 'color')
   SCHEME_ROI_LINE_WIDTH  : PrjParam = newParam('ROI Line Width', 1)
   SCHEME_GRID_LINE_WIDTH : PrjParam = newParam('Grid Line Width', 1)
-  SCHEME_GRID_CLR        : PrjParam = newParam('Grid Line Color', 'fff', 'color')
+  SCHEME_GRID_CLR        : PrjParam = newParam('Grid Line Color', '#fff', 'color')
   SCHEME_SHOW_GRID       : PrjParam = newParam('Show Grid', False)
   SCHEME_LBL_COL         : PrjParam = newParam('Labeling Column', REQD_TBL_FIELDS.INST_ID.name, pType='list', limits=[])
 
