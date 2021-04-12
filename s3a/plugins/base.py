@@ -10,7 +10,7 @@ from s3a.constants import PRJ_CONSTS
 
 
 class ProcessorPlugin(ParamEditorPlugin):
-  procCollection: pe.algcollection.AlgParamEditor = None
+  procEditor: pe.algcollection.AlgParamEditor = None
   """
   Most table field plugins will use some sort of processor to infer field data.
   This property holds spawned collections. See :class:`XYVerticesPlugin` for
@@ -19,11 +19,11 @@ class ProcessorPlugin(ParamEditorPlugin):
 
   @property
   def curProcessor(self):
-    return self.procCollection.curProcessor
+    return self.procEditor.curProcessor
 
   @curProcessor.setter
   def curProcessor(self, newProcessor: Union[str, NestedProcWrapper]):
-    self.procCollection.switchActiveProcessor(newProcessor)
+    self.procEditor.changeActiveProcessor(newProcessor)
 
 class TableFieldPlugin(ProcessorPlugin):
   mainImg = None

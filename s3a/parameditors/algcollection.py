@@ -1,134 +1,342 @@
 from __future__ import annotations
 
-from inspect import isclass
+import copy
+import inspect
+import pydoc
+import typing as t
 from pathlib import Path
-from typing import Optional, Dict, List, Callable, Union, Type
+from typing import Dict, List, Callable, Union, Type
 
-from pyqtgraph.Qt import QtCore
+import numpy as np
+from pyqtgraph.Qt import QtCore, QtWidgets
 from pyqtgraph.parametertree import Parameter
-from pyqtgraph.parametertree.parameterTypes import ListParameter
-from utilitys import ParamEditor, NestedProcWrapper, fns
-from utilitys.fns import setParamTooltips
-from utilitys.params.pgregistered import ProcGroupParameter
-from utilitys import NestedProcess
+from typing_extensions import TypedDict
 
 from s3a.constants import MENU_OPTS_DIR
+from utilitys import NestedProcess, RunOpts
+from utilitys import ParamEditor, NestedProcWrapper, fns, ProcessStage, AtomicProcess
+from utilitys.fns import nameFormatter
+from utilitys.widgets import EasyWidget
 
 Signal = QtCore.Signal
+_procDict = Dict[str, List[str]]
 
-class AlgCtorCollection(ParamEditor):
+class _AlgClctnDict(TypedDict):
+  top: List[Union[str, dict]]
+  primitive: List[Union[str, dict]]
+
+
+class AlgCollection(ParamEditor):
   # sigProcessorCreated = Signal(object) # Signal(AlgCollectionEditor)
-  def __init__(self, procWrapType: Type[NestedProcWrapper], parent=None):
-    super().__init__(parent, saveDir='', fileType='')
-    self.processorCtors : List[Callable[[], NestedProcess]] = []
-    self.spawnedCollections : List[AlgParamEditor] = []
+  def __init__(self, procWrapType=NestedProcWrapper, procType=NestedProcess, parent=None, fileType='alg',
+               **kwargs):
+    super().__init__(parent, fileType=fileType, **kwargs)
     self.procWrapType = procWrapType
+    self.procType = procType
+    self.primitiveProcs: Dict[str, Union[ProcessStage, List[str]]] = {}
+    self.topProcs: _procDict = {}
+    self.includeModules: List[str] = []
 
-  def createProcessorForClass(self, clsObj, editorName='Processor') -> AlgParamEditor:
-    if not isclass(clsObj):
-      clsObj = type(clsObj)
-    clsName = clsObj.__name__
-    formattedClsName = fns.pascalCaseToTitle(clsName)
+  def createProcessorEditor(self, saveDir: Union[str, Type], editorName='Processor') -> AlgParamEditor:
+    """
+    Creates a processor editor capable of dynamically loading, saving, and editing collection processes
+
+    :param saveDir: Directory for saved states. If a class type is provided, the __name__ of this class is used.
+      Note: Either way, the resulting name is lowercased before being applied.
+    :param editorName: The name of the spawned editor
+    """
+    if not isinstance(saveDir, str):
+      saveDir = saveDir.__name__
+    formattedClsName = fns.pascalCaseToTitle(saveDir)
     editorDir = MENU_OPTS_DIR/formattedClsName.lower()
-    newEditor = AlgParamEditor(editorDir, self.processorCtors, self.procWrapType, name=editorName)
-    self.spawnedCollections.append(newEditor)
-    # Wrap in property so changes propagate to the calling class
-    lims = newEditor.algOpts.opts['limits']
-    defaultKey = next(iter(lims))
-    defaultAlg = lims[defaultKey]
-    newEditor.algOpts.setDefault(defaultAlg)
-    newEditor.switchActiveProcessor(proc=defaultAlg)
-    # self.sigProcessorCreated.emit(newEditor)
-    return newEditor
+    return AlgParamEditor(self, saveDir=editorDir, fileType=self.fileType, name=editorName)
 
-  def addProcessCtor(self, procCtor: Callable[[], NestedProcess]):
-    self.processorCtors.append(procCtor)
-    for algCollection in self.spawnedCollections:
-      algCollection.addProcessor(procCtor())
+  def addProcess(self, proc: ProcessStage, top=False, force=False):
 
-  def addProcessFunction(self, func: Callable, procType: Type[NestedProcess], name:str=None, **kwargs):
-    def ctor():
-      return procType.fromFunction(func, name=name, **kwargs)
-    self.addProcessCtor(ctor)
+    addDict = self.topProcs if top else self.primitiveProcs
+    saveObj = {proc.name: proc} if isinstance(proc, AtomicProcess) else proc.saveState_flattened()
+    if force or proc.name not in addDict:
+      addDict.update(saveObj)
+    for stage in proc:
+      # Don't recurse 'top', since it should only hold the directly passed process
+      self.addProcess(stage, False, force)
+    return proc.name
 
-class AlgParamEditor(ParamEditor):
-  def __init__(self, saveDir, procCtors: List[Callable[[], NestedProcess]],
-               procWrapType: Type[NestedProcWrapper], name=None, parent=None):
-    algOptDict = {
-      'name': 'Algorithm', 'type':  'list', 'values': [], 'value': 'N/A'
-    }
-    self.treeAlgOpts: Parameter = Parameter(name='Algorithm Selection', type='group', children=[algOptDict])
-    self.algOpts: ListParameter = self.treeAlgOpts.children()[0]
-    self.nameToProcMapping: Dict[str, NestedProcWrapper] = {}
-    super().__init__(parent, saveDir=saveDir, fileType='alg', name=name,
-                     topTreeChild=self.algOpts)
-    self.algOpts.sigValueChanged.connect(lambda param, proc: self.switchActiveProcessor(proc))
-    self.expandAllBtn.hide()
-    self.collapseAllBtn.hide()
+  def addFunction(self, func: Callable, top=False, **kwargs):
+    """Helper function to wrap a function in an atomic process and add it as a stage"""
+    return self.addProcess(AtomicProcess(func, **kwargs), top)
 
-    self.saveDir.mkdir(parents=True, exist_ok=True)
+  def parseProcStages(self, stages: t.Sequence[Union[dict, str]], name:str=None, add=False, allowOverwrite=False):
+    """
+    Creates a nested process from a sequence of process stages and optional name
+    :param stages: Stages to parse
+    :param name: Name of the nested process
+    :param add: Whether to add this new process to the current collection
+    :param allowOverwrite: If `add` is *True*, this determines whether the new process can overwite an already existing
+      proess. If `add` is *False*, this value is ignored.
+    """
+    out = self.procType(name)
+    for stageName in stages:
+      if isinstance(stageName, dict):
+        stage = self.parseProcDict(stageName)
+      else:
+        stage = self.parseProcName(stageName, topFirst=False)
+      out.addProcess(stage)
+    exists = out.name in self.topProcs
+    if add and (not exists or allowOverwrite):
+      self.addProcess(out, allowOverwrite)
+    return out
 
-    self.curProcessor: Optional[NestedProcWrapper] = None
-    self.procWrapType = procWrapType
+  def parseProcName(self, procName: str, topFirst=True):
+    procDicts = [self.primitiveProcs, self.topProcs]
+    if topFirst:
+      procDicts = procDicts[::-1]
+    proc = procDicts[0].get(procName, procDicts[1].get(procName))
+    # It could still be in an include module, cache if found
+    if not proc:
+      for module in self.includeModules:
+        proc = self.parseProcModule(module, procName)
+        if proc:
+          # Success, make sure to cache this in processes
+          # Top processes must be nested
+          self.addProcess(proc, topFirst and isinstance(proc, NestedProcess))
+          break
+    if proc is None:
+      raise ValueError(f'Process "{procName}" not recognized')
+    if not isinstance(proc, ProcessStage):
+      proc = self.parseProcStages(proc, procName)
+    else:
+      proc = copy.deepcopy(proc)
+      # Default to disableale stages. For non-disablable, use parseDict
+      proc.allowDisable = True
+    return proc
 
-    wrapped : Optional[NestedProcWrapper] = None
-    for processorCtor in procCtors:
-      # Retrieve proc so default can be set after
-      wrapped = self.addProcessor(processorCtor())
-    self.algOpts.setDefault(wrapped)
-    self.switchActiveProcessor(proc=wrapped)
-    # self.saveParamValues('Default', allowOverwriteDefault=True)
+  def parseProcDict(self, procDict: dict, topFirst=False):
+    # 1. First key is always the process name, values are new inputs for any matching process
+    # 2. Second key is whether the process is disabled
+    keys = list(procDict)
+    vals = list(procDict.values())
+    procName = keys[0]
+    proc = self.parseProcName(procName, topFirst=topFirst)
+    updateArgs = vals[0]
+    if isinstance(updateArgs, list):
+      # TODO: Determine policy for loading nested procs, outer should already know about inner so it shouldn't
+      #   _need_ to occur, given outer would've been saved previously
+      raise ValueError('Parsing deep nested processes is currently undefined')
+    elif updateArgs:
+      proc.updateInput(**updateArgs, graceful=True)
+    # Check for disables at the nested level
+    proc.disabled = procDict.get('disabled', proc.disabled)
+    proc.allowDisable = procDict.get('allowDisable', proc.allowDisable)
+    proc.name = procDict.get('name', proc.name)
+    return proc
+    # TODO: Add recursion, if it's something that will be done. For now, assume only 1-depth nesting. Otherwise,
+    #   it's hard to distinguish between actual input optiosn and a nested process
 
-  def addProcessor(self, newProc: NestedProcess):
-    processor = self.procWrapType(newProc, parentParam=self.params)
-    self.tree.addParameters(self.params.child(processor.algName))
-    setParamTooltips(self.tree)
+  def _addFromModuleName(self, fullModuleName: str, primitive=True):
+    """
+    Adds all processes defined in a module to this collection. From a full module name (import.path.module). Rules:
+      - All functions defined in that file *not* beginning with an underscore (_) will be added, except for
+        the rule(s) below
+      - All functions ending with 'factory' will be assumed ProcessStage factories, where their return value is exactly
+        one ProcessStage. These are expected to take no arguments. Note that if `primitive` is *False* and an
+        AtomicProcess is returned, errors will occur. So, it is implicitly forced to be a primitive process if this
+        occurs
 
-    self.nameToProcMapping.update({processor.algName: processor})
-    self.algOpts.setLimits(self.nameToProcMapping.copy())
-    return processor
+    :param fullModuleName: Module name to parse. Should be in a format expected by pydoc
+    :param primitive: Whether the returned values should be considered top or primitive processes
+    """
+    if fullModuleName in self.includeModules:
+      return
+    module = pydoc.locate(fullModuleName)
+    if not module:
+      raise ValueError(f'Module "{fullModuleName}" not recognized')
+    for name, func in inspect.getmembers(module,
+                                         lambda el: inspect.isfunction(el)
+                                                    and el.__module__ == module.__name__
+                                                    and not el.__name__.startswith('_')):
+      if name.lower().endswith('factory'):
+        obj = func()
+        self.addProcess(obj, top=not primitive and not isinstance(obj, AtomicProcess))
+      else:
+        self.addFunction(func)
+
+  @classmethod
+  def parseProcModule(cls, moduleName: str, procName: str, formatter=nameFormatter):
+    module = pydoc.locate(moduleName)
+    if not module:
+      raise ValueError(f'Module "{module}" not recognized')
+    # TODO: Depending on search time, maybe quickly search without formatting?
+    attr = None
+    for name, modAttr in vars(module).items():
+      name = nameFormatter(name.split('.')[-1])
+      if name == procName:
+        attr = modAttr
+        break
+      elif procName in name and name.lower().endswith('factory'):
+        attr = modAttr()
+        break
+
+    # Change behavior based on obj type
+    if inspect.isfunction(attr):
+      return AtomicProcess(attr)
+    if isinstance(attr, ProcessStage):
+      return attr
+    return None
 
   def saveParamValues(self, saveName: str=None, paramState: dict=None, **kwargs):
+    def procFilter(procDict):
+      return {k: v for k, v in procDict.items() if not isinstance(v, ProcessStage)}
+    if paramState is None:
+      paramState = {'top': procFilter(self.topProcs), 'primitive': procFilter(self.primitiveProcs)}
+      if self.includeModules:
+        paramState['modules'] = self.includeModules
+    return super().saveParamValues(saveName, paramState, **kwargs)
+
+  def loadParamValues(self, stateName: t.Union[str, Path],
+                      stateDict: _AlgClctnDict=None,
+                      **kwargs):
+    stateDict = self._parseStateDict(stateName, stateDict)
+    top, primitive = stateDict.get('top', {}), stateDict.get('primitive', {})
+    modules = stateDict.get('modules', [])
+    for mod in modules:
+      self._addFromModuleName(mod)
+    self.includeModules = modules
+    self.topProcs.update(top)
+    self.primitiveProcs.update(primitive)
+
+    return super().loadParamValues(stateName, stateDict, candidateParams=[])
+
+class AlgParamEditor(ParamEditor):
+  sigProcessorChanged = QtCore.Signal(str)
+  """Name of newly selected process"""
+
+  def __init__(self, clctn: AlgCollection=None, **kwargs):
+    super().__init__(**kwargs)
+    if clctn is None:
+      clctn = AlgCollection()
+    self.clctn = clctn
+    self.treeBtnsWidget.hide()
+    self._unflatProc: t.Optional[NestedProcess] = None
+    """Retained for saving state on swap without flattening the source processor"""
+
+    noneProc = self.clctn.procType('None')
+    clctn.addProcess(noneProc, top=not clctn.topProcs)
+
+    procName = next(iter(self.clctn.topProcs))
+    # Set to None first to force switch, init states
+    self.curProcessor = self.clctn.procWrapType(noneProc, self.params)
+    self.changeActiveProcessor(procName)
+    _, self.changeProcParam = self.registerFunc(self.changeActiveProcessor, runOpts=RunOpts.ON_CHANGED, returnParam=True,
+                                                overrideBasePath=(), parentParam=self.algoGrp,
+                                                proc=procName)
+    fns.setParamsExpanded(self.algoTree)
+    self.algoTree.setMinimumHeight(self.algoTree.sizeHint().height())
+    procSelector = self.changeProcParam.child('proc')
+    self.clctn.sigChangesApplied.connect(lambda: procSelector.setLimits(list(self.clctn.topProcs)))
+    self.clctn.sigChangesApplied.emit({})
+    def onChange(name):
+      self.changeProcParam['proc'] = name
+    self.sigProcessorChanged.connect(onChange)
+
+  def _buildGui(self, **kwargs):
+    super()._buildGui(**kwargs)
+    self.algoGrp = Parameter.create(name='Algorithm Selection', type='group')
+    self.algoTree = fns.flexibleParamTree(self.algoGrp, False)
+    self.algoTree.setHeaderHidden(True)
+    self.algoTree.setSizePolicy(self.algoTree.sizePolicy().horizontalPolicy(), QtWidgets.QSizePolicy.Fixed)
+    # Size is just a tad too small
+    oldSzHint = self.algoTree.sizeHint
+    def newSzHint():
+      baseHint = oldSzHint()
+      baseHint.setHeight(int(baseHint.height()*1.1))
+      return baseHint
+    self.algoTree.sizeHint = newSzHint
+
+    dockLay = self.dockContentsWidget.easyChild.layout_
+    dockLay.removeWidget(self.tree)
+    dockLay.insertWidget(1, EasyWidget.buildWidget([self.algoTree, self.tree], useSplitter=True))
+
+  @classmethod
+  def _unnestedProcState(cls, proc: NestedProcess, _state=None, **kwargs):
+    """
+    Updates processes without hierarchy so separate stages are unnested. The outermost process is considered a
+    'top' process, while all subprocesses are considered 'primitive'.
+
+    :param proc: Process to record the unnested state
+    :param _state: Internally used, do not provide in the function call. It will be returned at the end with 'top' and
+      'primitive' keys
+    :return: Mock Collection state from just the provided nested process. The passed process will be the only 'top'
+      value, while all substages are entries (and unnested substages, etc.) are entries in the 'primitive' key
+    """
+    kwargs.update(includeMeta=True, disabled=False, allowDisable=True)
+    first = _state is None
+    if first:
+      _state = {'top': {}, 'primitive': {}}
+    stageVals = []
+    for stage in proc:
+      if isinstance(stage, NestedProcess):
+        cls._unnestedProcState(stage, _state, **kwargs)
+        stageVals.append(stage.addMetaProps(stage.name, **kwargs))
+      else:
+        stageVals.append(stage.saveState(**kwargs))
+    entryPt = 'top' if first else 'primitive'
+    _state[entryPt][proc.name] = stageVals
+    return _state
+
+  def saveParamValues(self, saveName: str=None, paramState: dict=None, *, includeDefaults=False, **kwargs):
     """
     The algorithm editor also needs to store information about the selected algorithm, so lump
     this in with the other parameter information before calling default save.
     """
+    proc = self.curProcessor.processor
+    # Make sure any newly added stages are accounted for
     if paramState is None:
-      paramDict = fns.paramDictWithOpts(self.params, addList=['enabled'], addTo=[ProcGroupParameter],
-                                         removeList=['value'])
-      paramState = {'Selected Algorithm': self.algOpts.value().algName,
-                    'Parameters': paramDict}
-    return super().saveParamValues(saveName, paramState, **kwargs)
+      # Since inner nested processes are already recorded, flatten here to just save updated parameter values for the
+      # outermost stage
+      paramState = self._unnestedProcState(proc, includeMeta=True)
+    self.clctn.loadParamValues(self.clctn.lastAppliedName, paramState)
+    clctnState = self.clctn.saveParamValues(saveName, blockWrite=True)
+    paramState = {'Selected Algorithm': self.curProcessor.algName, 'Parameters': clctnState}
+    return super().saveParamValues(saveName, paramState, includeDefaults=includeDefaults, **kwargs)
 
   def loadParamValues(self, stateName: Union[str, Path],
                       stateDict: dict=None, **kwargs):
     stateDict = self._parseStateDict(stateName, stateDict)
-    selectedOpt = stateDict.get('Selected Algorithm', None)
-    # Get the impl associated with this option name
-    isLegitSelection = selectedOpt in self.algOpts.opts['limits']
-    if not isLegitSelection:
-      selectedImpl = self.algOpts.value()
-      raise ValueError(f'Selection {selectedOpt} does'
-                                f' not match the list of available algorithms. Defaulting to {selectedImpl}')
-    else:
-      selectedImpl = self.algOpts.opts['limits'][selectedOpt]
-    self.algOpts.setValue(selectedImpl)
-    super().loadParamValues(stateName, stateDict['Parameters'])
+    procName = stateDict.get('Selected Algorithm')
+    if not procName:
+      procName = next(iter(self.clctn.topProcs))
+    clctnState = stateDict['Parameters']
 
-  def switchActiveProcessor(self, proc: Union[str, NestedProcWrapper]):
+    self.clctn.loadParamValues(stateName, clctnState, **kwargs)
+    self.changeActiveProcessor(procName, flatten=self.changeProcParam['flatten'], saveBeforeChange=False)
+
+  def changeActiveProcessor(self, proc: Union[str, NestedProcess], flatten=False, saveBeforeChange=True):
     """
-    Changes which processor is active. if ImgProcWrapper, uses that as the processor.
-    If str, looks for that name in current processors and uses that
+    Changes which processor is active.
+
+    :param proc:
+      helpText: Processor to load
+      pType: popuplineeditor
+      limits: []
+      title: Algorithm
+    :param flatten: Whether to flatten the processor by ignoring all nested hierarchies except the topmost level
+    :param saveBeforeChange: Whether to propagate current algorithm settings to the processor collection before changing
     """
+    # TODO: Maybe there's a better way of doing this? Ensures proc label is updated for programmatic calls
+    if saveBeforeChange and self._unflatProc:
+      self.saveParamValues(self.lastAppliedName, self._unnestedProcState(self._unflatProc, includeMeta=True),
+                           blockWrite=True)
     if isinstance(proc, str):
-      proc = self.nameToProcMapping[proc]
-    # Hide all except current selection
-    # TODO: Find out why hide() isn't working. Documentation indicates it should
-    # Instead, use the parentChanged utility as a hacky workaround
-    selectedParam = self.params.child(proc.algName)
-    for ii, child in enumerate(self.params.children()):
-      shouldHide = child is not selectedParam
-      # Offset by 1 to account for self.algOpts
-      self.tree.setRowHidden(1 + ii, QtCore.QModelIndex(), shouldHide)
-    # selectedParam.show()
-    self.curProcessor = proc
+      proc = self.clctn.parseProcName(proc)
+    unflatProc = proc
+    if flatten:
+      proc = proc.flatten()
+    if proc == self.curProcessor.processor:
+      return
+    self.curProcessor.clear()
+    self.params.clearChildren()
+    self.curProcessor = self.clctn.procWrapType(proc, self.params)
+    self._unflatProc = unflatProc
+    fns.setParamsExpanded(self.tree)
+    self.sigProcessorChanged.emit(proc.name)

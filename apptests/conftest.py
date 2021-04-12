@@ -60,7 +60,7 @@ def vertsPlugin(app):
   except KeyError:
     raise RuntimeError('Vertices plugin was not provided. Some tests are guaranteed to fail.')
 
-  plg.procCollection.switchActiveProcessor('Basic Shapes')
+  plg.procEditor.changeActiveProcessor('Basic Shapes')
   proc = plg.curProcessor
   for stage in proc.processor.stages:
     if stage.allowDisable:

@@ -6,7 +6,7 @@ from testingconsts import NUM_COMPS
 from s3a import PRJ_SINGLETON, REQD_TBL_FIELDS
 from s3a.constants import PRJ_CONSTS
 from s3a.controls.drawctrl import RoiCollection
-from s3a.parameditors.algcollection import AlgParamEditor
+from s3a.parameditors.algcollection import AlgParamEditor, AlgCollection
 from s3a.processing import ProcessIO, ImageProcess, ImgProcWrapper
 from s3a.structures import XYVertices, ComplexXYVertices, PrjParam, NChanImg
 
@@ -117,9 +117,11 @@ def test_selectionbounds_none(app):
 def test_proc_err(tmp_path):
   def badProc(image: NChanImg):
     return ProcessIO(image=image, extra=1 / 0)
-  newCtor = lambda: ImageProcess.fromFunction(badProc, name='Bad')
-  newClctn = AlgParamEditor(tmp_path, [newCtor], ImgProcWrapper)
+  proc = ImageProcess.fromFunction(badProc, name='Bad')
+  clctn = AlgCollection(ImgProcWrapper, ImageProcess)
+  algEditor = AlgParamEditor(clctn, saveDir=tmp_path)
+  clctn.addProcess(proc, top=True)
 
-  newClctn.switchActiveProcessor('Bad')
+  algEditor.changeActiveProcessor('Bad')
   with pytest.warns(UserWarning):
-    newClctn.curProcessor.run(image=np.array([[True]], dtype=bool), fgVerts=XYVertices([[0,0]]))
+    algEditor.curProcessor.run(image=np.array([[True]], dtype=bool), fgVerts=XYVertices([[0, 0]]))

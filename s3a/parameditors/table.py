@@ -1,21 +1,19 @@
 import copy
 import sys
-from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import List, Union, Tuple, Any, Optional, Callable, Dict
-from warnings import warn
 
 import numpy as np
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 from pyqtgraph.parametertree import Parameter
 from ruamel.yaml import YAML
-from utilitys import ParamEditor, PrjParam
 
-from s3a.constants import TABLE_DIR, REQD_TBL_FIELDS, PRJ_CONSTS, BASE_DIR
-from s3a.structures import PrjParamGroup, FilePath
+from s3a.constants import TABLE_DIR, REQD_TBL_FIELDS, PRJ_CONSTS, TBL_BASE_TEMPLATE
 from s3a.generalutils import hierarchicalUpdate
+from s3a.structures import PrjParamGroup, FilePath
+from utilitys import ParamEditor, PrjParam
 from utilitys import fns
 from utilitys.fns import warnLater
 
@@ -261,7 +259,7 @@ class TableData(QtCore.QObject):
     current config
     """
 
-    _, baseCfgDict = fns.resolveYamlDict(BASE_DIR/'tablecfg.yml')
+    _, baseCfgDict = fns.resolveYamlDict(TBL_BASE_TEMPLATE)
     cfgFname, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
     cfgFname = cfgFname.resolve()
     if not force and self.cfgFname == cfgFname:

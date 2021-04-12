@@ -1,67 +1,19 @@
 from __future__ import annotations
 
 import traceback
-from copy import deepcopy
-from typing import List
 
 import numpy as np
-from utilitys import NestedProcWrapper
-from utilitys.fns import warnLater
 
 from s3a.generalutils import augmentException
-from s3a.processing.algorithms import crop_to_local_area, apply_process_result, \
-  basicOpsCombo, return_to_full_size, format_vertices
 from s3a.structures import ComplexXYVertices, XYVertices
+from utilitys import NestedProcWrapper
+from utilitys.fns import warnLater
 from .processing import *
 
 __all__ = ['ImgProcWrapper', 'NestedProcWrapper']
 
-def _prependFuncs():
-  formatStage = ImageProcess.fromFunction(format_vertices)
-  formatStage.allowDisable = False
-  cropStage = ImageProcess.fromFunction(crop_to_local_area)
-  return [formatStage, cropStage]
-
-def _appendFuncs():
-  applyStage = ImageProcess.fromFunction(apply_process_result)
-  applyStage.allowDisable = False
-  resizeStage = ImageProcess.fromFunction(return_to_full_size)
-  resizeStage.allowDisable = False
-
-  return [applyStage, basicOpsCombo(), resizeStage]
-
 class ImgProcWrapper(NestedProcWrapper):
-  preProcStages = _prependFuncs()
-  postProcStages = _appendFuncs()
-
-  def __init__(self, processor: ImageProcess, *,
-               excludedStages: List[List[str]]=None, disabledStages: List[List[str]]=None,
-               **kwargs):
-    # Each processor is encapsulated in processes that crop the image to the region of
-    # interest specified by the user, and re-expand the area after processing
-    self.output = np.zeros((0,0), bool)
-
-    preStages = [*map(deepcopy, self.preProcStages)]
-    finalStages = [*map(deepcopy, self.postProcStages)]
-    processor.stages = preStages + processor.stages + finalStages
-
-    if disabledStages is None:
-      disabledStages = []
-    if hasattr(processor, 'disabledStages'):
-      disabledStages.extend(processor.disabledStages)
-
-    if excludedStages is None:
-      excludedStages = []
-    if hasattr(processor, 'excludedStages'):
-      excludedStages.extend(processor.excludedStages)
-
-    for namePath in disabledStages: # type: List[str]
-      proc = self.getNestedName(processor, namePath)
-      proc.disabled = True
-    for namePath in excludedStages: # type: List[str]
-      parentProc = self.getNestedName(processor, namePath[:-1])
-      parentProc.stages.remove(self.getNestedName(parentProc, [namePath[-1]]))
-    super().__init__(processor, **kwargs)
+  output: np.ndarray
 
   def run(self, **kwargs):
     newIo = self._ioDictFromRunKwargs(kwargs)

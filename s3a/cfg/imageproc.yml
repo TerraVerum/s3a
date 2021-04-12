@@ -1,0 +1,60 @@
+modules:
+  - s3a.processing.algorithms.imageproc
+
+primitive:
+  Default Preprocess:
+    - Format Vertices
+    - Crop To Local Area
+
+  Default Postprocess:
+    - Apply Process Result
+    - Basic Region Operations
+    - Return To Full Size
+
+  Basic Region Operations:
+    - Fill Holes
+    - Opening
+    - Closing
+    - Keep Largest Comp
+    - Rm Small Comps
+
+top:
+  Primitive Grab Cut:
+    - Default Preprocess
+    - Cv Grabcut
+    - Binarize Labels
+    - Default Postprocess
+
+  K Means:
+    - Default Preprocess
+    - K Means Segmentation
+    - Binarize Labels
+    - Default Postprocess
+
+  Basic Shapes:
+    - Default Preprocess
+    - Draw Vertices
+    - Default Postprocess
+
+  Region Growing:
+    - Default Preprocess
+    - Region Grow Segmentation
+    - Default Postprocess
+
+  Quickshift:
+    - Default Preprocess
+    - Quickshift Seg
+    - Binarize Labels
+    - Default Postprocess
+
+  Morphological ACWE:
+    - Default Preprocess
+    - Morph Acwe
+    - Binarize Labels
+    - Default Postprocess
+
+  SLIC:
+    - Default Preprocess
+    - Slic Segmentation
+    - Binarize Labels
+    - Default Postprocess

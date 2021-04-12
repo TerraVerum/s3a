@@ -6,11 +6,11 @@ from pyqtgraph.Qt import QtWidgets, QtCore
 from utilitys import ActionStack
 from utilitys import ParamEditor, ParamEditorDockGrouping, NestedProcWrapper, ParamEditorPlugin, dockPluginFactory
 
-from s3a.constants import GEN_PROPS_DIR, SCHEMES_DIR, SHORTCUTS_DIR
-from .algcollection import AlgCtorCollection
+from s3a.constants import GEN_PROPS_DIR, SCHEMES_DIR, SHORTCUTS_DIR, CFG_DIR, IMG_PROC_DIR, MULT_PRED_DIR
+from .algcollection import AlgCollection
 from .quickloader import QuickLoaderEditor
 from .table import TableData
-from ..processing import ImgProcWrapper
+from ..processing import ImgProcWrapper, ImageProcess
 from utilitys.params import ShortcutParameter
 
 Signal = QtCore.Signal
@@ -34,8 +34,8 @@ class _PrjSingleton(QtCore.QObject):
                                    name='Color Scheme')
     self.shortcuts = ShortcutParameter.setRegistry(createIfNone=True, saveDir=SHORTCUTS_DIR)
     self.quickLoader = QuickLoaderEditor()
-    self.imgProcClctn = AlgCtorCollection(ImgProcWrapper)
-    self.multiPredClctn = AlgCtorCollection(NestedProcWrapper)
+    self.imgProcClctn = AlgCollection(ImgProcWrapper, ImageProcess, saveDir=IMG_PROC_DIR)
+    self.multiPredClctn = AlgCollection(saveDir=MULT_PRED_DIR)
 
     self.docks: List[QtWidgets.QDockWidget] = []
     self.addPlugin(dockPluginFactory('&Settings', [self.generalProps, self.colorScheme]))

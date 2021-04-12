@@ -4,13 +4,14 @@ from pathlib import Path
 
 __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'QUICK_LOAD_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'TABLE_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
-           'SHORTCUT_BASE', 'MAIN_IMG_DIR', 'APP_STATE_DIR',
+           'SHORTCUT_BASE', 'MAIN_IMG_DIR', 'APP_STATE_DIR', 'CFG_DIR', 'IMG_PROC_DIR', 'MULT_PRED_DIR',
            'REQD_TBL_FIELDS', 'PRJ_CONSTS', 'PRJ_ENUMS', 'PROJ_FILE_TYPE', 'PROJ_BASE_TEMPLATE']
 
 from typing import Any
 
 BASE_DIR = Path(__file__).parent
 MENU_OPTS_DIR = BASE_DIR/'menuopts'
+CFG_DIR = BASE_DIR/'cfg'
 ICON_DIR = BASE_DIR/'icons'
 
 # -----
@@ -22,11 +23,14 @@ SCHEMES_DIR = MENU_OPTS_DIR/'schemes'
 GEN_PROPS_DIR = MENU_OPTS_DIR/'genprops'
 SHORTCUTS_DIR = MENU_OPTS_DIR/'shortcuts'
 MAIN_IMG_DIR = MENU_OPTS_DIR/'mainimg'
+IMG_PROC_DIR = MENU_OPTS_DIR/'imageproc'
+MULT_PRED_DIR = MENU_OPTS_DIR/'multiproc'
 TABLE_DIR = MENU_OPTS_DIR/'table'
 APP_STATE_DIR = Path.home()/'.s3a'
 
 
-PROJ_BASE_TEMPLATE = BASE_DIR/'projectcfg.yml'
+PROJ_BASE_TEMPLATE = CFG_DIR/'projectcfg.yml'
+TBL_BASE_TEMPLATE = CFG_DIR/'tablecfg.yml'
 PROJ_FILE_TYPE = 's3aprj'
 
 # Ensure menuopts and layouts directories exist

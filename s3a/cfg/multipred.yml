@@ -1,0 +1,8 @@
+modules:
+  - s3a.processing.algorithms.multipred
+
+primitive: {}
+
+top:
+  Basic Template Match:
+    - Cv Template Match

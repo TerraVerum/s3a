@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 import os
 import sys
 
@@ -31,8 +30,6 @@ appInst.setStyleSheet("QMessageBox { messagebox-text-interaction-flags: 5; }")
 
 from . import graphicsutils as gutils
 
-# appInst.installEventFilter(
-#   gutils.QAwesomeTooltipEventFilter(appInst))
 
 # Import here to resolve resolution order
 import s3a.constants
@@ -40,18 +37,14 @@ import s3a.structures
 
 from s3a.parameditors import PRJ_SINGLETON
 from ._io import ComponentIO, defaultIo
-from s3a.processing.algorithms import TopLevelImageProcessors, TOP_GLOBAL_PROCESSOR_FUNCS
 from s3a.structures import XYVertices, ComplexXYVertices
-from s3a.constants import REQD_TBL_FIELDS, PRJ_CONSTS
+from s3a.constants import REQD_TBL_FIELDS, PRJ_CONSTS, CFG_DIR
 
 # -----
 # DEFAULT PLUGINS
 # -----
-for name, func in inspect.getmembers(TopLevelImageProcessors, inspect.isfunction):
-  PRJ_SINGLETON.imgProcClctn.addProcessCtor(func)
-
-for ctor in TOP_GLOBAL_PROCESSOR_FUNCS:
-  PRJ_SINGLETON.multiPredClctn.addProcessCtor(ctor)
+PRJ_SINGLETON.imgProcClctn.loadParamValues(CFG_DIR/'imageproc.yml')
+PRJ_SINGLETON.multiPredClctn.loadParamValues(CFG_DIR/'multipred.yml')
 
 from .views.s3agui import S3A
 

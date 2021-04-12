@@ -223,8 +223,8 @@ class MultiPredictionsPlugin(ProcessorPlugin):
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
-    cls.procCollection = PRJ_SINGLETON.multiPredClctn.createProcessorForClass(cls, cls.name + ' Processor')
-    cls.dock.addEditors([cls.procCollection])
+    cls.procEditor = PRJ_SINGLETON.multiPredClctn.createProcessorEditor(cls, cls.name + ' Processor')
+    cls.dock.addEditors([cls.procEditor])
 
   def __init__(self):
     super().__init__()

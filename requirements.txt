@@ -13,4 +13,4 @@ ruamel.yaml
 docstring_parser
 pytest
 matplotlib
-utilitys >= 0.2.5
+utilitys >= 0.3.0

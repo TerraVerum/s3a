@@ -120,7 +120,7 @@ def test_autosave(tmp_path, app, filePlg):
 def test_stage_plotting(monkeypatch, app, vertsPlugin):
   mainImg = app.mainImg
   mainImg.drawActGrp.callFuncByParam(PRJ_CONSTS.DRAW_ACT_CREATE)
-  vertsPlugin.procCollection.switchActiveProcessor('Basic Shapes')
+  vertsPlugin.procEditor.changeActiveProcessor('Basic Shapes')
   oldSz = mainImg.minCompSize
   mainImg.minCompSize = 0
   mainImg.shapeCollection.sigShapeFinished.emit(XYVertices([[0, 0], [5, 5]]))
@@ -129,7 +129,7 @@ def test_stage_plotting(monkeypatch, app, vertsPlugin):
   assert app.mainImg.compSer.loc[REQD_TBL_FIELDS.INST_ID] >= 0
   mainImg.minCompSize = oldSz
 
-  vertsPlugin.procCollection.switchActiveProcessor('Basic Shapes')
+  vertsPlugin.procEditor.changeActiveProcessor('Basic Shapes')
   mainImg.drawActGrp.callFuncByParam(PRJ_CONSTS.DRAW_ACT_ADD)
 
   mainImg.shapeCollection.sigShapeFinished.emit(XYVertices([[0, 0], [10, 10]]))

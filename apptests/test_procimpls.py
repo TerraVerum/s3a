@@ -1,3 +1,5 @@
+import warnings
+
 import pytest
 
 from s3a.generalutils import imgCornerVertices
@@ -7,25 +9,34 @@ from s3a.structures import XYVertices
 @pytest.mark.smallimage
 def test_algs_working(app, vertsPlugin):
   mImg = app.mainImg
-  pc = vertsPlugin.procCollection
-  allAlgs = pc.nameToProcMapping.keys()
+  pe = vertsPlugin.procEditor
+  allAlgs = vertsPlugin.procEditor.clctn.topProcs
 
-  mImg.shapeCollection.sigShapeFinished.emit(imgCornerVertices(app.mainImg.image))
+  # Some exceptions may occur in the processor, this is fine since behavior might be undefined
+  with warnings.catch_warnings():
+    warnings.simplefilter('ignore', UserWarning)
+    mImg.shapeCollection.sigShapeFinished.emit(imgCornerVertices(app.mainImg.image))
   for alg in allAlgs:
-    pc.switchActiveProcessor(alg)
-    mImg.shapeCollection.sigShapeFinished.emit(XYVertices())
+    pe.changeActiveProcessor(alg)
+    with warnings.catch_warnings():
+      warnings.simplefilter('ignore', UserWarning)
+      mImg.shapeCollection.sigShapeFinished.emit(XYVertices())
 
 @pytest.mark.smallimage
 def test_disable_top_stages(app, vertsPlugin):
   mImg = app.mainImg
-  pc = vertsPlugin.procCollection
+  pe = vertsPlugin.procEditor
   mImg.shapeCollection.sigShapeFinished.emit(imgCornerVertices(app.mainImg.image))
-  for proc in pc.nameToProcMapping.values():
-    for stage in proc.processor.stages:
+  for name in pe.clctn.topProcs:
+    proc = pe.clctn.parseProcName(name)
+    pe.changeActiveProcessor(proc)
+    for stage in proc.stages_flattened:
       if stage.allowDisable and isinstance(stage, ImageProcess):
-        proc.setStageEnabled([stage.name], False)
-    pc.switchActiveProcessor(proc)
-    mImg.shapeCollection.sigShapeFinished.emit(XYVertices())
+        pe.curProcessor.setStageEnabled([stage.name], False)
+    # Some exceptions may occur in the processor, this is fine since behavior might be undefined
+    with warnings.catch_warnings():
+      warnings.simplefilter('ignore', UserWarning)
+      mImg.shapeCollection.sigShapeFinished.emit(XYVertices())
 
 
 

@@ -10,7 +10,7 @@ from utilitys import PrjParam
 from s3a import PRJ_SINGLETON, PRJ_CONSTS as CNST, XYVertices, REQD_TBL_FIELDS as RTF, \
   ComplexXYVertices
 from s3a.models.s3abase import S3ABase
-from s3a.processing.algorithms import _historyMaskHolder
+from s3a.processing.algorithms.imageproc import _historyMaskHolder
 from s3a.structures import BlackWhiteImg
 from s3a.views.regions import MultiRegionPlot, makeMultiRegionDf
 from .base import TableFieldPlugin
@@ -28,9 +28,9 @@ class VerticesPlugin(TableFieldPlugin):
   @classmethod
   def __initEditorParams__(cls):
     super().__initEditorParams__()
-    cls.procCollection = PRJ_SINGLETON.imgProcClctn.createProcessorForClass(cls, cls.name + ' Processor')
+    cls.procEditor = PRJ_SINGLETON.imgProcClctn.createProcessorEditor(cls, cls.name + ' Processor')
 
-    cls.dock.addEditors([cls.procCollection])
+    cls.dock.addEditors([cls.procEditor])
 
   def __init__(self):
     super().__init__()
@@ -131,7 +131,10 @@ class VerticesPlugin(TableFieldPlugin):
       firstRun=self.firstRun,
       viewbox=XYVertices(viewbox),
       prevCompVerts=self.mainImg.compSer[RTF.VERTICES]
-    ).astype('uint8')
+    )
+    if isinstance(newGrayscale, dict):
+      newGrayscale = newGrayscale['image']
+    newGrayscale = newGrayscale.astype('uint8')
 
     self.firstRun = False
     if not np.array_equal(newGrayscale, compGrayscale):

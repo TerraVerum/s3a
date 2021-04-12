@@ -1,7 +1,7 @@
+import inspect
 from functools import lru_cache
 from typing import Tuple, List
 
-import cv2 as cv
 import numpy as np
 import pandas as pd
 from scipy.ndimage import binary_fill_holes, maximum_filter
@@ -12,12 +12,14 @@ from skimage import segmentation as seg
 from utilitys.processing import *
 from utilitys import fns
 
-from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
 from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices, \
   showMaskDiff, MaxSizeDict
-from s3a.processing.processing import ImageProcess, GlobalPredictionProcess
+from s3a.processing.processing import ImageProcess
 from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg
 from s3a.structures import GrayImg, RgbImg
+
+import cv2 as cv
+
 
 def growSeedpoint(img: NChanImg, seeds: XYVertices, thresh: float) -> BlackWhiteImg:
   shape = np.array(img.shape[0:2])
@@ -42,13 +44,10 @@ def colorLabelsWithMean(labelImg: GrayImg, refImg: NChanImg) -> RgbImg:
     outImg[curmask,:] = refImg[curmask,:].reshape(-1,3).mean(0)
   return outImg
 
-def growSeedpoint_cv_fastButErratic(img: NChanImg, seeds: XYVertices, thresh: float):
+def _growSeedpoint_cv_fastButErratic(img: NChanImg, seeds: XYVertices, thresh: float):
   if len(seeds) == 0:
     return np.zeros(img.shape[:2], bool)
-  if img.ndim > 2:
-    nChans = img.shape[2]
-  else:
-    nChans = 1
+  nChans = img.shape[2] if img.ndim > 2 else 1
   thresh = int(np.clip(thresh, 0, 255))
   imRCShape = np.array(img.shape[:2])
   bwOut = np.zeros(imRCShape+2, 'uint8')
@@ -65,12 +64,11 @@ def growSeedpoint_cv_fastButErratic(img: NChanImg, seeds: XYVertices, thresh: fl
   bwOut = bwOut[1:-1,1:-1]
   return bwOut.astype(bool)
 
-def area_coord_regionTbl(_image: NChanImg):
+def _area_coord_regionTbl(_image: NChanImg):
   if not np.any(_image):
     return pd.DataFrame({'coords': [np.array([[]])], 'area': [0]})
   regionDict = regionprops_table(label(_image), properties=('coords', 'area'))
-  _regionPropTbl = pd.DataFrame(regionDict)
-  return _regionPropTbl
+  return pd.DataFrame(regionDict)
 
 
 _historyMaskHolder = [np.array([[]], 'uint8')]
@@ -223,35 +221,48 @@ def disallow_paint_tool(_image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertic
                               ' Only one vertex was given as an input.')
   return ProcessIO(image=_image)
 
-def openClose():
+
+@fns.dynamicDocstring(morphOps=[d for d in dir(cv) if d.startswith('MORPH_')])
+def morph_op(image: NChanImg, radius=1, op: str='', shape='rectangle'):
+  """
+  :param radius: Radius of the structuring element. Note that the total side length
+    of the structuring element will be (2*radius)+1.
+  :param shape:
+    helpText: Structuring element shape
+    pType: list
+    limits:
+      - rectangle
+      - disk
+      - diamond
+  :param op:
+    pType: list
+    limits: {morphOps}
+  """
+  opType = getattr(cv, op)
+  if image.ndim > 2:
+    image = image.mean(2)
+  image = image.astype('uint8')
+  ksize = [radius]
+  if shape == 'rectangle':
+    ksize = [ksize[0]*2+1]*2
+  strel = getattr(morph, shape)(*ksize)
+  outImg = cv.morphologyEx(image.copy(), opType, strel)
+  return ProcessIO(image=outImg)
+
+def opening_factory():
+  return AtomicProcess(morph_op, 'Opening', op='MORPH_OPEN')
+
+def closing_factory():
+  return AtomicProcess(morph_op, 'Closing', op='MORPH_CLOSE')
+
+def _openClose():
   proc = ImageProcess('Open -> Close')
-  def perform_op(image: NChanImg, radius=1, shape='rectangle'):
-    """
-    :param radius: Radius of the structuring element. Note that the total side length
-      of the structuring element will be (2*radius)+1.
-    :param shape:
-      helpText: Structuring element shape
-      pType: list
-      limits:
-        - rectangle
-        - disk
-        - diamond
-    """
-    if image.ndim > 2:
-      image = image.mean(2)
-    image = image.astype('uint8')
-    ksize = [radius]
-    if shape == 'rectangle':
-      ksize = [ksize[0]*2+1]*2
-    strel = getattr(morph, shape)(*ksize)
-    outImg = cv.morphologyEx(image.copy(), cv.MORPH_OPEN, strel)
-    outImg = cv.morphologyEx(outImg, cv.MORPH_CLOSE, strel)
-    return outImg
-  proc.addFunction(perform_op, name='Open -> Close', needsWrap=True)
+  proc.addFunction(morph_op, name='Open', needsWrap=True, op='MORPH_OPEN')
+  proc.addFunction(morph_op, name='Close', needsWrap=True, op='MORPH_CLOSE')
   return proc
 
 def keep_largest_comp(image: NChanImg):
-  regionPropTbl = area_coord_regionTbl(image)
+  regionPropTbl = _area_coord_regionTbl(image)
   out = np.zeros(image.shape, bool)
   coords = regionPropTbl.coords[regionPropTbl.area.argmax()]
   if coords.size == 0:
@@ -260,7 +271,7 @@ def keep_largest_comp(image: NChanImg):
   return ProcessIO(image=out)
 
 def rm_small_comps(image: NChanImg, minSzThreshold=30):
-  regionPropTbl = area_coord_regionTbl(image)
+  regionPropTbl = _area_coord_regionTbl(image)
   validCoords = regionPropTbl.coords[regionPropTbl.area >= minSzThreshold]
   out = np.zeros(image.shape, bool)
   if len(validCoords) == 0:
@@ -269,7 +280,7 @@ def rm_small_comps(image: NChanImg, minSzThreshold=30):
   out[coords[:,0], coords[:,1]] = True
   return ProcessIO(image=out)
 
-def basic_shapes(image: NChanImg, fgVerts: XYVertices, penSize=1, penShape='circle'):
+def _draw_vertices_old(image: NChanImg, fgVerts: XYVertices, penSize=1, penShape='circle'):
   """
   Draws basic shapes with minimal pre- or post-processing.
 
@@ -296,7 +307,10 @@ def basic_shapes(image: NChanImg, fgVerts: XYVertices, penSize=1, penShape='circ
   else:
     for vert in fgVerts:
       drawFn(vert)
-  return out > 0
+  return ProcessIO(image=out > 0)
+
+def draw_vertices(image: NChanImg, fgVerts: XYVertices):
+  return ProcessIO(image=ComplexXYVertices([fgVerts]).toMask(image.shape[:2], asBool=True))
 
 def convert_to_squares(image: NChanImg):
   outMask = np.zeros(image.shape, dtype=bool)
@@ -304,13 +318,15 @@ def convert_to_squares(image: NChanImg):
     outMask[region.bbox[0]:region.bbox[2],region.bbox[1]:region.bbox[3]] = True
   return ProcessIO(image=outMask)
 
-def basicOpsCombo():
+def _basicOpsCombo():
   proc = ImageProcess('Basic Region Operations')
-  toAdd: List[ImageProcess] = []
+  toAdd: List[ProcessStage] = []
   for func in fill_holes, keep_largest_comp, rm_small_comps:
-    toAdd.append(ImageProcess.fromFunction(func))
+    nextProc = AtomicProcess(func)
+    nextProc.allowDisable = False
+    toAdd.append(nextProc)
   proc.addProcess(toAdd[0])
-  proc.addProcess(openClose())
+  proc.addProcess(_openClose())
   proc.addProcess(toAdd[1])
   proc.addProcess(toAdd[2])
   return proc
@@ -358,10 +374,7 @@ def quickshift_seg(image: NChanImg, max_dist=10., kernel_size=5,
   key = (max_dist, kernel_size, sigma)
   if max_dist == 0:
     # Make sure output is still 1-channel
-    if image.ndim > 2:
-      segImg = image.mean(2).astype(int)
-    else:
-      segImg = image
+    segImg = image.mean(2).astype(int) if image.ndim > 2 else image
   else:
     if image.ndim < 3:
       image = np.tile(image[:,:,None], (1,1,3))
@@ -384,7 +397,7 @@ def morph_acwe(image: NChanImg, initialCheckerSize=6, iters=35, smoothing=3):
   outLevels = seg.morphological_chan_vese(image, iters, init_level_set=initLs, smoothing=smoothing)
   return ProcessIO(labels=outLevels)
 
-def k_means(image: NChanImg, kVal=5, attempts=10):
+def k_means_segmentation(image: NChanImg, kVal=5, attempts=10):
   # Logic taken from https://docs.opencv.org/master/d1/d5c/tutorial_py_kmeans_opencv.html
   numChannels = 1 if image.ndim < 3 else image.shape[2]
   clrs = image.reshape(-1, numChannels)
@@ -398,7 +411,7 @@ def k_means(image: NChanImg, kVal=5, attempts=10):
 
   return ProcessIO(labels=lbls, means=imgMeans)
 
-def labelBoundaries_cv(labels: np.ndarray, thickness: int):
+def _labelBoundaries_cv(labels: np.ndarray, thickness: int):
   """Code stolen and reinterpreted for cv from skimage.segmentation.boundaries"""
   if thickness % 2 == 0:
     thickness += 1
@@ -451,14 +464,14 @@ def binarize_labels(image: NChanImg, labels: BlackWhiteImg, fgVerts: XYVertices,
   else:
     if np.issubdtype(labels.dtype, np.bool_):
       labels = labels.astype('uint8')
-    boundaries = labelBoundaries_cv(labels, lineThickness)
+    boundaries = _labelBoundaries_cv(labels, lineThickness)
     summaryImg = image.copy()
     summaryImg[boundaries,...] = [255 for _ in range(nChans)]
   color = (255,) + tuple(0 for _ in range(1, nChans))
   cv.drawContours(summaryImg, [fgVerts], -1, color, lineThickness)
   return ProcessIO(image=out, summaryInfo={'image': summaryImg})
 
-def region_growing(image: NChanImg, fgVerts: XYVertices, seedThresh=10):
+def region_grow_segmentation(image: NChanImg, fgVerts: XYVertices, seedThresh=10):
   if image.size == 0:
     return ProcessIO(image=np.zeros(image.shape[:2], bool))
   if np.all(fgVerts == fgVerts[0, :]):
@@ -477,207 +490,6 @@ def region_growing(image: NChanImg, fgVerts: XYVertices, seedThresh=10):
 
   return ProcessIO(image=outMask)
 
-class TopLevelImageProcessors:
-  @staticmethod
-  def b_regionGrowProcessor():
-    return ImageProcess.fromFunction(region_growing)
-
-  @staticmethod
-  def c_kMeansProcessor():
-    proc = ImageProcess.fromFunction(k_means)
-    # Add as process so it can be disabled
-    proc.addFunction(binarize_labels)
-    return proc
-
-  @staticmethod
-  def a_grabCutProcessor():
-    proc = ImageProcess.fromFunction(cv_grabcut, name='Primitive Grab Cut')
-    proc.addFunction(binarize_labels)
-    return proc
-
-  @staticmethod
-  def ac_quickshiftProcessor():
-    proc = ImageProcess.fromFunction(quickshift_seg)
-    proc.addFunction(binarize_labels, ignoreKeys=['touchingRoiOnly'])
-    return proc
-
-  # @staticmethod
-  # def ad_morphAcweProcessor():
-  #   proc = ImageProcess.fromFunction(morph_acwe, name='Morph. ACWE Contours')
-  #   proc.addFunction(binarize_labels)
-  #   return proc
-
-  # @staticmethod
-  # def ab_slicProcessor():
-  #   def slic(image, n_segments=100, compactness=10.0, sigma=0, min_size_factor=0.5, max_size_factor=3):
-  #     return ProcessIO(labels=seg.slic(**locals(), start_label=1))
-  #   slic.__doc__ = seg.slic.__doc__
-  #   proc = ImageProcess.fromFunction(slic, name='SLIC')
-  #   proc.addFunction(binarize_labels)
-  #   return proc
-
-  @staticmethod
-  def w_basicShapesProcessor():
-    def basic_shapes(image: np.ndarray, fgVerts: XYVertices):
-      return ProcessIO(image=ComplexXYVertices([fgVerts]).toMask(image.shape[:2], asBool=True))
-    proc = ImageProcess.fromFunction(basic_shapes, name='Basic Shapes')
-    proc.disabledStages = [['Basic Region Operations', 'Open -> Close']]
-    return proc
-
-
-# -----
-# GLOBAL PROCESSING
-# -----
-def get_component_images(image: np.ndarray, components: pd.DataFrame):
-  """
-  From a main image and dataframe of components, adds an 'img' column to `components` which holds the
-  subregion within the image each component occupies.
-  """
-  imgs = [getCroppedImg(image, verts.stack(), 0) for verts in components[RTF.VERTICES]]
-  return ProcessIO(subimages=imgs)
-
-def dispatchedTemplateMatcher(func):
-  inputSpec = ProcessIO.fromFunction(func, ignoreKeys=['template'])
-  inputSpec['components'] = inputSpec.FROM_PREV_IO
-  def dispatcher(image: np.ndarray, components: pd.DataFrame, **kwargs):
-    out = ProcessIO()
-    allComps = []
-    for ii, comp in components.iterrows():
-      verts = comp[RTF.VERTICES].stack()
-      template = getCroppedImg(image, verts, 0, returnSlices=False)
-      result = func(image=image, template=template, **kwargs)
-      if isinstance(result, ProcessIO):
-        pts = result['matchPts']
-        out.update(**result)
-        out.pop('components', None)
-      else:
-        pts = result
-      allComps.append(pts_to_components(pts, comp))
-    outComps = pd.concat(allComps, ignore_index=True)
-    out['components'] = outComps
-    out['deleteOrig'] = True
-    return out
-  dispatcher.__doc__ = func.__doc__
-  proc = GlobalPredictionProcess(fns.nameFormatter(func.__name__))
-  proc.addFunction(dispatcher)
-  proc.stages[0].input = inputSpec
-  return proc
-
-def dispatchedFocusedProcessor(func):
-  inputSpec = ProcessIO.fromFunction(func)
-  inputSpec['components'] = inputSpec.FROM_PREV_IO
-  def dispatcher(image: np.ndarray, components: pd.DataFrame, **kwargs):
-    out = ProcessIO()
-    allComps = []
-    for ii, comp in components.iterrows():
-      verts = comp[RTF.VERTICES].stack()
-      focusedImage = getCroppedImg(image, verts, 0, returnSlices=False)
-      result = func(image=focusedImage, **kwargs)
-      if isinstance(result, ProcessIO):
-        mask = result['image']
-        out.update(**result)
-        out.pop('components', None)
-      else:
-        mask = result
-      newComp = comp.copy()
-      if mask is not None:
-        newComp[RTF.VERTICES] = ComplexXYVertices.fromBwMask(mask)
-      allComps.append(fns.serAsFrame(newComp))
-    outComps = pd.concat(allComps)
-    out['components'] = outComps
-    out['addType'] = PRJ_ENUMS.COMP_ADD_AS_MERGE
-    return out
-  dispatcher.__doc__ = func.__doc__
-  proc = GlobalPredictionProcess(fns.nameFormatter(func.__name__))
-  proc.addFunction(dispatcher)
-  proc.stages[0].input = inputSpec
-  return proc
-
-
-@fns.dynamicDocstring(metricTypes=[d for d in dir(cv) if d.startswith('TM')])
-def cv_template_match(template: np.ndarray, image: np.ndarray, viewbox: np.ndarray,
-                      threshold=0.8, metric='TM_CCOEFF_NORMED', area='viewbox'):
-  """
-  Performs template matching using default opencv functions
-  :param template: Template image
-  :param image: Main image
-  :param threshold:
-    helpText: Cutoff point to consider a matched template
-    limits: [0, 1]
-    step: 0.1
-  :param metric:
-    helpText: Template maching metric
-    pType: list
-    limits: {metricTypes}
-  :param area:
-    helpText: Where to apply the new components
-    pType: list
-    limits:
-      - image
-      - viewbox
-  """
-  if area == 'viewbox':
-    image, coords = getCroppedImg(image, viewbox, 0)
-  else:
-    coords = np.array([[0,0]])
-  if image.ndim < 3:
-    grayImg = image
-  else:
-    grayImg = cv.cvtColor(image, cv.COLOR_RGB2GRAY)
-  if template.ndim > 2:
-    template = cv.cvtColor(template, cv.COLOR_RGB2GRAY)
-
-  metric = getattr(cv, metric)
-  res = cv.matchTemplate(grayImg, template, metric)
-  maxFilter = maximum_filter(res, template.shape[:2])
-  # Non-max suppression to remove close-together peaks
-  res[maxFilter > res] = 0
-  loc = np.nonzero(res >= threshold)
-  scores = res[loc]
-  matchPts = np.c_[loc[::-1]] + coords[[0]]
-  return ProcessIO(matchPts=matchPts, scores=scores, matchImg=maxFilter)
-
-
-def pts_to_components(matchPts: np.ndarray, component: pd.Series):
-  numOutComps = len(matchPts)
-  # Explicit copy otherwise all rows point to the same component
-  outComps = pd.concat([fns.serAsFrame(component)]*numOutComps, ignore_index=True).copy()
-  origOffset = component[RTF.VERTICES].stack().min(0)
-  allNewverts = []
-  for ii, pt in zip(outComps.index, matchPts):
-    newVerts = []
-    for verts in outComps.at[ii, RTF.VERTICES]:
-      newVerts.append(verts-origOffset+pt)
-    allNewverts.append(ComplexXYVertices(newVerts))
-  outComps[RTF.VERTICES] = allNewverts
-  return outComps
-
-
-@lru_cache()
-def _modelFromFile(model: str):
-  fname = MODEL_DIR/model
-  return tf.load(fname)
-
-def nn_model_prediction(image: NChanImg, model=''):
-  """
-
-  :param image:
-  :param fgVerts:
-  :param model:
-    pType: list
-    limits:
-      - ''
-      - Tool 1
-      - Tool 2
-      - Tool 3
-  """
-  if not model:
-    return None
-  nnModel = _modelFromFile(model)
-
-  return np.random.random((image.shape[:2])) > 0
-
-TOP_GLOBAL_PROCESSOR_FUNCS = [
-  lambda: dispatchedTemplateMatcher(cv_template_match),
-  # lambda: dispatchedFocusedProcessor(nn_model_prediction)
-]
+def slic_segmentation(image, n_segments=100, compactness=10.0, sigma=0, min_size_factor=0.5, max_size_factor=3):
+  return ProcessIO(labels=seg.slic(**locals(), start_label=1))
+slic_segmentation.__doc__ = seg.slic.__doc__
