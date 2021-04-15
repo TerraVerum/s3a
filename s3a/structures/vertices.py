@@ -148,11 +148,16 @@ class ComplexXYVertices(list):
       return XYVertices(np.vstack(self), dtype=newDtype)
 
   @classmethod
-  def stackedMax(cls, complexVertList: list):
+  def stackedMax(cls, complexVertList: Sequence[ComplexXYVertices]):
     """
     Returns the max along dimension 0 for a list of complex vertices
     """
     return np.vstack([v.stack() for v in complexVertList]).max(0)
+
+  @classmethod
+  def stackedMin(cls, complexVertList: Sequence[ComplexXYVertices]):
+    return np.vstack([v.stack() for v in complexVertList]).min(0)
+
 
   def filledVerts(self) -> ComplexXYVertices:
     """

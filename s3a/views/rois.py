@@ -4,6 +4,8 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 from skimage.draw import draw
+
+from s3a.generalutils import orderContourPts
 from utilitys import PrjParam
 
 from s3a.constants import PRJ_CONSTS
@@ -149,18 +151,21 @@ class EllipseROI(PlotDataROI):
     super().__init__(endEvType=qe.MouseButtonRelease, addIntermedPts=False)
 
   def _refactorPoints(self, vertices: np.ndarray):
-    pts = vertices[:, ::-1]
-    ma = pts.max(0).astype(int)
-    mi = pts.min(0).astype(int)
-    center = (ma - mi)//2 + mi
-    # Ideally, the perimeter could be directly returned. However, the ordering is not
-    # compatible with direct column stacking (results in criss-crossing)
-    filled = draw.ellipse_perimeter(*center, ma[0]-mi[0], ma[1]-mi[1])
-    if filled[0].size <= 1:
-      return vertices
-    mask = np.zeros((filled[0].max()+1, filled[1].max()+1), bool)
-    mask[filled[0], filled[1]] = True
-    return ComplexXYVertices.fromBwMask(mask, externOnly=True).stack()
+    pts = vertices[:, ::-1].astype(float)
+    ma = pts.max(0)
+    mi = pts.min(0)
+    center = (ma - mi)/2 + mi
+    normedR = ma[0]-mi[0]
+    normedC = ma[1]-mi[1]
+    # Apply scaling so mouse point is on perimeter
+    # angle = np.arctan(normedR/normedC)
+    # normedR = abs(np.cos(angle))*normedR
+    # normedC = abs(np.sin(angle))*normedC
+    sqr2 = np.sqrt(2)
+    perim = draw.ellipse_perimeter(*center.astype(int), int(normedR/sqr2), int(normedC/sqr2))
+    # Reorder to ensure no criss-crossing when these vertices are plotted
+    perim = orderContourPts(np.column_stack(perim[::-1]))
+    return perim.view(XYVertices)
 
 SHAPE_ROI_MAPPING: Dict[PrjParam, Callable[[], PlotDataROI]] = {
   PRJ_CONSTS.DRAW_SHAPE_RECT: RectROI,

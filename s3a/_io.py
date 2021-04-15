@@ -12,7 +12,7 @@ import inspect
 
 import numpy as np
 import pandas as pd
-from skimage import io, measure
+from skimage import io, measure, draw
 from skimage.exposure import rescale_intensity
 from typing_extensions import Literal
 from utilitys import fns, ProcessIO
@@ -20,10 +20,10 @@ from utilitys import fns, ProcessIO
 from utilitys.fns import warnLater
 
 from s3a.constants import REQD_TBL_FIELDS as RTF
-from s3a.generalutils import augmentException, getCroppedImg, resize_pad, cvImsave_rgb
+from s3a.generalutils import augmentException, getCroppedImg, resize_pad, cvImsave_rgb, orderContourPts
 from s3a.parameditors.table import TableData
 from s3a.structures import PrjParamGroup, FilePath, GrayImg, \
-  ComplexXYVertices, PrjParam, XYVertices
+  ComplexXYVertices, PrjParam, XYVertices, AnnParseError
 
 FilePathOrDf = Union[FilePath, pd.DataFrame]
 _litLst = Literal['buildFrom', 'export']
@@ -644,7 +644,8 @@ class ComponentIO:
 
   def buildFromGeojson(self, inFileOrDict: Union[FilePath, dict], **importArgs):
     if not isinstance(inFileOrDict, dict):
-      inFileOrDict = json.load(open(inFileOrDict, 'r'))
+      with open(inFileOrDict, 'r') as ifile:
+        inFileOrDict = json.load(ifile)
     verts = []
     for ann in inFileOrDict['features']:
       geo = ann['geometry']
@@ -653,16 +654,33 @@ class ComponentIO:
     tmpDf = pd.DataFrame(verts, columns=[RTF.VERTICES.name])
     return self.buildFromCsv(tmpDf, **importArgs)
 
-  def buildFromSuperannotateJson(self, inFileOrDict: Union[FilePath, dict], **importArgs):
+  def buildFromSuperannotateJson(self, inFileOrDict: Union[FilePath, dict], parseErrorOk=False, **importArgs):
+    fileName = None
     if not isinstance(inFileOrDict, dict):
+      fileName = Path(inFileOrDict)
       inFileOrDict = json.load(open(inFileOrDict, 'r'))
-    points = [i['points'] for i in inFileOrDict['instances']]
-    npPoints = []
-    for pts in points:
-      npPts = np.column_stack([pts[::2], pts[1::2]])
-      npPoints.append(npPts)
-    outDf = self.tableData.makeCompDf(len(npPoints))
-    outDf[RTF.VERTICES] = [ComplexXYVertices([pts], coerceListElements=True) for pts in npPoints]
+    instances = inFileOrDict['instances']
+    parsePts = []
+    invalidInsts = []
+    for inst in instances:
+      typ = inst['type']
+      if typ in ['polygon', 'bbox']:
+        pts = inst['points']
+        if typ == 'bbox':
+          pts = list(pts.values())
+        parsePts.append(np.column_stack([pts[::2], pts[1::2]]))
+      elif typ == 'ellipse':
+        vals = inst['cy'], inst['cx'], inst['ry'], inst['rx'], inst['angle']
+        pts = draw.ellipse_perimeter(*(int(v) for v in vals))
+        pts = np.column_stack(pts[::-1])
+        parsePts.append(orderContourPts(pts))
+      else:
+        invalidInsts.append(inst)
+    if invalidInsts and not parseErrorOk:
+      raise AnnParseError('Currently, S3A only supports polygon annotations from SuperAnnotate',
+                          fileName=fileName, instances=invalidInsts)
+    outDf = self.tableData.makeCompDf(len(parsePts))
+    outDf[RTF.VERTICES] = [ComplexXYVertices([pts], coerceListElements=True) for pts in parsePts]
     outDf[RTF.SRC_IMG_FILENAME] = inFileOrDict['metadata']['name']
     imShape = (inFileOrDict['metadata']['height'], inFileOrDict['metadata']['width'])
     self.checkVertBounds(outDf[RTF.VERTICES], imShape)
@@ -769,7 +787,7 @@ class ComponentIO:
     # Remove components whose vertices go over any image edges
     vertMaxs = [verts.stack().max(0) for verts in vertSer if len(verts) > 0]
     vertMaxs = np.vstack(vertMaxs)
-    offendingIds = np.nonzero(np.any(vertMaxs >= imShape, axis=1))[0]
+    offendingIds = np.nonzero(np.any(vertMaxs > imShape, axis=1))[0]
     if len(offendingIds) > 0:
       warnLater(f'Vertices on some components extend beyond image dimensions. '
            f'Perhaps this export came from a different image?\n'

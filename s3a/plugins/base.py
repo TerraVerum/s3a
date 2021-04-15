@@ -5,12 +5,12 @@ from typing import Union
 import pandas as pd
 from utilitys import ParamEditorPlugin, NestedProcWrapper
 
-from s3a import parameditors as pe
+from s3a.parameditors import algcollection
 from s3a.constants import PRJ_CONSTS
 
 
 class ProcessorPlugin(ParamEditorPlugin):
-  procEditor: pe.algcollection.AlgParamEditor = None
+  procEditor: algcollection.AlgParamEditor = None
   """
   Most table field plugins will use some sort of processor to infer field data.
   This property holds spawned collections. See :class:`XYVerticesPlugin` for

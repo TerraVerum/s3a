@@ -226,22 +226,28 @@ class S3A(S3ABase):
   # ---------------
   def closeEvent(self, ev: QtGui.QCloseEvent):
     # Confirm all components have been saved
-    shouldExit = False
+    shouldExit = True
+    forceClose = False
     if self.hasUnsavedChanges:
       ev.ignore()
-      if (QtWidgets.QMessageBox().question(self, 'Confirm Exit',
-                                         'Component table has unsaved changes.\nAre you sure you want to exit?',
-                                         QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Cancel)
-          == QtWidgets.QMessageBox.Ok):
-        shouldExit = True
-    else:
-      shouldExit = True
+      forceClose = False
+      msg = QtWidgets.QMessageBox()
+      msg.setWindowTitle('Confirm Exit')
+      msg.setText('Component table has unsaved changes.\nAre you sure you want to exit?')
+      msg.setDefaultButton(msg.Ok)
+      msg.setStandardButtons(msg.Discard|msg.Cancel|msg.Ok)
+      code = msg.exec_()
+      if code == msg.Discard:
+        forceClose = True
+      elif code == msg.Cancel:
+        shouldExit = False
     if shouldExit:
       # Clean up all editor windows, which could potentially be left open
       ev.accept()
       PRJ_SINGLETON.close()
       fns.restoreExceptionBehavior()
-      self.appStateEditor.saveParamValues()
+      if not forceClose:
+        self.appStateEditor.saveParamValues()
 
   def forceClose(self):
     """

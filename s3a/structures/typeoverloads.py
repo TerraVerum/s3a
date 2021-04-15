@@ -1,5 +1,6 @@
 # noinspection PyUnresolvedReferences
 from utilitys.typeoverloads import FilePath
+from pathlib import Path
 
 from numpy import ndarray
 """
@@ -17,3 +18,9 @@ NChanImg = ndarray
 OneDArr = ndarray
 TwoDArr = ndarray
 ThreeDArr = ndarray
+
+class AnnParseError(ValueError):
+  def __init__(self, *args, fileName: Path=None, instances: list=None, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.fileName = fileName
+    self.instances = instances

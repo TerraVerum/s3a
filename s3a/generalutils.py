@@ -311,3 +311,19 @@ class MaxSizeDict(dict):
       # Evict oldest inserted entry
       self.pop(next(iter(self.keys())))
     super().__setitem__(key, value)
+
+def orderContourPts(pts: XYVertices, ccw=True):
+  """
+  Only guaranteed to work for convex hulls, i.e. shapes not intersecting themselves. Orderes
+  an arbitrary list of coordinates into one that works well line plotting, i.e. doesn't show
+  excessive self-crossing when plotting
+  """
+  if len(pts) < 3:
+    return pts
+  midpt = np.mean(pts, 0)
+  relPosPts = pts - midpt
+  angles = np.arctan2(*relPosPts.T[::-1])
+  ptOrder = np.argsort(angles)
+  if not ccw:
+    ptOrder = ptOrder[::-1]
+  return pts[ptOrder]
