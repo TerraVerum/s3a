@@ -162,7 +162,7 @@ def test_quickload_profile(tmp_path, app):
   outfile = tmp_path/'tmp.csv'
   app.exportCurAnnotation(outfile)
   app.appStateEditor.loadParamValues(
-    stateDict=dict(layout='Default', annotations=str(outfile),
+    stateDict=dict(annotations=str(outfile),
     mainimageprocessor='Default', focusedimageprocessor='Default',
     colorscheme='Default', tablefilter='Default', mainimagetools='Default',
     focusedimagetools='Default', generalproperties='Default', shortcuts='Default'

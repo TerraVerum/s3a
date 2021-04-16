@@ -13,9 +13,7 @@ def test_algs_working(app, vertsPlugin):
   allAlgs = vertsPlugin.procEditor.clctn.topProcs
 
   # Some exceptions may occur in the processor, this is fine since behavior might be undefined
-  with warnings.catch_warnings():
-    warnings.simplefilter('ignore', UserWarning)
-    mImg.shapeCollection.sigShapeFinished.emit(imgCornerVertices(app.mainImg.image))
+  mImg.shapeCollection.sigShapeFinished.emit(imgCornerVertices(app.mainImg.image))
   for alg in allAlgs:
     pe.changeActiveProcessor(alg)
     with warnings.catch_warnings():
@@ -26,10 +24,11 @@ def test_algs_working(app, vertsPlugin):
 def test_disable_top_stages(app, vertsPlugin):
   mImg = app.mainImg
   pe = vertsPlugin.procEditor
+  oldProc = pe.curProcessor.algName
   mImg.shapeCollection.sigShapeFinished.emit(imgCornerVertices(app.mainImg.image))
   for name in pe.clctn.topProcs:
     proc = pe.clctn.parseProcName(name)
-    pe.changeActiveProcessor(proc)
+    pe.changeActiveProcessor(proc, saveBeforeChange=False)
     for stage in proc.stages_flattened:
       if stage.allowDisable and isinstance(stage, ImageProcess):
         pe.curProcessor.setStageEnabled([stage.name], False)
@@ -37,6 +36,8 @@ def test_disable_top_stages(app, vertsPlugin):
     with warnings.catch_warnings():
       warnings.simplefilter('ignore', UserWarning)
       mImg.shapeCollection.sigShapeFinished.emit(XYVertices())
+  # Make sure to put stages back after
+  pe.changeActiveProcessor(oldProc, saveBeforeChange=False)
 
 
 

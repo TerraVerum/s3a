@@ -62,10 +62,6 @@ def vertsPlugin(app):
 
   plg.procEditor.changeActiveProcessor('Basic Shapes')
   proc = plg.curProcessor
-  for stage in proc.processor.stages:
-    if stage.allowDisable:
-      proc.setStageEnabled([stage.name], False)
-
   return plg
 
 # Each test can request wheter it starts with components, small image, etc.

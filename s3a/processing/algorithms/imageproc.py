@@ -452,7 +452,8 @@ def binarize_labels(image: NChanImg, labels: BlackWhiteImg, fgVerts: XYVertices,
     keepColors = labels[seeds[:,0], seeds[:,1]]
     out = np.isin(labels, keepColors)
   # Zero out negative regions from previous runs
-  out[historyMask == 1] = False
+  if historyMask.shape == out.shape:
+    out[historyMask == 1] = False
   nChans = image.shape[2]
   if useMeanColor:
     summaryImg = np.zeros_like(image)
