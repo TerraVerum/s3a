@@ -54,15 +54,9 @@ def test_set_cells_as(app, mgr):
   # Ensure the overwrite data will be different from what it's overwriting
   newFile = 'TestFile.png'
   newDf = mgr.compDf.loc[[0]]
-  compClsIdx = PRJ_SINGLETON.tableData.allFields.index(REQD_TBL_FIELDS.SRC_IMG_FILENAME)
-  newDf.iat[0, compClsIdx] = newFile
-  oldMode = app.compTbl.selectionMode()
-  app.compTbl.setSelectionMode(app.compTbl.MultiSelection)
-  for row in mgr.compDf.index[::2]:
-    app.compTbl.selectRow(row)
-  appInst.processEvents()
-  app.compTbl.setSelectionMode(oldMode)
-  selection = app.compTbl.ids_rows_colsFromSelection(excludeNoEditCols=False)
+  srcFileIdx = PRJ_SINGLETON.tableData.allFields.index(REQD_TBL_FIELDS.SRC_IMG_FILENAME)
+  newDf.iat[0, srcFileIdx] = newFile
+  selection = np.column_stack([mgr.compDf.index[::2], mgr.compDf.index[::2], np.tile(srcFileIdx, len(mgr.compDf)//2)])
   # Sometimes Qt doesn't process selections programmatically. Not sure what to do about that
   if len(selection) == 0:
     return
