@@ -44,6 +44,7 @@ class ImageProcess(NestedProcess):
     for ii, info in enumerate(infoToDisplay):
       pltItem: pg.PlotItem = outGrid.addPlot(title=info.get('name', None))
       pltItem.getViewBox().invertY(True)
+      pltItem.getViewBox().setAspectLocked(True)
       npImg = info['image']
       sameSizePlt = sizeToAxMapping.get(npImg.shape[:2], None)
       if sameSizePlt is not None:
@@ -57,15 +58,22 @@ class ImageProcess(NestedProcess):
         outGrid.nextRow()
     # See https://github.com/pyqtgraph/pyqtgraph/issues/1348. strange zooming occurs
     # if aspect is locked on all figures
-    for ax in sizeToAxMapping.values():
-      ax.getViewBox().setAspectLocked(True)
+    # for ax in sizeToAxMapping.values():
+    #   ax.getViewBox().setAspectLocked(True)
     oldClose = outGrid.closeEvent
     def newClose(ev):
       del _winRefs[outGrid]
       oldClose(ev)
+    oldResize = outGrid.resizeEvent
+    def newResize(ev):
+      oldResize(ev)
+      for ax in sizeToAxMapping.values():
+        ax.getViewBox().autoRange()
+
     # Windows that go out of scope get garbage collected. Prevent that here
     _winRefs[outGrid] = outGrid
     outGrid.closeEvent = newClose
+    outGrid.resizeEvent = newResize
 
     return outGrid
 
