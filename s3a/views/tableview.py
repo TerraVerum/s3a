@@ -155,7 +155,7 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
       params.child('visibleColumns').setLimits([f.name for f in TBL_FIELDS])
     onChange()
     PRJ_SINGLETON.tableData.sigCfgUpdated.connect(onChange)
-    proc.run()
+    proc.run(**params)
 
     if not minimal:
       self.popup = PopupTableDialog(*args)
