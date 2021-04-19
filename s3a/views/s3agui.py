@@ -71,12 +71,6 @@ class S3A(S3ABase):
     self.layoutEditor.saveParamValues = saveRecentLayout
     self.appStateEditor.addImportExportOpts('layout', loadLayout, saveRecentLayout)
 
-    # When docks are loaded via layout editor, they don't resize properly. Fix that here
-    for dock in PRJ_SINGLETON.docks:
-      editors = dock.editors if isinstance(dock, ParamEditorDockGrouping) else [dock]
-      for editor in editors:
-        editor.tree.resizeColumnToContents(0)
-
     self._buildGui()
     self._buildMenu()
     self._hookupSignals()

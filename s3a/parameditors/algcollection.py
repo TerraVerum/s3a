@@ -226,36 +226,17 @@ class AlgParamEditor(ParamEditor):
     procName = next(iter(self.clctn.topProcs))
     # Set to None first to force switch, init states
     self.curProcessor = self.clctn.procWrapType(noneProc, self.params)
-    self.changeActiveProcessor(procName)
     _, self.changeProcParam = self.registerFunc(self.changeActiveProcessor, runOpts=RunOpts.ON_CHANGED, returnParam=True,
-                                                overrideBasePath=(), parentParam=self.algoGrp,
+                                                overrideBasePath=(), parentParam=self._metaParamGrp,
                                                 proc=procName)
-    fns.setParamsExpanded(self.algoTree)
-    self.algoTree.setMinimumHeight(self.algoTree.sizeHint().height())
+    fns.setParamsExpanded(self._metaTree)
     procSelector = self.changeProcParam.child('proc')
     self.clctn.sigChangesApplied.connect(lambda: procSelector.setLimits(list(self.clctn.topProcs)))
     self.clctn.sigChangesApplied.emit({})
     def onChange(name):
       self.changeProcParam['proc'] = name
     self.sigProcessorChanged.connect(onChange)
-
-  def _buildGui(self, **kwargs):
-    super()._buildGui(**kwargs)
-    self.algoGrp = Parameter.create(name='Algorithm Selection', type='group')
-    self.algoTree = fns.flexibleParamTree(self.algoGrp, False)
-    self.algoTree.setHeaderHidden(True)
-    self.algoTree.setSizePolicy(self.algoTree.sizePolicy().horizontalPolicy(), QtWidgets.QSizePolicy.Fixed)
-    # Size is just a tad too small
-    oldSzHint = self.algoTree.sizeHint
-    def newSzHint():
-      baseHint = oldSzHint()
-      baseHint.setHeight(int(baseHint.height()*1.1))
-      return baseHint
-    self.algoTree.sizeHint = newSzHint
-
-    dockLay = self.dockContentsWidget.easyChild.layout_
-    dockLay.removeWidget(self.tree)
-    dockLay.insertWidget(1, EasyWidget.buildWidget([self.algoTree, self.tree], useSplitter=True))
+    self.changeActiveProcessor(procName)
 
   @classmethod
   def _unnestedProcState(cls, proc: NestedProcess, _state=None, **kwargs):
