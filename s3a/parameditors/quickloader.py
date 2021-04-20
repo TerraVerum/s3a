@@ -139,7 +139,7 @@ class QuickLoaderEditor(ParamEditor):
                f"{[e.name for e in self.listModel.uniqueEditors]}"
       warnLater(errMsg, UserWarning)
     if applyChanges:
-      self.applyChanges()
+      self.applyChanges(newName=stateName, newState=stateDict)
     return ret
 
   def buildFromStartupParams(self, startupSrc: dict):
@@ -153,7 +153,7 @@ class QuickLoaderEditor(ParamEditor):
       paramStateInfo: Union[dict, str] = startupSrc.get(lower_NoSpaces(editor.name), None)
       try:
         if isinstance(paramStateInfo, dict):
-          editor.loadParamValues(self.lastAppliedName, paramStateInfo)
+          editor.loadParamValues(self.stateName, paramStateInfo)
         elif paramStateInfo is not None:
           editor.loadParamValues(paramStateInfo)
       except Exception as ex:
@@ -180,8 +180,8 @@ class QuickLoaderEditor(ParamEditor):
     kwargs['paramState'] = {}
     super().saveParamValues(saveName, **kwargs)
 
-  def applyChanges(self):
-    super().applyChanges()
+  def applyChanges(self, **kwargs):
+    super().applyChanges(**kwargs)
     for grp in self.params.childs: # type: GroupParameter
       if grp.hasChildren():
         act: ShcKeySeq = next(iter(grp))

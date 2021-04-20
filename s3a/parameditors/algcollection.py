@@ -4,6 +4,7 @@ import copy
 import inspect
 import pydoc
 import typing as t
+import webbrowser
 from pathlib import Path
 from typing import Dict, List, Callable, Union, Type
 
@@ -188,9 +189,8 @@ class AlgCollection(ParamEditor):
     def procFilter(procDict):
       return {k: v for k, v in procDict.items() if not isinstance(v, ProcessStage)}
     if paramState is None:
-      paramState = {'top': procFilter(self.topProcs), 'primitive': procFilter(self.primitiveProcs)}
-      if self.includeModules:
-        paramState['modules'] = self.includeModules
+      paramState = {'top': procFilter(self.topProcs), 'primitive': procFilter(self.primitiveProcs),
+                    'modules': self.includeModules}
     return super().saveParamValues(saveName, paramState, **kwargs)
 
   def loadParamValues(self, stateName: t.Union[str, Path],
@@ -238,8 +238,7 @@ class AlgParamEditor(ParamEditor):
     self.sigProcessorChanged.connect(onChange)
     self.changeActiveProcessor(procName)
 
-  @classmethod
-  def _unnestedProcState(cls, proc: NestedProcess, _state=None, **kwargs):
+  def _unnestedProcState(self, proc: NestedProcess, _state=None, **kwargs):
     """
     Updates processes without hierarchy so separate stages are unnested. The outermost process is considered a
     'top' process, while all subprocesses are considered 'primitive'.
@@ -253,11 +252,11 @@ class AlgParamEditor(ParamEditor):
     kwargs.update(includeMeta=True, disabled=False, allowDisable=True)
     first = _state is None
     if first:
-      _state = {'top': {}, 'primitive': {}}
+      _state = {'modules': [], 'primitive': {}, 'top': {}}
     stageVals = []
     for stage in proc:
       if isinstance(stage, NestedProcess):
-        cls._unnestedProcState(stage, _state, **kwargs)
+        self._unnestedProcState(stage, _state, **kwargs)
         stageVals.append(stage.addMetaProps(stage.name, **kwargs))
       else:
         stageVals.append(stage.saveState(**kwargs))
@@ -276,7 +275,7 @@ class AlgParamEditor(ParamEditor):
       # Since inner nested processes are already recorded, flatten here to just save updated parameter values for the
       # outermost stage
       paramState = self._unnestedProcState(proc, includeMeta=True)
-    self.clctn.loadParamValues(self.clctn.lastAppliedName, paramState)
+    self.clctn.loadParamValues(self.clctn.stateName, paramState)
     clctnState = self.clctn.saveParamValues(saveName, blockWrite=True)
     paramState = {'Selected Algorithm': self.curProcessor.algName, 'Parameters': clctnState}
     return super().saveParamValues(saveName, paramState, includeDefaults=includeDefaults, **kwargs)
@@ -291,6 +290,7 @@ class AlgParamEditor(ParamEditor):
 
     self.clctn.loadParamValues(stateName, clctnState, **kwargs)
     self.changeActiveProcessor(procName, flatten=self.changeProcParam['flatten'], saveBeforeChange=False)
+    return super().loadParamValues(stateName, stateDict, candidateParams=[], **kwargs)
 
   def changeActiveProcessor(self, proc: Union[str, NestedProcess], flatten=False, saveBeforeChange=True):
     """
@@ -306,7 +306,7 @@ class AlgParamEditor(ParamEditor):
     """
     # TODO: Maybe there's a better way of doing this? Ensures proc label is updated for programmatic calls
     if saveBeforeChange and self._unflatProc:
-      self.saveParamValues(self.lastAppliedName, self._unnestedProcState(self._unflatProc, includeMeta=True),
+      self.saveParamValues(self.stateName, self._unnestedProcState(self._unflatProc, includeMeta=True),
                            blockWrite=True)
     if isinstance(proc, str):
       proc = self.clctn.parseProcName(proc)
@@ -321,3 +321,6 @@ class AlgParamEditor(ParamEditor):
     self._unflatProc = unflatProc
     fns.setParamsExpanded(self.tree)
     self.sigProcessorChanged.emit(proc.name)
+
+  def editParamValues_gui(self):
+    webbrowser.open(self.formatFileName(self.stateName))

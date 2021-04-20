@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import traceback
+import warnings
 
 import numpy as np
 
@@ -17,9 +18,10 @@ class ImgProcWrapper(NestedProcWrapper):
 
   def run(self, **kwargs):
     newIo = self._ioDictFromRunKwargs(kwargs)
-
     try:
-      result = self.processor.run(newIo)
+      with warnings.catch_warnings():
+        warnings.simplefilter('ignore', UserWarning)
+        result = self.processor.run(newIo)
     except Exception as ex:
       augmentException(ex, 'Exception during processor run:\n'
                        + ''.join(traceback.format_stack(limit=5)))

@@ -344,7 +344,8 @@ def cv_grabcut(image: NChanImg, prevCompMask: BlackWhiteImg, fgVerts: XYVertices
   bgdModel = np.zeros((1,65),np.float64)
   fgdModel = np.zeros((1,65),np.float64)
   historyMask = historyMask.copy()
-  historyMask[fgVerts.rows, fgVerts.cols] = 2
+  if historyMask.size:
+    historyMask[fgVerts.rows, fgVerts.cols] = 2
 
   mask = np.zeros(prevCompMask.shape, dtype='uint8')
   mask[prevCompMask == 1] = cv.GC_PR_FGD

@@ -39,12 +39,11 @@ class AppStateEditor(ParamEditor):
       updateDict = {k: ret for k, ret in zip(legitKeys, rets) if ret is not None}
       paramState = dict(Parameters=paramState, **updateDict)
       for editor in PRJ_SINGLETON.quickLoader.listModel.uniqueEditors:
-        editor.applyChanges()
-        if editor.lastAppliedName == 'Default':
+        if editor.stateName == 'Default':
           continue
         curSaveName = str(saveOnExitDir/editor.name)
         formattedName = editor.name.replace(' ', '').lower()
-        editor.saveParamValues(curSaveName, blockWrite=False)
+        editor.saveParamValues(curSaveName)
         paramState.update({formattedName: curSaveName})
     else:
       errs = []

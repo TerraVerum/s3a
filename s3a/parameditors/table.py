@@ -161,7 +161,7 @@ class TableFilterEditor(ParamEditor):
       warnLater(f'The table does not know how to create a filter for fields'
             f' {", ".join(colNames)}'
             f' since types {", ".join(colTypes)} do not have corresponding filters', UserWarning)
-    self.applyChanges()
+    self.saveParamValues(blockWrite=True)
 
   @property
   def activeFilters(self):
