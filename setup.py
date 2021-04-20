@@ -30,7 +30,7 @@ setup(
   package_dir={'s3a':'s3a'},
   packages=find_packages(),
   data_files=[('s3a/s3a/icons', _mltGlob('s3a/icons', '*.svg', '*.png')),
-  ('s3a/s3a', _mltGlob('s3a/', '*.yml'))],
+  ('s3a/s3a', _mltGlob('s3a/cfg', '*.yml'))],
   entry_points={
     'console_scripts': [
       's3a-gui = s3a.__main__:main',
