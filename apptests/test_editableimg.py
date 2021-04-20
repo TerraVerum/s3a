@@ -57,6 +57,7 @@ def test_update(app, mgr, vertsPlugin):
   assert mImg.compSer.equals(newerSer)
 
 def test_region_modify(sampleComps, app, mgr, vertsPlugin):
+  vertsPlugin.procEditor.changeActiveProcessor('Basic Shapes')
   mImg = app.mainImg
   app.add_focusComps(sampleComps)
   shapeBnds = mImg.image.shape[:2]
