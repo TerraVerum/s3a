@@ -1,10 +1,9 @@
 from functools import partial
-from typing import Sequence
+from typing import Sequence, Any
 from warnings import warn
 
 import numpy as np
 import pandas as pd
-from pandas import DataFrame as df
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
 from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
@@ -21,6 +20,41 @@ Signal = QtCore.Signal
 
 TBL_FIELDS = PRJ_SINGLETON.tableData.allFields
 
+class MinimalTableModel(ComponentMgr):
+  """
+  The CheckState flag is only possible on a minimal popup table, but Qt makes it
+  challenging to override just this portion of the ComponentMgr class. So, this simple
+  subclass maintains a checkstate and checkable columns on top of the traditional
+  component manager.
+  """
+
+  def __init__(self):
+    super().__init__()
+    # Map true/false to check state
+    self.csMap = {True: QtCore.Qt.Checked, False: QtCore.Qt.Unchecked}
+
+    # Since the minimal model only contains one row, everything checkable can be on a
+    # per-column basis
+    self.checkedColIdxs = set()
+
+  def flags(self, index: QtCore.QModelIndex) -> QtCore.Qt.ItemFlags:
+    return super().flags(index) | QtCore.Qt.ItemIsUserCheckable
+
+  def data(self, index: QtCore.QModelIndex, role: int) -> Any:
+    if role == QtCore.Qt.CheckStateRole:
+      return self.csMap[index.column() in self.checkedColIdxs]
+    return super().data(index, role)
+
+  def setData(self, index, value, role=QtCore.Qt.EditRole) -> bool:
+    if role == QtCore.Qt.CheckStateRole:
+      if value == QtCore.Qt.Checked:
+        self.checkedColIdxs.add(index.column())
+      else:
+        self.checkedColIdxs.remove(index.column())
+      return True
+    return super().setData(index, value, role)
+
+
 class PopupTableDialog(QtWidgets.QDialog):
   def __init__(self, *args):
     super().__init__(*args)
@@ -29,16 +63,17 @@ class PopupTableDialog(QtWidgets.QDialog):
     # Table View
     # -----------
     self.tbl = CompTableView(minimal=True)
-    # Keeps track of which columns were edited by the user
-    self.dirtyColIdxs = []
+    self.model = MinimalTableModel()
+    self.tbl.setModel(self.model)
 
     # -----------
     # Warning Message
     # -----------
     self.reflectDelegateChange()
-    self.warnLbl = QtWidgets.QLabel(self)
+    self.warnLbl = QtWidgets.QLabel(
+      'Check the boxes for data you wish to propagate to all selected cells.\n'
+      'Selections where every row has the same data are checkd by default.', self)
     self.warnLbl.setStyleSheet("font-weight: bold; color:red; font-size:14")
-    self.updateWarnMsg([])
 
     # -----------
     # Widget buttons
@@ -66,33 +101,33 @@ class PopupTableDialog(QtWidgets.QDialog):
     self.closeBtn.clicked.connect(self.close)
     self.applyBtn.clicked.connect(self.accept)
 
-  def updateWarnMsg(self, updatableCols: Sequence[str]):
-    warnMsg = 'Note! '
-    if len(updatableCols) == 0:
-      tblInfo = 'No information'
-    else:
-      tblInfo = "Only " + ", ".join(updatableCols)
-    warnMsg += f'{tblInfo} will be updated from this view.'
-    self.warnLbl.setText(warnMsg)
-
   def reflectDelegateChange(self):
     # TODO: Find if there's a better way to see if changes happen in a table
     self.titles = np.array(list([f.name for f in TBL_FIELDS]))
     self.tbl.setColDelegates()
+    # Avoid loop scoping
+    def wrapper(col):
+      def onUpdate():
+        self.model.checkedColIdxs.add(col)
+      return onUpdate
     for colIdx in range(len(self.titles)):
       deleg = self.tbl.itemDelegateForColumn(colIdx)
-      deleg.commitData.connect(partial(self.reflectDataChanged, colIdx))
-
+      deleg.commitData.connect(wrapper(colIdx))
 
   @property
   def data(self):
     return self.tbl.mgr.compDf.iloc[[0],:]
 
-  def setData(self, compDf: df, colIdxs: Sequence):
+  def setData(self, compDf: pd.DataFrame, colIdxs: Sequence[int],
+              dirtyColIdxs: Sequence[int]=None):
     # New selection, so reset dirty columns
-    self.dirtyColIdxs = []
+    if dirtyColIdxs is None:
+      dirtyColIdxs = []
     # Hide columns that weren't selected by the user since these changes
     # Won't propagate
+    self.model.checkedColIdxs.clear()
+    self.model.checkedColIdxs.update(dirtyColIdxs)
+
     for ii in range(len(self.titles)):
       if ii not in colIdxs:
         self.tbl.hideColumn(ii)
@@ -100,18 +135,9 @@ class PopupTableDialog(QtWidgets.QDialog):
         self.tbl.showColumn(ii)
     self.tbl.mgr.rmComps()
     self.tbl.mgr.addComps(compDf, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)
-    self.updateWarnMsg([])
-
-  def reflectDataChanged(self, editedColIdx: int):
-    """Responds to user editing the value in a cell by setting a dirty bit for that column"""
-    if editedColIdx not in self.dirtyColIdxs:
-      self.dirtyColIdxs.append(editedColIdx)
-      self.dirtyColIdxs.sort()
-      self.updateWarnMsg(self.titles[self.dirtyColIdxs])
 
   def reject(self):
     # On dialog close be sure to unhide all columns / reset dirty cols
-    self.dirtyColIdxs = []
     for ii in range(len(self.titles)):
       self.tbl.showColumn(ii)
     super().reject()
@@ -245,9 +271,21 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
       self.mgr.rmComps(idList)
       self.clearSelection()
 
-  def ids_rows_colsFromSelection(self, excludeNoEditCols=True, warnNoneSelection=True):
-    """Returns Nx3 np array of (ids, rows, cols) from current table selection"""
-    selectedIdxs = self.selectedIndexes()
+  def ids_rows_colsFromSelection(self, excludeNoEditCols=True, warnNoneSelection=True,
+                                 selectedIdxs: Sequence[QtCore.QModelIndex]=None):
+    """
+    Returns Nx3 np array of (ids, rows, cols) from current table selection. Ids refer to
+    the 'Instance ID' column, while rows refer to the placement in the visible table.
+    Thus, sorting the table will not affect `id` values, but will affect `row` values.
+
+    :param excludeNoEditCols: Whether to consider columns that do not allow editing, like
+      Instance ID and Vertices
+    :param warnNoneSelection: Whether to raise a warning if no values are selected
+    :param selectedIdxs: Selection to get ids, rows, and cols from. If *None*, defaults to
+      the current table selection (self.selectedIndexes())
+    """
+    if selectedIdxs is None:
+      selectedIdxs = self.selectedIndexes()
     retLists = [] # (Ids, rows, cols)
     for idx in selectedIdxs:
       row = idx.row()
@@ -282,15 +320,39 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
       selectionIdxs = self.ids_rows_colsFromSelection()
     overwriteData = self.mgr.compDf.loc[[selectionIdxs[0,0]]].copy()
     with PRJ_SINGLETON.actionStack.ignoreActions():
-      self.popup.setData(overwriteData, pd.unique(selectionIdxs[:,2]))
+      self.popup.setData(overwriteData, pd.unique(selectionIdxs[:,2]),
+                         self._getDupDataCols(selectionIdxs))
       wasAccepted = self.popup.exec_()
-    if not wasAccepted or len(self.popup.dirtyColIdxs) == 0:
+    # Convert to list or isin() check below fails
+    dirtyCols = list(self.popup.model.checkedColIdxs)
+    if not wasAccepted or not dirtyCols:
       return
 
-    selectionIdxs = selectionIdxs[np.isin(selectionIdxs[:,2], self.popup.dirtyColIdxs)]
+    selectionIdxs = selectionIdxs[np.isin(selectionIdxs[:,2], dirtyCols)]
     self.setSelectedCellsAs(selectionIdxs, self.popup.data)
 
-  def setSelectedCellsAs(self, selectionIdxs: TwoDArr, overwriteData: df):
+  def _getDupDataCols(self, selectionIdxs: np.ndarray):
+    """
+    From a selection of components, returns the column names which have the same data in
+    every row. This is useful for determining which columns should be propagated by
+    default when performing a "set cells" operation
+
+    :param selectionIdxs: Selection list of dataframe cells to consider. See
+      `ids_rows_colsFormSelection` for a description of this array
+    :return: List of column idxs which have only duplicate data selected, i.e. all
+    entries in every row of that column are the same
+    """
+    dupCols = []
+    # First, find out all rows for each column to select, then test data at those rows
+    for col in np.unique(selectionIdxs[:, 2]):
+      name = self.mgr.compDf.columns[col]
+      ids = selectionIdxs[selectionIdxs[:, 2] == col, 0]
+      data = self.mgr.compDf.loc[ids, name]
+      if len(pd.unique(data)) <= 1:
+        dupCols.append(col)
+    return dupCols
+
+  def setSelectedCellsAs(self, selectionIdxs: TwoDArr, overwriteData: pd.DataFrame):
     """
     Overwrites the data from rows and cols with the information in *overwriteData*.
     Each (id, row, col) index is treated as a single index
