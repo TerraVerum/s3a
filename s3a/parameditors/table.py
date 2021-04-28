@@ -8,7 +8,6 @@ import numpy as np
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 from pyqtgraph.parametertree import Parameter
-from ruamel.yaml import YAML
 
 from s3a.constants import TABLE_DIR, REQD_TBL_FIELDS, PRJ_CONSTS, TBL_BASE_TEMPLATE
 from s3a.generalutils import hierarchicalUpdate
@@ -16,8 +15,6 @@ from s3a.structures import PrjParamGroup, FilePath
 from utilitys import ParamEditor, PrjParam
 from utilitys import fns
 from utilitys.fns import warnLater
-
-yaml = YAML()
 
 def genParamList(nameIter, paramType, defaultVal, defaultParam='value'):
   """Helper for generating children elements"""
