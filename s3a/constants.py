@@ -7,12 +7,12 @@ __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'QUICK_LOAD_DIR',
            'SHORTCUT_BASE', 'MAIN_IMG_DIR', 'APP_STATE_DIR', 'CFG_DIR', 'IMG_PROC_DIR', 'MULT_PRED_DIR',
            'REQD_TBL_FIELDS', 'PRJ_CONSTS', 'PRJ_ENUMS', 'PROJ_FILE_TYPE', 'PROJ_BASE_TEMPLATE']
 
-from typing import Any
+CODE_DIR = Path(__file__).parent
+BASE_DIR = Path.home()/'.s3a'
 
-BASE_DIR = Path(__file__).parent
+CFG_DIR = CODE_DIR/'cfg'
+ICON_DIR = CODE_DIR/'icons'
 MENU_OPTS_DIR = BASE_DIR/'menuopts'
-CFG_DIR = BASE_DIR/'cfg'
-ICON_DIR = BASE_DIR/'icons'
 
 # -----
 # EDITORS
@@ -26,7 +26,7 @@ MAIN_IMG_DIR = MENU_OPTS_DIR/'mainimg'
 IMG_PROC_DIR = MENU_OPTS_DIR/'imageproc'
 MULT_PRED_DIR = MENU_OPTS_DIR/'multiproc'
 TABLE_DIR = MENU_OPTS_DIR/'table'
-APP_STATE_DIR = Path.home()/'.s3a'
+APP_STATE_DIR = BASE_DIR
 
 
 PROJ_BASE_TEMPLATE = CFG_DIR/'projectcfg.yml'
@@ -260,12 +260,3 @@ class _PrjConsts(PrjParamGroup):
     'Activate "Pan" draw action', f'{SHORTCUT_BASE},D,P', 'registeredaction', icon=str(ICON_DIR / 'pan.svg'),
     helpText='No ROI will be drawn in this mode. Right- or left-click and drag to pan.')
 PRJ_CONSTS = _PrjConsts()
-
-# from ruamel.yaml import YAML
-# yaml = YAML()
-# for cls in PrjParam, PrjParamGroup, _PrjConsts:
-#   yaml.register_class(cls)
-# for p in PRJ_CONSTS:
-#   p.group = []
-# p = Path('./consts.yml')
-# yaml.dump(PRJ_CONSTS, p)
