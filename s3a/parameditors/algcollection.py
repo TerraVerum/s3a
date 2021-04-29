@@ -4,6 +4,7 @@ import copy
 import inspect
 import pydoc
 import typing as t
+import types
 import webbrowser
 from pathlib import Path
 from typing import Dict, List, Callable, Union, Type
@@ -26,6 +27,11 @@ class _AlgClctnDict(TypedDict):
   top: List[Union[str, dict]]
   primitive: List[Union[str, dict]]
 
+algoNameFormatter = fns.NameFormatter(
+  lambda name: name.lower().replace(' ', '').replace('_', '')
+)
+"""Strips spaces and underscores from the provided name, and turns everything to 
+lowercase"""
 
 class AlgCollection(ParamEditor):
   # sigProcessorCreated = Signal(object) # Signal(AlgCollectionEditor)
@@ -163,26 +169,34 @@ class AlgCollection(ParamEditor):
         self.addFunction(func)
 
   @classmethod
-  def parseProcModule(cls, moduleName: str, procName: str, formatter=nameFormatter):
-    module = pydoc.locate(moduleName)
+  def parseProcModule(cls, moduleName: t.Union[str, types.ModuleType], procName: str,
+                                       formatter=algoNameFormatter):
+    if isinstance(moduleName, types.ModuleType):
+      module = moduleName
+    else:
+      module = pydoc.locate(moduleName)
     if not module:
       raise ValueError(f'Module "{module}" not recognized')
     # TODO: Depending on search time, maybe quickly search without formatting?
-    attr = None
-    for name, modAttr in vars(module).items():
-      name = nameFormatter(name.split('.')[-1])
+    procName = formatter(procName)
+    # It is possible after name formatting for multiple matches to exist for procName.
+    # The first match that is a function or process stage will be retained.
+    for name, attr in vars(module).items():
+      name = formatter(name.split('.')[-1])
+      # Evaluate factories first
+      if name.lower().endswith('factory'):
+        try:
+          attr: ProcessStage = attr()
+          if not isinstance(attr, ProcessStage):
+            continue
+          name = formatter(attr.name)
+        except:
+          continue
       if name == procName:
-        attr = modAttr
-        break
-      elif procName in name and name.lower().endswith('factory'):
-        attr = modAttr()
-        break
-
-    # Change behavior based on obj type
-    if inspect.isfunction(attr):
-      return AtomicProcess(attr)
-    if isinstance(attr, ProcessStage):
-      return attr
+        if inspect.isfunction(attr):
+          return AtomicProcess(attr)
+        if isinstance(attr, ProcessStage):
+          return attr
     return None
 
   def saveParamValues(self, saveName: str=None, paramState: dict=None, **kwargs):
@@ -199,8 +213,6 @@ class AlgCollection(ParamEditor):
     stateDict = self._parseStateDict(stateName, stateDict)
     top, primitive = stateDict.get('top', {}), stateDict.get('primitive', {})
     modules = stateDict.get('modules', [])
-    for mod in modules:
-      self._addFromModuleName(mod)
     self.includeModules = modules
     self.topProcs.update(top)
     self.primitiveProcs.update(primitive)
@@ -252,7 +264,7 @@ class AlgParamEditor(ParamEditor):
     kwargs.update(includeMeta=True, disabled=False, allowDisable=True)
     first = _state is None
     if first:
-      _state = {'modules': [], 'primitive': {}, 'top': {}}
+      _state = {'modules': self.clctn.includeModules, 'primitive': {}, 'top': {}}
     stageVals = []
     for stage in proc:
       if isinstance(stage, NestedProcess):
@@ -275,6 +287,7 @@ class AlgParamEditor(ParamEditor):
       # Since inner nested processes are already recorded, flatten here to just save updated parameter values for the
       # outermost stage
       paramState = self._unnestedProcState(proc, includeMeta=True)
+      paramState['modules'] = self.clctn.includeModules
     self.clctn.loadParamValues(self.clctn.stateName, paramState)
     clctnState = self.clctn.saveParamValues(saveName, blockWrite=True)
     paramState = {'Selected Algorithm': self.curProcessor.algName, 'Parameters': clctnState}
