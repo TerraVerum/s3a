@@ -18,6 +18,7 @@ from s3a.constants import MENU_OPTS_DIR
 from utilitys import NestedProcess, RunOpts
 from utilitys import ParamEditor, NestedProcWrapper, fns, ProcessStage, AtomicProcess
 from utilitys.fns import nameFormatter
+from utilitys.processing import ArgMapper
 from utilitys.widgets import EasyWidget
 
 Signal = QtCore.Signal
@@ -43,6 +44,9 @@ class AlgCollection(ParamEditor):
     self.primitiveProcs: Dict[str, Union[ProcessStage, List[str]]] = {}
     self.topProcs: _procDict = {}
     self.includeModules: List[str] = []
+
+    # Allow name remapping to take place
+    self.addProcess(ArgMapper())
 
   def createProcessorEditor(self, saveDir: Union[str, Type], editorName='Processor') -> AlgParamEditor:
     """
@@ -94,7 +98,7 @@ class AlgCollection(ParamEditor):
       self.addProcess(out, allowOverwrite)
     return out
 
-  def parseProcName(self, procName: str, topFirst=True):
+  def parseProcName(self, procName: str, topFirst=True, **kwargs):
     procDicts = [self.primitiveProcs, self.topProcs]
     if topFirst:
       procDicts = procDicts[::-1]
@@ -102,7 +106,7 @@ class AlgCollection(ParamEditor):
     # It could still be in an include module, cache if found
     if not proc:
       for module in self.includeModules:
-        proc = self.parseProcModule(module, procName)
+        proc = self.parseProcModule(module, procName, **kwargs)
         if proc:
           # Success, make sure to cache this in processes
           # Top processes must be nested
@@ -131,11 +135,14 @@ class AlgCollection(ParamEditor):
       #   _need_ to occur, given outer would've been saved previously
       raise ValueError('Parsing deep nested processes is currently undefined')
     elif updateArgs:
-      proc.updateInput(**updateArgs, graceful=True)
-    # Check for disables at the nested level
-    proc.disabled = procDict.get('disabled', proc.disabled)
-    proc.allowDisable = procDict.get('allowDisable', proc.allowDisable)
-    proc.name = procDict.get('name', proc.name)
+      proc.updateInput(**updateArgs, allowExtra=True, graceful=True)
+      # Set the defaults, too
+      if isinstance(proc, AtomicProcess):
+        proc.defaultInput.update(**updateArgs)
+    # Check for process-level traits
+    for kk, vv in procDict.items():
+      if hasattr(proc, kk):
+        setattr(proc, kk, vv)
     return proc
     # TODO: Add recursion, if it's something that will be done. For now, assume only 1-depth nesting. Otherwise,
     #   it's hard to distinguish between actual input optiosn and a nested process
@@ -170,7 +177,7 @@ class AlgCollection(ParamEditor):
 
   @classmethod
   def parseProcModule(cls, moduleName: t.Union[str, types.ModuleType], procName: str,
-                                       formatter=algoNameFormatter):
+                                       formatter=algoNameFormatter, **factoryArgs):
     if isinstance(moduleName, types.ModuleType):
       module = moduleName
     else:
@@ -186,17 +193,17 @@ class AlgCollection(ParamEditor):
       # Evaluate factories first
       if name.lower().endswith('factory'):
         try:
-          attr: ProcessStage = attr()
+          attr: ProcessStage = attr(**factoryArgs)
           if not isinstance(attr, ProcessStage):
             continue
           name = formatter(attr.name)
         except:
           continue
       if name == procName:
-        if inspect.isfunction(attr):
-          return AtomicProcess(attr)
         if isinstance(attr, ProcessStage):
           return attr
+        if callable(attr):
+          return AtomicProcess(attr)
     return None
 
   def saveParamValues(self, saveName: str=None, paramState: dict=None, **kwargs):
