@@ -1,24 +1,21 @@
-import inspect
-from functools import lru_cache
-from typing import Tuple, List
+from typing import Tuple, List, Union
 
+import cv2 as cv
 import numpy as np
 import pandas as pd
-from scipy.ndimage import binary_fill_holes, maximum_filter
+from scipy.ndimage import binary_fill_holes
 from skimage import morphology as morph, img_as_float
+from skimage import segmentation as seg
 from skimage.measure import regionprops, label, regionprops_table
 from skimage.morphology import flood
-from skimage import segmentation as seg
-from utilitys.processing import *
-from utilitys import fns
 
 from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices, \
-  showMaskDiff, MaxSizeDict
+  showMaskDiff, MaxSizeDict, tryCvResize, movePtsTowardCenter
 from s3a.processing.processing import ImageProcess
 from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg
 from s3a.structures import GrayImg, RgbImg
-
-import cv2 as cv
+from utilitys import fns
+from utilitys.processing import *
 
 
 def growSeedpoint(img: NChanImg, seeds: XYVertices, thresh: float) -> BlackWhiteImg:
@@ -129,7 +126,8 @@ def crop_to_local_area(image: NChanImg,
                        viewbox: XYVertices,
                        historyMask: GrayImg,
                        reference='viewbox',
-                       margin_pct=10
+                       margin_pct=10,
+                       maxSize=0
                        ):
   """
   :param reference:
@@ -139,6 +137,9 @@ def crop_to_local_area(image: NChanImg,
       - component
       - viewbox
       - roi
+  :param maxSize: Maximum side length for a local portion of the image. If the local area exceeds this, it will be
+    rescaled to match this size. It can be beneficial for algorithms that take a long time to run, and quality of
+    segmentation can be retained. Set to <= 0 to have no maximum size
   """
   roiVerts = np.vstack([fgVerts, bgVerts])
   compVerts = np.vstack([prevCompVerts.stack(), roiVerts])
@@ -159,10 +160,19 @@ def crop_to_local_area(image: NChanImg,
     vertArea_rowCol = 0
   margin = int(round(max(vertArea_rowCol) * (margin_pct / 100)))
   cropped, bounds = getCroppedImg(image, allVerts, margin)
+  ratio = 1
+  curMaxDim = np.max(cropped.shape[:2])
+  if 0 < maxSize < curMaxDim:
+    ratio = maxSize / curMaxDim
+
   vertOffset = bounds.min(0)
-  for vertList in fgVerts, bgVerts:
-    vertList -= vertOffset
-    np.clip(vertList, a_min=[0,0], a_max=bounds[1,:]-1, out=vertList)
+  useVerts = [fgVerts, bgVerts]
+  for ii in range(2):
+    # Add additional offset
+    useVerts[ii] = (movePtsTowardCenter((useVerts[ii] - vertOffset)*ratio)).astype(int)
+    np.clip(useVerts[ii], a_min=[0,0], a_max=(bounds[1,:]-1)*ratio, out=useVerts[ii])
+  fgVerts, bgVerts = useVerts
+
   boundSlices = slice(*bounds[:,1]), slice(*bounds[:,0])
   croppedCompMask = prevCompMask[boundSlices]
   curHistory = historyMask[boundSlices]
@@ -171,12 +181,17 @@ def crop_to_local_area(image: NChanImg,
   toPlot = cv.rectangle(image.copy(), tuple(bounds[0,:]), tuple(bounds[1,:]),
                         (255,0,0), rectThickness)
   info = {'name': 'Selected Area', 'image': toPlot}
-  return ProcessIO(image=cropped, fgVerts=fgVerts, bgVerts=bgVerts, prevCompMask=croppedCompMask,
-                   boundSlices=boundSlices, historyMask=curHistory, summaryInfo=info)
+  out = ProcessIO(image=cropped, fgVerts=fgVerts, bgVerts=bgVerts, prevCompMask=croppedCompMask,
+                   boundSlices=boundSlices, historyMask=curHistory, resizeRatio=ratio, summaryInfo=info)
+  if ratio < 1:
+    for kk in 'image', 'prevCompMask', 'historyMask':
+      out[kk] = cv_resize(out[kk], ratio)
+  return out
 
 def apply_process_result(image: NChanImg, asForeground: bool,
                          prevCompMask: BlackWhiteImg, origCompMask: BlackWhiteImg,
-                         boundSlices: Tuple[slice,slice]):
+                         boundSlices: Tuple[slice,slice],
+                         resizeRatio: float):
   if asForeground:
     bitOperation = np.bitwise_or
   else:
@@ -187,6 +202,10 @@ def apply_process_result(image: NChanImg, asForeground: bool,
   # now would incur unnecessary addtional processing times for the full-sized image
   outMask = origCompMask.copy()
   change = bitOperation(prevCompMask, image)
+  if resizeRatio < 1:
+    origSize = (boundSlices[0].stop - boundSlices[0].start,
+                boundSlices[1].stop - boundSlices[1].start)
+    change = cv_resize(change, origSize[::-1], asRatio=False, interpolation=cv.INTER_NEAREST)
   outMask[boundSlices] = change
   foregroundPixs = np.c_[np.nonzero(outMask)]
   # Keep algorithm from failing when no foreground pixels exist
@@ -348,14 +367,15 @@ def cv_grabcut(image: NChanImg, prevCompMask: BlackWhiteImg, fgVerts: XYVertices
     historyMask[fgVerts.rows, fgVerts.cols] = 2
 
   mask = np.zeros(prevCompMask.shape, dtype='uint8')
-  mask[prevCompMask == 1] = cv.GC_PR_FGD
-  mask[prevCompMask == 0] = cv.GC_PR_BGD
-  mask[historyMask == 2] = cv.GC_FGD
-  mask[historyMask == 1] = cv.GC_BGD
+  if historyMask.shape == mask.shape:
+    mask[prevCompMask == 1] = cv.GC_PR_FGD
+    mask[prevCompMask == 0] = cv.GC_PR_BGD
+    mask[historyMask == 2] = cv.GC_FGD
+    mask[historyMask == 1] = cv.GC_BGD
 
   cvRect = np.array([fgVerts.min(0), fgVerts.max(0) - fgVerts.min(0)]).flatten()
 
-  if noPrevMask:
+  if noPrevMask or not np.any(mask):
     if cvRect[2] == 0 or cvRect[3] == 0:
       return ProcessIO(image=np.zeros_like(prevCompMask))
     mode = cv.GC_INIT_WITH_RECT
@@ -495,3 +515,20 @@ def region_grow_segmentation(image: NChanImg, fgVerts: XYVertices, seedThresh=10
 def slic_segmentation(image, n_segments=100, compactness=10.0, sigma=0, min_size_factor=0.5, max_size_factor=3):
   return ProcessIO(labels=seg.slic(**locals(), start_label=1))
 slic_segmentation.__doc__ = seg.slic.__doc__
+
+@fns.dynamicDocstring(inters=[attr for attr in vars(cv) if attr.startswith('INTER_')])
+def cv_resize(image: np.ndarray, newSize: Union[float, tuple]=0.5, asRatio=True, interpolation='INTER_CUBIC'):
+  """
+  :param image: Image to resize
+  :param interpolation:
+    pType: list
+    limits: {inters}
+  :param newSize:
+    pType: float
+    step: 0.1
+  :param asRatio:
+    readonly: True
+  """
+  if isinstance(interpolation, str):
+    interpolation = getattr(cv, interpolation)
+  return tryCvResize(image, newSize, asRatio, interpolation)

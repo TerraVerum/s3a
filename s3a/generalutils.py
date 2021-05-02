@@ -6,6 +6,9 @@ from contextlib import contextmanager
 import cv2 as cv
 import numpy as np
 from pandas import DataFrame as df
+from skimage import transform
+from skimage.exposure import exposure
+
 from utilitys import PrjParam
 from utilitys.typeoverloads import FilePath
 
@@ -171,6 +174,34 @@ def cvImread_rgb(fname: FilePath, *args, **kwargs):
   image = cv.imread(str(fname), *args, **kwargs)
   return _maybeBgrToRgb(image)
 
+def tryCvResize(image: NChanImg, newSize: Union[tuple, float],
+                asRatio=True, interp=cv.INTER_CUBIC):
+  """
+  Uses cv.resize where posisble, but if dtypes prevent this, it falls back to skimage.transform.rescale/resize
+
+  :param image: Image to resize
+  :param newSize: Either ratio to scale each axis or new image size (x, y -- not row, col)
+  :param asRatio: Whether to interpret `newSize` as a ratio or new image dimensions
+  :param interp: Interpolation to use, if cv.resize is available for the given dtype
+  """
+  if asRatio:
+    if not isinstance(newSize, tuple):
+      newSize = (newSize, newSize)
+    args = dict(dsize=(0,0), fx=newSize[0], fy=newSize[1])
+  else:
+    args = dict(dsize=newSize)
+  try:
+    image = cv.resize(image, **args, interpolation=interp)
+  except (TypeError, cv.error):
+    oldRange = (image.min(), image.max())
+    if asRatio:
+      rescaled = transform.rescale(image, newSize, multichannel=image.ndim > 2)
+    else:
+      rescaled = transform.resize(image, newSize[::-1])
+    image = exposure.rescale_intensity(rescaled, out_range=oldRange).astype(image.dtype)
+  return image
+
+
 
 def cornersToFullBoundary(cornerVerts: Union[XYVertices, ComplexXYVertices], sizeLimit: float=np.inf,
                           fillShape: Tuple[int]=None, stackResult=True) -> Union[XYVertices, ComplexXYVertices]:
@@ -312,6 +343,11 @@ class MaxSizeDict(dict):
       self.pop(next(iter(self.keys())))
     super().__setitem__(key, value)
 
+def _getPtAngles(pts):
+  midpt = np.mean(pts, 0)
+  relPosPts = (pts - midpt).view(np.ndarray)
+  return np.arctan2(*relPosPts.T[::-1])
+
 def orderContourPts(pts: XYVertices, ccw=True):
   """
   Only guaranteed to work for convex hulls, i.e. shapes not intersecting themselves. Orderes
@@ -320,10 +356,18 @@ def orderContourPts(pts: XYVertices, ccw=True):
   """
   if len(pts) < 3:
     return pts
-  midpt = np.mean(pts, 0)
-  relPosPts = pts - midpt
-  angles = np.arctan2(*relPosPts.T[::-1])
+  angles = _getPtAngles(pts)
   ptOrder = np.argsort(angles)
   if not ccw:
     ptOrder = ptOrder[::-1]
   return pts[ptOrder]
+
+def movePtsTowardCenter(pts: XYVertices, dist=1):
+  if not pts.size:
+    return pts
+  angles = _getPtAngles(pts)
+  adjusts = np.column_stack([np.cos(angles), np.sin(angles)])
+  adjusts[np.abs(adjusts) < 0.01] = 0
+  # Adjust by whole steps
+  adjusts = np.sign(adjusts)*dist
+  return pts - adjusts
