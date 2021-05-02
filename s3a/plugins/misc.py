@@ -116,7 +116,7 @@ class CompTablePlugin(ParamEditorPlugin):
 
 class EditPlugin(ParamEditorPlugin):
 
-  name = '&Edit'
+  name = 'Edit'
 
   def attachWinRef(self, win: s3abase.S3ABase):
     super().attachWinRef(win)
@@ -140,7 +140,7 @@ class EditPlugin(ParamEditorPlugin):
     return [a for a in self.menu.actions() if a.text().startswith('Redo')][0]
 
 class RandomToolsPlugin(ParamEditorPlugin):
-  name = '&Tools'
+  name = 'Tools'
   _showFuncDetails = True
 
   def attachWinRef(self, win: s3abase.S3ABase):
@@ -175,7 +175,7 @@ class RandomToolsPlugin(ParamEditorPlugin):
     console.show()
 
 class HelpPlugin(ParamEditorPlugin):
-  name = '&Help'
+  name = 'Help'
 
   def attachWinRef(self, win: QtWidgets.QMainWindow):
     super().attachWinRef(win)

@@ -136,7 +136,7 @@ class TableFilterEditor(ParamEditor):
       _filterForParam(param) for param in paramList
     ]
     super().__init__(parent, paramList=_FILTER_PARAMS, saveDir=TABLE_DIR,
-                     fileType='filter', name='&Component Table Filter')
+                     fileType='filter', name='Component Table Filter')
 
   def updateParamList(self, paramList: List[PrjParam]):
     newParams = []

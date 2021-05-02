@@ -38,8 +38,8 @@ class _PrjSingleton(QtCore.QObject):
     self.multiPredClctn = AlgCollection(saveDir=MULT_PRED_DIR)
 
     self.docks: List[QtWidgets.QDockWidget] = []
-    self.addPlugin(dockPluginFactory('&Settings', [self.generalProps, self.colorScheme]))
-    self.addPlugin(dockPluginFactory('Sho&rtcuts', [self.shortcuts, self.quickLoader]))
+    self.addPlugin(dockPluginFactory('Settings', [self.generalProps, self.colorScheme]))
+    self.addPlugin(dockPluginFactory('Shortcuts', [self.shortcuts, self.quickLoader]))
 
   @property
   def registerableEditors(self):

@@ -37,9 +37,9 @@ class TableFieldPlugin(ProcessorPlugin):
 
   _makeMenuShortcuts = False
 
-  @property
-  def parentMenu(self):
-    return self.win.tblFieldToolbar
+  # @property
+  # def parentMenu(self):
+  #   return self.win.tblFieldToolbar
 
   def attachWinRef(self, win):
     super().attachWinRef(win)

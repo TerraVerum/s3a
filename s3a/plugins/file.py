@@ -27,7 +27,7 @@ from ..constants import APP_STATE_DIR, PROJ_FILE_TYPE, PROJ_BASE_TEMPLATE
 from s3a._io import ComponentIO
 
 class FilePlugin(CompositionMixin, ParamEditorPlugin):
-  name = '&File'
+  name = 'File'
   win: models.s3abase.S3A
   @classmethod
   def __initEditorParams__(cls):

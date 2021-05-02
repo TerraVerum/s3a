@@ -35,7 +35,7 @@ class S3A(S3ABase):
     super().__initEditorParams__()
     cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Main Window')
 
-  def __init__(self, parent=None, guiMode=True, loadLastState=True, **startupSettings):
+  def __init__(self, parent=None, guiMode=False, loadLastState=True, **startupSettings):
     # Wait to import quick loader profiles until after self initialization so
     # customized loading functions also get called
     super().__init__(parent, **startupSettings)
@@ -96,7 +96,8 @@ class S3A(S3ABase):
     layout.addWidget(self.mainImg)
 
     self.tblFieldToolbar.setObjectName('Table Field Plugins')
-    self.addToolBar(self.tblFieldToolbar)
+    # self.addToolBar(self.tblFieldToolbar)
+    self.tblFieldToolbar.hide()
     self.generalToolbar.setObjectName('General')
     self.addToolBar(self.generalToolbar)
 
@@ -158,7 +159,7 @@ class S3A(S3ABase):
   def _buildMenu(self):
     # TODO: Find a better way of fixing up menu order
     menus = self.menuBar_.actions()
-    menuFile = [a for a in menus if a.text() == FilePlugin.name][0]
+    menuFile = [a for a in menus if a.text().replace('&', '') == FilePlugin.name][0]
     self.menuBar_.insertAction(menus[0], menuFile)
 
   def _handleNewPlugin(self, plugin: ParamEditorPlugin):
