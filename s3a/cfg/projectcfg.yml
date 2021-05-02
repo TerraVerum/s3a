@@ -3,7 +3,7 @@ annotations: []
 
 table-cfg: {}
 
-annotation-format: "pkl"
+annotation-format: "csv"
 
 plugin-cfg: {}
 
