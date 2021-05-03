@@ -76,6 +76,7 @@ doesn't destroy object reference
 """
 def format_vertices(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
                     prevCompMask: BlackWhiteImg, firstRun: bool,
+                    useFullBoundary=True,
                     keepVertHistory=True):
   global _historyMaskHolder
 
@@ -87,11 +88,17 @@ def format_vertices(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
   asForeground = True
   # 0 = unspecified, 1 = background, 2 = foreground
   for fillClr, verts in enumerate([bgVerts, fgVerts], 1):
-    if not verts.empty:
+    if not verts.empty and verts.connected:
       cv.fillPoly(_historyMask, [verts], fillClr)
 
+  if useFullBoundary:
+    if not fgVerts.empty:
+      fgVerts = cornersToFullBoundary(fgVerts)
+    if not bgVerts.empty:
+      bgVerts = cornersToFullBoundary(bgVerts)
+
   if fgVerts.empty and bgVerts.empty:
-    # Give whole image as input
+    # Give whole image as input, trim from edges
     fgVerts = imgCornerVertices(image)
     fgVerts = cornersToFullBoundary(fgVerts)
     _historyMask[fgVerts.rows, fgVerts.cols] = 1
@@ -169,7 +176,7 @@ def crop_to_local_area(image: NChanImg,
   useVerts = [fgVerts, bgVerts]
   for ii in range(2):
     # Add additional offset
-    useVerts[ii] = (movePtsTowardCenter((useVerts[ii] - vertOffset)*ratio)).astype(int)
+    useVerts[ii] = (((useVerts[ii] - vertOffset)*ratio)).astype(int)
     np.clip(useVerts[ii], a_min=[0,0], a_max=(bounds[1,:]-1)*ratio, out=useVerts[ii])
   fgVerts, bgVerts = useVerts
 
@@ -388,7 +395,7 @@ def cv_grabcut(image: NChanImg, prevCompMask: BlackWhiteImg, fgVerts: XYVertices
 _qsInCache = MaxSizeDict(maxsize=5)
 _qsOutCache = MaxSizeDict(maxsize=5)
 
-def quickshift_seg(image: NChanImg, max_dist=10., kernel_size=5,
+def quickshift_seg(image: NChanImg, ratio=1.0, max_dist=10.0, kernel_size=5,
                    sigma=0.0):
   global _qsInCache, _qsOutCache
   # For max_dist of 0, the input isn't changed and it takes a long time
@@ -403,7 +410,7 @@ def quickshift_seg(image: NChanImg, max_dist=10., kernel_size=5,
     if np.array_equal(_qsInCache.get(key, None), image) and key in _qsOutCache:
       segImg =  _qsOutCache[key]
     else:
-      segImg = seg.quickshift(image, kernel_size=kernel_size, max_dist=max_dist, sigma=sigma)
+      segImg = seg.quickshift(image, ratio=ratio, kernel_size=kernel_size, max_dist=max_dist, sigma=sigma)
   _qsInCache[key] = image
   _qsOutCache[key] = segImg.copy()
   return ProcessIO(labels=segImg)
@@ -461,8 +468,8 @@ def binarize_labels(image: NChanImg, labels: BlackWhiteImg, fgVerts: XYVertices,
   if labels.ndim > 2:
     raise ValueError('Cannot handle multichannel labels.\n'
                      f'(labelss.shape={labels.shape})')
-  seeds = cornersToFullBoundary(fgVerts, 50e3)[:, ::-1]
-  seeds = np.clip(seeds, 0, np.array(labels.shape)-1)
+  # seeds = cornersToFullBoundary(fgVerts, 50e3)[:, ::-1]
+  seeds = np.clip(fgVerts[:, ::-1], 0, np.array(labels.shape)-1)
   if image.ndim < 3:
     image = image[...,None]
   if touchingRoiOnly:
