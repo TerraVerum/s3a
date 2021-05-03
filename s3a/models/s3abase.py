@@ -281,7 +281,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       self.hasUnsavedChanges = False
 
   @fns.dynamicDocstring(filters=ComponentIO.handledIoTypes_fileFilter())
-  def exportCurAnnotation(self, outFname: Union[str, Path], readOnly=True, verifyIntegrity=True):
+  def exportCurAnnotation(self, outFname: Union[str, Path], **kwargs):
     """
     Exports current image annotations to a file. This may be more convenient than exporting
     an entire project if just the current current annotations are needed
@@ -292,13 +292,10 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       pType: filepicker
       existing: False
       fileFilter: {filters}
-    :param readOnly: Whether the export should be read-only
-    :param verifyIntegrity: Whether the export should be re-imported to confirm
-      its contents were successfully exported. This is only applicable for file types
-      in `ComponentIO.roundTripIoTypes`
+    :param kwargs: Passed to the exporter
     """
     self.compIo.exportByFileType(self.exportableDf, outFname, imShape=self.mainImg.image.shape,
-                                 readOnly=readOnly, verifyIntegrity=verifyIntegrity)
+                                 **kwargs)
   @property
   def exportableDf(self):
     """

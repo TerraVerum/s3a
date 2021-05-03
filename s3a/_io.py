@@ -1,5 +1,6 @@
 from __future__ import annotations
 import pickle
+import shutil
 import sys
 from ast import literal_eval
 from collections import defaultdict
@@ -134,23 +135,6 @@ class ComponentIO:
         fileFilters.append(f'{info} (*.{typ})')
     return ';;'.join(fileFilters)
 
-  # @property
-  # def allOptions(self):
-  #   """
-  #   Returns all possible options from all import and export functions. This is useful
-  #   for showing the user editable values for various export types
-  #   """
-  #   opts = {}
-  #   opts.pop('top-descr', None)
-  #   for fnType in 'buildFrom', 'export':
-  #     opts[fnType] = {}
-  #     for ioType in self.handledIoTypes:
-  #       fn = self._ioFnFromFileType(ioType, fnType)
-  #       if fn is not None:
-  #         doc = fns.docParser(fn.__doc__)
-  #         opts[fnType][ioType] = doc
-  #   return opts
-
   def exportByFileType(self, compDf: pd.DataFrame, outFile: Union[str, Path], verifyIntegrity=True, **exportArgs):
     outFile = Path(outFile)
     outFn = self._ioFnFromFileType(outFile, 'export')
@@ -162,7 +146,7 @@ class ComponentIO:
       matchingCols = np.setdiff1d(compDf.columns, [RTF.INST_ID,
                                                    RTF.SRC_IMG_FILENAME])
       loadedDf = self.buildByFileType(outFile)
-      dfCmp = loadedDf[matchingCols].equals(compDf[matchingCols])
+      dfCmp = np.array_equal(loadedDf[matchingCols], compDf[matchingCols])
       problemCells = defaultdict(list)
 
       if not dfCmp:

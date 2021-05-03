@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import pydoc
 import shutil
 from contextlib import contextmanager
@@ -12,19 +13,19 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtCore
-from skimage import io
-from utilitys import CompositionMixin, AtomicProcess
-from utilitys import fns
-from utilitys.fns import warnLater
-from utilitys.params import *
 
-from s3a import PRJ_SINGLETON, PRJ_CONSTS as CNST, ComponentIO, models, REQD_TBL_FIELDS, \
+from s3a import PRJ_SINGLETON, PRJ_CONSTS as CNST, models, REQD_TBL_FIELDS, \
   defaultIo
+from s3a._io import ComponentIO
 from s3a.generalutils import hierarchicalUpdate, cvImsave_rgb
 from s3a.graphicsutils import DropList, ThumbnailViewer
 from s3a.structures import FilePath, NChanImg
+from utilitys import CompositionMixin, AtomicProcess, NestedProcess
+from utilitys import fns
+from utilitys.fns import warnLater
+from utilitys.params import *
 from ..constants import APP_STATE_DIR, PROJ_FILE_TYPE, PROJ_BASE_TEMPLATE
-from s3a._io import ComponentIO
+
 
 class FilePlugin(CompositionMixin, ParamEditorPlugin):
   name = 'File'
@@ -114,6 +115,30 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
   def _updateProjLbl(self):
     self.projNameLbl.setText(f'Project: {self.projData.cfgFname.name}')
 
+  def _buildIoOpts(self):
+    """
+    Builds export option parameters for user interaction. Assumes export popout funcs have already been created
+    """
+    compIo = self.projData.compIo
+    exportOptsParam = fns.getParamChild(self.toolsEditor.params, CNST.TOOL_PROJ_EXPORT.name, 'Export Options')
+    # Use a wrapper to easily get hyperparams created
+    wrapper = NestedProcWrapper(NestedProcess('Export Options'), exportOptsParam, nestHyperparams=False)
+    for name, fn in inspect.getmembers(type(compIo), inspect.isfunction):
+      if not name.startswith('export'):
+        continue
+      # Make params to expose options per export type
+      atomic = AtomicProcess(fn)
+      for key in reversed(atomic.input.hyperParamKeys):
+        # Reverse to delete without issue
+        # Remove none values that can't be edited by the user
+        # TODO: This is awful! But it works... Get a list of all generally editable parameters, except for known internal
+        #   ones
+        if atomic.input[key] is None or key in ('outDir', 'returnLblMapping'):
+          atomic.input.hyperParamKeys.remove(key)
+      if atomic.input.hyperParamKeys:
+        wrapper.addStage(atomic)
+    return wrapper.parentParam
+
   def attachWinRef(self, win: models.s3abase.S3ABase):
     super().attachWinRef(win)
     win.statBar.addWidget(self.projNameLbl)
@@ -142,14 +167,23 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       self.win.setMainImg(fullName)
     win.appStateEditor.addImportExportOpts('image', startImg, lambda *args: None, 1)
 
-    doctored = AtomicProcess(self.win.exportCurAnnotation, 'Current Annotation',
-                             outFname='')
-    self.registerPopoutFuncs([self.projData.exportProj, self.projData.exportAnnotations, doctored],
-                         ['Project', 'All Annotations', 'Current Annotation'], btnOpts=CNST.TOOL_PROJ_EXPORT)
+    def exportWrapper(func):
+      def wrapper(**kwargs):
+        initial = {**self.exportOptsParam}
+        initial.update(kwargs)
+        return func(**initial)
+      return wrapper
 
+    doctoredCur = AtomicProcess(exportWrapper(win.exportCurAnnotation),
+                                'Current Annotation', outFname='', docFunc=win.exportCurAnnotation)
+    doctoredAll = AtomicProcess(exportWrapper(self.projData.exportAnnotations),
+                                docFunc=self.projData.exportAnnotations)
+    self.registerPopoutFuncs([self.projData.exportProj, doctoredAll, doctoredCur],
+                         ['Project', 'All Annotations', 'Current Annotation'], btnOpts=CNST.TOOL_PROJ_EXPORT)
     self._projImgMgr.hide()
     self._updateProjLbl()
     win.addTabbedDock(QtCore.Qt.RightDockWidgetArea, self._projImgMgr)
+    self.exportOptsParam = self._buildIoOpts()
 
   def _createDefaultProj(self, setAsCur=True):
     defaultName = APP_STATE_DIR / PROJ_FILE_TYPE
@@ -918,14 +952,15 @@ class ProjectData(QtCore.QObject):
 
     existingAnnFiles = [f for f in self.imgToAnnMapping.values() if f is not None]
     if combine:
-      outAnn = pd.concat(map(self.compIo.buildByFileType, existingAnnFiles))
+      outAnn = pd.concat(map(self.compIo.buildByFileType, existingAnnFiles), ignore_index=True)
+      outAnn[REQD_TBL_FIELDS.INST_ID] = outAnn.index
       self.compIo.exportByFileType(outAnn, outputFolder / f'annotations.'
                                                           f'{annotationFormat}', **exportOpts)
     else:
       outAnnsDir = outputFolder / 'annotations'
       outAnnsDir.mkdir(exist_ok=True)
       if self.cfg['annotation-format'] == annotationFormat:
-        shutil.copytree(self.annotationsDir, outAnnsDir)
+        shutil.copytree(self.annotationsDir, outAnnsDir, dirs_exist_ok=True)
       else:
         for annFile in existingAnnFiles:
           self.compIo.convert(annFile, outAnnsDir/f'{annFile.stem}.{annotationFormat}',
