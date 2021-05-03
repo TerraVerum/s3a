@@ -3,30 +3,27 @@ from __future__ import annotations
 import copy
 import inspect
 import pydoc
-import typing as t
 import types
+import typing as t
 import webbrowser
 from pathlib import Path
-from typing import Dict, List, Callable, Union, Type
 
-import numpy as np
-from pyqtgraph.Qt import QtCore, QtWidgets
-from pyqtgraph.parametertree import Parameter
+from pyqtgraph.Qt import QtCore
 from typing_extensions import TypedDict
 
 from s3a.constants import MENU_OPTS_DIR
 from utilitys import NestedProcess, RunOpts
 from utilitys import ParamEditor, NestedProcWrapper, fns, ProcessStage, AtomicProcess
-from utilitys.fns import nameFormatter
 from utilitys.processing import ArgMapper
-from utilitys.widgets import EasyWidget
+from utilitys.widgets import makeDummySignal
 
 Signal = QtCore.Signal
-_procDict = Dict[str, List[str]]
+_procDict = t.Dict[str, t.List[t.Union[str, dict]]]
 
 class _AlgClctnDict(TypedDict):
-  top: List[Union[str, dict]]
-  primitive: List[Union[str, dict]]
+  top: _procDict
+  primitive: _procDict
+  modules: t.List[str]
 
 algoNameFormatter = fns.NameFormatter(
   lambda name: name.lower().replace(' ', '').replace('_', '')
@@ -41,14 +38,14 @@ class AlgCollection(ParamEditor):
     super().__init__(parent, fileType=fileType, **kwargs)
     self.procWrapType = procWrapType
     self.procType = procType
-    self.primitiveProcs: Dict[str, Union[ProcessStage, List[str]]] = {}
+    self.primitiveProcs: t.Dict[str, t.Union[ProcessStage, t.List[str]]] = {}
     self.topProcs: _procDict = {}
-    self.includeModules: List[str] = []
+    self.includeModules: t.List[str] = []
 
     # Allow name remapping to take place
     self.addProcess(ArgMapper())
 
-  def createProcessorEditor(self, saveDir: Union[str, Type], editorName='Processor') -> AlgParamEditor:
+  def createProcessorEditor(self, saveDir: t.Union[str, t.Type], editorName='Processor') -> AlgParamEditor:
     """
     Creates a processor editor capable of dynamically loading, saving, and editing collection processes
 
@@ -73,11 +70,11 @@ class AlgCollection(ParamEditor):
       self.addProcess(stage, False, force)
     return proc.name
 
-  def addFunction(self, func: Callable, top=False, **kwargs):
+  def addFunction(self, func: t.Callable, top=False, **kwargs):
     """Helper function to wrap a function in an atomic process and add it as a stage"""
     return self.addProcess(AtomicProcess(func, **kwargs), top)
 
-  def parseProcStages(self, stages: t.Sequence[Union[dict, str]], name:str=None, add=False, allowOverwrite=False):
+  def parseProcStages(self, stages: t.Sequence[t.Union[dict, str]], name:str=None, add=False, allowOverwrite=False):
     """
     Creates a nested process from a sequence of process stages and optional name
     :param stages: Stages to parse
@@ -98,11 +95,16 @@ class AlgCollection(ParamEditor):
       self.addProcess(out, allowOverwrite)
     return out
 
-  def parseProcName(self, procName: str, topFirst=True, **kwargs):
-    procDicts = [self.primitiveProcs, self.topProcs]
+  def parseProcName(self, procName: str, topFirst=True, searchDicts: t.Sequence[dict]=None, **kwargs):
+    """
+    From a list of search locations (ranging from most primitive to topmost), find the first processor matching the
+    specified name. If 'topFirst' is chosen, the search locations are parsed in reverse order.
+    """
+    if searchDicts is None:
+      searchDicts = [self.primitiveProcs, self.topProcs]
     if topFirst:
-      procDicts = procDicts[::-1]
-    proc = procDicts[0].get(procName, procDicts[1].get(procName))
+      searchDicts = searchDicts[::-1]
+    proc = searchDicts[0].get(procName, searchDicts[1].get(procName))
     # It could still be in an include module, cache if found
     if not proc:
       for module in self.includeModules:
@@ -137,8 +139,8 @@ class AlgCollection(ParamEditor):
     elif updateArgs:
       proc.updateInput(**updateArgs, allowExtra=True, graceful=True)
       # Set the defaults, too
-      if isinstance(proc, AtomicProcess):
-        proc.defaultInput.update(**updateArgs)
+      # if isinstance(proc, AtomicProcess):
+      #   proc.defaultInput.update(**updateArgs)
     # Check for process-level traits
     for kk, vv in procDict.items():
       if hasattr(proc, kk):
@@ -253,11 +255,15 @@ class AlgParamEditor(ParamEditor):
     self.clctn.sigChangesApplied.connect(lambda: procSelector.setLimits(list(self.clctn.topProcs)))
     self.clctn.sigChangesApplied.emit({})
     def onChange(name):
-      self.changeProcParam['proc'] = name
+      with makeDummySignal(procSelector, 'sigValueChanged'):
+        procSelector.setValue(name)
+        # Manually set item labels since valueChange was forcefully disconnected
+        for item in procSelector.items:
+          item.valueChanged(procSelector, name)
     self.sigProcessorChanged.connect(onChange)
     self.changeActiveProcessor(procName)
 
-  def _unnestedProcState(self, proc: NestedProcess, _state=None, **kwargs):
+  def _unnestedProcState(self, proc: NestedProcess, _state=None, **kwargs) -> _AlgClctnDict:
     """
     Updates processes without hierarchy so separate stages are unnested. The outermost process is considered a
     'top' process, while all subprocesses are considered 'primitive'.
@@ -295,12 +301,12 @@ class AlgParamEditor(ParamEditor):
       # outermost stage
       paramState = self._unnestedProcState(proc, includeMeta=True)
       paramState['modules'] = self.clctn.includeModules
-    self.clctn.loadParamValues(self.clctn.stateName, paramState)
+    # self.clctn.loadParamValues(self.clctn.stateName, paramState)
     clctnState = self.clctn.saveParamValues(saveName, blockWrite=True)
     paramState = {'Selected Algorithm': self.curProcessor.algName, 'Parameters': clctnState}
     return super().saveParamValues(saveName, paramState, includeDefaults=includeDefaults, **kwargs)
 
-  def loadParamValues(self, stateName: Union[str, Path],
+  def loadParamValues(self, stateName: t.Union[str, Path],
                       stateDict: dict=None, **kwargs):
     stateDict = self._parseStateDict(stateName, stateDict)
     procName = stateDict.get('Selected Algorithm')
@@ -312,7 +318,7 @@ class AlgParamEditor(ParamEditor):
     self.changeActiveProcessor(procName, flatten=self.changeProcParam['flatten'], saveBeforeChange=False)
     return super().loadParamValues(stateName, stateDict, candidateParams=[], **kwargs)
 
-  def changeActiveProcessor(self, proc: Union[str, NestedProcess], flatten=False, saveBeforeChange=True):
+  def changeActiveProcessor(self, proc: t.Union[str, NestedProcess], flatten=False, saveBeforeChange=True):
     """
     Changes which processor is active.
 
