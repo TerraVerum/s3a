@@ -2,14 +2,17 @@ from __future__ import annotations
 import pickle
 import shutil
 import sys
+import tempfile
 from ast import literal_eval
 from collections import defaultdict
+from contextlib import ExitStack
 from functools import wraps
 from pathlib import Path
 from stat import S_IREAD, S_IRGRP, S_IROTH
 from typing import Any, Optional, Union, Tuple, Callable, Type
 import json
 import inspect
+from zipfile import ZipFile
 
 import numpy as np
 import pandas as pd
@@ -515,6 +518,7 @@ class ComponentIO:
   def exportCompImgsZip(self, compDf: pd.DataFrame,
                         outDir:FilePath='s3a-export',
                         resizeShape: Tuple[int, int]=None,
+                        archive=False,
                         **kwargs):
     """
     From a component dataframe, creates output directories for component images and masks.
@@ -528,22 +532,36 @@ class ComponentIO:
     :param resizeShape: If provided, it is the shape that all images will be resized to before
       being saved. This is useful for neural networks with a fixed input size which forces all
       inputs to be e.g. 100x100 pixels.
+    :param archive: Whether to compress into a zip archive instead of directly outputting a folder
     :param kwargs: Passed directly to :meth:`ComponentIO.exportCompImgsDf`
     """
     outDir = Path(outDir)
-    dataDir = outDir/'data'
-    labelsDir= outDir/'labels'
-    dataDir.mkdir(exist_ok=True, parents=True)
-    labelsDir.mkdir(exist_ok=True, parents=True)
+    useDir = outDir
+
     saveFn = lambda fname, img: cvImsave_rgb(fname, img)
     if resizeShape is not None:
       saveFn = lambda fname, img: cvImsave_rgb(fname, resize_pad(img, resizeShape))
 
-    extractedImgs = self.exportCompImgsDf(compDf, None, **kwargs)
-    for idx, row in extractedImgs.iterrows():
-      saveName = f'{row.instId}.png'
-      saveFn(dataDir/saveName, row.img)
-      saveFn(labelsDir/saveName, row.labelMask)
+    with ExitStack() as stack:
+      if archive:
+        useDir = Path(stack.enter_context(tempfile.TemporaryDirectory()))
+      dataDir = useDir/'data'
+      labelsDir= useDir/'labels'
+      dataDir.mkdir(exist_ok=True, parents=True)
+      labelsDir.mkdir(exist_ok=True, parents=True)
+
+      extractedImgs = self.exportCompImgsDf(compDf, None, **kwargs)
+      for idx, row in extractedImgs.iterrows():
+        saveName = f'{row.instId}.png'
+        saveFn(dataDir/saveName, row.img)
+        saveFn(labelsDir/saveName, row.labelMask)
+      if archive:
+        if outDir.suffix != '.zip':
+          outDir = outDir.with_suffix(outDir.suffix + '.zip')
+        with ZipFile(outDir, 'w') as ozip:
+          for dir_ in labelsDir, dataDir:
+            for file in dir_.iterdir():
+              ozip.write(file, f'{dir_.name}/{file.name}')
 
   # -----
   # Import options
