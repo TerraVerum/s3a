@@ -74,6 +74,11 @@ class VerticesPlugin(TableFieldPlugin):
     for func, param in zip(funcLst, paramLst):
       self.registerFunc(func, btnOpts=param)
 
+    def onChange():
+      self.firstRun = True
+      clear()
+    win.mainImg.imgItem.sigImageChanged.connect(onChange)
+
     win.mainImg.registerDrawAction([CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self._run_drawAct)
     win.mainImg.addTools(self.toolsEditor)
     self.vb: pg.ViewBox = win.mainImg.getViewBox()
