@@ -20,6 +20,9 @@ pytest:
 pypi:
   stage: Deploy
   when: manual
+  variables:
+    TWINE_USERNAME: $TWINE_USERNAME
+    TWINE_PASSWORD: $TWINE_PASSWORD
   script:
     - pip install -U twine
     - python setup.py sdist bdist_wheel
