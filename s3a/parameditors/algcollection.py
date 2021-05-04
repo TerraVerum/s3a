@@ -301,7 +301,7 @@ class AlgParamEditor(ParamEditor):
       # outermost stage
       paramState = self._unnestedProcState(proc, includeMeta=True)
       paramState['modules'] = self.clctn.includeModules
-    # self.clctn.loadParamValues(self.clctn.stateName, paramState)
+    self.clctn.loadParamValues(self.clctn.stateName, paramState)
     clctnState = self.clctn.saveParamValues(saveName, blockWrite=True)
     paramState = {'Selected Algorithm': self.curProcessor.algName, 'Parameters': clctnState}
     return super().saveParamValues(saveName, paramState, includeDefaults=includeDefaults, **kwargs)
