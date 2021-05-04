@@ -20,8 +20,6 @@ def get_component_images(image: np.ndarray, components: pd.DataFrame):
 
 
 def _dispatchedTemplateMatcher(func):
-  inputSpec = ProcessIO.fromFunction(func, ignoreKeys=['template'])
-  inputSpec['components'] = inputSpec.FROM_PREV_IO
   def dispatcher(image: np.ndarray, components: pd.DataFrame, **kwargs):
     out = ProcessIO()
     allComps = []
@@ -41,16 +39,12 @@ def _dispatchedTemplateMatcher(func):
     out['deleteOrig'] = True
     return out
 
-  dispatcher.__doc__ = func.__doc__
-  dispatcher.__name__ = func.__name__
-  proc = AtomicProcess(dispatcher)
-  proc.input = inputSpec
+  proc = AtomicProcess(dispatcher, docFunc=func, ignoreKeys=['template'])
+  proc.input['components'] = ProcessIO.FROM_PREV_IO
   return proc
 
 
 def _dispatchedFocusedProcessor(func):
-  inputSpec = ProcessIO.fromFunction(func)
-  inputSpec['components'] = inputSpec.FROM_PREV_IO
   def dispatcher(image: np.ndarray, components: pd.DataFrame, **kwargs):
     out = ProcessIO()
     allComps = []
@@ -72,10 +66,9 @@ def _dispatchedFocusedProcessor(func):
     out['components'] = outComps
     out['addType'] = PRJ_ENUMS.COMP_ADD_AS_MERGE
     return out
-  dispatcher.__doc__ = func.__doc__
-  proc = GlobalPredictionProcess(fns.nameFormatter(func.__name__))
-  proc.addFunction(dispatcher)
-  proc.stages[0].input = inputSpec
+  proc = GlobalPredictionProcess()
+  proc.addFunction(dispatcher, docFunc=func)
+  proc.stages[0].input['components'] = ProcessIO.FROM_PREV_IO
   return proc
 
 

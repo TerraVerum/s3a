@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import inspect
 import pydoc
+import re
 import types
 import typing as t
 import webbrowser
@@ -25,9 +26,13 @@ class _AlgClctnDict(TypedDict):
   primitive: _procDict
   modules: t.List[str]
 
-algoNameFormatter = fns.NameFormatter(
-  lambda name: name.lower().replace(' ', '').replace('_', '')
-)
+_underscoreMatcher = re.compile(r'([A-Za-z])_+([A-Za-z])')
+def _fmt(name: str):
+  # Don't replace first/last underscore to avoid publicizing private / utility functions
+  name = name.lower().replace(' ', '')
+  return re.sub(_underscoreMatcher, r'\1\2', name)
+
+algoNameFormatter = fns.NameFormatter(_fmt)
 """Strips spaces and underscores from the provided name, and turns everything to 
 lowercase"""
 
