@@ -10,20 +10,20 @@ before_script:
 
 stages:
   - Test
-  - Deploy
+  # - Deploy
 
 pytest:
   stage: Test
   script:
     - pytest -l ./apptests --cov-report term --cov=.
 
-pypi:
-  stage: Deploy
-  when: manual
-  variables:
-    TWINE_USERNAME: $TWINE_USERNAME
-    TWINE_PASSWORD: $TWINE_PASSWORD
-  script:
-    - pip install -U twine
-    - python setup.py sdist bdist_wheel
-    - python -m twine upload --skip-existing dist/*
+# pypi:
+#   stage: Deploy
+#   when: manual
+#   variables:
+#     TWINE_USERNAME: $TWINE_USERNAME
+#     TWINE_PASSWORD: $TWINE_PASSWORD
+#   script:
+#     - pip install -U twine
+#     - python setup.py sdist bdist_wheel
+#     - python -m twine upload --skip-existing dist/*
