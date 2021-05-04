@@ -22,5 +22,5 @@ pypi:
   when: manual
   script:
     - pip install -U twine
-    - python -m setup.py sdist bdist_wheel
+    - python setup.py sdist bdist_wheel
     - python -m twine upload --skip-existing dist/*
