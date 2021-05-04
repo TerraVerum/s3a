@@ -1,4 +1,4 @@
-image: "python:3.8.6"
+image: "python:latest"
 
 before_script:
   - apt-get update
@@ -10,8 +10,17 @@ before_script:
 
 stages:
   - Test
+  - Deploy
 
 pytest:
   stage: Test
   script:
     - pytest -l ./apptests --cov-report term --cov=.
+
+pypi:
+  stage: Deploy
+  when: manual
+  script:
+    - pip install -U twine
+    - python -m setup.py sdist bdist_wheel
+    - python -m twine upload --skip-existing dist/*
