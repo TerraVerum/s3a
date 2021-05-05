@@ -60,6 +60,7 @@ class AppStateEditor(ParamEditor):
     try: # try block to ensure loading is false after
       if stateName is None:
         stateName = self.RECENT_STATE_FNAME
+      stateName = self.formatFileName(stateName)
       if not stateName.exists() and stateDict is None:
         stateDict = {}
       if isinstance(stateDict, str):
