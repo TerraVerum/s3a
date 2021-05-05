@@ -8,7 +8,7 @@ from pyqtgraph.Qt import QtWidgets
 from utilitys.processing import *
 
 __all__ = ['ProcessIO', 'ProcessStage', 'NestedProcess', 'ImageProcess',
-           'AtomicProcess', 'GlobalPredictionProcess']
+           'AtomicProcess', 'MultiPredictionProcess']
 
 _infoType = t.List[t.Union[t.List, t.Dict[str, t.Any]]]
 StrList = t.List[str]
@@ -86,7 +86,7 @@ class ImageProcess(NestedProcess):
 
 _winRefs = {}
 
-class GlobalPredictionProcess(ImageProcess):
+class MultiPredictionProcess(ImageProcess):
   def _stageSummaryWidget(self):
     return QtWidgets.QWidget()
   mainResultKeys = ['components']

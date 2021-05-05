@@ -1,3 +1,4 @@
+import cv2 as cv
 import numpy as np
 import pandas as pd
 from scipy.ndimage import maximum_filter
@@ -5,10 +6,8 @@ from scipy.ndimage import maximum_filter
 from s3a.constants import PRJ_ENUMS, REQD_TBL_FIELDS as RTF
 from s3a.generalutils import getCroppedImg
 from s3a.structures import ComplexXYVertices
-from s3a.processing import GlobalPredictionProcess
 from utilitys import ProcessIO, fns, AtomicProcess
 
-import cv2 as cv
 
 def get_component_images(image: np.ndarray, components: pd.DataFrame):
   """
@@ -66,9 +65,8 @@ def _dispatchedFocusedProcessor(func):
     out['components'] = outComps
     out['addType'] = PRJ_ENUMS.COMP_ADD_AS_MERGE
     return out
-  proc = GlobalPredictionProcess()
-  proc.addFunction(dispatcher, docFunc=func)
-  proc.stages[0].input['components'] = ProcessIO.FROM_PREV_IO
+  proc = AtomicProcess(dispatcher, docFunc=func)
+  proc.input['components'] = ProcessIO.FROM_PREV_IO
   return proc
 
 
