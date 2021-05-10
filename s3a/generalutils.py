@@ -8,6 +8,7 @@ import numpy as np
 from pandas import DataFrame as df
 from skimage import transform
 from skimage.exposure import exposure
+from skimage import io
 
 from utilitys import PrjParam
 from utilitys.typeoverloads import FilePath
@@ -166,9 +167,15 @@ def _maybeBgrToRgb(image: np.ndarray):
       image = image[...,lastAx]
   return image
 
-def cvImsave_rgb(fname: FilePath, image: np.ndarray, *args, **kwargs):
+def cvImsave_rgb(fname: FilePath, image: np.ndarray, *args, errOk=False, **kwargs):
   image = _maybeBgrToRgb(image)
-  cv.imwrite(str(fname), image, *args, **kwargs)
+  try:
+    cv.imwrite(str(fname), image, *args, **kwargs)
+  except cv.error:
+    if not errOk:
+      raise
+    # Dtype incompatible
+    io.imsave(fname, image)
 
 def cvImread_rgb(fname: FilePath, *args, **kwargs):
   image = cv.imread(str(fname), *args, **kwargs)

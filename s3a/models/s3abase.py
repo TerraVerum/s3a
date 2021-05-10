@@ -280,7 +280,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       # 'hasUnsavedChanges' will be true after this, even though the changes are saved.
       self.hasUnsavedChanges = False
 
-  @fns.dynamicDocstring(filters=ComponentIO.handledIoTypes_fileFilter())
+  @fns.dynamicDocstring(filters=ComponentIO.ioFileFilter(PRJ_ENUMS.IO_FIL_EXPORT))
   def exportCurAnnotation(self, outFname: Union[str, Path], **kwargs):
     """
     Exports current image annotations to a file. This may be more convenient than exporting
@@ -325,9 +325,9 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     if self.mainImg.image is None:
       raise IOError('Cannot load components when no main image is set.')
     fType = pathFname.suffix[1:]
-    if not any(fType in typ for typ in self.compIo.handledIoTypes):
+    if not any(fType in typ for typ in self.compIo.buildTypes):
       raise IOError(f'Extension {fType} is not recognized. Must be one of:\n'
-                       + self.compIo.handledIoTypes_fileFilter())
+                    + self.compIo.ioFileFilter())
     newComps = self.compIo.buildByFileType(inFname, self.mainImg.image.shape)
     self.compMgr.addComps(newComps, loadType)
 

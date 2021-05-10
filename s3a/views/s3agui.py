@@ -197,14 +197,14 @@ class S3A(S3ABase):
 
   def exportAnnotations_gui(self):
     """Saves the component table to a file"""
-    fileFilters = self.compIo.handledIoTypes_fileFilter(**{'*': 'All Files'})
+    fileFilters = self.compIo.ioFileFilter(**{'*': 'All Files'})
     outFname = fns.popupFilePicker(None, 'Select Save File', fileFilters, existing=False)
     if outFname is not None:
       super().exportCurAnnotation(outFname)
 
   def openAnnotation_gui(self):
     # TODO: See note about exporting comps. Delegate the filepicker activity to importer
-    fileFilter = self.compIo.handledIoTypes_fileFilter()
+    fileFilter = self.compIo.ioFileFilter(which=PRJ_ENUMS.IO_FIL_EXPORT)
     fname = fns.popupFilePicker(None, 'Select Load File', fileFilter)
     if fname is None:
       return

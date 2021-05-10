@@ -173,12 +173,11 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
 
   def toGrayImg(self, imShape: Sequence[int]=None):
     uint16Max = 2**16-2 # Subtract 1 extra so there's room for offset
-    labels = (self.regionData[PRJ_ENUMS.FIELD_LABEL]*uint16Max).astype('uint16')
     labelDf = pd.DataFrame()
     labelDf[RTF.VERTICES] = self.regionData[RTF.VERTICES]
     # Override id column to avoid an extra parameter
-    labelDf[RTF.INST_ID] = labels
-    return defaultIo.exportLblPng(labelDf, imShape=imShape, allowOffset=True)
+    labelDf[RTF.INST_ID] = self.regionData[PRJ_ENUMS.FIELD_LABEL]
+    return defaultIo.exportLblPng(labelDf, imShape=imShape, rescaleOutput=True)
 
   @fns.dynamicDocstring(cmapVals=colormaps() + ['None'])
   def updateColors(self, penWidth=0, penColor='w', selectedFill='#00f', focusedFill='#f00', labelColormap='viridis',

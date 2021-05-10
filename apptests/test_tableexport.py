@@ -13,7 +13,7 @@ from testingconsts import SAMPLE_IMG_FNAME
 def test_normal_export(sampleComps, tmp_path, app):
   io = app.compIo
   app.exportOnlyVis = False
-  for ftype in io.handledIoTypes:
+  for ftype in io.exportTypes:
     curPath = tmp_path / f'normalExport - All IDs.{ftype}'
     doAndAssertExport(app, curPath, io, app.exportableDf, 'Normal export with all IDs not successful.')
 
@@ -48,7 +48,7 @@ def test_filter_export(tmp_path, monkeypatch, app):
 
 def test_bad_import(tmp_path, app):
   io = app.compIo
-  for ext in io.handledIoTypes:
+  for ext in io.buildTypes:
     ofile = open(tmp_path/f'junkfile.{ext}', 'w')
     ofile.write('Vertices\nabsolute junk')
     ofile.close()
@@ -72,7 +72,7 @@ def doAndAssertExport(app, fpath: Path, io: ComponentIO, compDf: pd.DataFrame, f
     try:
       inDf = io.buildByFileType(fpath, app.mainImg.image.shape[:2])
       assert len(inDf) > 0
-    except ValueError:
+    except (ValueError, IOError):
       pass
 
 def test_impossible_io(tmp_path, sampleComps, app):

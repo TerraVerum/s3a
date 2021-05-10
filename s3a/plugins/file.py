@@ -133,7 +133,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         # Remove none values that can't be edited by the user
         # TODO: This is awful! But it works... Get a list of all generally editable parameters, except for known internal
         #   ones
-        if atomic.input[key] is None or key in ('outDir', 'returnLblMapping'):
+        if atomic.input[key] is None or key in ('outDir', 'returnLblMapping', 'offset'):
           atomic.input.hyperParamKeys.remove(key)
       if atomic.input.hyperParamKeys:
         wrapper.addStage(atomic)
@@ -207,7 +207,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     self.win.saveCurAnnotation()
     self.projData.saveCfg()
 
-  @fns.dynamicDocstring(ioTypes=['<Unchanged>'] + list(ComponentIO.handledIoTypes))
+  @fns.dynamicDocstring(ioTypes=['<Unchanged>'] + list(ComponentIO.roundTripTypes))
   def updateProjectProperties(self, tableConfig:FilePath=None, annotationFormat:str=None):
     """
     Updates the specified project properties, for each one that is provided
@@ -223,11 +223,13 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     if tableConfig is not None:
       tableConfig = Path(tableConfig)
       self.projData.tableData.loadCfg(tableConfig)
-    if annotationFormat is not None and annotationFormat in ComponentIO.handledIoTypes:
+    if (annotationFormat is not None
+        and annotationFormat in self.projData.compIo.buildTypes
+        and annotationFormat in self.projData.compIo.exportTypes):
       self.projData.cfg['annotation-format'] = annotationFormat
 
 
-  @fns.dynamicDocstring(ioTypes=list(ComponentIO.handledIoTypes))
+  @fns.dynamicDocstring(ioTypes=list(ComponentIO.exportTypes))
   def startAutosave(self, interval=5, backupFolder='', baseName='autosave', exportType='pkl'):
     """
     Saves the current annotation set evert *interval* minutes
@@ -912,7 +914,7 @@ class ProjectData(QtCore.QObject):
     """
     shutil.copytree(self.location, outputFolder)
 
-  @fns.dynamicDocstring(fileTypes=list(ComponentIO.handledIoTypes))
+  @fns.dynamicDocstring(fileTypes=list(ComponentIO.exportTypes))
   def exportAnnotations(self, outputFolder:FilePath= 's3a-export',
                         annotationFormat='csv',
                         combine=False,

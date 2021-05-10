@@ -78,7 +78,7 @@ def test_region_modify(sampleComps, app, mgr, vertsPlugin):
   # 2nd action
   app.mainImg.updateFocusedComp(sampleComps.iloc[-1])
   mImg.shapeCollection.sigShapeFinished.emit(newVerts)
-  checkpointMask = vertsPlugin.region.toGrayImg(shapeBnds) > 0
+  checkpointMask = vertsPlugin.region.toGrayImg(shapeBnds)
   assert np.any(checkpointMask)
 
   PRJ_SINGLETON.actionStack.undo()

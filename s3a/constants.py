@@ -66,7 +66,14 @@ class _PrjEnums(Enum):
   FIELD_FOCUSED    = 'focused'
   FIELD_LABEL    = 'label'
 
-PRJ_ENUMS = _PrjEnums
+  # --------------------------
+  # I/O SPECIFICATIONS
+  # --------------------------
+  IO_FIL_EXPORT = 'export'
+  IO_FIL_BUILD = 'buildFrom'
+  IO_FIL_ROUND_TRIP = 'round trip'
+  IO_META_MAPPING = 'mapping'
+  IO_META_FIELD = 'field'
 
 from s3a.structures import ComplexXYVertices, PrjParam, PrjParamGroup, newParam
 

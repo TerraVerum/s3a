@@ -1,6 +1,8 @@
 from __future__ import annotations
+
+import inspect
+import json
 import pickle
-import shutil
 import sys
 import tempfile
 from ast import literal_eval
@@ -9,28 +11,75 @@ from contextlib import ExitStack
 from functools import wraps
 from pathlib import Path
 from stat import S_IREAD, S_IRGRP, S_IROTH
-from typing import Any, Optional, Union, Tuple, Callable, Type
-import json
-import inspect
+from typing import Any, Optional, Union, Tuple, Callable
 from zipfile import ZipFile
 
+import cv2 as cv
 import numpy as np
 import pandas as pd
-from skimage import io, measure, draw
+from skimage import io, draw
 from skimage.exposure import rescale_intensity
 from typing_extensions import Literal
-from utilitys import fns, ProcessIO
+from PIL import Image
+from PIL.PngImagePlugin import PngInfo
 
-from utilitys.fns import warnLater
-
-from s3a.constants import REQD_TBL_FIELDS as RTF
-from s3a.generalutils import augmentException, getCroppedImg, resize_pad, cvImsave_rgb, orderContourPts
+from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
+from s3a.generalutils import augmentException, getCroppedImg, resize_pad, cvImsave_rgb, orderContourPts, classproperty, \
+  cvImread_rgb
 from s3a.parameditors.table import TableData
 from s3a.structures import PrjParamGroup, FilePath, GrayImg, \
   ComplexXYVertices, PrjParam, XYVertices, AnnParseError
+from utilitys import fns
+from utilitys.fns import warnLater
 
 FilePathOrDf = Union[FilePath, pd.DataFrame]
-_litLst = Literal['buildFrom', 'export']
+# Values are strings
+# noinspection PyTypeHints
+_litLst = Literal[PRJ_ENUMS.IO_FIL_BUILD, PRJ_ENUMS.IO_FIL_EXPORT]
+
+def _attrNameFmt(buildOrExport: _litLst, obj):
+  def membership(el):
+    for exclude in ['FileType', 'Opts', 'Types', 'Serialized']:
+      if el.endswith(exclude):
+        return False
+    return el.startswith(buildOrExport)
+  attrs = [attr.replace(buildOrExport, '') for attr in vars(obj) if membership(attr)]
+  out = {}
+  for attr in attrs:
+    descrFmt = fns.pascalCaseToTitle(attr)
+    fileFmt = descrFmt.replace(' ', '.').lower()
+    out[fileFmt] = descrFmt + ' Files'
+  return out
+
+def _getImg_mapping_offset(inFileOrImg: Union[FilePath, GrayImg]):
+  if isinstance(inFileOrImg, np.ndarray):
+    return inFileOrImg, None, None
+  try:
+    image: Image.Image = Image.open(inFileOrImg)
+    info = image.info
+    image = np.array(image)
+  except TypeError:
+    # E.g. float image
+    return cvImread_rgb(inFileOrImg, mode=cv.IMREAD_UNCHANGED), None, None
+  # "Offset" present for numeric data, "mapping" present for textual data
+  if 'mapping' in info:
+    mapping = pd.Series(json.loads(info['mapping']), name=info.get('field', None))
+    mapping.index = mapping.index.astype(int)
+    return image, mapping, None
+  if 'offset' in info:
+    return image, None, int(info['offset'])
+  # No extra metadata
+  return image, None, None
+
+def _writeImge_meta(outImg: np.ndarray, saveName: FilePath, mapping: pd.Series=None, offset: int=None):
+  outImg = Image.fromarray(outImg)
+  info = PngInfo()
+  if mapping is not None:
+    info.add_text('mapping', json.dumps(mapping.to_dict()))
+    info.add_text('field', str(mapping.name))
+  if offset is not None:
+    info.add_text('offset', str(offset))
+  outImg.save(saveName, pnginfo=info)
 
 def _getPdExporters():
   members = inspect.getmembers(
@@ -93,22 +142,16 @@ class ComponentIO:
   Once created, users can extract different representations of components by
   calling exporter.exportCsv, exportPkl, etc. for those objects / files respectively.
   """
-  handledIoTypes = {'csv': 'CSV Files', 'pkl': 'Pickle Files',
-                    'id.png': 'ID Grayscale Image', 'superannotate.json': 'Superannotate JSON File',
-                    'comp.imgs.zip': 'Separate Components Zip/Folder',
-                    'geojson': 'Geo JSON Files'}
-  """Dict of <type, description> for the file types this I/O obejct can handle"""
-
-  # Dictionary comprehension doesn't work in a class scope
-  roundTripIoTypes = {}
-  """
-  Not all IO types can export->import and remain the exact same dataframe afterwards.
-  For instance, exporting a labeled image will discard all additional fields.
-  This property holds export types which can give back the original dataframe after
-  a round trip export->import.
-  """
-  for k in ['csv', 'pkl']:
-    roundTripIoTypes[k] = handledIoTypes[k]
+  @classproperty
+  def roundTripTypes(self):
+    """
+    Not all IO types can export->import and remain the exact same dataframe afterwards.
+    For instance, exporting a labeled image will discard all additional fields.
+    This property holds export types which can give back the original dataframe after
+    a round trip export->import.
+    """
+    # Since both import and export should have these keys, can use either dict
+    return {k: self.buildTypes[k] for k in ['csv', 'pkl']}
 
   tableData = TableData()
   """Table to use for import/export cross checks. This is how class and table field information is derived."""
@@ -121,35 +164,61 @@ class ComponentIO:
   Propagated to every exportByFileType call to provide user-specified defaults as desired
   """
 
+  @classproperty
+  def exportTypes(cls):
+    """
+    File types this class can export. {file type: descriptoin} useful for adding to
+    file picker dialog
+    """
+    return _attrNameFmt(PRJ_ENUMS.IO_FIL_EXPORT, cls)
+
+  @classproperty
+  def buildTypes(cls):
+    """
+    Types this class can import. {file type: descriptoin} useful for adding to
+    file picker dialog
+    """
+    return _attrNameFmt(PRJ_ENUMS.IO_FIL_BUILD, cls)
+
   @classmethod
-  def handledIoTypes_fileFilter(cls, typeFilter='', **extraOpts):
+  def ioFileFilter(cls, which=PRJ_ENUMS.IO_FIL_ROUND_TRIP, typeFilter='', **extraOpts):
     """
     Helper for creating a file filter out of the handled IO types. The returned list of
     strings is suitable for inserting into a QFileDialog.
 
+    :param which: Whether to generate filters for build types, export types, or round trip
     :param typeFilter: type filter for handled io types. For instanece, if typ='png', then
       a file filter list with only 'id.png' and 'class.png' will appear.
+    :param extraOpts; Extra file types to include in the filter
     """
+    ioDict = {
+      PRJ_ENUMS.IO_FIL_ROUND_TRIP: cls.roundTripTypes,
+      PRJ_ENUMS.IO_FIL_BUILD: cls.buildTypes,
+      PRJ_ENUMS.IO_FIL_EXPORT: cls.exportTypes
+    }[which]
     if isinstance(typeFilter, str):
       typeFilter = [typeFilter]
     fileFilters = []
-    for typ, info in dict(**cls.handledIoTypes, **extraOpts).items():
+    for typ, info in dict(**ioDict, **extraOpts).items():
       if any([t in typ for t in typeFilter]):
         fileFilters.append(f'{info} (*.{typ})')
     return ';;'.join(fileFilters)
 
   def exportByFileType(self, compDf: pd.DataFrame, outFile: Union[str, Path], verifyIntegrity=True, **exportArgs):
     outFile = Path(outFile)
-    outFn = self._ioFnFromFileType(outFile, 'export')
+    outFn = self._ioFnFromFileType(outFile, PRJ_ENUMS.IO_FIL_EXPORT)
 
     useArgs = self.exportOpts.copy()
     useArgs.update(exportArgs)
     ret = outFn(compDf, outFile, **useArgs)
-    if verifyIntegrity and outFile.suffix[1:] in self.roundTripIoTypes:
+    if verifyIntegrity and outFile.suffix[1:] in self.roundTripTypes:
       matchingCols = np.setdiff1d(compDf.columns, [RTF.INST_ID,
                                                    RTF.SRC_IMG_FILENAME])
       loadedDf = self.buildByFileType(outFile)
-      dfCmp = np.array_equal(loadedDf[matchingCols], compDf[matchingCols])
+      # For some reason, there are cases in which numy comparison spots false errors and cases where
+      # pandas spots false errors. Only a problem if both see problms
+      dfCmp = np.array_equal(loadedDf[matchingCols], compDf[matchingCols]) \
+              or loadedDf[matchingCols].equals(compDf[matchingCols])
       problemCells = defaultdict(list)
 
       if not dfCmp:
@@ -172,7 +241,7 @@ class ComponentIO:
 
   def buildByFileType(self, inFile: Union[str, Path], imShape: Tuple[int]=None,
                       strColumns=False, **importArgs):
-    buildFn = self._ioFnFromFileType(inFile, 'buildFrom')
+    buildFn = self._ioFnFromFileType(inFile, PRJ_ENUMS.IO_FIL_BUILD)
     useArgs = self.buildOpts.copy()
     useArgs.update(**importArgs)
     outDf = buildFn(inFile, imShape=imShape, **useArgs)
@@ -185,10 +254,10 @@ class ComponentIO:
                         missingOk=False) -> Optional[Callable]:
     fpath = Path(fpath)
     fname = fpath.name
-    cmpTypes = np.array(list(self.handledIoTypes.keys()))
+    cmpTypes = np.array(list(_attrNameFmt(buildOrExport, type(self))))
     typIdx = [fname.endswith(typ) for typ in cmpTypes]
     if not any(typIdx):
-      raise IOError(f'Not sure how to handle file {fpath.stem}')
+      raise IOError(f'Not sure how to handle file {fpath.name}')
     fnNameSuffix = cmpTypes[typIdx][-1].title().replace('.', '')
     outFn =  getattr(self, buildOrExport + fnNameSuffix, None)
     if outFn is None and not missingOk:
@@ -235,8 +304,8 @@ class ComponentIO:
     defaultExportParams.update(pdExportArgs)
     exportFn = getattr(exportDf, f'to_{exporter}', None)
     if exportFn is None:
-      raise ValueError(f'Exporter {exporter} not recognized. Acceptable options:'
-                       ','.join(_getPdExporters()))
+      raise ValueError(f'Exporter {exporter} not recognized. Acceptable options:\n'
+                       + ', '.join(_getPdExporters()))
 
     with np.printoptions(threshold=sys.maxsize):
       exportFn(outFile, index=False)
@@ -293,7 +362,7 @@ class ComponentIO:
   def exportCompImgsDf(self, compDf: pd.DataFrame, outFile: Union[str, Path]=None,
                        imgDir: FilePath=None, margin=0, marginAsPct=False,
                        includeCols=('instId', 'img', 'labelMask', 'label', 'offset'),
-                       lblField='Instance ID', asIndiv=False, allowOffset=True,
+                       lblField='Instance ID', asIndiv=False,
                        missingOk=False, **kwargs):
     """
     Creates a dataframe consisting of extracted images around each component
@@ -314,7 +383,6 @@ class ComponentIO:
       include mask values of neighbors if they are within mask range. Note: This is
       performed with preference toward higher ids, i.e. if a high ID is on top of a low ID,
       the low ID will still be covered in its export mask
-    :param allowOffset: See ComponentIO.exportLblPng. This ensures index labels start at 1
     :param missingOk: Whether a missing image is acceptable. When no source image is found
       for an annotation, this will simpy the 'image' output property
     :return: Dataframe with the following keys:
@@ -357,7 +425,6 @@ class ComponentIO:
       lblImg, mapping = self.exportLblPng(miniDf,
                                           imShape=shape,
                                           lblField=lblField,
-                                          allowOffset=allowOffset,
                                           returnLblMapping=True,
                                           **kwargs)
       if img is None:
@@ -369,7 +436,6 @@ class ComponentIO:
         else:
           idImg, mapping = self.exportLblPng(miniDf, imShape=img.shape[:2],
                                              lblField=RTF.INST_ID,
-                                             allowOffset=True,
                                              returnLblMapping=True)
         mapping = mapping.astype(idImg.dtype)
         invertedMap = pd.Series(mapping.index, mapping)
@@ -429,8 +495,9 @@ class ComponentIO:
     return pklDf
 
   def exportLblPng(self, compDf: pd.DataFrame, outFile: FilePath=None, imShape: Tuple[int]=None,
-                   lblField: Union[PrjParam, str]='Instance ID', bgColor=0, allowOffset=None,
+                   lblField: Union[PrjParam, str]='Instance ID', bgColor=0,
                    rescaleOutput=False, returnLblMapping=False,
+                   writeMeta=True,
                    **kwargs):
     """
     :param compDf: Dataframe to export
@@ -441,16 +508,17 @@ class ComponentIO:
       will be colored according to this field.  See :meth:`PrjParam.toNumeric` for details.
       If `lblField` is *None*, the foreground mask will be boolean instead of integer-colored.
     :param bgColor: Color of the mask background. Must be an integer.
-    :param allowOffset: Some label fields may have 0-based starting values. In cases
-      where `bgColor` is also 0, an offset is required to prevent those field values
-      from being considered background. `allowOffset` determines whether this change
-      can be made to the data. See `PrjParam.toNumeric` for detailed description.
     :param rescaleOutput: For images designed for human use, it is helpful to have
       outputs rescaled to the entire intensity range. Otherwise, they usually end
       up looking pure black and it is difficult to see components in the image.
       When `rescaleOutput` is *True*, all numbers are scaled to the 'uint16' range.
     :param returnLblMapping: Whether to return a pd.Series matching original index values
-      to their numeric counterparts
+      to their numeric counterparts. Note: this is important in cases where an offset must be applied to the underlying
+      data. If the background color is 0 and a valid numeric value is also 0, it will be impossible to detect this
+      object in the labeled output. So, an offset must be applied in these cases (background - min(data) + 1). This
+      mapping records the relevant information to import original values back during `buildFromLblPng`.
+    :param writeMeta: Whether to write the field mapping/offset to the output image file as png metadata.
+      Useful to preserve label information when re-importing.
     :param kwargs:
     :return:
     """
@@ -459,25 +527,31 @@ class ComponentIO:
 
     if lblField not in self.tableData.allFields:
       raise IOError(f'Specified label field {lblField} does not exist in the table'
-                       f' fields. Must be one of:\n'
-                       f'{[f.name for f in self.tableData.allFields]}')
+                    f' fields. Must be one of:\n'
+                    f'{[f.name for f in self.tableData.allFields]}')
     if bgColor < 0:
       raise IOError(f'Background color must be >= 0, was {bgColor}')
 
+    readMapping = returnLblMapping or (writeMeta and outFile is not None)
     labels = compDf[lblField]
-    labels_numeric = lblField.toNumeric(labels, allowOffset, rescaleOutput,
-                                        returnMapping=returnLblMapping)
-    if returnLblMapping:
+    labels_numeric = lblField.toNumeric(labels, returnMapping=readMapping)
+    # Make sure numeric labels aren't the same as background, otherwise they will be forever lost
+    mapping = None
+    if readMapping:
       labels_numeric, mapping = labels_numeric
-    else:
-      mapping = None
+    diff = max(bgColor - np.min(labels_numeric, initial=0) + 1, 0)
+    if readMapping:
+      mapping.index += diff
+    labels_numeric += diff
     asBool = np.issubdtype(labels_numeric.dtype, np.bool_)
 
     if rescaleOutput:
-      newMax = np.iinfo(np.uint16).max
-      labels_numeric = (labels_numeric*newMax).astype('uint16')
       if mapping is not None:
-        mapping.index = (mapping.index*newMax).astype('uint16')
+        max_ = np.max(np.asarray(mapping.index), initial=bgColor)
+        mapping.index = rescale_intensity(mapping.index, in_range=(bgColor, max_), out_range='uint16')
+      else:
+        max_ = np.max(labels_numeric, initial=bgColor)
+      labels_numeric = rescale_intensity(labels_numeric, in_range=(bgColor, max_), out_range='uint16')
 
     if imShape is None:
       # Without any components the image is non-existant
@@ -494,26 +568,17 @@ class ComponentIO:
       outMask = outMask > 0
 
     if outFile is not None:
-      cvImsave_rgb(outFile, outMask.astype('uint16'))
+      if writeMeta:
+        _writeImge_meta(outMask, outFile, mapping)
+      else:
+        cvImsave_rgb(outFile, outMask)
     if returnLblMapping:
       return outMask, mapping
     return outMask
 
-  def exportClassPng(self, compDf: pd.DataFrame, outFile: FilePath = None, imShape: Tuple[int]=None, **kwargs):
-    # Create label to output mapping
-    return self.exportLblPng(compDf, outFile, imShape, 'Class', **kwargs)
-
-  def exportIdPng(self, compDf: pd.DataFrame, outFile: FilePath=None,
-                  imShape: Tuple[int]=None, **kwargs):
-    """
-    Creates a 2D grayscale image where each component is colored with its isntance ID + 1.
-    *Note* Since Id 0 would end up not coloring the mask, all IDs must be offest by 1.
-    :param compDf: Dataframe to export
-    :param imShape: The size of this output image
-    :param outFile: Where to save the output. If *None*, no export is created.
-    :return:
-    """
-    return self.exportLblPng(compDf, outFile, imShape, **kwargs, allowOffset=True)
+  # def exportClassPng(self, compDf: pd.DataFrame, outFile: FilePath = None, imShape: Tuple[int]=None, **kwargs):
+  #   # Create label to output mapping
+  #   return self.exportLblPng(compDf, outFile, imShape, 'Class', **kwargs)
 
   def exportCompImgsZip(self, compDf: pd.DataFrame,
                         outDir:FilePath='s3a-export',
@@ -575,7 +640,7 @@ class ComponentIO:
       exportArgs = {}
     if not isinstance(fromData, pd.DataFrame):
       fromData = self.buildByFileType(fromData, **importArgs)
-    exportFn = self._ioFnFromFileType(toFile, 'export')
+    exportFn = self._ioFnFromFileType(toFile, PRJ_ENUMS.IO_FIL_EXPORT)
     useArgs = self.exportOpts.copy()
     useArgs.update(exportArgs)
     if not doExport:
@@ -697,13 +762,13 @@ class ComponentIO:
     allVerts = []
 
     for idx, row in inDf.iterrows():
-      mask = self._strToNpArray(row.labelMask, dtype=bool)
+      mask = row.labelMask
       verts = ComplexXYVertices.fromBwMask(mask)
-      offset = self._strToNpArray(row.offset)
+      offset = row.offset
       for v in verts: v += offset
       allVerts.append(verts)
     outDf[RTF.VERTICES] = allVerts
-    outDf[lblField] = inDf[lblField]
+    outDf[lblField] = inDf['label']
     self.checkVertBounds(outDf[RTF.VERTICES], imShape)
     return outDf
 
@@ -718,56 +783,57 @@ class ComponentIO:
     return templateDf
 
   def buildFromLblPng(self, inFileOrImg: Union[FilePath, GrayImg],
-                      labelMapping: pd.Series=None,
-                      useDistinctRegions=False,
+                      lblField: Union[str, PrjParam]=None,
+                      lblMapping: pd.Series=None,
+                      distinctRegions=True,
+                      offset=0,
                       **importArgs) -> pd.DataFrame:
-    if isinstance(inFileOrImg, GrayImg):
-      labelImg = inFileOrImg
+    """
+    Build dataframe from label image
+
+    :param inFileOrImg: Image or image file to parse
+    :param lblField: label field to associate with this image. Pixels values within the image
+      correspond to values from this field in the table data. If *None*, this is inferred by the mapping read
+      from the image file (see `lblMapping` description)
+    :param lblMapping: For parameters that aren't numeric and don't have limits (e.g. arbitrary string values),
+      this mapping determines how numeric values should be turned into field values. See `PrjParam.toNumeric` for
+      details, since this is the mapping expected. If not provided, first the image metadata tags are searched for
+      a 'lblMapping' text attribute (this is often added to label images saved by S3A). Note that metadata can only be
+      read from the file if a file path is provided, of course. If this check fails, it is inferred based on the
+      allowed options of `lblField` (`lblField.opts['limits']`). Finally, if this is not present, it is assumed the
+      raw image values can be used directly as field values.
+    :param offset: When `lblMapping` is not provided and field values are directly inferred from label values, this
+      determines whether (and how much if not *None*) to offset numeric labels during import. I.e. if the png label
+      is 1, but offset is 1, the corresponding *field* value will be 0 (1 - offset = 0).
+    :param distinctRegions: Whether separate regions with the same ID should be separate IDs, or
+      one ID with a group of polygons
+    """
+    if lblMapping is None:
+      # Ignoring offset for now
+      labelImg, lblMapping, _ = _getImg_mapping_offset(inFileOrImg)
     else:
-      labelImg = io.imread(inFileOrImg, as_gray=True)
+      labelImg = cvImread_rgb(str(inFileOrImg), mode=cv.IMREAD_UNCHANGED)
+    lblField = self.tableData.fieldFromName(lblField or lblMapping.name)
+    if lblMapping is None:
+      vals = lblField.opts.get('limits', None) or np.unique(labelImg)
+      _, lblMapping = lblField.toNumeric(vals, returnMapping=True)
+      lblMapping.index += offset
     allVerts = []
     lblField_out = []
-    for origVal, numericLbl in labelMapping.iteritems():
+    for numericLbl, origVal in lblMapping.iteritems():
       origVal: np.number # silence warning
       verts = ComplexXYVertices.fromBwMask(labelImg == numericLbl)
-      if useDistinctRegions:
-        allVerts.extend(verts)
+      if distinctRegions:
+        newRegions = [ComplexXYVertices([v]) for v in verts]
+        allVerts.extend(newRegions)
         orig = np.tile(origVal, len(verts))
       else:
         allVerts.append(verts)
         orig = [origVal]
       lblField_out.extend(orig)
     outDf = self.tableData.makeCompDf(len(allVerts))
-    outDf[labelMapping.name] = lblField_out
+    outDf[lblField] = lblField_out
     outDf[RTF.VERTICES] = allVerts
-    return outDf
-
-  def buildFromIdPng(self, inFileOrImg: Union[FilePath, GrayImg], imShape: Tuple=None, **importArgs) -> pd.DataFrame:
-    if isinstance(inFileOrImg, GrayImg):
-      labelImg = inFileOrImg
-    else:
-      labelImg = io.imread(inFileOrImg, as_gray=True)
-    outDf = self._idImgToDf(labelImg)
-    self.checkVertBounds(outDf[RTF.VERTICES], imShape)
-    return outDf
-
-  def buildFromClassPng(self, inFileOrImg: Union[FilePath, GrayImg], imShape: Tuple=None, **importArgs) -> pd.DataFrame:
-    if isinstance(inFileOrImg, GrayImg):
-      clsImg = inFileOrImg
-    else:
-      clsImg = io.imread(inFileOrImg)
-    clsParam = self.tableData.fieldFromName('Class')
-    clsArray = np.array(clsParam.opts['limits'])
-    idImg = measure.label(clsImg)
-    outDf = self.buildFromIdPng(idImg, imShape)
-    outClasses = []
-    for curId in outDf[RTF.INST_ID]+1:
-      # All ID pixels should be the same class, so any representative will do
-      curCls = clsImg[idImg == curId][0]
-      outClasses.append(clsArray[curCls-1])
-    outDf[self.tableData.fieldFromName('Class')] = outClasses
-    outDf.reset_index(inplace=True, drop=True)
-    outDf[RTF.INST_ID] = outDf.index
     return outDf
 
   @staticmethod
