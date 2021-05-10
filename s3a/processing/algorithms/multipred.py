@@ -47,7 +47,11 @@ def _dispatchFactory(func, resultConverter: t.Callable[[t.Union[dict, t.Any], pd
       if resultConverter is not None:
         result = resultConverter(result, comp)
       compList.append(result.pop('components'))
-    outComps = pd.concat(compList, ignore_index=True)
+    if compList:
+      # Concat fails with empty list
+      outComps = pd.concat(compList, ignore_index=True)
+    else:
+      outComps = components.drop(components.index).copy()
     out = ProcessIO(**result, components=outComps)
     return out
 

@@ -15,4 +15,5 @@ dist
 menuopts
 
 # Auto-generated test files
-/apptests/files
+/apptests/files/*.png
+.coverage

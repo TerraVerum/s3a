@@ -1,26 +1,45 @@
 import stat
 from pathlib import Path
-from typing import List
+from typing import List, Union
 
 import cv2 as cv
 import numpy as np
-from pandas import DataFrame as df
+import pandas as pd
 
 from s3a import PRJ_SINGLETON
 from s3a.constants import REQD_TBL_FIELDS
 from s3a.structures import ComplexXYVertices
-from testingconsts import RND, IMG_DIR
+from testingconsts import RND, TEST_FILE_DIR
+from utilitys import PrjParam, CompositionMixin
 
-class CompDfTester:
-  def __init__(self, numComps, fillInfo=True):
-    self.compDf = PRJ_SINGLETON.tableData.makeCompDf(numComps)
+
+class CompDfTester(CompositionMixin):
+  def __init__(self, numComps, fillInfo=True, tableData=None):
+    if tableData is None:
+      tableData = PRJ_SINGLETON.tableData
+    self.tableData = tableData
+    self.compDf = self.exposes(tableData.makeCompDf(numComps))
     self.compDf.set_index(np.arange(numComps, dtype=int), inplace=True)
     self.numComps = numComps
     if fillInfo:
       self.fillRandomVerts()
+      for field in tableData.allFields:
+        # Silently fails for non-limit based fields
+        self.fillRandomCategorical(field)
 
+  def fillRandomCategorical(self, field: Union[str, PrjParam], compDf: pd.DataFrame=None):
+    if compDf is None:
+      compDf = self.compDf
+    field = self.tableData.fieldFromName(field)
+    lims = field.opts.get('limits', None)
+    if lims is None:
+      # Nothing to do
+      return compDf[field]
+    lims = np.array(lims)
+    newData = lims[RND.integers(0, len(lims), len(compDf))]
+    compDf[field] = newData
 
-  def fillRandomVerts(self, imShape=(2000, 2000), compDf: df=None, vertType='circle'):
+  def fillRandomVerts(self, imShape=(2000, 2000), compDf: pd.DataFrame=None, vertType='circle'):
     if compDf is None:
       compDf = self.compDf
     mask = np.zeros(imShape[:2], 'uint8')
@@ -40,10 +59,8 @@ class CompDfTester:
       mask.fill(0)
     return retVal
 
-def clearTmpFiles(exceptFiles: List[Path] =None):
-  if exceptFiles is None:
-    exceptFiles: List[Path] = []
-  for file in IMG_DIR.glob('*'):
-    if file not in exceptFiles:
-      file.chmod(stat.S_IWRITE)
-      file.unlink()
+def clearTmpFiles(globexpr='*'):
+  for curPath in TEST_FILE_DIR.glob(globexpr):
+    if curPath.is_file():
+      curPath.chmod(stat.S_IWRITE)
+      curPath.unlink()

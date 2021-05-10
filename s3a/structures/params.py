@@ -52,7 +52,7 @@ class PrjParamGroup:
     baseWarnMsg = f'String representation "{param}" was not recognized.\n'
     if default is None:
       # No default specified, so we have to raise Exception
-      raise ValueError(baseWarnMsg + 'No class default is specified.')
+      raise ValueError(baseWarnMsg + f'Must be one of {", ".join(list(str(g) for g in group))}.')
     # No exception needed, since the user specified a default type in the derived class
     warn(baseWarnMsg + f'Defaulting to {default.name}', UserWarning)
     return default

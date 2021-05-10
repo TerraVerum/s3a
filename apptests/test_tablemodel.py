@@ -15,7 +15,7 @@ oldIds = np.arange(NUM_COMPS, dtype=int)
 @pytest.fixture
 def sampleComps(app):
   app.clearBoundaries()
-  clearTmpFiles()
+  clearTmpFiles('*.png')
   return dfTester.compDf.copy()
 
 

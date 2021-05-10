@@ -941,7 +941,7 @@ class ProjectData(QtCore.QObject):
     self.saveCfg()
     outputFolder = Path(outputFolder)
 
-    if outputFolder.resolve() == self.cfgFname and not combine:
+    if outputFolder.resolve() == self.location and not combine:
       return
 
     outputFolder.mkdir(exist_ok=True)

@@ -523,12 +523,8 @@ class ComponentIO:
 
     lblField = self.tableData.fieldFromName(lblField)
 
-    if lblField not in self.tableData.allFields:
-      raise IOError(f'Specified label field {lblField} does not exist in the table'
-                    f' fields. Must be one of:\n'
-                    f'{[f.name for f in self.tableData.allFields]}')
     if bgColor < 0:
-      raise IOError(f'Background color must be >= 0, was {bgColor}')
+      raise ValueError(f'Background color must be >= 0, was {bgColor}')
 
     readMapping = returnLblMapping or (writeMeta and outFile is not None)
     labels = compDf[lblField]
@@ -704,23 +700,33 @@ class ComponentIO:
     """Exposed format from the more general importSerialized"""
     return self.importSerialized(*args, **kwargs)
 
-  def importGeojson(self, inFileOrDict: Union[FilePath, dict], **importArgs):
+  def importGeojson(self, inFileOrDict: Union[FilePath, dict], parseErrorOk=False, **importArgs):
+    fileName = None
     if not isinstance(inFileOrDict, dict):
+      fileName = Path(inFileOrDict)
       with open(inFileOrDict, 'r') as ifile:
         inFileOrDict = json.load(ifile)
     verts = []
+    badInsts = []
     for ann in inFileOrDict['features']:
       geo = ann['geometry']
       if geo['type'] == 'Polygon':
         verts.append(ComplexXYVertices(geo['coordinates'], coerceListElements=True))
-    tmpDf = pd.DataFrame(verts, columns=[RTF.VERTICES.name])
-    return self.importCsv(tmpDf, **importArgs)
+      else:
+        badInsts.append(ann)
+    if badInsts and not parseErrorOk:
+      raise AnnParseError(f'Currently, S3A only supports polygon geojson types',
+                          fileName=fileName, instances=badInsts)
+    outDf = self.tableData.makeCompDf(len(verts))
+    outDf[RTF.VERTICES] = verts
+    return outDf
 
   def importSuperannotateJson(self, inFileOrDict: Union[FilePath, dict], parseErrorOk=False, **importArgs):
     fileName = None
     if not isinstance(inFileOrDict, dict):
       fileName = Path(inFileOrDict)
-      inFileOrDict = json.load(open(inFileOrDict, 'r'))
+      with open(inFileOrDict, 'r') as ifile:
+        inFileOrDict = json.load(ifile)
     instances = inFileOrDict['instances']
     parsePts = []
     invalidInsts = []

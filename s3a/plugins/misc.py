@@ -146,12 +146,12 @@ class RandomToolsPlugin(ParamEditorPlugin):
   def attachWinRef(self, win: s3abase.S3ABase):
     super().attachWinRef(win)
 
-    self.registerFunc(self.showDevConsole)
+    self.registerFunc(self.showDevConsole_gui, 'Show Dev Console')
     self.registerFunc(win.clearBoundaries, btnOpts=CNST.TOOL_CLEAR_BOUNDARIES)
     self.registerFunc(win.compDisplay.exportCompOverlay, name='Export Component Overlay', toClipboard=True)
     self.registerFunc(lambda: win.setMainImg(None), name='Clear Current Image')
 
-  def showDevConsole(self):
+  def showDevConsole_gui(self):
     """
     Opens a console that allows dynamic interaction with current variables. If IPython
     is on your system, a qt console will be loaded. Otherwise, a (less capable) standard
@@ -182,9 +182,9 @@ class HelpPlugin(ParamEditorPlugin):
     self.registerFunc(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl('https://gitlab.com/ficsresearch/s3a/-/wikis/home')),
                          name='Online User Guide')
     self.registerFunc(lambda: QtWidgets.QMessageBox.aboutQt(win, 'About Qt'), name='About Qt')
-    self.registerFunc(self.iconAttributions)
+    self.registerFunc(self.iconAttributions_gui, 'Icon Attributions')
 
-  def iconAttributions(self):
+  def iconAttributions_gui(self):
     htmlStr = """
     <div>Icons made by <a href="https://www.freepik.com" title="Freepik">Freepik</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a></div>
 
