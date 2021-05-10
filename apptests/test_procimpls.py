@@ -1,10 +1,19 @@
 import warnings
 
+import numpy as np
+import pandas as pd
 import pytest
+from skimage import util
 
+from s3a import ComplexXYVertices, REQD_TBL_FIELDS
 from s3a.generalutils import imgCornerVertices
 from s3a.processing import ImageProcess
+from s3a.processing.algorithms import multipred as mulp
 from s3a.structures import XYVertices
+from s3a.processing.algorithms import imageproc as ip
+from conftest import SAMPLE_SMALL_IMG
+from utilitys import ProcessIO, fns
+
 
 @pytest.mark.smallimage
 def test_algs_working(app, vertsPlugin):
@@ -39,7 +48,65 @@ def test_disable_top_stages(app, vertsPlugin):
   # Make sure to put stages back after
   pe.changeActiveProcessor(oldProc, saveBeforeChange=False)
 
+# -----
+# Administrative Image processes (e.g. cropping, formatting, etc. stages that must work for every kind of process
+# hierarchy
+# -----
+def test_crop_image():
+  testImg = SAMPLE_SMALL_IMG.copy()
+  testShp = testImg.shape[:2]
+  testMask = np.zeros(testShp, dtype=bool)
+  converters = [func for (name, func) in vars(util).items() if name.startswith('img_as_')]
+  testSizes = max(testShp) * np.array([0.5, 0.8, 1, 5])
+  for converter in converters:
+    for size in testSizes:
+      # Make sure this works for all image types and downsample sizes
+      out = ip.crop_to_local_area(image=converter(testImg), fgVerts=XYVertices(), bgVerts=XYVertices(),
+                                  prevCompMask=testMask, prevCompVerts=ComplexXYVertices(),
+                                  viewbox=XYVertices(), historyMask=np.zeros_like(testMask),
+                                  reference='image', maxSize=size)
+      outShape = max(out['image'].shape)
+      assert outShape <= size and outShape <= max(testImg.shape), f'Failed for type {converter.__name__}'
 
 
+# -----
+# Multi-predictions
+# -----
+def test_template_dispatch(app):
+  x = np.zeros((512, 512), 'uint8')
+  rr, cc = np.ogrid[0:x.shape[0], 0:x.shape[1]]
+  rad = 100
+  origins = np.array([[rad, rad], [3*rad, 3*rad]])
+  for o in origins:
+    x += (rr - o[0])**2 + (cc - o[1])**2 <= rad**2
 
+  # Two perfectly matching circles should be detected by template matching
+  templateSize = 2*rad + 1
+  dummyComp = app.compIo.tableData.makeCompDf(1)
+  templateVerts = XYVertices([[0, 0], [templateSize, templateSize]])
+  dummyComp.at[dummyComp.index[0], REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices([templateVerts], coerceListElements=True)
+  tm = mulp.cv_template_match_factory()
+  out = tm(image=x, components=dummyComp, viewbox=np.zeros((2,2), int), area='image')
+  assert len(out['components']) == 1
+  assert np.all(out['scores'] == 1)
 
+  with pytest.raises(ValueError):
+    tm(image=x, components=dummyComp, viewbox=np.zeros((2,2), int), area='viewbox')
+  # No matches in this viewbox
+  vb = np.array([[2*rad+1, x.shape[1]], [0, 2*rad+1]])
+  out = tm(image=x, components=dummyComp, viewbox=vb, area='viewbox')
+  assert len(out['components']) == 0
+
+def test_focused_dispatch(sampleComps):
+  def dummyFunc(component: pd.Series, image=None):
+    return ProcessIO(components=fns.serAsFrame(component), image=image)
+  dispatched = mulp._dispatchFactory(dummyFunc, mulp._focusedResultConverter)
+  result = dispatched(image=SAMPLE_SMALL_IMG, components=sampleComps)
+  assert 'addType' in result
+  assert sampleComps is not result['components']
+  assert len(result['components']) == len(sampleComps)
+  def dummy2(component: pd.Series, image):
+    return image.mean(2) > 0
+  dispatched = mulp._dispatchFactory(dummy2, mulp._focusedResultConverter)
+  result = dispatched(image=SAMPLE_SMALL_IMG, components=sampleComps)
+  assert 'components' in result
