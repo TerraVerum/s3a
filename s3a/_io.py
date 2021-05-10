@@ -154,6 +154,13 @@ class ComponentIO:
   Propagated to every exportByFileType call to provide user-specified defaults as desired
   """
 
+  def __init__(self):
+    # Propagate custom defaults to each desired function
+    for typeDict, fnType in zip([self.importTypes, self.exportTypes], [PRJ_ENUMS.IO_IMPORT, PRJ_ENUMS.IO_EXPORT]):
+      for fileExt in typeDict:
+        func = self._ioFnFromFileType(fileExt, fnType)
+        setattr(self, func.__name__, self._ioWrapper(func))
+
   @classproperty
   def exportTypes(cls):
     """
@@ -194,7 +201,7 @@ class ComponentIO:
         fileFilters.append(f'{info} (*.{typ})')
     return ';;'.join(fileFilters)
 
-  def _ioWrapper(self, func):
+  def _ioWrapper(self, func: Callable):
     """Wraps build and export functions to provide defaults specified by build/exportOpts before the function call"""
     which = PRJ_ENUMS.IO_IMPORT if func.__name__.startswith(PRJ_ENUMS.IO_IMPORT) else PRJ_ENUMS.IO_EXPORT
     @wraps(func)
@@ -210,9 +217,7 @@ class ComponentIO:
     outFile = Path(outFile)
     outFn = self._ioFnFromFileType(outFile, PRJ_ENUMS.IO_EXPORT)
 
-    useArgs = self.exportOpts.copy()
-    useArgs.update(exportArgs)
-    ret = outFn(compDf, outFile, **useArgs)
+    ret = outFn(compDf, outFile, **exportArgs)
     if verifyIntegrity and outFile.suffix[1:] in self.roundTripTypes:
       matchingCols = np.setdiff1d(compDf.columns, [RTF.INST_ID,
                                                    RTF.SRC_IMG_FILENAME])
@@ -244,9 +249,7 @@ class ComponentIO:
   def importByFileType(self, inFile: Union[str, Path], imShape: Tuple[int]=None,
                       strColumns=False, **importArgs):
     buildFn = self._ioFnFromFileType(inFile, PRJ_ENUMS.IO_IMPORT)
-    useArgs = self.importOpts.copy()
-    useArgs.update(**importArgs)
-    outDf = buildFn(inFile, imShape=imShape, **useArgs)
+    outDf = buildFn(inFile, imShape=imShape, **importArgs)
     if strColumns:
       outDf.columns = list(map(str, outDf.columns))
     return outDf
@@ -261,7 +264,7 @@ class ComponentIO:
     if not any(typIdx):
       raise IOError(f'Not sure how to handle file {fpath.name}')
     fnNameSuffix = cmpTypes[typIdx][-1].title().replace('.', '')
-    outFn =  getattr(self, buildOrExport + fnNameSuffix, None)
+    outFn: Callable =  getattr(self, buildOrExport + fnNameSuffix, None)
     if outFn is None and not missingOk:
       raise ValueError(f'Full I/O specification missing for type {fnNameSuffix}')
     return outFn
@@ -350,9 +353,9 @@ class ComponentIO:
       raise
     return exportDf
 
-  @wraps(exportSerialized)
+  @wraps(exportSerialized, assigned=('__doc__', '__annotations__'))
   def exportCsv(self, *args, **kwargs):
-    """Deprecated in favor of exportSerialized"""
+    """Exposed format from the more general exportSerialized"""
     return self.exportSerialized(*args, **kwargs)
 
   def exportCompImgsDf(self, compDf: pd.DataFrame, outFile: Union[str, Path]=None,
@@ -433,7 +436,6 @@ class ComponentIO:
           idImg, mapping = self.exportLblPng(miniDf, imShape=img.shape[:2],
                                              lblField=RTF.INST_ID,
                                              returnLblMapping=True)
-        mapping = mapping.astype(idImg.dtype)
         invertedMap = pd.Series(mapping.index, mapping)
 
 
@@ -627,7 +629,6 @@ class ComponentIO:
   # -----
   # Import options
   # -----
-
   def convert(self, fromData: FilePathOrDf, toFile: FilePath, doExport=True, importArgs: dict=None,
               exportArgs: dict=None):
     if importArgs is None:
@@ -637,11 +638,9 @@ class ComponentIO:
     if not isinstance(fromData, pd.DataFrame):
       fromData = self.importByFileType(fromData, **importArgs)
     exportFn = self._ioFnFromFileType(toFile, PRJ_ENUMS.IO_EXPORT)
-    useArgs = self.exportOpts.copy()
-    useArgs.update(exportArgs)
     if not doExport:
       toFile = None
-    return exportFn(fromData, toFile, **useArgs)
+    return exportFn(fromData, toFile, **exportArgs)
 
   @fns.dynamicDocstring(availImporters=_getPdImporters())
   def importSerialized(self, inFileOrDf: FilePathOrDf, imShape: Tuple=None,
@@ -700,9 +699,9 @@ class ComponentIO:
     #  rows to gracefully fall off the dataframe with some sort of warning message
     return outDf
 
-  @wraps(importSerialized)
+  @wraps(importSerialized, assigned=('__doc__', '__annotations__'))
   def importCsv(self, *args, **kwargs):
-    """Deprecated in favor of ComponentIO.importSerialized"""
+    """Exposed format from the more general importSerialized"""
     return self.importSerialized(*args, **kwargs)
 
   def importGeojson(self, inFileOrDict: Union[FilePath, dict], **importArgs):
