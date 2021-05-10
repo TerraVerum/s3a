@@ -14,7 +14,7 @@ from utilitys import PrjParam, RunOpts, EditorPropsMixin, fns
 
 from s3a import PRJ_SINGLETON
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_CONSTS, PRJ_ENUMS
-from s3a.generalutils import stackedVertsPlusConnections
+from s3a.generalutils import stackedVertsPlusConnections, symbolFromVerts
 from s3a.structures import GrayImg, OneDArr, BlackWhiteImg
 from s3a.structures import XYVertices, ComplexXYVertices
 from . import imageareas
@@ -68,11 +68,6 @@ def _makeTxtSymbol(txt: str, fontSize: int):
   tr.translate(-br.x() - br.width()/2., -br.y() - br.height()/2.)
   outSymbol = tr.map(outSymbol)
   return outSymbol
-
-def _makeBoundSymbol(verts: XYVertices):
-  verts = verts - verts.min(0, keepdims=True)
-  path = arrayToQPath(*verts.T, connect='finite')
-  return path
 
 class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
   __groupingName__ = PRJ_CONSTS.CLS_MULT_REG_PLT.name
@@ -159,9 +154,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
 
     for region, _id in zip(self.regionData[RTF.VERTICES],
                            self.regionData.index):
-      concatRegion, isfinite = stackedVertsPlusConnections(region)
-      boundLoc = np.nanmin(concatRegion, 0, keepdims=True)
-      boundSymbol = pg.arrayToQPath(*(concatRegion-boundLoc+0.5).T, connect=isfinite)
+      boundSymbol, boundLoc = symbolFromVerts(region)
 
       boundLocs.append(boundLoc)
       boundSymbs.append(boundSymbol)
@@ -172,7 +165,6 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     self.updateColors()
 
   def toGrayImg(self, imShape: Sequence[int]=None):
-    uint16Max = 2**16-2 # Subtract 1 extra so there's room for offset
     labelDf = pd.DataFrame()
     labelDf[RTF.VERTICES] = self.regionData[RTF.VERTICES]
     # Override id column to avoid an extra parameter

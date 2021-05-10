@@ -171,7 +171,7 @@ def crop_to_local_area(image: NChanImg,
   for ii in range(2):
     # Add additional offset
     tmp = (((useVerts[ii] - vertOffset)*ratio)).astype(int)
-    useVerts[ii] = np.clip(tmp, a_min=[0,0], a_max=(bounds[1,:]-1)*ratio)
+    useVerts[ii] = np.clip(tmp, a_min=[0,0], a_max=(bounds[1,:]-1)*ratio, dtype=int, casting='unsafe')
   fgVerts, bgVerts = useVerts
 
   boundSlices = slice(*bounds[:,1]), slice(*bounds[:,0])

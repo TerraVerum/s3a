@@ -9,11 +9,14 @@ from pandas import DataFrame as df
 from skimage import transform
 from skimage.exposure import exposure
 from skimage import io
+import pyqtgraph as pg
 
 from utilitys import PrjParam
 from utilitys.typeoverloads import FilePath
 
 from .structures import TwoDArr, XYVertices, ComplexXYVertices, NChanImg, BlackWhiteImg
+# Needs to be visible outside this file
+# noinspection PyUnresolvedReferences
 from utilitys.fns import hierarchicalUpdate
 
 def stackedVertsPlusConnections(vertList: ComplexXYVertices) -> (XYVertices, np.ndarray):
@@ -375,15 +378,21 @@ def orderContourPts(pts: XYVertices, ccw=True):
     ptOrder = ptOrder[::-1]
   return pts[ptOrder]
 
-def movePtsTowardCenter(pts: XYVertices, dist=1):
-  if not pts.size:
-    return pts
-  angles = _getPtAngles(pts)
-  adjusts = np.column_stack([np.cos(angles), np.sin(angles)])
-  adjusts[np.abs(adjusts) < 0.01] = 0
-  # Adjust by whole steps
-  adjusts = np.sign(adjusts)*dist
-  return pts - adjusts
+# def movePtsTowardCenter(pts: XYVertices, dist=1):
+#   if not pts.size:
+#     return pts
+#   angles = _getPtAngles(pts)
+#   adjusts = np.column_stack([np.cos(angles), np.sin(angles)])
+#   adjusts[np.abs(adjusts) < 0.01] = 0
+#   # Adjust by whole steps
+#   adjusts = np.sign(adjusts)*dist
+#   return pts - adjusts
+
+def symbolFromVerts(verts: ComplexXYVertices):
+  concatRegion, isfinite = stackedVertsPlusConnections(verts)
+  boundLoc = np.nanmin(concatRegion, 0, keepdims=True)
+  useVerts = concatRegion - boundLoc + 0.5
+  return pg.arrayToQPath(*useVerts.T, connect=isfinite), boundLoc
 
 # Credit: https://www.pyimagesearch.com/2016/11/07/intersection-over-union-iou-for-object-detection/
 def bboxIou(boxA, boxB):

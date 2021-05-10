@@ -54,14 +54,13 @@ def mgr(app):
   return app.compMgr
 
 @pytest.fixture(scope='session', autouse=True)
-def vertsPlugin(app):
+def vertsPlugin(app) -> VerticesPlugin:
   try:
     plg = PRJ_SINGLETON.clsToPluginMapping[VerticesPlugin]
   except KeyError:
     raise RuntimeError('Vertices plugin was not provided. Some tests are guaranteed to fail.')
 
   plg.procEditor.changeActiveProcessor('Basic Shapes')
-  proc = plg.curProcessor
   return plg
 
 # Each test can request wheter it starts with components, small image, etc.

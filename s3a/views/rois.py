@@ -5,7 +5,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 from skimage.draw import draw
 
-from s3a.generalutils import orderContourPts
+from s3a.generalutils import orderContourPts, symbolFromVerts
 from utilitys import PrjParam
 
 from s3a.constants import PRJ_CONSTS
@@ -45,10 +45,9 @@ class PlotDataROI(BoundScatterPlot):
       vertsToUse = np.vstack([self.firstPt, pts])
     refactored = self._refactorPoints(vertsToUse)
     verts = self.vertices = XYVertices(refactored)
-    connectData = np.vstack([verts, verts[[0]]])
-    pos = connectData.min(0, keepdims=True)
-    connectData = connectData - pos + 0.5
-    self.setData(*pos.T, symbol=[pg.fn.arrayToQPath(*connectData.T)])
+    connectData = np.vstack([verts, verts[[0]]]).view(XYVertices)
+    symbol, pos = symbolFromVerts(ComplexXYVertices([connectData]))
+    self.setData(*pos.T, symbol=[symbol])
 
 
   def setRoiPoints(self, pts: XYVertices=None):

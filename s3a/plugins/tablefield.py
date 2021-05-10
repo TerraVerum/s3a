@@ -50,25 +50,7 @@ class VerticesPlugin(TableFieldPlugin):
     mainBufSize = PRJ_SINGLETON.generalProps.params.child(win.__groupingName__, 'maxLength')
     mainBufSize.sigValueChanged.connect(resetRegBuff)
 
-    def fill():
-      """Completely fill the focused region mask"""
-      if self.mainImg.compSer is None: return
-      filledImg = np.ones(self.mainImg.image.shape[:2], dtype='uint16')
-      self.updateRegionFromMask(filledImg)
-    def clear():
-      """
-      Clear the vertices in the focused image
-      """
-      self.updateRegionFromDf(None)
-    def clearProcessorHistory():
-      """
-      Each time an update is made in the processor, it is saved so algorithmscan take
-      past edits into account when performing their operations. Clearing that history
-      will erase algorithm knowledge of past edits.
-      """
-      _historyMaskHolder[0].fill(0)
-
-    funcLst = [self.resetFocusedRegion, fill, clear, clearProcessorHistory]
+    funcLst = [self.resetFocusedRegion, self.fillRegionMask, self.clearFocusedRegion, self.clearProcessorHistory]
     paramLst = [CNST.TOOL_RESET_FOC_REGION, CNST.TOOL_FILL_FOC_REGION,
                 CNST.TOOL_CLEAR_FOC_REGION, CNST.TOOL_CLEAR_HISTORY]
     for func, param in zip(funcLst, paramLst):
@@ -76,13 +58,34 @@ class VerticesPlugin(TableFieldPlugin):
 
     def onChange():
       self.firstRun = True
-      clear()
+      self.clearFocusedRegion()
     win.mainImg.imgItem.sigImageChanged.connect(onChange)
 
     win.mainImg.registerDrawAction([CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self._run_drawAct)
     win.mainImg.addTools(self.toolsEditor)
     self.vb: pg.ViewBox = win.mainImg.getViewBox()
     super().attachWinRef(win)
+
+  def fillRegionMask(self):
+    """Completely fill the focused region mask"""
+    if self.mainImg.compSer is None: return
+    filledImg = np.ones(self.mainImg.image.shape[:2], dtype='uint16')
+    self.updateRegionFromMask(filledImg)
+
+  def clearFocusedRegion(self):
+    """
+    Clear the vertices in the focused image
+    """
+    self.updateRegionFromDf(None)
+
+  @classmethod
+  def clearProcessorHistory(cls):
+    """
+    Each time an update is made in the processor, it is saved so algorithmscan take
+    past edits into account when performing their operations. Clearing that history
+    will erase algorithm knowledge of past edits.
+    """
+    _historyMaskHolder[0].fill(0)
 
   def updateFocusedComp(self, newComp:pd.Series = None):
     if self.mainImg.compSer[RTF.INST_ID] == -1:
@@ -245,7 +248,6 @@ class VerticesPlugin(TableFieldPlugin):
 
   def getRegionHistory(self):
     outImgs = []
-    bufferRegions = []
     if not self.regionBuffer:
       return None, []
     firstId = self.regionBuffer[-1].id_
