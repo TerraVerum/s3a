@@ -60,10 +60,11 @@ class S3A(S3ABase):
       layoutName = Path(layoutName)
       if not layoutName.is_absolute():
         layoutName = LAYOUTS_DIR/f'{layoutName}.dockstate'
-      self.restoreState(fns.attemptFileLoad(layoutName))
+      state = fns.attemptFileLoad(layoutName)
+      self.restoreState(state['docks'])
 
     def saveRecentLayout(_folderName: Path):
-      outFile = _folderName/'savedLayout.dockstate'
+      outFile = _folderName/'layout.dockstate'
       self.saveLayout(outFile)
       return str(outFile)
 
@@ -142,7 +143,7 @@ class S3A(S3ABase):
     else:
       savePathPlusStem = LAYOUTS_DIR/layoutName
     saveFile = savePathPlusStem.with_suffix(f'.dockstate')
-    fns.saveToFile(dockStates, saveFile,
+    fns.saveToFile({'docks': dockStates}, saveFile,
                    allowOverwriteDefault=allowOverwriteDefault)
     self.sigLayoutSaved.emit()
 
