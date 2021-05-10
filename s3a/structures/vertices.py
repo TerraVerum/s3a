@@ -140,11 +140,13 @@ class ComplexXYVertices(list):
                        f' Current list has {len(self)} element(s), '
                        f'where element 0 has shape {self[0].shape}.')
 
-  def stack(self, newDtype=int) -> XYVertices:
+  def stack(self, newDtype=None) -> XYVertices:
     if len(self) == 0:
       # Check required for np vstack since it won't work with a 0-element array
       return XYVertices()
     else:
+      if newDtype is None:
+        newDtype = self[0].dtype
       return XYVertices(np.vstack(self), dtype=newDtype)
 
   @classmethod

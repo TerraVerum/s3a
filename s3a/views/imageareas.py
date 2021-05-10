@@ -246,9 +246,14 @@ class MainImage(EditorPropsMixin, ImageViewer):
                                     namePath=(self.__groupingName__,), **registerOpts)
 
   def focusedCompImage(self, margin: int=0):
-    return getCroppedImg(self.image, self.compSer[RTF.VERTICES].stack(), margin, returnSlices=False)
+    return getCroppedImg(self.image, self.compSer[RTF.VERTICES].stack(), margin, returnCoords=False)
 
   def viewboxSquare(self, margin=0):
+    """
+    Returns a squared version of the viewbox, where the shortest side-length is used
+    in both directions. Ordering is [[xmin, xmax], [ymin, ymax]]. Most S3A functionality for bboxes
+    is [[xmin, ymin], [xmax, ymax]] but this follows the convention of the underlying viewbox range
+    """
     vbRange = np.array(self.getViewBox().viewRange())
     span = np.diff(vbRange).flatten()
     center = vbRange[:,0]+span/2

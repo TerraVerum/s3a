@@ -246,13 +246,14 @@ class MultiPredictionsPlugin(ProcessorPlugin):
       newComps = ProcessIO(components=newComps)
     compsToAdd = newComps['components']
     addType = newComps.get('addType', PRJ_ENUMS.COMP_ADD_AS_NEW)
-    if newComps.get('deleteOrig', False):
-      self.mgr.rmComps(comps.index)
     self.mgr.addComps(compsToAdd, addType)
 
 
   def predictFromSelection(self):
-    self.makePrediction(self.mgr.compDf.loc[self.win.compDisplay.selectedIds])
+    selectedIds = self.win.compDisplay.selectedIds
+    if len(selectedIds) == 0:
+      return
+    self.makePrediction(self.mgr.compDf.loc[selectedIds])
 
   def lastRunAnalytics(self):
     raise NotImplementedError

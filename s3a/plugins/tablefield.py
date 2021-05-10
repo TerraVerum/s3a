@@ -135,7 +135,7 @@ class VerticesPlugin(TableFieldPlugin):
       **vertsDict,
       firstRun=self.firstRun,
       viewbox=XYVertices(viewbox),
-      prevCompVerts=self.mainImg.compSer[RTF.VERTICES]
+      prevCompVerts=ComplexXYVertices([r.stack() for r in self.region.regionData[RTF.VERTICES]])
     )
     if isinstance(newGrayscale, dict):
       newGrayscale = newGrayscale['image']

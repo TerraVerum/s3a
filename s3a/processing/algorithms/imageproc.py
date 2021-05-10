@@ -1,19 +1,17 @@
-from typing import Tuple, List, Union
+from typing import Tuple, Union
 
 import cv2 as cv
 import numpy as np
-import pandas as pd
 from scipy.ndimage import binary_fill_holes
 from skimage import morphology as morph, img_as_float
 from skimage import segmentation as seg
-from skimage.measure import regionprops, label, regionprops_table
+from skimage.measure import regionprops, label
 from skimage.morphology import flood
 
 from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices, \
-  showMaskDiff, MaxSizeDict, tryCvResize, movePtsTowardCenter
-from s3a.processing.processing import ImageProcess
+  showMaskDiff, MaxSizeDict, tryCvResize
 from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg
-from s3a.structures import GrayImg, RgbImg
+from s3a.structures import GrayImg
 from utilitys import fns
 from utilitys.processing import *
 
@@ -33,40 +31,36 @@ def growSeedpoint(img: NChanImg, seeds: XYVertices, thresh: float) -> BlackWhite
       bwOut |= curBwMask
   return bwOut
 
-def colorLabelsWithMean(labelImg: GrayImg, refImg: NChanImg) -> RgbImg:
-  outImg = np.empty(refImg.shape)
-  labels = np.unique(labelImg)
-  for curLabel in labels:
-    curmask = labelImg == curLabel
-    outImg[curmask,:] = refImg[curmask,:].reshape(-1,3).mean(0)
-  return outImg
+# def _growSeedpoint_cv_fastButErratic(img: NChanImg, seeds: XYVertices, thresh: float):
+#   if len(seeds) == 0:
+#     return np.zeros(img.shape[:2], bool)
+#   nChans = img.shape[2] if img.ndim > 2 else 1
+#   thresh = int(np.clip(thresh, 0, 255))
+#   imRCShape = np.array(img.shape[:2])
+#   bwOut = np.zeros(imRCShape+2, 'uint8')
+#   # Throw away seeds outside image boundaries
+#   seeds = seeds[np.all(seeds < imRCShape, axis=1)]
+#   seeds = np.fliplr(seeds)
+#   mask = np.zeros(imRCShape+2, 'uint8')
+#   for seed in seeds:
+#     mask.fill(0)
+#     flooded = img.copy()
+#     seed = tuple(seed.flatten())
+#     _, _, curOut, _ = cv.floodFill(flooded, mask, seed, 255, (thresh,)*nChans, (thresh,)*nChans,8)
+#     bwOut |= curOut
+#   bwOut = bwOut[1:-1,1:-1]
+#   return bwOut.astype(bool)
 
-def _growSeedpoint_cv_fastButErratic(img: NChanImg, seeds: XYVertices, thresh: float):
-  if len(seeds) == 0:
-    return np.zeros(img.shape[:2], bool)
-  nChans = img.shape[2] if img.ndim > 2 else 1
-  thresh = int(np.clip(thresh, 0, 255))
-  imRCShape = np.array(img.shape[:2])
-  bwOut = np.zeros(imRCShape+2, 'uint8')
-  # Throw away seeds outside image boundaries
-  seeds = seeds[np.all(seeds < imRCShape, axis=1)]
-  seeds = np.fliplr(seeds)
-  mask = np.zeros(imRCShape+2, 'uint8')
-  for seed in seeds:
-    mask.fill(0)
-    flooded = img.copy()
-    seed = tuple(seed.flatten())
-    _, _, curOut, _ = cv.floodFill(flooded, mask, seed, 255, (thresh,)*nChans, (thresh,)*nChans,8)
-    bwOut |= curOut
-  bwOut = bwOut[1:-1,1:-1]
-  return bwOut.astype(bool)
-
-def _area_coord_regionTbl(_image: NChanImg):
-  if not np.any(_image):
-    return pd.DataFrame({'coords': [np.array([[]])], 'area': [0]})
-  regionDict = regionprops_table(label(_image), properties=('coords', 'area'))
-  return pd.DataFrame(regionDict)
-
+def _cvConnComps(image: np.ndarray, returnLabels=True, areaOnly=True, removeBg=True):
+  if image.dtype != 'uint8':
+    image = image.astype('uint8')
+  _, labels, conncomps, _ = cv.connectedComponentsWithStats(image)
+  startIdx = 1 if removeBg else 0
+  if areaOnly:
+    conncomps = conncomps[:, cv.CC_STAT_AREA]
+  if returnLabels:
+    return conncomps[startIdx:], labels
+  return conncomps[startIdx:]
 
 _historyMaskHolder = [np.array([[]], 'uint8')]
 
@@ -176,8 +170,8 @@ def crop_to_local_area(image: NChanImg,
   useVerts = [fgVerts, bgVerts]
   for ii in range(2):
     # Add additional offset
-    useVerts[ii] = (((useVerts[ii] - vertOffset)*ratio)).astype(int)
-    np.clip(useVerts[ii], a_min=[0,0], a_max=(bounds[1,:]-1)*ratio, out=useVerts[ii])
+    tmp = (((useVerts[ii] - vertOffset)*ratio)).astype(int)
+    useVerts[ii] = np.clip(tmp, a_min=[0,0], a_max=(bounds[1,:]-1)*ratio)
   fgVerts, bgVerts = useVerts
 
   boundSlices = slice(*bounds[:,1]), slice(*bounds[:,0])
@@ -185,8 +179,17 @@ def crop_to_local_area(image: NChanImg,
   curHistory = historyMask[boundSlices]
 
   rectThickness = int(max(1, *image.shape)*0.005)
-  toPlot = cv.rectangle(image.copy(), tuple(bounds[0,:]), tuple(bounds[1,:]),
-                        (255,0,0), rectThickness)
+  toPlot = image.copy()
+  borderMask = cv.rectangle(np.zeros(image.shape[:2], dtype='uint8'), tuple(bounds[0,:]), tuple(bounds[1,:]),
+                        255, rectThickness) > 0
+  if image.ndim < 3:
+    borderClr = 255
+    borderSlice = borderMask,
+  else:
+    borderClr = [255] + [0 for _ in range(image.shape[2]-1)]
+    borderSlice = borderMask, slice(None, None)
+  borderClr = np.clip(np.array(borderClr, dtype=image.dtype), image.min(), image.max(), dtype=image.dtype)
+  toPlot[borderSlice] = borderClr
   info = {'name': 'Selected Area', 'image': toPlot}
   out = ProcessIO(image=cropped, fgVerts=fgVerts, bgVerts=bgVerts, prevCompMask=croppedCompMask,
                    boundSlices=boundSlices, historyMask=curHistory, resizeRatio=ratio, summaryInfo=info)
@@ -281,59 +284,22 @@ def opening_factory():
 def closing_factory():
   return AtomicProcess(morph_op, 'Closing', op='MORPH_CLOSE')
 
-def _openClose():
-  proc = ImageProcess('Open -> Close')
-  proc.addFunction(morph_op, name='Open', needsWrap=True, op='MORPH_OPEN')
-  proc.addFunction(morph_op, name='Close', needsWrap=True, op='MORPH_CLOSE')
-  return proc
-
 def keep_largest_comp(image: NChanImg):
-  regionPropTbl = _area_coord_regionTbl(image)
-  out = np.zeros(image.shape, bool)
-  coords = regionPropTbl.coords[regionPropTbl.area.argmax()]
-  if coords.size == 0:
-    return ProcessIO(image=out)
-  out[coords[:,0], coords[:,1]] = True
+  if not np.any(image):
+    return ProcessIO(image=image)
+  areas, labels = _cvConnComps(image)
+  # 0 is background, so skip it
+  out = np.zeros_like(image, shape=image.shape[:2])
+  # Offset by 1 since 0 was removed earlier
+  maxAreaIdx = np.argmax(areas) + 1
+  out[labels == maxAreaIdx] = True
   return ProcessIO(image=out)
 
 def rm_small_comps(image: NChanImg, minSzThreshold=30):
-  regionPropTbl = _area_coord_regionTbl(image)
-  validCoords = regionPropTbl.coords[regionPropTbl.area >= minSzThreshold]
-  out = np.zeros(image.shape, bool)
-  if len(validCoords) == 0:
-    return ProcessIO(image=out)
-  coords = np.vstack(validCoords)
-  out[coords[:,0], coords[:,1]] = True
+  areas, labels = _cvConnComps(image, areaOnly=True)
+  validLabels = np.flatnonzero(areas >= minSzThreshold) + 1
+  out = np.isin(labels, validLabels)
   return ProcessIO(image=out)
-
-def _draw_vertices_old(image: NChanImg, fgVerts: XYVertices, penSize=1, penShape='circle'):
-  """
-  Draws basic shapes with minimal pre- or post-processing.
-
-  :param penSize: Size of the drawing pen
-  :param penShape:
-    helpText: Shape of the drawing pen
-    pType: list
-    limits:
-      - circle
-      - rectangle
-  """
-  out = np.zeros(image.shape[:2], dtype='uint8')
-  drawFns = {
-    'circle': lambda pt: cv.circle(out, tuple(pt), penSize//2, 1, -1),
-    'rectangle': lambda pt: cv.rectangle(out, tuple(pt-penSize//2), tuple(pt+penSize//2), 1, -1)
-  }
-  try:
-    drawFn = drawFns[penShape]
-  except KeyError:
-    raise ValueError(f"Can't understand shape {penShape}. Must be one of:\n"
-                              f"{','.join(drawFns)}")
-  if len(fgVerts) > 1 and penSize > 1:
-    ComplexXYVertices([fgVerts]).toMask(out, 1, False, warnIfTooSmall=False)
-  else:
-    for vert in fgVerts:
-      drawFn(vert)
-  return ProcessIO(image=out > 0)
 
 def draw_vertices(image: NChanImg, fgVerts: XYVertices):
   return ProcessIO(image=ComplexXYVertices([fgVerts]).toMask(image.shape[:2], asBool=True))
@@ -343,20 +309,6 @@ def convert_to_squares(image: NChanImg):
   for region in regionprops(label(image)):
     outMask[region.bbox[0]:region.bbox[2],region.bbox[1]:region.bbox[3]] = True
   return ProcessIO(image=outMask)
-
-def _basicOpsCombo():
-  proc = ImageProcess('Basic Region Operations')
-  toAdd: List[ProcessStage] = []
-  for func in fill_holes, keep_largest_comp, rm_small_comps:
-    nextProc = AtomicProcess(func)
-    nextProc.allowDisable = False
-    toAdd.append(nextProc)
-  proc.addProcess(toAdd[0])
-  proc.addProcess(_openClose())
-  proc.addProcess(toAdd[1])
-  proc.addProcess(toAdd[2])
-  return proc
-
 
 def _grabcutResultToMask(gcResult):
   return np.where((gcResult==2)|(gcResult==0), False, True)
