@@ -35,7 +35,7 @@ from utilitys.fns import warnLater
 FilePathOrDf = Union[FilePath, pd.DataFrame]
 # Values are strings
 # noinspection PyTypeHints
-_litLst = Literal[PRJ_ENUMS.IO_FIL_BUILD, PRJ_ENUMS.IO_FIL_EXPORT]
+_litLst = Literal[PRJ_ENUMS.IO_IMPORT, PRJ_ENUMS.IO_EXPORT]
 
 def _attrNameFmt(buildOrExport: _litLst, obj):
   def membership(el):
@@ -90,16 +90,6 @@ def _getPdImporters():
     pd.DataFrame,lambda meth: inspect.isfunction(meth) and meth.__name__.startswith('read_'))
   return [mem[0].replace('read_', '') for mem in members]
 
-def buildWrapper(func):
-  @wraps(func)
-  def wrapper(*args, **kwargs):
-    self = args[0]
-    # Turn args into kwargs
-    fnKwargs = inspect.getcallargs(func, *args, **kwargs)
-    fnKwargs.update(self.buildOpts)
-    return func(**fnKwargs)
-  return wrapper
-
 def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> pd.Series:
   paramType = type(paramVal)
   # TODO: Move this to a more obvious place?
@@ -151,11 +141,11 @@ class ComponentIO:
     a round trip export->import.
     """
     # Since both import and export should have these keys, can use either dict
-    return {k: self.buildTypes[k] for k in ['csv', 'pkl']}
+    return {k: self.importTypes[k] for k in ['csv', 'pkl']}
 
   tableData = TableData()
   """Table to use for import/export cross checks. This is how class and table field information is derived."""
-  buildOpts = {}
+  importOpts = {}
   """
   Propagated to every importByFileType call to provide user-specified defaults as desired
   """
@@ -170,18 +160,18 @@ class ComponentIO:
     File types this class can export. {file type: descriptoin} useful for adding to
     file picker dialog
     """
-    return _attrNameFmt(PRJ_ENUMS.IO_FIL_EXPORT, cls)
+    return _attrNameFmt(PRJ_ENUMS.IO_EXPORT, cls)
 
   @classproperty
-  def buildTypes(cls):
+  def importTypes(cls):
     """
     Types this class can import. {file type: descriptoin} useful for adding to
     file picker dialog
     """
-    return _attrNameFmt(PRJ_ENUMS.IO_FIL_BUILD, cls)
+    return _attrNameFmt(PRJ_ENUMS.IO_IMPORT, cls)
 
   @classmethod
-  def ioFileFilter(cls, which=PRJ_ENUMS.IO_FIL_ROUND_TRIP, typeFilter='', **extraOpts):
+  def ioFileFilter(cls, which=PRJ_ENUMS.IO_ROUND_TRIP, typeFilter='', **extraOpts):
     """
     Helper for creating a file filter out of the handled IO types. The returned list of
     strings is suitable for inserting into a QFileDialog.
@@ -192,9 +182,9 @@ class ComponentIO:
     :param extraOpts; Extra file types to include in the filter
     """
     ioDict = {
-      PRJ_ENUMS.IO_FIL_ROUND_TRIP: cls.roundTripTypes,
-      PRJ_ENUMS.IO_FIL_BUILD: cls.buildTypes,
-      PRJ_ENUMS.IO_FIL_EXPORT: cls.exportTypes
+      PRJ_ENUMS.IO_ROUND_TRIP: cls.roundTripTypes,
+      PRJ_ENUMS.IO_IMPORT: cls.importTypes,
+      PRJ_ENUMS.IO_EXPORT: cls.exportTypes
     }[which]
     if isinstance(typeFilter, str):
       typeFilter = [typeFilter]
@@ -204,9 +194,21 @@ class ComponentIO:
         fileFilters.append(f'{info} (*.{typ})')
     return ';;'.join(fileFilters)
 
+  def _ioWrapper(self, func):
+    """Wraps build and export functions to provide defaults specified by build/exportOpts before the function call"""
+    which = PRJ_ENUMS.IO_IMPORT if func.__name__.startswith(PRJ_ENUMS.IO_IMPORT) else PRJ_ENUMS.IO_EXPORT
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+      useOpts = self.importOpts if which is PRJ_ENUMS.IO_IMPORT else self.exportOpts
+      # Turn args into kwargs
+      fnKwargs = {**useOpts, **kwargs}
+      return func(*args, **fnKwargs)
+
+    return wrapper
+
   def exportByFileType(self, compDf: pd.DataFrame, outFile: Union[str, Path], verifyIntegrity=True, **exportArgs):
     outFile = Path(outFile)
-    outFn = self._ioFnFromFileType(outFile, PRJ_ENUMS.IO_FIL_EXPORT)
+    outFn = self._ioFnFromFileType(outFile, PRJ_ENUMS.IO_EXPORT)
 
     useArgs = self.exportOpts.copy()
     useArgs.update(exportArgs)
@@ -214,7 +216,7 @@ class ComponentIO:
     if verifyIntegrity and outFile.suffix[1:] in self.roundTripTypes:
       matchingCols = np.setdiff1d(compDf.columns, [RTF.INST_ID,
                                                    RTF.SRC_IMG_FILENAME])
-      loadedDf = self.buildByFileType(outFile)
+      loadedDf = self.importByFileType(outFile)
       # For some reason, there are cases in which numy comparison spots false errors and cases where
       # pandas spots false errors. Only a problem if both see problms
       dfCmp = np.array_equal(loadedDf[matchingCols], compDf[matchingCols]) \
@@ -239,10 +241,10 @@ class ComponentIO:
                f'Please try manually altering these values before exporting again.', UserWarning)
     return ret
 
-  def buildByFileType(self, inFile: Union[str, Path], imShape: Tuple[int]=None,
+  def importByFileType(self, inFile: Union[str, Path], imShape: Tuple[int]=None,
                       strColumns=False, **importArgs):
-    buildFn = self._ioFnFromFileType(inFile, PRJ_ENUMS.IO_FIL_BUILD)
-    useArgs = self.buildOpts.copy()
+    buildFn = self._ioFnFromFileType(inFile, PRJ_ENUMS.IO_IMPORT)
+    useArgs = self.importOpts.copy()
     useArgs.update(**importArgs)
     outDf = buildFn(inFile, imShape=imShape, **useArgs)
     if strColumns:
@@ -263,12 +265,6 @@ class ComponentIO:
     if outFn is None and not missingOk:
       raise ValueError(f'Full I/O specification missing for type {fnNameSuffix}')
     return outFn
-
-  @staticmethod
-  def _strToNpArray(array_string: str, **opts):
-    # Adapted from https://stackoverflow.com/a/42756309/9463643
-    array_string = ','.join(array_string.replace('[ ', '[').split())
-    return np.array(literal_eval(array_string), **opts)
 
   def _pandasSerialImport(self, inFileOrDf: Union[str, Path, pd.DataFrame],
                           **pdImportArgs):
@@ -516,7 +512,7 @@ class ComponentIO:
       to their numeric counterparts. Note: this is important in cases where an offset must be applied to the underlying
       data. If the background color is 0 and a valid numeric value is also 0, it will be impossible to detect this
       object in the labeled output. So, an offset must be applied in these cases (background - min(data) + 1). This
-      mapping records the relevant information to import original values back during `buildFromLblPng`.
+      mapping records the relevant information to import original values back during `importLblPng`.
     :param writeMeta: Whether to write the field mapping/offset to the output image file as png metadata.
       Useful to preserve label information when re-importing.
     :param kwargs:
@@ -639,8 +635,8 @@ class ComponentIO:
     if exportArgs is None:
       exportArgs = {}
     if not isinstance(fromData, pd.DataFrame):
-      fromData = self.buildByFileType(fromData, **importArgs)
-    exportFn = self._ioFnFromFileType(toFile, PRJ_ENUMS.IO_FIL_EXPORT)
+      fromData = self.importByFileType(fromData, **importArgs)
+    exportFn = self._ioFnFromFileType(toFile, PRJ_ENUMS.IO_EXPORT)
     useArgs = self.exportOpts.copy()
     useArgs.update(exportArgs)
     if not doExport:
@@ -648,7 +644,7 @@ class ComponentIO:
     return exportFn(fromData, toFile, **useArgs)
 
   @fns.dynamicDocstring(availImporters=_getPdImporters())
-  def buildFromSerialized(self, inFileOrDf: FilePathOrDf, imShape: Tuple=None,
+  def importSerialized(self, inFileOrDf: FilePathOrDf, imShape: Tuple=None,
                           reindex=False, **importArgs):
     """
     Deserializes data from a file or string dataframe to create a S3A Component
@@ -704,12 +700,12 @@ class ComponentIO:
     #  rows to gracefully fall off the dataframe with some sort of warning message
     return outDf
 
-  @wraps(buildFromSerialized)
-  def buildFromCsv(self, *args, **kwargs):
-    """Deprecated in favor of ComponentIO.buildFromSerialized"""
-    return self.buildFromSerialized(*args, **kwargs)
+  @wraps(importSerialized)
+  def importCsv(self, *args, **kwargs):
+    """Deprecated in favor of ComponentIO.importSerialized"""
+    return self.importSerialized(*args, **kwargs)
 
-  def buildFromGeojson(self, inFileOrDict: Union[FilePath, dict], **importArgs):
+  def importGeojson(self, inFileOrDict: Union[FilePath, dict], **importArgs):
     if not isinstance(inFileOrDict, dict):
       with open(inFileOrDict, 'r') as ifile:
         inFileOrDict = json.load(ifile)
@@ -719,9 +715,9 @@ class ComponentIO:
       if geo['type'] == 'Polygon':
         verts.append(ComplexXYVertices(geo['coordinates'], coerceListElements=True))
     tmpDf = pd.DataFrame(verts, columns=[RTF.VERTICES.name])
-    return self.buildFromCsv(tmpDf, **importArgs)
+    return self.importCsv(tmpDf, **importArgs)
 
-  def buildFromSuperannotateJson(self, inFileOrDict: Union[FilePath, dict], parseErrorOk=False, **importArgs):
+  def importSuperannotateJson(self, inFileOrDict: Union[FilePath, dict], parseErrorOk=False, **importArgs):
     fileName = None
     if not isinstance(inFileOrDict, dict):
       fileName = Path(inFileOrDict)
@@ -753,7 +749,7 @@ class ComponentIO:
     self.checkVertBounds(outDf[RTF.VERTICES], imShape)
     return outDf
 
-  def buildFromCompImgsDf(self, inFile: FilePath, imShape: Tuple=None,
+  def importCompImgsDf(self, inFile: FilePath, imShape: Tuple=None,
                           lblField='Instance ID', **importArgs):
     lblField = self.tableData.fieldFromName(lblField)
     inDf = pd.read_pickle(inFile)
@@ -772,9 +768,9 @@ class ComponentIO:
     self.checkVertBounds(outDf[RTF.VERTICES], imShape)
     return outDf
 
-  def buildFromPkl(self, inFile: FilePath, imShape: Tuple=None, **importArgs) -> pd.DataFrame:
+  def importPkl(self, inFile: FilePath, imShape: Tuple=None, **importArgs) -> pd.DataFrame:
     """
-    See docstring for :func:`self.buildFromCsv`
+    See docstring for :func:`self.importCsv`
     """
     pklDf = pd.read_pickle(inFile)
     self.checkVertBounds(pklDf[RTF.VERTICES], imShape)
@@ -782,7 +778,7 @@ class ComponentIO:
     templateDf.update(pklDf)
     return templateDf
 
-  def buildFromLblPng(self, inFileOrImg: Union[FilePath, GrayImg],
+  def importLblPng(self, inFileOrImg: Union[FilePath, GrayImg],
                       lblField: Union[str, PrjParam]=None,
                       lblMapping: pd.Series=None,
                       distinctRegions=True,

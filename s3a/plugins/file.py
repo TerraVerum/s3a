@@ -224,7 +224,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       tableConfig = Path(tableConfig)
       self.projData.tableData.loadCfg(tableConfig)
     if (annotationFormat is not None
-        and annotationFormat in self.projData.compIo.buildTypes
+        and annotationFormat in self.projData.compIo.importTypes
         and annotationFormat in self.projData.compIo.exportTypes):
       self.projData.cfg['annotation-format'] = annotationFormat
 
@@ -612,7 +612,7 @@ class ProjectData(QtCore.QObject):
     if dirs:
       self.watcher.removePaths(dirs)
     self.watcher.addPaths([str(self.imagesDir), str(self.annotationsDir)])
-    self.compIo.buildOpts['imgDir'] = self.imagesDir
+    self.compIo.importOpts['imgDir'] = self.imagesDir
     self.compIo.exportOpts['imgDir'] = self.imagesDir
     return self.cfgFname
 
@@ -816,7 +816,7 @@ class ProjectData(QtCore.QObject):
       # Already present, shouldn't be added
       return
     if data is None:
-      data = self.compIo.buildByFileType(name)
+      data = self.compIo.importByFileType(name)
     if image is None:
       # If no explicit matching to an image is provided, try to determine based on annotation name
       xpondingImgs = np.unique(data[REQD_TBL_FIELDS.SRC_IMG_FILENAME].to_numpy())
@@ -834,7 +834,7 @@ class ProjectData(QtCore.QObject):
     annForImg = self.imgToAnnMapping.get(image, None)
     oldAnns = []
     if annForImg is not None and not overwriteOld:
-      oldAnns.append(self.compIo.buildByFileType(annForImg))
+      oldAnns.append(self.compIo.importByFileType(annForImg))
     combinedAnns = oldAnns + [data]
     outAnn = pd.concat(combinedAnns, ignore_index=True)
     outAnn[REQD_TBL_FIELDS.INST_ID] = outAnn.index
@@ -954,7 +954,7 @@ class ProjectData(QtCore.QObject):
 
     existingAnnFiles = [f for f in self.imgToAnnMapping.values() if f is not None]
     if combine:
-      outAnn = pd.concat(map(self.compIo.buildByFileType, existingAnnFiles), ignore_index=True)
+      outAnn = pd.concat(map(self.compIo.importByFileType, existingAnnFiles), ignore_index=True)
       outAnn[REQD_TBL_FIELDS.INST_ID] = outAnn.index
       self.compIo.exportByFileType(outAnn, outputFolder / f'annotations.'
                                                           f'{annotationFormat}', **exportOpts)

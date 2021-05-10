@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from s3a.generalutils import augmentException
-from s3a import ComponentIO
+from s3a import ComponentIO, REQD_TBL_FIELDS
 from testingconsts import SAMPLE_IMG_FNAME
 
 
@@ -48,12 +48,42 @@ def test_filter_export(tmp_path, monkeypatch, app):
 
 def test_bad_import(tmp_path, app):
   io = app.compIo
-  for ext in io.buildTypes:
+  for ext in io.importTypes:
     ofile = open(tmp_path/f'junkfile.{ext}', 'w')
     ofile.write('Vertices\nabsolute junk')
     ofile.close()
     with pytest.raises(Exception):
-      io.buildFromCsv(tmp_path/f'junkfile.{ext}')
+      io.importCsv(tmp_path/f'junkfile.{ext}')
+
+@pytest.mark.withcomps
+def test_bad_integrity(tmp_path, app, monkeypatch, qtbot):
+  oldBuild = app.compIo.importByFileType
+  def badBuilder(*args, **kwargs):
+    df = oldBuild(*args, **kwargs)
+    df[REQD_TBL_FIELDS.VERTICES] = 5
+    return df
+
+  with monkeypatch.context() as m:
+    m.setattr(app.compIo, 'importByFileType', badBuilder)
+    with pytest.warns(UserWarning):
+      app.exportCurAnnotation(tmp_path/'test.csv', verifyIntegrity=True)
+
+def test_serial_export(tmp_path, sampleComps, app):
+  with pytest.raises(ValueError):
+    app.compIo.exportSerialized(sampleComps, tmp_path/'test.nopandastypehere')
+
+  # No export without a file path
+  app.compIo.exportSerialized(sampleComps)
+  assert len(list(tmp_path.glob('*.*'))) == 0
+
+  sampleComps = sampleComps.copy()
+  # Put in data that pandas can't handle
+  class BadRep:
+    def __str__(self):
+      raise AttributeError
+  sampleComps[REQD_TBL_FIELDS.INST_ID] = BadRep()
+  with pytest.raises(Exception):
+    app.compIo.exportSerialized(sampleComps, tmp_path/'test.csv')
 
 
 def doAndAssertExport(app, fpath: Path, io: ComponentIO, compDf: pd.DataFrame, failMsg: str):
@@ -70,7 +100,7 @@ def doAndAssertExport(app, fpath: Path, io: ComponentIO, compDf: pd.DataFrame, f
   else:
     assert fpath.exists(), 'File doesn\'t exist despite export'
     try:
-      inDf = io.buildByFileType(fpath, app.mainImg.image.shape[:2])
+      inDf = io.importByFileType(fpath, app.mainImg.image.shape[:2])
       assert len(inDf) > 0
     except (ValueError, IOError):
       pass
@@ -80,4 +110,14 @@ def test_impossible_io(tmp_path, sampleComps, app):
   with pytest.raises(IOError):
     io.exportByFileType(sampleComps, './nopossible.exporttype$')
   with pytest.raises(IOError):
-    io.buildByFileType('./nopossible.importtype$')
+    io.importByFileType('./nopossible.importtype$')
+
+@pytest.mark.withcomps
+def test_opts_insertion(app, sampleComps, tmp_path):
+  io = app.compIo
+  fn = io._ioWrapper(io.importSerialized)
+  io.importOpts['reindex'] = True
+  sampleComps.index = np.linspace(0, 10000, len(sampleComps), dtype=int)
+  io.exportSerialized(sampleComps, tmp_path/'test.csv')
+  imported = fn(tmp_path/'test.csv')
+  assert not (imported.index == sampleComps.index).all()

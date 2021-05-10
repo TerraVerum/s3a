@@ -68,9 +68,9 @@ class PRJ_ENUMS:
   # --------------------------
   # I/O SPECIFICATIONS
   # --------------------------
-  IO_FIL_EXPORT = 'export'
-  IO_FIL_BUILD = 'buildFrom'
-  IO_FIL_ROUND_TRIP = 'round trip'
+  IO_EXPORT = 'export'
+  IO_IMPORT = 'import'
+  IO_ROUND_TRIP = 'round trip'
   IO_META_MAPPING = 'mapping'
   IO_META_FIELD = 'field'
 
