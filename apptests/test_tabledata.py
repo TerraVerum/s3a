@@ -1,11 +1,14 @@
 import contextlib
 from pathlib import Path
 from typing import Union
+from io import StringIO
 
+import numpy as np
 import pytest
 
 from conftest import dfTester
 from s3a import PRJ_SINGLETON, REQD_TBL_FIELDS
+from utilitys import fns
 
 td = PRJ_SINGLETON.tableData
 cfgDict = {
@@ -49,3 +52,39 @@ def test_params_for_class(newCfg):
 def test_no_change(app, newCfg):
   with newCfg(td.cfgFname, td.cfg):
     assert len(app.compMgr.compDf) > 0
+
+def test_filter():
+  # Try a bunch of types
+  mockCfg = """
+  fields:
+    List:
+      - A
+      - B
+      - C
+    Bool: False
+    Int: 0
+    String: ''
+    Bad:
+      pType: unrecognizable
+  """
+  file = StringIO(mockCfg)
+  parsed = fns.yamlLoad(file)
+  with pytest.warns(UserWarning):
+    td.loadCfg(td.cfgFname, parsed, force=True)
+
+  del parsed['fields']['Bad']
+  td.loadCfg(td.cfgFname, parsed, force=True)
+  for name in parsed['fields']:
+    assert name in td.filter.params.names
+    assert td.fieldFromName(name)
+  filterStatus = {'List': {
+    'Active': True, 'A': True, 'B': False, 'C': False
+  }}
+  listParam = td.fieldFromName('List')
+  td.filter.loadParamValues(td.filter.stateName, filterStatus)
+  tmpdf = td.makeCompDf(7)
+  tmpdf[listParam] = list('AABBCCC')
+  filteredDf = td.filter.filterCompDf(tmpdf)
+  assert len(filteredDf) == 2
+  assert np.array_equal(['A'], np.unique(filteredDf[listParam]))
+
