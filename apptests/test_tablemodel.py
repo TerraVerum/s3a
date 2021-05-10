@@ -84,7 +84,7 @@ def test_rm_comps(sampleComps, mgr):
   for _ in range(10):
     mgr.addComps(sampleComps)
   prevIds = mgr.compDf[REQD_TBL_FIELDS.INST_ID].values
-  changeList = mgr.rmComps(PRJ_ENUMS.COMP_RM_ALL)
+  changeList = mgr.rmComps()
   cmpChangeList(changeList,deleted=prevIds)
 
   # Remove single

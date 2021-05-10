@@ -39,14 +39,13 @@ APP_STATE_DIR.mkdir(parents=True, exist_ok=True)
 
 SHORTCUT_BASE = 'Ctrl+Q'
 
-class _PrjEnums(Enum):
+class PRJ_ENUMS:
   # --------------------------
   # COMPONENTS
   # --------------------------
-  COMP_ADD_AS_MERGE = 'Add as Merge'
-  COMP_ADD_AS_NEW   = 'Add as New'
-  COMP_EXPORT_ALL   = 'Export All Components'
-  COMP_RM_ALL       = "Remove All"
+  COMP_ADD_AS_MERGE = 'merge'
+  COMP_ADD_AS_NEW   = 'new'
+  COMP_RM_ALL       = None
 
   # --------------------------
   # REGION CREATION
@@ -64,7 +63,7 @@ class _PrjEnums(Enum):
   # --------------------------
   FIELD_SELECTED   = 'selected'
   FIELD_FOCUSED    = 'focused'
-  FIELD_LABEL    = 'label'
+  FIELD_LABEL      = 'label'
 
   # --------------------------
   # I/O SPECIFICATIONS
