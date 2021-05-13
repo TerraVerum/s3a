@@ -362,6 +362,7 @@ class ComponentIO:
                        imgDir: FilePath=None, margin=0, marginAsPct=False,
                        includeCols=('instId', 'img', 'labelMask', 'label', 'offset'),
                        lblField='Instance ID', asIndiv=False,
+                       returnLblMapping=False,
                        missingOk=False, **kwargs):
     """
     Creates a dataframe consisting of extracted images around each component
@@ -384,6 +385,7 @@ class ComponentIO:
       the low ID will still be covered in its export mask
     :param missingOk: Whether a missing image is acceptable. When no source image is found
       for an annotation, this will simpy the 'image' output property
+    :param returnLblMapping: Whether to return the mapping of label numeric values to table field values
     :return: Dataframe with the following keys:
       - instId: The component's Instance ID
       - img: The (MxNxC) image corresponding to the component vertices, where MxN are
@@ -417,6 +419,7 @@ class ComponentIO:
     lblField = self.tableData.fieldFromName(lblField)
     # imshape is automatically inferred by the exporter
     kwargs.pop('imShape', None)
+    mappings = {}
     for miniDf, fullImgName in zip(dfGroupingsByImg, uniqueImgs):
       fullImgName = imgDir / fullImgName
       img = _imgCache[fullImgName]
@@ -426,6 +429,7 @@ class ComponentIO:
                                           lblField=lblField,
                                           returnLblMapping=True,
                                           **kwargs)
+      mappings[fullImgName.name] = mapping
       if img is None:
         img = np.zeros_like(lblImg)
       if asIndiv:
@@ -477,8 +481,14 @@ class ComponentIO:
         if 'offset' in useKeys:
           outDf['offset'].append(xyOffset)
     outDf = pd.DataFrame(outDf)
+    if len(mappings) == 1:
+      # Common case where annotations for just one image were converted
+      mappings = next(iter(mappings.values()))
+    outDf.attrs['mapping'] = mappings
     if outFile is not None:
       outDf.to_pickle(outFile)
+    if returnLblMapping:
+      return outDf, mappings
     return outDf
 
   def exportPkl(self, compDf: pd.DataFrame, outFile: Union[str, Path]=None, **exportArgs) -> (Any, str):
