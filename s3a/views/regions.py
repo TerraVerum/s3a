@@ -8,11 +8,9 @@ import pyqtgraph as pg
 from matplotlib import cm
 from matplotlib.pyplot import colormaps
 from pandas import DataFrame as df
-from pyqtgraph import arrayToQPath
 from pyqtgraph.Qt import QtGui, QtCore
-from utilitys import PrjParam, RunOpts, EditorPropsMixin, fns
+from utilitys import PrjParam, RunOpts, EditorPropsMixin, fns, ParamContainer, DeferredActionStackMixin as DASM
 
-from s3a import PRJ_SINGLETON
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_CONSTS, PRJ_ENUMS
 from s3a.generalutils import stackedVertsPlusConnections, symbolFromVerts
 from s3a.structures import GrayImg, OneDArr, BlackWhiteImg
@@ -23,6 +21,7 @@ from .clickables import BoundScatterPlot
 __all__ = ['MultiRegionPlot', 'VertexDefinedImg', 'RegionCopierPlot']
 
 from .._io import defaultIo
+from ..shared import SharedAppSettings
 
 Signal = QtCore.Signal
 
@@ -72,17 +71,15 @@ def _makeTxtSymbol(txt: str, fontSize: int):
 class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
   __groupingName__ = PRJ_CONSTS.CLS_MULT_REG_PLT.name
 
-  @classmethod
-  def __initEditorParams__(cls):
-    super().__initEditorParams__()
+  def __initEditorParams__(self, shared: SharedAppSettings):
+    with shared.colorScheme.setBaseRegisterPath(self.__groupingName__):
+      self.updateColors = shared.colorScheme.registerFunc(
+        self.updateColors, runOpts=RunOpts.ON_CHANGED, nest=False, ignoreKeys=['hideFocused'])
 
   def __init__(self, parent=None):
     super().__init__(size=1, pxMode=False)
     # Wrapping in atomic process means when users make changes to properties, these are maintained when calling the
     # function internally with no parameters
-    with PRJ_SINGLETON.colorScheme.setBaseRegisterPath(self.__groupingName__):
-      self.updateColors = PRJ_SINGLETON.colorScheme.registerFunc(
-        self.updateColors, runOpts=RunOpts.ON_CHANGED, nest=False, ignoreKeys=['hideFocused'])
     self.setParent(parent)
     self.setZValue(50)
     self.regionData = makeMultiRegionDf(0)
@@ -244,21 +241,22 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     return list(bounds[:,ax])
 
 
-class VertexDefinedImg(EditorPropsMixin, pg.ImageItem):
+class VertexDefinedImg(DASM, EditorPropsMixin, pg.ImageItem):
   sigRegionReverted = Signal(object) # new GrayImg
 
   __groupingName__ = 'Focused Image Graphics'
 
-  @classmethod
-  def __initEditorParams__(cls):
-    cls.fillClr, cls.vertClr = PRJ_SINGLETON.colorScheme.registerProps(
-      [PRJ_CONSTS.SCHEME_REG_FILL_COLOR, PRJ_CONSTS.SCHEME_REG_VERT_COLOR])
+  def __initEditorParams__(self, shared: SharedAppSettings):
+    self.props = ParamContainer()
+    shared.colorScheme.registerProps(
+      [PRJ_CONSTS.SCHEME_REG_FILL_COLOR, PRJ_CONSTS.SCHEME_REG_VERT_COLOR],
+    container=self.props)
+    shared.colorScheme.sigChangesApplied.connect(lambda: self.setImage(
+      lut=self.getLUTFromScheme()))
 
   def __init__(self):
     super().__init__()
     self.verts = ComplexXYVertices()
-    PRJ_SINGLETON.colorScheme.sigChangesApplied.connect(lambda: self.setImage(
-      lut=self.getLUTFromScheme()))
 
   def embedMaskInImg(self, toEmbedShape: Tuple[int, int]):
     outImg = np.zeros(toEmbedShape, dtype=bool)
@@ -266,7 +264,7 @@ class VertexDefinedImg(EditorPropsMixin, pg.ImageItem):
     outImg[0:selfShp[0], 0:selfShp[1]] = self.image
     return outImg
 
-  @PRJ_SINGLETON.actionStack.undoable('Modify Focused Region')
+  @DASM.undoable('Modify Focused Region')
   def updateFromVertices(self, newVerts: ComplexXYVertices, srcImg: GrayImg=None):
     oldImg = self.image
     oldVerts = self.verts
@@ -304,7 +302,7 @@ class VertexDefinedImg(EditorPropsMixin, pg.ImageItem):
 
   def getLUTFromScheme(self):
     lut = [(0, 0, 0, 0)]
-    for clr in self.fillClr, self.vertClr:
+    for clr in PRJ_CONSTS.SCHEME_REG_FILL_COLOR, PRJ_CONSTS.SCHEME_REG_VERT_COLOR:
       lut.append(clr.getRgb())
     return np.array(lut, dtype='uint8')
 

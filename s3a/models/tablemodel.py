@@ -7,27 +7,28 @@ import cv2 as cv
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 
-from s3a import PRJ_SINGLETON
 from s3a.generalutils import coerceDfTypes
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
+from s3a.shared import SharedAppSettings
 from s3a.structures import ComplexXYVertices, OneDArr
 
 __all__ = ['ComponentMgr', 'CompTableModel']
 
+from utilitys import EditorPropsMixin
+
 from utilitys.fns import warnLater
+from utilitys.misc import DeferredActionStackMixin as DASM
 
 Signal = QtCore.Signal
 
-TBL_FIELDS = PRJ_SINGLETON.tableData.allFields
-
-class CompTableModel(QtCore.QAbstractTableModel):
+class CompTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
   # Emits 3-element dict: Deleted comp ids, changed comp ids, added comp ids
   defaultEmitDict = {'deleted': np.array([]), 'changed': np.array([]), 'added': np.array([])}
   sigCompsChanged = Signal(dict)
   sigFieldsChanged = Signal()
 
-  # Used for efficient deletion, where deleting non-contiguous rows takes 1 operation
-  # Instead of N operations
+  def __initEditorParams__(self, shared: SharedAppSettings):
+    self.tableData = shared.tableData
 
   def __init__(self):
     super().__init__()
@@ -58,7 +59,7 @@ class CompTableModel(QtCore.QAbstractTableModel):
     else:
       return None
 
-  @PRJ_SINGLETON.actionStack.undoable('Alter Component Data')
+  @DASM.undoable('Alter Component Data')
   def setData(self, index, value, role=QtCore.Qt.EditRole) -> bool:
     row = index.row()
     col = index.column()
@@ -102,11 +103,11 @@ class CompTableModel(QtCore.QAbstractTableModel):
 
   # noinspection PyAttributeOutsideInit
   def resetFields(self):
-    self.colTitles = [f.name for f in TBL_FIELDS]
+    self.colTitles = [f.name for f in self.tableData.allFields]
 
-    self.compDf = PRJ_SINGLETON.tableData.makeCompDf(0)
+    self.compDf = self.tableData.makeCompDf(0)
 
-    noEditParams = [f for f in PRJ_SINGLETON.tableData.allFields if f.opts.get('readonly', False)]
+    noEditParams = [f for f in self.tableData.allFields if f.opts.get('readonly', False)]
 
     self.noEditColIdxs = [self.colTitles.index(col.name) for col in noEditParams]
     self.editColIdxs = np.setdiff1d(np.arange(len(self.colTitles)), self.noEditColIdxs)
@@ -120,7 +121,7 @@ class ComponentMgr(CompTableModel):
     super().resetFields()
     self._nextCompId = 0
 
-  @PRJ_SINGLETON.actionStack.undoable('Add Components')
+  @DASM.undoable('Add Components')
   def addComps(self, newCompsDf: df, addtype: PRJ_ENUMS = PRJ_ENUMS.COMP_ADD_AS_NEW, emitChange=True):
     toEmit = self.defaultEmitDict.copy()
     existingIds = self.compDf.index
@@ -169,7 +170,7 @@ class ComponentMgr(CompTableModel):
     # Make sure all required data is present for new rows
     missingCols = np.setdiff1d(self.compDf.columns, compsToAdd.columns)
     if missingCols.size > 0 and len(compsToAdd) > 0:
-      embedInfo = PRJ_SINGLETON.tableData.makeCompDf(len(newCompsDf)).set_index(compsToAdd.index)
+      embedInfo = self.tableData.makeCompDf(len(newCompsDf)).set_index(compsToAdd.index)
       compsToAdd[missingCols] = embedInfo[missingCols]
     self.compDf = pd.concat((self.compDf, compsToAdd), sort=False)
     # Retain type information
@@ -192,7 +193,7 @@ class ComponentMgr(CompTableModel):
     if len(addedCompIdxs) > 0:
       self.rmComps(toEmit['added'])
 
-  @PRJ_SINGLETON.actionStack.undoable('Remove Components')
+  @DASM.undoable('Remove Components')
   def rmComps(self, idsToRemove: Union[np.ndarray, type(PRJ_ENUMS)] = PRJ_ENUMS.COMP_RM_ALL,
               emitChange=True) -> dict:
     toEmit = self.defaultEmitDict.copy()
@@ -243,7 +244,7 @@ class ComponentMgr(CompTableModel):
     # Undo code
     self.addComps(removedData, PRJ_ENUMS.COMP_ADD_AS_MERGE)
 
-  @PRJ_SINGLETON.actionStack.undoable('Merge Components')
+  @DASM.undoable('Merge Components')
   def mergeCompVertsById(self, mergeIds: OneDArr=None, keepId: int=None):
     """
     Merges the selected components
@@ -275,7 +276,7 @@ class ComponentMgr(CompTableModel):
     yield
     self.addComps(mergeComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
 
-  @PRJ_SINGLETON.actionStack.undoable('Split Components')
+  @DASM.undoable('Split Components')
   def splitCompVertsById(self, splitIds: OneDArr):
     """
     Makes a separate component for each distinct boundary in all selected components.

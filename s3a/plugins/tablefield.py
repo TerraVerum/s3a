@@ -1,36 +1,35 @@
+from __future__ import annotations
 from collections import deque, namedtuple
 from warnings import warn
 
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore
-from utilitys import PrjParam
 
-from s3a import PRJ_SINGLETON, PRJ_CONSTS as CNST, XYVertices, REQD_TBL_FIELDS as RTF, \
-  ComplexXYVertices
-from s3a.models.s3abase import S3ABase
+import s3a
+from s3a import PRJ_CONSTS as CNST, XYVertices, REQD_TBL_FIELDS as RTF, ComplexXYVertices
 from s3a.processing.algorithms.imageproc import _historyMaskHolder
 from s3a.structures import BlackWhiteImg
 from s3a.views.regions import MultiRegionPlot, makeMultiRegionDf
+from utilitys import PrjParam, DeferredActionStackMixin as DASM
 from .base import TableFieldPlugin
 from ..constants import PRJ_ENUMS
 from ..generalutils import getCroppedImg, showMaskDiff
 from ..graphicsutils import RegionHistoryViewer
+from ..shared import SharedAppSettings
 
 
 class _REG_ACCEPTED: pass
 buffEntry = namedtuple('buffentry', 'id_ vertices')
 
-class VerticesPlugin(TableFieldPlugin):
+class VerticesPlugin(DASM, TableFieldPlugin):
   name = 'Vertices'
 
-  @classmethod
-  def __initEditorParams__(cls):
+  def __initEditorParams__(self, shared: SharedAppSettings):
     super().__initEditorParams__()
-    cls.procEditor = PRJ_SINGLETON.imgProcClctn.createProcessorEditor(cls, cls.name + ' Processor')
+    self.procEditor = shared.imgProcClctn.createProcessorEditor(type(self), self.name + ' Processor')
 
-    cls.dock.addEditors([cls.procEditor])
+    self.dock.addEditors([self.procEditor])
 
   def __init__(self):
     super().__init__()
@@ -40,14 +39,14 @@ class VerticesPlugin(TableFieldPlugin):
     self.playbackWindow = RegionHistoryViewer()
     self.regionBuffer = deque(maxlen=CNST.PROP_UNDO_BUF_SZ.value)
 
-  def attachWinRef(self, win: S3ABase):
+  def attachWinRef(self, win: s3a.S3A):
     win.mainImg.addItem(self.region)
 
     def resetRegBuff(_, newSize):
       newBuff = deque(maxlen=newSize)
       newBuff.extend(self.regionBuffer)
       self.regionBuffer = newBuff
-    mainBufSize = PRJ_SINGLETON.generalProps.params.child(win.__groupingName__, 'maxLength')
+    mainBufSize = win.sharedAttrs.generalProps.params.child(win.__groupingName__, 'maxLength')
     mainBufSize.sigValueChanged.connect(resetRegBuff)
 
     funcLst = [self.resetFocusedRegion, self.fillRegionMask, self.clearFocusedRegion, self.clearProcessorHistory]
@@ -71,12 +70,6 @@ class VerticesPlugin(TableFieldPlugin):
     if self.mainImg.compSer is None: return
     filledImg = np.ones(self.mainImg.image.shape[:2], dtype='uint16')
     self.updateRegionFromMask(filledImg)
-
-  def clearFocusedRegion(self):
-    """
-    Clear the vertices in the focused image
-    """
-    self.updateRegionFromDf(None)
 
   @classmethod
   def clearProcessorHistory(cls):
@@ -148,7 +141,7 @@ class VerticesPlugin(TableFieldPlugin):
     if not np.array_equal(newGrayscale, compGrayscale):
       self.updateRegionFromMask(newGrayscale)
 
-  @PRJ_SINGLETON.actionStack.undoable('Modify Focused Component')
+  @DASM.undoable('Modify Focused Component')
   def updateRegionFromDf(self, newData: pd.DataFrame=None, offset: XYVertices=None):
     """
     Updates the current focused region using the new provided vertices

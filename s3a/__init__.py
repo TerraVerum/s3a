@@ -6,7 +6,7 @@ import sys
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 
-__all__ = ['appInst', 'PRJ_SINGLETON', 'S3A', 'REQD_TBL_FIELDS',
+__all__ = ['appInst', 'S3A', 'REQD_TBL_FIELDS',
            'ComplexXYVertices', 'XYVertices', 'PRJ_CONSTS', 'ComponentIO',
            'ProjectData', '__version__']
 
@@ -35,22 +35,11 @@ from . import graphicsutils as gutils
 import s3a.constants
 import s3a.structures
 
-from s3a.parameditors import PRJ_SINGLETON
 from ._io import ComponentIO, defaultIo
 from s3a.structures import XYVertices, ComplexXYVertices
 from s3a.constants import REQD_TBL_FIELDS, PRJ_CONSTS, CFG_DIR
 
-# -----
-# DEFAULT PLUGINS
-# -----
-PRJ_SINGLETON.imgProcClctn.loadParamValues(CFG_DIR/'imageproc.yml')
-PRJ_SINGLETON.multiPredClctn.loadParamValues(CFG_DIR/'multipred.yml')
-
 from .views.s3agui import S3A
 
-from s3a.plugins import ALL_PLUGINS
 from s3a.plugins.misc import RandomToolsPlugin
-for plugin in ALL_PLUGINS():
-  PRJ_SINGLETON.addPlugin(plugin)
 from s3a.plugins.file import ProjectData
-miscPlugin: RandomToolsPlugin = PRJ_SINGLETON.clsToPluginMapping[RandomToolsPlugin]

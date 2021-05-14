@@ -3,8 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from conftest import stack
-from s3a import appInst, PRJ_SINGLETON
+from s3a import appInst
 from s3a.constants import REQD_TBL_FIELDS
 from s3a.structures import ComplexXYVertices, XYVertices
 from s3a.views.tableview import CompTableView
@@ -18,7 +17,7 @@ def test_merge_selected_comps(app, mgr):
   assert len(app.compDisplay.selectedIds) > 0
   app.compDisplay.mergeSelectedComps()
   assert len(mgr.compDf) == 1
-  stack.undo()
+  mgr.actionStack.undo()
   assert len(mgr.compDf) == oldLen
   app.compTbl.clearSelection()
   # Nothing should happen
@@ -32,14 +31,14 @@ def test_split_selected_comps(app, mgr):
   cv.rectangle(compMask, (21, 21), (30, 30), 1, -1)
   cv.rectangle(compMask, (46, 46), (60, 60), 1, -1)
   verts = ComplexXYVertices.fromBwMask(compMask > 0)
-  comp = PRJ_SINGLETON.tableData.makeCompDf()
+  comp = mgr.tableData.makeCompDf()
   comp.at[comp.index[0], REQD_TBL_FIELDS.VERTICES] = verts
   app.add_focusComps(comp)
 
   app.compTbl.selectAll()
   app.compDisplay.splitSelectedComps()
   assert len(mgr.compDf) == 4
-  stack.undo()
+  mgr.actionStack.undo()
   assert len(mgr.compDf) == 1
   # Nothing should happen
   app.compDisplay.splitSelectedComps()
@@ -54,7 +53,7 @@ def test_set_cells_as(app, mgr):
   # Ensure the overwrite data will be different from what it's overwriting
   newFile = 'TestFile.png'
   newDf = mgr.compDf.loc[[0]]
-  srcFileIdx = PRJ_SINGLETON.tableData.allFields.index(REQD_TBL_FIELDS.SRC_IMG_FILENAME)
+  srcFileIdx = mgr.tableData.allFields.index(REQD_TBL_FIELDS.SRC_IMG_FILENAME)
   newDf.iat[0, srcFileIdx] = newFile
   selection = np.column_stack([mgr.compDf.index[::2], mgr.compDf.index[::2], np.tile(srcFileIdx, len(mgr.compDf)//2)])
   # Sometimes Qt doesn't process selections programmatically. Not sure what to do about that

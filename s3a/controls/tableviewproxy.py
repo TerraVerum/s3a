@@ -1,31 +1,29 @@
 from typing import Union, Sequence
-from warnings import warn
 
 import numpy as np
-import pandas as pd
 import pyqtgraph as pg
-from pandas import DataFrame as df
-from pyqtgraph.Qt import QtCore, QtGui, QtSvg, QtWidgets
-from utilitys import EditorPropsMixin, PrjParam, RunOpts
-from utilitys.fns import warnLater
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
-from s3a import PRJ_SINGLETON
 from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
 from s3a.models.tablemodel import ComponentMgr
+from s3a.shared import SharedAppSettings
 from s3a.structures import OneDArr
 from s3a.structures import XYVertices, ComplexXYVertices
 from s3a.views import tableview
 from s3a.views.imageareas import MainImage
 from s3a.views.regions import MultiRegionPlot
+from utilitys import DeferredActionStackMixin as DASM
+from utilitys import EditorPropsMixin, RunOpts, ParamContainer
 
 __all__ = ['CompSortFilter', 'CompDisplayFilter']
 
 Signal = QtCore.Signal
-TBL_FIELDS = PRJ_SINGLETON.tableData.allFields
 QISM = QtCore.QItemSelectionModel
 
-class CompSortFilter(QtCore.QSortFilterProxyModel):
-  colTitles = [f.name for f in TBL_FIELDS]
+class CompSortFilter(QtCore.QSortFilterProxyModel, EditorPropsMixin):
+  def __initEditorParams__(self, shared: SharedAppSettings):
+    self.tableData = shared.tableData
+    
   def __init__(self, compMgr: ComponentMgr, parent=None):
     super().__init__(parent)
     self.setSourceModel(compMgr)
@@ -37,7 +35,7 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
     # Do nothing if the user is trying to sort by vertices, since the intention of
     # sorting numpy arrays is somewhat ambiguous
     noSortCols = []
-    for ii, col in enumerate(PRJ_SINGLETON.tableData.allFields):
+    for ii, col in enumerate(self.tableData.allFields):
       if isinstance(col.value, (list, np.ndarray)):
         noSortCols.append(ii)
     if column in noSortCols:
@@ -55,20 +53,21 @@ class CompSortFilter(QtCore.QSortFilterProxyModel):
       # If that doesn't work, default to stringified comparison
       return str(leftObj) < str(rightObj)
 
-class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
+class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
   sigCompsSelected = Signal(object)
 
   __groupingName__ = 'Main Image'
 
-  @classmethod
-  def __initEditorParams__(cls):
-    cls.pltClickBehav: str = PRJ_SINGLETON.generalProps.registerProp(
-      PRJ_CONSTS.PROP_COMP_SEL_BHV)
+  def __initEditorParams__(self, shared: SharedAppSettings):
+    self.props = ParamContainer()
+    shared.generalProps.registerProp(PRJ_CONSTS.PROP_COMP_SEL_BHV,
+                                            container=self.props)
+    self.sharedAttrs = shared
 
   def __init__(self, compMgr: ComponentMgr, mainImg: MainImage,
                compTbl: tableview.CompTableView, parent=None):
     super().__init__(parent)
-    filterEditor = PRJ_SINGLETON.filter
+    filterEditor = self.sharedAttrs.filter
     self._mainImgArea = mainImg
     self._filter = filterEditor
     self._compTbl = compTbl
@@ -80,15 +79,16 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     self.updateLabelCol()
 
     self.regionCopier = mainImg.regionCopier
+    attrs = self.sharedAttrs
 
-    with PRJ_SINGLETON.colorScheme.setBaseRegisterPath(self.regionPlot.__groupingName__):
-      proc, argsParam = PRJ_SINGLETON.colorScheme.registerFunc(
+    with attrs.colorScheme.setBaseRegisterPath(self.regionPlot.__groupingName__):
+      proc, argsParam = attrs.colorScheme.registerFunc(
         self.updateLabelCol, runOpts=RunOpts.ON_CHANGED, returnParam=True, nest=False)
     def updateLblList():
-      fields = PRJ_SINGLETON.tableData.allFields
+      fields = attrs.tableData.allFields
       # TODO: Filter out non-viable field types
       argsParam.child('labelCol').setLimits([f.name for f in fields])
-    PRJ_SINGLETON.tableData.sigCfgUpdated.connect(updateLblList)
+    attrs.tableData.sigCfgUpdated.connect(updateLblList)
 
     # Attach to UI signals
     def _maybeRedraw():
@@ -96,7 +96,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
       Since an updated filter can also result from refreshed table fields, make sure not to update in that case
       (otherwise errors may occur from missing classes, etc.)
       """
-      if np.array_equal(PRJ_SINGLETON.tableData.allFields, self._compMgr.compDf.columns):
+      if np.array_equal(attrs.tableData.allFields, self._compMgr.compDf.columns):
         self.redrawComps()
     self._filter.sigChangesApplied.connect(_maybeRedraw)
 
@@ -120,7 +120,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
       title: Labeling Column
       pType: list
     """
-    self.labelCol = PRJ_SINGLETON.tableData.fieldFromName(labelCol)
+    self.labelCol = self.sharedAttrs.tableData.fieldFromName(labelCol)
     newLblData = self.labelCol.toNumeric(self._compMgr.compDf.loc[
                                            self.displayedIds, self.labelCol], rescale=True)
 
@@ -165,7 +165,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
       xpondingIdx = model.mapFromSource(self._compMgr.index(rowId,0)).row()
       self._compTbl.showRow(xpondingIdx)
 
-  @PRJ_SINGLETON.actionStack.undoable('Split Components', asGroup=True)
+  @DASM.undoable('Split Components', asGroup=True)
   def splitSelectedComps(self):
     """Makes a separate component for each distinct boundary of all selected components"""
     selection = self._compTbl.ids_rows_colsFromSelection(excludeNoEditCols=False,
@@ -175,7 +175,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     changes = self._compMgr.splitCompVertsById(np.unique(selection[:,0]))
     self.selectRowsById(changes['added'], QISM.ClearAndSelect)
 
-  @PRJ_SINGLETON.actionStack.undoable('Merge Components', asGroup=True)
+  @DASM.undoable('Merge Components', asGroup=True)
   def mergeSelectedComps(self, keepId=-1):
     """
     Merges the selected components into one, keeping all properties of the first in the selection
@@ -281,7 +281,7 @@ class CompDisplayFilter(EditorPropsMixin, QtCore.QObject):
     if selection.size == 0: return
     if len(selection) == 1 or np.abs(selection[0] - selection[1]).sum() < 0.01:
       qtPoint = QtCore.QPointF(*selection[0])
-      selectedSpots = self.regionPlot.pointsAt(qtPoint, self.pltClickBehav=='Boundary Only')
+      selectedSpots = self.regionPlot.pointsAt(qtPoint, self.props[PRJ_CONSTS.PROP_COMP_SEL_BHV]=='Boundary Only')
       selectedIds = [spot.data() for spot in selectedSpots]
     else:
       selectedIds = self.regionPlot.boundsWithin(selection)

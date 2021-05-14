@@ -6,12 +6,11 @@ import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
-from s3a import PRJ_SINGLETON
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_CONSTS as CNST
 from s3a.controls.drawctrl import RoiCollection
 from s3a.generalutils import getCroppedImg, coerceDfTypes
 from s3a.structures import XYVertices
-from utilitys import ParamEditor, PrjParam, RunOpts, fns, EditorPropsMixin
+from utilitys import ParamEditor, PrjParam, RunOpts, fns, EditorPropsMixin, DeferredActionStackMixin as DASM
 from utilitys.widgets import ButtonCollection, ImageViewer, EasyWidget
 from .clickables import RightPanViewBox
 from .regions import RegionCopierPlot
@@ -19,12 +18,14 @@ from .rois import SHAPE_ROI_MAPPING
 
 __all__ = ['MainImage']
 
+from ..shared import SharedAppSettings
+
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
 
 DrawActFn = Union[Callable[[XYVertices, PrjParam], Any], Callable[[XYVertices], Any]]
 
-class MainImage(EditorPropsMixin, ImageViewer):
+class MainImage(DASM, EditorPropsMixin, ImageViewer):
   sigShapeFinished = Signal(object, object)
   """
   (XYVertices, PrjParam) emitted when a shape is finished
@@ -35,13 +36,10 @@ class MainImage(EditorPropsMixin, ImageViewer):
   sigUpdatedFocusedComp = Signal(object)
   """pd.Series, newly focused component"""
 
-  minCompSize: int
-
-  @classmethod
-  def __initEditorParams__(cls):
-    super().__initEditorParams__()
-
-    cls.minCompSize = PRJ_SINGLETON.generalProps.registerProp(CNST.PROP_MIN_COMP_SZ)
+  def __initEditorParams__(self, shared: SharedAppSettings):
+    self.compSer: pd.Series = shared.tableData.makeCompSer()
+    shared.colorScheme.registerFunc(self.updateGridScheme, runOpts=RunOpts.ON_CHANGED)
+    self.tableData = shared.tableData
 
   def __init__(self, parent=None, drawShapes: Collection[PrjParam]=None,
                toolbar: QtWidgets.QToolBar=None,
@@ -52,7 +50,6 @@ class MainImage(EditorPropsMixin, ImageViewer):
       drawShapes = SHAPE_ROI_MAPPING.keys()
 
     self._initGrid()
-    PRJ_SINGLETON.colorScheme.registerFunc(self.updateGridScheme, runOpts=RunOpts.ON_CHANGED)
     self.lastClickPos = QtCore.QPoint()
     self.toolbar = toolbar
 
@@ -61,7 +58,6 @@ class MainImage(EditorPropsMixin, ImageViewer):
     # -----
     # FOCUSED COMPONENT INFORMATION
     # -----
-    self.compSer: pd.Series = PRJ_SINGLETON.tableData.makeCompSer()
     self._focusedTools: List[ParamEditor] = []
     """
     List of all toolsEditor that allow actions to be performed on the currently focused components
@@ -277,7 +273,7 @@ class MainImage(EditorPropsMixin, ImageViewer):
     self.getViewBox().menu = self.menu
     return retClctn
 
-  @PRJ_SINGLETON.actionStack.undoable('Update Focused Component')
+  @DASM.undoable('Update Focused Component')
   def updateFocusedComp(self, newComp: pd.Series=None):
     """
     Updates focused image and component from provided information. Useful for creating
@@ -288,7 +284,7 @@ class MainImage(EditorPropsMixin, ImageViewer):
     oldComp = self.compSer
     mainImg = self.image
     if newComp is None or mainImg is None:
-      newComp = PRJ_SINGLETON.tableData.makeCompSer()
+      newComp = self.tableData.makeCompSer()
     else:
       # Since values INSIDE the dataframe are reset instead of modified, there is no
       # need to go through the trouble of deep copying

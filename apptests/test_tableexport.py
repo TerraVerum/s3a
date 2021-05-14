@@ -8,7 +8,7 @@ from PIL import Image
 from apptests.helperclasses import CompDfTester
 from apptests.testingconsts import SAMPLE_SMALL_IMG_FNAME, SAMPLE_IMG_FNAME, SAMPLE_SMALL_IMG, TEST_FILE_DIR
 from s3a.generalutils import augmentException
-from s3a import ComponentIO, REQD_TBL_FIELDS, ComplexXYVertices, XYVertices
+from s3a import ComponentIO, REQD_TBL_FIELDS, ComplexXYVertices, XYVertices, PRJ_CONSTS as CNST
 from s3a.parameditors.table import TableData
 
 @pytest.fixture
@@ -20,7 +20,7 @@ def _simpleTbl(tmp_path):
 @pytest.mark.withcomps
 def test_normal_export(sampleComps, tmp_path, app):
   io = app.compIo
-  app.exportOnlyVis = False
+  app.props[CNST.EXP_ONLY_VISIBLE] = False
   for ftype in io.exportTypes:
     curPath = tmp_path / f'normalExport - All IDs.{ftype}'
     doAndAssertExport(app, curPath, io, app.exportableDf, 'Normal export with all IDs not successful.')
@@ -33,7 +33,7 @@ def test_filter_export(tmp_path, monkeypatch, app):
   filterIds = np.array([0,3,2])
   sampleComps = app.compMgr.compDf
   with monkeypatch.context() as m:
-    m.setattr(app, 'exportOnlyVis', False)
+    m.setitem(app.props, CNST.EXP_ONLY_VISIBLE, False)
     m.setattr(app.compDisplay, 'displayedIds', filterIds)
     exportDf = app.exportableDf
   np.testing.assert_array_equal(exportDf.index, sampleComps.index,
@@ -45,7 +45,7 @@ def test_filter_export(tmp_path, monkeypatch, app):
 
   curPath = tmp_path / 'normalExport - Filtered IDs export filtered.csv'
   with monkeypatch.context() as m:
-    m.setattr(app, 'exportOnlyVis', True)
+    m.setitem(app.props, CNST.EXP_ONLY_VISIBLE, True)
     m.setattr(app.compDisplay, 'displayedIds', filterIds)
     exportDf = app.exportableDf
   np.testing.assert_array_equal(exportDf.index, filterIds,

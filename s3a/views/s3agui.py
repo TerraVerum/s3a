@@ -1,13 +1,16 @@
 import warnings
 from collections import defaultdict
 from pathlib import Path
-from typing import Union, Dict, List
+from typing import Union, Dict, List, Type
 
 import numpy as np
 import pyqtgraph as pg
 import qdarkstyle
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
+
+from s3a import PRJ_CONSTS
+from s3a.shared import SharedAppSettings
 from utilitys import ParamEditor, ParamEditorPlugin, RunOpts, PrjParam, fns, \
   ParamEditorDockGrouping
 
@@ -15,7 +18,6 @@ from s3a.generalutils import hierarchicalUpdate
 from s3a.constants import LAYOUTS_DIR, REQD_TBL_FIELDS, ICON_DIR
 from s3a.constants import PRJ_ENUMS
 from s3a.models.s3abase import S3ABase
-from s3a.parameditors import PRJ_SINGLETON
 from s3a.plugins.file import FilePlugin
 from s3a.plugins.misc import RandomToolsPlugin, MainImagePlugin, CompTablePlugin
 from s3a.structures import XYVertices, FilePath, NChanImg
@@ -26,14 +28,14 @@ _MENU_PLUGINS = [RandomToolsPlugin]
 
 class S3A(S3ABase):
   sigLayoutSaved = QtCore.Signal()
-  S3A_INST = None
 
   __groupingName__ = 'Main Window'
 
-  @classmethod
-  def __initEditorParams__(cls):
-    super().__initEditorParams__()
-    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, 'Main Window')
+  def __initEditorParams__(self, shared: SharedAppSettings):
+    super().__initEditorParams__(shared)
+    self.toolsEditor = ParamEditor.buildClsToolsEditor(type(self), 'Main Window')
+    shared.colorScheme.registerFunc(self.updateTheme, runOpts=RunOpts.ON_CHANGED, nest=False)
+
 
   def __init__(self, parent=None, guiMode=False, loadLastState=True, **startupSettings):
     # Wait to import quick loader profiles until after self initialization so
@@ -73,7 +75,6 @@ class S3A(S3ABase):
     self.appStateEditor.addImportExportOpts('layout', loadLayout, saveRecentLayout)
 
     self._buildGui()
-    self._buildMenu()
     self._hookupSignals()
 
     # Load in startup settings
@@ -82,7 +83,6 @@ class S3A(S3ABase):
     self.appStateEditor.loadParamValues(stateDict=stateDict)
 
   def _hookupSignals(self):
-    PRJ_SINGLETON.colorScheme.registerFunc(self.updateTheme, runOpts=RunOpts.ON_CHANGED, nest=False)
     # EDIT
     self.saveAllEditorDefaults()
 
@@ -102,7 +102,7 @@ class S3A(S3ABase):
     self.generalToolbar.setObjectName('General')
     self.addToolBar(self.generalToolbar)
 
-    _plugins = [PRJ_SINGLETON.clsToPluginMapping[c] for c in [MainImagePlugin, CompTablePlugin]]
+    _plugins = [self.clsToPluginMapping[c] for c in [MainImagePlugin, CompTablePlugin]]
     parents = [self.mainImg, self.compTbl]
     for plugin, parent in zip(_plugins, reversed(parents)):
       plugin.toolsEditor.actionsMenuFromProcs(plugin.name, nest=True, parent=parent, outerMenu=parent.menu)
@@ -155,20 +155,14 @@ class S3A(S3ABase):
   def resetTblFields_gui(self):
     outFname = fns.popupFilePicker(None, 'Select Table Config File', 'All Files (*.*);; Config Files (*.yml)')
     if outFname is not None:
-      PRJ_SINGLETON.tableData.loadCfg(outFname)
+      self.sharedAttrs.tableData.loadCfg(outFname)
 
-  def _buildMenu(self):
-    # TODO: Find a better way of fixing up menu order
-    menus = self.menuBar_.actions()
-    menuFile = [a for a in menus if a.text().replace('&', '') == FilePlugin.name][0]
-    self.menuBar_.insertAction(menus[0], menuFile)
-
-  def _handleNewPlugin(self, plugin: ParamEditorPlugin):
-    super()._handleNewPlugin(plugin)
+  def addPlugin(self, *args, **kwargs):
+    plugin = super().addPlugin(*args, **kwargs)
     dock = plugin.dock
     if dock is None:
       return
-    PRJ_SINGLETON.quickLoader.addDock(dock)
+    self.sharedAttrs.quickLoader.addDock(dock)
     self.addTabbedDock(QtCore.Qt.RightDockWidgetArea, dock)
 
     if plugin.menu is None:
@@ -240,7 +234,6 @@ class S3A(S3ABase):
     if shouldExit:
       # Clean up all editor windows, which could potentially be left open
       ev.accept()
-      PRJ_SINGLETON.close()
       fns.restoreExceptionBehavior()
       if not forceClose:
         self.appStateEditor.saveParamValues()
@@ -285,7 +278,7 @@ class S3A(S3ABase):
   def add_focusComps(self, newComps: df, addType=PRJ_ENUMS.COMP_ADD_AS_NEW):
     ret = super().add_focusComps(newComps, addType=addType)
     selection = self.compDisplay.selectRowsById(newComps[REQD_TBL_FIELDS.INST_ID])
-    if self.isVisible() and self.compTbl.showOnCreate:
+    if self.isVisible() and self.compTbl.props[PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE]:
       # For some reason sometimes the actual table selection doesn't propagate in time, so
       # directly forward the selection here
       self.compTbl.setSelectedCellsAs_gui(selection)

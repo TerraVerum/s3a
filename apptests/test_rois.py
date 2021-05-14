@@ -4,13 +4,16 @@ from typing import Tuple
 from pyqtgraph.Qt import QtCore, QtGui
 import numpy as np
 
+from s3a.shared import SharedAppSettings
 from s3a.views.imageareas import MainImage
 from s3a.views.rois import SHAPE_ROI_MAPPING
 from s3a.constants import PRJ_CONSTS
+from utilitys import EditorPropsMixin
 
 shapes = tuple(SHAPE_ROI_MAPPING.keys())
-editableImg = MainImage(drawShapes=shapes,
-                        drawActions=(PRJ_CONSTS.DRAW_ACT_SELECT,))
+with EditorPropsMixin.setOpts(shared=SharedAppSettings()):
+  editableImg = MainImage(drawShapes=shapes,
+                          drawActions=(PRJ_CONSTS.DRAW_ACT_SELECT,),)
 clctn = editableImg.shapeCollection
 
 def leftClick(pt: Tuple[int, int]):

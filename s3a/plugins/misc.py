@@ -7,12 +7,13 @@ import numpy as np
 import pandas as pd
 from pyqtgraph import console as pg_console
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-from utilitys import ParamEditorPlugin, ProcessIO, widgets as uw
+
+from s3a.shared import SharedAppSettings
+from utilitys import ParamEditorPlugin, ProcessIO, widgets as uw, ParamEditor, ParamContainer
 
 from s3a import models, XYVertices, ComplexXYVertices
-from s3a.constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF, PRJ_ENUMS
+from s3a.constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF, PRJ_ENUMS, GEN_PROPS_DIR, SCHEMES_DIR
 from s3a.models import s3abase
-from s3a.parameditors import PRJ_SINGLETON
 from s3a.plugins.base import ProcessorPlugin
 
 
@@ -22,6 +23,7 @@ class MainImagePlugin(ParamEditorPlugin):
 
   def __init__(self):
     super().__init__()
+    self.props = ParamContainer()
 
   def attachWinRef(self, win: s3abase.S3ABase):
     mainImg = win.mainImg
@@ -61,6 +63,7 @@ class MainImagePlugin(ParamEditorPlugin):
           verts = verts.mean(0, keepdims=True)
         disp.reflectSelectionBoundsMade(verts)
 
+    win.sharedAttrs.generalProps.registerProp(CNST.PROP_MIN_COMP_SZ, container=self.props)
     self.registerFunc(disp.mergeSelectedComps, btnOpts=CNST.TOOL_MERGE_COMPS, ignoreKeys=['keepId'])
     self.registerFunc(disp.splitSelectedComps, btnOpts=CNST.TOOL_SPLIT_COMPS)
     win.mainImg.registerDrawAction([CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM, CNST.DRAW_ACT_SELECT, CNST.DRAW_ACT_PAN],
@@ -69,6 +72,8 @@ class MainImagePlugin(ParamEditorPlugin):
 
     win.mainImg.registerDrawAction(CNST.DRAW_ACT_CREATE, self.createComponent)
     win.mainImg.addTools(self.toolsEditor)
+
+    self.tableData = win.sharedAttrs.tableData
 
     # No need for a dropdown menu
     self.dock = None
@@ -81,25 +86,23 @@ class MainImagePlugin(ParamEditorPlugin):
   def createComponent(self, roiVerts: XYVertices):
     verts = np.clip(roiVerts.astype(int), 0, self.image.shape[:2][::-1])
 
-    if cv.contourArea(verts) < self.win.mainImg.minCompSize:
+    if cv.contourArea(verts) < self.props[CNST.PROP_MIN_COMP_SZ]:
       # Use as selection instead of creation
       self.win.compDisplay.reflectSelectionBoundsMade(roiVerts[[0]])
       return
 
     # noinspection PyTypeChecker
     verts = ComplexXYVertices([verts])
-    newComps = PRJ_SINGLETON.tableData.makeCompDf()
+    newComps = self.tableData.makeCompDf()
     newComps[RTF.VERTICES] = [verts]
     self.win.add_focusComps(newComps)
 
 class CompTablePlugin(ParamEditorPlugin):
   name = 'Component Table'
 
-  @classmethod
-  def __initEditorParams__(cls):
+  def __initEditorParams__(self, shared: SharedAppSettings):
     super().__initEditorParams__()
-    cls.dock.addEditors([PRJ_SINGLETON.filter])
-
+    self.dock.addEditors([shared.filter])
 
   def attachWinRef(self, win: s3abase.S3ABase):
 
@@ -113,6 +116,7 @@ class CompTablePlugin(ParamEditorPlugin):
       self.registerFunc(func, name=param.name, btnOpts=param)
     tbl.menu = self.toolsEditor.actionsMenuFromProcs(parent=tbl, nest=True)
     super().attachWinRef(win)
+    self.tableData = win.sharedAttrs.tableData
 
 class EditPlugin(ParamEditorPlugin):
 
@@ -120,7 +124,7 @@ class EditPlugin(ParamEditorPlugin):
 
   def attachWinRef(self, win: s3abase.S3ABase):
     super().attachWinRef(win)
-    stack = PRJ_SINGLETON.actionStack
+    stack = win.sharedAttrs.actionStack
 
     self.registerFunc(stack.undo, name='Undo', btnOpts=CNST.TOOL_UNDO)
     self.registerFunc(stack.redo, name='Redo', btnOpts=CNST.TOOL_REDO)
@@ -146,7 +150,7 @@ class RandomToolsPlugin(ParamEditorPlugin):
   def attachWinRef(self, win: s3abase.S3ABase):
     super().attachWinRef(win)
 
-    self.registerFunc(self.showDevConsole_gui, 'Show Dev Console')
+    self.registerFunc(self.showDevConsole_gui, name='Show Dev Console')
     self.registerFunc(win.clearBoundaries, btnOpts=CNST.TOOL_CLEAR_BOUNDARIES)
     self.registerFunc(win.compDisplay.exportCompOverlay, name='Export Component Overlay', toClipboard=True)
     self.registerFunc(lambda: win.setMainImg(None), name='Clear Current Image')
@@ -157,7 +161,7 @@ class RandomToolsPlugin(ParamEditorPlugin):
     is on your system, a qt console will be loaded. Otherwise, a (less capable) standard
     pyqtgraph console will be used.
     """
-    namespace = dict(app=self.win, rtf=RTF, singleton=PRJ_SINGLETON)
+    namespace = dict(app=self.win, rtf=RTF)
     # "dict" default is to use repr instead of string for internal elements, so expanding
     # into string here ensures repr is not used
     nsPrintout = [f"{k}: {v}" for k, v in namespace.items()]
@@ -182,7 +186,7 @@ class HelpPlugin(ParamEditorPlugin):
     self.registerFunc(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl('https://gitlab.com/ficsresearch/s3a/-/wikis/home')),
                          name='Online User Guide')
     self.registerFunc(lambda: QtWidgets.QMessageBox.aboutQt(win, 'About Qt'), name='About Qt')
-    self.registerFunc(self.iconAttributions_gui, 'Icon Attributions')
+    self.registerFunc(self.iconAttributions_gui, name='Icon Attributions')
 
   def iconAttributions_gui(self):
     htmlStr = """
@@ -220,11 +224,10 @@ class MultiPredictionsPlugin(ProcessorPlugin):
 
   mgr: models.tablemodel.ComponentMgr
 
-  @classmethod
-  def __initEditorParams__(cls):
+  def __initEditorParams__(self, shared: SharedAppSettings):
     super().__initEditorParams__()
-    cls.procEditor = PRJ_SINGLETON.multiPredClctn.createProcessorEditor(cls, cls.name + ' Processor')
-    cls.dock.addEditors([cls.procEditor])
+    self.procEditor = shared.multiPredClctn.createProcessorEditor(type(self), self.name + ' Processor')
+    self.dock.addEditors([self.procEditor])
 
   def __init__(self):
     super().__init__()

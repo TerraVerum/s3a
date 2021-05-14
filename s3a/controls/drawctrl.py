@@ -2,9 +2,10 @@ from typing import Dict, Collection
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
+
+from s3a.shared import SharedAppSettings
 from utilitys import EditorPropsMixin, RunOpts
 
-from s3a.parameditors import singleton
 from s3a.structures import PrjParam, XYVertices
 from s3a.views.rois import SHAPE_ROI_MAPPING, PlotDataROI, PointROI
 
@@ -14,12 +15,14 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
   # Signal(ExtendedROI)
   sigShapeFinished = QtCore.Signal(object) # roiVerts : XYVertices
 
+  def __initEditorParams__(self, shared: SharedAppSettings):
+    shared.colorScheme.registerFunc(
+      PointROI.updateRadius, name='Point ROI Features', runOpts=RunOpts.ON_CHANGED, namePath=(self.__groupingName__,),
+    )
+
   def __init__(self, allowableShapes: Collection[PrjParam]=(), parent: pg.GraphicsView=None):
     super().__init__(parent)
-    singleton.PRJ_SINGLETON.colorScheme.registerFunc(
-      PointROI.updateRadius, name='Point ROI Features', runOpts=RunOpts.ON_CHANGED, namePath=(self.__groupingName__,),
 
-    )
     if allowableShapes is None:
       allowableShapes = set()
     self.shapeVerts = XYVertices()

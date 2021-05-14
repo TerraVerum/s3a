@@ -16,6 +16,7 @@ from s3a.constants import MENU_OPTS_DIR
 from utilitys import NestedProcess, RunOpts
 from utilitys import ParamEditor, NestedProcWrapper, fns, ProcessStage, AtomicProcess
 from utilitys.processing import ArgMapper
+from utilitys.typeoverloads import FilePath
 from utilitys.widgets import makeDummySignal
 
 Signal = QtCore.Signal
@@ -39,13 +40,16 @@ lowercase"""
 class AlgCollection(ParamEditor):
   # sigProcessorCreated = Signal(object) # Signal(AlgCollectionEditor)
   def __init__(self, procWrapType=NestedProcWrapper, procType=NestedProcess, parent=None, fileType='alg',
-               **kwargs):
+               template: FilePath=None, **kwargs):
     super().__init__(parent, fileType=fileType, **kwargs)
     self.procWrapType = procWrapType
     self.procType = procType
     self.primitiveProcs: t.Dict[str, t.Union[ProcessStage, t.List[str]]] = {}
     self.topProcs: _procDict = {}
     self.includeModules: t.List[str] = []
+
+    if template is not None:
+      self.loadParamValues(template)
 
     # Allow name remapping to take place
     self.addProcess(ArgMapper())

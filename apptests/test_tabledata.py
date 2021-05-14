@@ -7,10 +7,9 @@ import numpy as np
 import pytest
 
 from conftest import dfTester
-from s3a import PRJ_SINGLETON, REQD_TBL_FIELDS
+from s3a import REQD_TBL_FIELDS
 from utilitys import fns
 
-td = PRJ_SINGLETON.tableData
 cfgDict = {
   'fields': {
     'Class': {
@@ -22,7 +21,11 @@ cfgDict = {
 }
 
 @pytest.fixture
-def newCfg(app):
+def td(app):
+  return app.sharedAttrs.tableData
+
+@pytest.fixture
+def newCfg(app, td):
   @contextlib.contextmanager
   def newCfg(name: Union[str, Path], cfg: dict):
     oldCfg = td.cfg
@@ -34,26 +37,26 @@ def newCfg(app):
 
 @pytest.mark.withcomps
 def test_no_opt_fields(app, newCfg):
-  PRJ_SINGLETON.tableData.loadCfg('testcfg', cfgDict, force=True)
+  app.sharedAttrs.tableData.loadCfg('testcfg', cfgDict, force=True)
   with newCfg('none', {}):
     assert len(app.compMgr.compDf) == 0
     assert app.compMgr.colTitles == list(map(str, REQD_TBL_FIELDS))
-    newComps = PRJ_SINGLETON.tableData.makeCompDf(3).reset_index(drop=True)
+    newComps = app.sharedAttrs.tableData.makeCompDf(3).reset_index(drop=True)
     dfTester.fillRandomVerts(compDf=newComps)
     # Just make sure no errors are thrown on adding comps
     app.add_focusComps(newComps)
     assert len(app.compMgr.compDf) == 3
 
-def test_params_for_class(newCfg):
+def test_params_for_class(newCfg, app):
   with newCfg('testcfg', cfgDict):
-    assert 'Class' in [f.name for f in PRJ_SINGLETON.tableData.allFields]
+    assert 'Class' in [f.name for f in app.sharedAttrs.tableData.allFields]
 
 @pytest.mark.withcomps
-def test_no_change(app, newCfg):
+def test_no_change(app, newCfg, td):
   with newCfg(td.cfgFname, td.cfg):
     assert len(app.compMgr.compDf) > 0
 
-def test_filter():
+def test_filter(td):
   # Try a bunch of types
   mockCfg = """
   fields:

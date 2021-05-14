@@ -1,13 +1,12 @@
-import re
-from ast import literal_eval
 from pathlib import Path
 
 import numpy as np
 import pytest
 
 from conftest import NUM_COMPS, dfTester
-from s3a import PRJ_SINGLETON, appInst, PRJ_CONSTS, S3A
-from s3a.constants import REQD_TBL_FIELDS, LAYOUTS_DIR
+from s3a import appInst
+from s3a.constants import REQD_TBL_FIELDS, LAYOUTS_DIR, PRJ_CONSTS as CNST
+from s3a.plugins.misc import MainImagePlugin
 from s3a.structures import XYVertices, ComplexXYVertices
 from testingconsts import RND, SAMPLE_IMG, SAMPLE_IMG_FNAME
 
@@ -33,8 +32,8 @@ seem to get the programmatically allocated keystrokes to work."""
 #
 #   p2 = copy(param)
 #   p2.name = 'dummy2'
-#   PRJ_SINGLETON.shortcuts.registerButton(param, app.mainImg)
-#   PRJ_SINGLETON.shortcuts.registerButton(p2, app.mainImg)
+#   app.sharedAttrs.shortcuts.registerButton(param, app.mainImg)
+#   app.sharedAttrs.shortcuts.registerButton(p2, app.mainImg)
 #   keypress = QtGui.QKeyEvent(QtGui.QKeyEvent.KeyPress, QtCore.Qt.Key_T, QtCore.Qt.NoModifier, "T")
 #   with pytest.warns(UserWarning):
 #     QtGui.QGuiApplication.sendEvent(app.mainImg, keypress)
@@ -77,7 +76,7 @@ def test_import_large_verts(sampleComps, tmp_path, app):
     io.importCsv(tmp_path/'Bad Verts.csv', app.mainImg.image.shape)
 
 def test_change_comp(app, mgr):
-  stack = PRJ_SINGLETON.actionStack
+  stack = app.actionStack
   mImg = app.mainImg
   mgr.addComps(dfTester.compDf.copy())
   comp = mgr.compDf.loc[[RND.integers(NUM_COMPS)]]
@@ -119,18 +118,19 @@ def test_autosave(tmp_path, app, filePlg):
 @pytest.mark.withcomps
 def test_stage_plotting(monkeypatch, app, vertsPlugin):
   mainImg = app.mainImg
-  mainImg.drawActGrp.callFuncByParam(PRJ_CONSTS.DRAW_ACT_CREATE)
+  mainImg.drawActGrp.callFuncByParam(CNST.DRAW_ACT_CREATE)
   vertsPlugin.procEditor.changeActiveProcessor('Basic Shapes')
-  oldSz = mainImg.minCompSize
-  mainImg.minCompSize = 0
+  mainImgProps = app.clsToPluginMapping[MainImagePlugin].props
+  oldSz = mainImgProps[CNST.PROP_MIN_COMP_SZ]
+  mainImgProps[CNST.PROP_MIN_COMP_SZ] = 0
   mainImg.shapeCollection.sigShapeFinished.emit(XYVertices([[0, 0], [5, 5]]))
   assert len(app.compMgr.compDf) > 0
   app.changeFocusedComp(app.compMgr.compDf.iloc[[0]])
   assert app.mainImg.compSer.loc[REQD_TBL_FIELDS.INST_ID] >= 0
-  mainImg.minCompSize = oldSz
+  mainImgProps[CNST.PROP_MIN_COMP_SZ] = oldSz
 
   vertsPlugin.procEditor.changeActiveProcessor('Basic Shapes')
-  mainImg.drawActGrp.callFuncByParam(PRJ_CONSTS.DRAW_ACT_ADD)
+  mainImg.drawActGrp.callFuncByParam(CNST.DRAW_ACT_ADD)
 
   mainImg.shapeCollection.sigShapeFinished.emit(XYVertices([[0, 0], [10, 10]]))
   proc = vertsPlugin.curProcessor.processor

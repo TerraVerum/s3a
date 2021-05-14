@@ -1,4 +1,3 @@
-from functools import partial
 from typing import Sequence, Any
 from warnings import warn
 
@@ -8,17 +7,15 @@ from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 
 from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
 from s3a.models.tablemodel import ComponentMgr
-from s3a.parameditors.singleton import PRJ_SINGLETON
+from s3a.shared import SharedAppSettings
 from s3a.structures import TwoDArr
 
 __all__ = ['CompTableView']
 
-from utilitys import ParamEditor, EditorPropsMixin, RunOpts
+from utilitys import ParamEditor, EditorPropsMixin, RunOpts, ParamContainer, DeferredActionStackMixin as DASM
 from utilitys.params.pgregistered import PgParamDelegate
 
 Signal = QtCore.Signal
-
-TBL_FIELDS = PRJ_SINGLETON.tableData.allFields
 
 class MinimalTableModel(ComponentMgr):
   """
@@ -103,7 +100,7 @@ class PopupTableDialog(QtWidgets.QDialog):
 
   def reflectDelegateChange(self):
     # TODO: Find if there's a better way to see if changes happen in a table
-    self.titles = np.array(list([f.name for f in TBL_FIELDS]))
+    self.titles = np.array(list([f.name for f in self.tbl.tableData.allFields]))
     self.tbl.setColDelegates()
     # Avoid loop scoping
     def wrapper(col):
@@ -142,17 +139,29 @@ class PopupTableDialog(QtWidgets.QDialog):
       self.tbl.showColumn(ii)
     super().reject()
 
-class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
+class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
   __groupingName__ = 'Component Table'
   """
   Table for displaying :class:`ComponentMgr` data.
   """
   sigSelectionChanged = Signal(object)
 
-  @classmethod
-  def __initEditorParams__(cls):
-    cls.showOnCreate = PRJ_SINGLETON.generalProps.registerProp(PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE)
-    cls.toolsEditor = ParamEditor.buildClsToolsEditor(cls, name='Component Table Tools')
+  def __initEditorParams__(self, shared: SharedAppSettings):
+    self.props = ParamContainer()
+    self.tableData = shared.tableData
+    shared.generalProps.registerProp(PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE,
+                                                               container=self.props)
+
+    self.toolsEditor = ParamEditor.buildClsToolsEditor(type(self), name='Component Table Tools')
+
+    with shared.generalProps.setBaseRegisterPath(self.__groupingName__):
+      proc, params = shared.generalProps.registerFunc(
+        self.setVisibleColumns, runOpts=RunOpts.ON_CHANGED, nest=False,
+        returnParam=True, visibleColumns=[])
+    def onChange(*_args):
+      params.child('visibleColumns').setLimits([f.name for f in shared.tableData.allFields])
+    onChange()
+    shared.tableData.sigCfgUpdated.connect(onChange)
 
   def __init__(self, *args, minimal=False):
     """
@@ -173,16 +182,6 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
     self.setModel(self.mgr)
     self.setColDelegates()
 
-    with PRJ_SINGLETON.generalProps.setBaseRegisterPath(self.__groupingName__):
-      proc, params = PRJ_SINGLETON.generalProps.registerFunc(
-        self.setVisibleColumns, runOpts=RunOpts.ON_CHANGED, nest=False,
-        returnParam=True, visibleColumns=[])
-    def onChange(*_args):
-      params.child('visibleColumns').setLimits([f.name for f in TBL_FIELDS])
-    onChange()
-    PRJ_SINGLETON.tableData.sigCfgUpdated.connect(onChange)
-    proc.run(**params)
-
     if not minimal:
       self.popup = PopupTableDialog(*args)
       # Create context menu for changing table rows
@@ -190,7 +189,7 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
       cursor = QtGui.QCursor()
       self.customContextMenuRequested.connect(lambda: self.menu.exec_(cursor.pos()))
 
-    self.instIdColIdx = TBL_FIELDS.index(REQD_TBL_FIELDS.INST_ID)
+    self.instIdColIdx = self.tableData.allFields.index(REQD_TBL_FIELDS.INST_ID)
 
   def setVisibleColumns(self, visibleColumns: Sequence[str]):
     """
@@ -202,7 +201,7 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
       self.setColumnHidden(ii, col not in visibleColumns)
 
   def setColDelegates(self):
-    for ii, field in enumerate(TBL_FIELDS):
+    for ii, field in enumerate(self.tableData.allFields):
       curType = field.pType.lower()
       curval = field.value
       paramDict = dict(type=curType, default=curval, **field.opts)
@@ -319,7 +318,7 @@ class CompTableView(EditorPropsMixin, QtWidgets.QTableView):
     if selectionIdxs is None:
       selectionIdxs = self.ids_rows_colsFromSelection()
     overwriteData = self.mgr.compDf.loc[[selectionIdxs[0,0]]].copy()
-    with PRJ_SINGLETON.actionStack.ignoreActions():
+    with self.actionStack.ignoreActions():
       self.popup.setData(overwriteData, pd.unique(selectionIdxs[:,2]),
                          self._getDupDataCols(selectionIdxs))
       wasAccepted = self.popup.exec_()

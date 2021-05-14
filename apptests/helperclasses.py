@@ -6,8 +6,9 @@ import cv2 as cv
 import numpy as np
 import pandas as pd
 
-from s3a import PRJ_SINGLETON
+from s3a import S3A
 from s3a.constants import REQD_TBL_FIELDS
+from s3a.parameditors.table import TableData
 from s3a.structures import ComplexXYVertices
 from testingconsts import RND, TEST_FILE_DIR
 from utilitys import PrjParam, CompositionMixin
@@ -16,7 +17,7 @@ from utilitys import PrjParam, CompositionMixin
 class CompDfTester(CompositionMixin):
   def __init__(self, numComps, fillInfo=True, tableData=None):
     if tableData is None:
-      tableData = PRJ_SINGLETON.tableData
+      tableData = TableData()
     self.tableData = tableData
     self.compDf = self.exposes(tableData.makeCompDf(numComps))
     self.compDf.set_index(np.arange(numComps, dtype=int), inplace=True)

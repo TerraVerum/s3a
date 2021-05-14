@@ -1,4 +1,4 @@
-from s3a import generalutils as gu, PRJ_SINGLETON
+from s3a import generalutils as gu
 import numpy as np
 
 from s3a.plugins.misc import miscFuncsPluginFactory, MultiPredictionsPlugin
@@ -24,7 +24,7 @@ def test_plg_factory(app):
   assert count == 1
 
 def test_pred(app):
-  predPlg: MultiPredictionsPlugin = PRJ_SINGLETON.clsToPluginMapping[MultiPredictionsPlugin]
+  predPlg: MultiPredictionsPlugin = app.clsToPluginMapping[MultiPredictionsPlugin]
   # Correctness of algo already tested elsewhere, run to assert no errors
   predPlg.makePrediction(app.exportableDf)
   predPlg.predictFromSelection()

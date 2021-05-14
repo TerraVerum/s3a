@@ -6,7 +6,7 @@ import shutil
 from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
-from typing import Optional, Set, List, Dict, Sequence, Union, Tuple
+from typing import Optional, Set, List, Dict, Sequence, Union, Tuple, Type
 from warnings import warn
 
 import numpy as np
@@ -14,8 +14,7 @@ import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtCore
 
-from s3a import PRJ_SINGLETON, PRJ_CONSTS as CNST, models, REQD_TBL_FIELDS, \
-  defaultIo
+from s3a import PRJ_CONSTS as CNST, models, REQD_TBL_FIELDS
 from s3a._io import ComponentIO
 from s3a.generalutils import hierarchicalUpdate, cvImsave_rgb
 from s3a.graphicsutils import DropList, ThumbnailViewer
@@ -30,9 +29,6 @@ from ..constants import APP_STATE_DIR, PROJ_FILE_TYPE, PROJ_BASE_TEMPLATE
 class FilePlugin(CompositionMixin, ParamEditorPlugin):
   name = 'File'
   win: models.s3abase.S3A
-  @classmethod
-  def __initEditorParams__(cls):
-    super().__initEditorParams__()
 
   def __init__(self, startupName: FilePath=None, startupCfg: dict=None):
     super().__init__()
@@ -141,6 +137,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
 
   def attachWinRef(self, win: models.s3abase.S3ABase):
     super().attachWinRef(win)
+    self.projData.compIo.tableData = win.sharedAttrs.tableData
     win.statBar.addWidget(self.projNameLbl)
     def handleExport(_dir):
       saveImg = win.srcImgFname
@@ -459,10 +456,11 @@ class ProjectData(QtCore.QObject):
   """List[Path]"""
 
 
-  def __init__(self, cfgFname: FilePath=None, cfgDict: dict=None):
+  def __init__(self, cfgFname: FilePath=None, cfgDict: dict=None, io: ComponentIO=None):
     super().__init__()
-    self.compIo = defaultIo
-    self.tableData = self.compIo.tableData = PRJ_SINGLETON.tableData
+    if io is None:
+      io = ComponentIO()
+    self.compIo = io
     self.templateName = PROJ_BASE_TEMPLATE
     self.cfg = fns.attemptFileLoad(self.templateName)
     self.cfgFname: Optional[Path] = None
@@ -470,6 +468,8 @@ class ProjectData(QtCore.QObject):
     self.baseImgDirs: Set[Path] = set()
     self.imgToAnnMapping: Dict[Path, Path] = {}
     """Records annotations belonging to each image"""
+    self.spawnedPlugins: List[ParamEditorPlugin] = []
+    """Plugin instances stored separately from plugin-cfg to maintain serializability of self.cfg"""
 
     self._suppressSignals = False
     """If this is *True*, no signals will be emitted """
@@ -525,6 +525,10 @@ class ProjectData(QtCore.QObject):
   def pluginCfg(self) -> Dict[str, str]:
       return self.cfg['plugin-cfg']
 
+  @property
+  def tableData(self):
+      return self.compIo.tableData
+
   def clearImgs_anns(self):
     oldImgs = self.images.copy()
     for lst in self.images, self.imgToAnnMapping, self.baseImgDirs:
@@ -553,23 +557,25 @@ class ProjectData(QtCore.QObject):
       raise ValueError('The previous project loaded custom plugins, which cannot easily'
                        ' be removed. To load a new project, close and re-open S3A with'
                        ' the new project instance instead.')
+    warnPlgs = []
+    for plgName, plgPath in newPlugins.items():
+      # noinspection PyTypeChecker
+      pluginCls: Type[ParamEditorPlugin] = pydoc.locate(plgPath)
+      if pluginCls:
+        # False Positive
+        # noinspection PyCallingNonCallable
+        self.spawnedPlugins.append(pluginCls())
+      elif not pluginCls:
+        warnPlgs.append(plgPath)
+    if warnPlgs:
+      fns.warnLater(f'Some project plugins were specified, but could not be found:\n'
+                    f'{warnPlgs}', UserWarning)
 
     self.cfgFname = cfgFname
     cfg = self.cfg = baseCfgDict
     self.annotationsDir.mkdir(exist_ok=True)
     self.imagesDir.mkdir(exist_ok=True)
     self.clearImgs_anns()
-
-    warnPlgs = []
-    for plgName, plgPath in newPlugins.items():
-      pluginCls = pydoc.locate(plgPath)
-      if pluginCls:
-        PRJ_SINGLETON.addPlugin(pluginCls)
-      else:
-        warnPlgs.append(plgPath)
-    if warnPlgs:
-      warnLater(f'Some project plugins were specified, but could not be found:\n'
-           f'{warnPlgs}', UserWarning)
 
     tableInfo = cfg.get('table-cfg', None)
     if isinstance(tableInfo, str):

@@ -3,7 +3,7 @@ import pytest
 import numpy as np
 
 from apptests.testingconsts import SAMPLE_SMALL_IMG
-from s3a import PRJ_SINGLETON, XYVertices, REQD_TBL_FIELDS, ComplexXYVertices
+from s3a import XYVertices, REQD_TBL_FIELDS, ComplexXYVertices
 from s3a.generalutils import imgCornerVertices
 from s3a.plugins.file import NewProjectWizard
 from s3a.processing.algorithms.imageproc import _historyMaskHolder
@@ -28,7 +28,7 @@ def test_registered_verts_funcs(vertsPlugin, app):
   vertsPlugin.clearFocusedRegion()
   assert togray().sum() == 0
 
-  PRJ_SINGLETON.actionStack.undo()
+  vertsPlugin.actionStack.undo()
   assert (img > 0).sum() == imsize
 
   app.changeFocusedComp(app.compMgr.compDf.iloc[[0]])

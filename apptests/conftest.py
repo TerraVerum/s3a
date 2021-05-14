@@ -6,14 +6,11 @@ import pytest
 os.environ['S3A_PLATFORM'] = 'minimal'
 from s3a import constants
 from helperclasses import CompDfTester
-from s3a import PRJ_SINGLETON
 from s3a.views.s3agui import S3A
 from testingconsts import SAMPLE_IMG, SAMPLE_IMG_FNAME, NUM_COMPS, \
   SAMPLE_SMALL_IMG, SAMPLE_SMALL_IMG_FNAME
 from s3a.plugins.tablefield import VerticesPlugin
 from s3a.plugins.file import FilePlugin
-
-stack = PRJ_SINGLETON.actionStack
 
 dfTester = CompDfTester(NUM_COMPS)
 dfTester.fillRandomVerts(imShape=SAMPLE_IMG.shape)
@@ -56,7 +53,7 @@ def mgr(app):
 @pytest.fixture(scope='session', autouse=True)
 def vertsPlugin(app) -> VerticesPlugin:
   try:
-    plg = PRJ_SINGLETON.clsToPluginMapping[VerticesPlugin]
+    plg = app.clsToPluginMapping[VerticesPlugin]
   except KeyError:
     raise RuntimeError('Vertices plugin was not provided. Some tests are guaranteed to fail.')
 
@@ -82,7 +79,7 @@ def resetApp_tester(request, app, filePlg, mgr):
     dfTester.fillRandomVerts(app.mainImg.image.shape)
     mgr.addComps(dfTester.compDf.copy())
   yield
-  stack.clear()
+  app.sharedAttrs.actionStack.clear()
   app.clearBoundaries()
 
 def assertExInList(exList, typ: Type[Exception]=Exception):

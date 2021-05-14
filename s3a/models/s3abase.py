@@ -1,6 +1,7 @@
-import sys
+import pydoc
+from contextlib import ExitStack
 from pathlib import Path
-from typing import Optional, Union, Type
+from typing import Optional, Union, Type, Dict, List
 from warnings import warn
 
 import numpy as np
@@ -8,49 +9,86 @@ import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
 
-from s3a.generalutils import hierarchicalUpdate
-from utilitys import EditorPropsMixin, RunOpts, ParamEditorPlugin, fns, ParamEditor
-
 from s3a import ComponentIO
-from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, LAYOUTS_DIR
+from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS
 from s3a.constants import PRJ_ENUMS
 from s3a.controls.tableviewproxy import CompDisplayFilter, CompSortFilter
 from s3a.models.tablemodel import ComponentMgr
-from s3a.parameditors import PRJ_SINGLETON
 from s3a.parameditors.appstate import AppStateEditor
 from s3a.plugins.file import FilePlugin
+from s3a.plugins import ALL_PLUGINS, tablefield
+from s3a.plugins.misc import RandomToolsPlugin
+from s3a.shared import SharedAppSettings
 from s3a.structures import FilePath, NChanImg
 from s3a.views.imageareas import MainImage
 from s3a.views.tableview import CompTableView
+from utilitys import EditorPropsMixin, RunOpts, ParamEditorPlugin, fns, ParamContainer, \
+  DeferredActionStackMixin as DASM, ParamEditorDockGrouping
 
 __all__ = ['S3ABase']
 
-class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
+class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
   """
   Top-level widget for producing component bounding regions from an input image.
   """
 
   sigRegionAccepted = QtCore.Signal()
-
   __groupingName__ = 'S3A Window'
 
-  @classmethod
-  def __initEditorParams__(cls):
-    with PRJ_SINGLETON.generalProps.setBaseRegisterPath(PRJ_CONSTS.CLS_COMP_EXPORTER.name):
-      cls.exportOnlyVis, cls.includeFullSourceImgName = \
-        PRJ_SINGLETON.generalProps.registerProps(
-          [PRJ_CONSTS.EXP_ONLY_VISIBLE, PRJ_CONSTS.INCLUDE_FNAME_PATH])
+  scope = ExitStack()
+  """
+  Allows each instance of s3a to act like a "scope" for all objecats instantiated within. Keeps multiple instances
+  of separate S3A pieces from e.g. sharing the same undo buffer. This is managed by __new__.
+  """
+
+  sharedAttrs: SharedAppSettings
+  """App-level properties that many moving pieces use"""
+
+  def __new__(cls, *args, **kwargs):
+    cls.scope.close()
+    cls.scope, newAttrs = cls.createScope(cls.scope, returnAttrs=True)
+    obj = super().__new__(cls, *args, **kwargs)
+    obj.sharedAttrs = newAttrs
+    return obj
+
+  def __initEditorParams__(self, shared: SharedAppSettings):
+    self.props = ParamContainer()
+    with shared.generalProps.setBaseRegisterPath(PRJ_CONSTS.CLS_COMP_EXPORTER.name):
+      shared.generalProps.registerProps(
+          [PRJ_CONSTS.EXP_ONLY_VISIBLE, PRJ_CONSTS.INCLUDE_FNAME_PATH],
+        container=self.props)
+
+  @staticmethod
+  def createScope(scope: ExitStack = None, returnAttrs=False):
+    if scope is None:
+      scope = ExitStack()
+    newAttrs = SharedAppSettings()
+    scope.enter_context(EditorPropsMixin.setOpts(shared=newAttrs))
+    scope.enter_context(DASM.setStack(newAttrs.actionStack))
+    if returnAttrs:
+      return scope, newAttrs
+    return scope
 
   def __init__(self, parent=None, **startupSettings):
     super().__init__(parent)
+
+    self.clsToPluginMapping: Dict[Type[ParamEditorPlugin], ParamEditorPlugin] = {}
+    """
+    Maintains a record of all plugins added to this window. Only up to one instance of each plugin class is expected.
+    """
+
+    self.docks: List[QtWidgets.QDockWidget] = []
+    """List of docks from added plugins"""
+
     self.tblFieldToolbar = QtWidgets.QToolBar('Table Field Plugins')
     self.generalToolbar = QtWidgets.QToolBar('General')
 
     self.mainImg = MainImage(toolbar=self.generalToolbar)
     PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION.opts['ownerObj'] = self.mainImg
+    attrs = self.sharedAttrs
     self.mainImg.toolsEditor.registerFunc(self.acceptFocusedRegion,
                                           btnOpts=PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION)
-    _, param = PRJ_SINGLETON.generalProps.registerFunc(PRJ_SINGLETON.actionStack.resizeStack,
+    _, param = attrs.generalProps.registerFunc(attrs.actionStack.resizeStack,
                                                        name=self.__groupingName__,
                                                        runOpts=RunOpts.ON_CHANGED,
                                                        maxLength=PRJ_CONSTS.PROP_UNDO_BUF_SZ.value,
@@ -59,14 +97,14 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     self.statBar = QtWidgets.QStatusBar(self)
     self.menuBar_ = self.menuBar()
 
-    PRJ_SINGLETON.shortcuts.registerShortcut(PRJ_CONSTS.TOOL_CLEAR_ROI,
+    attrs.shortcuts.registerShortcut(PRJ_CONSTS.TOOL_CLEAR_ROI,
                                              self.mainImg.clearCurRoi,
                                              overrideOwnerObj=self.mainImg
                                              )
 
     self.compMgr = ComponentMgr()
     # Register exporter to allow user parameters
-    ComponentIO.tableData = PRJ_SINGLETON.tableData
+    ComponentIO.tableData = attrs.tableData
 
     self.compTbl = CompTableView()
     self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl)
@@ -85,16 +123,19 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     # -----
     # INTERFACE WITH QUICK LOADER / PLUGINS
     # -----
-    PRJ_SINGLETON.tableData.sigCfgUpdated.connect(lambda: self.resetTblFields())
-    self.filePlg: FilePlugin = self.addPlugin(FilePlugin)
-    self.compIo = self.filePlg.projData.compIo
+    for plgCls in ALL_PLUGINS() + [self.sharedAttrs.settingsPlg, self.sharedAttrs.shortcutsPlg]:
+      self.addPlugin(plgCls)
 
-    for plugin in PRJ_SINGLETON.clsToPluginMapping.values(): # type: ParamEditorPlugin
-      # Plugins created before window was initialized may need their plugins forcefully
-      # attached here
-      if plugin.win is not self:
-        self._handleNewPlugin(plugin)
-    PRJ_SINGLETON.sigPluginAdded.connect(self._handleNewPlugin)
+    # Create links for commonly used plugins
+    # noinspection PyTypeChecker
+    self.filePlg: FilePlugin = self.clsToPluginMapping[FilePlugin]
+    attrs.tableData.sigCfgUpdated.connect(lambda: self.resetTblFields())
+
+    # noinspection PyTypeChecker
+    self.vertsPlg: FilePlugin = self.clsToPluginMapping[tablefield.VerticesPlugin]
+    # noinspection PyTypeChecker
+    self.miscPlugin: RandomToolsPlugin = self.clsToPluginMapping[RandomToolsPlugin]
+    self.compIo = self.filePlg.projData.compIo
 
     # Connect signals
     # -----
@@ -125,7 +166,6 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     # MISC
     # -----
     self.saveAllEditorDefaults()
-    PRJ_SINGLETON.tableData.sigCfgUpdated.connect(lambda: self.resetTblFields())
 
   def resetTblFields(self):
     """
@@ -134,11 +174,14 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     """
     # Even if the field names are the same, e.g. classes may added or default values could
     # be changed. So, reset the cell editor delegates no matter what
+    # Start by adding any potentially new plugins
+    for plg in self.filePlg.projData.spawnedPlugins:
+      self._addPluginObj(plg)
     self.compTbl.setColDelegates()
     self.compTbl.popup.reflectDelegateChange()
     # Make sure this is necessary, first
     for mgr in self.compMgr, self.compTbl.popup.tbl.mgr:
-      if mgr.colTitles == list([f.name for f in PRJ_SINGLETON.tableData.allFields]):
+      if mgr.colTitles == list([f.name for f in self.sharedAttrs.tableData.allFields]):
         # Fields haven't changed since last reset. Types could be different, but nothing
         # will break. So, the table doesn't have to be completely reset
         return
@@ -148,17 +191,15 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       mgr.resetFields()
       mgr.endResetModel()
 
-  def _handleNewPlugin(self, plugin: ParamEditorPlugin):
-    plugin.attachWinRef(self)
-    if plugin.dock:
-      plugin.dock.setParent(self)
+  def saveAllEditorDefaults(self):
+    for editor in self.docks:
+      if isinstance(editor, ParamEditorDockGrouping):
+        for subEditor in editor.editors:
+          subEditor.saveCurStateAsDefault()
+      else:
+        editor.saveCurStateAsDefault()
 
-  @staticmethod
-  def saveAllEditorDefaults():
-    for editor in PRJ_SINGLETON.registerableEditors:
-      editor.saveCurStateAsDefault()
-
-  @PRJ_SINGLETON.actionStack.undoable('Accept Focused Region')
+  @DASM.undoable('Accept Focused Region')
   def acceptFocusedRegion(self):
     """Applies the focused image vertices to the corresponding component in the table"""
     # If the component was deleted
@@ -209,11 +250,39 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     self.compMgr.rmComps()
 
   def addPlugin(self, pluginCls: Type[ParamEditorPlugin], *args, **kwargs):
-    """See PRJ_SINGLETON.addPlugin"""
-    plugin = PRJ_SINGLETON.addPlugin(pluginCls, *args, **kwargs)
+    """
+    From a class inheriting the *PrjParamEditorPlugin*, creates a plugin object
+    that will appear in the S3A toolbar. An entry is created with dropdown options
+    for each editor in *pluginCls*'s *editors* attribute.
+
+    :param pluginCls: Class containing plugin actions
+    :param args: Passed to class constructor
+    :param kwargs: Passed to class constructor
+    """
+    if pluginCls in self.clsToPluginMapping:
+      fns.warnLater(f'Ignoring {pluginCls} since it was previously added', UserWarning)
+
+    plugin: ParamEditorPlugin = pluginCls(*args, **kwargs)
+    return self._addPluginObj(plugin)
+
+  def _addPluginObj(self, plugin: ParamEditorPlugin, overwriteOk=False):
+    """
+    Adds already intsantiated plugin. Discourage public use of this API since most plugin use should be class-based
+    until window registration. This mainly provides for adding spawned plugins from prject data
+    """
+    pluginCls = type(plugin)
+    if not overwriteOk and pluginCls in self.clsToPluginMapping:
+      raise KeyError(f'{pluginCls} already present in window plugins')
+    self.clsToPluginMapping[pluginCls] = plugin
+    if plugin.dock is not None and plugin.dock not in self.docks:
+      self.docks.append(plugin.dock)
+    plugin.attachWinRef(self)
+    if plugin.dock:
+      plugin.dock.setParent(self)
     return plugin
 
-  @PRJ_SINGLETON.actionStack.undoable('Change Main Image')
+
+  @DASM.undoable('Change Main Image')
   def setMainImg(self, fileName: FilePath=None, imgData: NChanImg=None,
                  clearExistingComps=True):
     """
@@ -304,12 +373,12 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     """
     displayIds = self.compDisplay.displayedIds
     srcImgFname = self.srcImgFname
-    if self.exportOnlyVis and displayIds is not None:
+    if self.props[PRJ_CONSTS.EXP_ONLY_VISIBLE] and displayIds is not None:
       exportIds = displayIds
     else:
       exportIds = self.compMgr.compDf.index
     exportDf: df = self.compMgr.compDf.loc[exportIds].copy()
-    if not self.includeFullSourceImgName and srcImgFname is not None:
+    if not self.props[PRJ_CONSTS.INCLUDE_FNAME_PATH] and srcImgFname is not None:
       # Only use the file name, not the whole path
       srcImgFname = srcImgFname.name
     elif srcImgFname is not None:
@@ -331,7 +400,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
     newComps = self.compIo.importByFileType(inFname, self.mainImg.image.shape)
     self.compMgr.addComps(newComps, loadType)
 
-  @PRJ_SINGLETON.actionStack.undoable('Create New Comp', asGroup=True)
+  @DASM.undoable('Create New Comp', asGroup=True)
   def add_focusComps(self, newComps: df, addType=PRJ_ENUMS.COMP_ADD_AS_NEW):
     changeDict = self.compMgr.addComps(newComps, addType)
     # Focus is performed by comp table
@@ -341,7 +410,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       return
     self.changeFocusedComp(self.compMgr.compDf.loc[[changeList[-1]]])
 
-  @PRJ_SINGLETON.actionStack.undoable('Change Focused Component')
+  @DASM.undoable('Change Focused Component')
   def changeFocusedComp(self, newComps: df=None, forceKeepLastChange=False):
     oldSer = self.mainImg.compSer.copy()
     oldImg = self.mainImg.image
@@ -360,7 +429,7 @@ class S3ABase(EditorPropsMixin, QtWidgets.QMainWindow):
       self.mainImg.updateFocusedComp(newComp)
     # Nothing happened since the last component change, so just replace it instead of
     # adding a distinct action to the buffer queue
-    stack = PRJ_SINGLETON.actionStack
+    stack = self.sharedAttrs.actionStack
     if not forceKeepLastChange and stack.undoDescr == 'Change Focused Component':
       stack.actions.pop()
     yield

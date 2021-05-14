@@ -2,19 +2,22 @@ import typing as t
 from pathlib import Path
 from typing import List, Dict, Union, Callable, Any
 
-import numpy as np
 import pandas as pd
 from pyqtgraph.parametertree import Parameter
-from utilitys import ParamEditor, fns
 
-from s3a import PRJ_SINGLETON
+from s3a.shared import SharedAppSettings
+from utilitys import ParamEditor, fns, EditorPropsMixin
+
 from s3a.constants import APP_STATE_DIR
 from s3a.generalutils import safeCallFuncList, hierarchicalUpdate, safeCallFunc
 from s3a.structures import FilePath
 from utilitys.fns import serAsFrame, attemptFileLoad, raiseErrorLater, warnLater
 
 
-class AppStateEditor(ParamEditor):
+class AppStateEditor(EditorPropsMixin, ParamEditor):
+
+  def __initEditorParams__(self, shared: SharedAppSettings):
+    self.quickLoader = shared.quickLoader
 
   def __init__(self, parent=None, paramList: List[Dict] = None,
                saveDir: FilePath = APP_STATE_DIR, fileType='param', name=None,
@@ -38,7 +41,7 @@ class AppStateEditor(ParamEditor):
       rets, errs = safeCallFuncList(legitKeys, exportFuncs, [[saveOnExitDir]] * len(legitKeys))
       updateDict = {k: ret for k, ret in zip(legitKeys, rets) if ret is not None}
       paramState = dict(Parameters=paramState, **updateDict)
-      for editor in PRJ_SINGLETON.quickLoader.listModel.uniqueEditors:
+      for editor in self.quickLoader.listModel.uniqueEditors:
         if editor.stateName == 'Default':
           curSaveName = str(saveOnExitDir/editor.name)
         else:
@@ -92,7 +95,7 @@ class AppStateEditor(ParamEditor):
         warnLater('The following settings could not be loaded (shown as [setting]: [exception])\n'
              + "\n\n".join(errPrint), UserWarning)
       if stateDict:
-        PRJ_SINGLETON.quickLoader.buildFromStartupParams(stateDict)
+        self.quickLoader.buildFromStartupParams(stateDict)
       ret = super().loadParamValues(stateName, paramDict)
     finally:
       self.loading = False
