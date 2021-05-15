@@ -1,26 +1,21 @@
 import warnings
 from collections import defaultdict
 from pathlib import Path
-from typing import Union, Dict, List, Type
+from typing import Union, Dict, List, Sequence
 
-import numpy as np
 import pyqtgraph as pg
 import qdarkstyle
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
-from s3a import PRJ_CONSTS
-from s3a.shared import SharedAppSettings
-from utilitys import ParamEditor, ParamEditorPlugin, RunOpts, PrjParam, fns, \
-  ParamEditorDockGrouping
-
-from s3a.generalutils import hierarchicalUpdate
 from s3a.constants import LAYOUTS_DIR, REQD_TBL_FIELDS, ICON_DIR
-from s3a.constants import PRJ_ENUMS
+from s3a.constants import PRJ_ENUMS, PRJ_CONSTS
+from s3a.generalutils import hierarchicalUpdate
 from s3a.models.s3abase import S3ABase
-from s3a.plugins.file import FilePlugin
 from s3a.plugins.misc import RandomToolsPlugin, MainImagePlugin, CompTablePlugin
-from s3a.structures import XYVertices, FilePath, NChanImg
+from s3a.shared import SharedAppSettings
+from s3a.structures import FilePath, NChanImg
+from utilitys import ParamEditor, ParamEditorPlugin, RunOpts, PrjParam, fns
 
 __all__ = ['S3A']
 
@@ -37,12 +32,13 @@ class S3A(S3ABase):
     shared.colorScheme.registerFunc(self.updateTheme, runOpts=RunOpts.ON_CHANGED, nest=False)
 
 
-  def __init__(self, parent=None, guiMode=False, loadLastState=True, **startupSettings):
+  def __init__(self, parent=None, log: Union[str, Sequence[str]]=PRJ_ENUMS.LOG_TERM,
+               loadLastState=True, **startupSettings):
     # Wait to import quick loader profiles until after self initialization so
     # customized loading functions also get called
     super().__init__(parent, **startupSettings)
     self.setWindowIcon(QtGui.QIcon(str(ICON_DIR/'s3alogo.svg')))
-    if guiMode:
+    if PRJ_ENUMS.LOG_GUI in log:
       warnings.simplefilter('error', UserWarning)
       fns.makeExceptionsShowDialogs(self)
     self.APP_TITLE = 'FICS Semi-Supervised Semantic Annotator'

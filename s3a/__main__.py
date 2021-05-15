@@ -3,6 +3,7 @@ import sys
 import fire
 from pyqtgraph.Qt import QtCore
 
+from s3a.constants import PRJ_ENUMS
 from . import appInst
 from .views.s3agui import S3A
 from utilitys.fns import makeExceptionsShowDialogs
@@ -27,7 +28,7 @@ def main(loadLastState=True, version=False, **profileArgs):
     from .__version__ import __version__
     print(__version__)
     return
-  win = S3A(guiMode=True, loadLastState=loadLastState, **profileArgs)
+  win = S3A(log=PRJ_ENUMS.LOG_GUI, loadLastState=loadLastState, **profileArgs)
   makeExceptionsShowDialogs(win)
   QtCore.QTimer.singleShot(0, win.showMaximized)
   sys.exit(appInst.exec_())

@@ -3,6 +3,8 @@ from typing import Type
 
 import pytest
 
+from s3a.constants import PRJ_ENUMS
+
 os.environ['S3A_PLATFORM'] = 'minimal'
 from s3a import constants
 from helperclasses import CompDfTester
@@ -37,7 +39,7 @@ def sampleComps():
 @pytest.fixture(scope="session", autouse=True)
 def app(tmpdir_factory):
   constants.APP_STATE_DIR = tmpdir_factory.mktemp('settings')
-  app_ = S3A(Image=SAMPLE_IMG_FNAME, guiMode=False, loadLastState=False)
+  app_ = S3A(Image=SAMPLE_IMG_FNAME, log=PRJ_ENUMS.LOG_TERM, loadLastState=False)
   app_.filePlg.projData.create(name=str(tmpdir_factory.mktemp('proj')), parent=app_.filePlg.projData)
   return app_
 

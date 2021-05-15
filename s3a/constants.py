@@ -74,6 +74,13 @@ class PRJ_ENUMS:
   IO_META_MAPPING = 'mapping'
   IO_META_FIELD = 'field'
 
+  # --------------------------
+  # LOGGING / FEEDBACK CAPABILITIES
+  # --------------------------
+  LOG_GUI = 'gui'
+  LOG_TERM = 'term'
+  LOG_FILE = 'file'
+  
 from s3a.structures import ComplexXYVertices, PrjParam, PrjParamGroup, newParam
 
 @dataclass
