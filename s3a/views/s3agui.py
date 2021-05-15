@@ -71,6 +71,7 @@ class S3A(S3ABase):
     self.appStateEditor.addImportExportOpts('layout', loadLayout, saveRecentLayout)
 
     self._buildGui()
+    self._buildMenu()
     self._hookupSignals()
 
     # Load in startup settings
@@ -81,6 +82,10 @@ class S3A(S3ABase):
   def _hookupSignals(self):
     # EDIT
     self.saveAllEditorDefaults()
+
+  def _buildMenu(self):
+    # Nothing to do for now
+    pass
 
   def _buildGui(self):
     self.setDockOptions(self.ForceTabbedDocks)
@@ -153,8 +158,8 @@ class S3A(S3ABase):
     if outFname is not None:
       self.sharedAttrs.tableData.loadCfg(outFname)
 
-  def addPlugin(self, *args, **kwargs):
-    plugin = super().addPlugin(*args, **kwargs)
+  def _addPluginObj(self, plugin: ParamEditorPlugin, overwriteOk=False):
+    plugin = super()._addPluginObj(plugin, overwriteOk=overwriteOk)
     dock = plugin.dock
     if dock is None:
       return
@@ -163,11 +168,12 @@ class S3A(S3ABase):
 
     if plugin.menu is None:
       # No need to add menu and graphics options
-      return
+      return plugin
 
     parentTb = plugin.parentMenu
     if parentTb is not None:
       self.createMenuOptForPlugin(plugin, parentToolbarOrMenu=parentTb)
+    return plugin
 
   def setMainImg(self, fileName: FilePath = None, imgData: NChanImg = None,
                  clearExistingComps=True):

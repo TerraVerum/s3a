@@ -1,3 +1,4 @@
+import inspect
 import pydoc
 from contextlib import ExitStack
 from pathlib import Path
@@ -123,8 +124,15 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     # -----
     # INTERFACE WITH QUICK LOADER / PLUGINS
     # -----
-    for plgCls in ALL_PLUGINS() + [self.sharedAttrs.settingsPlg, self.sharedAttrs.shortcutsPlg]:
-      self.addPlugin(plgCls)
+    toAdd = ALL_PLUGINS()
+    # Insert "settings" and "shortcuts" in a more logical location (after file + edit)
+    toAdd = toAdd[:2] + [self.sharedAttrs.settingsPlg, self.sharedAttrs.shortcutsPlg] \
+              + toAdd[2:]
+    for plg in toAdd:
+      if inspect.isclass(plg):
+        self.addPlugin(plg)
+      else:
+        self._addPluginObj(plg)
 
     # Create links for commonly used plugins
     # noinspection PyTypeChecker

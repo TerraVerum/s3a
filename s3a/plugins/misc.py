@@ -8,11 +8,12 @@ import pandas as pd
 from pyqtgraph import console as pg_console
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
-from s3a.shared import SharedAppSettings
-from utilitys import ParamEditorPlugin, ProcessIO, widgets as uw, ParamEditor, ParamContainer
-
+from s3a.parameditors.quickloader import QuickLoaderEditor
+from utilitys import ParamEditorPlugin, ProcessIO, widgets as uw, ParamEditor, ParamContainer, ShortcutParameter
+import s3a.shared
 from s3a import models, XYVertices, ComplexXYVertices
-from s3a.constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF, PRJ_ENUMS, GEN_PROPS_DIR, SCHEMES_DIR
+from s3a.constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF, PRJ_ENUMS, GEN_PROPS_DIR, SCHEMES_DIR, \
+  SHORTCUTS_DIR
 from s3a.models import s3abase
 from s3a.plugins.base import ProcessorPlugin
 
@@ -100,7 +101,7 @@ class MainImagePlugin(ParamEditorPlugin):
 class CompTablePlugin(ParamEditorPlugin):
   name = 'Component Table'
 
-  def __initEditorParams__(self, shared: SharedAppSettings):
+  def __initEditorParams__(self, shared: s3a.shared.SharedAppSettings):
     super().__initEditorParams__()
     self.dock.addEditors([shared.filter])
 
@@ -224,7 +225,7 @@ class MultiPredictionsPlugin(ProcessorPlugin):
 
   mgr: models.tablemodel.ComponentMgr
 
-  def __initEditorParams__(self, shared: SharedAppSettings):
+  def __initEditorParams__(self, shared: s3a.shared.SharedAppSettings):
     super().__initEditorParams__()
     self.procEditor = shared.multiPredClctn.createProcessorEditor(type(self), self.name + ' Processor')
     self.dock.addEditors([self.procEditor])
@@ -260,3 +261,29 @@ class MultiPredictionsPlugin(ProcessorPlugin):
 
   def lastRunAnalytics(self):
     raise NotImplementedError
+
+class SettingsPlugin(ParamEditorPlugin):
+  name = 'Settings'
+
+  def __initEditorParams__(self, **kwargs):
+    super().__initEditorParams__(**kwargs)
+
+    self.generalProps = ParamEditor(saveDir=GEN_PROPS_DIR, fileType='genprops',
+                                    name='App Settings')
+    self.colorScheme = ParamEditor(saveDir=SCHEMES_DIR, fileType='scheme',
+                                   name='Color Scheme')
+
+    self.dock.addEditors([self.generalProps, self.colorScheme])
+
+
+class ShortcutsPlugin(ParamEditorPlugin):
+  name = 'Shortcuts'
+
+  def __initEditorParams__(self, **kwargs):
+    super().__initEditorParams__(**kwargs)
+
+    self.shortcuts = ShortcutParameter.setRegistry(createIfNone=True, saveDir=SHORTCUTS_DIR)
+    self.quickLoader = QuickLoaderEditor()
+
+    self.dock.addEditors([self.shortcuts, self.quickLoader])
+

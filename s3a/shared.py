@@ -5,6 +5,7 @@ from s3a.constants import GEN_PROPS_DIR, SCHEMES_DIR, SHORTCUTS_DIR, IMG_PROC_DI
 from s3a.parameditors.algcollection import AlgCollection
 from s3a.parameditors.quickloader import QuickLoaderEditor
 from s3a.parameditors.table import TableData
+from s3a.plugins.misc import SettingsPlugin, ShortcutsPlugin
 from s3a.processing import ImgProcWrapper, ImageProcess
 from utilitys import ActionStack, ParamEditor, ShortcutParameter, dockPluginFactory
 
@@ -17,16 +18,14 @@ class SharedAppSettings(QtCore.QObject):
     self.tableData = TableData()
     self.filter = self.tableData.filter
 
-
-    self.generalProps = ParamEditor(saveDir=GEN_PROPS_DIR, fileType='genprops',
-                                    name='App Settings')
-    self.colorScheme = ParamEditor(saveDir=SCHEMES_DIR, fileType='scheme',
-                                   name='Color Scheme')
-    self.shortcuts = ShortcutParameter.setRegistry(createIfNone=True, saveDir=SHORTCUTS_DIR)
-    self.quickLoader = QuickLoaderEditor()
     self.imgProcClctn = AlgCollection(ImgProcWrapper, ImageProcess, saveDir=IMG_PROC_DIR,
                                       template=CFG_DIR/'imageproc.yml')
     self.multiPredClctn = AlgCollection(saveDir=MULT_PRED_DIR, template=CFG_DIR/'multipred.yml')
 
-    self.settingsPlg = dockPluginFactory('Settings', [self.generalProps, self.colorScheme])
-    self.shortcutsPlg = dockPluginFactory('Shortcuts', [self.shortcuts, self.quickLoader])
+    self.settingsPlg = SettingsPlugin()
+    self.colorScheme = self.settingsPlg.colorScheme
+    self.generalProps = self.settingsPlg.generalProps
+
+    self.shortcutsPlg = ShortcutsPlugin()
+    self.shortcuts = self.shortcutsPlg.shortcuts
+    self.quickLoader = self.shortcutsPlg.quickLoader
