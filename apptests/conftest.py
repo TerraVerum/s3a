@@ -1,11 +1,10 @@
 import os
+os.environ['S3A_PLATFORM'] = 'minimal'
 from typing import Type
 
 import pytest
 
 from s3a.constants import PRJ_ENUMS
-
-os.environ['S3A_PLATFORM'] = 'minimal'
 from s3a import constants
 from helperclasses import CompDfTester
 from s3a.views.s3agui import S3A
