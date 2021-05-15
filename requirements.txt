@@ -11,4 +11,4 @@ Pillow
 qdarkstyle
 pytest
 matplotlib
-utilitys >= 0.3.10
+utilitys >= 0.3.11
