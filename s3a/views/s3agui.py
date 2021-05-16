@@ -158,8 +158,10 @@ class S3A(S3ABase):
     if outFname is not None:
       self.sharedAttrs.tableData.loadCfg(outFname)
 
-  def _addPluginObj(self, plugin: ParamEditorPlugin, overwriteOk=False):
-    plugin = super()._addPluginObj(plugin, overwriteOk=overwriteOk)
+  def _addPluginObj(self, plugin: ParamEditorPlugin, **kwargs):
+    plugin = super()._addPluginObj(plugin, **kwargs)
+    if not plugin:
+      return
     dock = plugin.dock
     if dock is None:
       return
@@ -172,7 +174,7 @@ class S3A(S3ABase):
 
     parentTb = plugin.parentMenu
     if parentTb is not None:
-      self.createMenuOptForPlugin(plugin, parentToolbarOrMenu=parentTb)
+      plugin.addToWindow(self, parentToolbarOrMenu=parentTb)
     return plugin
 
   def setMainImg(self, fileName: FilePath = None, imgData: NChanImg = None,
@@ -247,26 +249,6 @@ class S3A(S3ABase):
     """
     self.hasUnsavedChanges = False
     self.close()
-
-  def createMenuOptForPlugin(self, plugin: ParamEditorPlugin, parentToolbarOrMenu=None):
-    if isinstance(parentToolbarOrMenu, QtWidgets.QToolBar):
-      btn = QtWidgets.QToolButton()
-      btn.setText(plugin.name)
-      parentToolbarOrMenu.addWidget(btn)
-      parentToolbarOrMenu = btn
-      btn.addMenu = btn.setMenu
-      btn.addAction = lambda act: act.triggered.connect(btn.click)
-      btn.setPopupMode(btn.InstantPopup)
-    parentToolbarOrMenu.addMenu(plugin.menu)
-    oldShow = plugin.dock.showEvent
-    def show_fixDockWidth(ev):
-      oldShow(ev)
-      dock = plugin.dock
-      dock.raise_()
-      dock.activateWindow()
-      if dock.width() < dock.biggestMinWidth + 100:
-        self.resizeDocks([dock], [dock.biggestMinWidth + 100], QtCore.Qt.Horizontal)
-    plugin.dock.showEvent = show_fixDockWidth
 
   def _populateLoadLayoutOptions(self):
     self.layoutEditor.addDirItemsToMenu(self.menuLayout)
