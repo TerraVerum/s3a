@@ -40,6 +40,20 @@
         "visible": true,
         "attributes": []
     }, {
+        "type": "ellipse",
+        "classId": 2,
+        "probability": 100,
+        "cx": 100,
+        "cy": 100,
+        "rx": 35,
+        "ry": 55,
+        "angle": 0,
+        "groupId": 0,
+        "pointLabels": {},
+        "locked": false,
+        "visible": true,
+        "attributes": []
+    }, {
         "type": "meta",
         "name": "lastAction",
         "timestamp": 1600628979793

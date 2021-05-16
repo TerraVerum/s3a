@@ -44,23 +44,6 @@ def stackedVertsPlusConnections(vertList: ComplexXYVertices) -> (XYVertices, np.
   return XYVertices(allVerts, dtype=float), isfinite
   #return XYVertices(dtype=float)
 
-
-def splitListAtNans(concatVerts:XYVertices):
-  """
-  Utility for taking a single list of nan-separated region vertices
-  and breaking it into several regions with no nans.
-  """
-  allVerts = []
-  nanEntries = np.nonzero(np.isnan(concatVerts[:,0]))[0]
-  curIdx = 0
-  for nanEntry in nanEntries:
-    curVerts = concatVerts[curIdx:nanEntry,:].astype('int')
-    allVerts.append(curVerts)
-    curIdx = nanEntry+1
-  # Account for final grouping of verts
-  allVerts.append(concatVerts[curIdx:,:].astype('int'))
-  return ComplexXYVertices(allVerts, coerceListElements=True)
-
 def getClippedBbox(arrShape: tuple, bbox: TwoDArr, margin: int):
   """
   Given a bounding box and margin, create a clipped bounding box that does not extend
@@ -110,30 +93,6 @@ def largestList(verts: List[XYVertices]) -> XYVertices:
 
 def augmentException(ex: Exception, prependedMsg: str):
   ex.args = (prependedMsg + str(ex),)
-
-def makeUniqueBaseClass(obj: Any):
-  """
-  Overwrites obj's class to a mixin base class.
-  Property objects only work in Python if assigned to the *class* of an object, e.g.
-  >>> class b:
-  >>>   num = property(lambda self: 4)
-  >>> ob = b()
-  >>> ob.num # works as expected
-  >>> ob.num2 = property(lambda self: 6)
-  >>> ob.num2 # Property object at ... -- NOT AS EXPECTED!
-  To work around this, simply use <type(ob).num2 = ...>. However, for regisetering properties,
-  this means *all* objects of that type will have the properties of all other objects.
-  To fix this, a mixin is added to this object and the property is added to the mixin.
-  That way, the original object class is not altered, and each separate object will not
-  end up sharing the same parameters.
-  In summary, this feature enables the assignment
-  >>> type(ob).a = property(...)
-  without all other `b` objects also receiving this property.
-  """
-  class mixin(type(obj)): pass
-  obj.__class__ = mixin
-  return mixin
-
 
 def lower_NoSpaces(name: str):
   return name.replace(' ', '').lower()
@@ -280,7 +239,7 @@ def getCroppedImg(image: NChanImg, verts: np.ndarray, margin=0, *otherBboxes: np
   else:
     return croppedImg, compCoords
 
-def imgCornerVertices(img: NChanImg=None):
+def imgCornerVertices(img: NChanImg=None) -> XYVertices:
   """Returns [x,y] vertices for each corner of the input image"""
   if img is None:
     return XYVertices()
@@ -328,16 +287,6 @@ def resize_pad(img: NChanImg, newSize: Tuple[int, int], interp=cv.INTER_NEAREST,
   if needsRotate:
     paddedImg = cv.rotate(paddedImg, cv.ROTATE_90_COUNTERCLOCKWISE)
   return paddedImg
-
-@contextmanager
-def monkeyPatch(obj, toChange: str, newVal):
-  oldVal = getattr(obj, toChange, None)
-  setattr(obj, toChange, newVal)
-  yield
-  if oldVal is None:
-    delattr(obj, toChange)
-  else:
-    setattr(obj, toChange, oldVal)
 
 def showMaskDiff(oldMask: BlackWhiteImg, newMask: BlackWhiteImg):
   infoMask = np.tile(oldMask[...,None].astype('uint8')*255, (1,1,3))

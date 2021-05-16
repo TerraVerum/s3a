@@ -8,7 +8,7 @@ from pyqtgraph.Qt import QtWidgets
 
 __all__ = ['appInst', 'S3A', 'REQD_TBL_FIELDS',
            'ComplexXYVertices', 'XYVertices', 'PRJ_CONSTS', 'ComponentIO',
-           'ProjectData', '__version__']
+           'ProjectData', '__version__', 'PRJ_ENUMS']
 
 pg.setConfigOptions(imageAxisOrder='row-major')
 
@@ -37,7 +37,7 @@ import s3a.structures
 
 from ._io import ComponentIO, defaultIo
 from s3a.structures import XYVertices, ComplexXYVertices
-from s3a.constants import REQD_TBL_FIELDS, PRJ_CONSTS, CFG_DIR
+from s3a.constants import REQD_TBL_FIELDS, PRJ_CONSTS, CFG_DIR, PRJ_ENUMS
 
 from .views.s3agui import S3A
 

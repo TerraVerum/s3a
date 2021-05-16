@@ -73,8 +73,10 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
 
   def __initEditorParams__(self, shared: SharedAppSettings):
     with shared.colorScheme.setBaseRegisterPath(self.__groupingName__):
-      self.updateColors = shared.colorScheme.registerFunc(
+      # Use setattr so pycharm autocomplete doesn't forget arg hints
+      proc = shared.colorScheme.registerFunc(
         self.updateColors, runOpts=RunOpts.ON_CHANGED, nest=False, ignoreKeys=['hideFocused'])
+      setattr(self, 'updateColors', proc)
 
   def __init__(self, parent=None):
     super().__init__(size=1, pxMode=False)

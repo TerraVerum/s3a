@@ -222,6 +222,6 @@ def test_superannotate_import():
   with pytest.raises(ValueError):
     io.importByFileType(file)
   df = io.importByFileType(file, parseErrorOk=True).reset_index(drop=True)
-  assert len(df) == 2
+  assert len(df) == 3
   loadedVerts = df.at[df.index[1], REQD_TBL_FIELDS.VERTICES].stack()
   assert len(loadedVerts) == 17

@@ -20,7 +20,7 @@ __all__ = ['CompSortFilter', 'CompDisplayFilter']
 Signal = QtCore.Signal
 QISM = QtCore.QItemSelectionModel
 
-class CompSortFilter(QtCore.QSortFilterProxyModel, EditorPropsMixin):
+class CompSortFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
   def __initEditorParams__(self, shared: SharedAppSettings):
     self.tableData = shared.tableData
     
@@ -168,11 +168,11 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
   @DASM.undoable('Split Components', asGroup=True)
   def splitSelectedComps(self):
     """Makes a separate component for each distinct boundary of all selected components"""
-    selection = self._compTbl.ids_rows_colsFromSelection(excludeNoEditCols=False,
-                                                            warnNoneSelection=False)
+    selection = self.selectedIds
+
     if len(selection) == 0:
       return
-    changes = self._compMgr.splitCompVertsById(np.unique(selection[:,0]))
+    changes = self._compMgr.splitCompVertsById(selection)
     self.selectRowsById(changes['added'], QISM.ClearAndSelect)
 
   @DASM.undoable('Merge Components', asGroup=True)
@@ -182,22 +182,16 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     :param keepId: If specified and >0, this is the ID whose peripheral data will be retained
       during the merge. Otherwise, the first selected component is used as the keep ID.
     """
-    selection = self._compTbl.ids_rows_colsFromSelection(excludeNoEditCols=False,
-                                                         warnNoneSelection=False)
+    selection = self.selectedIds
 
     if len(selection) < 2:
       # Nothing to do
       return
     if keepId < 0:
-      keepId = selection[0,0]
-    try:
-      self._compMgr.mergeCompVertsById(np.unique(selection[:,0]), keepId)
-    except UserWarning:
-      # No merge was performed, don't alter the table selection
-      raise
-    else:
-      self.selectRowsById(np.array([keepId]), QISM.ClearAndSelect)
+      keepId = selection[0]
 
+    self._compMgr.mergeCompVertsById(selection, keepId)
+    self.selectRowsById(np.array([keepId]), QISM.ClearAndSelect)
 
   def removeSelectedCompOverlap(self):
     """

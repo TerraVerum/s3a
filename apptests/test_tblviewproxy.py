@@ -2,9 +2,11 @@ import cv2 as cv
 import numpy as np
 import pandas as pd
 import pytest
+from pyqtgraph.Qt import QtCore
 
 from s3a import appInst
 from s3a.constants import REQD_TBL_FIELDS
+from s3a.generalutils import imgCornerVertices, cvImread_rgb
 from s3a.structures import ComplexXYVertices, XYVertices
 from s3a.views.tableview import CompTableView
 
@@ -33,6 +35,7 @@ def test_split_selected_comps(app, mgr):
   verts = ComplexXYVertices.fromBwMask(compMask > 0)
   comp = mgr.tableData.makeCompDf()
   comp.at[comp.index[0], REQD_TBL_FIELDS.VERTICES] = verts
+  app.clearBoundaries()
   app.add_focusComps(comp)
 
   app.compTbl.selectAll()
@@ -41,7 +44,27 @@ def test_split_selected_comps(app, mgr):
   mgr.actionStack.undo()
   assert len(mgr.compDf) == 1
   # Nothing should happen
+  app.compDisplay.selectedIds = mgr.compDf.index
   app.compDisplay.splitSelectedComps()
+
+def test_rm_overlap(app):
+  verts = [imgCornerVertices(np.zeros(shape)) for shape in ([100,100], [200,200])]
+  comps = app.sharedAttrs.tableData.makeCompDf(2)
+  comps[REQD_TBL_FIELDS.VERTICES] = [ComplexXYVertices([v]) for v in verts]
+  cd = app.compDisplay
+  app.add_focusComps(comps)
+  old = comps.copy()
+  cd.selectedIds = comps.index
+  cd.removeSelectedCompOverlap()
+  assert len(app.compMgr.compDf) == 1
+
+  app.clearBoundaries()
+  app.add_focusComps(old)
+  cd.selectedIds = old.index.to_numpy()[::-1]
+  cd.removeSelectedCompOverlap()
+  assert len(app.compMgr.compDf) == 2
+  checkVerts = app.compMgr.compDf.loc[old.index[-1], REQD_TBL_FIELDS.VERTICES]
+  assert len(checkVerts[0]) > 4
 
 @pytest.mark.withcomps
 def test_set_cells_as(app, mgr):
@@ -76,11 +99,6 @@ def test_set_as_gui(sampleComps):
   allCols = np.arange(len(view.mgr.colTitles))
   editCols = np.setdiff1d(allCols, mgr.noEditColIdxs)
 
-  oldSetData = view.popup.setData
-  def patchedSetData(*args, **kwargs):
-    oldSetData(*args, **kwargs)
-    view.popup.dirtyColIdxs = editCols
-  view.popup.setData = patchedSetData
   numEditCols = len(editCols)
   selectionIdxs = np.tile(np.arange(len(mgr.compDf))[:,None], (numEditCols,3))
   selectionIdxs[:,2] = np.tile(editCols, len(mgr.compDf))
@@ -97,7 +115,6 @@ def test_move_comps(app, mgr, copyHelper):
   app.compDisplay.finishRegionCopier(True)
   compCopiedCompDfs(oldComps, mgr.compDf)
 
-
 @pytest.mark.withcomps
 def test_copy_comps(app, mgr, copyHelper):
   copyHelper(copyMode=True)
@@ -105,6 +122,38 @@ def test_copy_comps(app, mgr, copyHelper):
   app.compDisplay.finishRegionCopier(True)
   assert len(mgr.compDf) == 2*len(oldComps)
   compCopiedCompDfs(oldComps, mgr.compDf, newStartIdx=len(oldComps))
+
+def test_scale_viewbox(app, mgr):
+  verts = ComplexXYVertices([XYVertices([[0, 0], [35, 35]])])
+  comps = mgr.tableData.makeCompDf(1)
+  comps[REQD_TBL_FIELDS.VERTICES] = [verts]
+  mgr.addComps(comps)
+
+  app.compDisplay.scaleViewboxToSelectedIds(comps.index, padding=0)
+  bounds = np.array(app.mainImg.getViewBox().targetRange())
+  assert np.array_equal(bounds, [[0, 35], [0, 35]])
+
+@pytest.mark.smallimage
+def test_export_overlay(app, mgr, tmp_path):
+  verts = imgCornerVertices(app.mainImg.image)
+  comps = mgr.tableData.makeCompDf(1)
+  comps[REQD_TBL_FIELDS.VERTICES] = [ComplexXYVertices([verts])]
+  app.add_focusComps(comps)
+  app.compDisplay.regionPlot.updateColors(labelColormap='Reds', fillAlpha=1.0)
+  exportLoc = str(tmp_path/'export.png')
+  app.compDisplay.exportCompOverlay(outFile=exportLoc)
+  img = cvImread_rgb(exportLoc)
+  checkPix = img[20,20,:]
+  # Red channel should be largest for overlay export and red colormap
+  assert np.array_equal(checkPix, [255,0,0])
+
+@pytest.mark.withcomps
+def test_sorted_tbl(app, mgr):
+  proxy = app.sortFilterProxy
+  proxy.sort(0, QtCore.Qt.DescendingOrder)
+  ordering = [proxy.index(ii,0).data(QtCore.Qt.EditRole) for ii in range(len(mgr.compDf))]
+  assert np.array_equal(mgr.compDf.index[::-1], ordering)
+
 
 def compCopiedCompDfs(old: pd.DataFrame, new: pd.DataFrame, newStartIdx=0):
   for ii in range(len(old)):

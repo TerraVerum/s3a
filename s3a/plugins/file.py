@@ -191,9 +191,14 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     self.projData.create(name=defaultName, parent=parent)
 
   def open(self, cfgFname: FilePath=None, cfgDict: dict=None):
-    if cfgFname is not None and Path(cfgFname).resolve() != self.projData.cfgFname:
+    _, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
+    if (cfgFname is not None
+        and (Path(cfgFname).resolve() != self.projData.cfgFname
+          or not pg.eq(cfgDict, self.projData.cfg)
+        )
+    ):
       self.win.setMainImg(None)
-      self.projData.loadCfg(cfgFname, cfgDict)
+      self.projData.loadCfg(cfgFname, cfgDict, force=True)
 
   def open_gui(self):
     fname = fns.popupFilePicker(None, 'Select Project File', f'S3A Project (*.{PROJ_FILE_TYPE})')
@@ -553,10 +558,12 @@ class ProjectData(QtCore.QObject):
 
     loadPrjPlugins = baseCfgDict.get('plugin-cfg', {})
     newPlugins = {k: v for (k, v) in loadPrjPlugins.items() if k not in self.pluginCfg}
-    if self.pluginCfg and newPlugins:
-      raise ValueError('The previous project loaded custom plugins, which cannot easily'
-                       ' be removed. To load a new project, close and re-open S3A with'
-                       ' the new project instance instead.')
+    removedPlugins = set(self.pluginCfg).difference(loadPrjPlugins)
+    if removedPlugins:
+      raise ValueError(f'The previous project loaded custom plugins, which cannot easily'
+                       f' be removed. To load a new project without plugin(s) {", ".join(removedPlugins)}, close and'
+                       f' re-open S3A with the new project instance instead. Alternatively, add these missing plugins'
+                       f' to the project you wish to add.')
     warnPlgs = []
     for plgName, plgPath in newPlugins.items():
       # noinspection PyTypeChecker

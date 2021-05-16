@@ -53,10 +53,25 @@ def test_bad_user_profile(ql):
   invalidFileDict = {'colorscheme': 'doesnt exist'}
   with pytest.warns(UserWarning):
     ql.buildFromStartupParams(invalidFileDict)
+
+def test_load_state(ql):
+  state = {
+    'Parameters': {
+      'Color Scheme': {'Default': None},
+      'Vertices Processor': {'Default': None},
+      'App Settings': {'Default': None}
+    }
+  }
+  ql.loadParamValues('test', state)
+  assert len(ql.params.childs) == 3
+  for ch in ql.params:
+    assert 'Default' in ch.names
 #
-# def test_bad_load_state(qtbot):
-#   badLoad = dict(name='Non-existent editor', type='group',
-#                  children=[dict(name='bad action', type='shortcutkeyseq', value='Test')])
-#   pstate = dict(name='test', type='group', children=[badLoad])
-#   with pytest.warns(UserWarning):
-#     ql.loadParamValues('bad state', pstate)
+def test_bad_load_state(ql):
+  state = {
+    'Parameters': {
+      'Nonsense': {'Default': None},
+    }
+  }
+  with pytest.raises(ValueError):
+    ql.loadParamValues('test', state)

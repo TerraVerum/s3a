@@ -273,14 +273,14 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     plugin: ParamEditorPlugin = pluginCls(*args, **kwargs)
     return self._addPluginObj(plugin)
 
-  def _addPluginObj(self, plugin: ParamEditorPlugin, overwriteOk=False):
+  def _addPluginObj(self, plugin: ParamEditorPlugin, overwriteExisting=False):
     """
     Adds already intsantiated plugin. Discourage public use of this API since most plugin use should be class-based
     until window registration. This mainly provides for adding spawned plugins from prject data
     """
     pluginCls = type(plugin)
-    if not overwriteOk and pluginCls in self.clsToPluginMapping:
-      raise KeyError(f'{pluginCls} already present in window plugins')
+    if not overwriteExisting and pluginCls in self.clsToPluginMapping:
+      return None
     self.clsToPluginMapping[pluginCls] = plugin
     if plugin.dock is not None and plugin.dock not in self.docks:
       self.docks.append(plugin.dock)

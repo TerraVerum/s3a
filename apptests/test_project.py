@@ -3,7 +3,7 @@ import shutil
 import pytest
 
 from apptests.helperclasses import CompDfTester
-from apptests.testingconsts import SAMPLE_SMALL_IMG_FNAME, SAMPLE_SMALL_IMG, SAMPLE_IMG_FNAME
+from apptests.testingconsts import SAMPLE_SMALL_IMG_FNAME, SAMPLE_SMALL_IMG, SAMPLE_IMG_FNAME, TEST_FILE_DIR
 from apptests.conftest import dfTester
 from s3a import S3A
 from s3a.plugins.file import ProjectData, FilePlugin
@@ -78,13 +78,62 @@ def test_export_anns(prjWithSavedStuff, tmp_path):
   # Make sure self export doesn't break anything
   prj.exportAnnotations(prj.location)
 
-def test_bad_ann_load(prjWithSavedStuff,sampleComps):
-  with pytest.raises(IOError):
-    prjWithSavedStuff.addAnnotation(data=sampleComps, image='garbage.png')
-
 def test_load_startup_img(tmp_path, app, filePlg):
   prjcfg = {'startup': {'image': str(SAMPLE_SMALL_IMG_FNAME)}}
   oldCfg = filePlg.projData.cfgFname, filePlg.projData.cfg
   filePlg.open(tmp_path/'test-startup.s3aprj', prjcfg)
   assert app.srcImgFname == SAMPLE_SMALL_IMG_FNAME
   filePlg.open(*oldCfg)
+
+def test_load_with_plg(monkeypatch, tmp_path):
+  # Make separate win to avoid clobbering existing menus/new projs
+  app = S3A()
+  filePlg = app.filePlg
+  with monkeypatch.context() as m:
+    m.syspath_prepend(str(TEST_FILE_DIR))
+    from files.sample_plg import SamplePlugin
+    cfg = {
+      'plugin-cfg': {'Test': 'files.sample_plg.SamplePlugin'}
+    }
+    filePlg.open(tmp_path/'plgprj.s3aprj', cfg)
+    assert SamplePlugin in app.clsToPluginMapping
+    assert len(filePlg.projData.spawnedPlugins) == 1
+    assert filePlg.projData.spawnedPlugins[0].win
+
+  # Remove existing plugin
+  cfg = {
+    'plugin-cfg': {'New Name': 'nonsense.Plugin'}
+  }
+  with pytest.raises(ValueError):
+    filePlg.open(tmp_path/'plgprj2.s3aprj', cfg)
+  # Add nonsense plugin
+  cfg['plugin-cfg']['Test'] = 'files.sample_plg.SamplePlugin'
+  with pytest.warns(UserWarning):
+    filePlg.open(tmp_path/'plgprj2.s3aprj', cfg)
+
+def test_unique_tblcfg(tmp_path, tmpProj):
+  tblCfg = {'fields': {'Test': ''}}
+  tblName = tmp_path/'tbl.yml'
+  fns.saveToFile(tblCfg, tblName)
+
+  cfg = {'table-cfg': str(tblName)}
+  tmpProj.loadCfg(tmp_path/'myprj.s3aprj', cfg)
+  assert tmpProj.tableData.fieldFromName('Test')
+
+def test_img_ops(tmpProj, tmp_path):
+  img = {'data': SAMPLE_SMALL_IMG, 'name': 'my image.png'}
+  cfg = {'images': [img]}
+  tmpProj.loadCfg(tmp_path/'test.s3aprj', cfg)
+  assert len(tmpProj.images) == 1
+  assert tmpProj.images[0].name == 'my image.png'
+
+  with pytest.raises(IOError):
+    tmpProj.addImage('this image does not exist.png', copyToProj=True)
+
+def test_ann_opts(prjWithSavedStuff, sampleComps):
+  img, toRemove = next(iter(prjWithSavedStuff.imgToAnnMapping.items()))
+  prjWithSavedStuff.removeAnnotation(toRemove)
+  assert img not in prjWithSavedStuff.imgToAnnMapping
+
+  with pytest.raises(IOError):
+    prjWithSavedStuff.addAnnotation(data=sampleComps, image='garbage.png')
