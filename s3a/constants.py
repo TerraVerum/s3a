@@ -18,7 +18,7 @@ MENU_OPTS_DIR = BASE_DIR/'menuopts'
 # EDITORS
 # -----
 LAYOUTS_DIR = MENU_OPTS_DIR/'layouts'
-QUICK_LOAD_DIR = MENU_OPTS_DIR/'quickloaders'
+QUICK_LOAD_DIR = MENU_OPTS_DIR/'quickloader'
 SCHEMES_DIR = MENU_OPTS_DIR/'schemes'
 GEN_PROPS_DIR = MENU_OPTS_DIR/'genprops'
 SHORTCUTS_DIR = MENU_OPTS_DIR/'shortcuts'

@@ -10,6 +10,7 @@ from utilitys.params.pgregistered import ShortcutKeySeqParameter as ShcKeySeq
 
 
 from s3a.constants import QUICK_LOAD_DIR
+from utilitys.typeoverloads import FilePath
 from ..generalutils import lower_NoSpaces
 
 class EditorListModel(QtCore.QAbstractListModel):
@@ -98,13 +99,11 @@ def _addRmOption(param: Parameter):
 
 class QuickLoaderEditor(ParamEditor):
   def __init__(self, parent=None, editorList: List[ParamEditor]=None):
-    super().__init__(parent, paramList=[], saveDir=None, fileType='loader',
-                     name='Editor State Shortcuts')
+    super().__init__(parent, paramList=[], saveDir=QUICK_LOAD_DIR, fileType='loader',
+                     name='Quick Loader')
     if editorList is None:
       editorList = []
     self.listModel = EditorListModel(editorList, self)
-    # TODO: Get quickloader working
-    self.saveAsBtn.hide()
 
     self.addNewParamState = uw.PopupLineEditor(self, self.listModel, clearOnComplete=False)
     self.centralLayout.insertWidget(0, self.addNewParamState)
@@ -112,35 +111,9 @@ class QuickLoaderEditor(ParamEditor):
     # self.addNewParamState.completer().activated.connect(self.addFromLineEdit)
     self.addNewParamState.returnPressed.connect(self.addFromLineEdit)
 
-  def _loadParamState(self, stateName: Union[str, Path], stateDict: dict=None,
-                     addChildren=False, removeChildren=False, applyChanges=True):
-    ret = super()._loadParamState(stateName, stateDict, applyChanges=False)
-    invalidGrps = []
-    editorNames = [e.name for e in self.listModel.uniqueEditors]
-    hasInvalidEntries = False
-    for grp in self.params: # type: GroupParameter
-      name = grp.name()
-      # Get corresponding editor
-      try:
-        idx = editorNames.index(name)
-        editor = self.listModel.uniqueEditors[idx]
-      except ValueError:
-        invalidGrps.append(grp)
-        hasInvalidEntries = True
-        continue
-      for act in grp: # type: ShcKeySeq
-        self.addActForEditor(editor, act.name(), act)
-    for grp in invalidGrps:
-      grp.remove()
-    if hasInvalidEntries:
-      errMsg = f"The following editors were not recognized:\n" \
-               f"{[grp.name() for grp in invalidGrps]}\n" \
-               f"Must be one of:\n" \
-               f"{[e.name for e in self.listModel.uniqueEditors]}"
-      warnLater(errMsg, UserWarning)
-    if applyChanges:
-      self.applyChanges(newName=stateName, newState=stateDict)
-    return ret
+  def saveParamValues(self, saveName: str=None, paramState: dict=None, **kwargs):
+    kwargs.pop('includeDefaults', None)
+    return super().saveParamValues(saveName, paramState, **kwargs, includeDefaults=True)
 
   def buildFromStartupParams(self, startupSrc: dict):
     # If quick loader is given along with other params, use the quick loader as the
@@ -169,19 +142,25 @@ class QuickLoaderEditor(ParamEditor):
     else:
       self.listModel.addEditors([dock])
 
-  def saveCurStateAsDefault(self):
-    # TODO: Get quickloader working
-    return
-    super().saveCurStateAsDefault()
+  def loadParamValues(self, stateName: Union[str, Path], stateDict: dict=None, useDefaults=True,
+                      **kwargs):
+    stateDict = self._parseStateDict(stateName, stateDict)
+    if useDefaults:
+      self.params.clearChildren()
+    if stateDict['Parameters']:
+      for editorName, shcOpts in stateDict['Parameters'].items():
+        matches = [e for e in self.listModel.uniqueEditors if e.name == editorName]
+        if len(matches) != 1:
+          raise ValueError(f'Exactly one editor name must match "{editorName}" but {len(matches)}'
+                           f' were found')
+        editor = matches[0]
+        for state, shcValue in shcOpts.items():
+          self.addActForEditor(editor, state, shcValue)
+    return super().loadParamValues(stateName, stateDict, useDefaults=False, candidateParams=[],
+                                   **kwargs)
 
-  def saveParamValues(self, saveName: str=None, paramState: dict=None, **kwargs):
-    # TODO: Get quickloader working
-    # stateDict = fns.paramDictWithOpts(self.params, ['type'], [ShcKeySeq, GroupParameter])
-    kwargs['paramState'] = {}
-    super().saveParamValues(saveName, **kwargs)
-
-  def applyChanges(self, **kwargs):
-    super().applyChanges(**kwargs)
+  def applyChanges(self, newName: FilePath=None, newState: dict=None):
+    super().applyChanges(newName, newState)
     for grp in self.params.childs: # type: GroupParameter
       if grp.hasChildren():
         act: ShcKeySeq = next(iter(grp))
@@ -205,7 +184,13 @@ class QuickLoaderEditor(ParamEditor):
     # self.addNewParamState.clear()
 
 
-  def addActForEditor(self, editor: ParamEditor, paramState: str, act: ShcKeySeq=None):
+  def addActForEditor(self, editor: ParamEditor, paramState: str, shortcut: str=None):
+    """
+    Ensures the specified editor shortcut will exist in the quickloader parameter tree. The
+    action can either be None (if no shortcut should be defaulted) or the starting shortcut
+    value.
+    """
+    act = None
     if editor.name not in self.params.names:
       curGroup = self.params.addChild(dict(name=editor.name, type='group', removable=True))
     else:
@@ -213,15 +198,16 @@ class QuickLoaderEditor(ParamEditor):
       # It is not made possible through the context menu. Fix this
       curGroup = self.params.names[editor.name]
       _addRmOption(curGroup)
-      if act is None and paramState in curGroup.names:
+      if paramState in curGroup.names:
         act = curGroup.child(paramState)
 
     if paramState in curGroup.names and act is not None and act.isActivateConnected:
-      # Duplicate option, no reason to add
+      # Duplicate option, no reason to add, but value might be different
+      act.setValue(shortcut)
       return
     curGroup.opts['removable'] = True
     if act is None:
-      act = ShcKeySeq(name=paramState, value='', removable=True, type='shortcutkeyseq')
+      act = ShcKeySeq(name=paramState, value=shortcut or '', removable=True, type='shortcutkeyseq')
     curGroup.addChild(act)
 
     act.opts['removable'] = True
