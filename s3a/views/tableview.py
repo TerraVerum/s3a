@@ -49,7 +49,7 @@ class MinimalTableModel(ComponentMgr):
       else:
         self.checkedColIdxs.remove(index.column())
       return True
-    return super().setData(index, value, role)
+    yield from super().setData(index, value, role)
 
 
 class PopupTableDialog(QtWidgets.QDialog):
