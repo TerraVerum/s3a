@@ -80,6 +80,13 @@ class PRJ_ENUMS:
   LOG_GUI = 'gui'
   LOG_TERM = 'term'
   LOG_FILE = 'file'
+
+  # --------------------------
+  # PROCESSING
+  # --------------------------
+  PROC_ADD_TOP  = 'top'
+  PROC_ADD_PRIM = 'primitive'
+  PROC_NO_ADD   = None
   
 from s3a.structures import ComplexXYVertices, PrjParam, PrjParamGroup, newParam
 

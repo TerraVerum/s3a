@@ -15,8 +15,8 @@ StrList = t.List[str]
 StrCol = t.Collection[str]
 
 class ImageProcess(NestedProcess):
-  mainInputKeys = ['image']
-  mainResultKeys = ['image']
+  inMap = ['image']
+  outMap = ['image']
 
   @classmethod
   def _cmpPrevCurInfos(cls, prevInfos: t.List[dict], infos: t.List[dict]):
@@ -94,10 +94,10 @@ _winRefs = {}
 class MultiPredictionProcess(ImageProcess):
   def _stageSummaryWidget(self):
     return QtWidgets.QWidget()
-  mainResultKeys = ['components']
+  outMap = ['components']
 
 class CategoricalProcess(NestedProcess):
   def _stageSummaryWidget(self):
     pass
 
-  mainResultKeys = ['categories', 'confidences']
+  inMap = ['categories', 'confidences']
