@@ -1,5 +1,6 @@
 [![pipeline status](https://gitlab.com/ficsresearch/s3a/badges/development/pipeline.svg)](https://gitlab.com/ficsresearch/s3a/-/commits/development)
 [![coverage report](https://gitlab.com/ficsresearch/s3a/badges/development/coverage.svg)](https://gitlab.com/ficsresearch/s3a/-/commits/development)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=ficsresearch_s3a&metric=sqale_rating)](https://sonarcloud.io/dashboard?id=ficsresearch_s3a)
 
 # Semi-Supervised Semantic Annotator (S3A)
 
