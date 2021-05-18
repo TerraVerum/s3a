@@ -16,7 +16,7 @@ primitive:
     - Opening
     - Closing
     - Keep Largest Comp
-    - Rm Small Comps
+    - Remove Small Comps
 
 top:
   Primitive Grab Cut:

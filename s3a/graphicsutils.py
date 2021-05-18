@@ -153,7 +153,7 @@ class DropList(QtWidgets.QListWidget):
 
   def deleteSelected(self):
     selectedIdxs = self.selectionModel().selectedIndexes()
-    selectedRows = reversed(sorted([i.row() for i in selectedIdxs]))
+    selectedRows = np.sort([i.row() for i in selectedIdxs])[::-1]
     for row in selectedRows:
       self.takeItem(row)
 

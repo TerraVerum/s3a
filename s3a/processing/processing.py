@@ -43,14 +43,19 @@ class ImageProcess(NestedProcess):
     sizeToAxMapping: t.Dict[tuple, pg.PlotItem] = {}
     for ii, info in enumerate(infoToDisplay):
       pltItem: pg.PlotItem = outGrid.addPlot(title=info.get('name', None))
-      pltItem.getViewBox().invertY(True)
-      pltItem.getViewBox().setAspectLocked(True)
+      vb = pltItem.getViewBox()
+      vb.invertY(True)
+      vb.setAspectLocked(True)
       npImg = info['image']
-      sameSizePlt = sizeToAxMapping.get(npImg.shape[:2], None)
+      imShp = npImg.shape[:2]
+      margin = np.array(imShp)*2
+      lim = max(margin + imShp)
+      vb.setLimits(maxXRange=lim, maxYRange=lim)
+      sameSizePlt = sizeToAxMapping.get(imShp, None)
       if sameSizePlt is not None:
         pltItem.setXLink(sameSizePlt)
         pltItem.setYLink(sameSizePlt)
-      sizeToAxMapping[npImg.shape[:2]] = pltItem
+      sizeToAxMapping[imShp] = pltItem
       imgItem = pg.ImageItem(npImg)
       pltItem.addItem(imgItem)
 

@@ -195,7 +195,7 @@ def crop_to_local_area(image: NChanImg,
                    boundSlices=boundSlices, historyMask=curHistory, resizeRatio=ratio, summaryInfo=info)
   if ratio < 1:
     for kk in 'image', 'prevCompMask', 'historyMask':
-      out[kk] = cv_resize(out[kk], ratio)
+      out[kk] = cv_resize(out[kk], ratio, interpolation='INTER_NEAREST')
   return out
 
 def apply_process_result(image: NChanImg, asForeground: bool,
@@ -215,7 +215,10 @@ def apply_process_result(image: NChanImg, asForeground: bool,
   if resizeRatio < 1:
     origSize = (boundSlices[0].stop - boundSlices[0].start,
                 boundSlices[1].stop - boundSlices[1].start)
-    change = cv_resize(change, origSize[::-1], asRatio=False, interpolation=cv.INTER_NEAREST)
+    # Without first converting to float, interpolation will be cliped to True/False. This causes
+    # 'jagged' edges in the output
+    change = cv_resize(change.astype(float), origSize[::-1], asRatio=False, interpolation='INTER_LINEAR')
+    change = change > change[change > 0].mean()
   outMask[boundSlices] = change
   foregroundPixs = np.c_[np.nonzero(outMask)]
   # Keep algorithm from failing when no foreground pixels exist
@@ -295,7 +298,7 @@ def keep_largest_comp(image: NChanImg):
   out[labels == maxAreaIdx] = True
   return ProcessIO(image=out)
 
-def rm_small_comps(image: NChanImg, minSzThreshold=30):
+def remove_small_comps(image: NChanImg, minSzThreshold=30):
   areas, labels = _cvConnComps(image, areaOnly=True)
   validLabels = np.flatnonzero(areas >= minSzThreshold) + 1
   out = np.isin(labels, validLabels)
@@ -432,6 +435,9 @@ def binarize_labels(image: NChanImg, labels: BlackWhiteImg, fgVerts: XYVertices,
     keepColors = labels[seeds[:,0], seeds[:,1]]
     out = np.isin(labels, keepColors)
   # Zero out negative regions from previous runs
+  if np.issubdtype(labels.dtype, np.bool_):
+    # Done for stage summary only
+    labels = label(labels)
   if historyMask.shape == out.shape:
     out[historyMask == 1] = False
   nChans = image.shape[2]
@@ -443,8 +449,6 @@ def binarize_labels(image: NChanImg, labels: BlackWhiteImg, fgVerts: XYVertices,
       intensity = image[coords[:,0], coords[:,1],...].mean(0)
       summaryImg[coords[:,0], coords[:,1], :] = intensity
   else:
-    if np.issubdtype(labels.dtype, np.bool_):
-      labels = labels.astype('uint8')
     boundaries = _labelBoundaries_cv(labels, lineThickness)
     summaryImg = image.copy()
     summaryImg[boundaries,...] = [255 for _ in range(nChans)]

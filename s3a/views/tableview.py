@@ -260,13 +260,13 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
     if len(idList) == 0:
       return
     # Make sure the user actually wants this
+    idList = pd.unique(idList)
     dlg = QtWidgets.QMessageBox()
-    confirm  = dlg.question(self, 'Remove Rows', 'Are you sure you want to remove these rows?',
-                 dlg.Yes | dlg.Cancel)
+    confirm  = dlg.question(self, 'Remove Rows', f'Are you sure you want to remove {len(idList)} selected row(s)?',
+                 dlg.Yes | dlg.Cancel, dlg.Yes)
     if confirm == dlg.Yes:
       # Proceed with operation
       # Since each selection represents a row, remove duplicate row indices
-      idList = pd.unique(idList)
       self.mgr.rmComps(idList)
       self.clearSelection()
 

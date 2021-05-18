@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import copy
 import inspect
 import pydoc
@@ -12,10 +13,10 @@ from pathlib import Path
 from pyqtgraph.Qt import QtCore
 from typing_extensions import TypedDict
 
+from s3a import PRJ_ENUMS
 from s3a.constants import MENU_OPTS_DIR
-from utilitys import NestedProcess, RunOpts
+from utilitys import NestedProcess, RunOpts, ProcessIO
 from utilitys import ParamEditor, NestedProcWrapper, fns, ProcessStage, AtomicProcess
-from utilitys.processing import ArgMapper
 from utilitys.typeoverloads import FilePath
 from utilitys.widgets import makeDummySignal
 
@@ -51,8 +52,12 @@ class AlgCollection(ParamEditor):
     if template is not None:
       self.loadParamValues(template)
 
-    # Allow name remapping to take place
-    self.addProcess(ArgMapper())
+    if not self.topProcs:
+      # Ensure at least one top-level processor exists
+      self.addProcess(self.procType('None'), top=True)
+
+    # Make sure fallthroughs are possible, i.e. for really simple image processes
+    self.addProcess(AtomicProcess(lambda **_kwargs: ProcessIO(**_kwargs), name='Fallthrough'))
 
   def createProcessorEditor(self, saveDir: t.Union[str, t.Type], editorName='Processor') -> AlgParamEditor:
     """
@@ -83,12 +88,14 @@ class AlgCollection(ParamEditor):
     """Helper function to wrap a function in an atomic process and add it as a stage"""
     return self.addProcess(AtomicProcess(func, **kwargs), top)
 
-  def parseProcStages(self, stages: t.Sequence[t.Union[dict, str]], name:str=None, add=False, allowOverwrite=False):
+  def parseProcStages(self, stages: t.Sequence[t.Union[dict, str]], name:str=None, add=PRJ_ENUMS.PROC_NO_ADD,
+                      allowOverwrite=False):
     """
     Creates a nested process from a sequence of process stages and optional name
     :param stages: Stages to parse
     :param name: Name of the nested process
-    :param add: Whether to add this new process to the current collection
+    :param add: Whether to add this new process to the current collection's top or primitive process blocks, or
+      to not add at all (if NO_ADD)
     :param allowOverwrite: If `add` is *True*, this determines whether the new process can overwite an already existing
       proess. If `add` is *False*, this value is ignored.
     """
@@ -100,8 +107,8 @@ class AlgCollection(ParamEditor):
         stage = self.parseProcName(stageName, topFirst=False)
       out.addProcess(stage)
     exists = out.name in self.topProcs
-    if add and (not exists or allowOverwrite):
-      self.addProcess(out, allowOverwrite)
+    if add is not PRJ_ENUMS.PROC_NO_ADD and (not exists or allowOverwrite):
+      self.addProcess(out, top=add is PRJ_ENUMS.PROC_ADD_TOP, force=allowOverwrite)
     return out
 
   def parseProcName(self, procName: str, topFirst=True, searchDicts: t.Sequence[dict]=None, **kwargs):
@@ -136,11 +143,9 @@ class AlgCollection(ParamEditor):
   def parseProcDict(self, procDict: dict, topFirst=False):
     # 1. First key is always the process name, values are new inputs for any matching process
     # 2. Second key is whether the process is disabled
-    keys = list(procDict)
-    vals = list(procDict.values())
-    procName = keys[0]
+    procName, updateArgs = next(iter(procDict.items()))
+    procDict.pop(procName)
     proc = self.parseProcName(procName, topFirst=topFirst)
-    updateArgs = vals[0]
     if isinstance(updateArgs, list):
       # TODO: Determine policy for loading nested procs, outer should already know about inner so it shouldn't
       #   _need_ to occur, given outer would've been saved previously
@@ -194,7 +199,7 @@ class AlgCollection(ParamEditor):
     else:
       module = pydoc.locate(moduleName)
     if not module:
-      raise ValueError(f'Module "{module}" not recognized')
+      raise ValueError(f'Module "{moduleName}" not recognized')
     # TODO: Depending on search time, maybe quickly search without formatting?
     procName = formatter(procName)
     # It is possible after name formatting for multiple matches to exist for procName.
@@ -214,7 +219,7 @@ class AlgCollection(ParamEditor):
         if isinstance(attr, ProcessStage):
           return attr
         if callable(attr):
-          return AtomicProcess(attr)
+          return AtomicProcess(attr, **factoryArgs)
     return None
 
   def saveParamValues(self, saveName: str=None, paramState: dict=None, **kwargs):
@@ -247,15 +252,11 @@ class AlgParamEditor(ParamEditor):
       clctn = AlgCollection()
     self.clctn = clctn
     self.treeBtnsWidget.hide()
-    self._unflatProc: t.Optional[NestedProcess] = None
-    """Retained for saving state on swap without flattening the source processor"""
-
-    noneProc = self.clctn.procType('None')
-    clctn.addProcess(noneProc, top=not clctn.topProcs)
 
     procName = next(iter(self.clctn.topProcs))
+    proc = clctn.parseProcName(procName)
     # Set to None first to force switch, init states
-    self.curProcessor = self.clctn.procWrapType(noneProc, self.params)
+    self.curProcessor = self.clctn.procWrapType(proc, self.params)
     _, self.changeProcParam = self.registerFunc(self.changeActiveProcessor, runOpts=RunOpts.ON_CHANGED, returnParam=True,
                                                 overrideBasePath=(), parentParam=self._metaParamGrp,
                                                 proc=procName)
@@ -324,10 +325,10 @@ class AlgParamEditor(ParamEditor):
     clctnState = stateDict['Parameters']
 
     self.clctn.loadParamValues(stateName, clctnState, **kwargs)
-    self.changeActiveProcessor(procName, flatten=self.changeProcParam['flatten'], saveBeforeChange=False)
+    self.changeActiveProcessor(procName, saveBeforeChange=False)
     return super().loadParamValues(stateName, stateDict, candidateParams=[], **kwargs)
 
-  def changeActiveProcessor(self, proc: t.Union[str, NestedProcess], flatten=False, saveBeforeChange=True):
+  def changeActiveProcessor(self, proc: t.Union[str, NestedProcess], saveBeforeChange=True):
     """
     Changes which processor is active.
 
@@ -336,24 +337,19 @@ class AlgParamEditor(ParamEditor):
       pType: popuplineeditor
       limits: []
       title: Algorithm
-    :param flatten: Whether to flatten the processor by ignoring all nested hierarchies except the topmost level
     :param saveBeforeChange: Whether to propagate current algorithm settings to the processor collection before changing
     """
     # TODO: Maybe there's a better way of doing this? Ensures proc label is updated for programmatic calls
-    if saveBeforeChange and self._unflatProc:
-      self.saveParamValues(self.stateName, self._unnestedProcState(self._unflatProc, includeMeta=True),
+    if saveBeforeChange:
+      self.saveParamValues(self.stateName, self._unnestedProcState(self.curProcessor.processor, includeMeta=True),
                            blockWrite=True)
     if isinstance(proc, str):
       proc = self.clctn.parseProcName(proc)
-    unflatProc = proc
-    if flatten:
-      proc = proc.flatten()
     if proc == self.curProcessor.processor:
       return
     self.curProcessor.clear()
     self.params.clearChildren()
     self.curProcessor = self.clctn.procWrapType(proc, self.params)
-    self._unflatProc = unflatProc
     fns.setParamsExpanded(self.tree)
     self.sigProcessorChanged.emit(proc.name)
 

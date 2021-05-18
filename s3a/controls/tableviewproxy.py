@@ -48,7 +48,7 @@ class CompSortFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
     leftObj = left.data(QtCore.Qt.EditRole)
     rightObj = right.data(QtCore.Qt.EditRole)
     try:
-      return np.all(leftObj < rightObj)
+      return bool(np.all(leftObj < rightObj))
     except (ValueError, TypeError):
       # If that doesn't work, default to stringified comparison
       return str(leftObj) < str(rightObj)

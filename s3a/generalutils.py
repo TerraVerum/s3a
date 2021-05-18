@@ -1,23 +1,21 @@
-from functools import lru_cache
-from pathlib import Path
-from typing import Any, Optional, Callable, Tuple, Union, Sequence, List, Collection
-from contextlib import contextmanager
+import html
+from typing import Callable, Tuple, Union, Sequence, List, Collection
 
 import cv2 as cv
 import numpy as np
+import pyqtgraph as pg
 from pandas import DataFrame as df
+from skimage import io
 from skimage import transform
 from skimage.exposure import exposure
-from skimage import io
-import pyqtgraph as pg
 
-from utilitys import PrjParam
-from utilitys.typeoverloads import FilePath
-
-from .structures import TwoDArr, XYVertices, ComplexXYVertices, NChanImg, BlackWhiteImg
+from utilitys import PrjParam, fns
 # Needs to be visible outside this file
 # noinspection PyUnresolvedReferences
 from utilitys.fns import hierarchicalUpdate
+from utilitys.typeoverloads import FilePath
+from .structures import TwoDArr, XYVertices, ComplexXYVertices, NChanImg, BlackWhiteImg
+
 
 def stackedVertsPlusConnections(vertList: ComplexXYVertices) -> (XYVertices, np.ndarray):
   """
@@ -92,7 +90,12 @@ def largestList(verts: List[XYVertices]) -> XYVertices:
   return XYVertices(maxLenList)
 
 def augmentException(ex: Exception, prependedMsg: str):
-  ex.args = (prependedMsg + str(ex),)
+  exMsg = str(ex)
+  if fns.usingPostponedErrors:
+    # Escape for qt dialog box
+    prependedMsg = html.escape(prependedMsg)
+    exMsg = html.escape(exMsg)
+  ex.args = (prependedMsg + exMsg,)
 
 def lower_NoSpaces(name: str):
   return name.replace(' ', '').lower()
