@@ -1,11 +1,26 @@
-image: "python:latest"
+stages:
+  - Test
+  - CodeCov
+  # - Deploy
 
-variables:
-  SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
-  GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
+pytest:
+  stage: Test
+  image: "python:latest"
+  before_script:
+  - apt-get update
+  - apt-get install -y python3-pyqt5
+  - python --version
+  - pip install -e .
+  - pip install pytest-cov
+  - pip install pytest-qt
+  script:
+    - pytest -l ./apptests --cov-report term --cov=.
 
 sonarcloud-check:
   stage: CodeCov
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+    GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
   image:
     name: sonarsource/sonar-scanner-cli:latest
     entrypoint: [""]
@@ -18,24 +33,6 @@ sonarcloud-check:
   only:
     - main
     - development
-
-before_script:
-  - apt-get update
-  - apt-get install -y python3-pyqt5
-  - python --version
-  - pip install -e .
-  - pip install pytest-cov
-  - pip install pytest-qt
-
-stages:
-  - Test
-  - CodeCov
-  # - Deploy
-
-pytest:
-  stage: Test
-  script:
-    - pytest -l ./apptests --cov-report term --cov=.
 
 
 # pypi:
