@@ -82,7 +82,7 @@ def test_load_startup_img(tmp_path, app, filePlg):
   prjcfg = {'startup': {'image': str(SAMPLE_SMALL_IMG_FNAME)}}
   oldCfg = filePlg.projData.cfgFname, filePlg.projData.cfg
   filePlg.open(tmp_path/'test-startup.s3aprj', prjcfg)
-  assert app.srcImgFname == SAMPLE_SMALL_IMG_FNAME
+  assert app.srcImgFname == filePlg.projData.imagesDir/SAMPLE_SMALL_IMG_FNAME.name
   filePlg.open(*oldCfg)
 
 def test_load_with_plg(monkeypatch, tmp_path):

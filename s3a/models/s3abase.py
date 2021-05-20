@@ -323,7 +323,9 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     self.clearBoundaries()
     self.mainImg.plotItem.vb.autoRange()
     if fileName is not None:
-      self.filePlg.addImage(fileName)
+      # Add image data if the file doesn't exist
+      data = None if fileName.exists() else self.mainImg.image
+      self.filePlg.projData.addImage(fileName, data)
     self.loadNewAnnotations()
     yield
     self.setMainImg(oldFile, oldData, clearExistingComps)

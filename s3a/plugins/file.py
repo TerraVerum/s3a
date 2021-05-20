@@ -17,7 +17,7 @@ from pyqtgraph.Qt import QtWidgets, QtCore
 from s3a import PRJ_CONSTS as CNST, models, REQD_TBL_FIELDS
 from s3a._io import ComponentIO
 from s3a.generalutils import hierarchicalUpdate, cvImsave_rgb
-from s3a.graphicsutils import DropList, ThumbnailViewer
+from s3a.graphicsutils import DropList
 from s3a.structures import FilePath, NChanImg
 from utilitys import CompositionMixin, AtomicProcess, NestedProcess
 from utilitys import fns
@@ -52,45 +52,14 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     self.registerPopoutFuncs([self.startAutosave, self.stopAutosave], btnOpts=CNST.TOOL_AUTOSAVE)
 
     self._projImgMgr = ProjectImageManager()
-    self._imgThumbnails = self._projImgMgr.thumbnails
-    self.nameToFullPathMapping = self._imgThumbnails.nameToFullPathMapping
-
-    def onAdd(imList):
-      for im in imList:
-        self._imgThumbnails.addThumbnail(im, force=True)
-    def onMove(imList):
-      for oldName, newName in imList:
-        self.nameToFullPathMapping[oldName.name] = newName
-    def onDel(imList):
-      if len(imList) == 0:
-        # or QtWidgets.QMessageBox.question(
-        # self.win, 'Confirm Delete', f'Are you sure you want to delete the following images?\n'
-        #                             f'{[i.name for i in imList]})') != QtWidgets.QMessageBox.Yes:
-        return
-      delCurrent = False
-
-      for name in imList:
-        if name == self.win.srcImgFname and self.win.srcImgFname.exists():
-          delCurrent = True
-          continue
-        self._imgThumbnails.removeThumbnail(name.name)
-      if delCurrent:
-        raise IOError(f'Cannot delete {self.win.srcImgFname.name} since it is currently'
-             f' being annotated. Change the image and try again.')
-    self.projData.sigImagesAdded.connect(onAdd)
-    self.projData.sigImagesMoved.connect(onMove)
-    self.projData.sigImagesRemoved.connect(onDel)
-
     self._projImgMgr.sigImageSelected.connect(lambda imgFname: self.win.setMainImg(imgFname))
+    self.projData.sigCfgLoaded.connect(lambda: self._projImgMgr.setRootDir(str(self.projData.imagesDir)))
     def handleDelete(delImgs):
       for img in delImgs:
         self.projData.removeImage(img)
     self._projImgMgr.sigDeleteRequested.connect(handleDelete)
 
     def onCfgLoad():
-      for im in self._imgThumbnails.nameToFullPathMapping.values():
-        if im not in self.projData.images:
-          self._imgThumbnails.removeThumbnail(im.name)
       self._updateProjLbl()
       if self.win:
         # Other arguments are consumed by app state editor
@@ -158,10 +127,8 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         imgName = self.projData.imagesDir/imgName
       if not imgName.exists():
         return
-      name = imgName.name
-      self.projData.addImage(imgName)
-      fullName = self.nameToFullPathMapping[name]
-      self.win.setMainImg(fullName)
+      addedName = self.projData.addImage(imgName)
+      self.win.setMainImg(addedName or imgName)
     win.appStateEditor.addImportExportOpts('image', startImg, lambda *args: None, 1)
 
     def exportWrapper(func):
@@ -184,11 +151,14 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
 
   def _createDefaultProj(self, setAsCur=True):
     defaultName = APP_STATE_DIR / PROJ_FILE_TYPE
-    # Delete default prj on startup
-    for prj in defaultName.glob(f'*.{PROJ_FILE_TYPE}'):
-      prj.unlink()
+    # Delete default prj on startup, if not current
+    if not setAsCur:
+      for prj in defaultName.glob(f'*.{PROJ_FILE_TYPE}'):
+        prj.unlink()
     parent = self.projData if setAsCur else None
-    self.projData.create(name=defaultName, parent=parent)
+    if setAsCur or not defaultName.exists():
+      # Otherwise, no action needed
+      self.projData.create(name=defaultName, parent=parent)
 
   def open(self, cfgFname: FilePath=None, cfgDict: dict=None):
     _, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
@@ -411,7 +381,10 @@ def getFileList(wizard, _flist: DropList, _title: str, _selectFolder=False):
   _flist.addItems(files)
 
 class ProjectImageManager(QtWidgets.QDockWidget):
-  def __init__(self, parent=None):
+  sigImageSelected = QtCore.Signal(str) # Selected image name
+  sigDeleteRequested = QtCore.Signal(str) # Image name to delete
+
+  def __init__(self, parent=None, rootDir: FilePath=None):
     super().__init__(parent)
     self.setWindowTitle('Project Images')
     self.setObjectName('Project Images')
@@ -419,19 +392,42 @@ class ProjectImageManager(QtWidgets.QDockWidget):
     wid = QtWidgets.QWidget()
     self.setWidget(wid)
 
+    self.rootDir = None
+
     layout = QtWidgets.QVBoxLayout()
     wid.setLayout(layout)
 
-    self.thumbnails = ThumbnailViewer()
+    self.fileModel = QtWidgets.QFileSystemModel(self)
+    self.fileModel.setNameFilterDisables(False)
+
+    self.fileViewer = QtWidgets.QTreeView(self)
+    self.fileViewer.setModel(self.fileModel)
+    self.fileViewer.setSortingEnabled(True)
+    self.fileViewer.header().setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
+
     self.completer = QtWidgets.QLineEdit()
     self.completer.setPlaceholderText('Type to filter')
-    self.completer.textChanged.connect(self._filterThumbnails)
+    self.completer.textChanged.connect(self._filterFiles)
 
-    self.sigImageSelected = self.thumbnails.sigImageSelected
-    self.sigDeleteRequested = self.thumbnails.sigDeleteRequested
+    self.fileViewer.activated.connect(self._emitFileName)
 
     layout.addWidget(self.completer)
-    layout.addWidget(self.thumbnails)
+    layout.addWidget(self.fileViewer)
+
+  def _emitFileName(self, idx: QtCore.QModelIndex):
+    self.sigImageSelected.emit(str(self.rootDir/idx.siblingAtColumn(0).data()))
+
+  def _filterFiles(self, text):
+    self.fileModel.setNameFilters([f'*{text}*'])
+
+  def setRootDir(self, rootDir: FilePath):
+    self.rootDir = Path(rootDir).absolute()
+    rootDir = str(self.rootDir)
+    rootIdx = self.fileModel.index(rootDir)
+    if not rootIdx.isValid():
+      raise ValueError(f'Invalid root directory specified: {rootDir}')
+    self.fileModel.setRootPath(rootDir)
+    self.fileViewer.setRootIndex(rootIdx)
 
   def _filterThumbnails(self, text):
     for ii in range(self.thumbnails.model().rowCount()):
@@ -580,6 +576,7 @@ class ProjectData(QtCore.QObject):
 
     self.cfgFname = cfgFname
     cfg = self.cfg = baseCfgDict
+
     self.annotationsDir.mkdir(exist_ok=True)
     self.imagesDir.mkdir(exist_ok=True)
     self.clearImgs_anns()
@@ -600,15 +597,15 @@ class ProjectData(QtCore.QObject):
 
     allAddedImages = []
     with self.suppressSignals():
-      allAddedImages.extend(self.addImageFolder(self.imagesDir))
+      allAddedImages.extend(self.addImageFolder(self.imagesDir, copyToProj=False))
       for image in self.cfg['images']:
         if isinstance(image, dict):
-          image.setdefault('copyToProj', False)
+          image.setdefault('copyToProj', True)
           renamed = self.addImage(**image)
           if renamed is not None:
             allAddedImages.append(renamed)
         else:
-          allAddedImages.extend(self.addImageByPath(image, False))
+          allAddedImages.extend(self.addImageByPath(image))
     self._maybeEmit(self.sigImagesAdded, allAddedImages)
 
     with self.suppressSignals():
@@ -695,7 +692,7 @@ class ProjectData(QtCore.QObject):
       self.cfg['table-cfg'] = str(tblName)
     fns.saveToFile(self.cfg, self.cfgFname)
 
-  def addImageByPath(self, name: FilePath, copyToProj=False):
+  def addImageByPath(self, name: FilePath, copyToProj=True):
     """
     Determines whether to add as a folder or file based on filepath type. Since adding a folder returns a list of
     images and adding a single image returns a name or None, this function unifies the return signature by always
@@ -716,7 +713,8 @@ class ProjectData(QtCore.QObject):
       ret = [] if ret is None else [ret]
     return ret
 
-  def addImage(self, name: FilePath, data: NChanImg=None, copyToProj=False, allowOverwrite=False) -> Optional[FilePath]:
+  def addImage(self, name: FilePath, data: NChanImg=None, copyToProj=True, allowOverwrite=False) -> Optional[FilePath]:
+    """Returns None if an image with the same name already exists in the project, else the new full filepath"""
     fullName = Path(name)
     if not fullName.is_absolute():
       fullName = self.imagesDir / fullName
@@ -740,7 +738,7 @@ class ProjectData(QtCore.QObject):
       self.images[oldIdx] = newName
     self._maybeEmit(self.sigImagesMoved, [(oldName, newName)])
 
-  def addImageFolder(self, folder: FilePath, copyToProj=False):
+  def addImageFolder(self, folder: FilePath, copyToProj=True):
     folder = Path(folder).resolve()
     if folder in self.baseImgDirs:
       return []
@@ -853,8 +851,7 @@ class ProjectData(QtCore.QObject):
     outAnn[REQD_TBL_FIELDS.INST_ID] = outAnn.index
     outFmt = f".{self.cfg['annotation-format']}"
     outName = self.annotationsDir / f'{image.name}{outFmt}'
-    self.compIo.exportByFileType(outAnn, outName, verifyIntegrity=False, readOnly=False,
-                       imgDir=self.imagesDir)
+    self.compIo.exportByFileType(outAnn, outName, verifyIntegrity=False, readOnly=False)
     self.imgToAnnMapping[image] = outName
 
   def _copyImgToProj(self, name: Path, data: NChanImg=None, overwrite=False):

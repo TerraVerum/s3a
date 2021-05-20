@@ -93,56 +93,6 @@ def autosaveOptsDialog(parent):
   layout.addWidget(cancelBtn, 4, 1)
   return dlg
 
-class ThumbnailViewer(QtWidgets.QListWidget):
-  sigDeleteRequested = QtCore.Signal(object)
-  """List[Selected image paths]"""
-  sigImageSelected = QtCore.Signal(object)
-  """Full path of selected image"""
-
-  def __init__(self, parent=None):
-    super().__init__(parent)
-    self.nameToFullPathMapping: Dict[str, Path] = {}
-    self.setViewMode(self.IconMode)
-    self.setIconSize(QtCore.QSize(200,200))
-    self.setResizeMode(self.Adjust)
-    self.itemActivated.connect(lambda item: self.sigImageSelected.emit(self.nameToFullPathMapping[item.text()]))
-
-    # def findDelImgs():
-    #   selection = self.selectedImages
-    #   self.sigDeleteRequested.emit(selection)
-    # TODO: Incorporate deletion. Just using "delete" button isn't great since
-    #   when shortcuts conflict it is ambiguous as to whether an image will
-    #   actually be deleted
-    # self.delShc = QtWidgets.QShortcut(QtCore.Qt.Key_Delete, self, findDelImgs)
-
-  def addThumbnail(self, fullName: Path, force=False):
-    icon = QtGui.QIcon(str(fullName))
-    if fullName.name in self.nameToFullPathMapping:
-      if force:
-        self.removeThumbnail(fullName.name)
-      else:
-        raise IOError('Name already exists in image list')
-    newItem = QtWidgets.QListWidgetItem(fullName.name)
-    newItem.setIcon(icon)
-    self.addItem(newItem)
-    self.nameToFullPathMapping[fullName.name] = fullName
-
-  @property
-  def selectedImages(self):
-    return [self.nameToFullPathMapping[idx.data()] for idx in self.selectedIndexes()]
-
-  def removeThumbnail(self, name: str):
-    items = self.findItems(name, QtCore.Qt.MatchExactly)
-    if len(items) == 0:
-      return
-    item = items[0]
-    self.takeItem(self.row(item))
-    del self.nameToFullPathMapping[name]
-
-  def clear(self):
-    super().clear()
-    self.nameToFullPathMapping.clear()
-
 # Taken directly from https://stackoverflow.com/questions/60663793/drop-one-or-more-files-into-listwidget-or-lineedit
 class DropList(QtWidgets.QListWidget):
   def __init__(self, parent=None):
