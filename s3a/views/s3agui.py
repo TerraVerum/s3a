@@ -149,9 +149,11 @@ class S3A(S3ABase):
     self.sigLayoutSaved.emit()
 
   def changeFocusedComp(self, newComps: df=None, forceKeepLastChange=False):
-    ret = super().changeFocusedComp(newComps, forceKeepLastChange)
+    gen = super().changeFocusedComp(newComps, forceKeepLastChange)
+    ret = fns.gracefulNext(gen)
     self.curCompIdLbl.setText(f'Component ID: {self.mainImg.compSer[REQD_TBL_FIELDS.INST_ID]}')
-    return ret
+    yield ret
+    yield fns.gracefulNext(gen)
 
   def resetTblFields_gui(self):
     outFname = fns.popupFilePicker(None, 'Select Table Config File', 'All Files (*.*);; Config Files (*.yml)')
@@ -179,13 +181,15 @@ class S3A(S3ABase):
 
   def setMainImg(self, fileName: FilePath = None, imgData: NChanImg = None,
                  clearExistingComps=True):
-    ret = super().setMainImg(fileName, imgData, clearExistingComps)
+    gen = super().setMainImg(fileName, imgData, clearExistingComps)
+    ret = fns.gracefulNext(gen)
     img = self.srcImgFname
     if img is not None:
       img = img.name
     self.imageLbl.setText(f'Image: {img}')
 
-    return ret
+    yield ret
+    yield fns.gracefulNext(gen)
 
   def setMainImg_gui(self):
     fileFilter = "Image Files (*.png *.tif *.jpg *.jpeg *.bmp *.jfif);;All files(*.*)"
