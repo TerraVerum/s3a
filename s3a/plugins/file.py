@@ -403,7 +403,6 @@ class ProjectImageManager(QtWidgets.QDockWidget):
     self.fileViewer = QtWidgets.QTreeView(self)
     self.fileViewer.setModel(self.fileModel)
     self.fileViewer.setSortingEnabled(True)
-    self.fileViewer.header().setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
 
     self.completer = QtWidgets.QLineEdit()
     self.completer.setPlaceholderText('Type to filter')
@@ -457,11 +456,9 @@ class ProjectData(QtCore.QObject):
   """List[Path]"""
 
 
-  def __init__(self, cfgFname: FilePath=None, cfgDict: dict=None, io: ComponentIO=None):
+  def __init__(self, cfgFname: FilePath=None, cfgDict: dict=None):
     super().__init__()
-    if io is None:
-      io = ComponentIO()
-    self.compIo = io
+    self.compIo = ComponentIO()
     self.templateName = PROJ_BASE_TEMPLATE
     self.cfg = fns.attemptFileLoad(self.templateName)
     self.cfgFname: Optional[Path] = None
@@ -761,7 +758,6 @@ class ProjectData(QtCore.QObject):
 
     return addedImgs
 
-
   def addAnnotationByPath(self, name: FilePath):
     """Determines whether to add as a folder or file based on filepath type"""
     name = Path(name)
@@ -988,3 +984,6 @@ class ProjectData(QtCore.QObject):
     self._suppressSignals = True
     yield
     self._suppressSignals = oldSuppress
+
+  def __reduce__(self):
+    return ProjectData, (self.cfgFname, self.cfg)
