@@ -84,6 +84,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     with attrs.colorScheme.setBaseRegisterPath(self.regionPlot.__groupingName__):
       proc, argsParam = attrs.colorScheme.registerFunc(
         self.updateLabelCol, runOpts=RunOpts.ON_CHANGED, returnParam=True, nest=False)
+      attrs.generalProps.registerProp(PRJ_CONSTS.PROP_SCALE_PEN_WIDTH, container=self.props)
     def updateLblList():
       fields = attrs.tableData.allFields
       # TODO: Filter out non-viable field types
@@ -109,8 +110,17 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
 
     mainImg.addItem(self.regionPlot)
     mainImg.addItem(self.regionCopier)
+    self.vb = mainImg.getViewBox()
+    self.vb.sigRangeChanged.connect(self.recomputePenWidth)
 
-    # self.filterableCols = self.findFilterableCols()
+  def recomputePenWidth(self):
+    if not self.props[PRJ_CONSTS.PROP_SCALE_PEN_WIDTH]:
+      return
+    newWidth = int(max(1/min(self.vb.viewPixelSize()), 1))
+    if newWidth == 1:
+      # Performance gains
+      newWidth = 0
+    self.regionPlot.props['penWidth'] = newWidth
 
   def updateLabelCol(self, labelCol=REQD_TBL_FIELDS.INST_ID.name):
     """

@@ -164,6 +164,7 @@ class _PrjConsts(PrjParamGroup):
              'When `Entire Component`, clicking anywhere within the component'
              ' will select it')
   PROP_SHOW_TBL_ON_COMP_CREATE : PrjParam = newParam('Show popup table when creating component', False)
+  PROP_SCALE_PEN_WIDTH : PrjParam = newParam('Scale pen width to image pixel size', True)
   # --------------------------
   # MISC TOOLS
   # --------------------------

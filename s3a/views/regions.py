@@ -72,10 +72,12 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
   __groupingName__ = PRJ_CONSTS.CLS_MULT_REG_PLT.name
 
   def __initEditorParams__(self, shared: SharedAppSettings):
+    self.props = ParamContainer()
     with shared.colorScheme.setBaseRegisterPath(self.__groupingName__):
       # Use setattr so pycharm autocomplete doesn't forget arg hints
       proc = shared.colorScheme.registerFunc(
-        self.updateColors, runOpts=RunOpts.ON_CHANGED, nest=False, ignoreKeys=['hideFocused'])
+        self.updateColors, runOpts=RunOpts.ON_CHANGED, nest=False, ignoreKeys=['hideFocused'],
+      container=self.props)
       setattr(self, 'updateColors', proc)
 
   def __init__(self, parent=None):
@@ -171,8 +173,8 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     return defaultIo.exportLblPng(labelDf, imShape=imShape, rescaleOutput=True)
 
   @fns.dynamicDocstring(cmapVals=colormaps() + ['None'])
-  def updateColors(self, penWidth=0, penColor='w', selectedFill='#00f', focusedFill='#f00', labelColormap='viridis',
-                   fillAlpha=0.7):
+  def updateColors(self, penWidth=0, penColor='w',
+                   selectedFill='#00f', focusedFill='#f00', labelColormap='viridis', fillAlpha=0.7):
     """
     Assigns colors from the specified colormap to each unique class
     :param penWidth: Width of the pen in pixels
@@ -194,8 +196,6 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
       helpText: Transparency of fill color (0 is totally transparent, 1 is totally opaque)
       limits: [0,1]
       step: 0.1
-    :param hideFocused: Many plugins alter the visual behavior of focused regions, so it
-      is helpful to have a flag which will cause focused regions to be hidden.
     """
     if len(self.regionData) == 0 or len(self.data) == 0:
       return
