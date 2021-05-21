@@ -264,7 +264,7 @@ class ComponentMgr(CompTableModel):
 
     keepInfo = mergeComps.loc[keepId].copy()
     allVerts = [v.stack() for v in mergeComps[RTF.VERTICES]]
-    maskShape = np.max(np.vstack(allVerts), 0)[::-1]
+    maskShape = np.max(np.vstack(allVerts), 0)[::-1] + 1
     mask = np.zeros(maskShape, bool)
     for verts in mergeComps[RTF.VERTICES]: # type: ComplexXYVertices
       mask |= verts.toMask(tuple(maskShape))
@@ -317,7 +317,7 @@ class ComponentMgr(CompTableModel):
     """
     overlapComps = self.compDf.loc[overlapIds].copy()
     allVerts = np.vstack([v.stack() for v in overlapComps[RTF.VERTICES]])
-    wholeMask = np.zeros(allVerts.max(0)[::-1], dtype='uint16')
+    wholeMask = np.zeros(allVerts.max(0)[::-1] + 1, dtype='uint16')
     for ii, (_, comp) in enumerate(overlapComps.iterrows(), 1):
       comp[RTF.VERTICES].toMask(wholeMask, ii, asBool=False)
     for ii, compId in enumerate(overlapIds, 1):
