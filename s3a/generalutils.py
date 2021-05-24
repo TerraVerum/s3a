@@ -216,7 +216,7 @@ def getCroppedImg(image: NChanImg, verts: np.ndarray, margin=0, *otherBboxes: np
   """
   Crops an image according to the specified vertices such that the returned image does not extend
   past vertices plus margin (including other bboxes if specified). All bboxes and output coords
-  are of the form [[xmin, xmax], [ymin, ymax]]. Slices are (row slices, col slices) if `coordsAsSlices`
+  are of the form [[xmin, ymin], [xmax, ymax]]. Slices are (row slices, col slices) if `coordsAsSlices`
   is specified.
   """
   verts = np.vstack(verts)

@@ -280,7 +280,7 @@ class ComponentIO:
         raise ValueError(f'File type {fType} cannot be handled by the serial importer.'
                          f' Must be one of {",".join(_getPdImporters())}')
       # Special case: csv imports need to avoid interpreting nan results
-      pdImportArgs.update(keep_default_na=False)
+      pdImportArgs.update(na_filter=False, dtype=str)
       acceptedArgs = inspect.signature(importFn).parameters
       useArgs = pdImportArgs.keys() & acceptedArgs
       serialDf = importFn(inFileOrDf, **{k: pdImportArgs[k] for k in useArgs})
@@ -380,9 +380,9 @@ class ComponentIO:
     :param asIndiv: Whether components should be exported as individual units (i.e.
       neighbors are guaranteed never to show up in the ground truth label mask) or whether
       a cropped area around the component should be used as the label mask. This will
-      include mask values of neighbors if they are within mask range. Note: This is
-      performed with preference toward higher ids, i.e. if a high ID is on top of a low ID,
-      the low ID will still be covered in its export mask
+      include mask values of neighbors if they are within mask range.
+      Note: When false, the mask is created with preference toward higher ids, i.e. if a high ID is on
+      top of a low ID, the low ID will still be covered in its export mask
     :param missingOk: Whether a missing image is acceptable. When no source image is found
       for an annotation, this will simpy the 'image' output property
     :param returnLblMapping: Whether to return the mapping of label numeric values to table field values
@@ -432,15 +432,7 @@ class ComponentIO:
       mappings[fullImgName.name] = mapping
       if img is None:
         img = np.zeros_like(lblImg)
-      if asIndiv:
-        # Also need an ID mask
-        if lblField == RTF.INST_ID:
-          idImg = lblImg.copy()
-        else:
-          idImg, mapping = self.exportLblPng(miniDf, imShape=img.shape[:2],
-                                             lblField=RTF.INST_ID,
-                                             returnLblMapping=True)
-        invertedMap = pd.Series(mapping.index, mapping)
+      invertedMap = pd.Series(mapping.index, mapping)
 
 
       for ii, (idx, row) in enumerate(miniDf.iterrows()):
@@ -467,11 +459,13 @@ class ComponentIO:
         if 'labelMask' in useKeys:
           mask = lblImg[indexer]
           if asIndiv:
-            # Need to black out every pixel not in the current component, copy to avoid
-            # in-place modification
-            mask = mask.copy()
-            idMask = idImg[indexer]
-            mask[idMask != invertedMap[idx]] = bgColor
+            # Only color in this id's region. Since it might've been covered over by a different ID, regenerate the
+            # mask from vertices, taking margin into account
+            colorVerts = ComplexXYVertices([allVerts - bounds[0,:]])
+            mask = np.full_like(mask, bgColor)
+            # 'Float' works for int and float orig values, required since opencv complains about some numpy
+            # dtypes
+            colorVerts.toMask(mask, float(invertedMap[idx]), asBool=False)
 
           outDf['labelMask'].append(mask)
 
