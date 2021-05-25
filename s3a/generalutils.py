@@ -378,3 +378,6 @@ class classproperty:
 
   def __get__(self, owner_self, owner_cls):
     return self.fget(owner_cls)
+
+def imgPathtoHtml(imgPath: FilePath, width=150):
+  return '<img src="' + str(imgPath) + f'" width="{width}px">'

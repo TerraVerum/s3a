@@ -25,7 +25,7 @@ from PIL.PngImagePlugin import PngInfo
 
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
 from s3a.generalutils import augmentException, getCroppedImg, resize_pad, cvImsave_rgb, orderContourPts, classproperty, \
-  cvImread_rgb
+  cvImread_rgb, imgPathtoHtml
 from s3a.parameditors.table import TableData
 from s3a.structures import PrjParamGroup, FilePath, GrayImg, \
   ComplexXYVertices, PrjParam, XYVertices, AnnParseError
@@ -582,6 +582,7 @@ class ComponentIO:
                         outDir:FilePath='s3a-export',
                         resizeShape: Tuple[int, int]=None,
                         archive=False,
+                        makeSummary=False,
                         **kwargs):
     """
     From a component dataframe, creates output directories for component images and masks.
@@ -596,6 +597,8 @@ class ComponentIO:
       being saved. This is useful for neural networks with a fixed input size which forces all
       inputs to be e.g. 100x100 pixels.
     :param archive: Whether to compress into a zip archive instead of directly outputting a folder
+    :param makeSummary: Whether to include an html table showing each component from the dataframe along with
+      its image and mask representations
     :param kwargs: Passed directly to :meth:`ComponentIO.exportCompImgsDf`
     """
     outDir = Path(outDir)
@@ -613,11 +616,25 @@ class ComponentIO:
       dataDir.mkdir(exist_ok=True, parents=True)
       labelsDir.mkdir(exist_ok=True, parents=True)
 
+      summaryName = useDir/'summary.html'
+
       extractedImgs = self.exportCompImgsDf(compDf, None, **kwargs)
       for idx, row in extractedImgs.iterrows():
         saveName = f'{row.instId}.png'
         saveFn(dataDir/saveName, row.img)
         saveFn(labelsDir/saveName, row.labelMask)
+
+      if makeSummary:
+        extractedImgs = extractedImgs.rename({'instId': RTF.INST_ID}, axis=1)
+        outDf: pd.DataFrame = compDf.drop([RTF.VERTICES], axis=1).merge(extractedImgs, on=RTF.INST_ID)
+        for colName, imgDir in zip(['labelMask', 'img'], [labelsDir, dataDir]):
+          relDir = imgDir.relative_to(useDir)
+          outDf[colName] = outDf[RTF.INST_ID].apply(
+            lambda el: imgPathtoHtml((relDir/str(el)).with_suffix('.png').as_posix())
+          )
+        outDf.columns = list(map(str, outDf.columns))
+        outDf.to_html(summaryName, escape=False, index=False)
+
       if archive:
         if outDir.suffix != '.zip':
           outDir = outDir.with_suffix(outDir.suffix + '.zip')
@@ -625,6 +642,8 @@ class ComponentIO:
           for dir_ in labelsDir, dataDir:
             for file in dir_.iterdir():
               ozip.write(file, f'{dir_.name}/{file.name}')
+            if makeSummary:
+              ozip.write(summaryName, file.name)
 
   # -----
   # Import options
