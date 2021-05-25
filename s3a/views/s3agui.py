@@ -207,7 +207,7 @@ class S3A(S3ABase):
 
   def openAnnotation_gui(self):
     # TODO: See note about exporting comps. Delegate the filepicker activity to importer
-    fileFilter = self.compIo.ioFileFilter(which=PRJ_ENUMS.IO_EXPORT)
+    fileFilter = self.compIo.ioFileFilter(which=PRJ_ENUMS.IO_IMPORT)
     fname = fns.popupFilePicker(None, 'Select Load File', fileFilter)
     if fname is None:
       return
