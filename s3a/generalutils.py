@@ -91,10 +91,6 @@ def largestList(verts: List[XYVertices]) -> XYVertices:
 
 def augmentException(ex: Exception, prependedMsg: str):
   exMsg = str(ex)
-  if fns.usingPostponedErrors:
-    # Escape for qt dialog box
-    prependedMsg = html.escape(prependedMsg)
-    exMsg = html.escape(exMsg)
   ex.args = (prependedMsg + exMsg,)
 
 def lower_NoSpaces(name: str):

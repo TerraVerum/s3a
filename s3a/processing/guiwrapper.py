@@ -23,8 +23,7 @@ class ImgProcWrapper(NestedProcWrapper):
         warnings.simplefilter('ignore', UserWarning)
         result = self.processor.run(newIo)
     except Exception as ex:
-      msg = 'Exception during processor run:\n' \
-                       ''.join(traceback.format_stack(limit=2))
+      msg = 'Exception during processor run:\n'
       augmentException(ex, msg)
       result = ProcessIO(image=kwargs['prevCompMask'])
       warnLater(str(ex), UserWarning)
