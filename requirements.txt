@@ -1,4 +1,5 @@
-typing_extensions
+typing_extensions; python_version < '3.8'
+importlib_metadata; python_version < '3.8'
 fire
 opencv_python>=4.1.2.30
 numpy
@@ -6,9 +7,8 @@ pandas
 scipy
 scikit-image
 PyQt5>=5.11
-pyqtgraph>=0.11.1
+pyqtgraph>=0.12.1
 Pillow
 qdarkstyle
-pytest
 matplotlib
 utilitys >= 0.3.14

@@ -1,11 +1,6 @@
 import pydoc
-import sys
 from functools import lru_cache
-
-if sys.version_info < (3, 10):
-    from importlib_metadata import entry_points
-else:
-    from importlib.metadata import entry_points
+from s3a.shims import entry_points
 
 def INTERNAL_PLUGINS():
   from .misc import MainImagePlugin, CompTablePlugin, RandomToolsPlugin, EditPlugin, HelpPlugin, MultiPredictionsPlugin
@@ -17,9 +12,11 @@ def INTERNAL_PLUGINS():
 
 @lru_cache()
 def EXTERNAL_PLUGINS():
-  discoveredPlgs = entry_points(group='s3a.plugins')
+  discoveredPlgs = entry_points().get('s3a.plugins', [])
   externPlgs = []
+  # noinspection PyTypeChecker
   for ep in discoveredPlgs:
+    # ALL_PLUGINS is usually exposed here
     member = pydoc.locate(ep.value)
     if member:
       plgs = member()

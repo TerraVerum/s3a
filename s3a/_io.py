@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 from skimage import io, draw
 from skimage.exposure import rescale_intensity
-from typing_extensions import Literal
+from s3a.shims import typing_extensions
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
@@ -35,7 +35,7 @@ from utilitys.fns import warnLater
 FilePathOrDf = Union[FilePath, pd.DataFrame]
 # Values are strings
 # noinspection PyTypeHints
-_litLst = Literal[PRJ_ENUMS.IO_IMPORT, PRJ_ENUMS.IO_EXPORT]
+_litLst = typing_extensions.Literal[PRJ_ENUMS.IO_IMPORT, PRJ_ENUMS.IO_EXPORT]
 
 def _attrNameFmt(buildOrExport: _litLst, obj):
   def membership(el):

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import copy
 import inspect
 import pydoc
@@ -11,10 +10,10 @@ import webbrowser
 from pathlib import Path
 
 from pyqtgraph.Qt import QtCore
-from typing_extensions import TypedDict
 
 from s3a import PRJ_ENUMS
 from s3a.constants import MENU_OPTS_DIR
+from s3a.shims import typing_extensions as t_e
 from utilitys import NestedProcess, RunOpts, ProcessIO
 from utilitys import ParamEditor, NestedProcWrapper, fns, ProcessStage, AtomicProcess
 from utilitys.typeoverloads import FilePath
@@ -23,7 +22,7 @@ from utilitys.widgets import makeDummySignal
 Signal = QtCore.Signal
 _procDict = t.Dict[str, t.List[t.Union[str, dict]]]
 
-class _AlgClctnDict(TypedDict):
+class _AlgClctnDict(t_e.TypedDict):
   top: _procDict
   primitive: _procDict
   modules: t.List[str]
