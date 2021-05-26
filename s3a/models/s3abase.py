@@ -17,7 +17,7 @@ from s3a.controls.tableviewproxy import CompDisplayFilter, CompSortFilter
 from s3a.models.tablemodel import ComponentMgr
 from s3a.parameditors.appstate import AppStateEditor
 from s3a.plugins.file import FilePlugin
-from s3a.plugins import ALL_PLUGINS, tablefield
+from s3a.plugins import INTERNAL_PLUGINS, tablefield, EXTERNAL_PLUGINS
 from s3a.plugins.misc import RandomToolsPlugin
 from s3a.shared import SharedAppSettings
 from s3a.structures import FilePath, NChanImg
@@ -124,7 +124,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     # -----
     # INTERFACE WITH QUICK LOADER / PLUGINS
     # -----
-    toAdd = ALL_PLUGINS()
+    toAdd = INTERNAL_PLUGINS() + EXTERNAL_PLUGINS()
     # Insert "settings" and "shortcuts" in a more logical location (after file + edit)
     toAdd = toAdd[:2] + [self.sharedAttrs.settingsPlg, self.sharedAttrs.shortcutsPlg] \
               + toAdd[2:]
@@ -330,16 +330,13 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     yield
     self.setMainImg(oldFile, oldData, clearExistingComps)
 
-  def saveCurAnnotation(self, allowOverwrite=False):
+  def saveCurAnnotation(self):
     srcImg = self.srcImgFname
     if srcImg is None:
       return
     srcImg_proj = self.filePlg.imagesDir/srcImg.name
-    if srcImg_proj.exists() and not allowOverwrite and srcImg_proj != srcImg:
-      # warn(f'Image {srcImg.name} already present in project images. Using'
-      #      f' existing image instead of current data.', UserWarning)
-      pass
-    else:
+    if not srcImg_proj.exists() or srcImg_proj != srcImg:
+      # Either the image didn't exist (i.e. was programmatically generated) or doesn't yet belong to the project
       self.filePlg.addImage(srcImg, data=self.mainImg.image, copyToProj=True,
                             allowOverwrite=True)
     # srcImg_proj is guaranteed to exist at this point
