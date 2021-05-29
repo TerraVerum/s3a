@@ -116,7 +116,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
   def recomputePenWidth(self):
     if not self.props[PRJ_CONSTS.PROP_SCALE_PEN_WIDTH]:
       return
-    newWidth = int(max(1/min(self.vb.viewPixelSize()), 1))
+    newWidth = np.ceil(max(1/min(self.vb.viewPixelSize()), 1))
     if newWidth == 1:
       # Performance gains
       newWidth = 0
