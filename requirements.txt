@@ -11,4 +11,4 @@ pyqtgraph>=0.12.1
 Pillow
 qdarkstyle
 matplotlib
-utilitys >= 0.3.14
+utilitys >= 0.3.16
