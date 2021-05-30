@@ -338,7 +338,10 @@ def orderContourPts(pts: XYVertices, ccw=True):
 
 def symbolFromVerts(verts: ComplexXYVertices):
   concatRegion, isfinite = stackedVertsPlusConnections(verts)
-  boundLoc = np.nanmin(concatRegion, 0, keepdims=True)
+  if not len(concatRegion):
+    boundLoc = np.array([[0,0]])
+  else:
+    boundLoc = np.nanmin(concatRegion, 0, keepdims=True)
   useVerts = concatRegion - boundLoc + 0.5
   return pg.arrayToQPath(*useVerts.T, connect=isfinite), boundLoc
 

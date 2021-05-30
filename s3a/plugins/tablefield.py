@@ -1,5 +1,8 @@
 from __future__ import annotations
+
+import copy
 from collections import deque, namedtuple
+from typing import Sequence
 from warnings import warn
 
 import numpy as np
@@ -81,23 +84,30 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     _historyMaskHolder[0].fill(0)
 
   def updateFocusedComp(self, newComp:pd.Series = None):
+    self.updateFocusedPen_Fill()
     if self.mainImg.compSer[RTF.INST_ID] == -1:
       self.updateRegionFromDf(None)
       return
     oldId = self.mainImg.compSer[RTF.INST_ID]
     self.updateRegionFromDf(self.mainImg.compSer_asFrame)
-    self.clearFocusedPen_Fill()
     if newComp is None or oldId != newComp[RTF.INST_ID]:
       self.firstRun = True
 
-  def clearFocusedPen_Fill(self):
-    plt: MultiRegionPlot = self.win.compDisplay.regionPlot
-    ids = plt.regionData[PRJ_ENUMS.FIELD_FOCUSED].to_numpy()
-    for name, fn in zip(['pen', 'brush'], [pg.mkPen, pg.mkBrush]):
-      clrs = plt.data[name]
-      clrs[ids] = fn('#0000')
-      plt.data[name] = clrs
-    plt.updateSpots(plt.data)
+  def updateFocusedPen_Fill(self):
+    disp = self.win.compDisplay
+    plt: MultiRegionPlot = disp.regionPlot
+    mgrDf = self.win.compMgr.compDf
+    regDf = plt.regionData.copy()
+    focused = regDf[PRJ_ENUMS.FIELD_FOCUSED].to_numpy(bool)
+    # Show IDs that were previously hidden
+    for showId in regDf.index[regDf[RTF.VERTICES].apply(ComplexXYVertices.isEmpty)]:
+      regDf.at[showId, RTF.VERTICES] = mgrDf.at[showId, RTF.VERTICES]
+
+    # Make 0-area regions where the plot must be hidden
+    for hideId in regDf.index[focused]:
+      # Bug: Can't set array of values without indexer error since pandas thinks ComplexXYVertices is a 2d array
+      regDf.at[hideId, RTF.VERTICES] = ComplexXYVertices()
+    plt.resetRegionList(regDf, self.win.compDisplay.labelCol)
 
   def _run_drawAct(self, verts: XYVertices, param: PrjParam):
     # noinspection PyTypeChecker
@@ -141,7 +151,6 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     if not np.array_equal(newGrayscale, compGrayscale):
       self.updateRegionFromMask(newGrayscale)
 
-  @DASM.undoable('Modify Focused Component')
   def updateRegionFromDf(self, newData: pd.DataFrame=None, offset: XYVertices=None):
     """
     Updates the current focused region using the new provided vertices
@@ -151,50 +160,77 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     :param offset: Offset of newVerts relative to main image coordinates
     """
     fImg = self.mainImg
-    oldSer = fImg.compSer
+    # Since some calls to this function make an undo entry and others don't, be sure to save state for the undoable ones
+    # revertId is only used when changedComp is true and an undo is valid
+    newId = fImg.compSer[RTF.INST_ID]
     if newData is None or np.all(newData[RTF.VERTICES].apply(ComplexXYVertices.isEmpty)):
       newData = makeMultiRegionDf(0)
+
+    self._maybeChangeFocusedComp(newData.index)
+
     if fImg.image is None:
       self.region.clear()
-      self.regionBuffer.append(buffEntry(oldSer[RTF.INST_ID], ComplexXYVertices()))
+      self.regionBuffer.append(buffEntry(newId, ComplexXYVertices()))
       return
+
     oldData = self.region.regionData
 
     if offset is None:
       offset = XYVertices([[0,0]])
     # 0-center new vertices relative to FocusedImage image
-    # Make a copy of each list first so we aren't modifying the
-    # original data
-    centeredData = newData.copy()
+    centeredData = newData
     if np.any(offset != 0):
-      centeredVerts = []
-      for complexVerts in centeredData[RTF.VERTICES]:
-        newVertList = ComplexXYVertices()
-        for vertList in complexVerts:
-          newVertList.append(vertList+offset)
-        centeredVerts.append(newVertList)
-      centeredData[RTF.VERTICES] = centeredVerts
-
+      # Make a deep copy of verts (since they change) to preserve redos
+      centeredData = centeredData.copy()
+      centeredData[RTF.VERTICES] = self.applyOffset([copy.deepcopy(v) for v in newData[RTF.VERTICES]], offset)
     if oldData.equals(centeredData):
       return
-    else:
-      self.region.resetRegionList(newRegionDf=centeredData)
-      self.region.focusById(centeredData.index)
-      buffVerts = ComplexXYVertices()
-      for inner in centeredData[RTF.VERTICES]: buffVerts.extend(inner)
-      self.regionBuffer.append(buffEntry(oldSer[RTF.INST_ID], buffVerts))
-      yield
-    if (fImg.compSer.loc[RTF.INST_ID] != oldSer.loc[RTF.INST_ID]
-        or fImg.image is None):
-      self.win.changeFocusedComp(oldSer)
-    self.region.resetRegionList(oldData)
-    self.regionBuffer.pop()
 
-  def updateRegionFromMask(self, mask: BlackWhiteImg, offset=None):
+    lblCol = self.win.compDisplay.labelCol
+    self.region.resetRegionList(newRegionDf=centeredData, lblField=lblCol)
+    self.region.focusById(centeredData.index)
+
+    buffVerts = ComplexXYVertices()
+    for inner in centeredData[RTF.VERTICES]: buffVerts.extend(inner)
+    self.regionBuffer.append(buffEntry(newId, buffVerts))
+
+  @staticmethod
+  def applyOffset(complexVerts: Sequence[ComplexXYVertices], offset: XYVertices):
+    centeredVerts = []
+    for complexVerts in complexVerts:
+      newVertList = ComplexXYVertices()
+      for vertList in complexVerts:
+        newVertList.append(vertList + offset)
+      centeredVerts.append(newVertList)
+    return centeredVerts
+
+  def _maybeChangeFocusedComp(self, newIds: Sequence[int]):
+    regionId = newIds[0] if len(newIds) else -1
+    focusedId = self.mainImg.compSer[RTF.INST_ID]
+    updated = regionId != focusedId
+    if updated:
+      if regionId in self.win.compMgr.compDf.index:
+        self.win.compDisplay.selectRowsById([regionId])
+      else:
+        self.win.compDisplay.selectRowsById([])
+    return updated
+
+  def updateRegionFromMask(self, mask: BlackWhiteImg, offset=None, compId=None):
     if offset is None:
       offset = XYVertices([0,0])
-    df = makeMultiRegionDf(vertices=[ComplexXYVertices.fromBwMask(mask)])
-    self.updateRegionFromDf(df, offset=offset)
+    data = self.region.regionData.copy()
+    if compId is None:
+      compId = data.index[0] if len(data) else -1
+    df = makeMultiRegionDf(vertices=[ComplexXYVertices.fromBwMask(mask)], idList=[compId])
+    self.updateRegion_undoable(df, offset=offset)
+
+
+  @DASM.undoable('Modify Focused Component')
+  def updateRegion_undoable(self, newData: pd.DataFrame=None, offset: XYVertices=None):
+    oldData = self.region.regionData.copy()
+    self.updateRegionFromDf(newData, offset=offset)
+    yield
+    self.updateRegionFromDf(oldData)
 
   def acceptChanges(self, overrideVerts: ComplexXYVertices=None):
     # Add in offset from main image to VertexRegion vertices
@@ -223,17 +259,17 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     # Only perform action if image currently exists
     if self.mainImg.compSer is None:
       return
-    self.updateRegionFromDf(None)
+    self.updateRegion_undoable(None)
 
   def resetFocusedRegion(self):
     """Reset the focused image by restoring the region mask to the last saved state"""
     if self.mainImg.compSer is None:
       return
-    self.updateRegionFromDf(self.mainImg.compSer_asFrame)
+    self.updateRegion_undoable(self.mainImg.compSer_asFrame)
 
   def _onActivate(self):
     self.region.show()
-    self.clearFocusedPen_Fill()
+    self.updateFocusedPen_Fill()
 
   def _onDeactivate(self):
     self.region.hide()

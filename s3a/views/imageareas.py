@@ -273,7 +273,6 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
     self.getViewBox().menu = self.menu
     return retClctn
 
-  @DASM.undoable('Update Focused Component')
   def updateFocusedComp(self, newComp: pd.Series=None):
     """
     Updates focused image and component from provided information. Useful for creating
@@ -281,7 +280,6 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
     algorithms to the entire image each iteration.
     :param newComp: New component to edit using various plugins (See :class:`TableFieldPlugin`)
     """
-    oldComp = self.compSer
     mainImg = self.image
     if newComp is None or mainImg is None:
       newComp = self.tableData.makeCompSer()
@@ -296,5 +294,3 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
     self.compSer = newComp
 
     self.sigUpdatedFocusedComp.emit(newComp)
-    yield
-    self.updateFocusedComp(oldComp)

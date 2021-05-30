@@ -258,6 +258,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
       selectedCols = self._compMgr.editColIdxs
     else:
       selectedCols = np.arange(len(self._compMgr.colTitles))
+    ids = np.intersect1d(ids, self._compMgr.compDf.index)
     for curId in ids:
       idRow = np.nonzero(self._compMgr.compDf.index == curId)[0][0]
       # Map this ID to its sorted position in the list
@@ -277,26 +278,31 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     #   self.selectedIds = np.concatenate([self.selectedIds, ids])
 
 
-  def reflectSelectionBoundsMade(self, selection: Union[OneDArr, XYVertices]):
+  def reflectSelectionBoundsMade(self, selection: Union[OneDArr, XYVertices], checkPlt: MultiRegionPlot=None,
+                                 clearExisting=True):
     """
     :param selection: bounding box of user selection: [xmin ymin; xmax ymax]
+    :param checkPlt: Plot to look for selected regions. Some plugins provide their own, and can use this parameter
+       to define their selection
     """
     # If min and max are the same, just check for points at mouse position
     if selection.size == 0: return
+    if checkPlt is None:
+      checkPlt = self.regionPlot
     if len(selection) == 1 or np.abs(selection[0] - selection[1]).sum() < 0.01:
       qtPoint = QtCore.QPointF(*selection[0])
-      selectedSpots = self.regionPlot.pointsAt(qtPoint, self.props[PRJ_CONSTS.PROP_COMP_SEL_BHV]=='Boundary Only')
+      selectedSpots = checkPlt.pointsAt(qtPoint, self.props[PRJ_CONSTS.PROP_COMP_SEL_BHV]=='Boundary Only')
       selectedIds = [spot.data() for spot in selectedSpots]
     else:
-      selectedIds = self.regionPlot.boundsWithin(selection)
+      selectedIds = checkPlt.boundsWithin(selection)
       selectedIds = np.unique(selectedIds)
 
     # -----
     # Obtain table idxs corresponding to ids so rows can be highlighted
-    # -----
+    # ---`--
     # Add to current selection depending on modifiers
     mode = QISM.Rows
-    if QtGui.QGuiApplication.keyboardModifiers() == QtCore.Qt.ControlModifier:
+    if not clearExisting or QtGui.QGuiApplication.keyboardModifiers() == QtCore.Qt.ControlModifier:
       # Toggle select on already active ids
       toDeselect = np.intersect1d(self.selectedIds, selectedIds)
       self.selectRowsById(toDeselect, mode|QISM.Deselect)
@@ -306,7 +312,6 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     else:
       mode |= QISM.ClearAndSelect
     if not self.regionCopier.active:
-      self.selectRowsById(selectedIds, mode)
       self.selectRowsById(selectedIds, mode)
     # TODO: Better management of widget focus here
 
@@ -359,9 +364,18 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
       pType: filepicker
       existing: False
     """
+    data = self.regionPlot.regionData
+    focusedIds = data.index[data[PRJ_ENUMS.FIELD_FOCUSED]]
+    # Temporarily fill in focused ids
+    data.loc[focusedIds, REQD_TBL_FIELDS.VERTICES] = self._compMgr.compDf.loc[focusedIds, REQD_TBL_FIELDS.VERTICES]
+    self.regionPlot.resetRegionList(data, self.labelCol)
     pm = self._mainImgArea.imgItem.getPixmap()
     painter = QtGui.QPainter(pm)
     self.regionPlot.paint(painter)
+    # Pandas bug setting vertices to empty as a set, must be done individually
+    for id_ in focusedIds:
+      data.at[id_, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices()
+    self.regionPlot.resetRegionList(data, self.labelCol)
     if outFile:
       # if outFile.endswith('svg'):
       #   svgr = QtSvg.QSvgRenderer(outFile)

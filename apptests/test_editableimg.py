@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from pyqtgraph.Qt import QtGui, QtCore
 
+from apptests.testingconsts import RND
 from testingconsts import NUM_COMPS
 from s3a import REQD_TBL_FIELDS
 from s3a.constants import PRJ_CONSTS
@@ -39,22 +40,46 @@ def test_update(app, mgr, vertsPlugin):
   mImg = app.mainImg
   focusedId = NUM_COMPS-1
   newCompSer = mgr.compDf.loc[focusedId]
-  # Action 1
+
+  masks = RND.random((3, 500,500)) > 0.5
+  def regionCmp(mask):
+    assert np.array_equal(mask > 0, vertsPlugin.region.toGrayImg(mask.shape) > 0)
+
   mImg.updateFocusedComp(newCompSer)
   assert mImg.compSer.equals(newCompSer)
+  oldestMask = vertsPlugin.region.toGrayImg()
+  # Add two updates so one is undoable and still comparable
+  for ii in range(2):
+    vertsPlugin.updateRegionFromMask(masks[ii])
+    regionCmp(masks[ii])
 
-  # Action 2
   newerSer = mgr.compDf.loc[0]
   mImg.updateFocusedComp(newerSer)
+  oldMask = vertsPlugin.region.toGrayImg()
+  vertsPlugin.updateRegionFromMask(masks[2])
+  regionCmp(masks[2])
+
+  # Test undos for comp change and non-comp changes
+  vertsPlugin.actionStack.undo()
+  regionCmp(oldMask)
+  assert mImg.compSer.equals(newerSer)
+
+  vertsPlugin.actionStack.undo()
+  assert mImg.compSer.equals(newCompSer)
+  regionCmp(masks[0])
 
   app.sharedAttrs.actionStack.undo()
-  assert mImg.compSer.equals(newCompSer)
-  app.sharedAttrs.actionStack.undo()
-  assert mImg.compSer[REQD_TBL_FIELDS.INST_ID] == -1
-  app.sharedAttrs.actionStack.redo()
-  assert mImg.compSer.equals(newCompSer)
+  regionCmp(oldestMask)
+
+  for ii in range(2):
+    app.sharedAttrs.actionStack.redo()
+    assert mImg.compSer.equals(newCompSer)
+    regionCmp(masks[ii])
+
   app.sharedAttrs.actionStack.redo()
   assert mImg.compSer.equals(newerSer)
+  with pytest.warns(UserWarning):
+    app.sharedAttrs.actionStack.redo()
 
 def test_region_modify(sampleComps, app, mgr, vertsPlugin):
   vertsPlugin.procEditor.changeActiveProcessor('Basic Shapes')

@@ -55,14 +55,22 @@ class MainImagePlugin(ParamEditorPlugin):
     # Wrap in process to ignore the default param
 
     def actHandler(verts, param):
-      # When editing, only want to select if nothing is already selected
+      # When editing, only want to select if nothing is already started
       if (param not in [CNST.DRAW_ACT_REM, CNST.DRAW_ACT_ADD]
-          or  len(disp.selectedIds) == 0
+          or len(self.win.vertsPlg.region.regionData) == 0
       ):
         # Special case: Selection with point shape should be a point
         if self.win.mainImg.shapeCollection.curShapeParam == CNST.DRAW_SHAPE_POINT:
           verts = verts.mean(0, keepdims=True)
-        disp.reflectSelectionBoundsMade(verts)
+        # Make sure to check vertices plugin regions since they suppress disp's regions for focused ids
+        # Must be done first, since a no-find in disp's regions will deselect them
+        with uw.makeDummySignal(win.compTbl, 'sigSelectionChanged'):
+          # Second call should handle the true selection signal
+          disp.reflectSelectionBoundsMade(verts, self.win.vertsPlg.region)
+          disp.reflectSelectionBoundsMade(verts, clearExisting=False)
+
+        selection = pd.unique(win.compTbl.ids_rows_colsFromSelection(warnNoneSelection=False)[:,0])
+        win.compTbl.sigSelectionChanged.emit(selection)
 
     win.sharedAttrs.generalProps.registerProp(CNST.PROP_MIN_COMP_SZ, container=self.props)
     self.registerFunc(disp.mergeSelectedComps, btnOpts=CNST.TOOL_MERGE_COMPS, ignoreKeys=['keepId'])

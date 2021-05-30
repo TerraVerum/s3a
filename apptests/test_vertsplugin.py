@@ -31,7 +31,7 @@ def test_registered_verts_funcs(vertsPlugin, app):
   vertsPlugin.actionStack.undo()
   assert (img > 0).sum() == imsize
 
-  app.changeFocusedComp(app.compMgr.compDf.iloc[[0]])
+  app.changeFocusedComp(app.compMgr.compDf.index[0])
   img = togray()
   vertsPlugin.clearFocusedRegion()
   vertsPlugin.resetFocusedRegion()
@@ -45,14 +45,14 @@ def test_region_offset(vertsPlugin, sampleComps):
 @pytest.mark.withcomps
 def test_accept_region(app, vertsPlugin):
   comp = app.compMgr.compDf.iloc[[0]]
-  app.changeFocusedComp(comp)
+  app.changeFocusedComp(comp.index)
   vertsPlugin.clearFocusedRegion()
 
   app.acceptFocusedRegion()
   assert comp.index[0] not in app.compMgr.compDf.index
 
   comp = app.compMgr.compDf.iloc[[0]]
-  app.changeFocusedComp(comp)
+  app.changeFocusedComp(comp.index)
   vertsPlugin.fillRegionMask()
   verts = vertsPlugin.region.regionData[REQD_TBL_FIELDS.VERTICES]
   app.acceptFocusedRegion()
@@ -62,7 +62,7 @@ def test_accept_region(app, vertsPlugin):
 @pytest.mark.withcomps
 def test_region_history(vertsPlugin, app, monkeypatch):
   comp = app.compMgr.compDf.iloc[[0]]
-  app.changeFocusedComp(comp)
+  app.changeFocusedComp(comp.index)
 
   vertsPlugin.run(bgVerts=imgCornerVertices(SAMPLE_SMALL_IMG))
   vertsPlugin.run()

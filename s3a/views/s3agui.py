@@ -148,12 +148,10 @@ class S3A(S3ABase):
                    allowOverwriteDefault=allowOverwriteDefault)
     self.sigLayoutSaved.emit()
 
-  def changeFocusedComp(self, newComps: df=None, forceKeepLastChange=False):
-    gen = super().changeFocusedComp(newComps, forceKeepLastChange)
-    ret = fns.gracefulNext(gen)
+  def changeFocusedComp(self, compIds: Union[int, Sequence[int]]=None):
+    ret = super().changeFocusedComp(compIds)
     self.curCompIdLbl.setText(f'Component ID: {self.mainImg.compSer[REQD_TBL_FIELDS.INST_ID]}')
-    yield ret
-    yield fns.gracefulNext(gen)
+    return ret
 
   def resetTblFields_gui(self):
     outFname = fns.popupFilePicker(None, 'Select Table Config File', 'All Files (*.*);; Config Files (*.yml)')
@@ -231,9 +229,9 @@ class S3A(S3ABase):
       forceClose = False
       msg = QtWidgets.QMessageBox()
       msg.setWindowTitle('Confirm Exit')
-      msg.setText('Component table has unsaved changes.\nAre you sure you want to exit?')
-      msg.setDefaultButton(msg.Ok)
-      msg.setStandardButtons(msg.Discard|msg.Cancel|msg.Ok)
+      msg.setText('Component table has unsaved changes.\nYou can choose to save and exit or discard changes')
+      msg.setDefaultButton(msg.Save)
+      msg.setStandardButtons(msg.Discard|msg.Cancel|msg.msg.Save)
       code = msg.exec_()
       if code == msg.Discard:
         forceClose = True

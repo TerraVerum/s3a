@@ -2,7 +2,7 @@ import inspect
 import pydoc
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Optional, Union, Type, Dict, List
+from typing import Optional, Union, Type, Dict, List, Sequence
 from warnings import warn
 
 import numpy as np
@@ -140,7 +140,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     attrs.tableData.sigCfgUpdated.connect(lambda: self.resetTblFields())
 
     # noinspection PyTypeChecker
-    self.vertsPlg: FilePlugin = self.clsToPluginMapping[tablefield.VerticesPlugin]
+    self.vertsPlg: tablefield.VerticesPlugin = self.clsToPluginMapping[tablefield.VerticesPlugin]
     # noinspection PyTypeChecker
     self.miscPlugin: RandomToolsPlugin = self.clsToPluginMapping[RandomToolsPlugin]
     self.compIo = self.filePlg.projData.compIo
@@ -168,7 +168,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     # -----
     # COMPONENT TABLE
     # -----
-    self.compDisplay.sigCompsSelected.connect(lambda newComps: self.changeFocusedComp(newComps))
+    self.compDisplay.sigCompsSelected.connect(lambda newComps: self.changeFocusedComp(newComps.index))
 
     # -----
     # MISC
@@ -415,35 +415,21 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     changeList = np.concatenate([changeDict['added'], changeDict['changed']])
     if len(changeList) == 0:
       return
-    self.changeFocusedComp(self.compMgr.compDf.loc[[changeList[-1]]])
+    self.changeFocusedComp(changeList[-1])
 
-  @DASM.undoable('Change Focused Component')
-  def changeFocusedComp(self, newComps: df=None, forceKeepLastChange=False):
-    oldSer = self.mainImg.compSer.copy()
-    oldImg = self.mainImg.image
-    if newComps is None or len(newComps) == 0:
-      self.mainImg.updateFocusedComp()
+  def changeFocusedComp(self, compIds: Union[int, Sequence[int]]=None):
+    # TODO: More robust scenario if multiple comps are in the dataframe
+    #   For now, treat ambiguity by not focusing anything
+    if np.isscalar(compIds):
+      compIds = [compIds]
+    if compIds is None or len(compIds) != 1 or compIds[0] not in self.compMgr.compDf.index:
       self.compDisplay.regionPlot.focusById([])
-      self.compDisplay.selectRowsById([])
+      self.mainImg.updateFocusedComp()
     else:
-      # TODO: More robust scenario if multiple comps are in the dataframe
-      #   For now, just use the last in the selection. This is so that if multiple
-      #   components are selected in a row, the most recently selected is always
-      #   the current displayed.
-      newComp: pd.Series = newComps.iloc[-1,:]
+      newComp: pd.Series = self.compMgr.compDf.loc[compIds[0]]
       newCompId = newComp[REQD_TBL_FIELDS.INST_ID]
       self.compDisplay.regionPlot.focusById([newCompId])
       self.mainImg.updateFocusedComp(newComp)
-    # Nothing happened since the last component change, so just replace it instead of
-    # adding a distinct action to the buffer queue
-    stack = self.sharedAttrs.actionStack
-    if not forceKeepLastChange and stack.undoDescr == 'Change Focused Component':
-      stack.actions.pop()
-    yield
-    if oldImg is not None and len(oldSer.loc[REQD_TBL_FIELDS.VERTICES]) > 0:
-      self.changeFocusedComp(fns.serAsFrame(oldSer), forceKeepLastChange=True)
-    else:
-      self.changeFocusedComp()
 
   # Stolen and adapted for python from https://stackoverflow.com/a/42910109/9463643
   # noinspection PyTypeChecker

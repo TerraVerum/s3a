@@ -52,7 +52,7 @@ def makeMultiRegionDf(numRows=1, idList: Sequence[int]=None, selected:Sequence[b
   outDict[RTF.VERTICES] = vertices
   outDf = pd.DataFrame(outDict)
   if idList is not None:
-    outDf = outDf.set_index(idList, drop=True)
+    outDf.index = idList
   return outDf
 
 def _makeTxtSymbol(txt: str, fontSize: int):

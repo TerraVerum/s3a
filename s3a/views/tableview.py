@@ -297,6 +297,8 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
       # Set diff will eliminate any repeats, so use a slower op that at least preserves
       # duplicates
       retLists = retLists[~np.isin(retLists[:,2], self.mgr.noEditColIdxs)]
+    if len(retLists) == 0:
+      retLists.shape = (-1,3)
     if warnNoneSelection and len(retLists) == 0:
       warn('No editable columns selected.', UserWarning)
     return retLists

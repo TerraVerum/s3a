@@ -80,7 +80,7 @@ def test_change_comp(app, mgr):
   mImg = app.mainImg
   mgr.addComps(dfTester.compDf.copy())
   comp = mgr.compDf.loc[[RND.integers(NUM_COMPS)]]
-  app.changeFocusedComp(comp)
+  app.changeFocusedComp(comp.index)
   assert app.mainImg.compSer.equals(comp.squeeze())
   assert mImg.image is not None
   stack.undo()
@@ -125,7 +125,7 @@ def test_stage_plotting(monkeypatch, app, vertsPlugin):
   mainImgProps[CNST.PROP_MIN_COMP_SZ] = 0
   mainImg.shapeCollection.sigShapeFinished.emit(XYVertices([[0, 0], [5, 5]]))
   assert len(app.compMgr.compDf) > 0
-  app.changeFocusedComp(app.compMgr.compDf.iloc[[0]])
+  app.changeFocusedComp(app.compMgr.compDf.index[0])
   assert app.mainImg.compSer.loc[REQD_TBL_FIELDS.INST_ID] >= 0
   mainImgProps[CNST.PROP_MIN_COMP_SZ] = oldSz
 
