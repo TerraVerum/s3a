@@ -218,7 +218,12 @@ def apply_process_result(image: NChanImg, asForeground: bool,
     # Without first converting to float, interpolation will be cliped to True/False. This causes
     # 'jagged' edges in the output
     change = cv_resize(change.astype(float), origSize[::-1], asRatio=False, interpolation='INTER_LINEAR')
-    change = change > change[change > 0].mean()
+  # Vast majority of samples will be near 0 or 1, filter these out
+  subset = change[(change > 0.01) & (change < 0.99)].ravel()
+  if len(subset) == 0:
+    change = change > 0
+  else:
+    change = change > subset.mean()
   outMask[boundSlices] = change
   foregroundPixs = np.c_[np.nonzero(outMask)]
   # Keep algorithm from failing when no foreground pixels exist
