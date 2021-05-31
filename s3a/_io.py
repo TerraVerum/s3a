@@ -468,7 +468,7 @@ class ComponentIO:
             mask = np.full_like(mask, bgColor)
             # 'Float' works for int and float orig values, required since opencv complains about some numpy
             # dtypes
-            colorVerts.toMask(mask, float(invertedMap[idx]), asBool=False)
+            colorVerts.toMask(mask, float(invertedMap[lbl]), asBool=False)
 
           outDf['labelMask'].append(mask)
 
