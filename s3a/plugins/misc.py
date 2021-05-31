@@ -69,7 +69,8 @@ class MainImagePlugin(ParamEditorPlugin):
           disp.reflectSelectionBoundsMade(verts, self.win.vertsPlg.region)
           disp.reflectSelectionBoundsMade(verts, clearExisting=False)
 
-        selection = pd.unique(win.compTbl.ids_rows_colsFromSelection(warnNoneSelection=False)[:,0])
+        nonUniqueIds = win.compTbl.ids_rows_colsFromSelection(excludeNoEditCols=False, warnNoneSelection=False)[:,0]
+        selection = pd.unique(nonUniqueIds)
         win.compTbl.sigSelectionChanged.emit(selection)
 
     win.sharedAttrs.generalProps.registerProp(CNST.PROP_MIN_COMP_SZ, container=self.props)
