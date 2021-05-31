@@ -231,7 +231,7 @@ class S3A(S3ABase):
       msg.setWindowTitle('Confirm Exit')
       msg.setText('Component table has unsaved changes.\nYou can choose to save and exit or discard changes')
       msg.setDefaultButton(msg.Save)
-      msg.setStandardButtons(msg.Discard|msg.Cancel|msg.msg.Save)
+      msg.setStandardButtons(msg.Discard|msg.Cancel|msg.Save)
       code = msg.exec_()
       if code == msg.Discard:
         forceClose = True
