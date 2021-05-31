@@ -193,7 +193,7 @@ class HelpPlugin(ParamEditorPlugin):
 
   def attachWinRef(self, win: QtWidgets.QMainWindow):
     super().attachWinRef(win)
-    self.registerFunc(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl('https://gitlab.com/ficsresearch/s3a/-/wikis/home')),
+    self.registerFunc(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl('https://gitlab.com/ficsresearch/s3a/-/wikis/docs/user\'s-guide')),
                          name='Online User Guide')
     self.registerFunc(lambda: QtWidgets.QMessageBox.aboutQt(win, 'About Qt'), name='About Qt')
     self.registerFunc(self.iconAttributions_gui, name='Icon Attributions')
