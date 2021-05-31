@@ -178,7 +178,7 @@ class ComponentIO:
     return _attrNameFmt(PRJ_ENUMS.IO_IMPORT, cls)
 
   @classmethod
-  def ioFileFilter(cls, which=PRJ_ENUMS.IO_ROUND_TRIP, typeFilter='', **extraOpts):
+  def ioFileFilter(cls, which=PRJ_ENUMS.IO_ROUND_TRIP, typeFilter='', allFilesOpt=True, **extraOpts):
     """
     Helper for creating a file filter out of the handled IO types. The returned list of
     strings is suitable for inserting into a QFileDialog.
@@ -186,6 +186,7 @@ class ComponentIO:
     :param which: Whether to generate filters for build types, export types, or round trip
     :param typeFilter: type filter for handled io types. For instanece, if typ='png', then
       a file filter list with only 'id.png' and 'class.png' will appear.
+    :param allFilesOpt: Whether to add an "All Files (*.*) option to the dropdown menu
     :param extraOpts; Extra file types to include in the filter
     """
     ioDict = {
@@ -199,6 +200,8 @@ class ComponentIO:
     for typ, info in dict(**ioDict, **extraOpts).items():
       if any([t in typ for t in typeFilter]):
         fileFilters.append(f'{info} (*.{typ})')
+    if allFilesOpt:
+      fileFilters.append('All Files (*.*)')
     return ';;'.join(fileFilters)
 
   def _ioWrapper(self, func: Callable):
