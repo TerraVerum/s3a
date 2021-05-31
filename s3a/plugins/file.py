@@ -255,8 +255,8 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
   def showProjImgs_gui(self):
     if len(self.projData.images) == 0:
       warn('This project does not have any images yet. You can add them either in\n'
-           '<code>File > Project Settings... > Add Image Files</code> or\n'
-           '<code>File > Add New Image</code>.', UserWarning)
+           '`Project Settings... > Add Image Files` or\n'
+           '`File > Add New Image`.', UserWarning)
       return
     self._projImgMgr.show()
     self._projImgMgr.raise_()

@@ -86,7 +86,7 @@ class CompTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
       cmp = np.any(cmp)
     if cmp:
       warnLater('Warning! An error occurred setting this value. Please try again using a'
-           ' <em>multi-cell</em> edit. E.g. do not just set this value, set it along with'
+           ' *multi-cell* edit. E.g. do not just set this value, set it along with'
            ' at least one other selected cell.', UserWarning)
     toEmit = self.defaultEmitDict.copy()
     toEmit['changed'] = np.array([self.compDf.index[index.row()]])
