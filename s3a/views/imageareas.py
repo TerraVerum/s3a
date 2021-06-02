@@ -244,18 +244,14 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
   def focusedCompImage(self, margin: int=0):
     return getCroppedImg(self.image, self.compSer[RTF.VERTICES].stack(), margin, returnCoords=False)
 
-  def viewboxSquare(self, margin=0):
+  def viewboxCoords(self, margin=0):
     """
-    Returns a squared version of the viewbox, where the shortest side-length is used
-    in both directions. Ordering is [[xmin, xmax], [ymin, ymax]]. Most S3A functionality for bboxes
-    is [[xmin, ymin], [xmax, ymax]] but this follows the convention of the underlying viewbox range
+    Returns the dimensions of the viewbox as (x,y) coordinates of its boundaries
     """
     vbRange = np.array(self.getViewBox().viewRange())
     span = np.diff(vbRange).flatten()
-    center = vbRange[:,0]+span/2
-    minSpan = np.min(span) + margin
-    offset = center - minSpan/2
-    return minSpan*np.array([[0,0], [0,1], [1,1], [1,0]]) + offset
+    offset = vbRange[:, 0]
+    return span*np.array([[0,0], [0,1], [1,1], [1,0]]) + offset
 
   def addTools(self, toolsEditor: ParamEditor):
     if toolsEditor in self._focusedTools:

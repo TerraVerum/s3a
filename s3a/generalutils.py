@@ -1,4 +1,5 @@
 import html
+from collections import defaultdict
 from typing import Callable, Tuple, Union, Sequence, List, Collection
 
 import cv2 as cv
@@ -9,7 +10,7 @@ from skimage import io
 from skimage import transform
 from skimage.exposure import exposure
 
-from utilitys import PrjParam, fns
+from utilitys import PrjParam, fns, ProcessStage
 # Needs to be visible outside this file
 # noinspection PyUnresolvedReferences
 from utilitys.fns import hierarchicalUpdate
@@ -380,3 +381,18 @@ class classproperty:
 
 def imgPathtoHtml(imgPath: FilePath, width=150):
   return '<img src="' + str(imgPath) + f'" width="{width}px">'
+
+def incrStageNames(stages: Sequence[ProcessStage]):
+  """
+  Returns a list of names numerically incrementing where they would otherwise be duplicated. E.g. if the stage
+  list was [Open, Open], this is converted to [Open, Open#2]
+  """
+  preExisting = defaultdict(int)
+  names = []
+  for stage in stages:
+    name = stage.name
+    if preExisting[name] > 0:
+      name += f'#{preExisting[name] + 1}'
+    preExisting[name] += 1
+    names.append(name)
+  return names

@@ -34,7 +34,7 @@ class ImageProcess(NestedProcess):
 
 
   def _stageSummaryWidget(self):
-    infoToDisplay = self.getStageInfos()
+    infoToDisplay = self.getAllStageInfos()
 
     numStages = len(infoToDisplay)
     nrows = np.sqrt(numStages).astype(int)
@@ -82,8 +82,8 @@ class ImageProcess(NestedProcess):
 
     return outGrid
 
-  def getStageInfos(self, ignoreDuplicates=True):
-    infos = super().getStageInfos(ignoreDuplicates)
+  def getAllStageInfos(self, ignoreDuplicates=True):
+    infos = super().getAllStageInfos(ignoreDuplicates)
     # Add entry for initial image since it will be missed when just searching for
     # stage outputs
     infos.insert(0, {'name': 'Initial Image', 'image': self.input['image']})

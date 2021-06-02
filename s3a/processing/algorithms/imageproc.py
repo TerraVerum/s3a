@@ -1,4 +1,5 @@
-from typing import Tuple, Union
+import typing as t
+from typing import Tuple, Union, Dict, Any
 
 import cv2 as cv
 import numpy as np
@@ -10,11 +11,23 @@ from skimage.morphology import flood
 
 from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices, \
   showMaskDiff, MaxSizeDict, tryCvResize
-from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg
-from s3a.structures import GrayImg
+from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg, GrayImg
+from s3a.shims import typing_extensions as te
 from utilitys import fns
 from utilitys.processing import *
 
+# TODO: Establish better mechanism than global buffer
+procCache: Dict[str, Any] = {
+  'mask': np.array([[]], 'uint8')
+}
+"""
+While a global structure is not ideal, it allows algorithms to use previous results across multiple calls.
+Only results that need to be accessed across several different functions should be stored here. If one function
+needs to maintain its state across multiple calls, it should be promoted to an AtomicProcess and use its own
+`result` structure.
+keys are:
+  mask: Mask of previous results, where 0 = unspecified, 1 = background, 2 = foreground
+"""
 
 def growSeedpoint(img: NChanImg, seeds: XYVertices, thresh: float) -> BlackWhiteImg:
   shape = np.array(img.shape[0:2])
@@ -62,22 +75,15 @@ def _cvConnComps(image: np.ndarray, returnLabels=True, areaOnly=True, removeBg=T
     return conncomps[startIdx:], labels
   return conncomps[startIdx:]
 
-_historyMaskHolder = [np.array([[]], 'uint8')]
-
-"""
-0 = unspecified, 1 = background, 2 = foreground. Place inside list so reassignment
-doesn't destroy object reference
-"""
 def format_vertices(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
                     prevCompMask: BlackWhiteImg, firstRun: bool,
                     useFullBoundary=True,
                     keepVertHistory=True):
-  global _historyMaskHolder
 
   if firstRun or not keepVertHistory:
     _historyMask = np.zeros(image.shape[:2], 'uint8')
   else:
-    _historyMask = _historyMaskHolder[0]
+    _historyMask = procCache['mask']
 
   asForeground = True
   # 0 = unspecified, 1 = background, 2 = foreground
@@ -96,7 +102,7 @@ def format_vertices(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
     fgVerts = imgCornerVertices(image)
     fgVerts = cornersToFullBoundary(fgVerts)
     _historyMask[fgVerts.rows, fgVerts.cols] = 1
-  _historyMaskHolder[0] = _historyMask
+  procCache['mask'] = _historyMask
   curHistory = _historyMask.copy()
   if fgVerts.empty:
     # Invert the mask and paint foreground pixels
@@ -128,7 +134,8 @@ def crop_to_local_area(image: NChanImg,
                        historyMask: GrayImg,
                        reference='viewbox',
                        margin_pct=10,
-                       maxSize=0
+                       maxSize=0,
+                       useMinSpan=False
                        ):
   """
   :param reference:
@@ -141,6 +148,9 @@ def crop_to_local_area(image: NChanImg,
   :param maxSize: Maximum side length for a local portion of the image. If the local area exceeds this, it will be
     rescaled to match this size. It can be beneficial for algorithms that take a long time to run, and quality of
     segmentation can be retained. Set to <= 0 to have no maximum size
+  :param useMinSpan: When `viewbox` is the reference, this determines whether to crop to the area defined by the
+    shortest side of the viewbox. So, for aspect ratios far from 1 (i.e. heavily rectangular), this prevents a large
+    area from being used every time
   """
   roiVerts = np.vstack([fgVerts, bgVerts])
   compVerts = np.vstack([prevCompVerts.stack(), roiVerts])
@@ -152,6 +162,18 @@ def crop_to_local_area(image: NChanImg,
     allVerts = compVerts
   else:
     # viewbox or badly sized previous region/roi
+    if useMinSpan:
+      center = viewbox.mean(0)
+      spans = center - viewbox[0]
+      adjustments = (spans - min(spans)).astype(viewbox.dtype)
+      adjustments = (spans - min(spans)).astype(viewbox.dtype)
+      # maxs need to be subtracted toward center, mins need to be extended toward center
+      dim = np.argmax(adjustments)
+      adjust = adjustments[dim]
+      maxs = viewbox[:, dim] == viewbox[:, dim].max()
+      mins = ~maxs
+      viewbox[maxs, dim] -= adjust
+      viewbox[mins, dim] += adjust
     allVerts = np.vstack([viewbox, roiVerts])
   # Lots of points, use their bounded area
   try:
@@ -236,7 +258,7 @@ def apply_process_result(image: NChanImg, asForeground: bool,
 
   # Add 1 to max slice so stopping value is last foreground pixel
   newSlices = (slice(mins[0], maxs[0]+1), slice(mins[1], maxs[1]+1))
-  return ProcessIO(image=outMask[newSlices], boundSlices=newSlices)
+  return ProcessIO(image=outMask[newSlices], boundSlices=newSlices, info={'image': change})
 
 def return_to_full_size(image: NChanImg, origCompMask: BlackWhiteImg,
                         boundSlices: Tuple[slice]):
@@ -321,43 +343,52 @@ def convert_to_squares(image: NChanImg):
 def _grabcutResultToMask(gcResult):
   return np.where((gcResult==2)|(gcResult==0), False, True)
 
-def cv_grabcut(image: NChanImg, prevCompMask: BlackWhiteImg, fgVerts: XYVertices,
-               noPrevMask: bool, historyMask: GrayImg, iters=5):
-  if image.size == 0:
-    return ProcessIO(image=np.zeros_like(prevCompMask))
-  img = cv.cvtColor(image, cv.COLOR_RGB2BGR)
-  # Turn foreground into x-y-width-height
-  bgdModel = np.zeros((1,65),np.float64)
-  fgdModel = np.zeros((1,65),np.float64)
-  historyMask = historyMask.copy()
-  if historyMask.size:
-    historyMask[fgVerts.rows, fgVerts.cols] = 2
+class _CvGrabcut(AtomicProcess):
 
-  mask = np.zeros(prevCompMask.shape, dtype='uint8')
-  if historyMask.shape == mask.shape:
-    mask[prevCompMask == 1] = cv.GC_PR_FGD
-    mask[prevCompMask == 0] = cv.GC_PR_BGD
-    mask[historyMask == 2] = cv.GC_FGD
-    mask[historyMask == 1] = cv.GC_BGD
 
-  cvRect = np.array([fgVerts.min(0), fgVerts.max(0) - fgVerts.min(0)]).flatten()
+  def __init__(self, **kwargs):
+    super().__init__(self.grabcut, 'Cv Grabcut', **kwargs)
 
-  if noPrevMask or not np.any(mask):
-    if cvRect[2] == 0 or cvRect[3] == 0:
+  def grabcut(self, image: NChanImg, prevCompMask: BlackWhiteImg, fgVerts: XYVertices,
+               firstRun: bool, historyMask: GrayImg, iters=5):
+    if image.size == 0:
       return ProcessIO(image=np.zeros_like(prevCompMask))
-    mode = cv.GC_INIT_WITH_RECT
-  else:
-    mode = cv.GC_INIT_WITH_MASK
-  cv.grabCut(img, mask, cvRect, bgdModel, fgdModel, iters, mode=mode)
-  outMask = np.where((mask==2)|(mask==0), False, True)
-  return ProcessIO(labels=outMask)
+    img = cv.cvtColor(image, cv.COLOR_RGB2BGR)
+    historyMask = historyMask.copy()
+    if historyMask.size:
+      historyMask[fgVerts.rows, fgVerts.cols] = 2
 
-_qsInCache = MaxSizeDict(maxsize=5)
-_qsOutCache = MaxSizeDict(maxsize=5)
+    mask = np.zeros(prevCompMask.shape, dtype='uint8')
+    if historyMask.shape == mask.shape:
+      mask[prevCompMask == 1] = cv.GC_PR_FGD
+      mask[prevCompMask == 0] = cv.GC_PR_BGD
+      mask[historyMask == 2] = cv.GC_FGD
+      mask[historyMask == 1] = cv.GC_BGD
+
+    cvRect = np.array([fgVerts.min(0), fgVerts.max(0) - fgVerts.min(0)]).flatten()
+
+    if firstRun or self.result is None or 'fgdModel' not in self.result:
+      bgdModel = np.zeros((1, 65), np.float64)
+      fgdModel = np.zeros((1, 65), np.float64)
+    else:
+      bgdModel = self.result['bgdModel']
+      fgdModel = self.result['fgdModel']
+
+    if not np.any(mask):
+      if cvRect[2] == 0 or cvRect[3] == 0:
+        return ProcessIO(image=np.zeros_like(prevCompMask))
+      mode = cv.GC_INIT_WITH_RECT
+    else:
+      mode = cv.GC_INIT_WITH_MASK
+    cv.grabCut(img, mask, cvRect, bgdModel, fgdModel, iters, mode=mode)
+    outMask = np.where((mask==2)|(mask==0), False, True)
+    return ProcessIO(labels=outMask, fgdModel=fgdModel, bgdModel=bgdModel)
+
+def cv_grabcut_factory():
+  return _CvGrabcut()
 
 def quickshift_seg(image: NChanImg, ratio=1.0, max_dist=10.0, kernel_size=5,
                    sigma=0.0):
-  global _qsInCache, _qsOutCache
   # For max_dist of 0, the input isn't changed and it takes a long time
   key = (max_dist, kernel_size, sigma)
   if max_dist == 0:
@@ -366,13 +397,7 @@ def quickshift_seg(image: NChanImg, ratio=1.0, max_dist=10.0, kernel_size=5,
   else:
     if image.ndim < 3:
       image = np.tile(image[:,:,None], (1,1,3))
-    # First check if this image was the same as last time
-    if np.array_equal(_qsInCache.get(key, None), image) and key in _qsOutCache:
-      segImg =  _qsOutCache[key]
-    else:
-      segImg = seg.quickshift(image, ratio=ratio, kernel_size=kernel_size, max_dist=max_dist, sigma=sigma)
-  _qsInCache[key] = image
-  _qsOutCache[key] = segImg.copy()
+    segImg = seg.quickshift(image, ratio=ratio, kernel_size=kernel_size, max_dist=max_dist, sigma=sigma)
   return ProcessIO(labels=segImg)
 quickshift_seg.__doc__ = seg.quickshift.__doc__
 

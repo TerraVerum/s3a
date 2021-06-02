@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import copy
-from collections import deque, namedtuple
-from typing import Sequence
+from collections import deque, namedtuple, defaultdict
+import typing as t
+from functools import lru_cache
 from warnings import warn
 
 import numpy as np
@@ -11,13 +12,13 @@ import pyqtgraph as pg
 
 import s3a
 from s3a import PRJ_CONSTS as CNST, XYVertices, REQD_TBL_FIELDS as RTF, ComplexXYVertices
-from s3a.processing.algorithms.imageproc import _historyMaskHolder
+from s3a.processing.algorithms.imageproc import procCache
 from s3a.structures import BlackWhiteImg
 from s3a.views.regions import MultiRegionPlot, makeMultiRegionDf
-from utilitys import PrjParam, DeferredActionStackMixin as DASM
+from utilitys import PrjParam, DeferredActionStackMixin as DASM, ProcessStage, ProcessIO, RunOpts, fns
 from .base import TableFieldPlugin
 from ..constants import PRJ_ENUMS
-from ..generalutils import getCroppedImg, showMaskDiff
+from ..generalutils import getCroppedImg, showMaskDiff, tryCvResize, incrStageNames
 from ..graphicsutils import RegionHistoryViewer
 from ..shared import SharedAppSettings
 
@@ -41,9 +42,16 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     self.firstRun = True
     self.playbackWindow = RegionHistoryViewer()
     self.regionBuffer = deque(maxlen=CNST.PROP_UNDO_BUF_SZ.value)
+    self.stageInfoImage = pg.ImageItem()
+    self.stageInfoImage.hide()
+    self._displayedStage = ''
+
+    _, self._overlayParam = self.procEditor.registerFunc(self.overlayStageInfo, parentParam=self.procEditor._metaParamGrp,
+                                            returnParam=True, runOpts=RunOpts.ON_CHANGED)
 
   def attachWinRef(self, win: s3a.S3A):
     win.mainImg.addItem(self.region)
+    win.mainImg.addItem(self.stageInfoImage)
 
     def resetRegBuff(_, newSize):
       newBuff = deque(maxlen=newSize)
@@ -61,6 +69,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     def onChange():
       self.firstRun = True
       self.clearFocusedRegion()
+      self.stageInfoImage.hide()
     win.mainImg.imgItem.sigImageChanged.connect(onChange)
 
     win.mainImg.registerDrawAction([CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self._run_drawAct)
@@ -81,7 +90,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     past edits into account when performing their operations. Clearing that history
     will erase algorithm knowledge of past edits.
     """
-    _historyMaskHolder[0].fill(0)
+    procCache['mask'].fill(0)
 
   def updateFocusedComp(self, newComp:pd.Series = None):
     self.updateFocusedPen_Fill()
@@ -134,7 +143,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     #  change will have to occur
     # Clip viewrange to min view axis area instead of max, which will happen internally
     # otherwise
-    viewbox = self.mainImg.viewboxSquare()
+    viewbox = self.mainImg.viewboxCoords()
     newGrayscale = self.curProcessor.run(
       image=img,
       prevCompMask=compMask,
@@ -146,6 +155,16 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     if isinstance(newGrayscale, dict):
       newGrayscale = newGrayscale['image']
     newGrayscale = newGrayscale.astype('uint8')
+
+    matchNames = incrStageNames(self.curProcessor.processor.stages_flattened)
+    type(self).displayableInfos.fget.cache_clear()
+    if self._displayedStage in matchNames:
+      self.overlayStageInfo(self._displayedStage, self.stageInfoImage.opacity())
+    else:
+      self.stageInfoImage.hide()
+    # Can't set limits to actual infos since equality comparison fails in pyqtgraph setLimits
+    limits = [''] + list(self.displayableInfos)
+    self._overlayParam.child('info').setLimits(limits)
 
     self.firstRun = False
     if not np.array_equal(newGrayscale, compGrayscale):
@@ -195,7 +214,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     self.regionBuffer.append(buffEntry(newId, buffVerts))
 
   @staticmethod
-  def applyOffset(complexVerts: Sequence[ComplexXYVertices], offset: XYVertices):
+  def applyOffset(complexVerts: t.Sequence[ComplexXYVertices], offset: XYVertices):
     centeredVerts = []
     for complexVerts in complexVerts:
       newVertList = ComplexXYVertices()
@@ -204,7 +223,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
       centeredVerts.append(newVertList)
     return centeredVerts
 
-  def _maybeChangeFocusedComp(self, newIds: Sequence[int]):
+  def _maybeChangeFocusedComp(self, newIds: t.Sequence[int]):
     regionId = newIds[0] if len(newIds) else -1
     focusedId = self.mainImg.compSer[RTF.INST_ID]
     updated = regionId != focusedId
@@ -299,6 +318,81 @@ class VerticesPlugin(DASM, TableFieldPlugin):
       img = copied.toMask(imShape, warnIfTooSmall=False)
       outImgs.append(img)
     return initialImg, outImgs
+
+  def overlayStageInfo(self, info: t.Union[str, dict]='', alpha=1.0):
+    """
+    :param info:
+      pType: list
+      helpText: "If a name is given, this stage's info result will be shown on top of the image. Note that
+        if multiple stages exist with the same name and a string is passed, include the 1-based numeric index in the
+        name, i.e. if two 'Open' stages exist, to select the second stage pass 'Open#2'.
+      "
+      limits: ['']
+    :param alpha:
+      helpText: Opacity of this overlay
+      limits: [0, 1]
+      step: 0.1
+    """
+    if not isinstance(info, dict):
+      info = self.displayableInfos.get(info, None)
+    if not info:
+      # Reset to none
+      self.stageInfoImage.hide()
+      return
+    self._displayedStage = info['name']
+    useImg = info['image']
+    span = info['span']
+    pos = info['pos']
+    if useImg.shape[:2] != span:
+      useImg = tryCvResize(useImg, span[::-1], asRatio=False)
+    self.stageInfoImage.setPos(*pos)
+    self.stageInfoImage.setImage(useImg)
+    self.stageInfoImage.setOpts(opacity=alpha)
+    self.stageInfoImage.show()
+
+  @property
+  @lru_cache
+  def displayableInfos(self):
+    outInfos = {}
+    stages = self.curProcessor.processor.stages_flattened
+    matchNames = incrStageNames(stages)
+    boundSlices = None
+
+    for name, stage in zip(matchNames, stages):
+      if stage.result is None:
+        # Not run yet
+        continue
+      info = self.curProcessor.processor.singleStageInfo(stage)
+      if info:
+        # TODO: Figure out which 'info' to use
+        info = info[0]
+      if info is None or 'image' not in info:
+        continue
+      useImg = info['image']
+      # This image was likely from a cropped area, make sure to put it in the right place
+      imPos = (0, 0)
+      span = useImg.shape[:2]
+      if boundSlices is not None:
+        # Resizing may have also occurred
+        span = []
+        imPos = []
+        for curSlice in boundSlices: # type: slice
+          # Pos is specified in x-y, not row-col
+          curSlice: slice
+          imPos.append(curSlice.start)
+          span.append(curSlice.stop - curSlice.start)
+        span = tuple(span)
+        imPos = tuple(imPos)
+      outInfos[name] = {
+        'name': name,
+        'image': useImg,
+        'span': span,
+        'pos': imPos[::-1]
+      }
+      # Bound slices up to the evaluated stage are used for resizing information
+      if isinstance(stage.result, ProcessIO) and 'boundSlices' in stage.result:
+        boundSlices = stage.result['boundSlices']
+    return outInfos
 
 
   def playbackRegionHistory(self):
