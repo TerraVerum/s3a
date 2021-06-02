@@ -87,7 +87,7 @@ def test_load_startup_img(tmp_path, app, filePlg):
 
 def test_load_with_plg(monkeypatch, tmp_path):
   # Make separate win to avoid clobbering existing menus/new projs
-  app = S3A()
+  app = S3A(loadLastState=False)
   filePlg = app.filePlg
   with monkeypatch.context() as m:
     m.syspath_prepend(str(TEST_FILE_DIR))
