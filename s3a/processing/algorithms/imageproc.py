@@ -258,7 +258,7 @@ def apply_process_result(image: NChanImg, asForeground: bool,
 
   # Add 1 to max slice so stopping value is last foreground pixel
   newSlices = (slice(mins[0], maxs[0]+1), slice(mins[1], maxs[1]+1))
-  return ProcessIO(image=outMask[newSlices], boundSlices=newSlices, info={'image': change})
+  return ProcessIO(image=outMask[newSlices], boundSlices=newSlices, summaryInfo={'image': change})
 
 def return_to_full_size(image: NChanImg, origCompMask: BlackWhiteImg,
                         boundSlices: Tuple[slice]):

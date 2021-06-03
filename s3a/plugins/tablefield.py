@@ -334,12 +334,14 @@ class VerticesPlugin(DASM, TableFieldPlugin):
       step: 0.1
     """
     if not isinstance(info, dict):
+      self._displayedStage = info
       info = self.displayableInfos.get(info, None)
+    else:
+      self._displayedStage = info['name']
     if not info:
       # Reset to none
       self.stageInfoImage.hide()
       return
-    self._displayedStage = info['name']
     useImg = info['image']
     span = info['span']
     pos = info['pos']
@@ -351,7 +353,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     self.stageInfoImage.show()
 
   @property
-  @lru_cache
+  @lru_cache()
   def displayableInfos(self):
     outInfos = {}
     stages = self.curProcessor.processor.stages_flattened
