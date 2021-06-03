@@ -98,7 +98,7 @@ def doAndAssertExport(app, fpath: Path, io: ComponentIO, compDf: pd.DataFrame, f
   fpath = Path(fpath)
   try:
     io.exportByFileType(compDf, fpath, imShape=app.mainImg.image.shape[:2],
-                        imgDir=SAMPLE_IMG_FNAME.parent)
+                        srcDir=SAMPLE_IMG_FNAME.parent)
   except ValueError as ve:
     if 'Full I/O' not in str(ve):
       raise

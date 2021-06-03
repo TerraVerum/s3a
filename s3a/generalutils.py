@@ -1,6 +1,9 @@
 import html
+import warnings
 from collections import defaultdict
-from typing import Callable, Tuple, Union, Sequence, List, Collection
+from functools import wraps
+from pathlib import Path
+from typing import Callable, Tuple, Union, Sequence, List, Collection, Any
 
 import cv2 as cv
 import numpy as np
@@ -303,7 +306,7 @@ class MaxSizeDict(dict):
     self.maxsize = maxsize
 
   def __setitem__(self, key, value):
-    if len(self) == self.maxsize:
+    if len(self) >= self.maxsize:
       # Evict oldest inserted entry
       self.pop(next(iter(self.keys())))
     super().__setitem__(key, value)
@@ -396,3 +399,87 @@ def incrStageNames(stages: Sequence[ProcessStage]):
     preExisting[name] += 1
     names.append(name)
   return names
+
+class DirectoryDict(MaxSizeDict):
+  """
+  Used to shim the API between file-system and programmatically generated content. If a directory is passed, files are
+  read and cached when a name is passed. Otherwise, treat as a normal dict of things. For instance, a directory of
+  png images can be accessed through this data structure as ddict['x.png'] which will load the image. Next time 'x.png'
+  is accessed, it will be instantaneous due to caching. Similarly, `ddict` could be given an initial dict if contents
+  are not directory-backed
+  """
+  _UNSET = object()
+
+  def __init__(self, initData:Union[FilePath, dict, 'DirectoryDict']=None, readFunc: Callable[[str], Any]=None, allowAbsolute=False,
+               **kwargs,):
+    """
+    :param initData: Either startup dict or backing directory path. If a DirectoryDict is passed, its attribute will
+      be used instead of the value passed for allowAbsolute. Its readFunc will be used if the passed
+      readFunc is *None*
+    :param readFunc: Function used to read files from the directory, i.e. `io.imread`, `attemptFileLoad`, etc.
+      Must accept the name of the file to read
+    :param allowAbsolute: Whether to allow reading absolute paths
+    :param kwargs: Passed to super constructor
+    """
+    if isinstance(initData, FilePath.__args__):
+      self.fileDir = Path(initData)
+      super().__init__(**kwargs)
+    else:
+      if isinstance(initData, DirectoryDict):
+        readFunc = readFunc or initData.readFunc
+        allowAbsolute = initData.allowAbsolute
+        self.fileDir = initData.fileDir
+      super().__init__(initData, **kwargs)
+    self.readFunc = readFunc
+    self.allowAbsolute = allowAbsolute
+
+  def __missing__(self, key):
+    key = str(key)
+    exists = super().get(key, self._UNSET)
+    if exists is not self._UNSET:
+      return exists
+    if self.fileDir is None:
+      raise KeyError(f'"{key}" is not in dict and no backing file system was provided')
+    pathKey = Path(key)
+    isAbsolute = pathKey.is_absolute()
+    if not self.allowAbsolute and isAbsolute:
+      raise KeyError(f'Directory paths must be relative, received {key}')
+    testPath = pathKey if isAbsolute else self.fileDir/key
+    candidates = list(testPath.parent.glob(testPath.name))
+    if len(candidates) != 1:
+      grammar = ': ' if len(candidates) else ''
+      raise KeyError(f'"{key}" corresponds to {len(candidates)} files{grammar}{", ".join(c.name for c in candidates)}')
+    else:
+      file = candidates[0]
+      ret = self[key] = self.readFunc(file)
+    return ret
+
+  def get(self, key, default=None):
+    ret = super().get(key, self._UNSET)
+    if ret is self._UNSET:
+      # See if directory has this data
+      try:
+        ret = self[key]
+      except KeyError:
+        return default
+    return ret
+
+
+def deprecateKwargs(**toDeprecate):
+  def deco(func):
+    @wraps(func)
+    def inner(*args, **kwargs):
+      usedDeprecated = set(toDeprecate) & set(kwargs)
+      if usedDeprecated:
+        grammar = 'is' if len(usedDeprecated) == 1 else 'are'
+        replacements = {k: toDeprecate[k] for k in usedDeprecated if toDeprecate[k] is not None}
+        msg = f'{", ".join(usedDeprecated)} {grammar} deprecated and will be removed in a future release.'
+        if replacements:
+          for orig, replace in replacements.items():
+            kwargs[replace] = kwargs[orig]
+            del kwargs[orig]
+          msg += f' Use the following replacement guide: {replacements}'
+        warnings.warn(msg, DeprecationWarning, stacklevel=2)
+      return func(*args, **kwargs)
+    return inner
+  return deco

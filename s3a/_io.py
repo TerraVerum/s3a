@@ -13,8 +13,10 @@ from pathlib import Path
 from stat import S_IREAD, S_IRGRP, S_IROTH
 from typing import Any, Optional, Union, Tuple, Callable
 from zipfile import ZipFile
+import os
 
 import cv2 as cv
+import errno
 import numpy as np
 import pandas as pd
 from skimage import io, draw
@@ -25,7 +27,7 @@ from PIL.PngImagePlugin import PngInfo
 
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
 from s3a.generalutils import augmentException, getCroppedImg, resize_pad, cvImsave_rgb, orderContourPts, classproperty, \
-  cvImread_rgb, imgPathtoHtml
+  cvImread_rgb, imgPathtoHtml, deprecateKwargs, DirectoryDict
 from s3a.parameditors.table import TableData
 from s3a.structures import PrjParamGroup, FilePath, GrayImg, \
   ComplexXYVertices, PrjParam, XYVertices, AnnParseError
@@ -361,8 +363,10 @@ class ComponentIO:
     """Exposed format from the more general exportSerialized"""
     return self.exportSerialized(*args, **kwargs)
 
-  def exportCompImgsDf(self, compDf: pd.DataFrame, outFile: Union[str, Path]=None,
-                       imgDir: FilePath=None, margin=0, marginAsPct=False,
+  @deprecateKwargs(imgDir='srcDir')
+  def exportCompImgsDf(self, compDf: pd.DataFrame, outFile: Union[str, Path]=None, *,
+                       srcDir: Union[FilePath, dict, DirectoryDict]=None,
+                       margin=0, marginAsPct=False,
                        includeCols=('instId', 'img', 'labelMask', 'label', 'offset'),
                        lblField='Instance ID', asIndiv=False,
                        returnLblMapping=False,
@@ -372,8 +376,9 @@ class ComponentIO:
     :param compDf: Dataframe to export
     :param outFile: Where to save the result, if it should be saved. Caution -- this
       is currently a time-consuming process!
-    :param imgDir: Where images corresponding to this dataframe are kept. Source image
-      filenames are interpreted relative to this directory if they are not absolute.
+    :param srcDir: Where images corresponding to this dataframe are kept. Source image
+      filenames are interpreted relative to this directory if they are not absolute. Alternatively, can be a dict
+      of {name: np.ndarray} image mappings
     :param margin: How much padding to give around each component
     :param marginAsPct: Whether the margin should be a percentage of the component size or
       a raw pixel value.
@@ -400,21 +405,12 @@ class ComponentIO:
     """
     bgColor = kwargs.get('bgColor', 0)
     _imgCache = {}
-    if imgDir is None:
-      imgDir = Path('.')
-    else:
-      imgDir = Path(imgDir)
+    if srcDir is None:
+      srcDir = Path('.')
+    srcDir = DirectoryDict(srcDir, allowAbsolute=True, readFunc=cvImread_rgb)
     uniqueImgs = np.unique(compDf[RTF.SRC_IMG_FILENAME])
     dfGroupingsByImg = []
     for imgName in uniqueImgs:
-      fullImgName = Path(imgName)
-      if not fullImgName.is_absolute():
-        fullImgName = imgDir / fullImgName
-      if fullImgName not in _imgCache:
-        if not fullImgName.exists() and missingOk:
-          _imgCache[fullImgName] = None
-        else:
-          _imgCache[fullImgName] = io.imread(fullImgName)
       dfGroupingsByImg.append(compDf[compDf[RTF.SRC_IMG_FILENAME] == imgName])
 
     useKeys = set(includeCols)
@@ -424,15 +420,16 @@ class ComponentIO:
     kwargs.pop('imShape', None)
     mappings = {}
     for miniDf, fullImgName in zip(dfGroupingsByImg, uniqueImgs):
-      fullImgName = imgDir / fullImgName
-      img = _imgCache[fullImgName]
+      img = srcDir.get(fullImgName)
+      if img is None and not missingOk:
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), fullImgName)
       shape = img if img is None else img.shape[:2]
       lblImg, mapping = self.exportLblPng(miniDf,
                                           imShape=shape,
                                           lblField=lblField,
                                           returnLblMapping=True,
                                           **kwargs)
-      mappings[fullImgName.name] = mapping
+      mappings[Path(fullImgName).name] = mapping
       if img is None:
         img = np.zeros_like(lblImg)
       invertedMap = pd.Series(mapping.index, mapping)

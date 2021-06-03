@@ -619,8 +619,8 @@ class ProjectData(QtCore.QObject):
     if dirs:
       self.watcher.removePaths(dirs)
     self.watcher.addPaths([str(self.imagesDir), str(self.annotationsDir)])
-    self.compIo.importOpts['imgDir'] = self.imagesDir
-    self.compIo.exportOpts['imgDir'] = self.imagesDir
+    for opts in self.compIo.importOpts, self.compIo.exportOpts:
+      opts['srcDir'] = self.imagesDir
     return self.cfgFname
 
   @classmethod

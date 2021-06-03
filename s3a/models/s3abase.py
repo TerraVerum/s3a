@@ -351,8 +351,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
       return
     imgAnns = self.filePlg.imgToAnnMapping.get(imgFname, None)
     if imgAnns is not None:
-      self.compMgr.addComps(self.compIo.importByFileType(imgAnns, imgDir=self.filePlg.imagesDir,
-                                                        imShape=self.mainImg.image.shape))
+      self.compMgr.addComps(self.compIo.importByFileType(imgAnns, imShape=self.mainImg.image.shape))
       # 'hasUnsavedChanges' will be true after this, even though the changes are saved.
       self.hasUnsavedChanges = False
 
