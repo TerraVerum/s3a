@@ -8,5 +8,5 @@ fields:
     value: ''
     readOnly: True
     parser: 'superanntime'
-    alises: [Timestamp]
+    aliases: [Timestamp]
   probability: 100.0
