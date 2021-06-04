@@ -10,9 +10,8 @@ from skimage.measure import regionprops, label
 from skimage.morphology import flood
 
 from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices, \
-  showMaskDiff, MaxSizeDict, tryCvResize
+  showMaskDiff, tryCvResize
 from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg, GrayImg
-from s3a.shims import typing_extensions as te
 from utilitys import fns
 from utilitys.processing import *
 
