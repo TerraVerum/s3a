@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import errno
 import inspect
 import json
+import os
 import pickle
 import sys
 import tempfile
-from ast import literal_eval
 from collections import defaultdict
 from contextlib import ExitStack
 from functools import wraps
@@ -13,26 +14,25 @@ from pathlib import Path
 from stat import S_IREAD, S_IRGRP, S_IROTH
 from typing import Any, Optional, Union, Tuple, Callable
 from zipfile import ZipFile
-import os
 
 import cv2 as cv
-import errno
 import numpy as np
 import pandas as pd
-from skimage import io, draw
-from skimage.exposure import rescale_intensity
-from s3a.shims import typing_extensions
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
-
-from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
+from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS, IO_TEMPLATES_DIR
 from s3a.generalutils import augmentException, getCroppedImg, resize_pad, cvImsave_rgb, orderContourPts, classproperty, \
   cvImread_rgb, imgPathtoHtml, deprecateKwargs, DirectoryDict
 from s3a.parameditors.table import TableData
-from s3a.structures import PrjParamGroup, FilePath, GrayImg, \
-  ComplexXYVertices, PrjParam, XYVertices, AnnParseError
+from s3a.shims import typing_extensions
+from s3a.structures import FilePath, GrayImg, \
+  ComplexXYVertices, PrjParam, AnnParseError
+from skimage import draw
+from skimage.exposure import rescale_intensity
 from utilitys import fns
 from utilitys.fns import warnLater
+
+from .helpers import serialize, deserialize
 
 FilePathOrDf = Union[FilePath, pd.DataFrame]
 # Values are strings
@@ -92,35 +92,6 @@ def _getPdImporters():
     pd.DataFrame,lambda meth: inspect.isfunction(meth) and meth.__name__.startswith('read_'))
   return [mem[0].replace('read_', '') for mem in members]
 
-def _strSerToParamSer(strSeries: pd.Series, paramVal: Any) -> pd.Series:
-  paramType = type(paramVal)
-  # TODO: Move this to a more obvious place?
-  funcMap = {
-    # Format string to look like a list, use ast to convert that string INTO a list, make a numpy array from the list
-    np.ndarray        : lambda strVal: np.array(literal_eval(strVal)),
-    ComplexXYVertices : ComplexXYVertices.deserialize,
-    XYVertices        : XYVertices.deserialize,
-    bool              : lambda strVal: strVal.lower() == 'true',
-    PrjParam          : lambda strVal: PrjParamGroup.fieldFromParam(paramVal.group, strVal)
-  }
-  defaultFunc = lambda strVal: paramType(strVal)
-  funcToUse = funcMap.get(paramType, defaultFunc)
-  return strSeries.apply(funcToUse).values
-
-
-def _paramSerToStrSer(paramSer: pd.Series, paramVal: Any) -> pd.Series:
-  # TODO: Move along with above function?
-  paramType = type(paramVal)
-  funcMap = {
-    # Format string to look like a list, use ast to convert that string INTO a list, make a numpy array from the list
-    np.ndarray: lambda param: str(param.tolist()),
-    XYVertices: XYVertices.serialize,
-    ComplexXYVertices: ComplexXYVertices.serialize,
-  }
-  defaultFunc = lambda param: str(param)
-
-  funcToUse = funcMap.get(paramType, defaultFunc)
-  return paramSer.apply(funcToUse)
 
 # Credit: https://stackoverflow.com/a/28238047/9463643
 # class classorinstancemethod(classmethod):
@@ -178,6 +149,16 @@ class ComponentIO:
     file picker dialog
     """
     return _attrNameFmt(PRJ_ENUMS.IO_IMPORT, cls)
+
+  def _getForeignTableData(self, ioFuncName: str):
+    """Returns a TableData object responsible for importing / exporting data of this format"""
+    out = TableData(IO_TEMPLATES_DIR/(ioFuncName.lower() + '.tblcfg'))
+    # Make sure current factories from plugins still work
+    for field in list(RTF):
+      factory = field.opts.get('factory')
+      if factory:
+        out.addFieldFactory(field, factory)
+    return out
 
   @classmethod
   def ioFileFilter(cls, which=PRJ_ENUMS.IO_ROUND_TRIP, typeFilter='', allFilesOpt=True, **extraOpts):
@@ -350,7 +331,10 @@ class ComponentIO:
       exportDf = compDf.copy(deep=True)
       for col in exportDf:
         if not isinstance(col.value, str):
-          exportDf[col] = _paramSerToStrSer(exportDf[col], col.value)
+          serial, errs = serialize(col, exportDf[col])
+          exportDf[col] = serial.to_numpy()
+          if len(errs):
+            raise ValueError(f'Encountered errors on the following rows:\n{errs.to_string()}')
       self._pandasSerialExport(exportDf, outFile, readOnly, **pdExportArgs)
     except Exception as ex:
       errMsg = f'Error on parsing column "{col.name}"\n'
@@ -663,7 +647,7 @@ class ComponentIO:
 
   @fns.dynamicDocstring(availImporters=_getPdImporters())
   def importSerialized(self, inFileOrDf: FilePathOrDf, imShape: Tuple=None,
-                          reindex=False, **importArgs):
+                          reindex=False, parseErrorOk=False, **importArgs):
     """
     Deserializes data from a file or string dataframe to create a S3A Component
     :class:`DataFrame`.
@@ -682,8 +666,10 @@ class ComponentIO:
       the index doesn't need to be retained.
     :return: Tuple: pd.DataFrame that will be exported if successful extraction
     """
+    fileName = None if isinstance(inFileOrDf, pd.DataFrame) else inFileOrDf
     field = PrjParam('None', None)
     serialDf = self._pandasSerialImport(inFileOrDf, **importArgs)
+    totalErrs = pd.DataFrame()
     if reindex:
       serialDf[RTF.INST_ID.name] = np.arange(len(serialDf), dtype=int)
       serialDf = serialDf.set_index(RTF.INST_ID.name, drop=False)
@@ -694,17 +680,21 @@ class ComponentIO:
       # Objects in the original frame are repre sented as strings, so try to convert these
       # as needed
       for field in self.tableData.allFields:
+        errs = []
         if field.name in serialDf:
           matchingCol = serialDf[field.name]
           # 'Object' type results in false positives
-          if matchingCol.dtype != object and type(field.value) == matchingCol.dtype:
-            outDf[field] = serialDf[field.name]
-          else:
-            # Parsing functions only know how to convert from strings to themselves.
-            # So, assume the exting types can first convert themselves to strings
-            with np.printoptions(threshold=sys.maxsize):
-              matchingCol = matchingCol.apply(str)
-            outDf[field] = _strSerToParamSer(matchingCol, field.value)
+          # if matchingCol.dtype != object and type(field.value) == matchingCol.dtype:
+          #   outDf[field] = serialDf[field.name]
+          # else:
+          # Parsing functions only know how to convert from strings to themselves.
+          # So, assume the exting types can first convert themselves to strings
+          matchingCol = matchingCol.astype(str)
+          outDf[field], errs = deserialize(field, matchingCol)
+          if len(errs):
+            totalErrs = totalErrs.join(errs, how='outer')
+      if len(totalErrs) and not parseErrorOk:
+        raise AnnParseError(f'Encountered problems on some annotations:\n{totalErrs.to_string()}', fileName=fileName, instances=totalErrs)
       outDf = outDf.set_index(RTF.INST_ID, drop=False)
 
       self.checkVertBounds(outDf[RTF.VERTICES], imShape)
@@ -722,6 +712,43 @@ class ComponentIO:
   def importCsv(self, *args, **kwargs):
     """Exposed format from the more general importSerialized"""
     return self.importSerialized(*args, **kwargs)
+
+  def _foreignSerialImport(self, foreignTbl: TableData, foreignDf: pd.DataFrame, mapping: dict=None):
+    """
+    Several forms of imports / exports handle data that may not be compatible with the current table data.
+    In these cases, it is beneficial to determine a mapping between names to allow greater compatibility between
+    I/O formats. This also safely attempts a serial transfer without leaving self's table data in an unstable state.
+    Mapping is also extended in both directions by parameter name aliases (param.opts['aliases']), which are a list
+    of strings of common mappings for that parameter (e.g. [Class, Label] are often used interchangeably)
+
+    :param foreignTbl: Table of foreign information
+    :param foreignDf: Dataframe with maybe foreign fields
+    :param mapping: Foreign to local field name mapping
+    """
+    oldTbl = self.tableData
+    try:
+      self.tableData = foreignTbl
+      foreignDf = self.importSerialized(foreignDf)
+    finally:
+      self.tableData = oldTbl
+    outCols = list(foreignTbl.allFields)
+
+    for ii, field in enumerate(foreignTbl.allFields):
+      checkNames = set([field.name] + field.opts.get('aliases', []))
+      for cmp in oldTbl.allFields:
+        cmpNames = [cmp.name] + cmp.opts.get('aliases', [])
+        if checkNames & set(cmpNames):
+          # There's a match!
+          outCols[ii] = cmp
+
+    if mapping:
+      # Mapping takes priority, so let it overwrite potentially alias-mapped values
+      for kk, vv in mapping.items():
+        if vv in oldTbl and kk in outCols:
+          outCols[kk] = vv
+    foreignDf.columns = outCols
+    return foreignDf
+
 
   def importGeojson(self, inFileOrDict: Union[FilePath, dict], parseErrorOk=False, **importArgs):
     fileName = None
@@ -744,16 +771,37 @@ class ComponentIO:
     outDf[RTF.VERTICES] = verts
     return outDf
 
-  def importSuperannotateJson(self, inFileOrDict: Union[FilePath, dict], parseErrorOk=False, **importArgs):
+  def importSuperannotateJson(self, inFileOrDict: Union[FilePath, dict], parseErrorOk=False,
+                              srcDir: Union[FilePath, dict]=None,
+                              **importArgs,):
+    """
+    :param inFileOrDict: File or object to import
+    :param parseErrorOk: Whether errors should be raised on bad annotation instances
+    :param srcDir: Folder path with 'classes.json' (usually this folder is called 'classes')
+      or dict with 'classes.json' key and dict value
+    """
     fileName = None
+    def readFunc(file):
+      with open(file, 'r') as ifile:
+        return json.load(ifile)
     if not isinstance(inFileOrDict, dict):
       fileName = Path(inFileOrDict)
-      with open(inFileOrDict, 'r') as ifile:
-        inFileOrDict = json.load(ifile)
+      inFileOrDict = readFunc(inFileOrDict)
+    foreignDf = pd.DataFrame(inFileOrDict['instances'])
+    if srcDir is None:
+      srcDir = Path(f'.')
+    srcDir = DirectoryDict(srcDir, readFunc=readFunc, allowAbsolute=True)
+    useTbl = self._getForeignTableData('superannotateJson')
+    classes = srcDir.get('classes.json')
+    if classes is None and fileName is not None:
+      classes = srcDir.get(fileName.parent/'classes'/'classes.json')
+    if classes is not None:
+      useTbl.fieldFromName('className').opts['limits'] = [c['name'] for c in classes]
     instances = inFileOrDict['instances']
     parsePts = []
     invalidInsts = []
-    for inst in instances:
+    invalidIdxs = []
+    for ii, inst in enumerate(instances):
       typ = inst['type']
       if typ in ['polygon', 'bbox']:
         pts = inst['points']
@@ -767,10 +815,13 @@ class ComponentIO:
         parsePts.append(orderContourPts(pts))
       else:
         invalidInsts.append(inst)
+        invalidIdxs.append(ii)
     if invalidInsts and not parseErrorOk:
       raise AnnParseError('Currently, S3A only supports polygon annotations from SuperAnnotate',
                           fileName=fileName, instances=invalidInsts)
-    outDf = self.tableData.makeCompDf(len(parsePts))
+    foreignDf = foreignDf.drop(invalidIdxs)
+    outDf = self._foreignSerialImport(useTbl, foreignDf, importArgs.get('mapping'))
+
     outDf[RTF.VERTICES] = [ComplexXYVertices([pts], coerceListElements=True) for pts in parsePts]
     outDf[RTF.SRC_IMG_FILENAME] = inFileOrDict['metadata']['name']
     imShape = (inFileOrDict['metadata']['height'], inFileOrDict['metadata']['width'])

@@ -1,0 +1,12 @@
+fields:
+  className:
+    value: ''
+    pType: list
+    limits: []
+    aliases: [Class, Label]
+  createdAt:
+    value: ''
+    readOnly: True
+    parser: 'superanntime'
+    alises: [Timestamp]
+  probability: 100.0

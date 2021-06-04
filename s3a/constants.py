@@ -13,6 +13,7 @@ BASE_DIR = Path.home()/'.s3a'
 CFG_DIR = CODE_DIR/'cfg'
 ICON_DIR = CODE_DIR/'icons'
 MENU_OPTS_DIR = BASE_DIR/'menuopts'
+IO_TEMPLATES_DIR = CODE_DIR/'_io/templates'
 
 # -----
 # EDITORS
