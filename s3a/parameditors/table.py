@@ -186,7 +186,7 @@ class TableData(QtCore.QObject):
   sigCfgUpdated = QtCore.Signal(object)
   """dict (self.cfg) during update"""
 
-  def __init__(self):
+  def __init__(self, cfgFname: FilePath=None, cfgDict: dict=None):
     super().__init__()
     self._factories: Dict[PrjParam, Callable[[], Any]] = {}
 
@@ -199,7 +199,10 @@ class TableData(QtCore.QObject):
     self.allFields: List[PrjParam] = []
     self.resetLists()
 
-  def makeCompDf(self, numRows=1) -> df:
+    if cfgFname or cfgDict:
+      self.loadCfg(cfgFname, cfgDict)
+
+  def makeCompDf(self, numRows=1, sequentialIds=False) -> df:
     """
     Creates a dataframe for the requested number of components.
     This is the recommended method for component instantiation prior to table insertion.
@@ -223,7 +226,10 @@ class TableData(QtCore.QObject):
       # Make sure to construct a separate component instance for
       # each row no objects have the same reference
       df_list.append(copy.copy(populators))
-    outDf = df(df_list, columns=self.allFields).set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
+    outDf = df(df_list, columns=self.allFields)
+    if sequentialIds:
+      outDf[REQD_TBL_FIELDS.INST_ID] = np.arange(len(outDf))
+    outDf = outDf.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
     # Set the metadata for this application run
     outDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME] = PRJ_CONSTS.ANN_CUR_FILE_INDICATOR.value
     if dropRow:
@@ -239,6 +245,7 @@ class TableData(QtCore.QObject):
     :param factory: Callable to use instead of field value. This is called with no parameters.
     """
     self._factories[fieldLbl] = factory
+    fieldLbl.opts['factory'] = factory
 
   def makeCompSer(self):
     return self.makeCompDf().squeeze()
@@ -289,11 +296,11 @@ class TableData(QtCore.QObject):
     self.allFields.clear()
     self.allFields.extend(REQD_TBL_FIELDS)
 
-  def fieldFromName(self, name: Union[str, PrjParam]):
+  def fieldFromName(self, name: Union[str, PrjParam], default=None):
     """
     Helper function to retrieve the PrjParam corresponding to the field with this name
     """
-    return PrjParamGroup.fieldFromParam(self.allFields, name)
+    return PrjParamGroup.fieldFromParam(self.allFields, name, default)
 
 NestedIndexer = Union[str, Tuple[Union[str,int],...]]
 class YamlParser:
