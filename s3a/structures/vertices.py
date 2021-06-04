@@ -93,7 +93,7 @@ class ComplexXYVertices(list):
   hierarchy = np.ones((0,4), dtype=int)
   """See cv.findContours for hierarchy explanation. Used in cv.RETR_CCOMP mode."""
 
-  def __init__(self, inputArr: Union[List[XYVertices], np.ndarray]=None,
+  def __init__(self, inputArr: Union[List[XYVertices], np.ndarray, Sequence]=None,
                hierarchy:np.ndarray=None,
                coerceListElements=False):
 
@@ -148,6 +148,24 @@ class ComplexXYVertices(list):
       if newDtype is None:
         newDtype = self[0].dtype
       return XYVertices(np.vstack(self), dtype=newDtype)
+
+  def removeOffset(self, offset=None, inplace=False, returnOffset=False):
+    """
+    Subtracts a constant offset from all contained vertices. If offset is None, it will be set to the min value across
+    all contained vertices such that this polygon's coordinates are all relative to (0,0).
+    """
+    if offset is None:
+      offset = self.stack().min(0)
+    if inplace:
+      for verts in self:
+        verts -= offset
+      if returnOffset:
+        return offset
+    else:
+      out = ComplexXYVertices([verts - offset for verts in self], self.hierarchy)
+      if returnOffset:
+        return out, offset
+      return out
 
   @classmethod
   def stackedMax(cls, complexVertList: Sequence[ComplexXYVertices]):

@@ -492,7 +492,8 @@ class ComponentIO:
           if asIndiv:
             # Only color in this id's region. Since it might've been covered over by a different ID, regenerate the
             # mask from vertices, taking margin into account
-            colorVerts = ComplexXYVertices([allVerts - bounds[0, :]])
+            colorVerts = row[RTF.VERTICES].removeOffset(bounds[0, :])
+            colorVerts.hierarchy = row[RTF.VERTICES].hierarchy
             mask = np.full_like(mask, bgColor)
             # 'Float' works for int and float orig values, required since opencv complains about some numpy
             # dtypes
@@ -948,10 +949,7 @@ class ComponentIO:
 
     for idx, row in inDf.iterrows():
       mask = row.labelMask
-      verts = ComplexXYVertices.fromBwMask(mask)
-      offset = row.offset
-      for v in verts:
-        v += offset
+      verts = ComplexXYVertices.fromBwMask(mask).remove(-row.offset)
       allVerts.append(verts)
     outDf[RTF.VERTICES] = allVerts
     outDf[lblField] = inDf['label']

@@ -1,4 +1,4 @@
-from s3a import generalutils as gu
+from s3a import generalutils as gu, ComplexXYVertices, XYVertices
 import numpy as np
 
 from s3a.plugins.misc import miscFuncsPluginFactory, MultiPredictionsPlugin
@@ -28,3 +28,14 @@ def test_pred(app):
   # Correctness of algo already tested elsewhere, run to assert no errors
   predPlg.makePrediction(app.exportableDf)
   predPlg.predictFromSelection()
+
+def test_vertices_offset():
+  subVerts = [[50, 50]], [[100,100], [200, 200], [300,300]]
+  verts = ComplexXYVertices(subVerts, coerceListElements=True)
+  vertsCopy = ComplexXYVertices(subVerts, coerceListElements=True)
+  out = verts.removeOffset()
+  assert out == ([[0,0]], [[50,50], [150,150], [250,250]])
+  assert verts == vertsCopy
+
+  verts.removeOffset(inplace=True)
+  assert verts != vertsCopy

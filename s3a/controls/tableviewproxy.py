@@ -338,15 +338,8 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     truncatedCompIds = []
     # imShape_xy = self._mainImgArea.image.shape[:2][::-1]
     for idx in newComps.index:
-      newVerts = []
-      for verts in newComps.at[idx, REQD_TBL_FIELDS.VERTICES]:
-        verts = verts + regionOffset
-        # goodVerts = np.all(verts >= imShape_xy, 1)
-        # if not np.all(goodVerts):
-        #   verts = verts[goodVerts,:]
-        #   truncatedCompIds.append(idx)
-        newVerts.append(verts)
-      newComps.at[idx, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices(newVerts)
+      newVerts = newComps.at[idx, REQD_TBL_FIELDS.VERTICES].removeOffset(-regionOffset)
+      newComps.at[idx, REQD_TBL_FIELDS.VERTICES] = newVerts
     # truncatedCompIds = np.unique(truncatedCompIds)
     if self.regionCopier.inCopyMode:
       self._compMgr.addComps(newComps)

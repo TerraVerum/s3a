@@ -314,7 +314,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     outImgs.append(img)
     for singleRegionVerts in bufferRegions:
       # Copy to avoid screwing up undo buffer!
-      copied = ComplexXYVertices([subV - offset for subV in singleRegionVerts])
+      copied = singleRegionVerts.removeOffset(offset)
       img = copied.toMask(imShape, warnIfTooSmall=False)
       outImgs.append(img)
     return initialImg, outImgs
