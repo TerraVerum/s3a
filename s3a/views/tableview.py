@@ -4,7 +4,9 @@ from warnings import warn
 import numpy as np
 import pandas as pd
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
+from pyqtgraph.parametertree import Parameter
 
+from s3a._io.helpers import serialize, deserialize
 from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
 from s3a.models.tablemodel import ComponentMgr
 from s3a.shared import SharedAppSettings
@@ -12,10 +14,53 @@ from s3a.structures import TwoDArr
 
 __all__ = ['CompTableView']
 
-from utilitys import ParamEditor, EditorPropsMixin, RunOpts, ParamContainer, DeferredActionStackMixin as DASM
+from utilitys import ParamEditor, EditorPropsMixin, RunOpts, ParamContainer, DeferredActionStackMixin as DASM, PrjParam
 from utilitys.params.pgregistered import PgParamDelegate
 
 Signal = QtCore.Signal
+
+class SerDesDelegate(QtWidgets.QStyledItemDelegate):
+  def __init__(self, param: PrjParam, asLineEdit=False, parent=None):
+    """
+    Creates a string-editable item delegate which uses ComponentIO's serialize and deserialize methods to convert to
+    actual values.
+    :param param: PrjParam which dictates the serialization/deserialization of this value
+    :param asLineEdit: Whether to give this delegate a line editor text edit to set the serialized form of value
+    :parent: Parent widget
+    """
+    super().__init__(parent)
+    self.asLineEdit=asLineEdit
+    self.param = param
+
+  def createEditor(self, parent, option, index: QtCore.QModelIndex):
+    editorType = 'str' if self.asLineEdit else 'text'
+    pgParam = Parameter.create(name='dummy', type=editorType, value=index.data(QtCore.Qt.DisplayRole))
+    editor = pgParam.itemClass(pgParam, 0).makeWidget()
+    editor.setParent(parent)
+    editor.setMaximumSize(option.rect.width(), option.rect.height())
+    return editor
+
+  def setModelData(self, editor: QtWidgets.QWidget,
+                   model: QtCore.QAbstractTableModel,
+                   index: QtCore.QModelIndex):
+    values, errs = deserialize(self.param, [editor.value()])
+    if not len(values):
+      raise ValueError(f'Error during deserialize:\n{errs[0]}')
+    value = values[0]
+    model.setData(index, value, QtCore.Qt.EditRole)
+
+  def setEditorData(self, editor: QtWidgets.QWidget, index):
+    value = index.data(QtCore.Qt.EditRole)
+    strVals, strErrs = serialize(self.param, [value])
+    if len(strErrs):
+      raise ValueError(f'Error during serialize:\n{strErrs[0]}')
+    strVal = strVals[0]
+    editor.setValue(strVal)
+
+  def updateEditorGeometry(self, editor: QtWidgets.QWidget,
+                           option: QtWidgets.QStyleOptionViewItem,
+                           index: QtCore.QModelIndex):
+    editor.setGeometry(option.rect)
 
 class MinimalTableModel(ComponentMgr):
   """
@@ -220,10 +265,8 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         self.setItemDelegateForColumn(ii, PgParamDelegate(paramDict, self))
       except TypeError:
         # Parameter doesn't have a registered pyqtgraph editor, so default to
-        # generic text editor
-        paramDict['type'] = 'text'
-        paramDict['default'] = str(curval)
-        self.setItemDelegateForColumn(ii, PgParamDelegate(paramDict, self))
+        # generic serdes editor
+        self.setItemDelegateForColumn(ii, SerDesDelegate(field, parent=self))
 
     self.horizontalHeader().setSectionsMovable(True)
 
@@ -250,7 +293,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
     if np.array_equal(newRows, self._prevSelRows):
       return
     self._prevSelRows = newRows
-    self.sigSelectionChanged.emit(pd.unique(selectedIds))
+    self.sigSelectionChanged.emit(newRows)
 
   def removeSelectedRows_gui(self):
     if self.minimal: return
@@ -349,7 +392,12 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
       name = self.mgr.compDf.columns[col]
       ids = selectionIdxs[selectionIdxs[:, 2] == col, 0]
       data = self.mgr.compDf.loc[ids, name]
-      if len(pd.unique(data)) <= 1:
+      try:
+        numDups = len(pd.unique(data))
+      except TypeError:
+        # Occurs for unhashable types
+        numDups = 2
+      if numDups <= 1:
         dupCols.append(col)
     return dupCols
 
