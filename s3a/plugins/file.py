@@ -161,6 +161,9 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       self.projData.create(name=defaultName, parent=parent)
 
   def open(self, cfgFname: FilePath=None, cfgDict: dict=None):
+    if cfgFname is None and cfgDict is None:
+      # Do nothing, happens when e.g. intentionally not loading a project
+      return
     _, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
     if (cfgFname is not None
         and (Path(cfgFname).resolve() != self.projData.cfgFname
