@@ -75,12 +75,12 @@ def filterParamCol(compDf: df, column: PrjParam, filterOpts: dict):
   dfAtParam = compDf.loc[:, column]
 
   if pType in ['int', 'float']:
-    curmin, curmax = [filterOpts[name]['value'] for name in ['min', 'max']]
+    curmin, curmax = [filterOpts[name] for name in ['min', 'max']]
 
     compDf = compDf.loc[(dfAtParam >= curmin) & (dfAtParam <= curmax)]
   elif pType == 'bool':
-    filterOpts = filterOpts['Options']['children']
-    allowTrue, allowFalse = [filterOpts[name]['value'] for name in
+    filterOpts = filterOpts['Options']
+    allowTrue, allowFalse = [filterOpts[name] for name in
                              [f'{column.name}', f'Not {column.name}']]
 
     validList = np.array(dfAtParam, dtype=bool)
@@ -91,26 +91,26 @@ def filterParamCol(compDf: df, column: PrjParam, filterOpts: dict):
   elif pType in ['prjparam', 'list', 'popuplineeditor']:
     existingParams = np.array(dfAtParam)
     allowedParams = []
-    filterOpts = filterOpts['Options']['children']
+    filterOpts = filterOpts['Options']
     if pType == 'prjparam':
       groupSubParams = [p.name for p in column.value.group]
     else:
       groupSubParams = column.opts['limits']
     for groupSubParam in groupSubParams:
-      isAllowed = filterOpts[groupSubParam]['value']
+      isAllowed = filterOpts[groupSubParam]
       if isAllowed:
         allowedParams.append(groupSubParam)
     compDf = compDf.loc[np.isin(existingParams, allowedParams)]
   elif pType in ['str', 'text']:
-    allowedRegex = filterOpts['Regex Value']['value']
+    allowedRegex = filterOpts['Regex Value']
     isCompAllowed = dfAtParam.str.contains(allowedRegex, regex=True, case=False)
     compDf = compDf.loc[isCompAllowed]
   elif pType in ['complexxyvertices', 'xyvertices']:
     vertsAllowed = np.ones(len(dfAtParam), dtype=bool)
 
-    xParam = filterOpts['X Bounds']['children']
-    yParam = filterOpts['Y Bounds']['children']
-    xmin, xmax, ymin, ymax = [param[val]['value'] for param in (xParam, yParam) for val in ['min', 'max']]
+    xParam = filterOpts['X Bounds']
+    yParam = filterOpts['Y Bounds']
+    xmin, xmax, ymin, ymax = [param[val] for param in (xParam, yParam) for val in ['min', 'max']]
 
     for vertIdx, verts in enumerate(dfAtParam):
       if pType == 'complexxyvertices':
@@ -132,10 +132,8 @@ class TableFilterEditor(ParamEditor):
   def __init__(self, paramList: List[PrjParam]=None, parent=None):
     if paramList is None:
       paramList = []
-    _FILTER_PARAMS = [
-      _filterForParam(param) for param in paramList
-    ]
-    super().__init__(parent, paramList=_FILTER_PARAMS, saveDir=TABLE_DIR,
+    filterParams = [fil for fil in map(_filterForParam, paramList) if fil is not None]
+    super().__init__(parent, paramList=filterParams, saveDir=TABLE_DIR,
                      fileType='filter', name='Component Table Filter')
 
   def updateParamList(self, paramList: List[PrjParam]):
@@ -159,16 +157,16 @@ class TableFilterEditor(ParamEditor):
             f' {", ".join(colNames)}'
             f' since types {", ".join(colTypes)} do not have corresponding filters', UserWarning)
     self.saveParamValues(blockWrite=True)
+    self.saveCurStateAsDefault()
 
   @property
   def activeFilters(self):
     filters = {}
     for child in self.params.childs:
       if child['Active']:
-        cState = child.saveState('user')
-        keepChildren = cState['children']
-        keepChildren.pop('Active')
-        filters[child.name()] = keepChildren
+        cState = next(iter(fns.paramValues(child, includeDefaults=True).values()))
+        cState.pop('Active')
+        filters[child.name()] = cState
     return filters
 
   def filterCompDf(self, compDf: df):
@@ -177,6 +175,8 @@ class TableFilterEditor(ParamEditor):
       try:
         matchIdx = strNames.index(fieldName)
       except IndexError:
+        # This filter can be used on dataframes that didn't have to come from S3A,
+        # so silently ignore mismatched filter requests
         continue
       col = compDf.columns[matchIdx]
       compDf = filterParamCol(compDf, col, opts)
@@ -307,25 +307,6 @@ class YamlParser:
   def __init__(self, cfg: dict):
     self.cfg = cfg
 
-  def parseParamList(self, listName: NestedIndexer, groupOwner: Union[List, PrjParamGroup]=None):
-    """
-    A simple list is only a list of strings. A complex list is a dict, where each
-    (key, val) pair is a list element. See the structural setup in pg.ListParameter.
-    """
-    if not isinstance(listName, tuple):
-      listName = (listName,)
-    paramList = self.getNestedCfgName(listName)
-    outList = []
-    if groupOwner is None:
-      groupOwner = outList
-    for ii in range(len(paramList)):
-      # Default to list of string values
-      accessor = listName + (ii,)
-      curParam = self[accessor]
-      curParam.group = groupOwner
-      outList.append(curParam)
-    return outList
-
   @lru_cache(maxsize=None)
   def __getitem__(self, paramName: NestedIndexer):
     value = self.getNestedCfgName(paramName)
@@ -362,16 +343,14 @@ class YamlParser:
 
     elif isinstance(value, list):
       leafParam.pType = 'list'
-      # If inner values are dicts, it could be a complex list. Otherwise,
-      # it is a primitive list
       testVal = value[0]
       if isinstance(testVal, dict):
-        leafParam.value = self.parseParamList(leafParam.name)[0]
-      else:
-        # list of simple values, implied these are the limits. Since no default
-        # is specified, it'll be the first in the list
-        leafParam.opts['limits'] = value
-        leafParam.value = testVal
+        # Value is on the other side of the mapping
+        testVal = next(iter(testVal.values()))
+      # list of simple values, implied these are the limits. Since no default
+      # is specified, it'll be the first in the list
+      leafParam.opts['limits'] = value
+      leafParam.value = testVal
     return leafParam
 
   def getNestedCfgName(self, namePath: NestedIndexer):
