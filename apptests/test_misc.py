@@ -1,6 +1,9 @@
+import pytest
+
 from s3a import generalutils as gu, ComplexXYVertices, XYVertices
 import numpy as np
 
+from s3a.generalutils import deprecateKwargs
 from s3a.plugins.misc import miscFuncsPluginFactory, MultiPredictionsPlugin
 
 
@@ -39,3 +42,10 @@ def test_vertices_offset():
 
   verts.removeOffset(inplace=True)
   assert verts != vertsCopy
+
+def test_deprecation():
+  @deprecateKwargs(b='a')
+  def sampleFunc(a=5):
+    return a
+  with pytest.warns(DeprecationWarning):
+    assert sampleFunc(b=10) == 10
