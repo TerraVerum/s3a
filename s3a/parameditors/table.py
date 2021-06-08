@@ -188,7 +188,7 @@ class TableData(QtCore.QObject):
 
   def __init__(self, cfgFname: FilePath=None, cfgDict: dict=None):
     super().__init__()
-    self._factories: Dict[PrjParam, Callable[[], Any]] = {}
+    self.factories: Dict[PrjParam, Callable[[], Any]] = {}
 
     self.filter = TableFilterEditor()
     self.paramParser: Optional[YamlParser] = None
@@ -216,8 +216,8 @@ class TableData(QtCore.QObject):
       dropRow = True
     populators = []
     for f in self.allFields:
-      if f in self._factories:
-        val = self._factories[f]()
+      if f in self.factories:
+        val = self.factories[f]()
       else:
         val = f.value
       populators.append(val)
@@ -244,8 +244,7 @@ class TableData(QtCore.QObject):
     :param fieldLbl: WHich field this factory is used for instead of just the default value
     :param factory: Callable to use instead of field value. This is called with no parameters.
     """
-    self._factories[fieldLbl] = factory
-    fieldLbl.opts['factory'] = factory
+    self.factories[fieldLbl] = factory
 
   def makeCompSer(self):
     return self.makeCompDf().squeeze()

@@ -170,10 +170,8 @@ class ComponentIO:
     """Returns a TableData object responsible for importing / exporting data of this format"""
     out = TableData(IO_TEMPLATES_DIR / (ioFuncName.lower() + '.tblcfg'))
     # Make sure current factories from plugins still work
-    for field in list(RTF):
-      factory = field.opts.get('factory')
-      if factory:
-        out.addFieldFactory(field, factory)
+    for param, factory in self.tableData.factories.items():
+      out.addFieldFactory(param, factory)
     return out
 
   @classmethod

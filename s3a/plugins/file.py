@@ -228,7 +228,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     self.autosaveTimer.start(int(interval * 60 * 1000))
     self.autosaveTimer.timeout.connect(self.win.saveCurAnnotation)
     if len(str(backupFolder)) == 0:
-      return
+      warn(f'No backup folder selected, defaulting to {Path().absolute()}', UserWarning)
     backupFolder = Path(backupFolder)
     backupFolder.mkdir(exist_ok=True, parents=True)
     lastSavedDf = self.win.exportableDf.copy()
