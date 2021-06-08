@@ -26,6 +26,14 @@ def main(loadLastState=True, **load):
     appInst.exec()
   return win
 
+def main_cli():
+  parser = fns.makeCli(main, parserKwargs=dict(prog='S3A', add_help=False))
+  parser.register('action', 'help', S3AHelp)
+  parser.add_argument('--version', action='version', version=__version__)
+  parser.add_argument('--help', action='help')
+  args = parser.parse_args()
+  main(**vars(args))
+
 class S3AHelp(Action):
   def __init__(self, **kwargs):
     kwargs.update(nargs=0)
@@ -42,9 +50,4 @@ class S3AHelp(Action):
 
 
 if __name__ == '__main__':
-  parser = fns.makeCli(main, parserKwargs=dict(prog='S3A', add_help=False))
-  parser.register('action', 'help', S3AHelp)
-  parser.add_argument('--version', action='version', version=__version__)
-  parser.add_argument('--help', action='help')
-  args = parser.parse_args()
-  main(**vars(args))
+  main_cli()
