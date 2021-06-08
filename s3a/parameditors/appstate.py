@@ -24,7 +24,7 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
                topTreeChild: Parameter = None):
     # TODO: Add params to choose which features are saved, etc.
     super().__init__(parent, paramList, saveDir, fileType, name, topTreeChild)
-    self._stateFuncsDf = pd.DataFrame(columns=['importFuncs', 'exportFuncs', 'required'])
+    self.stateFuncsDf = pd.DataFrame(columns=['importFuncs', 'exportFuncs', 'required'])
     self.loading = False
 
     self.startupSettings = {}
@@ -34,8 +34,8 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
       saveName = self.RECENT_STATE_FNAME
     if paramState is None:
       # TODO: May be good in the future to be able to choose which should be saved
-      legitKeys = self._stateFuncsDf.index
-      exportFuncs = self._stateFuncsDf.exportFuncs
+      legitKeys = self.stateFuncsDf.index
+      exportFuncs = self.stateFuncsDf.exportFuncs
       saveOnExitDir = self.saveDir/'saved_on_exit'
       saveOnExitDir.mkdir(exist_ok=True)
       rets, errs = safeCallFuncList(legitKeys, exportFuncs, [[saveOnExitDir]] * len(legitKeys))
@@ -77,14 +77,14 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
       def nextKey():
         hierarchicalUpdate(stateDict, self.startupSettings)
         self.startupSettings.clear()
-        legitKeys = self._stateFuncsDf.index.intersection(stateDict)
+        legitKeys = self.stateFuncsDf.index.intersection(stateDict)
         if legitKeys.size > 0:
           return legitKeys[0]
 
       key = nextKey()
       rets, errs = [], {}
       while key:
-        importFunc = self._stateFuncsDf.loc[key, 'importFuncs']
+        importFunc = self.stateFuncsDf.loc[key, 'importFuncs']
         arg = stateDict.pop(key, None)
         curRet, curErr = safeCallFunc(key, importFunc, arg)
         rets.append(curRet)
@@ -111,7 +111,7 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
       out = self._parseStateDict(stateName, stateDict)
     except FileNotFoundError:
       out = {}
-    for k in self._stateFuncsDf.index[self._stateFuncsDf['required']]:
+    for k in self.stateFuncsDf.index[self.stateFuncsDf['required']]:
       out.setdefault(k, defaults.get(k))
     return out
 
@@ -146,13 +146,13 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
       from the most recent saved state.
     """
     newRow = pd.Series([importFunc, exportFunc, required], name=optName,
-                       index=self._stateFuncsDf.columns)
+                       index=self.stateFuncsDf.columns)
     if index is not None:
       # First, shift old entries
-      df = self._stateFuncsDf
-      self._stateFuncsDf = pd.concat([df.iloc[:index], serAsFrame(newRow), df.iloc[index:]])
+      df = self.stateFuncsDf
+      self.stateFuncsDf = pd.concat([df.iloc[:index], serAsFrame(newRow), df.iloc[index:]])
     else:
-      self._stateFuncsDf: pd.DataFrame = self._stateFuncsDf.append(newRow)
+      self.stateFuncsDf: pd.DataFrame = self.stateFuncsDf.append(newRow)
 
   @property
   def RECENT_STATE_FNAME(self):

@@ -1,36 +1,50 @@
-import sys
+from argparse import Action
 
-import fire
 from pyqtgraph.Qt import QtCore
 
 from s3a.constants import PRJ_ENUMS
+from utilitys import fns
+from . import __version__
 from . import appInst
 from .views.s3agui import S3A
-from utilitys.fns import makeExceptionsShowDialogs
 
 
-def main(loadLastState=True, version=False, **profileArgs):
+def main(loadLastState=True, **load):
   """
   Calling code for the S3A application.
 
   :param loadLastState: When the app is closed, all settings are saved. If this is *True*,
     these settings are restored on startup. If *False*, they aren't.
-
-  :param version: Show version information
-
-  :key image: Optional initial image to be annotated
-  :key annotations: Optional initial annotation file loaded.
-  :key `param editor name`: Name of the parameter editor within S3A with a loadable state.
-    This can be e.g. `colorscheme`, `shortcuts`, etc.
+  :param load: States to load, see the help output for possible values
   """
   # Handle here for faster bootup
-  if version:
-    from .__version__ import __version__
-    print(__version__)
-    return
-  win = S3A(log=PRJ_ENUMS.LOG_GUI, loadLastState=loadLastState, **profileArgs)
+  win = S3A(log=PRJ_ENUMS.LOG_GUI, loadLastState=loadLastState, **load)
   QtCore.QTimer.singleShot(0, win.showMaximized)
-  sys.exit(appInst.exec_())
+  try:
+    appInst.exec_()
+  except AttributeError:
+    appInst.exec()
+  return win
+
+class S3AHelp(Action):
+  def __init__(self, **kwargs):
+    kwargs.update(nargs=0)
+    super().__init__(**kwargs)
+
+  def __call__(self, parser, *args, **kwargs) -> None:
+    win = S3A(loadLastState=False, log=PRJ_ENUMS.LOG_NONE)
+    win.makeHelpOpts(parser)
+    # Prevent settings overwrite
+    win.appStateEditor.saveParamValues = lambda *args, **kwargs: None
+    win.forceClose()
+    parser.print_help()
+    parser.exit()
+
 
 if __name__ == '__main__':
-    fire.Fire(main)
+  parser = fns.makeCli(main, parserKwargs=dict(prog='S3A', add_help=False))
+  parser.register('action', 'help', S3AHelp)
+  parser.add_argument('--version', action='version', version=__version__)
+  parser.add_argument('--help', action='help')
+  args = parser.parse_args()
+  main(**vars(args))

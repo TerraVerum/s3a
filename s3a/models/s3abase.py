@@ -1,3 +1,4 @@
+import argparse
 import inspect
 import pydoc
 from contextlib import ExitStack
@@ -440,3 +441,16 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     except IndexError:
       # First dock in area
       self.addDockWidget(area, dockwidget)
+
+  def makeHelpOpts(self, parser: argparse.ArgumentParser=None):
+    """Adds quick loader and app state options to a parser, or creates a new parser if one is not passed"""
+    if parser is None:
+      parser = argparse.ArgumentParser('S3A')
+    ql = self.appStateEditor.quickLoader
+    for editor in ql.listModel.uniqueEditors:
+      states = ql.listModel.getParamStateFiles(editor.saveDir, editor.fileType)
+      formatted = [f'"{s}"' for s in states]
+      parser.add_argument(f'--{editor.name.lower().replace(" ", "")}',
+                          choices=formatted)
+    for loader in self.appStateEditor.stateFuncsDf.index:
+      parser.add_argument(f'--{loader}', type=str)

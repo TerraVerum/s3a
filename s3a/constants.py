@@ -80,6 +80,7 @@ class PRJ_ENUMS:
   # --------------------------
   LOG_GUI = 'gui'
   LOG_TERM = 'term'
+  LOG_NONE = 'none'
   LOG_FILE = 'file'
 
   # --------------------------

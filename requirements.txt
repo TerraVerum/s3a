@@ -1,6 +1,5 @@
 typing_extensions; python_version < '3.8'
 importlib_metadata; python_version < '3.8'
-fire
 opencv_python>=4.1.2.30
 numpy
 pandas
@@ -11,4 +10,4 @@ pyqtgraph>=0.12.1
 Pillow
 qdarkstyle
 matplotlib
-utilitys >= 0.3.17
+utilitys >= 0.3.18
