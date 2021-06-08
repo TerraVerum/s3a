@@ -17,14 +17,11 @@ from .__version__ import __version__
 # Makes sure that when the folder is run as a module, the app exists in the outermost
 # scope of the application
 customPlatform = os.environ.get('S3A_PLATFORM')
-appInst = QtWidgets.QApplication.instance()
-if appInst is None:
-  args = list(sys.argv)
-  if customPlatform is not None:
-    args += ['-platform', customPlatform]
-  appInst = QtWidgets.QApplication(args)
-# Now that the app was created with sys args, populate pg instance
-pg.mkQApp()
+args = list(sys.argv)
+if customPlatform is not None:
+  args += ['-platform', customPlatform]
+sys.argv = args
+appInst = pg.mkQApp()
 # Allow selectable text in message boxes
 appInst.setStyleSheet("QMessageBox { messagebox-text-interaction-flags: 5; }")
 
