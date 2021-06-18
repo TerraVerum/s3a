@@ -506,7 +506,8 @@ class ProjectData(QtCore.QObject):
     for ann in anns:
       if ann not in self.imgToAnnMapping.values():
         self.addAnnotation(ann)
-    for ann in self.imgToAnnMapping.values():
+    # Convert to list to avoid "dictionary changed size on iteration" error
+    for ann in list(self.imgToAnnMapping.values()):
       if ann not in anns:
         self.removeAnnotation(ann)
 
@@ -811,10 +812,10 @@ class ProjectData(QtCore.QObject):
   def removeAnnotation(self, annName: FilePath):
     annName = Path(annName).resolve()
     # Since no mapping exists of all annotations, loop the long way until the file is found
-    for key, ann in self.imgToAnnMapping.items():
+    for key, ann in list(self.imgToAnnMapping.items()):
       if annName == ann:
         del self.imgToAnnMapping[key]
-        ann.unlink()
+        ann.unlink(missing_ok=True)
         break
 
   def addAnnotation(self, name: FilePath=None, data: pd.DataFrame=None, image: FilePath=None,
@@ -836,7 +837,7 @@ class ProjectData(QtCore.QObject):
       return
     image = self._getFullImgName(Path(image))
     # Force provided annotations to now belong to this image
-    data[REQD_TBL_FIELDS.SRC_IMG_FILENAME] = image.name
+    data.loc[:, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = image.name
     # Since only one annotation file can exist per image, concatenate this with any existing files for the same image
     # if needed
     if image.parent != self.imagesDir:
