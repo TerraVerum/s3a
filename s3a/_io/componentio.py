@@ -670,17 +670,25 @@ class ComponentIO:
       extractedImgs = self.exportCompImgsDf(compDf, None, **kwargs)
       for idx, row in extractedImgs.iterrows():
         saveName = f'{row.instId}.png'
-        saveFn(dataDir / saveName, row.img)
-        saveFn(labelsDir / saveName, row.labelMask)
+        if 'img' in row.index:
+          saveFn(dataDir / saveName, row.img)
+        if 'labelMask' in row.index:
+          saveFn(labelsDir / saveName, row.labelMask)
 
       if makeSummary:
-        extractedImgs = extractedImgs.rename({'instId': RTF.INST_ID}, axis=1)
-        outDf: pd.DataFrame = compDf.drop([RTF.VERTICES], axis=1).merge(
-            extractedImgs, on=RTF.INST_ID
+        extractedImgs = extractedImgs.rename({'instId': RTF.INST_ID.name}, axis=1)
+        # Prevent merge error by renaming index
+        # INST_ID.name has to be used instead of raw INST_ID due to strange pandas issue
+        # throwing a TypeError: keywords must be a string
+        outDf: pd.DataFrame = compDf.drop([RTF.VERTICES], axis=1).rename(str, axis=1)
+        outDf = outDf.merge(
+          extractedImgs, on=RTF.INST_ID.name
         )
         for colName, imgDir in zip(['labelMask', 'img'], [labelsDir, dataDir]):
+          if colName not in extractedImgs:
+            continue
           relDir = imgDir.relative_to(useDir)
-          outDf[colName] = outDf[RTF.INST_ID].apply(
+          outDf[colName] = outDf[RTF.INST_ID.name].apply(
               lambda el: imgPathtoHtml((relDir / str(el)).with_suffix('.png').as_posix())
           )
         outDf.columns = list(map(str, outDf.columns))
@@ -691,10 +699,12 @@ class ComponentIO:
           outDir = outDir.with_suffix(outDir.suffix + '.zip')
         with ZipFile(outDir, 'w') as ozip:
           for dir_ in labelsDir, dataDir:
+            if not dir_.exists():
+              continue
             for file in dir_.iterdir():
               ozip.write(file, f'{dir_.name}/{file.name}')
-            if makeSummary:
-              ozip.write(summaryName, file.name)
+          if makeSummary:
+            ozip.write(summaryName, file.name)
 
   # -----
   # Import options
