@@ -407,7 +407,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     newComps = self.compIo.importByFileType(inFname, self.mainImg.image.shape)
     self.compMgr.addComps(newComps, loadType)
 
-  @DASM.undoable('Create New Comp', asGroup=True)
+  @DASM.undoable('Create New Component', asGroup=True)
   def add_focusComps(self, newComps: df, addType=PRJ_ENUMS.COMP_ADD_AS_NEW):
     changeDict = self.compMgr.addComps(newComps, addType)
     # Focus is performed by comp table
