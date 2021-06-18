@@ -833,7 +833,8 @@ class ProjectData(QtCore.QObject):
       xpondingImgs = np.unique(data[REQD_TBL_FIELDS.SRC_IMG_FILENAME].to_numpy())
       # Break into annotaitons by iamge
       for img in xpondingImgs:
-        self.addAnnotation(name, data[data[REQD_TBL_FIELDS.SRC_IMG_FILENAME] == img], img)
+        # Copy to avoid pandas warning
+        self.addAnnotation(name, data[data[REQD_TBL_FIELDS.SRC_IMG_FILENAME] == img].copy(), img)
       return
     image = self._getFullImgName(Path(image))
     # Force provided annotations to now belong to this image
