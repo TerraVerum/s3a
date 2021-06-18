@@ -267,6 +267,11 @@ class TableData(QtCore.QObject):
     cfgFname = cfgFname.resolve()
     if not force and self.cfgFname == cfgFname:
       return None
+
+    # Often, a table config can be wrapped in a project config; look for this case first
+    if 'table-cfg' in cfgDict:
+      cfgDict = cfgDict['table-cfg']
+
     hierarchicalUpdate(baseCfgDict, cfgDict)
 
     cfg = baseCfgDict
