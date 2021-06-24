@@ -6,6 +6,7 @@ import pydoc
 import re
 import types
 import typing as t
+import warnings
 import webbrowser
 from pathlib import Path
 
@@ -66,10 +67,13 @@ class AlgCollection(ParamEditor):
       Note: Either way, the resulting name is lowercased before being applied.
     :param editorName: The name of the spawned editor
     """
-    if not isinstance(saveDir, str):
-      saveDir = saveDir.__name__
-    formattedClsName = fns.pascalCaseToTitle(saveDir)
-    editorDir = MENU_OPTS_DIR/formattedClsName.lower()
+    if saveDir is not None:
+      if not isinstance(saveDir, str):
+        saveDir = saveDir.__name__
+      formattedClsName = fns.pascalCaseToTitle(saveDir)
+      editorDir = MENU_OPTS_DIR/formattedClsName.lower()
+    else:
+      editorDir = saveDir
     return AlgParamEditor(self, saveDir=editorDir, fileType=self.fileType, name=editorName)
 
   def addProcess(self, proc: ProcessStage, top=False, force=False):
@@ -312,20 +316,23 @@ class AlgParamEditor(ParamEditor):
       paramState['modules'] = self.clctn.includeModules
     self.clctn.loadParamValues(self.clctn.stateName, paramState)
     clctnState = self.clctn.saveParamValues(saveName, blockWrite=True)
-    paramState = {'Selected Algorithm': self.curProcessor.algName, 'Parameters': clctnState}
+    paramState = {'Selected Algorithm': self.curProcessor.algName, **clctnState}
     return super().saveParamValues(saveName, paramState, includeDefaults=includeDefaults, **kwargs)
 
   def loadParamValues(self, stateName: t.Union[str, Path],
                       stateDict: dict=None, **kwargs):
     stateDict = self._parseStateDict(stateName, stateDict)
-    procName = stateDict.get('Selected Algorithm')
+    procName = stateDict.pop('Selected Algorithm', None)
+    if 'Parameters' in stateDict:
+      warnings.warn('"Parameters" is deprecated for a loaded state. In the future, set "top", "primitive", etc. at the'
+                    ' top dictionary level along with "Selected Algorithm"', DeprecationWarning)
+      stateDict = stateDict['Parameters']
     if not procName:
       procName = next(iter(self.clctn.topProcs))
-    clctnState = stateDict['Parameters']
 
-    self.clctn.loadParamValues(stateName, clctnState, **kwargs)
+    self.clctn.loadParamValues(stateName, stateDict, **kwargs)
     self.changeActiveProcessor(procName, saveBeforeChange=False)
-    return super().loadParamValues(stateName, stateDict, candidateParams=[], **kwargs)
+    return super().loadParamValues(stateName, {}, candidateParams=[], **kwargs)
 
   def changeActiveProcessor(self, proc: t.Union[str, NestedProcess], saveBeforeChange=True):
     """
