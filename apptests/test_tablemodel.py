@@ -126,7 +126,7 @@ def test_table_setdata(sampleComps, app, mgr):
   for col, newVal in intColMapping.items():
     row = RND.integers(NUM_COMPS)
     idx = app.compTbl.model().index(row, col)
-    oldVal = mgr.data(idx, QtCore.Qt.EditRole)
+    oldVal = mgr.data(idx, QtCore.Qt.ItemDataRole.EditRole)
     mgr.setData(idx, newVal)
     # Test with no change
     mgr.setData(idx, newVal)
@@ -138,8 +138,8 @@ def test_table_getdata(sampleComps, mgr):
   mgr.addComps(sampleComps)
   idx = mgr.index(0, list(REQD_TBL_FIELDS).index(REQD_TBL_FIELDS.SRC_IMG_FILENAME))
   dataVal = sampleComps.iat[0, idx.column()]
-  assert mgr.data(idx, QtCore.Qt.EditRole) == dataVal
-  assert mgr.data(idx, QtCore.Qt.DisplayRole) == str(dataVal)
+  assert mgr.data(idx, QtCore.Qt.ItemDataRole.EditRole) == dataVal
+  assert mgr.data(idx, QtCore.Qt.ItemDataRole.DisplayRole) == str(dataVal)
   assert mgr.data(idx, 854) is None
 
 def cmpChangeList(changeList: dict, added: np.ndarray=None, deleted: np.ndarray=None,

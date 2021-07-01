@@ -45,22 +45,22 @@ class CompTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
   def rowCount(self, *args, **kwargs):
     return len(self.compDf)
 
-  def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
-    if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
+  def headerData(self, section, orientation, role=QtCore.Qt.ItemDataRole.DisplayRole):
+    if orientation == QtCore.Qt.Orientation.Horizontal and role == QtCore.Qt.ItemDataRole.DisplayRole:
       return self.colTitles[section]
 
   # noinspection PyMethodOverriding
   def data(self, index: QtCore.QModelIndex, role: int) -> Any:
     outData = self.compDf.iloc[index.row(), index.column()]
-    if role == QtCore.Qt.DisplayRole:
+    if role == QtCore.Qt.ItemDataRole.DisplayRole:
       return str(outData)
-    elif role == QtCore.Qt.EditRole:
+    elif role == QtCore.Qt.ItemDataRole.EditRole:
       return outData
     else:
       return None
 
   @DASM.undoable('Alter Component Data')
-  def setData(self, index, value, role=QtCore.Qt.EditRole) -> bool:
+  def setData(self, index, value, role=QtCore.Qt.ItemDataRole.EditRole) -> bool:
     row = index.row()
     col = index.column()
     oldVal = self.compDf.iat[row, col]
@@ -96,10 +96,11 @@ class CompTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
     return True
 
   def flags(self, index: QtCore.QModelIndex) -> QtCore.Qt.ItemFlags:
+    flgs = QtCore.Qt.ItemFlag
     if index.column() not in self.noEditColIdxs:
-      return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable
+      return flgs.ItemIsEnabled | flgs.ItemIsSelectable | flgs.ItemIsEditable
     else:
-      return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
+      return flgs.ItemIsEnabled | flgs.ItemIsSelectable
 
   # noinspection PyAttributeOutsideInit
   def resetFields(self):

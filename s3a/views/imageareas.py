@@ -118,7 +118,7 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
 
   def maybeBuildRoi(self, ev: QtGui.QMouseEvent):
     ev.ignore()
-    if (QtCore.Qt.LeftButton not in [ev.buttons(), ev.button()]
+    if (QtCore.Qt.MouseButton.LeftButton not in [ev.buttons(), ev.button()]
         or self.drawAction == CNST.DRAW_ACT_PAN
         or self.regionCopier.active):
       return False
@@ -160,7 +160,7 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
 
   def mouseReleaseEvent(self, ev: QtGui.QMouseEvent):
     # Typical reaction is to right-click to cancel an roi
-    if self.image is not None and QtCore.Qt.RightButton not in [ev.button(), ev.buttons()]:
+    if self.image is not None and QtCore.Qt.MouseButton.RightButton not in [ev.button(), ev.buttons()]:
       self.maybeBuildRoi(ev)
 
       # Special case: Panning

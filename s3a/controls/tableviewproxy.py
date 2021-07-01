@@ -45,8 +45,8 @@ class CompSortFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
 
   def lessThan(self, left: QtCore.QModelIndex, right: QtCore.QModelIndex) -> bool:
     # First, attempt to compare the object data
-    leftObj = left.data(QtCore.Qt.EditRole)
-    rightObj = right.data(QtCore.Qt.EditRole)
+    leftObj = left.data(QtCore.Qt.ItemDataRole.EditRole)
+    rightObj = right.data(QtCore.Qt.ItemDataRole.EditRole)
     try:
       return bool(np.all(leftObj < rightObj))
     except (ValueError, TypeError):
@@ -302,7 +302,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     # ---`--
     # Add to current selection depending on modifiers
     mode = QISM.Rows
-    if not clearExisting or QtGui.QGuiApplication.keyboardModifiers() == QtCore.Qt.ControlModifier:
+    if not clearExisting or QtGui.QGuiApplication.keyboardModifiers() == QtCore.Qt.KeyboardModifier.ControlModifier:
       # Toggle select on already active ids
       toDeselect = np.intersect1d(self.selectedIds, selectedIds)
       self.selectRowsById(toDeselect, mode|QISM.Deselect)

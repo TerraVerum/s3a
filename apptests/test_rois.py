@@ -17,33 +17,35 @@ with EditorPropsMixin.setOpts(shared=SharedAppSettings()):
 clctn = editableImg.shapeCollection
 
 def leftClick(pt: Tuple[int, int]):
+  btns = QtCore.Qt.MouseButton
   event = QtGui.QMouseEvent(
-    QtCore.QEvent.MouseButtonPress,
+    QtCore.QEvent.Type.MouseButtonPress,
     QtCore.QPoint(*pt),
-    QtCore.Qt.LeftButton,
-    QtCore.Qt.LeftButton,
-    QtCore.Qt.NoModifier,
+    btns.LeftButton,
+    btns.LeftButton,
+    QtCore.Qt.KeyboardModifier.NoModifier,
   )
   clctn.buildRoi(event)
 
 @pytest.fixture
 def mouseDragFactory(qtbot):
   def mouseDrag(widget: MainImage, startPos, endPos):
+    btns = QtCore.Qt.MouseButton
     startPos = widget.imgItem.mapToScene(startPos)
     endPos = widget.imgItem.mapToScene(endPos)
-    press = QtGui.QMouseEvent(QtGui.QMouseEvent.MouseButtonPress,
-                              startPos, QtCore.Qt.LeftButton, QtCore.Qt.LeftButton,
-                              QtCore.Qt.NoModifier)
+    press = QtGui.QMouseEvent(QtGui.QMouseEvent.Type.MouseButtonPress,
+                              startPos, btns.LeftButton, btns.LeftButton,
+                              QtCore.Qt.KeyboardModifier.NoModifier)
     widget.mousePressEvent(press)
 
-    move = QtGui.QMouseEvent(QtCore.QEvent.MouseMove,
-                             endPos, QtCore.Qt.LeftButton, QtCore.Qt.LeftButton,
-                             QtCore.Qt.NoModifier,)
+    move = QtGui.QMouseEvent(QtCore.QEvent.Type.MouseMove,
+                             endPos, btns.LeftButton, btns.LeftButton,
+                             QtCore.Qt.KeyboardModifier.NoModifier,)
     widget.mouseMoveEvent(move)
 
-    release = QtGui.QMouseEvent(QtGui.QMouseEvent.MouseButtonRelease,
-                                endPos, QtCore.Qt.LeftButton, QtCore.Qt.LeftButton,
-                                QtCore.Qt.NoModifier)
+    release = QtGui.QMouseEvent(QtGui.QMouseEvent.Type.MouseButtonRelease,
+                                endPos, btns.LeftButton, btns.LeftButton,
+                                QtCore.Qt.KeyboardModifier.NoModifier)
     widget.mouseReleaseEvent(release)
   return mouseDrag
 

@@ -146,7 +146,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
                          ['Project', 'All Annotations', 'Current Annotation'], btnOpts=CNST.TOOL_PROJ_EXPORT)
     self._projImgMgr.hide()
     self._updateProjLbl()
-    win.addTabbedDock(QtCore.Qt.RightDockWidgetArea, self._projImgMgr)
+    win.addTabbedDock(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self._projImgMgr)
     self.exportOptsParam = self._buildIoOpts()
 
   def _createDefaultProj(self, setAsCur=True):

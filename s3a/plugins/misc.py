@@ -185,7 +185,7 @@ class RandomToolsPlugin(ParamEditorPlugin):
     except Exception:
       # Ipy kernel can have issues for many different reasons. Always be ready to fall back to traditional console
       console = pg_console.ConsoleWidget(parent=self.win, namespace=namespace, text=text)
-    console.setWindowFlags(QtCore.Qt.Window)
+    console.setWindowFlags(QtCore.Qt.WindowFlags.Window)
     console.show()
 
 class HelpPlugin(ParamEditorPlugin):

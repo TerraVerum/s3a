@@ -99,7 +99,7 @@ class DropList(QtWidgets.QListWidget):
     super(DropList, self).__init__(parent)
     self.setAcceptDrops(True)
     self.setSelectionMode(self.ExtendedSelection)
-    self.delShc = QtWidgets.QShortcut(QtCore.Qt.Key_Delete, self, self.deleteSelected)
+    self.delShc = QtWidgets.QShortcut(QtCore.Qt.Key.Key_Delete, self, self.deleteSelected)
 
   def deleteSelected(self):
     selectedIdxs = self.selectionModel().selectedIndexes()
@@ -154,7 +154,7 @@ class RegionHistoryViewer(QtWidgets.QMainWindow):
     dp.toolsEditor.registerFunc(self.discardLeftEntries, name='Discard Entries Left of Slider')
 
     EasyWidget.buildMainWin([dp], layout='H', win=self)
-    self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dp.toolsEditor)
+    self.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dp.toolsEditor)
 
 
   def setDiffs(self, diffs: List[np.ndarray]):

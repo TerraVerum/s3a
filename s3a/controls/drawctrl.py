@@ -89,8 +89,8 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
     # Unblock on mouse press
     # None imgitem is only the case during programmatic calls so allow this case
     if ((imgItem is None or imgItem.image is not None)
-        and ev.type() == ev.MouseButtonPress
-        and ev.button() == QtCore.Qt.LeftButton):
+        and ev.type() == QtCore.QEvent.Type.MouseButtonPress
+        and ev.button() == QtCore.Qt.MouseButton.LeftButton):
       self.removeLock(self)
     if self.locked: return False
     if imgItem is not None:

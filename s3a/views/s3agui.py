@@ -118,7 +118,7 @@ class S3A(S3ABase):
     tableLayout.addWidget(self.compTbl)
     tableDock.setWidget(tableContents)
 
-    self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, tableDock)
+    self.addDockWidget(QtCore.Qt.DockWidgetArea.BottomDockWidgetArea, tableDock)
 
     # STATUS BAR
     self.setStatusBar(self.statBar)
@@ -166,7 +166,7 @@ class S3A(S3ABase):
     if dock is None:
       return
     self.sharedAttrs.quickLoader.addDock(dock)
-    self.addTabbedDock(QtCore.Qt.RightDockWidgetArea, dock)
+    self.addTabbedDock(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock)
 
     if plugin.menu is None:
       # No need to add menu and graphics options

@@ -16,7 +16,7 @@ class BoundScatterPlot(pg.ScatterPlotItem):
     # TODO: Find out where the mouse is and make sure it's above a point before changing
     # the mouse cursor
 
-    self.hoverCursor = QtCore.Qt.PointingHandCursor
+    self.hoverCursor = QtCore.Qt.CursorShape.PointingHandCursor
 
   # Not working at the moment :/
   # def mouseMoveEvent(self, ev):
@@ -86,8 +86,9 @@ class BoundScatterPlot(pg.ScatterPlotItem):
 
 class RightPanViewBox(pg.ViewBox):
   def mouseDragEvent(self, ev: MouseDragEvent, axis=None):
-    if ev.buttons() == QtCore.Qt.RightButton \
-        or ev.button() == QtCore.Qt.RightButton:
-      ev.buttons = lambda: QtCore.Qt.LeftButton
+    btns = QtCore.Qt.MouseButton
+    if ev.buttons() == btns.RightButton \
+        or ev.button() == btns.RightButton:
+      ev.buttons = lambda: btns.LeftButton
       ev.button = ev.buttons
     super().mouseDragEvent(ev)

@@ -34,7 +34,7 @@ class SerDesDelegate(QtWidgets.QStyledItemDelegate):
 
   def createEditor(self, parent, option, index: QtCore.QModelIndex):
     editorType = 'str' if self.asLineEdit else 'text'
-    pgParam = Parameter.create(name='dummy', type=editorType, value=index.data(QtCore.Qt.DisplayRole))
+    pgParam = Parameter.create(name='dummy', type=editorType, value=index.data(QtCore.Qt.ItemDataRole.DisplayRole))
     editor = pgParam.itemClass(pgParam, 0).makeWidget()
     editor.setParent(parent)
     editor.setMaximumSize(option.rect.width(), option.rect.height())
@@ -47,10 +47,10 @@ class SerDesDelegate(QtWidgets.QStyledItemDelegate):
     if not len(values):
       raise ValueError(f'Error during deserialize:\n{errs[0]}')
     value = values[0]
-    model.setData(index, value, QtCore.Qt.EditRole)
+    model.setData(index, value, QtCore.Qt.ItemDataRole.EditRole)
 
   def setEditorData(self, editor: QtWidgets.QWidget, index):
-    value = index.data(QtCore.Qt.EditRole)
+    value = index.data(QtCore.Qt.ItemDataRole.EditRole)
     strVals, strErrs = serialize(self.param, [value])
     if len(strErrs):
       raise ValueError(f'Error during serialize:\n{strErrs[0]}')
@@ -73,23 +73,23 @@ class MinimalTableModel(ComponentMgr):
   def __init__(self):
     super().__init__()
     # Map true/false to check state
-    self.csMap = {True: QtCore.Qt.Checked, False: QtCore.Qt.Unchecked}
+    self.csMap = {True: QtCore.Qt.CheckState.Checked, False: QtCore.Qt.CheckState.Unchecked}
 
     # Since the minimal model only contains one row, everything checkable can be on a
     # per-column basis
     self.checkedColIdxs = set()
 
   def flags(self, index: QtCore.QModelIndex) -> QtCore.Qt.ItemFlags:
-    return super().flags(index) | QtCore.Qt.ItemIsUserCheckable
+    return super().flags(index) | QtCore.Qt.ItemFlag.ItemIsUserCheckable
 
   def data(self, index: QtCore.QModelIndex, role: int) -> Any:
-    if role == QtCore.Qt.CheckStateRole:
+    if role == QtCore.Qt.ItemDataRole.CheckStateRole:
       return self.csMap[index.column() in self.checkedColIdxs]
     return super().data(index, role)
 
-  def setData(self, index, value, role=QtCore.Qt.EditRole) -> bool:
-    if role == QtCore.Qt.CheckStateRole:
-      if value == QtCore.Qt.Checked:
+  def setData(self, index, value, role=QtCore.Qt.ItemDataRole.EditRole) -> bool:
+    if role == QtCore.Qt.ItemDataRole.CheckStateRole:
+      if value == QtCore.Qt.CheckState.Checked:
         self.checkedColIdxs.add(index.column())
       else:
         self.checkedColIdxs.remove(index.column())
@@ -230,7 +230,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
     if not minimal:
       self.popup = PopupTableDialog(*args)
       # Create context menu for changing table rows
-      self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+      self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
       cursor = QtGui.QCursor()
       self.customContextMenuRequested.connect(lambda: self.menu.exec_(cursor.pos()))
 
@@ -288,7 +288,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
     selectedIds = []
     selection = self.selectionModel().selectedIndexes()
     for item in selection:
-      selectedIds.append(item.sibling(item.row(),self.instIdColIdx).data(QtCore.Qt.EditRole))
+      selectedIds.append(item.sibling(item.row(),self.instIdColIdx).data(QtCore.Qt.ItemDataRole.EditRole))
     newRows = pd.unique(selectedIds)
     if np.array_equal(newRows, self._prevSelRows):
       return
@@ -298,7 +298,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
   def removeSelectedRows_gui(self):
     if self.minimal: return
 
-    idList = [idx.siblingAtColumn(self.instIdColIdx).data(QtCore.Qt.EditRole)
+    idList = [idx.siblingAtColumn(self.instIdColIdx).data(QtCore.Qt.ItemDataRole.EditRole)
               for idx in self.selectedIndexes()]
     if len(idList) == 0:
       return
@@ -333,7 +333,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
       row = idx.row()
       # 0th row contains instance ID
       # TODO: If the user is allowed to reorder columns this needs to be revisited
-      idAtIdx = idx.siblingAtColumn(self.instIdColIdx).data(QtCore.Qt.EditRole)
+      idAtIdx = idx.siblingAtColumn(self.instIdColIdx).data(QtCore.Qt.ItemDataRole.EditRole)
       retLists.append([idAtIdx, row, idx.column()])
     retLists = np.array(retLists)
     if excludeNoEditCols and len(retLists) > 0:

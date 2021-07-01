@@ -70,11 +70,11 @@ class PlotDataROI(BoundScatterPlot):
     verts = None
     constructingRoi = self.constructingRoi
     # If not left click, do nothing
-    if (int(ev.buttons()) & QtCore.Qt.LeftButton) == 0 \
-        and ev.button() != QtCore.Qt.LeftButton:
+    if (int(ev.buttons()) & QtCore.Qt.MouseButton.LeftButton) == 0 \
+        and ev.button() != QtCore.Qt.MouseButton.LeftButton:
       return self.constructingRoi, verts
     evType = ev.type()
-    if evType == qe.MouseButtonPress and not constructingRoi:
+    if evType == qe.Type.MouseButtonPress and not constructingRoi:
       # Need to start a new shape
       self.setRoiPoints(xyEvCoords)
       constructingRoi = True

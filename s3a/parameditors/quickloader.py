@@ -52,13 +52,13 @@ class EditorListModel(QtCore.QAbstractListModel):
   #   self.addEditors([editor])
   #   self.layoutChanged.emit()
 
-  def data(self, index: QtCore.QModelIndex, role: int=QtCore.Qt.DisplayRole):
+  def data(self, index: QtCore.QModelIndex, role: int=QtCore.Qt.ItemDataRole.DisplayRole):
     row = index.row()
     paramState = self.paramStatesLst[row]
     editor = self.editorList[row]
-    if role == QtCore.Qt.DisplayRole:
+    if role == QtCore.Qt.ItemDataRole.DisplayRole:
       return self.displayFormat.format(stateName=paramState, editor=editor)
-    elif role == QtCore.Qt.EditRole:
+    elif role == QtCore.Qt.ItemDataRole.EditRole:
       return paramState, editor
     else:
       return
@@ -74,7 +74,7 @@ class EditorListModel(QtCore.QAbstractListModel):
   def rowCount(self, paren=QtCore.QModelIndex()) -> int:
     return len(self.paramStatesLst)
 
-  def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
+  def headerData(self, section, orientation, role=QtCore.Qt.ItemDataRole.DisplayRole):
     return 'Parameter State List'
 
   @staticmethod
@@ -179,7 +179,7 @@ class QuickLoaderEditor(ParamEditor):
     # selectionIdx = completer.popup().currentIndex()
     # if not selectionIdx.isValid():
     #   selectionIdx = completer.currentIndex()
-    paramState, editor = qtSelectionIdx.data(QtCore.Qt.EditRole)
+    paramState, editor = qtSelectionIdx.data(QtCore.Qt.ItemDataRole.EditRole)
     self.addActForEditor(editor, paramState)
     # self.addNewParamState.clear()
 

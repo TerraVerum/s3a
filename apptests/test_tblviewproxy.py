@@ -150,8 +150,8 @@ def test_export_overlay(app, mgr, tmp_path):
 @pytest.mark.withcomps
 def test_sorted_tbl(app, mgr):
   proxy = app.sortFilterProxy
-  proxy.sort(0, QtCore.Qt.DescendingOrder)
-  ordering = [proxy.index(ii,0).data(QtCore.Qt.EditRole) for ii in range(len(mgr.compDf))]
+  proxy.sort(0, QtCore.Qt.SortOrder.DescendingOrder)
+  ordering = [proxy.index(ii,0).data(QtCore.Qt.ItemDataRole.EditRole) for ii in range(len(mgr.compDf))]
   assert np.array_equal(mgr.compDf.index[::-1], ordering)
 
 
