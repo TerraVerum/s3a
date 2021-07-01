@@ -192,10 +192,10 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
   sigSelectionChanged = Signal(object)
 
   def __initEditorParams__(self, shared: SharedAppSettings):
-    self.props = ParamContainer()
+    self.props = props = ParamContainer()
     self.tableData = shared.tableData
     shared.generalProps.registerProp(PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE,
-                                                               container=self.props)
+                                                               container=props)
 
     self.toolsEditor = ParamEditor.buildClsToolsEditor(type(self), name='Component Table Tools')
 
@@ -203,10 +203,8 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
       proc, params = shared.generalProps.registerFunc(
         self.setVisibleColumns, runOpts=RunOpts.ON_CHANGED, nest=False,
         returnParam=True, visibleColumns=[])
-    def onChange(*_args):
-      params.child('visibleColumns').setLimits([f.name for f in shared.tableData.allFields])
-    onChange()
-    shared.tableData.sigCfgUpdated.connect(onChange)
+    props['visibleColumns'] = params.child('visibleColumns')
+    shared.tableData.sigCfgUpdated.connect(self._onTableChange)
 
   def __init__(self, *args, minimal=False):
     """
@@ -235,6 +233,18 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
       self.customContextMenuRequested.connect(lambda: self.menu.exec_(cursor.pos()))
 
     self.instIdColIdx = self.tableData.allFields.index(REQD_TBL_FIELDS.INST_ID)
+    self._onTableChange()
+
+  def _onTableChange(self, *_args):
+    lims = []
+    val = []
+    for f in self.tableData.allFields:
+      name = f.name
+      if f.opts.get('visible', True):
+        val.append(name)
+      lims.append(name)
+    lims = [f.name for f in self.tableData.allFields]
+    self.props.params['visibleColumns'].setOpts(limits=lims, value=val)
 
   def setVisibleColumns(self, visibleColumns: Sequence[str]):
     """
