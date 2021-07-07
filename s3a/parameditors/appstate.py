@@ -91,9 +91,8 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
         if curErr: errs[key] = curErr
         key = nextKey()
       if errs:
-        errPrint = [f'{k}: {v}' for (k, v) in errs.items()]
         warnLater('The following settings could not be loaded (shown as [setting]: [exception])\n'
-             + "\n\n".join(errPrint), UserWarning)
+             + "\n\n".join(errs.values()), UserWarning)
       if stateDict:
         self.quickLoader.buildFromStartupParams(stateDict)
       ret = super().loadParamValues(stateName, paramDict)
