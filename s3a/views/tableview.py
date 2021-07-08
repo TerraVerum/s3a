@@ -6,7 +6,7 @@ import pandas as pd
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from pyqtgraph.parametertree import Parameter
 
-from s3a._io.helpers import serialize, deserialize
+from s3a.compio.helpers import serialize, deserialize
 from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
 from s3a.models.tablemodel import ComponentMgr
 from s3a.shared import SharedAppSettings

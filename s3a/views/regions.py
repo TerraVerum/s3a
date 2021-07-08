@@ -20,7 +20,7 @@ from .clickables import BoundScatterPlot
 
 __all__ = ['MultiRegionPlot', 'VertexDefinedImg', 'RegionCopierPlot']
 
-from .._io import defaultIo
+from ..compio import defaultIo
 from ..shared import SharedAppSettings
 
 Signal = QtCore.Signal

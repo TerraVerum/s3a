@@ -73,7 +73,7 @@ def test_import_large_verts(sampleComps, tmp_path, app):
   io = app.compIo
   io.exportCsv(sampleComps, tmp_path/'Bad Verts.csv')
   with pytest.warns(UserWarning):
-    io.importCsv(tmp_path/'Bad Verts.csv', app.mainImg.image.shape)
+    io.importCsv(tmp_path/'Bad Verts.csv', imShape=app.mainImg.image.shape)
 
 def test_change_comp(app, mgr):
   stack = app.actionStack
@@ -112,7 +112,7 @@ def test_autosave(tmp_path, app, filePlg):
   app.compMgr.addComps(testComps3)
   filePlg.autosaveTimer.timeout.emit()
   filePlg.stopAutosave()
-  savedFiles = list(tmp_path.glob('autosave*.pkl'))
+  savedFiles = list(tmp_path.glob('autosave*.csv'))
   assert len(savedFiles) >= 3, 'Not enough autosaves generated'
 
 @pytest.mark.withcomps

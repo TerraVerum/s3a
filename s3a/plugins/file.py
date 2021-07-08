@@ -15,7 +15,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtCore
 
 from s3a import PRJ_CONSTS as CNST, models, REQD_TBL_FIELDS
-from s3a._io import ComponentIO
+from s3a.compio import ComponentIO, defaultIo
 from s3a.generalutils import hierarchicalUpdate, cvImsave_rgb
 from s3a.graphicsutils import DropList
 from s3a.structures import FilePath, NChanImg
@@ -182,7 +182,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     self.win.saveCurAnnotation()
     self.projData.saveCfg()
 
-  @fns.dynamicDocstring(ioTypes=['<Unchanged>'] + list(ComponentIO.roundTripTypes))
+  @fns.dynamicDocstring(ioTypes=['<Unchanged>'] + list(defaultIo.roundTripTypes))
   def updateProjectProperties(self, tableConfig:FilePath=None, annotationFormat:str=None):
     """
     Updates the specified project properties, for each one that is provided
@@ -204,8 +204,8 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       self.projData.cfg['annotation-format'] = annotationFormat
 
 
-  @fns.dynamicDocstring(ioTypes=list(ComponentIO.exportTypes))
-  def startAutosave(self, interval=5, backupFolder='', baseName='autosave', exportType='pkl'):
+  @fns.dynamicDocstring(ioTypes=list(defaultIo.exportTypes))
+  def startAutosave(self, interval=5, backupFolder='', baseName='autosave', annotationFormat='csv'):
     """
     Saves the current annotation set evert *interval* minutes
 
@@ -219,10 +219,10 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       pType: filepicker
       asFolder: True
     :param baseName: What to name the saved annotation file
-    :param exportType:
+    :param annotationFormat:
       helpText: File format for backups
       pType: list
-      limits: {ioTypes}
+      limits: []
     """
     self.autosaveTimer = QtCore.QTimer()
     self.autosaveTimer.start(int(interval * 60 * 1000))
@@ -234,7 +234,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     lastSavedDf = self.win.exportableDf.copy()
     # Qtimer expects ms, turn mins->s->ms
     # Figure out where to start the counter
-    globExpr = lambda: backupFolder.glob(f'{baseName}*.{exportType}')
+    globExpr = lambda: backupFolder.glob(f'{baseName}*.{annotationFormat}')
     existingFiles = list(globExpr())
     if len(existingFiles) == 0:
       counter = 0
@@ -243,7 +243,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
 
     def save_incrementCounter():
       nonlocal counter, lastSavedDf
-      baseSaveNamePlusFolder = backupFolder / f'{baseName}_{counter}.{exportType}'
+      baseSaveNamePlusFolder = backupFolder / f'{baseName}_{counter}.{annotationFormat}'
       counter += 1
       curDf = self.win.exportableDf
       if not curDf.equals(lastSavedDf):
@@ -925,7 +925,6 @@ class ProjectData(QtCore.QObject):
     """
     shutil.copytree(self.location, outputFolder)
 
-  @fns.dynamicDocstring(fileTypes=list(ComponentIO.exportTypes))
   def exportAnnotations(self, outputFolder:FilePath= 's3a-export',
                         annotationFormat='csv',
                         combine=False,
@@ -942,8 +941,7 @@ class ProjectData(QtCore.QObject):
       file types are:
       {fileTypes}"
       pType: list
-      limits:
-        {fileTypes}
+      limits: []
     :param combine: If `True`, all annotation files will be combined into one exported file with name `annotations.<format>`
     :param includeImages: If `True`, the corresponding image for each annotation will also be exported into an `images`
       folder

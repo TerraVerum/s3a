@@ -11,7 +11,7 @@ import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
 
-from s3a import ComponentIO
+from s3a import ComponentIO, defaultIo
 from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS
 from s3a.constants import PRJ_ENUMS
 from s3a.controls.tableviewproxy import CompDisplayFilter, CompSortFilter
@@ -356,7 +356,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
       # 'hasUnsavedChanges' will be true after this, even though the changes are saved.
       self.hasUnsavedChanges = False
 
-  @fns.dynamicDocstring(filters=ComponentIO.ioFileFilter(PRJ_ENUMS.IO_EXPORT))
+  @fns.dynamicDocstring(filters=defaultIo.ioFileFilter(PRJ_ENUMS.IO_EXPORT))
   def exportCurAnnotation(self, outFname: Union[str, Path], **kwargs):
     """
     Exports current image annotations to a file. This may be more convenient than exporting

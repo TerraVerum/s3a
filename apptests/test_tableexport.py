@@ -169,9 +169,12 @@ def test_compimgs_export(tmp_path, _simpleTbl):
   io.exportCompImgsZip(tester.compDf, tmp_path/'out_zip', archive=True)
   assert (tmp_path/'out_zip.zip').exists()
 
+@pytest.mark.withcomps
 def test_convert(app, tmp_path):
   sampleComps = app.exportableDf
   io = ComponentIO()
+  td = app.sharedAttrs.tableData
+  io.tableData.loadCfg(td.cfgFname, td.cfg)
   pklFile = tmp_path/'pklexport.pkl'
   csvFile = tmp_path/'csvexport.csv'
   io.exportPkl(sampleComps, pklFile)

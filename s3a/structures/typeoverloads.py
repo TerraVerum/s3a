@@ -1,6 +1,8 @@
 # noinspection PyUnresolvedReferences
 from utilitys.typeoverloads import FilePath
 from pathlib import Path
+import typing as t
+from utilitys import PrjParam
 
 from numpy import ndarray
 """
@@ -19,8 +21,13 @@ OneDArr = ndarray
 TwoDArr = ndarray
 ThreeDArr = ndarray
 
+LabelFieldType = t.Union[str, PrjParam]
+
+
 class AnnParseError(ValueError):
   def __init__(self, *args, fileName: Path=None, instances: list=None, **kwargs):
-    super().__init__(*args, **kwargs)
+    super().__init__(*args)
     self.fileName = fileName
     self.instances = instances
+
+class AnnInstanceError(ValueError): pass

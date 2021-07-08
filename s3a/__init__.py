@@ -32,7 +32,7 @@ from . import graphicsutils as gutils
 import s3a.constants
 import s3a.structures
 
-from ._io import ComponentIO, defaultIo
+from .compio import ComponentIO, defaultIo
 from s3a.structures import XYVertices, ComplexXYVertices
 from s3a.constants import REQD_TBL_FIELDS, PRJ_CONSTS, CFG_DIR, PRJ_ENUMS
 

@@ -281,11 +281,15 @@ class ComplexXYVertices(list):
            f'Max:\t{concatVerts.max(0)}'
 
   def __eq__(self, other: ComplexXYVertices):
-    if len(self) != len(other):
-      return False
-    for selfVerts, otherVerts in zip(self, other):
-      if not np.array_equal(selfVerts, otherVerts):
+    try:
+      if len(self) != len(other):
         return False
+      for selfVerts, otherVerts in zip(self, other):
+        if not np.array_equal(selfVerts, otherVerts):
+          return False
+    except TypeError:
+      # No 'len()' or no 'iter()'
+      return False
     return True
 
   def __ne__(self, other):

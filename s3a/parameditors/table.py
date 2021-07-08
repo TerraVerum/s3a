@@ -186,7 +186,7 @@ class TableData(QtCore.QObject):
   sigCfgUpdated = QtCore.Signal(object)
   """dict (self.cfg) during update"""
 
-  def __init__(self, cfgFname: FilePath=None, cfgDict: dict=None):
+  def __init__(self, cfgFname: FilePath=None, cfgDict: dict=None, template: Union[FilePath, dict]=None):
     super().__init__()
     self.factories: Dict[PrjParam, Callable[[], Any]] = {}
 
@@ -200,7 +200,7 @@ class TableData(QtCore.QObject):
     self.resetLists()
 
     if cfgFname or cfgDict:
-      self.loadCfg(cfgFname, cfgDict)
+      self.loadCfg(cfgFname, cfgDict, template)
 
   def makeCompDf(self, numRows=1, sequentialIds=False) -> df:
     """
@@ -249,7 +249,10 @@ class TableData(QtCore.QObject):
   def makeCompSer(self):
     return self.makeCompDf().squeeze()
 
-  def loadCfg(self, cfgFname: FilePath=None, cfgDict: dict=None, force=False):
+  def loadCfg(self, cfgFname: FilePath=None,
+              cfgDict: dict=None,
+              template: Union[FilePath, dict]=None,
+              force=False):
     """
     Lodas the specified table configuration file for S3A. Alternatively, a name
     and dict pair can be supplied instead.
@@ -258,11 +261,17 @@ class TableData(QtCore.QObject):
       configuration name assiciated with the given dictionary.
     :param cfgDict: If not *None*, this is the config data used instad of
       reading *cfgFname* as a file.
+    :param template: Template file or dict whose fields must exist to ensure updates happen properly.
+      This can also be used to specify the base of a compositional configs
     :param force: If *True*, the new config will be loaded even if it is the same name as the
     current config
     """
-
-    _, baseCfgDict = fns.resolveYamlDict(TBL_BASE_TEMPLATE)
+    if template is None:
+      template = TBL_BASE_TEMPLATE
+    if isinstance(template, dict):
+      baseCfgDict = template.copy()
+    else:
+      _, baseCfgDict = fns.resolveYamlDict(template)
     cfgFname, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
     cfgFname = cfgFname.resolve()
     if not force and self.cfgFname == cfgFname:

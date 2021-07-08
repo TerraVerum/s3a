@@ -469,14 +469,14 @@ class DirectoryDict(MaxSizeDict):
     return ret
 
 
-def deprecateKwargs(**toDeprecate):
+def deprecateKwargs(**oldToNewNameMapping):
   def deco(func):
     @wraps(func)
     def inner(*args, **kwargs):
-      usedDeprecated = set(toDeprecate) & set(kwargs)
+      usedDeprecated = set(oldToNewNameMapping) & set(kwargs)
       if usedDeprecated:
         grammar = 'is' if len(usedDeprecated) == 1 else 'are'
-        replacements = {k: toDeprecate[k] for k in usedDeprecated if toDeprecate[k] is not None}
+        replacements = {k: oldToNewNameMapping[k] for k in usedDeprecated if oldToNewNameMapping[k] is not None}
         msg = f'{", ".join(usedDeprecated)} {grammar} deprecated and will be removed in a future release.'
         if replacements:
           for orig, replace in replacements.items():
