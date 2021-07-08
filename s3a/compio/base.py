@@ -5,11 +5,10 @@ from functools import wraps
 import numpy as np
 import pandas as pd
 
-from constants import IO_TEMPLATES_DIR
 from utilitys import PrjParam
 from utilitys.typeoverloads import FilePath
 from .helpers import serialize, deserialize, checkVertBounds
-from ..constants import REQD_TBL_FIELDS as RTF
+from ..constants import REQD_TBL_FIELDS as RTF, IO_TEMPLATES_DIR
 from ..parameditors.table import TableData
 from ..structures import AnnInstanceError, AnnParseError
 from pathlib import  Path
