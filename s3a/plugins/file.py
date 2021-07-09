@@ -14,16 +14,17 @@ import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtCore
 
-from s3a import PRJ_CONSTS as CNST, models, REQD_TBL_FIELDS
-from s3a.compio import ComponentIO, defaultIo
-from s3a.generalutils import hierarchicalUpdate, cvImsave_rgb
-from s3a.graphicsutils import DropList
-from s3a.structures import FilePath, NChanImg
+from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS
+from .. import models
+from ..compio import ComponentIO, defaultIo
+from ..generalutils import hierarchicalUpdate, cvImsave_rgb
+from ..graphicsutils import DropList
+from ..structures import FilePath, NChanImg
 from utilitys import CompositionMixin, AtomicProcess, NestedProcess
 from utilitys import fns
-from utilitys.fns import warnLater
 from utilitys.params import *
 from ..constants import APP_STATE_DIR, PROJ_FILE_TYPE, PROJ_BASE_TEMPLATE
+from ..logger import getAppLogger
 
 
 class FilePlugin(CompositionMixin, ParamEditorPlugin):
@@ -107,7 +108,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
   def attachWinRef(self, win: models.s3abase.S3ABase):
     super().attachWinRef(win)
     self.projData.compIo.tableData = win.sharedAttrs.tableData
-    win.statBar.addWidget(self.projNameLbl)
+    win.statBar.addPermanentWidget(self.projNameLbl)
     def handleExport(_dir):
       saveImg = win.srcImgFname
       ret = str(self.projData.cfgFname)
@@ -181,6 +182,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
   def save(self):
     self.win.saveCurAnnotation()
     self.projData.saveCfg()
+    getAppLogger(__name__).info('Saved Project')
 
   @fns.dynamicDocstring(ioTypes=['<Unchanged>'] + list(defaultIo.roundTripTypes))
   def updateProjectProperties(self, tableConfig:FilePath=None, annotationFormat:str=None):
@@ -228,7 +230,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     self.autosaveTimer.start(int(interval * 60 * 1000))
     self.autosaveTimer.timeout.connect(self.win.saveCurAnnotation)
     if len(str(backupFolder)) == 0:
-      warn(f'No backup folder selected, defaulting to {Path().absolute()}', UserWarning)
+      getAppLogger(__name__).attention(f'No backup folder selected, defaulting to {Path().absolute()}')
     backupFolder = Path(backupFolder)
     backupFolder.mkdir(exist_ok=True, parents=True)
     lastSavedDf = self.win.exportableDf.copy()
@@ -257,9 +259,10 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
 
   def showProjImgs_gui(self):
     if len(self.projData.images) == 0:
-      warn('This project does not have any images yet. You can add them either in\n'
-           '`Project Settings... > Add Image Files` or\n'
-           '`File > Add New Image`.', UserWarning)
+      getAppLogger(__name__).attention(
+        'This project does not have any images yet. You can add them either in\n'
+        '`Project Settings... > Add Image Files` or\n'
+        '`File > Add New Image`.')
       return
     self._projImgMgr.show()
     self._projImgMgr.raise_()
@@ -572,7 +575,7 @@ class ProjectData(QtCore.QObject):
       elif not pluginCls:
         warnPlgs.append(plgPath)
     if warnPlgs:
-      fns.warnLater(f'Some project plugins were specified, but could not be found:\n'
+      warn(f'Some project plugins were specified, but could not be found:\n'
                     f'{warnPlgs}', UserWarning)
 
     self.cfgFname = cfgFname
@@ -678,7 +681,7 @@ class ProjectData(QtCore.QObject):
         offendingAnns.append(str(ann))
         self.addAnnotation(ann)
     if len(offendingAnns) > 0:
-      warnLater('Encountered annotation(s) in project config, but not officially added. '
+      self.win.sharedAttrs('Encountered annotation(s) in project config, but not officially added. '
             'Adding them now.'
            '  Offending files:\n'
            + ',\n'.join(offendingAnns), UserWarning)
@@ -704,8 +707,7 @@ class ProjectData(QtCore.QObject):
     if not image.is_absolute():
       image = self.location/image
     if not image.exists():
-      warnLater(f'Provided image path does not exist: {image}\nNo action performed.',
-            UserWarning)
+      getAppLogger(__name__).attention(f'Provided image path does not exist: {image}\nNo action performed.')
       return []
     if image.is_dir():
       ret = self.addImageFolder(image, copyToProj)
@@ -768,8 +770,8 @@ class ProjectData(QtCore.QObject):
     if not name.is_absolute():
       name = self.location/name
     if not name.exists():
-      warnLater(f'Provided annotation path does not exist: {name}\nNo action '
-                f'performed.', UserWarning)
+      getAppLogger(__name__).attention(f'Provided annotation path does not exist: {name}\nNo action '
+                f'performed.')
       return
     if name.is_dir():
       self.addAnnotationFolder(name)

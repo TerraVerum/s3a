@@ -154,6 +154,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     )
     if isinstance(newGrayscale, dict):
       newGrayscale = newGrayscale['image']
+    elif newGrayscale is None:
+      # No change
+      return
     newGrayscale = newGrayscale.astype('uint8')
 
     matchNames = incrStageNames(self.curProcessor.processor.stages_flattened)

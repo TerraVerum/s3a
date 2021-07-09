@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 
 from conftest import assertExInList
@@ -25,17 +27,18 @@ def test_double_add(ql, editor):
   ql.params.clearChildren()
 
 @pytest.mark.qt_no_exception_capture
-def test_invalid_load(qtbot, ql, editor):
+def test_invalid_load(caplog, ql, editor):
   # Pytest isn't catching this error correctly for some reason, try wrapping in caller
   # function within qt event loop
   def invalidLoadCaller():
     ql.addActForEditor(editor, 'SaveOptionThatDoesntExist')
     ql.applyChanges()
-  with qtbot.capture_exceptions() as exceptions:
-    invalidLoadCaller()
-    assertExInList(exceptions)
+  invalidLoadCaller()
+  crits = [r for r in caplog.records if r.levelno == logging.CRITICAL]
+  assert crits
   assert len(ql.params.child(editor.name).children()) == 0
   ql.params.clearChildren()
+  caplog.clear()
 
 def test_from_line_edit(ql, editor):
   ql.addNewParamState.setText(ql.listModel.displayFormat.format(stateName='Default',
@@ -56,11 +59,9 @@ def test_bad_user_profile(ql):
 
 def test_load_state(ql):
   state = {
-    'Parameters': {
-      'Color Scheme': {'Default': None},
-      'Vertices Processor': {'Default': None},
-      'App Settings': {'Default': None}
-    }
+    'Color Scheme': {'Default': None},
+    'Vertices Processor': {'Default': None},
+    'App Settings': {'Default': None}
   }
   ql.loadParamValues('test', state)
   assert len(ql.params.childs) == 3
@@ -69,9 +70,7 @@ def test_load_state(ql):
 #
 def test_bad_load_state(ql):
   state = {
-    'Parameters': {
-      'Nonsense': {'Default': None},
-    }
+    'Nonsense': {'Default': None},
   }
   with pytest.raises(ValueError):
     ql.loadParamValues('test', state)

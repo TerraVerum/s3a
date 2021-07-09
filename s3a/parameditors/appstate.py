@@ -1,17 +1,18 @@
 import typing as t
+import warnings
 from pathlib import Path
 from typing import List, Dict, Union, Callable, Any
 
 import pandas as pd
 from pyqtgraph.parametertree import Parameter
 
-from s3a.shared import SharedAppSettings
-from utilitys import ParamEditor, fns, EditorPropsMixin
-
 from s3a.constants import APP_STATE_DIR
 from s3a.generalutils import safeCallFuncList, hierarchicalUpdate, safeCallFunc
+from s3a.logger import getAppLogger
+from s3a.shared import SharedAppSettings
 from s3a.structures import FilePath
-from utilitys.fns import serAsFrame, attemptFileLoad, raiseErrorLater, warnLater
+from utilitys import ParamEditor, EditorPropsMixin
+from utilitys.fns import serAsFrame, attemptFileLoad
 
 
 class AppStateEditor(EditorPropsMixin, ParamEditor):
@@ -40,7 +41,7 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
       saveOnExitDir.mkdir(exist_ok=True)
       rets, errs = safeCallFuncList(legitKeys, exportFuncs, [[saveOnExitDir]] * len(legitKeys))
       updateDict = {k: ret for k, ret in zip(legitKeys, rets) if ret is not None}
-      paramState = dict(Parameters=paramState, **updateDict)
+      paramState = dict(**updateDict)
       for editor in self.quickLoader.listModel.uniqueEditors:
         if editor.stateName == 'Default':
           curSaveName = str(saveOnExitDir/editor.name)
@@ -91,7 +92,7 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
         if curErr: errs[key] = curErr
         key = nextKey()
       if errs:
-        warnLater('The following settings could not be loaded (shown as [setting]: [exception])\n'
+        warnings.warn('The following settings could not be loaded (shown as [setting]: [exception])\n'
              + "\n\n".join(errs.values()), UserWarning)
       if stateDict:
         self.quickLoader.buildFromStartupParams(stateDict)
@@ -120,7 +121,7 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
       err = IOError('Errors were encountered for the following parameters'
                          ' (shown as [parameter]: [exception])\n'
                        + "\n\n".join(errMsgs))
-      fns.raiseErrorLater(err)
+      getAppLogger(__name__).critical(err)
 
 
   def addImportExportOpts(self, optName: str, importFunc: Callable[[str], Any],

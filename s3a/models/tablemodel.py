@@ -122,7 +122,7 @@ class ComponentMgr(CompTableModel):
     super().resetFields()
     self._nextCompId = 0
 
-  @DASM.undoable('Add Components')
+  @DASM.undoable('Add/Modify Components')
   def addComps(self, newCompsDf: df, addtype: PRJ_ENUMS = PRJ_ENUMS.COMP_ADD_AS_NEW, emitChange=True):
     toEmit = self.defaultEmitDict.copy()
     existingIds = self.compDf.index

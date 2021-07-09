@@ -1,11 +1,11 @@
 import inspect
 import typing as t
+import warnings
 
 import numpy as np
 import pandas as pd
 
 from utilitys import PrjParam
-from utilitys.fns import warnLater
 
 _serFunc = t.Callable
 _deserFunc = t.Callable
@@ -113,7 +113,7 @@ def checkVertBounds(vertSer: pd.Series, imShape: tuple):
   vertMaxs = np.vstack(vertMaxs)
   offendingIds = np.nonzero(np.any(vertMaxs > imShape, axis=1))[0]
   if len(offendingIds) > 0:
-    warnLater(
+    warnings.warn(
         f'Vertices on some components extend beyond image dimensions. '
         f'Perhaps this export came from a different image?\n'
         f'Offending IDs: {offendingIds}', UserWarning

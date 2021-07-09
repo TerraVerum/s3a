@@ -7,6 +7,7 @@ import os
 import pickle
 import sys
 import tempfile
+import warnings
 from collections import defaultdict
 from contextlib import ExitStack
 from functools import wraps
@@ -28,7 +29,6 @@ from s3a.shims import typing_extensions
 from s3a.structures import FilePath, ComplexXYVertices, PrjParam
 from skimage.exposure import rescale_intensity
 from utilitys import fns
-from utilitys.fns import warnLater
 
 from .helpers import serialize, _getPdExporters, _getPdImporters
 from .importers import *
@@ -214,7 +214,7 @@ class ComponentIO:
         problemMsg = [f'{idx}: {cols}' for idx, cols in problemCells.items()]
         problemMsg = '\n'.join(problemMsg)
         # Try to fix the problem with an iloc write
-        warnLater(
+        warnings.warn(
             '<b>Warning!</b> Saved components do not match current component'
             ' state. This can occur when pandas incorrectly caches some'
             ' table values. Problem cells (shown as [id]: [columns]):\n' + f'{problemMsg}\n'

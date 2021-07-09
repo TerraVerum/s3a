@@ -1,6 +1,5 @@
 import argparse
 import inspect
-import pydoc
 from contextlib import ExitStack
 from pathlib import Path
 from typing import Optional, Union, Type, Dict, List, Sequence
@@ -11,21 +10,21 @@ import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
 
-from s3a import ComponentIO, defaultIo
-from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS
-from s3a.constants import PRJ_ENUMS
-from s3a.controls.tableviewproxy import CompDisplayFilter, CompSortFilter
-from s3a.models.tablemodel import ComponentMgr
-from s3a.parameditors.appstate import AppStateEditor
-from s3a.plugins.file import FilePlugin
-from s3a.plugins import INTERNAL_PLUGINS, tablefield, EXTERNAL_PLUGINS
-from s3a.plugins.misc import RandomToolsPlugin
-from s3a.shared import SharedAppSettings
-from s3a.structures import FilePath, NChanImg
-from s3a.views.imageareas import MainImage
-from s3a.views.tableview import CompTableView
 from utilitys import EditorPropsMixin, RunOpts, ParamEditorPlugin, fns, ParamContainer, \
   DeferredActionStackMixin as DASM, ParamEditorDockGrouping
+from .. import ComponentIO, defaultIo
+from ..constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
+from ..controls.tableviewproxy import CompDisplayFilter, CompSortFilter
+from ..logger import getAppLogger
+from ..models.tablemodel import ComponentMgr
+from ..parameditors.appstate import AppStateEditor
+from ..plugins import INTERNAL_PLUGINS, tablefield, EXTERNAL_PLUGINS
+from ..plugins.file import FilePlugin
+from ..plugins.misc import RandomToolsPlugin
+from ..shared import SharedAppSettings
+from ..structures import FilePath, NChanImg
+from ..views.imageareas import MainImage
+from ..views.tableview import CompTableView
 
 __all__ = ['S3ABase']
 
@@ -49,6 +48,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
   def __new__(cls, *args, **kwargs):
     cls.scope.close()
     cls.scope, newAttrs = cls.createScope(cls.scope, returnAttrs=True)
+    newAttrs: SharedAppSettings
     obj = super().__new__(cls, *args, **kwargs)
     obj.sharedAttrs = newAttrs
     return obj
@@ -269,7 +269,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     :param kwargs: Passed to class constructor
     """
     if pluginCls in self.clsToPluginMapping:
-      fns.warnLater(f'Ignoring {pluginCls} since it was previously added', UserWarning)
+      getAppLogger(__name__).info(f'Ignoring {pluginCls} since it was previously added', UserWarning)
 
     plugin: ParamEditorPlugin = pluginCls(*args, **kwargs)
     return self._addPluginObj(plugin)
@@ -328,6 +328,8 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
       data = None if fileName.exists() else self.mainImg.image
       self.filePlg.projData.addImage(fileName, data)
     self.loadNewAnnotations()
+    infoName = (fileName and fileName.name) or None
+    getAppLogger(__name__).info(f'Changed main image to {infoName}')
     yield
     self.setMainImg(oldFile, oldData, clearExistingComps)
 

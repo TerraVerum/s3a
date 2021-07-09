@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 
 __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'QUICK_LOAD_DIR',

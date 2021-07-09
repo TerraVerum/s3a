@@ -1,5 +1,6 @@
 import copy
 import sys
+import warnings
 from functools import lru_cache
 from pathlib import Path
 from typing import List, Union, Tuple, Any, Optional, Callable, Dict
@@ -40,15 +41,8 @@ def _filterForParam(param: PrjParam):
       iterGroup = [f'{param.name}', f'Not {param.name}']
     else: # pType == 'list' or 'popuplineeditor'
       iterGroup = param.opts['limits']
-    optsParam = Parameter.create(name='Options', type='group', children=genParamList(iterGroup, 'bool', True))
-    def changeOpts(allowed: bool):
-      for param in optsParam.childs:
-        param.setValue(allowed)
+    optsParam = Parameter.create(name='Options', type='checklist', limits=iterGroup, value=iterGroup)
     paramWithChildren = Parameter.create(**paramWithChildren)
-    actions = [Parameter.create(name=name, type='action') for name in ('Select All', 'Clear All')]
-    actions[0].sigActivated.connect(lambda: changeOpts(True))
-    actions[1].sigActivated.connect(lambda: changeOpts(False))
-    paramWithChildren.addChildren(actions)
     paramWithChildren.addChild(optsParam)
   elif 'xyvertices' in pType:
     minMax = _filterForParam(PrjParam('', 5))
@@ -123,7 +117,7 @@ def filterParamCol(compDf: df, column: PrjParam, filterOpts: dict):
       vertsAllowed[vertIdx] = isAllowed
     compDf = compDf.loc[vertsAllowed]
   else:
-    warnLater('No filter type exists for parameters of type ' f'{pType}.'
+    warnings.warn('No filter type exists for parameters of type ' f'{pType}.'
               f' Did not filter column {column.name}.',
               UserWarning)
   return compDf
@@ -153,7 +147,7 @@ class TableFilterEditor(ParamEditor):
     if len(badCols) > 0:
       colNames = [f'"{col}"' for col in badCols]
       colTypes = np.unique([f'"{col.pType}"' for col in badCols])
-      warnLater(f'The table does not know how to create a filter for fields'
+      warnings.warn(f'The table does not know how to create a filter for fields'
             f' {", ".join(colNames)}'
             f' since types {", ".join(colTypes)} do not have corresponding filters', UserWarning)
     self.saveParamValues(blockWrite=True)

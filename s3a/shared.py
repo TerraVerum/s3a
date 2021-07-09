@@ -1,3 +1,5 @@
+import logging
+
 from pyqtgraph.Qt import QtCore
 
 from s3a.constants import GEN_PROPS_DIR, SCHEMES_DIR, SHORTCUTS_DIR, IMG_PROC_DIR, \
@@ -8,7 +10,8 @@ from s3a.parameditors.table import TableData
 from s3a.plugins.misc import SettingsPlugin, ShortcutsPlugin
 from s3a.processing import ImgProcWrapper, ImageProcess
 from utilitys import ActionStack, ParamEditor, ShortcutParameter, dockPluginFactory
-
+from utilitys.fns import AppLogger
+import logging
 
 class SharedAppSettings(QtCore.QObject):
   def __init__(self, parent=None):

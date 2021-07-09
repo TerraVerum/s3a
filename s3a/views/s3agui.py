@@ -1,4 +1,4 @@
-import warnings
+import logging
 from collections import defaultdict
 from pathlib import Path
 from typing import Union, Dict, List, Sequence
@@ -8,14 +8,14 @@ import qdarkstyle
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
-from s3a.constants import LAYOUTS_DIR, REQD_TBL_FIELDS, ICON_DIR
-from s3a.constants import PRJ_ENUMS, PRJ_CONSTS
+from ..constants import LAYOUTS_DIR, REQD_TBL_FIELDS, ICON_DIR, PRJ_ENUMS, PRJ_CONSTS
+from ..logger import getAppLogger
 from s3a.generalutils import hierarchicalUpdate
 from s3a.models.s3abase import S3ABase
 from s3a.plugins.misc import RandomToolsPlugin, MainImagePlugin, CompTablePlugin
 from s3a.shared import SharedAppSettings
 from s3a.structures import FilePath, NChanImg
-from utilitys import ParamEditor, ParamEditorPlugin, RunOpts, PrjParam, fns
+from utilitys import ParamEditor, ParamEditorPlugin, RunOpts, PrjParam, fns, widgets
 
 __all__ = ['S3A']
 
@@ -38,9 +38,11 @@ class S3A(S3ABase):
     # customized loading functions also get called
     super().__init__(parent, **startupSettings)
     self.setWindowIcon(QtGui.QIcon(str(ICON_DIR/'s3alogo.svg')))
+    logger = getAppLogger(__name__)
     if PRJ_ENUMS.LOG_GUI in log:
-      warnings.simplefilter('error', UserWarning)
-      fns.makeExceptionsShowDialogs(self)
+      logger.registerExceptions()
+      logger.registerWarnings()
+      logger.addHandler(widgets.StatusBarHandler(logging.INFO, self))
     self.APP_TITLE = 'FICS Semi-Supervised Semantic Annotator'
     self.CUR_COMP_LBL = 'Current Component ID:'
     self.setWindowTitle(self.APP_TITLE)
@@ -129,12 +131,12 @@ class S3A(S3ABase):
     self.imageLbl = QtWidgets.QLabel(f"Image: None")
 
     self.statBar.show()
-    self.statBar.addWidget(self.imageLbl)
+    self.statBar.addPermanentWidget(self.imageLbl)
 
-    self.statBar.addWidget(self.mouseCoordsLbl)
+    self.statBar.addPermanentWidget(self.mouseCoordsLbl)
     self.mainImg.mouseCoordsLbl = self.mouseCoordsLbl
 
-    self.statBar.addWidget(self.pxColorLbl)
+    self.statBar.addPermanentWidget(self.pxColorLbl)
     self.mainImg.pxColorLbl = self.pxColorLbl
 
   def saveLayout(self, layoutName: Union[str, Path]=None, allowOverwriteDefault=False):

@@ -8,14 +8,16 @@ import pandas as pd
 from pyqtgraph import console as pg_console
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 
-from s3a.parameditors.quickloader import QuickLoaderEditor
-from utilitys import ParamEditorPlugin, ProcessIO, widgets as uw, ParamEditor, ParamContainer, ShortcutParameter
 import s3a.shared
 from s3a import models, XYVertices, ComplexXYVertices
 from s3a.constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF, PRJ_ENUMS, GEN_PROPS_DIR, SCHEMES_DIR, \
   SHORTCUTS_DIR
+from s3a.logger import getAppLogger
 from s3a.models import s3abase
+from s3a.parameditors.quickloader import QuickLoaderEditor
 from s3a.plugins.base import ProcessorPlugin
+from utilitys import Action
+from utilitys import ParamEditorPlugin, ProcessIO, widgets as uw, ParamEditor, ParamContainer, ShortcutParameter
 
 
 class MainImagePlugin(ParamEditorPlugin):
@@ -139,10 +141,22 @@ class EditPlugin(ParamEditorPlugin):
     self.registerFunc(stack.undo, name='Undo', btnOpts=CNST.TOOL_UNDO)
     self.registerFunc(stack.redo, name='Redo', btnOpts=CNST.TOOL_REDO)
 
-    def updateUndoRedoTxts():
+    def updateUndoRedoTxts(_action=None):
       self.undoAct.setText(f'Undo: {stack.undoDescr}')
       self.redoAct.setText(f'Redo: {stack.redoDescr}')
     stack.stackChangedCallbacks.append(updateUndoRedoTxts)
+
+    def showStatus(action):
+      # Since this was the *already performed* action, what it reports is the opposite of what happens
+      if action is None:
+        return
+      if action.treatAsUndo:
+        msg = f'{stack.undoDescr}'
+      else:
+        msg = f'Undid {stack.redoDescr}'
+      getAppLogger(__name__).info(msg)
+    stack.stackChangedCallbacks.append(showStatus)
+
     updateUndoRedoTxts()
 
   @property

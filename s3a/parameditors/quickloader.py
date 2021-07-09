@@ -1,17 +1,17 @@
+import warnings
 from pathlib import Path
 from typing import List, Union
-from warnings import warn
 
 from pyqtgraph.Qt import QtCore, QtWidgets
 from pyqtgraph.parametertree.parameterTypes import GroupParameter, Parameter
-from utilitys import ParamEditor, ParamEditorDockGrouping, fns, widgets as uw
-from utilitys.fns import warnLater
+
+from utilitys import ParamEditor, ParamEditorDockGrouping, widgets as uw
 from utilitys.params.pgregistered import ShortcutKeySeqParameter as ShcKeySeq
-
-
-from s3a.constants import QUICK_LOAD_DIR
 from utilitys.typeoverloads import FilePath
+from ..constants import QUICK_LOAD_DIR
 from ..generalutils import lower_NoSpaces
+from ..logger import getAppLogger
+
 
 class EditorListModel(QtCore.QAbstractListModel):
   def __init__(self, editorList: List[ParamEditor], parent: QtWidgets.QWidget=None):
@@ -132,7 +132,7 @@ class QuickLoaderEditor(ParamEditor):
       except Exception as ex:
         errSettings.append(f'{editor.name}: {ex}')
     if len(errSettings) > 0:
-      warnLater('The following settings could not be loaded (shown as [setting]: [exception])\n'
+      warnings.warn('The following settings could not be loaded (shown as [setting]: [exception])\n'
            + "\n\n".join(errSettings), UserWarning)
     return startupSrc
 
@@ -147,8 +147,8 @@ class QuickLoaderEditor(ParamEditor):
     stateDict = self._parseStateDict(stateName, stateDict)
     if useDefaults:
       self.params.clearChildren()
-    if stateDict['Parameters']:
-      for editorName, shcOpts in stateDict['Parameters'].items():
+    if len(stateDict):
+      for editorName, shcOpts in stateDict.items():
         matches = [e for e in self.listModel.uniqueEditors if e.name == editorName]
         if len(matches) != 1:
           raise ValueError(f'Exactly one editor name must match "{editorName}" but {len(matches)}'
@@ -156,8 +156,7 @@ class QuickLoaderEditor(ParamEditor):
         editor = matches[0]
         for state, shcValue in shcOpts.items():
           self.addActForEditor(editor, state, shcValue)
-    return super().loadParamValues(stateName, stateDict, useDefaults=False, candidateParams=[],
-                                   **kwargs)
+    return super().loadParamValues(stateName, stateDict, useDefaults=False, candidateParams=[], **kwargs)
 
   def applyChanges(self, newName: FilePath=None, newState: dict=None):
     super().applyChanges(newName, newState)
@@ -167,8 +166,6 @@ class QuickLoaderEditor(ParamEditor):
         act.activate()
 
   def addFromLineEdit(self):
-    completer = self.addNewParamState.completer()
-    selection = completer.completionModel()
     try:
       selectionIdx = self.listModel.displayedData.index(self.addNewParamState.text())
     except ValueError:
@@ -229,6 +226,4 @@ class QuickLoaderEditor(ParamEditor):
       action.remove()
       # Wait until end of process cycle to raise error
       formattedState = self.listModel.displayFormat.format(editor=editor, stateName=paramState)
-      fns.raiseErrorLater(ValueError(
-        f'Attempted to load {formattedState} but the setting was not found.'
-      ))
+      getAppLogger(__name__).critical(f'Attempted to load {formattedState} but the setting was not found.')

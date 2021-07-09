@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import traceback
 import warnings
 
 import numpy as np
@@ -8,7 +7,6 @@ import numpy as np
 from s3a.generalutils import augmentException
 from s3a.structures import ComplexXYVertices, XYVertices
 from utilitys import NestedProcWrapper
-from utilitys.fns import warnLater
 from .processing import *
 
 __all__ = ['ImgProcWrapper', 'NestedProcWrapper']
@@ -24,9 +22,14 @@ class ImgProcWrapper(NestedProcWrapper):
         result = self.processor.run(newIo)
     except Exception as ex:
       msg = 'Exception during processor run:\n'
+      # Convert stage info into a more readable format
+      stages = [a.name for a in ex.args if isinstance(a, ProcessStage)]
+      stagePath = ' > '.join(stages)
+      # Cut these out of the current arguments
+      ex.args = (f'Stage: {stagePath}\nMessage: ' + '\n'.join(ex.args[len(stages):]),)
       augmentException(ex, msg)
-      result = ProcessIO(image=kwargs['prevCompMask'])
-      warnLater(str(ex), UserWarning)
+      warnings.warn(str(ex), UserWarning)
+      return
 
     outImg = result['image'].astype(bool)
     if outImg.ndim > 2:
