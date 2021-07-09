@@ -347,6 +347,9 @@ def symbolFromVerts(verts: ComplexXYVertices):
   else:
     boundLoc = np.nanmin(concatRegion, 0, keepdims=True)
   useVerts = concatRegion - boundLoc + 0.5
+  # pyqtgraph 0.12.2 errs on an empty symbol https://github.com/pyqtgraph/pyqtgraph/issues/1888
+  if not len(isfinite):
+    isfinite='all'
   return pg.arrayToQPath(*useVerts.T, connect=isfinite), boundLoc
 
 # Credit: https://www.pyimagesearch.com/2016/11/07/intersection-over-union-iou-for-object-detection/
