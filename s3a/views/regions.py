@@ -212,9 +212,9 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     selectedFill = pg.Color(selectedFill)
     focusedFill = pg.Color(focusedFill)
 
-    focusedFill = np.array(pg.Color(focusedFill).getRgbF())
+    focusedFill = np.array(focusedFill.getRgbF())
     focusedFill[-1] = fillAlpha
-    selectedFill = np.array(pg.Color(selectedFill).getRgbF())
+    selectedFill = np.array(selectedFill.getRgbF())
     selectedFill[-1] = fillAlpha
     # combinedFill = (focusedFill + selectedFill)/2
     lbls = self.regionData[PRJ_ENUMS.FIELD_LABEL].to_numpy()
@@ -226,7 +226,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     # fillColors[focused & selected] = combinedFill
     penColors = np.tile(pg.mkPen(color=penColor, width=penWidth), len(lbls))
     self.setPen(penColors)
-    self.setBrush([pg.Color(f*255) for f in fillColors])
+    self.setBrush([f*255 for f in fillColors])
     self.invalidate()
 
   def drop(self, ids):

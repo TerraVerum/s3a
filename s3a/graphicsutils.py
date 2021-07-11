@@ -99,7 +99,8 @@ class DropList(QtWidgets.QListWidget):
     super(DropList, self).__init__(parent)
     self.setAcceptDrops(True)
     self.setSelectionMode(self.ExtendedSelection)
-    self.delShc = QtWidgets.QShortcut(QtCore.Qt.Key.Key_Delete, self, self.deleteSelected)
+    seq = QtGui.QKeySequence(QtCore.Qt.Key.Key_Delete)
+    self.delShc = QtWidgets.QShortcut(seq, self, self.deleteSelected)
 
   def deleteSelected(self):
     selectedIdxs = self.selectionModel().selectedIndexes()

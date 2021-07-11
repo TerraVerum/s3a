@@ -84,4 +84,4 @@ def test_proj_wizard(filePlg):
   # Much is gui, just make sure mechanics work
   npw = NewProjectWizard(filePlg)
   for fileLst in npw.fileLists.values():
-    assert not fileLst
+    assert not fileLst.files
