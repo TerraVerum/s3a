@@ -43,6 +43,10 @@ class S3A(S3ABase):
       logger.registerExceptions()
       logger.registerWarnings()
       logger.addHandler(widgets.StatusBarHandler(logging.INFO, self))
+      # This logger isn't supposed to propagate, since everything is handled in the terminal on accepted events
+      # unless 'terminal' is also specified
+      if PRJ_ENUMS.LOG_TERM not in log:
+        logger.propagate = False
     self.APP_TITLE = 'FICS Semi-Supervised Semantic Annotator'
     self.CUR_COMP_LBL = 'Current Component ID:'
     self.setWindowTitle(self.APP_TITLE)

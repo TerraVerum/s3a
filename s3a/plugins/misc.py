@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import Callable, Sequence
 
 import cv2 as cv
@@ -195,7 +196,14 @@ class RandomToolsPlugin(ParamEditorPlugin):
     # loop is sync-able with the Jupyter dev console
     # noinspection PyBroadException
     try:
-      console = uw.ConsoleWidget(parent=self.win, namespace=namespace, text=text)
+      # See https://intellij-support.jetbrains.com/hc/en-us/community/posts/205819799/comments/206004059
+      # for detecting whether this is run in debug mode. PyCharm among other IDEs crash trying to spawn a jupyter console
+      # without a stack trace, so attempt to catch this situation early
+      if sys.gettrace() is None:
+        console = uw.ConsoleWidget(parent=self.win, namespace=namespace, text=text)
+      else:
+        # Raising an error goes into the except clause
+        raise RuntimeError('Cannot spawn Jupyter console in a debug environment')
     except Exception:
       # Ipy kernel can have issues for many different reasons. Always be ready to fall back to traditional console
       console = pg_console.ConsoleWidget(parent=self.win, namespace=namespace, text=text)
