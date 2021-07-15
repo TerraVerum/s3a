@@ -1,5 +1,6 @@
 import argparse
 import inspect
+import os.path
 from contextlib import ExitStack
 from pathlib import Path
 from typing import Optional, Union, Type, Dict, List, Sequence
@@ -372,8 +373,11 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
       fileFilter: {filters}
     :param kwargs: Passed to the exporter
     """
+    outFname = Path(outFname)
     self.compIo.exportByFileType(self.exportableDf, outFname, imShape=self.mainImg.image.shape,
                                  **kwargs)
+    msgPath = os.path.join(outFname.parent.name, outFname.name)
+    getAppLogger(__name__).attention(f'Exported current annotation to {msgPath}')
   @property
   def exportableDf(self):
     """

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import os
 import pydoc
 import shutil
 from contextlib import contextmanager
@@ -182,7 +183,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
   def save(self):
     self.win.saveCurAnnotation()
     self.projData.saveCfg()
-    getAppLogger(__name__).info('Saved Project')
+    getAppLogger(__name__).attention('Saved project')
 
   @fns.dynamicDocstring(ioTypes=['<Unchanged>'] + list(defaultIo.roundTripTypes))
   def updateProjectProperties(self, tableConfig:FilePath=None, annotationFormat:str=None):
@@ -772,8 +773,7 @@ class ProjectData(QtCore.QObject):
     if not name.is_absolute():
       name = self.location/name
     if not name.exists():
-      getAppLogger(__name__).attention(f'Provided annotation path does not exist: {name}\nNo action '
-                f'performed.')
+      getAppLogger(__name__).attention(f'Provided annotation path does not exist: {name}\nNo action performed.')
       return
     if name.is_dir():
       self.addAnnotationFolder(name)
@@ -946,6 +946,7 @@ class ProjectData(QtCore.QObject):
       asFolder: True
     """
     shutil.copytree(self.location, outputFolder)
+    getAppLogger(__name__).info('Exported project')
 
   def exportAnnotations(self, outputFolder:FilePath= 's3a-export',
                         annotationFormat='csv',
@@ -985,19 +986,20 @@ class ProjectData(QtCore.QObject):
 
     existingAnnFiles = [f for f in self.imgToAnnMapping.values() if f is not None]
     if combine:
+      outAnnsPath = outputFolder / f'annotations.{annotationFormat}'
       outAnn = pd.concat(map(self.compIo.importByFileType, existingAnnFiles), ignore_index=True)
       outAnn[REQD_TBL_FIELDS.INST_ID] = outAnn.index
-      self.compIo.exportByFileType(outAnn, outputFolder / f'annotations.'
-                                                          f'{annotationFormat}', **exportOpts)
+      self.compIo.exportByFileType(outAnn, outAnnsPath, **exportOpts)
     else:
-      outAnnsDir = outputFolder / 'annotations'
-      outAnnsDir.mkdir(exist_ok=True)
+      outAnnsPath = outputFolder / 'annotations'
+      outAnnsPath.mkdir(exist_ok=True)
       if self.cfg['annotation-format'] == annotationFormat:
-        shutil.copytree(self.annotationsDir, outAnnsDir, dirs_exist_ok=True)
+        shutil.copytree(self.annotationsDir, outAnnsPath, dirs_exist_ok=True)
       else:
         for annFile in existingAnnFiles:
-          self.compIo.convert(annFile, outAnnsDir/f'{annFile.stem}.{annotationFormat}',
+          self.compIo.convert(annFile, outAnnsPath/f'{annFile.stem}.{annotationFormat}',
                               importArgs=exportOpts, exportArgs=exportOpts)
+    getAppLogger(__name__).attention(f'Exported project annotations to {os.path.join(outAnnsPath.parent.name, outAnnsPath.name)}')
 
   def _maybeEmit(self, signal: QtCore.Signal, emitList: Sequence[Union[Path, Tuple[Path, Path]]]):
     if not self._suppressSignals:

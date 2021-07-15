@@ -38,11 +38,12 @@ class S3A(S3ABase):
     # customized loading functions also get called
     super().__init__(parent, **startupSettings)
     self.setWindowIcon(QtGui.QIcon(str(ICON_DIR/'s3alogo.svg')))
-    logger = getAppLogger(__name__)
+    logger = getAppLogger()
     if PRJ_ENUMS.LOG_GUI in log:
       logger.registerExceptions()
       logger.registerWarnings()
-      logger.addHandler(widgets.StatusBarHandler(logging.INFO, self))
+      logger.addHandler(widgets.FadeNotifyHandler(PRJ_ENUMS.LOG_LVL_ATTN, self, maxLevel=PRJ_ENUMS.LOG_LVL_ATTN))
+      logger.addHandler(widgets.StatusBarHandler(logging.INFO, self, maxLevel=logging.INFO))
       # This logger isn't supposed to propagate, since everything is handled in the terminal on accepted events
       # unless 'terminal' is also specified
       if PRJ_ENUMS.LOG_TERM not in log:

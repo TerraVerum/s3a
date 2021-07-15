@@ -7,6 +7,8 @@ __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'QUICK_LOAD_DIR',
            'REQD_TBL_FIELDS', 'PRJ_CONSTS', 'PRJ_ENUMS', 'PROJ_FILE_TYPE', 'PROJ_BASE_TEMPLATE',
            'IO_TEMPLATES_DIR']
 
+import utilitys.constants
+
 CODE_DIR = Path(__file__).parent
 BASE_DIR = Path.home()/'.s3a'
 
@@ -82,6 +84,7 @@ class PRJ_ENUMS:
   LOG_TERM = 'term'
   LOG_NONE = 'none'
   LOG_FILE = 'file'
+  LOG_LVL_ATTN = utilitys.constants.PrjEnums.LOG_LVL_ATTN
 
   # --------------------------
   # PROCESSING
