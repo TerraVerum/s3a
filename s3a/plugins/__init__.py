@@ -4,11 +4,12 @@ from s3a.shims import entry_points
 
 def INTERNAL_PLUGINS():
   from .misc import MainImagePlugin, CompTablePlugin, RandomToolsPlugin, EditPlugin, HelpPlugin, MultiPredictionsPlugin
+  from .usermetrics import UserMetricsPlugin
   from .file import FilePlugin
   from .tablefield import VerticesPlugin
 
   return [FilePlugin, EditPlugin, MultiPredictionsPlugin, VerticesPlugin, MainImagePlugin, CompTablePlugin,
-          RandomToolsPlugin, HelpPlugin]
+          RandomToolsPlugin, HelpPlugin, UserMetricsPlugin]
 
 @lru_cache()
 def EXTERNAL_PLUGINS():

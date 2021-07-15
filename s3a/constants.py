@@ -170,6 +170,8 @@ class _PrjConsts(PrjParamGroup):
              ' will select it')
   PROP_SHOW_TBL_ON_COMP_CREATE : PrjParam = newParam('Show popup table when creating component', False)
   PROP_SCALE_PEN_WIDTH : PrjParam = newParam('Scale pen width to image pixel size', True)
+
+  PROP_COLLECT_USR_METRICS: PrjParam = newParam('Collect user metrics', False, helpText='Collect user metrics for smarter segmentation algorithms')
   # --------------------------
   # MISC TOOLS
   # --------------------------

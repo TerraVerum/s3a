@@ -36,6 +36,9 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
   sigUpdatedFocusedComp = Signal(object)
   """pd.Series, newly focused component"""
 
+  sigDrawActionChanged = Signal(object)
+  """New draw action (PrjParam)"""
+
   def __initEditorParams__(self, shared: SharedAppSettings):
     self.compSer: pd.Series = shared.tableData.makeCompSer()
     shared.colorScheme.registerFunc(self.updateGridScheme, runOpts=RunOpts.ON_CHANGED)
@@ -115,6 +118,7 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
     self.drawAction = newActionParam
     if self.regionCopier.active:
       self.regionCopier.erase()
+    self.sigDrawActionChanged.emit(newActionParam)
 
   def maybeBuildRoi(self, ev: QtGui.QMouseEvent):
     ev.ignore()
