@@ -506,9 +506,10 @@ class ProjectData(QtCore.QObject):
 
     anns = list(self.annotationsDir.glob(f'*.{self.cfg["annotation-format"]}'))
     # Images already in the project will be ignored on add
+    # Assume new annotations here are already formatted properly
     for ann in anns:
       if ann not in self.imgToAnnMapping.values():
-        self.addAnnotation(ann)
+        self.addFormattedAnnotation(ann)
     # Convert to list to avoid "dictionary changed size on iteration" error
     for ann in list(self.imgToAnnMapping.values()):
       if ann not in anns:
@@ -613,7 +614,8 @@ class ProjectData(QtCore.QObject):
     self._maybeEmit(self.sigImagesAdded, allAddedImages)
 
     with self.suppressSignals():
-      self.addAnnotationFolder(self.annotationsDir)
+      for file in self.annotationsDir.glob(f'*.{self.cfg["annotation-format"]}'):
+        self.addFormattedAnnotation(file)
       for annotation in set(self.cfg['annotations']) - {self.annotationsDir}:
         if isinstance(annotation, dict):
           self.addAnnotation(**annotation)
@@ -857,6 +859,23 @@ class ProjectData(QtCore.QObject):
     self.compIo.exportByFileType(outAnn, outName, verifyIntegrity=False, readOnly=False)
     self.imgToAnnMapping[image] = outName
 
+  def addFormattedAnnotation(self, filename: FilePath, overwriteOld=False):
+    """
+    Adds an annotation file that is already formatted in the following ways:
+      * The right source image filename column (i.e. REQD_TBL_FIELDS.SRC_IMG_FILENAME set to the image name
+      * The file stem already matches a project image (not remote, i.e. an image in the `images` directory)
+      * The annotations correspond to exactly one image
+    """
+    image = self._getFullImgName(filename.stem, thorough=False)
+    if filename.parent != self.annotationsDir:
+      if not overwriteOld:
+        raise IOError(f'Cannot add annotation {filename} since a corresponding annotation with that name already'
+                      f' exists and `overwriteOld` was False')
+      newName = self.annotationsDir/filename.name
+      shutil.copy2(filename, newName)
+      filename = newName
+    self.imgToAnnMapping[image] = filename
+
   def _copyImgToProj(self, name: Path, data: NChanImg=None, overwrite=False):
     newName = self.imagesDir/name.name
     if newName.exists() and (not overwrite or newName == name):
@@ -876,7 +895,7 @@ class ProjectData(QtCore.QObject):
       self._maybeEmit(self.sigImagesMoved, [(name, newName)])
     return newName
 
-  def _getFullImgName(self, name: Path, thorough=True):
+  def _getFullImgName(self, name: FilePath, thorough=True):
     """
     From an absolute or relative image name, attempts to find the absolute path it corresponds
     to based on current project images. A match is located in the following order:
@@ -888,6 +907,7 @@ class ProjectData(QtCore.QObject):
       all solitary paths and images will be checked to ensure there is exactly one matching
       image for the name provided.
     """
+    name = Path(name)
     if name.is_absolute():
       return name.resolve()
 

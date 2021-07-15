@@ -71,6 +71,7 @@ def renameDfColsFromAliases(compDf: pd.DataFrame,
 
 
 class AnnotationExporter:
+  __name__ = None
   opts = {}
 
   def __init__(self, tableData: TableData=None):
@@ -133,6 +134,8 @@ class AnnotationExporter:
     return exportObj
 
 class AnnotationImporter:
+  __name__ = None
+
   imageShape: tuple = None
   tableData = TableData()
   importObj: t.Any
@@ -142,7 +145,7 @@ class AnnotationImporter:
   def __init__(self, destTableData: TableData=None):
     self.destTableData = destTableData
     # Compatibility with function analysis done in ComponentIO
-    self.__name__ = f'import{type(self).__name__.replace("Importer", "")}'
+    self.__name__ = self.__name__ or f'import{type(self).__name__.replace("Importer", "")}'
 
   def readFile(self, filename: FilePath, **kwargs):
     raise NotImplementedError
@@ -159,7 +162,8 @@ class AnnotationImporter:
   @classmethod
   def getForeignTableData(cls, ioFuncName: str, templateCfg=None):
     """Returns a TableData object responsible for importing / exporting data of this format"""
-    cfgName = IO_TEMPLATES_DIR / (ioFuncName.lower().replace('importer', '') + '.tblcfg')
+    name = ioFuncName.lower().replace('import', '').replace('export', '')
+    cfgName = IO_TEMPLATES_DIR / (name + '.tblcfg')
     if not cfgName.exists():
       return None
     out = TableData(cfgName, template=templateCfg)
@@ -201,7 +205,7 @@ class AnnotationImporter:
     if destTableData is None:
       destTableData = TableData()
     self.opts = {}
-    srcTableData = self.getForeignTableData(self.__class__.__name__, destTableData.cfg)
+    srcTableData = self.getForeignTableData(self.__name__, destTableData.cfg)
     if srcTableData is not None:
       self.tableData = srcTableData
     else:
