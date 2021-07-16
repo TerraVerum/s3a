@@ -10,7 +10,7 @@ from s3a import appInst
 from s3a.constants import REQD_TBL_FIELDS
 from s3a.generalutils import imgCornerVertices, cvImread_rgb
 from s3a.structures import ComplexXYVertices, XYVertices
-from s3a.views.tableview import CompTableView
+from s3a.views.tableview import CompTableView, PopupTableDialog
 
 
 @pytest.mark.withcomps
@@ -54,18 +54,19 @@ def test_rm_overlap(app):
   comps = app.sharedAttrs.tableData.makeCompDf(2)
   comps[REQD_TBL_FIELDS.VERTICES] = [ComplexXYVertices([v]) for v in verts]
   cd = app.compDisplay
-  app.add_focusComps(comps)
+  changeDict = app.add_focusComps(comps)
+  comps[REQD_TBL_FIELDS.INST_ID] = changeDict['ids']
   old = comps.copy()
-  cd.selectedIds = comps.index
+  cd.selectedIds = changeDict['ids']
   cd.removeSelectedCompOverlap()
   assert len(app.compMgr.compDf) == 1
 
   app.clearBoundaries()
-  app.add_focusComps(old)
-  cd.selectedIds = old.index.to_numpy()[::-1]
+  changeDict = app.add_focusComps(old)
+  cd.selectedIds = changeDict['ids'][::-1]
   cd.removeSelectedCompOverlap()
   assert len(app.compMgr.compDf) == 2
-  checkVerts = app.compMgr.compDf.loc[old.index[-1], REQD_TBL_FIELDS.VERTICES]
+  checkVerts = app.compMgr.compDf.loc[changeDict['ids'][-1], REQD_TBL_FIELDS.VERTICES]
   assert len(checkVerts[0]) > 4
 
 @pytest.mark.withcomps
@@ -129,9 +130,9 @@ def test_scale_viewbox(app, mgr):
   verts = ComplexXYVertices([XYVertices([[0, 0], [35, 35]])])
   comps = mgr.tableData.makeCompDf(1)
   comps[REQD_TBL_FIELDS.VERTICES] = [verts]
-  mgr.addComps(comps)
+  changeDict = mgr.addComps(comps)
 
-  app.compDisplay.scaleViewboxToSelectedIds(comps.index, padding=0)
+  app.compDisplay.scaleViewboxToSelectedIds(changeDict['ids'], padding=0)
   bounds = np.array(app.mainImg.getViewBox().targetRange())
   assert np.array_equal(bounds, [[0, 35], [0, 35]])
 
@@ -173,3 +174,23 @@ def copyHelper(app, mgr):
     copier.regionIds = mgr.compDf.index
     copier.inCopyMode = copyMode
   return copyHelper
+
+def test_minimal_model(sampleComps):
+  view = PopupTableDialog()
+  comp = sampleComps.iloc[[0]]
+  numCols = len(comp.columns)
+  idxs = np.arange(numCols)
+  view.setData(comp, idxs, idxs[[-1]])
+  model = view.model
+  csrole = QtCore.Qt.ItemDataRole.CheckStateRole
+  for colIdx in idxs:
+    modelIdx = model.index(0, colIdx)
+    state = model.data(modelIdx, csrole)
+    assert state == model.csMap[colIdx == idxs[-1]]
+
+  colIdx = comp.columns.get_loc(REQD_TBL_FIELDS.INST_ID)
+  modelIdx = model.index(0, colIdx)
+  model.setData(modelIdx, model.csMap[True], csrole)
+  assert colIdx in model.checkedColIdxs
+  model.setData(modelIdx, model.csMap[False], csrole)
+  assert colIdx not in model.checkedColIdxs

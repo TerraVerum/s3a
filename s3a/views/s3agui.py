@@ -269,13 +269,15 @@ class S3A(S3ABase):
     self.setStyleSheet(style)
 
   def add_focusComps(self, newComps: df, addType=PRJ_ENUMS.COMP_ADD_AS_NEW):
-    ret = super().add_focusComps(newComps, addType=addType)
-    selection = self.compDisplay.selectRowsById(newComps[REQD_TBL_FIELDS.INST_ID])
+    changeDict = super().add_focusComps(newComps, addType=addType)
+    keepIds = changeDict['ids']
+    keepIds = keepIds[keepIds >= 0]
+    selection = self.compDisplay.selectRowsById(keepIds)
     if self.isVisible() and self.compTbl.props[PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE]:
       # For some reason sometimes the actual table selection doesn't propagate in time, so
       # directly forward the selection here
       self.compTbl.setSelectedCellsAs_gui(selection)
-    return ret
+    return changeDict
 
 if __name__ == '__main__':
   import sys

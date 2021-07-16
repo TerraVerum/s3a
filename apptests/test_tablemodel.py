@@ -38,7 +38,8 @@ def test_rm_by_empty_vert_add(sampleComps, mgr):
   perm = RND.permutation(NUM_COMPS)
   deleteIdxs = np.sort(perm[:numDeletions])
   changeIdxs = np.sort(perm[numDeletions:])
-  mgr.addComps(sampleComps)
+  changes = mgr.addComps(sampleComps)
+  sampleComps[REQD_TBL_FIELDS.INST_ID] = changes['ids']
 
   # List assignment behaves poorly for list-inherited objs (like frcomplexverts) so
   # use individual assignment
@@ -59,6 +60,7 @@ def test_double_add(sampleComps, mgr):
 def test_change_comps(sampleComps, mgr):
   changeList = mgr.addComps(sampleComps, PRJ_ENUMS.COMP_ADD_AS_NEW)
   cmpChangeList(changeList, added=oldIds)
+  sampleComps[REQD_TBL_FIELDS.INST_ID] = changeList['ids']
 
   newVerts = dfTester.fillRandomVerts(compDf=sampleComps)
   changeList = mgr.addComps(sampleComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)

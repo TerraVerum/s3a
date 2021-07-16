@@ -4,7 +4,6 @@ from warnings import warn
 import numpy as np
 import pandas as pd
 import cv2 as cv
-from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 
 from s3a.generalutils import coerceDfTypes
@@ -22,8 +21,10 @@ from utilitys.misc import DeferredActionStackMixin as DASM
 Signal = QtCore.Signal
 
 class CompTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
-  # Emits 3-element dict: Deleted comp ids, changed comp ids, added comp ids
-  defaultEmitDict = {'deleted': np.array([]), 'changed': np.array([]), 'added': np.array([])}
+  # Emits 4-element dict: Deleted comp ids, changed comp ids, added comp ids, renamed indexes.
+  # Renaming is useful when the new id for an added component should be propagated. "-1" new index indicates
+  # that component was deleted (or never added in the first place, in the case of ADD_TYPE_NEW)
+  defaultEmitDict = {'deleted': np.array([]), 'changed': np.array([]), 'added': np.array([]), 'ids': np.array([])}
   sigCompsChanged = Signal(dict)
   sigFieldsChanged = Signal()
 
@@ -123,9 +124,10 @@ class ComponentMgr(CompTableModel):
     self._nextCompId = 0
 
   @DASM.undoable('Add/Modify Components')
-  def addComps(self, newCompsDf: df, addtype: PRJ_ENUMS = PRJ_ENUMS.COMP_ADD_AS_NEW, emitChange=True):
+  def addComps(self, newCompsDf: pd.DataFrame, addtype: PRJ_ENUMS = PRJ_ENUMS.COMP_ADD_AS_NEW, emitChange=True):
     toEmit = self.defaultEmitDict.copy()
     existingIds = self.compDf.index
+    newIdsForOrigComps = newCompsDf.index.to_numpy(dtype=int)
 
     if len(newCompsDf) == 0:
       # Nothing to undo
@@ -134,20 +136,28 @@ class ComponentMgr(CompTableModel):
     # Delete entries with no vertices, since they make work within the app difficult.
     # TODO: Is this the appropriate response?
     verts = newCompsDf[RTF.VERTICES]
-    dropIds = newCompsDf.index[verts.map(ComplexXYVertices.isEmpty)]
-    newCompsDf.drop(index=dropIds, inplace=True)
+    dropLocs = verts.map(ComplexXYVertices.isEmpty).to_numpy(bool)
+    dropIds = newCompsDf.index[dropLocs]
+    newCompsDf = newCompsDf.loc[~dropLocs].copy()
+    newIdsForOrigComps[dropLocs] = -1
+
+    if RTF.INST_ID in newCompsDf:
+      # IDs take precedence over native index if present
+      newCompsDf = newCompsDf.set_index(RTF.INST_ID, drop=False)
 
     if addtype == PRJ_ENUMS.COMP_ADD_AS_NEW:
       # Treat all comps as new -> set their IDs to guaranteed new values
       newIds = np.arange(self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int)
       newCompsDf[RTF.INST_ID] = newIds
-      newCompsDf.set_index(newIds, inplace=True)
       dropIds = np.array([], dtype=int)
     else:
       # Merge may have been performed with new comps (id -1) mixed in
       needsUpdatedId = newCompsDf.index == RTF.INST_ID.value
       newIds = np.arange(self._nextCompId, self._nextCompId + np.sum(needsUpdatedId), dtype=int)
       newCompsDf.loc[needsUpdatedId, RTF.INST_ID] = newIds
+
+    newCompsDf = newCompsDf.set_index(RTF.INST_ID, drop=False)
+    newIdsForOrigComps[~dropLocs] = newCompsDf.index.to_numpy(int)
 
     # Track dropped data for undo
     alteredIdxs = np.concatenate([newCompsDf.index.values, dropIds])
@@ -166,6 +176,9 @@ class ComponentMgr(CompTableModel):
     self.compDf.update(newCompsDf)
     toEmit['changed'] = changedIds
 
+    # Record mapping for exterior scopes
+    toEmit['ids'] = newIdsForOrigComps
+
     # Finally, add new comps
     compsToAdd = newCompsDf.iloc[~newChangedIdxs, :]
     # Make sure all required data is present for new rows
@@ -179,7 +192,6 @@ class ComponentMgr(CompTableModel):
 
     toEmit['added'] = newIds[~newChangedIdxs]
     self.layoutChanged.emit()
-
 
     self._nextCompId = np.max(self.compDf.index.to_numpy(), initial=-1) + 1
 
@@ -221,7 +233,7 @@ class ComponentMgr(CompTableModel):
 
     # Reset manager's component list
     self.layoutAboutToBeChanged.emit()
-    self.compDf: df = self.compDf.iloc[tfKeepIdx,:]
+    self.compDf: pd.DataFrame = self.compDf.iloc[tfKeepIdx,:]
     self.layoutChanged.emit()
 
     # Preserve type information after change
@@ -259,7 +271,7 @@ class ComponentMgr(CompTableModel):
     if mergeIds is None or len(mergeIds) < 2:
       warn(f'Less than two components are selected, so "merge" is a no-op.', UserWarning)
       return
-    mergeComps: df = self.compDf.loc[mergeIds].copy()
+    mergeComps: pd.DataFrame = self.compDf.loc[mergeIds].copy()
     if keepId is None:
       keepId = mergeIds[0]
 
@@ -272,8 +284,11 @@ class ComponentMgr(CompTableModel):
     newVerts = ComplexXYVertices.fromBwMask(mask)
     keepInfo[RTF.VERTICES] = newVerts
 
-    self.rmComps(mergeComps.index)
-    self.addComps(keepInfo.to_frame().T, PRJ_ENUMS.COMP_ADD_AS_MERGE)
+    deleted = self.rmComps(mergeComps.index, emitChange=False)['deleted']
+    toEmit = self.addComps(keepInfo.to_frame().T, PRJ_ENUMS.COMP_ADD_AS_MERGE, emitChange=False)
+    toEmit['deleted'] = np.concatenate([toEmit['deleted'], deleted])
+    self.sigCompsChanged.emit(toEmit)
+
     yield
     self.addComps(mergeComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
 
@@ -305,7 +320,7 @@ class ComponentMgr(CompTableModel):
     outDict = self.rmComps(splitComps.index)
     outDict.update(self.addComps(newComps))
     yield outDict
-    undoDict = self.rmComps(newComps.index)
+    undoDict = self.rmComps(outDict['ids'])
     undoDict.update(self.addComps(splitComps, PRJ_ENUMS.COMP_ADD_AS_MERGE))
     return undoDict
 

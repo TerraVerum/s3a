@@ -12,7 +12,7 @@ from s3a.models.tablemodel import ComponentMgr
 from s3a.shared import SharedAppSettings
 from s3a.structures import TwoDArr
 
-__all__ = ['CompTableView']
+__all__ = ['CompTableView', 'PopupTableDialog']
 
 from utilitys import ParamEditor, EditorPropsMixin, RunOpts, ParamContainer, DeferredActionStackMixin as DASM, PrjParam
 from utilitys.params.pgregistered import PgParamDelegate
@@ -95,7 +95,6 @@ class MinimalTableModel(ComponentMgr):
         self.checkedColIdxs.remove(index.column())
       return True
     yield from super().setData(index, value, role)
-
 
 class PopupTableDialog(QtWidgets.QDialog):
   def __init__(self, *args):

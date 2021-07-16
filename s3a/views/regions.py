@@ -230,7 +230,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     self.invalidate()
 
   def drop(self, ids):
-    self.regionData.drop(index=ids, inplace=True)
+    return self.regionData.drop(index=ids)
 
   def dataBounds(self, ax, frac=1.0, orthoRange=None):
     allVerts = ComplexXYVertices()

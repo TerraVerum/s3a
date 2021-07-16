@@ -421,8 +421,9 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     # Arbitrarily choose the last possible component
     changeList = np.concatenate([changeDict['added'], changeDict['changed']])
     if len(changeList) == 0:
-      return
+      return changeDict
     self.changeFocusedComp(changeList[-1])
+    return changeDict
 
   def changeFocusedComp(self, compIds: Union[int, Sequence[int]]=None):
     # TODO: More robust scenario if multiple comps are in the dataframe
