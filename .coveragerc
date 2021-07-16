@@ -7,3 +7,5 @@ omit =
 exclude_lines =
     def .*_gui
     def .*Event
+    # Delegate is only spawned on gui ops
+    SerDesDelegate
