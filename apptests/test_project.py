@@ -1,4 +1,5 @@
 import shutil
+from pathlib import Path
 
 import pytest
 
@@ -6,7 +7,8 @@ from apptests.helperclasses import CompDfTester
 from apptests.testingconsts import SAMPLE_SMALL_IMG_FNAME, SAMPLE_SMALL_IMG, SAMPLE_IMG_FNAME, TEST_FILE_DIR
 from apptests.conftest import dfTester
 from s3a import S3A
-from s3a.plugins.file import ProjectData, FilePlugin
+from s3a.constants import TBL_BASE_TEMPLATE
+from s3a.plugins.file import ProjectData
 from utilitys import fns
 
 
@@ -137,3 +139,62 @@ def test_ann_opts(prjWithSavedStuff, sampleComps):
 
   with pytest.raises(IOError):
     prjWithSavedStuff.addAnnotation(data=sampleComps, image='garbage.png')
+
+def test_filter_proj_imgs(filePlg, prjWithSavedStuff):
+  for img in prjWithSavedStuff.images:
+    filePlg.projData.addImage(img)
+  fMgr = filePlg._projImgMgr
+  fMgr.completer.setText('hubble')
+  assert '*hubble*' in fMgr.fileModel.nameFilters()
+
+def test_load_self_cfg(prjWithSavedStuff):
+  assert prjWithSavedStuff.loadCfg(prjWithSavedStuff.cfgFname) is None
+
+def test_load_independent_tbl_cfg(prjWithSavedStuff, tmpdir):
+  tblCfg = {
+    'fields': {
+      'Class': ['a', 'b', 'c']
+    }
+  }
+  outName = 'separate_tbl_cfg.tblcfg'
+  outFile = tmpdir/outName
+  fns.saveToFile(tblCfg, outFile)
+  prjCfg = {
+    'table-cfg': str(outFile)
+  }
+  prjWithSavedStuff.loadCfg(tmpdir/'new_loaded_cfg.s3aprj', prjCfg)
+
+  relativeName = prjWithSavedStuff.location/outName
+  assert prjWithSavedStuff.tableData.cfgFname == relativeName
+
+def test_none_tblinfo(tmpdir):
+  cfg = {}
+  prj = ProjectData(tmpdir/'none-table.s3aprj', cfg)
+  assert prj.tableData.cfgFname == prj.cfgFname
+  assert prj.tableData.cfg == fns.attemptFileLoad(TBL_BASE_TEMPLATE)
+
+def test_change_image_path(tmpProj):
+  tmpProj.addImage(SAMPLE_SMALL_IMG_FNAME, copyToProj=False)
+  newPath = Path('./ridiculous/but/different')/SAMPLE_SMALL_IMG_FNAME.name
+  tmpProj.changeImgPath(SAMPLE_SMALL_IMG_FNAME, newPath)
+  assert newPath in tmpProj.images
+  assert SAMPLE_SMALL_IMG_FNAME not in tmpProj.images
+
+  tmpProj.changeImgPath(newPath, None)
+  assert newPath not in tmpProj.images
+
+def test_add_image_folder(tmpProj, tmpdir):
+  for fname in SAMPLE_SMALL_IMG_FNAME, SAMPLE_IMG_FNAME:
+    shutil.copy(fname, tmpdir/fname.name)
+  tmpProj.addImageFolder(Path(tmpdir))
+  assert len(tmpProj.images) == 2
+
+
+def test_remove_image(prjWithSavedStuff):
+  imName = prjWithSavedStuff.getFullImgName(SAMPLE_IMG_FNAME.name)
+  assert imName in prjWithSavedStuff.imgToAnnMapping
+  assert imName.exists()
+
+  prjWithSavedStuff.removeImage(imName)
+  assert imName not in prjWithSavedStuff.imgToAnnMapping
+  assert not imName.exists()

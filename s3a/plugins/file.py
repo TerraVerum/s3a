@@ -56,10 +56,6 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     self._projImgMgr = ProjectImageManager()
     self._projImgMgr.sigImageSelected.connect(lambda imgFname: self.win.setMainImg(imgFname))
     self.projData.sigCfgLoaded.connect(lambda: self._projImgMgr.setRootDir(str(self.projData.imagesDir)))
-    def handleDelete(delImgs):
-      for img in delImgs:
-        self.projData.removeImage(img)
-    self._projImgMgr.sigDeleteRequested.connect(handleDelete)
 
     def onCfgLoad():
       self._updateProjLbl()
@@ -373,12 +369,12 @@ class NewProjectWizard(QtWidgets.QWizard):
     for title in f'Add Files', f'Add Folder':
       selectFolder = 'Folder' in title
       btn = QtWidgets.QPushButton(title, wizard)
-      btn.clicked.connect(partial(getFileList, wizard, flist, title, selectFolder))
+      btn.clicked.connect(partial(getFileList_gui, wizard, flist, title, selectFolder))
       fileBtnLayout.addWidget(btn)
     curLayout.addLayout(fileBtnLayout)
     return page
 
-def getFileList(wizard, _flist: DropList, _title: str, _selectFolder=False):
+def getFileList_gui(wizard, _flist: DropList, _title: str, _selectFolder=False):
   dlg = QtWidgets.QFileDialog()
   dlg.setModal(True)
   getFn = lambda *args, **kwargs: dlg.getOpenFileNames(*args, **kwargs, options=dlg.DontUseNativeDialog)[0]
@@ -434,14 +430,6 @@ class ProjectImageManager(QtWidgets.QDockWidget):
       raise ValueError(f'Invalid root directory specified: {rootDir}')
     self.fileModel.setRootPath(rootDir)
     self.fileViewer.setRootIndex(rootIdx)
-
-  def _filterThumbnails(self, text):
-    for ii in range(self.thumbnails.model().rowCount()):
-      item = self.thumbnails.item(ii)
-      if text in item.text():
-        item.setHidden(False)
-      else:
-        item.setHidden(True)
 
 class ProjectData(QtCore.QObject):
   sigCfgLoaded = QtCore.Signal()
@@ -654,13 +642,6 @@ class ProjectData(QtCore.QObject):
       cfg = {}
     parent.loadCfg(name, cfg)
 
-    tdName = Path(parent.tableData.cfgFname)
-    if tdName.resolve() != parent.cfgFname:
-      tdName = tdName.name
-      fns.saveToFile(parent.tableData.cfg, location / tdName, True)
-      parent.tableData.cfgFname = tdName
-      parent.cfg['table-cfg'] = tdName
-
     parent.saveCfg()
     return parent
 
@@ -684,16 +665,15 @@ class ProjectData(QtCore.QObject):
         offendingAnns.append(str(ann))
         self.addAnnotation(ann)
     if len(offendingAnns) > 0:
-      self.win.sharedAttrs('Encountered annotation(s) in project config, but not officially added. '
-            'Adding them now.'
-           '  Offending files:\n'
-           + ',\n'.join(offendingAnns), UserWarning)
+      getAppLogger(__name__).warning('Encountered annotation(s) in project config, but not officially added.'
+                                       ' Adding them now.  Offending files:\n'
+                                       ',\n'.join(offendingAnns), UserWarning)
     self.cfg['images'] = strImgNames
     # 'Ann' folder is always added on startup so no need to record it here. However,
     # if it is shown explicitly the user is aware.
     self.cfg['annotations'] = [self.annotationsDir.name]
     tblName = Path(self.tableData.cfgFname).absolute()
-    if tblName !=  self.cfgFname:
+    if tblName != self.cfgFname:
       if tblName.parent == self.location:
         tblName = tblName.name
       self.cfg['table-cfg'] = str(tblName)
@@ -737,7 +717,19 @@ class ProjectData(QtCore.QObject):
     # self.removeImage(name)
 
   def changeImgPath(self, oldName: Path, newName: Path=None):
+    """
+    Changes the filepath associated with a project image. Note that this doesn't do anything to the path
+    of either oldName or newName (i.e. the actual image isn't moved/copied/etc.), it just changes the association
+    within the project from the old image to the new image.
+      * If newName is None, the association is deleted. Don't do this for images inside the project directory.
+      * if newName already exists in the current project (i.e. matches an image already added to the project),
+        oldName is deleted from the project associations
+      * Otherwise, oldName is re-associated to newName.
+    """
+    oldName = Path(oldName).resolve()
     oldIdx = self.images.index(oldName)
+    if newName is not None:
+      newName = Path(newName).resolve()
     if newName is None or newName in self.images:
       del self.images[oldIdx]
     else:
@@ -748,12 +740,6 @@ class ProjectData(QtCore.QObject):
     folder = Path(folder).resolve()
     if folder in self.baseImgDirs:
       return []
-    if copyToProj:
-      newFolder = self.imagesDir/folder.name
-      shutil.copytree(folder, newFolder)
-      folder = newFolder
-      copyToProj = False
-    self.baseImgDirs.add(folder)
     # Need to keep track of actually added images instead of using all globbed images. If an added image already
     # existed in the project, it won't be added. Also, if the images are copied into the project, the paths
     # will change.
@@ -840,7 +826,7 @@ class ProjectData(QtCore.QObject):
         # Copy to avoid pandas warning
         self.addAnnotation(name, data[data[REQD_TBL_FIELDS.SRC_IMG_FILENAME] == img].copy(), img)
       return
-    image = self._getFullImgName(Path(image))
+    image = self.getFullImgName(Path(image))
     # Force provided annotations to now belong to this image
     data.loc[:, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = image.name
     # Since only one annotation file can exist per image, concatenate this with any existing files for the same image
@@ -866,7 +852,7 @@ class ProjectData(QtCore.QObject):
       * The file stem already matches a project image (not remote, i.e. an image in the `images` directory)
       * The annotations correspond to exactly one image
     """
-    image = self._getFullImgName(filename.stem, thorough=False)
+    image = self.getFullImgName(filename.stem, thorough=False)
     if filename.parent != self.annotationsDir:
       if not overwriteOld:
         raise IOError(f'Cannot add annotation {filename} since a corresponding annotation with that name already'
@@ -895,7 +881,7 @@ class ProjectData(QtCore.QObject):
       self._maybeEmit(self.sigImagesMoved, [(name, newName)])
     return newName
 
-  def _getFullImgName(self, name: FilePath, thorough=True):
+  def getFullImgName(self, name: FilePath, thorough=True):
     """
     From an absolute or relative image name, attempts to find the absolute path it corresponds
     to based on current project images. A match is located in the following order:
