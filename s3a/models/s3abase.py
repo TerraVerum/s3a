@@ -238,12 +238,15 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     yield
     undo()
 
-
   def _acceptFocused_new(self, compSer: pd.Series):
     # New, make a brand new table entry
-    newIds = self.compMgr.addComps(fns.serAsFrame(compSer))['added']
+    compAsDf = fns.serAsFrame(compSer)
+    newIds = self.compMgr.addComps(compAsDf)['added']
+    compAsDf.index = newIds
     def undo():
       self.compMgr.rmComps(newIds)
+      # Make sure the old, previously existing outline re-exists at this point
+      self.vertsPlg.updateRegionFromDf(compAsDf)
     return undo
 
   def _acceptFocused_existing(self, compSer: pd.Series):
@@ -253,7 +256,6 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     def undo():
       self.add_focusComps(oldComp, addType=PRJ_ENUMS.COMP_ADD_AS_MERGE)
     return undo
-
 
   def clearBoundaries(self):
     """Removes all components from the component table"""
@@ -290,7 +292,6 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     if plugin.dock:
       plugin.dock.setParent(self)
     return plugin
-
 
   @DASM.undoable('Change Main Image')
   def setMainImg(self, fileName: FilePath=None, imgData: NChanImg=None,
