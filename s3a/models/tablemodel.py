@@ -127,7 +127,7 @@ class ComponentMgr(CompTableModel):
   def addComps(self, newCompsDf: pd.DataFrame, addtype: PRJ_ENUMS = PRJ_ENUMS.COMP_ADD_AS_NEW, emitChange=True):
     toEmit = self.defaultEmitDict.copy()
     existingIds = self.compDf.index
-    newIdsForOrigComps = newCompsDf.index.to_numpy(dtype=int)
+    newIdsForOrigComps = newCompsDf.index.to_numpy(dtype=int, copy=True)
 
     if len(newCompsDf) == 0:
       # Nothing to undo
@@ -161,7 +161,7 @@ class ComponentMgr(CompTableModel):
 
     # Track dropped data for undo
     alteredIdxs = np.concatenate([newCompsDf.index.values, dropIds])
-    alteredDataDf = self.compDf.loc[self.compDf.index.intersection(alteredIdxs)]
+    alteredDataDf = self.compDf.loc[np.intersect1d(self.compDf.index, alteredIdxs)]
 
     # Delete entries that were updated to have no vertices
     toEmit.update(self.rmComps(dropIds, emitChange=False))
