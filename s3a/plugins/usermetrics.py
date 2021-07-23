@@ -1,6 +1,4 @@
 from inspect import isdatadescriptor
-import logging
-import sys
 import typing as t
 
 import numpy as np
@@ -17,17 +15,20 @@ from ..views.imageareas import MainImage
 import pandas as pd
 from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 from datetime import datetime, timedelta
+from pyqtgraph.Qt import isQObjectAlive
 
+METRIC_TICK_INTERVAL_S = 0.25
 
 class MetricsEventFilter(QtCore.QObject):
   """
   Functions as the event filter to grab mouse information
   """
+  sigMouseMoved = QtCore.Signal(object)
+  """dict with [x, y] pos, current action, device pixel size"""
 
   def __init__(self, parent=None, metrics=None):
     super().__init__(parent)
     self.metrics = metrics
-    self.lastTime = datetime.now()
 
   def eventFilter(self, watched:QtCore.QObject, event:QtCore.QEvent):
     event: QtGui.QMouseEvent
@@ -37,22 +38,17 @@ class MetricsEventFilter(QtCore.QObject):
             and mImg.drawAction in [CNST.DRAW_ACT_CREATE, CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM]
     ):
       return False
-    newTime = datetime.now()
-    elapsed = newTime - self.lastTime
-    self.lastTime = newTime
-    if elapsed < timedelta(seconds=0.3):
-      return False
     globalPos = QtGui.QCursor.pos()
     scenePos = mImg.mapFromGlobal(globalPos)
     itemPos = mImg.imgItem.mapFromScene(scenePos)
     # Aspect ratio is locked, so pixel width and height are the same
-    self.metrics.updateUserMetrics(action=mImg.drawAction, mouse_pos=(itemPos.x(), itemPos.y()),
-                                   pixel_size=mImg.imgItem.pixelWidth())
+    toEmit = dict(action=mImg.drawAction, mouse_pos=(itemPos.x(), itemPos.y()),
+                  pixel_size=mImg.imgItem.pixelWidth())
+    self.sigMouseMoved.emit(toEmit)
     return False
 
 class UserMetricsPlugin(ParamEditorPlugin):
   name = 'User Metrics'
-  parentMenu = None
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -61,6 +57,10 @@ class UserMetricsPlugin(ParamEditorPlugin):
     ).set_index(['time'])
     self.mainImgMouseFilter = MetricsEventFilter(metrics=self)
     self._metricsImage = None
+    self._metricsViewer = self._metricsViewerContainer = None
+    self.collectorProxies = []
+    self.registerFunc(self.showMetricsWidget)
+    self.registerFunc(self.resetMetrics)
 
   def __initEditorParams__(self, shared: SharedAppSettings):
     super().__initEditorParams__(shared=shared)
@@ -69,6 +69,7 @@ class UserMetricsPlugin(ParamEditorPlugin):
       CNST.PROP_COLLECT_USR_METRICS,
       container=self.props, asProperty=False)
     def onPropChange(param, value):
+      self.menu.menuAction().setVisible(value)
       if value:
         self.activateMetricCollection()
       else:
@@ -78,25 +79,39 @@ class UserMetricsPlugin(ParamEditorPlugin):
   def attachWinRef(self, win):
     super().attachWinRef(win)
     
-
     if self.props[CNST.PROP_COLLECT_USR_METRICS]:
       self.activateMetricCollection()
+    else:
+      self.menu.hide()
+
+    win.mainImg.imgItem.sigImageChanged.connect(self.resetMetrics)
+    
 
   def activateMetricCollection(self):
     mImg: MainImage = self.win.mainImg
     def collectViewboxMetrics(args):
       vb, vbRange, axes = args
       self.updateUserMetrics(viewbox_range=vbRange)
-    self.mouseSignalProxy = SignalProxy(mImg.getViewBox().sigRangeChanged,
-                                        slot=collectViewboxMetrics,
-                                        rateLimit=3)
+    def collectMouseMetrics(metricsDict):
+      # Receives a tuple for some reason?
+      self.updateUserMetrics(**metricsDict[0])
+    self.collectorProxies = [
+      SignalProxy(mImg.getViewBox().sigRangeChanged,
+                  slot=collectViewboxMetrics,
+                  rateLimit=int(1/METRIC_TICK_INTERVAL_S)),
+      SignalProxy(self.mainImgMouseFilter.sigMouseMoved,
+                  slot=collectMouseMetrics,
+                  rateLimit=int(1/METRIC_TICK_INTERVAL_S))
+    ]
 
     mImg.scene().installEventFilter(self.mainImgMouseFilter)
   
   def deactivateMetricCollection(self):
     mImg: MainImage = self.win.mainImg
     mImg.scene().removeEventFilter(self.mainImgMouseFilter)
-    self.mouseSignalProxy.disconnect()
+    for proxy in self.collectorProxies:
+      proxy.disconnect
+    self.collectorProxies = []
 
   def updateUserMetrics(self, **kwargs):
     """
@@ -106,9 +121,23 @@ class UserMetricsPlugin(ParamEditorPlugin):
     time = kwargs.pop('time', datetime.now())
     toInsert = pd.Series(kwargs, name=time)
     self.collectedMetrics = self.collectedMetrics.append(toInsert)
-    lowerBound = -1 if 'viewbox_range' in kwargs else -2
-    useMetrics = self.collectedMetrics.iloc[lowerBound:]
+    
+    lowerBound = 1 if 'viewbox_range' in kwargs else 2
+    self.incrementUserMetricsImage(n=lowerBound)
+
+  def incrementUserMetricsImage(self, n=1):
+    """
+    Updates the current metrics image instead of recreating it by applying the last n rows
+    of collected metrisc
+    """
+    if not len(self.collectedMetrics):
+      useMetrics = None
+    else:
+      useMetrics = self.collectedMetrics.iloc[-n:]
     self._metricsImage = self.imageFromMetrics(useMetrics)
+    if self._metricsViewer is not None and isQObjectAlive(self._metricsViewer):
+      self._metricsViewer.setImage(self._metricsImage)
+
 
   def imageFromMetrics(self, metricsToUse=None):
     actions = [CNST.DRAW_ACT_REM, CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_CREATE]
@@ -134,7 +163,6 @@ class UserMetricsPlugin(ParamEditorPlugin):
         continue
       self._populateMouseVotes(metrics, image[...,ii])
     return image
-
 
   @staticmethod
   def _populateViewboxVotes(votes: pd.Series, image: np.ndarray):
@@ -180,3 +208,24 @@ class UserMetricsPlugin(ParamEditorPlugin):
       pxWeight = maxVoteWeight*distToPxSizeRatio/pxSize
       # Expand the image by the pixel size
       image[y-pxSize:y+pxSize+1, x-pxSize:x+pxSize+1, ...] += wgt + pxWeight
+
+  def showMetricsWidget(self):
+    if (self._metricsViewer is not None
+        and isQObjectAlive(self._metricsViewer)
+        and self._metricsViewerContainer is not None
+        and isQObjectAlive(self._metricsViewerContainer)
+    ):
+      if not self._metricsViewerContainer.isVisible():
+        self._metricsViewerContainer.show()
+      return
+    viewer = ImageViewer(self._metricsImage)
+    container = viewer.widgetContainer()
+    container.show()
+    self._metricsViewer = viewer
+    # Keep reference to container to prevent garbage collection
+    self._metricsViewerContainer = container
+    container.show()
+
+  def resetMetrics(self):
+    self.collectedMetrics = self.collectedMetrics.iloc[0:0].copy()
+    self.incrementUserMetricsImage()
