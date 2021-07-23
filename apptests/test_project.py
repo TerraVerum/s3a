@@ -177,7 +177,7 @@ def test_change_image_path(tmpProj):
   tmpProj.addImage(SAMPLE_SMALL_IMG_FNAME, copyToProj=False)
   newPath = Path('./ridiculous/but/different')/SAMPLE_SMALL_IMG_FNAME.name
   tmpProj.changeImgPath(SAMPLE_SMALL_IMG_FNAME, newPath)
-  assert newPath in tmpProj.images
+  assert newPath.absolute() in tmpProj.images
   assert SAMPLE_SMALL_IMG_FNAME not in tmpProj.images
 
   tmpProj.changeImgPath(newPath, None)

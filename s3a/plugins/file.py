@@ -28,6 +28,15 @@ from ..constants import APP_STATE_DIR, PROJ_FILE_TYPE, PROJ_BASE_TEMPLATE
 from ..logger import getAppLogger
 
 
+def _absolutePath(p: Path):
+  """
+  Bug in Path.resolve means it doesn't actually return an absolute path on Windows for a non-existent path
+  While we're here, return None nicely without raising error
+  """
+  if p is None:
+    return None
+  return Path(os.path.abspath(p))
+
 class FilePlugin(CompositionMixin, ParamEditorPlugin):
   name = 'File'
   win: models.s3abase.S3A
@@ -192,7 +201,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       return
     _, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
     if (cfgFname is not None
-        and (Path(cfgFname).resolve() != self.projData.cfgFname
+        and (_absolutePath(cfgFname) != self.projData.cfgFname
           or not pg.eq(cfgDict, self.projData.cfg)
         )
     ):
@@ -579,7 +588,7 @@ class ProjectData(QtCore.QObject):
     """
     _, baseCfgDict = fns.resolveYamlDict(self.templateName)
     cfgFname, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
-    cfgFname = cfgFname.resolve()
+    cfgFname = _absolutePath(cfgFname)
     if not force and self.cfgFname == cfgFname:
       return None
 
@@ -696,7 +705,7 @@ class ProjectData(QtCore.QObject):
       if img.parent in self.baseImgDirs:
         # This image is already accounted for in the base directories
         continue
-      strImgNames.append(str(img.resolve()))
+      strImgNames.append(str(_absolutePath(img)))
 
     offendingAnns = []
     for img, ann in self.imgToAnnMapping.items():
@@ -765,10 +774,10 @@ class ProjectData(QtCore.QObject):
         oldName is deleted from the project associations
       * Otherwise, oldName is re-associated to newName.
     """
-    oldName = Path(oldName).resolve()
+    oldName = _absolutePath(oldName)
     oldIdx = self.images.index(oldName)
     if newName is not None:
-      newName = Path(newName).resolve()
+      newName = _absolutePath(newName)
     if newName is None or newName in self.images:
       del self.images[oldIdx]
     else:
@@ -776,7 +785,7 @@ class ProjectData(QtCore.QObject):
     self._maybeEmit(self.sigImagesMoved, [(oldName, newName)])
 
   def addImageFolder(self, folder: FilePath, copyToProj=True):
-    folder = Path(folder).resolve()
+    folder = _absolutePath(folder)
     if folder in self.baseImgDirs:
       return []
     # Need to keep track of actually added images instead of using all globbed images. If an added image already
@@ -806,7 +815,7 @@ class ProjectData(QtCore.QObject):
       self.addAnnotation(name)
 
   def addAnnotationFolder(self, folder: FilePath):
-    folder = Path(folder).resolve()
+    folder = _absolutePath(folder)
     for file in folder.glob('*.*'):
       self.addAnnotation(file)
 
@@ -817,7 +826,7 @@ class ProjectData(QtCore.QObject):
       self.addImage(fname, copyToProj=copyToProject)
 
   def removeImage(self, imgName: FilePath):
-    imgName = Path(imgName).resolve()
+    imgName = _absolutePath(imgName)
     if imgName not in self.images:
       return
     self.images.remove(imgName)
@@ -839,7 +848,7 @@ class ProjectData(QtCore.QObject):
     # self.addImage(imgName)
 
   def removeAnnotation(self, annName: FilePath):
-    annName = Path(annName).resolve()
+    annName = _absolutePath(annName)
     # Since no mapping exists of all annotations, loop the long way until the file is found
     for key, ann in list(self.imgToAnnMapping.items()):
       if annName == ann:
@@ -871,7 +880,8 @@ class ProjectData(QtCore.QObject):
     # Since only one annotation file can exist per image, concatenate this with any existing files for the same image
     # if needed
     if image.parent != self.imagesDir:
-      image = self._copyImgToProj(image)
+      # None result means already exists in project prior to copying, which is OK in this context
+      image = self.addImage(image) or self.imagesDir/image.name
     annForImg = self.imgToAnnMapping.get(image, None)
     oldAnns = []
     if annForImg is not None and not overwriteOld:
@@ -928,12 +938,14 @@ class ProjectData(QtCore.QObject):
       - Solitary project images are searched to see if they end with the specified relative path
       - All base image directories are checked to see if they contain this subpath
 
+    :param name: Image name
     :param thorough: If `False`, as soon as a match is found the function returns. Otherwise,
       all solitary paths and images will be checked to ensure there is exactly one matching
       image for the name provided.
     """
     name = Path(name)
     if name.is_absolute():
+      # Ok to call 'resolve', since relative paths are the ones with issues.
       return name.resolve()
 
     candidates = set()
@@ -945,7 +957,7 @@ class ProjectData(QtCore.QObject):
         candidates.add(img)
 
     for parent in self.baseImgDirs:
-      curName = (parent/name).resolve()
+      curName = parent/name
       if curName.exists():
         if not thorough:
           return curName
