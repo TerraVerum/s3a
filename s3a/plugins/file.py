@@ -119,6 +119,34 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       return ret
     win.appStateEditor.addImportExportOpts('project', self.open, handleExport, 0)
 
+    def receiveAutosave(filenameOrBool):
+      """Loads autosave configuration from file and starts autosaving"""
+      if isinstance(filenameOrBool, bool):
+        if not filenameOrBool:
+          # --autosave False means don't autosave
+          return
+        cfg = {}
+      else:
+        cfg = fns.attemptFileLoad(filenameOrBool)
+      self.startAutosave(**cfg)
+
+    def exportAutosave(savePath: Path):
+      """Stores current autosave configuration at the specified location, if autosave is running"""
+      if not self.autosaveTimer.isActive():
+        return None
+      for proc, params in self.toolsEditor.procToParamsMapping.items():
+        if proc.name == 'Start Autosave':
+          cfg = fns.paramValues(params).pop('Start Autosave', {})
+          break
+      else:
+        cfg = {}
+
+      saveName = str(savePath/'autosave.params')
+      fns.saveToFile(cfg, saveName)
+      return saveName
+
+    win.appStateEditor.addImportExportOpts('autosave', receiveAutosave, exportAutosave)
+
     def startImg(imgName: str):
       imgName = Path(imgName)
       if not imgName.is_absolute():
@@ -223,11 +251,11 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       pType: list
       limits: []
     """
+    self.autosaveTimer.stop()
     self.autosaveTimer = QtCore.QTimer()
-    self.autosaveTimer.start(int(interval * 60 * 1000))
-    self.autosaveTimer.timeout.connect(self.win.saveCurAnnotation)
-    if len(str(backupFolder)) == 0:
-      getAppLogger(__name__).attention(f'No backup folder selected, defaulting to {Path().absolute()}')
+    saveToBackup = len(str(backupFolder)) > 0
+    if not saveToBackup:
+      getAppLogger(__name__).attention(f'No backup folder selected. Will save to project without saving to backup directory.')
     backupFolder = Path(backupFolder)
     backupFolder.mkdir(exist_ok=True, parents=True)
     lastSavedDf = self.win.exportableDf.copy()
@@ -245,14 +273,25 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       baseSaveNamePlusFolder = backupFolder / f'{baseName}_{counter}.{annotationFormat}'
       counter += 1
       curDf = self.win.exportableDf
-      if not curDf.equals(lastSavedDf):
+      # A few things can go wrong during the comparison
+      # noinspection PyBroadException
+      try:
+        isEqual = curDf.equals(lastSavedDf)
+      except:
+        isEqual = False
+      if not isEqual:
         self.win.exportCurAnnotation(baseSaveNamePlusFolder)
         lastSavedDf = curDf.copy()
 
-    self.autosaveTimer.timeout.connect(save_incrementCounter)
+    if saveToBackup:
+      self.autosaveTimer.timeout.connect(save_incrementCounter)
+    self.autosaveTimer.timeout.connect(self.win.saveCurAnnotation)
+    self.autosaveTimer.start(int(interval * 60 * 1000))
+    getAppLogger(__name__).attention(f'Started autosaving')
 
   def stopAutosave(self):
     self.autosaveTimer.stop()
+    getAppLogger(__name__).attention(f'Stopped autosaving')
 
   def showProjImgs_gui(self):
     if len(self.projData.images) == 0:
@@ -934,6 +973,7 @@ class ProjectData(QtCore.QObject):
     shutil.copytree(self.location, outputFolder)
     getAppLogger(__name__).info('Exported project')
 
+  @fns.dynamicDocstring(fileTypes=defaultIo.exportTypes)
   def exportAnnotations(self, outputFolder:FilePath= 's3a-export',
                         annotationFormat='csv',
                         combine=False,
