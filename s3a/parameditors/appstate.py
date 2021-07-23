@@ -137,7 +137,7 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
       full file path
     :param exportFunc: Function to save the app data. Input is a full folder path. Expects
       the output to be a full file path of the saved file. This file is then passed to
-      'importFunc' on loading a param state
+      'importFunc' on loading a param state. If *None* is returned, the value is not stored.
     :param index: Where to place this function. In most cases, this won't matter. However, some imports must be
       performed first / last otherwise app behavior may be undefined. In these cases, passing a value for index ensures
       correct placement of the import/export pair. By default, the function is added to the end of the import/export list.
