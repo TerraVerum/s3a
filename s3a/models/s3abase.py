@@ -348,6 +348,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     self.filePlg.addAnnotation(data=self.exportableDf, image=srcImg_proj, overwriteOld=True)
     self.srcImgFname = srcImg_proj
     self.hasUnsavedChanges = False
+    getAppLogger(__name__).info('Saved current annotation')
 
   def loadNewAnnotations(self, imgFname: FilePath=None):
     if imgFname is None:
