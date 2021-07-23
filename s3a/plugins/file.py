@@ -249,7 +249,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     :param annotationFormat:
       helpText: File format for backups
       pType: list
-      limits: []
+      limits: {ioTypes}
     """
     self.autosaveTimer.stop()
     self.autosaveTimer = QtCore.QTimer()
@@ -990,7 +990,7 @@ class ProjectData(QtCore.QObject):
       file types are:
       {fileTypes}"
       pType: list
-      limits: []
+      limits: {fileTypes}
     :param combine: If `True`, all annotation files will be combined into one exported file with name `annotations.<format>`
     :param includeImages: If `True`, the corresponding image for each annotation will also be exported into an `images`
       folder
