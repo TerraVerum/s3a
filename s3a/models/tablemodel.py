@@ -52,7 +52,7 @@ class CompTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
 
   # noinspection PyMethodOverriding
   def data(self, index: QtCore.QModelIndex, role: int) -> Any:
-    outData = self.compDf.iloc[index.row(), index.column()]
+    outData = self.compDf.iat[index.row(), index.column()]
     if role == QtCore.Qt.ItemDataRole.DisplayRole:
       return str(outData)
     elif role == QtCore.Qt.ItemDataRole.EditRole:
