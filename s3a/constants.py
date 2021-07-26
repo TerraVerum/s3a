@@ -168,6 +168,10 @@ class _PrjConsts(PrjParamGroup):
     helpText='When `Boundary Only`, components are selected when clicking on their boundaries.\n'
              'When `Entire Component`, clicking anywhere within the component'
              ' will select it')
+  PROP_FIELD_INFO_ON_SEL      : PrjParam = newParam(
+    'Show field info after selection', False,
+    helpText='Whether to show field information in the main image'
+             ' every time the current selection changes')
   PROP_VERT_SORT_BHV           : PrjParam = newParam(
     'Vertices Sorting', 'X First', 'list', limits=['X First', 'Y First'],
     helpText='Whether to sort first by X or Y when sorting a vertices-like field')

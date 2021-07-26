@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Tuple, Sequence, Optional, List
+from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -8,13 +8,16 @@ import pyqtgraph as pg
 from matplotlib import cm
 from matplotlib.pyplot import colormaps
 from pandas import DataFrame as df
-from pyqtgraph.Qt import QtGui, QtCore
-from utilitys import PrjParam, RunOpts, EditorPropsMixin, fns, ParamContainer, DeferredActionStackMixin as DASM
+from pyqtgraph.Qt import QtCore, QtGui
+from s3a.constants import PRJ_CONSTS, PRJ_ENUMS
+from s3a.constants import REQD_TBL_FIELDS as RTF
+from s3a.generalutils import (minVertsCoord, stackedVertsPlusConnections,
+                              symbolFromVerts)
+from s3a.structures import (BlackWhiteImg, ComplexXYVertices, GrayImg, OneDArr,
+                            XYVertices)
+from utilitys import DeferredActionStackMixin as DASM
+from utilitys import EditorPropsMixin, ParamContainer, PrjParam, RunOpts, fns
 
-from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_CONSTS, PRJ_ENUMS
-from s3a.generalutils import stackedVertsPlusConnections, symbolFromVerts
-from s3a.structures import GrayImg, OneDArr, BlackWhiteImg
-from s3a.structures import XYVertices, ComplexXYVertices
 from . import imageareas
 from .clickables import BoundScatterPlot
 
@@ -54,19 +57,6 @@ def makeMultiRegionDf(numRows=1, idList: Sequence[int]=None, selected:Sequence[b
   if idList is not None:
     outDf.index = idList
   return outDf
-
-def _makeTxtSymbol(txt: str, fontSize: int):
-  outSymbol = QtGui.QPainterPath()
-  txtLabel = QtGui.QFont("Sans Serif", fontSize)
-  txtLabel.setStyleStrategy(QtGui.QFont.PreferBitmap | QtGui.QFont.PreferQuality)
-  outSymbol.addText(0, 0, txtLabel, txt)
-  br = outSymbol.boundingRect()
-  scale = min(1. / br.width(), 1. / br.height())
-  tr = QtGui.QTransform()
-  tr.scale(scale, scale)
-  tr.translate(-br.x() - br.width()/2., -br.y() - br.height()/2.)
-  outSymbol = tr.map(outSymbol)
-  return outSymbol
 
 class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
   __groupingName__ = PRJ_CONSTS.CLS_MULT_REG_PLT.name
@@ -352,10 +342,8 @@ class RegionCopierPlot(pg.PlotCurveItem):
     connectivity = np.concatenate(allConnctivity)
 
     try:
-      allMin = plotData.min(0)
-      closestPtIdx  = np.argmin(np.sum(np.abs(plotData - allMin), 1))
       # Guarantees that the mouse will be on the boundary closest to the top left
-      self.dataMin = plotData[closestPtIdx]
+      self.dataMin = minVertsCoord(plotData)
       # connectivity[addtnlFalseConnectivityIdxs] = False
     except ValueError:
       # When no elements are in the array

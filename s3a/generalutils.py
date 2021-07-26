@@ -21,7 +21,7 @@ from utilitys.typeoverloads import FilePath
 from .structures import TwoDArr, XYVertices, ComplexXYVertices, NChanImg, BlackWhiteImg
 
 
-def stackedVertsPlusConnections(vertList: ComplexXYVertices) -> (XYVertices, np.ndarray):
+def stackedVertsPlusConnections(vertList: ComplexXYVertices) -> Tuple[XYVertices, np.ndarray]:
   """
   Utility for concatenating all vertices within a list while recording where separations
   occurred
@@ -340,8 +340,13 @@ def orderContourPts(pts: XYVertices, ccw=True):
 #   adjusts = np.sign(adjusts)*dist
 #   return pts - adjusts
 
-def symbolFromVerts(verts: ComplexXYVertices):
-  concatRegion, isfinite = stackedVertsPlusConnections(verts)
+def symbolFromVerts(verts: Union[ComplexXYVertices, XYVertices, np.ndarray]):
+  if isinstance(verts, ComplexXYVertices):
+    concatRegion, isfinite = stackedVertsPlusConnections(verts)
+  else:
+    concatRegion, isfinite = verts, np.all(np.isfinite(verts), axis=1)
+    # Qt doesn't like subclassed ndarrays
+    concatRegion = concatRegion.view(np.ndarray)
   if not len(concatRegion):
     boundLoc = np.array([[0,0]])
   else:
@@ -375,6 +380,20 @@ def bboxIou(boxA, boxB):
   iou = interArea / float(boxAArea + boxBArea - interArea)
   # return the intersection over union value
   return iou
+
+def minVertsCoord(verts: XYVertices):
+  """
+  Finds the coordinate in the vertices list that is closest to the origin. `verts` must
+  have length > 0.
+  """
+  # Early exit condition
+  if verts.ndim < 2:
+    # One point
+    return verts
+  allMin = verts.min(0)
+  closestPtIdx  = np.argmin(np.sum(np.abs(verts - allMin), 1))
+  return verts[closestPtIdx]
+
 
 # Credit: https://stackoverflow.com/a/13624858/9463643
 class classproperty:

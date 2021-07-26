@@ -3,6 +3,7 @@ from typing import Union, Sequence
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from utilitys.processing import AtomicProcess, ProcessIO
 
 from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
 from s3a.models.tablemodel import ComponentMgr
@@ -12,6 +13,7 @@ from s3a.structures import XYVertices, ComplexXYVertices
 from s3a.views import tableview
 from s3a.views.imageareas import MainImage
 from s3a.views.regions import MultiRegionPlot
+from s3a.views.fielddelegates import FieldDisplay
 from utilitys import DeferredActionStackMixin as DASM
 from utilitys import EditorPropsMixin, RunOpts, ParamContainer
 
@@ -95,7 +97,8 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
 
   def __initEditorParams__(self, shared: SharedAppSettings):
     self.props = ParamContainer()
-    shared.generalProps.registerProp(PRJ_CONSTS.PROP_COMP_SEL_BHV,
+    shared.generalProps.registerProps([PRJ_CONSTS.PROP_COMP_SEL_BHV,
+                                      PRJ_CONSTS.PROP_FIELD_INFO_ON_SEL],
                                             container=self.props)
     self.sharedAttrs = shared
 
@@ -117,14 +120,9 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     attrs = self.sharedAttrs
 
     with attrs.colorScheme.setBaseRegisterPath(self.regionPlot.__groupingName__):
-      proc, argsParam = attrs.colorScheme.registerFunc(
-        self.updateLabelCol, runOpts=RunOpts.ON_CHANGED, returnParam=True, nest=False)
+      self.updateLabelProc = attrs.colorScheme.registerFunc(
+        self.updateLabelCol, runOpts=RunOpts.ON_CHANGED, nest=False)
       attrs.generalProps.registerProp(PRJ_CONSTS.PROP_SCALE_PEN_WIDTH, container=self.props)
-    def updateLblList():
-      fields = attrs.tableData.allFields
-      # TODO: Filter out non-viable field types
-      argsParam.child('labelCol').setLimits([f.name for f in fields])
-    attrs.tableData.sigCfgUpdated.connect(updateLblList)
 
     # Attach to UI signals
     def _maybeRedraw():
@@ -147,6 +145,22 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     mainImg.addItem(self.regionCopier)
     self.vb = mainImg.getViewBox()
     self.vb.sigRangeChanged.connect(self.recomputePenWidth)
+
+    self.fieldDisplay = FieldDisplay(mainImg)
+    self.fieldsShowing = False
+    self.fieldInfoProc = self._createFieldDisplayProc()
+    self.fieldDisplay.callDelegateFunc('hide')
+
+  def _createFieldDisplayProc(self):
+    io = ProcessIO()
+    for deleg in self.fieldDisplay.availableDelegates.values():
+      curIo = io.fromFunction(deleg.setData)
+      # Remove keys from prev io (have no default)
+      for k, v in list(curIo.items()):
+        if v is io.FROM_PREV_IO:
+          del curIo[k]
+      io.update(curIo)
+    return AtomicProcess(self.showFieldInfoById, **io)
 
   def recomputePenWidth(self):
     if not self.props[PRJ_CONSTS.PROP_SCALE_PEN_WIDTH]:
@@ -250,6 +264,11 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     self._compMgr.removeOverlapById(self.selectedIds)
 
   def _reflectFieldsChanged(self):
+    fields = self.sharedAttrs.tableData.allFields
+    # TODO: Filter out non-viable field types
+    lblParams = self.sharedAttrs.colorScheme.procToParamsMapping[self.updateLabelProc]
+    lblParams.child('labelCol').setLimits([f.name for f in fields])
+
     self.redrawComps()
 
   def _reflectTableSelectionChange(self, selectedIds: OneDArr):
@@ -257,6 +276,8 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     self.regionPlot.selectById(selectedIds)
     selectedComps = self._compMgr.compDf.loc[selectedIds]
     self.sigCompsSelected.emit(selectedComps)
+    if self.props[PRJ_CONSTS.PROP_FIELD_INFO_ON_SEL]:
+      self.fieldInfoProc(ids=selectedIds, force=True)
 
   def scaleViewboxToSelectedIds(self, selectedIds: OneDArr=None, padding: int=None):
     """
@@ -312,6 +333,39 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     #   self.selectedIds = ids
     # else: # Add to selection without clearing old selection
     #   self.selectedIds = np.concatenate([self.selectedIds, ids])
+
+  def showFieldInfoById(self, ids=None, fields=None, force=False, **kwargs):
+    """
+    :param ids:
+      ignore: True
+    :param fields:
+      pType: checklist
+      limits: []
+    :param force:
+      ignore: True
+    """
+    if not self.fieldsShowing and not force:
+      return
+    if not fields:
+      self.fieldDisplay.callDelegateFunc('clear')
+      # Sometimes artifacts are left on the scene at this point
+      self._mainImgArea.scene().update()
+      return
+
+    if ids is None:
+      ids = self.selectedIds
+    comps = self._compMgr.compDf.loc[ids]
+    self.fieldDisplay.showFieldData(comps, fields, **kwargs)
+    self.fieldsShowing = True
+
+  def toggleFieldInfoDisplay(self):
+    func = 'hide' if self.fieldsShowing else 'show'
+    self.fieldDisplay.callDelegateFunc(func)
+    self.fieldsShowing = not self.fieldsShowing
+    # May need to refresh data
+    if func == 'show' and not self.fieldDisplay.inUseDelegates:
+      # Using the proc maintains user settings
+      self.fieldInfoProc()
 
 
   def reflectSelectionBoundsMade(self, selection: Union[OneDArr, XYVertices], checkPlt: MultiRegionPlot=None,
