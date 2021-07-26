@@ -21,8 +21,12 @@ Signal = QtCore.Signal
 QISM = QtCore.QItemSelectionModel
 
 class CompSortFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
+  __groupingName__ = 'Component Table'
+
   def __initEditorParams__(self, shared: SharedAppSettings):
     self.tableData = shared.tableData
+    self.props = ParamContainer()
+    shared.generalProps.registerProp(PRJ_CONSTS.PROP_VERT_SORT_BHV, container=self.props)
     
   def __init__(self, compMgr: ComponentMgr, parent=None):
     super().__init__(parent)
@@ -30,13 +34,23 @@ class CompSortFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
     # TODO: Move code for filtering into the proxy too. It will be more efficient and
     #  easier to generalize than the current solution in CompDisplayFilter.
 
+  @property
+  def vertSortCol(self):
+    """Returns the column index to sort by based on whether the user wants x first or y"""
+    if self.props[PRJ_CONSTS.PROP_VERT_SORT_BHV] == 'X First':
+      return 0
+    return 1
+
 
   def sort(self, column: int, order: QtCore.Qt.SortOrder=...) -> None:
     # Do nothing if the user is trying to sort by vertices, since the intention of
     # sorting numpy arrays is somewhat ambiguous
+
     noSortCols = []
     for ii, col in enumerate(self.tableData.allFields):
-      if isinstance(col.value, (list, np.ndarray)):
+      if (isinstance(col.value, (list, np.ndarray))
+          and not isinstance(col.value, (XYVertices, ComplexXYVertices))
+      ):
         noSortCols.append(ii)
     if column in noSortCols:
       return
@@ -45,13 +59,34 @@ class CompSortFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
 
   def lessThan(self, left: QtCore.QModelIndex, right: QtCore.QModelIndex) -> bool:
     # First, attempt to compare the object data
-    leftObj = left.data(QtCore.Qt.ItemDataRole.EditRole)
-    rightObj = right.data(QtCore.Qt.ItemDataRole.EditRole)
+    # For some reason, data doesn't preserve the true type so get from the source model
+    model = self.sourceModel()
+    leftObj = model.data(left, QtCore.Qt.ItemDataRole.EditRole)
+    rightObj = model.data(right, QtCore.Qt.ItemDataRole.EditRole)
+
+    # Special case: Handle vertices
+    if isinstance(leftObj, (ComplexXYVertices, XYVertices)):
+      return self.lessThan_vertices(leftObj, rightObj)
+
+    # General case
     try:
       return bool(np.all(leftObj < rightObj))
     except (ValueError, TypeError):
       # If that doesn't work, default to stringified comparison
       return str(leftObj) < str(rightObj)
+
+  def lessThan_vertices(self, leftObj, rightObj):
+    """Sort implementation for vertices objects"""
+    if isinstance(leftObj, ComplexXYVertices):
+        leftObj = leftObj.stack()
+        rightObj = rightObj.stack()
+    leftObj = np.min(leftObj, axis=0)
+    rightObj = np.min(rightObj, axis=0)
+    sortCol = self.vertSortCol
+    otherCol = 1 - sortCol
+    return (leftObj[sortCol] < rightObj[sortCol]
+            or (leftObj[sortCol] == rightObj[sortCol]
+                and leftObj[otherCol] < rightObj[otherCol]))
 
 class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
   sigCompsSelected = Signal(object)

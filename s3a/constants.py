@@ -168,6 +168,9 @@ class _PrjConsts(PrjParamGroup):
     helpText='When `Boundary Only`, components are selected when clicking on their boundaries.\n'
              'When `Entire Component`, clicking anywhere within the component'
              ' will select it')
+  PROP_VERT_SORT_BHV           : PrjParam = newParam(
+    'Vertices Sorting', 'X First', 'list', limits=['X First', 'Y First'],
+    helpText='Whether to sort first by X or Y when sorting a vertices-like field')
   PROP_SHOW_TBL_ON_COMP_CREATE : PrjParam = newParam('Show popup table when creating component', False)
   PROP_SCALE_PEN_WIDTH : PrjParam = newParam('Scale pen width to image pixel size', True)
 
