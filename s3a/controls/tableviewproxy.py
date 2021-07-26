@@ -164,6 +164,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
       helpText: New column to use
       title: Labeling Column
       pType: list
+      limits: [Instance ID] # Will be updated programmatically
     """
     self.labelCol = self.sharedAttrs.tableData.fieldFromName(labelCol)
     newLblData = self.labelCol.toNumeric(self._compMgr.compDf.loc[

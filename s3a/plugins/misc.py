@@ -17,6 +17,7 @@ from s3a.logger import getAppLogger
 from s3a.models import s3abase
 from s3a.parameditors.quickloader import QuickLoaderEditor
 from s3a.plugins.base import ProcessorPlugin
+from s3a.shared import SharedAppSettings
 from utilitys import Action
 from utilitys import ParamEditorPlugin, ProcessIO, widgets as uw, ParamEditor, ParamContainer, ShortcutParameter
 
@@ -25,11 +26,47 @@ class MainImagePlugin(ParamEditorPlugin):
   name = __groupingName__ = 'Main Image'
   _makeMenuShortcuts = False
 
-  def __init__(self):
-    super().__init__()
+  def __initEditorParams__(self, shared: SharedAppSettings, **kwargs):
     self.props = ParamContainer()
+    shared.generalProps.registerProp(CNST.PROP_MIN_COMP_SZ, container=self.props)
+    self.tableData = shared.tableData
+    super().__initEditorParams__(shared=shared, **kwargs)
 
   def attachWinRef(self, win: s3abase.S3ABase):
+    self._hookupCopier(win)
+    self._hookupDrawActions(win)
+    self._hookupSelectionTools(win)
+
+    win.mainImg.addTools(self.toolsEditor)
+    # No need for a dropdown menu
+    self.dock = None
+    super().attachWinRef(win)
+
+  def _hookupDrawActions(self, win):
+    disp = win.compDisplay
+    def actHandler(verts, param):
+      # When editing, only want to select if nothing is already started
+      if (param not in [CNST.DRAW_ACT_REM, CNST.DRAW_ACT_ADD]
+          or len(self.win.vertsPlg.region.regionData) == 0
+      ):
+        # Special case: Selection with point shape should be a point
+        if self.win.mainImg.shapeCollection.curShapeParam == CNST.DRAW_SHAPE_POINT:
+          verts = verts.mean(0, keepdims=True)
+        # Make sure to check vertices plugin regions since they suppress disp's regions for focused ids
+        # Must be done first, since a no-find in disp's regions will deselect them
+        with uw.makeDummySignal(win.compTbl, 'sigSelectionChanged'):
+          # Second call should handle the true selection signal
+          disp.reflectSelectionBoundsMade(verts, self.win.vertsPlg.region)
+          disp.reflectSelectionBoundsMade(verts, clearExisting=False)
+
+        nonUniqueIds = win.compTbl.ids_rows_colsFromSelection(excludeNoEditCols=False, warnNoneSelection=False)[:,0]
+        selection = pd.unique(nonUniqueIds)
+        win.compTbl.sigSelectionChanged.emit(selection)
+    acts = [CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM, CNST.DRAW_ACT_SELECT, CNST.DRAW_ACT_PAN]
+    win.mainImg.registerDrawAction(acts, actHandler)
+    win.mainImg.registerDrawAction(CNST.DRAW_ACT_CREATE, self.createComponent)
+
+  def _hookupCopier(self, win):
     mainImg = win.mainImg
 
     copier = mainImg.regionCopier
@@ -53,44 +90,11 @@ class MainImagePlugin(ParamEditorPlugin):
     self.registerFunc(startCopy, btnOpts=CNST.TOOL_COPY_REGIONS)
     copier.sigCopyStopped.connect(win.mainImg.updateFocusedComp)
 
-
+  def _hookupSelectionTools(self, win):
     disp = win.compDisplay
-    # Wrap in process to ignore the default param
-
-    def actHandler(verts, param):
-      # When editing, only want to select if nothing is already started
-      if (param not in [CNST.DRAW_ACT_REM, CNST.DRAW_ACT_ADD]
-          or len(self.win.vertsPlg.region.regionData) == 0
-      ):
-        # Special case: Selection with point shape should be a point
-        if self.win.mainImg.shapeCollection.curShapeParam == CNST.DRAW_SHAPE_POINT:
-          verts = verts.mean(0, keepdims=True)
-        # Make sure to check vertices plugin regions since they suppress disp's regions for focused ids
-        # Must be done first, since a no-find in disp's regions will deselect them
-        with uw.makeDummySignal(win.compTbl, 'sigSelectionChanged'):
-          # Second call should handle the true selection signal
-          disp.reflectSelectionBoundsMade(verts, self.win.vertsPlg.region)
-          disp.reflectSelectionBoundsMade(verts, clearExisting=False)
-
-        nonUniqueIds = win.compTbl.ids_rows_colsFromSelection(excludeNoEditCols=False, warnNoneSelection=False)[:,0]
-        selection = pd.unique(nonUniqueIds)
-        win.compTbl.sigSelectionChanged.emit(selection)
-
-    win.sharedAttrs.generalProps.registerProp(CNST.PROP_MIN_COMP_SZ, container=self.props)
     self.registerFunc(disp.mergeSelectedComps, btnOpts=CNST.TOOL_MERGE_COMPS, ignoreKeys=['keepId'])
     self.registerFunc(disp.splitSelectedComps, btnOpts=CNST.TOOL_SPLIT_COMPS)
-    win.mainImg.registerDrawAction([CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM, CNST.DRAW_ACT_SELECT, CNST.DRAW_ACT_PAN],
-                                 actHandler)
     self.registerFunc(disp.removeSelectedCompOverlap, btnOpts=CNST.TOOL_REM_OVERLAP)
-
-    win.mainImg.registerDrawAction(CNST.DRAW_ACT_CREATE, self.createComponent)
-    win.mainImg.addTools(self.toolsEditor)
-
-    self.tableData = win.sharedAttrs.tableData
-
-    # No need for a dropdown menu
-    self.dock = None
-    super().attachWinRef(win)
 
   @property
   def image(self):
@@ -113,7 +117,7 @@ class MainImagePlugin(ParamEditorPlugin):
 class CompTablePlugin(ParamEditorPlugin):
   name = 'Component Table'
 
-  def __initEditorParams__(self, shared: s3a.shared.SharedAppSettings):
+  def __initEditorParams__(self, shared: SharedAppSettings):
     super().__initEditorParams__()
     self.dock.addEditors([shared.filter])
 
@@ -256,7 +260,7 @@ class MultiPredictionsPlugin(ProcessorPlugin):
 
   mgr: models.tablemodel.ComponentMgr
 
-  def __initEditorParams__(self, shared: s3a.shared.SharedAppSettings):
+  def __initEditorParams__(self, shared: SharedAppSettings):
     super().__initEditorParams__()
     self.procEditor = shared.multiPredClctn.createProcessorEditor(type(self), self.name + ' Processor')
     self.dock.addEditors([self.procEditor])
