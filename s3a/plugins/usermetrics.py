@@ -82,7 +82,7 @@ class UserMetricsPlugin(ParamEditorPlugin):
     if self.props[CNST.PROP_COLLECT_USR_METRICS]:
       self.activateMetricCollection()
     else:
-      self.menu.hide()
+      self.menu.menuAction().setVisible(False)
 
     win.mainImg.imgItem.sigImageChanged.connect(self.resetMetrics)
     
