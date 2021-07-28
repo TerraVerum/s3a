@@ -25,7 +25,7 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
                topTreeChild: Parameter = None):
     # TODO: Add params to choose which features are saved, etc.
     super().__init__(parent, paramList, saveDir, fileType, name, topTreeChild)
-    self.stateFuncsDf = pd.DataFrame(columns=['importFuncs', 'exportFuncs', 'required'])
+    self.stateFuncsDf = pd.DataFrame(columns=['importFunc', 'exportFunc', 'required'])
     self.loading = False
 
     self.startupSettings = {}
@@ -36,7 +36,7 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
     if paramState is None:
       # TODO: May be good in the future to be able to choose which should be saved
       legitKeys = self.stateFuncsDf.index
-      exportFuncs = self.stateFuncsDf.exportFuncs
+      exportFuncs = self.stateFuncsDf.exportFunc
       saveOnExitDir = self.saveDir/'saved_on_exit'
       saveOnExitDir.mkdir(exist_ok=True)
       rets, errs = safeCallFuncList(legitKeys, exportFuncs, [[saveOnExitDir]] * len(legitKeys))
@@ -85,7 +85,7 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
       key = nextKey()
       rets, errs = [], {}
       while key:
-        importFunc = self.stateFuncsDf.loc[key, 'importFuncs']
+        importFunc = self.stateFuncsDf.loc[key, 'importFunc']
         arg = stateDict.pop(key, None)
         curRet, curErr = safeCallFunc(key, importFunc, arg)
         rets.append(curRet)
