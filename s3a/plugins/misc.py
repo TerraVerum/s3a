@@ -189,11 +189,26 @@ class RandomToolsPlugin(ParamEditorPlugin):
 
   def _hookupFieldDisplay(self, win):
     display = win.compDisplay
-    _, param = self.registerFunc(display.fieldInfoProc, returnParam=True, runOpts=RunOpts.ON_CHANGED)
-    # self.registerFunc(display.toggleFieldInfoDisplay)
+    # This option shouldn't show in the menu dropdown, so register directly to the tools
+    _, param = self.toolsEditor.registerFunc(
+      display.fieldInfoProc,
+      name='Show Field Info',
+      returnParam=True,
+      runOpts=RunOpts.ON_CHANGED,
+    )
+
+    # There should also be an option that *does* show in the menu, which displays field info
+    # for every component
+    def showAll():
+      display.fieldInfoProc(ids=win.compMgr.compDf.index, force=True)
+    self.registerFunc(showAll, name='Show All Field Info')
+    
     fieldsParam = param.child('fields')
     def updateLims():
-      fieldsParam.setLimits([str(f) for f in win.sharedAttrs.tableData.allFields])
+      fieldsParam.setLimits(
+        [str(f) for f in win.sharedAttrs.tableData.allFields
+          if f not in display.fieldDisplay.ignoreCols]
+      )
       fieldsParam.setValue(fieldsParam.opts['limits'])
 
     win.sharedAttrs.tableData.sigCfgUpdated.connect(updateLims)
