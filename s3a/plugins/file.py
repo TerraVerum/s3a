@@ -28,7 +28,7 @@ from ..constants import APP_STATE_DIR, PROJ_FILE_TYPE, PROJ_BASE_TEMPLATE
 from ..logger import getAppLogger
 
 
-def _absolutePath(p: Path):
+def absolutePath(p: Optional[Path]):
   """
   Bug in Path.resolve means it doesn't actually return an absolute path on Windows for a non-existent path
   While we're here, return None nicely without raising error
@@ -133,6 +133,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       if isinstance(filenameOrBool, bool):
         if not filenameOrBool:
           # --autosave False means don't autosave
+          self.autosaveTimer.stop()
           return
         cfg = {}
       else:
@@ -143,12 +144,12 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       """Stores current autosave configuration at the specified location, if autosave is running"""
       if not self.autosaveTimer.isActive():
         return None
+
+      cfg = {}
       for proc, params in self.toolsEditor.procToParamsMapping.items():
         if proc.name == 'Start Autosave':
           cfg = fns.paramValues(params).pop('Start Autosave', {})
           break
-      else:
-        cfg = {}
 
       saveName = str(savePath/'autosave.params')
       fns.saveToFile(cfg, saveName)
@@ -201,7 +202,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       return
     _, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
     if (cfgFname is not None
-        and (_absolutePath(cfgFname) != self.projData.cfgFname
+        and (absolutePath(cfgFname) != self.projData.cfgFname
           or not pg.eq(cfgDict, self.projData.cfg)
         )
     ):
@@ -588,7 +589,7 @@ class ProjectData(QtCore.QObject):
     """
     _, baseCfgDict = fns.resolveYamlDict(self.templateName)
     cfgFname, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
-    cfgFname = _absolutePath(cfgFname)
+    cfgFname = absolutePath(cfgFname)
     if not force and self.cfgFname == cfgFname:
       return None
 
@@ -705,7 +706,7 @@ class ProjectData(QtCore.QObject):
       if img.parent in self.baseImgDirs:
         # This image is already accounted for in the base directories
         continue
-      strImgNames.append(str(_absolutePath(img)))
+      strImgNames.append(str(absolutePath(img)))
 
     offendingAnns = []
     for img, ann in self.imgToAnnMapping.items():
@@ -774,10 +775,10 @@ class ProjectData(QtCore.QObject):
         oldName is deleted from the project associations
       * Otherwise, oldName is re-associated to newName.
     """
-    oldName = _absolutePath(oldName)
+    oldName = absolutePath(oldName)
     oldIdx = self.images.index(oldName)
     if newName is not None:
-      newName = _absolutePath(newName)
+      newName = absolutePath(newName)
     if newName is None or newName in self.images:
       del self.images[oldIdx]
     else:
@@ -785,7 +786,7 @@ class ProjectData(QtCore.QObject):
     self._maybeEmit(self.sigImagesMoved, [(oldName, newName)])
 
   def addImageFolder(self, folder: FilePath, copyToProj=True):
-    folder = _absolutePath(folder)
+    folder = absolutePath(folder)
     if folder in self.baseImgDirs:
       return []
     # Need to keep track of actually added images instead of using all globbed images. If an added image already
@@ -815,7 +816,7 @@ class ProjectData(QtCore.QObject):
       self.addAnnotation(name)
 
   def addAnnotationFolder(self, folder: FilePath):
-    folder = _absolutePath(folder)
+    folder = absolutePath(folder)
     for file in folder.glob('*.*'):
       self.addAnnotation(file)
 
@@ -826,7 +827,7 @@ class ProjectData(QtCore.QObject):
       self.addImage(fname, copyToProj=copyToProject)
 
   def removeImage(self, imgName: FilePath):
-    imgName = _absolutePath(imgName)
+    imgName = absolutePath(imgName)
     if imgName not in self.images:
       return
     self.images.remove(imgName)
@@ -848,7 +849,7 @@ class ProjectData(QtCore.QObject):
     # self.addImage(imgName)
 
   def removeAnnotation(self, annName: FilePath):
-    annName = _absolutePath(annName)
+    annName = absolutePath(annName)
     # Since no mapping exists of all annotations, loop the long way until the file is found
     for key, ann in list(self.imgToAnnMapping.items()):
       if annName == ann:

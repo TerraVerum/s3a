@@ -1,6 +1,10 @@
 import shutil
+from io import StringIO
 from pathlib import Path
+import pickle as pkl
 
+import numpy as np
+import pandas as pd
 import pytest
 
 from apptests.helperclasses import CompDfTester
@@ -8,7 +12,7 @@ from apptests.testingconsts import SAMPLE_SMALL_IMG_FNAME, SAMPLE_SMALL_IMG, SAM
 from apptests.conftest import dfTester
 from s3a import S3A
 from s3a.constants import TBL_BASE_TEMPLATE
-from s3a.plugins.file import ProjectData
+from s3a.plugins.file import ProjectData, absolutePath
 from utilitys import fns
 
 
@@ -85,6 +89,11 @@ def test_load_startup_img(tmp_path, app, filePlg):
   oldCfg = filePlg.projData.cfgFname, filePlg.projData.cfg
   filePlg.open(tmp_path/'test-startup.s3aprj', prjcfg)
   assert app.srcImgFname == filePlg.projData.imagesDir/SAMPLE_SMALL_IMG_FNAME.name
+  for img in None, filePlg.projData.imagesDir/'my-image.jpg':
+    app.srcImgFname = img
+    app.appStateEditor.stateFuncsDf.at['project', 'exportFunc'](tmp_path/'another')
+    assert bool(img) == ('image' in filePlg.projData.startup)
+
   filePlg.open(*oldCfg)
 
 def test_load_with_plg(monkeypatch, tmp_path):
@@ -189,6 +198,23 @@ def test_add_image_folder(tmpProj, tmpdir):
   tmpProj.addImageFolder(Path(tmpdir))
   assert len(tmpProj.images) == 2
 
+def test_base_dir_logic(tmpProj: ProjectData, tmpdir):
+  tmpdir = Path(tmpdir)
+  shutil.copy(SAMPLE_SMALL_IMG_FNAME, tmpdir/SAMPLE_SMALL_IMG_FNAME.name)
+  tmpProj.baseImgDirs.add(tmpdir)
+
+  assert tmpProj.getFullImgName(SAMPLE_SMALL_IMG_FNAME.name) == tmpdir/SAMPLE_SMALL_IMG_FNAME.name
+
+  tmp2 = tmpdir/'another'
+  tmp2.mkdir()
+  shutil.copy(SAMPLE_SMALL_IMG_FNAME, tmp2)
+
+  tmpProj.baseImgDirs.add(tmp2)
+  with pytest.raises(IOError):
+    tmpProj.getFullImgName(SAMPLE_SMALL_IMG_FNAME.name)
+  
+  # Since a set is used internally, no gurantee that the order is preserved
+  assert tmpProj.getFullImgName(SAMPLE_SMALL_IMG_FNAME.name, thorough=False)
 
 def test_remove_image(prjWithSavedStuff):
   imName = prjWithSavedStuff.getFullImgName(SAMPLE_IMG_FNAME.name)
@@ -198,3 +224,78 @@ def test_remove_image(prjWithSavedStuff):
   prjWithSavedStuff.removeImage(imName)
   assert imName not in prjWithSavedStuff.imgToAnnMapping
   assert not imName.exists()
+
+  nonexistImg = 'garbage.png'
+  prjWithSavedStuff.removeImage(nonexistImg)
+
+def test_pkl(prjWithSavedStuff):
+  pklBytes = pkl.dumps(prjWithSavedStuff)
+
+  # Test that the pickle is valid
+  loaded = pkl.loads(pklBytes)
+
+  assert loaded.cfg == prjWithSavedStuff.cfg
+
+def test_add_fmt_annotation(prjWithSavedStuff: ProjectData, sampleComps: pd.DataFrame, tmpdir):
+  imname = SAMPLE_SMALL_IMG_FNAME.name
+  fpath = Path(tmpdir/imname + '.csv')
+  prjWithSavedStuff.compIo.exportCsv(sampleComps, fpath)
+  with pytest.raises(IOError):
+    prjWithSavedStuff.addFormattedAnnotation(fpath)
+  
+  prjWithSavedStuff.addFormattedAnnotation(fpath, True)
+  fullImgName = prjWithSavedStuff.getFullImgName(imname)
+  annName = prjWithSavedStuff.imgToAnnMapping[fullImgName]
+  cmpData = prjWithSavedStuff.compIo.importByFileType(annName)
+  assert np.array_equal(cmpData.values, sampleComps.values)
+
+def test_abspath_none():
+  assert absolutePath(None) is None
+
+def test_load_autosave(app, filePlg, tmp_path):
+  state = app.appStateEditor
+
+  fns.saveToFile({'interval': 10}, tmp_path/'autosave.param')
+
+  importer = state.stateFuncsDf.at['autosave', 'importFunc']
+  importer(True)
+  assert filePlg.autosaveTimer.isActive()
+
+  importer(tmp_path/'autosave.param')
+  assert filePlg.autosaveTimer.interval() == 1000*60*10
+
+  importer(False)
+  assert not filePlg.autosaveTimer.isActive()
+
+def test_export_autosave(app, filePlg, tmp_path):
+  state = app.appStateEditor
+
+  fns.saveToFile({'interval': 10}, tmp_path/'autosave.param')
+
+  exporter = state.stateFuncsDf.at['autosave', 'exportFunc']
+  for proc, params in filePlg.toolsEditor.procToParamsMapping.items():
+    if proc.name == 'Start Autosave':
+      break
+  else:
+    raise ValueError('Autosave proc not found')
+
+  params['interval'] = 10
+  params['backupFolder'] = str(tmp_path)
+  proc()
+
+  outpath = tmp_path/'autosave_export'
+  outpath.mkdir()
+  exporter(outpath)
+  assert list(outpath.iterdir())
+
+  cfg = fns.attemptFileLoad(next(outpath.iterdir()))
+  assert 'interval' in cfg and cfg['interval'] == 10
+  assert 'backupFolder' in cfg and cfg['backupFolder'] == str(tmp_path)
+
+  filePlg.stopAutosave()
+  for file in outpath.iterdir():
+    file.unlink()
+  assert not exporter(outpath)
+  assert not list(outpath.iterdir())
+
+
