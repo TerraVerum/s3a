@@ -139,11 +139,7 @@ def crop_to_local_area(image: NChanImg,
   """
   :param reference:
     pType: list
-    limits:
-      - image
-      - component
-      - viewbox
-      - roi
+    limits: ['image', 'component', 'viewbox', 'roi']
   :param maxSize: Maximum side length for a local portion of the image. If the local area exceeds this, it will be
     rescaled to match this size. It can be beneficial for algorithms that take a long time to run, and quality of
     segmentation can be retained. Set to <= 0 to have no maximum size
@@ -288,10 +284,7 @@ def morph_op(image: NChanImg, radius=1, op: str='', shape='rectangle'):
   :param shape:
     helpText: Structuring element shape
     pType: list
-    limits:
-      - rectangle
-      - disk
-      - diamond
+    limits: ['rectangle', 'disk', 'diamond']
   :param op:
     pType: list
     limits: {morphOps}

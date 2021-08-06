@@ -94,9 +94,7 @@ def _cv_template_match(component: pd.Series, image: np.ndarray, viewbox: np.ndar
   :param area:
     helpText: Where to apply the new components
     pType: list
-    limits:
-      - image
-      - viewbox
+    limits: ['image', 'viewbox']
   :param refOverlapThresh:
     helpText: "How much overlap can exist between the found bounding box and reference box. This helps
     prevent detecting the original as a new component"
