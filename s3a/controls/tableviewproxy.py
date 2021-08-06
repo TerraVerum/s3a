@@ -3,6 +3,7 @@ from typing import Union, Sequence
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from pyqtgraph.parametertree import Parameter
 from utilitys.processing import AtomicProcess, ProcessIO
 
 from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
@@ -138,7 +139,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     self.regionCopier.sigCopyStopped.connect(lambda *args: self.finishRegionCopier())
 
     compMgr.sigCompsChanged.connect(self.redrawComps)
-    compMgr.sigFieldsChanged.connect(lambda: self._reflectFieldsChanged())
+    compMgr.sigFieldsChanged.connect(self._reflectFieldsChanged)
     compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
 
     mainImg.addItem(self.regionPlot)
@@ -150,16 +151,17 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     self.fieldsShowing = False
     self.fieldInfoProc = self._createFieldDisplayProc()
     self.fieldDisplay.callDelegateFunc('hide')
+    # Populate initial field options
+    self._reflectFieldsChanged()
 
   def _createFieldDisplayProc(self):
-    io = ProcessIO()
+    io = {}
     for deleg in self.fieldDisplay.availableDelegates.values():
-      curIo = io.fromFunction(deleg.setData)
+      delegIo = ProcessIO.fromFunction(deleg.setData)
+      useIo = {k: v.saveState() for k, v in delegIo.params.items()}
+      useIo.update({k: v for k, v in delegIo.extras.items() if v is not ProcessIO.FROM_PREV_IO})
       # Remove keys from prev io (have no default)
-      for k, v in list(curIo.items()):
-        if v is io.FROM_PREV_IO:
-          del curIo[k]
-      io.update(curIo)
+      io.update(useIo)
     return AtomicProcess(self.showFieldInfoById, **io)
 
   def recomputePenWidth(self):
