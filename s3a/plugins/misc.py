@@ -199,9 +199,12 @@ class RandomToolsPlugin(ParamEditorPlugin):
 
     # There should also be an option that *does* show in the menu, which displays field info
     # for every component
-    def showAll():
-      display.fieldInfoProc(ids=win.compMgr.compDf.index, force=True)
-    self.registerFunc(showAll, name='Show All Field Info')
+    def toggleAll():
+      if display.fieldDisplay.inUseDelegates:
+        display.fieldDisplay.callDelegateFunc('clear')
+      else:
+        display.fieldInfoProc(ids=win.compMgr.compDf.index, force=True)
+    self.registerFunc(toggleAll, name='Toggle All Field Info')
     
     fieldsParam = param.child('fields')
     def updateLims():
