@@ -104,7 +104,7 @@ class TextFieldDelegate(SceneItemContainer, FieldDisplayDelegate):
     bgSymbols = [self.makeBgSymbol(symb) for symb in symbols_scales[:,0]]
     multiplier = fontSize/12
     sizes = multiplier/symbols_scales[:,1]
-    
+
     self.scatter.setData(*positions.T, pen=textColor, brush=textColor,
                          symbol=symbols_scales[:,0], size=sizes)
     self.bgScatter.setData(*positions.T, symbol=bgSymbols, size=sizes*1.1,
@@ -201,12 +201,11 @@ class XYVerticesDelegate(SceneItemContainer, FieldDisplayDelegate):
       calloutPositions = np.row_stack(callouts)
       pen = pg.mkPen(color=spotColor, width=calloutWidth)
       self.calloutCurve.setData(*calloutPositions.T, pen=pen, connect='pairs')
-  
-  def _calloutLine(self, compVerts, point):
-    """Creates a callout line from the point to the nearest comp vertex"""
-    distances = np.sum(np.abs(compVerts - point), axis=1)
-    minIdx = np.argmin(distances)
-    return np.row_stack([compVerts[minIdx], point])
+
+  @staticmethod
+  def _calloutLine(compVerts, point):
+    """Creates a callout line from the point to the comp vertex closest to the origin"""
+    return np.row_stack([minVertsCoord(compVerts), point])
   
 class ComplexXYVerticesDelegate(SceneItemContainer, FieldDisplayDelegate):
   LBL_PARAM = PrjParam('complex delegate label')
