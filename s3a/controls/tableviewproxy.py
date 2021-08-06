@@ -201,31 +201,28 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     # Update and add changed/new components
     # TODO: Find out why this isn't working. For now, just reset the whole comp list
     #  each time components are changed, since the overhead isn't too terrible.
-    # changedIds = np.concatenate((idLists['added'], idLists['changed']))
-    # self._regionPlots[changedIds, regCols] = compDf.loc[changedIds, compCols]
-
-    # Hide all ids and table rows, since they will be reshown as needed after display filtering
-    for rowIdx in range(len(compDf)):
-      self._compTbl.hideRow(rowIdx)
 
     # Component deleted: Nothing to do, since only displayed IDs will remain in the
     # region manager anyway
-    #idsToRm = idLists['deleted']
-
+    previouslyVisible = self.displayedIds
     # Update filter list: hide/unhide ids and verts as needed.
     self._updateDisplayedIds()
-    # Remove all IDs that aren't displayed
-    # FIXME: This isn't working correctly at the moment
-    # self._regionPlots.drop(np.setdiff1d(self._regionPlots.data.index, self._displayedIds))
     self.regionPlot.resetRegionList(compDf.loc[self.displayedIds], lblField=self.labelCol)
     # noinspection PyTypeChecker
     # self._reflectTableSelectionChange(np.intersect1d(self.displayedIds, self.selectedIds))
 
     tblIdsToShow = np.isin(compDf.index, self.displayedIds).nonzero()[0]
+    # Don't go through the effort of showing an already visible row
+    tblIdsToShow = np.setdiff1d(tblIdsToShow, previouslyVisible)
     model = self._compTbl.model()
     for rowId in tblIdsToShow:
       xpondingIdx = model.mapFromSource(self._compMgr.index(rowId,0)).row()
       self._compTbl.showRow(xpondingIdx)
+    
+    # Hide no longer visible components
+    for rowId in np.setdiff1d(previouslyVisible, self.displayedIds):
+      xpondingIdx = model.mapFromSource(self._compMgr.index(rowId,0)).row()
+      self._compTbl.hideRow(xpondingIdx)
 
   @DASM.undoable('Split Components', asGroup=True)
   def splitSelectedComps(self):
