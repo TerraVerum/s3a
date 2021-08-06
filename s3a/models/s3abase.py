@@ -242,7 +242,8 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     # New, make a brand new table entry
     compAsDf = fns.serAsFrame(compSer)
     newIds = self.compMgr.addComps(compAsDf)['added']
-    compAsDf.index = newIds
+    compAsDf[REQD_TBL_FIELDS.INST_ID] = newIds
+    compAsDf = compAsDf.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
     def undo():
       self.compMgr.rmComps(newIds)
       # Make sure the old, previously existing outline re-exists at this point
@@ -255,6 +256,8 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     self.compMgr.addComps(modifiedDf, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)
     def undo():
       self.add_focusComps(oldComp, addType=PRJ_ENUMS.COMP_ADD_AS_MERGE)
+      self.compDisplay.regionPlot.focusById(modifiedDf.index)
+      self.mainImg.updateFocusedComp(compSer)
     return undo
 
   def clearBoundaries(self):
