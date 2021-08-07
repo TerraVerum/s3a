@@ -12,7 +12,7 @@ import pyqtgraph as pg
 
 import s3a
 from s3a import PRJ_CONSTS as CNST, XYVertices, REQD_TBL_FIELDS as RTF, ComplexXYVertices
-from s3a.processing.algorithms.imageproc import procCache
+from s3a.processing.algorithms import imageproc
 from s3a.structures import BlackWhiteImg
 from s3a.views.regions import MultiRegionPlot, makeMultiRegionDf
 from utilitys import PrjParam, DeferredActionStackMixin as DASM, ProcessStage, ProcessIO, RunOpts, fns
@@ -45,6 +45,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     self.stageInfoImage = pg.ImageItem()
     self.stageInfoImage.hide()
     self._displayedStage = ''
+
+    self.oldProcCache = None
+    """Holds the last result from a region run so undoables reset the proc cache"""
 
     _, self._overlayParam = self.procEditor.registerFunc(self.overlayStageInfo, parentParam=self.procEditor._metaParamGrp,
                                             returnParam=True, runOpts=RunOpts.ON_CHANGED)
@@ -90,7 +93,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     past edits into account when performing their operations. Clearing that history
     will erase algorithm knowledge of past edits.
     """
-    procCache['mask'].fill(0)
+    imageproc.procCache['mask'] = np.zeros_like(imageproc.procCache['mask'])
 
   def updateFocusedComp(self, newComp:pd.Series = None):
     self.updateFocusedPen_Fill()
@@ -141,9 +144,8 @@ class VerticesPlugin(DASM, TableFieldPlugin):
       compMask = compGrayscale > 0
     # TODO: When multiple classes can be represented within focused image, this is where
     #  change will have to occur
-    # Clip viewrange to min view axis area instead of max, which will happen internally
-    # otherwise
     viewbox = self.mainImg.viewboxCoords()
+    self.oldProcCache = imageproc.procCache.copy()
     newGrayscale = self.curProcessor.run(
       image=img,
       prevCompMask=compMask,
@@ -244,14 +246,18 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     if compId is None:
       compId = data.index[0] if len(data) else -1
     df = makeMultiRegionDf(vertices=[ComplexXYVertices.fromBwMask(mask)], idList=[compId])
-    self.updateRegion_undoable(df, offset=offset)
+    self.updateRegion_undoable(df, offset=offset, oldProcCache=self.oldProcCache)
 
 
   @DASM.undoable('Modify Focused Component')
-  def updateRegion_undoable(self, newData: pd.DataFrame=None, offset: XYVertices=None):
+  def updateRegion_undoable(self, newData: pd.DataFrame=None, offset: XYVertices=None, oldProcCache=None):
+    # Preserve cache state in argument list so it can be restored on undo. Otherwise, a separate undo buffer must
+    # be maintained just to keep the cache up to date
     oldData = self.region.regionData.copy()
     self.updateRegionFromDf(newData, offset=offset)
     yield
+    if oldProcCache is not None:
+      imageproc.procCache = oldProcCache
     self.updateRegionFromDf(oldData)
 
   def acceptChanges(self, overrideVerts: ComplexXYVertices=None):

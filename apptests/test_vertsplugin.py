@@ -6,7 +6,7 @@ from apptests.testingconsts import SAMPLE_SMALL_IMG
 from s3a import XYVertices, REQD_TBL_FIELDS, ComplexXYVertices
 from s3a.generalutils import imgCornerVertices
 from s3a.plugins.file import NewProjectWizard
-from s3a.processing.algorithms.imageproc import procCache
+from s3a.processing.algorithms import imageproc
 
 @pytest.mark.withcomps
 @pytest.mark.smallimage
@@ -16,10 +16,10 @@ def test_registered_verts_funcs(vertsPlugin, app):
   editor = vertsPlugin.procEditor
   editor.changeActiveProcessor('Basic Shapes')
   vertsPlugin.run()
-  assert procCache['mask'].sum()
+  assert imageproc.procCache['mask'].sum()
 
   vertsPlugin.clearProcessorHistory()
-  assert procCache['mask'].sum() == 0
+  assert imageproc.procCache['mask'].sum() == 0
 
   vertsPlugin.fillRegionMask()
   img = togray()

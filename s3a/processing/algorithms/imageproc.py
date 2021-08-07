@@ -79,10 +79,10 @@ def format_vertices(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
                     useFullBoundary=True,
                     keepVertHistory=True):
 
-  if firstRun or not keepVertHistory:
+  if firstRun or not keepVertHistory or not np.any(procCache['mask']):
     _historyMask = np.zeros(image.shape[:2], 'uint8')
   else:
-    _historyMask = procCache['mask']
+    _historyMask = procCache['mask'].copy()
 
   asForeground = True
   # 0 = unspecified, 1 = background, 2 = foreground
