@@ -1,15 +1,15 @@
-from typing import Callable, Dict
+import math
+from typing import Callable, Dict, Optional
 
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 from skimage.draw import draw
 
-from s3a.generalutils import orderContourPts, symbolFromVerts
-from utilitys import PrjParam
-
 from s3a.constants import PRJ_CONSTS
+from s3a.generalutils import orderContourPts, symbolFromVerts
 from s3a.structures import XYVertices, ComplexXYVertices
+from utilitys import PrjParam
 
 __all__ = ['RectROI', 'PlotDataROI', 'PolygonROI', 'PointROI', 'SHAPE_ROI_MAPPING']
 from s3a.views.clickables import BoundScatterPlot
@@ -165,6 +165,83 @@ class EllipseROI(PlotDataROI):
     # Reorder to ensure no criss-crossing when these vertices are plotted
     perim = orderContourPts(np.column_stack(perim[::-1]))
     return perim.view(XYVertices)
+
+class ROIManipulator(pg.RectROI):
+  """
+  Pyqtgraph roi assigned to a PlotDataROI to allow various manipulations such as scaling,
+  rotating, translating, etc. After the manipulation is complete, the wrapped PlotDataROI is
+  transformed accordingly.
+  """
+  roiVerts: Optional[np.ndarray] = None
+  _connectivity: Optional[np.ndarray] = None
+
+  def __init__(self, **kwargs):
+    self.handleSize = 10
+    super().__init__([0, 0], [0, 0], handlePen=pg.mkPen('r'),
+                     hoverPen=pg.mkPen('y', width=5), **kwargs)
+    self.addRotateHandle([1, 0], [0.5, 0.5])
+    # For some reason, handle pens are explicitly set to 0 width. Fix that here
+    for handle in self.getHandles():
+      handle.pen.setWidth(3)
+      handle.radius = 10
+      handle.buildPath()
+
+  def paint(self, p, opt, widget):
+    super().paint(p, opt, widget)
+    if self.roiVerts is None or not len(self.roiVerts):
+      return
+    pts = self.roiVerts.copy()
+    # Draw twice, once with white and once with black pen. This ensures the outline
+    # is always visible regardless of background color
+    path = pg.arrayToQPath(*(pts/pts.max(0)).T, connect=self._connectivity)
+    for color, width in zip('kw', (2, 1)):
+      width = max(width, int(width/self.pixelLength(None)))
+      p.setPen(pg.mkPen(color, width=width))
+      p.drawPath(path)
+
+  def setBaseData(self, data: XYVertices, connectivity: np.ndarray, show=True):
+    """
+    Entry point for transformations to a plot data roi. When meth:`RoiManpulator.finish` is
+    called, whatever translations, scaling, and rotating done to this ROI will be applied
+    to `dataRoi`.
+    """
+    self.roiVerts = data.view(np.ndarray)
+    self.roiVerts = self.roiVerts - data.min(0)
+    # 0 offset for easier calculations
+    self.setSize(self.roiVerts.max(0))
+    self._connectivity = connectivity
+    if show:
+      self.show()
+
+  def getTransformedPoints(self, data=None, rot=None, pos=None, scale=None, dtype=int, hide=False):
+    """
+    Applies rotation/translation/scaling to set of ROI points based on current
+    pg.ROI properties. Rotation, position, and/or scale can optionally be overridden
+    """
+    state = self.getState()
+
+    if data is None:
+      data = self.roiVerts
+
+    if rot is None:
+      rot = state['angle']
+      rot = np.deg2rad(rot)
+    if pos is None:
+      pos = np.array(state['pos']).reshape(1, 2)
+    if scale is None:
+      scale = np.array(state['size']/self.roiVerts.max(0)).reshape(2, 1)
+
+    xformMat = np.array([
+    [math.cos(rot), -math.sin(rot)],
+    [math.sin(rot),  math.cos(rot)],
+    ])
+    useVerts = data.view(np.ndarray).T
+    #          rotate                   scale   translate
+    newVerts = (xformMat @ (useVerts * scale)).T + pos
+    if hide:
+      self.hide()
+    return newVerts.astype(dtype)
+
 
 SHAPE_ROI_MAPPING: Dict[PrjParam, Callable[[], PlotDataROI]] = {
   PRJ_CONSTS.DRAW_SHAPE_RECT: RectROI,

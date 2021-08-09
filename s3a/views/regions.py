@@ -21,7 +21,9 @@ from utilitys import EditorPropsMixin, ParamContainer, PrjParam, RunOpts, fns
 from . import imageareas
 from .clickables import BoundScatterPlot
 
-__all__ = ['MultiRegionPlot', 'VertexDefinedImg', 'RegionCopierPlot']
+__all__ = ['MultiRegionPlot', 'VertexDefinedImg', 'RegionMoverPlot']
+
+from .rois import ROIManipulator
 
 from ..compio import defaultIo
 from ..shared import SharedAppSettings
@@ -298,63 +300,55 @@ class VertexDefinedImg(DASM, EditorPropsMixin, pg.ImageItem):
       lut.append(clr.getRgb())
     return np.array(lut, dtype='uint8')
 
-class RegionCopierPlot(pg.PlotCurveItem):
-  sigCopyStarted = QtCore.Signal()
-  sigCopyStopped = QtCore.Signal()
+class RegionMoverPlot(QtCore.QObject):
+  sigMoveStarted = QtCore.Signal()
+  sigMoveStopped = QtCore.Signal()
 
   def __init__(self, mainImg: imageareas.MainImage=None, parent=None):
     super().__init__(parent)
     self.active = False
     self.inCopyMode = True
-    self.baseData = XYVertices()
-    self.regionIds = np.ndarray([])
+    self.baseData = pd.DataFrame()
     self.dataMin = XYVertices()
-    self.offset = XYVertices([[0,0]])
 
-    self.setShadowPen(color='k', width=2*self.opts['pen'].width())
-    """
-    Instead of a customizeable color palette for the copy shape, it is easier to
-    have a black outline and white inline color for the shape plot which ensures
-    all vertices are visible on any background. However, it is not easy to create
-    a multicolored pen in pyqt -- the much simpler solution is to simply create
-    a shadow pen, where one has a boundary twice as thick as the other.
-    """
+    self.manipRoi = ROIManipulator()
+    self.manipRoi.hide()
 
     self._connectivity = np.ndarray([], bool)
-    mainImg.sigMouseMoved.connect(self.mainMouseMoved)
 
-  def mainMouseMoved(self, xyPos: np.ndarray):
-    if not self.active: return
-    newData = self.baseData + xyPos
-    self.setData(newData[:,0], newData[:,1], connect=self._connectivity)
-    self.offset = xyPos - self.dataMin
+  def transformedData(self, verts: ComplexXYVertices):
+    out = ComplexXYVertices(hierarchy=verts.hierarchy)
+    for sublist in verts:
+      out.append(self.manipRoi.getTransformedPoints(data=sublist))
+    return out
 
-  def resetBaseData(self, baseData: List[ComplexXYVertices], regionIds: OneDArr):
+  def resetBaseData(self, baseData: pd.DataFrame):
     allData = ComplexXYVertices()
     allConnctivity = []
-    for verts in baseData: # each list element represents one component
+    for verts in baseData[RTF.VERTICES]: # each list element represents one component
       plotData, connectivity = stackedVertsPlusConnections(verts)
       allData.append(plotData)
       allConnctivity.append(connectivity)
       if len(connectivity) > 0:
         connectivity[-1] = False
     plotData = allData.stack()
-    connectivity = np.concatenate(allConnctivity)
+    if len(allConnctivity):
+      connectivity = np.concatenate(allConnctivity)
 
-    try:
-      # Guarantees that the mouse will be on the boundary closest to the top left
-      self.dataMin = minVertsCoord(plotData)
-      # connectivity[addtnlFalseConnectivityIdxs] = False
-    except ValueError:
-      # When no elements are in the array
-      self.dataMin = XYVertices([[0,0]])
-    baseData: XYVertices = plotData - self.dataMin
+    self.manipRoi.setAngle(0)
+
     self.baseData = baseData
-    self._connectivity = connectivity
-    self.setData(plotData[:,0], plotData[:,1], connect=connectivity)
 
-    self.regionIds = regionIds
+    if len(plotData):
+      pos = self.dataMin = plotData.min(0)
+      baseData = plotData
+      self.manipRoi.setPos(pos)
+      self.manipRoi.setBaseData(baseData, connectivity)
+    else:
+      self.dataMin = np.array([0, 0])
+      self.manipRoi.hide()
 
   def erase(self):
-    self.resetBaseData([ComplexXYVertices()], np.array([]))
+    self.resetBaseData(pd.DataFrame(columns=[RTF.VERTICES]))
     self.active = False
+    self.manipRoi.hide()

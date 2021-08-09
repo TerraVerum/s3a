@@ -70,7 +70,7 @@ class MainImagePlugin(ParamEditorPlugin):
   def _hookupCopier(self, win):
     mainImg = win.mainImg
 
-    copier = mainImg.regionCopier
+    copier = mainImg.regionMover
     def startCopy():
       """
       Copies the selected components. They can be pasted by <b>double-clicking</b>
@@ -78,18 +78,18 @@ class MainImagePlugin(ParamEditorPlugin):
       the current draw action.
       """
       copier.inCopyMode = True
-      copier.sigCopyStarted.emit()
+      copier.sigMoveStarted.emit()
     def startMove():
       """
       Moves the selected components. They can be pasted by <b>double-clicking</b>
       on the destination location.
       """
       copier.inCopyMode = False
-      copier.sigCopyStarted.emit()
+      copier.sigMoveStarted.emit()
 
     self.registerFunc(startMove, btnOpts=CNST.TOOL_MOVE_REGIONS)
     self.registerFunc(startCopy, btnOpts=CNST.TOOL_COPY_REGIONS)
-    copier.sigCopyStopped.connect(win.mainImg.updateFocusedComp)
+    copier.sigMoveStopped.connect(win.mainImg.updateFocusedComp)
 
   def _hookupSelectionTools(self, win):
     disp = win.compDisplay

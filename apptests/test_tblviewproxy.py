@@ -116,7 +116,7 @@ def test_move_comps(app, mgr, copyHelper):
   copyHelper(copyMode=False)
   oldComps = mgr.compDf.copy()
   app.compDisplay.finishRegionCopier(True)
-  compareCopiedCompDfs(oldComps, mgr.compDf)
+  compareCopiedCompDfs(oldComps, mgr.compDf, app.compDisplay.regionMover.dataMin)
 
 @pytest.mark.withcomps
 def test_copy_comps(app, mgr, copyHelper):
@@ -124,7 +124,8 @@ def test_copy_comps(app, mgr, copyHelper):
   oldComps = mgr.compDf.copy()
   app.compDisplay.finishRegionCopier(True)
   assert len(mgr.compDf) == 2*len(oldComps)
-  compareCopiedCompDfs(oldComps, mgr.compDf, newStartIdx=len(oldComps))
+  compareCopiedCompDfs(oldComps, mgr.compDf,
+                       app.compDisplay.regionMover.dataMin, newStartIdx=len(oldComps))
 
 def test_scale_viewbox(app, mgr):
   verts = ComplexXYVertices([XYVertices([[0, 0], [35, 35]])])
@@ -158,20 +159,19 @@ def test_sorted_tbl(app, mgr):
   assert np.array_equal(mgr.compDf.index[::-1], ordering)
 
 
-def compareCopiedCompDfs(old: pd.DataFrame, new: pd.DataFrame, newStartIdx=0):
+def compareCopiedCompDfs(old: pd.DataFrame, new: pd.DataFrame, newOffset, newStartIdx=0):
   for ii in range(len(old)):
     oldComp = old.iloc[ii, :].copy()
     for jj in range(len(oldComp[REQD_TBL_FIELDS.VERTICES])):
-      oldComp[REQD_TBL_FIELDS.VERTICES][jj] += 50
+      oldComp[REQD_TBL_FIELDS.VERTICES][jj] += newOffset
     oldComp.at[REQD_TBL_FIELDS.INST_ID] += newStartIdx
     assert np.array_equal(oldComp, new.iloc[newStartIdx+ii, :])
 
 @pytest.fixture
 def copyHelper(app, mgr):
   def copyHelper(copyMode=True):
-    copier = app.mainImg.regionCopier
-    copier.offset = XYVertices([[50, 50]])
-    copier.regionIds = mgr.compDf.index
+    copier = app.mainImg.regionMover
+    copier.resetBaseData(mgr.compDf.copy())
     copier.inCopyMode = copyMode
   return copyHelper
 

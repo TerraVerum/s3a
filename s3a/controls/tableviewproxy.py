@@ -117,7 +117,6 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     self.labelCol = REQD_TBL_FIELDS.INST_ID
     self.updateLabelCol()
 
-    self.regionCopier = mainImg.regionCopier
     attrs = self.sharedAttrs
 
     with attrs.colorScheme.setBaseRegisterPath(self.regionPlot.__groupingName__):
@@ -135,15 +134,15 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         self.redrawComps()
     self._filter.sigChangesApplied.connect(_maybeRedraw)
 
-    self.regionCopier.sigCopyStarted.connect(lambda *args: self.activateRegionCopier())
-    self.regionCopier.sigCopyStopped.connect(lambda *args: self.finishRegionCopier())
+    self.regionMover.sigMoveStarted.connect(lambda *args: self.activateRegionCopier())
+    self.regionMover.sigMoveStopped.connect(lambda *args: self.finishRegionCopier())
 
     compMgr.sigCompsChanged.connect(self.redrawComps)
     compMgr.sigFieldsChanged.connect(self._reflectFieldsChanged)
     compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
 
     mainImg.addItem(self.regionPlot)
-    mainImg.addItem(self.regionCopier)
+    mainImg.addItem(self.regionMover.manipRoi)
     self.vb = mainImg.getViewBox()
     self.vb.sigRangeChanged.connect(self.recomputePenWidth)
 
@@ -400,7 +399,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
 
     else:
       mode |= QISM.ClearAndSelect
-    if not self.regionCopier.active:
+    if not self.regionMover.active:
       self.selectRowsById(selectedIds, mode)
     # TODO: Better management of widget focus here
 
@@ -414,27 +413,26 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     if selectedIds is None:
       selectedIds = self.selectedIds
     if len(selectedIds) == 0: return
-    vertsList = self._compMgr.compDf.loc[selectedIds, REQD_TBL_FIELDS.VERTICES]
-    self.regionCopier.resetBaseData(vertsList, selectedIds)
-    self.regionCopier.active = True
+    comps = self._compMgr.compDf.loc[selectedIds].copy()
+    self.regionMover.resetBaseData(comps)
+    self.regionMover.active = True
 
   def finishRegionCopier(self, keepResult=True):
     if not keepResult: return
-    newComps = self._compMgr.compDf.loc[self.regionCopier.regionIds].copy()
-    regionOffset = self.regionCopier.offset.astype(int)
+    newComps = self.regionMover.baseData
     # TODO: Truncate vertices that lie outside image boundaries
     # Invalid if any verts are outside image bounds
     truncatedCompIds = []
     # imShape_xy = self._mainImgArea.image.shape[:2][::-1]
     for idx in newComps.index:
-      newVerts = newComps.at[idx, REQD_TBL_FIELDS.VERTICES].removeOffset(-regionOffset)
-      newComps.at[idx, REQD_TBL_FIELDS.VERTICES] = newVerts
+      verts = newComps.at[idx, REQD_TBL_FIELDS.VERTICES].removeOffset(self.regionMover.dataMin)
+      newComps.at[idx, REQD_TBL_FIELDS.VERTICES] = self.regionMover.transformedData(verts)
     # truncatedCompIds = np.unique(truncatedCompIds)
-    if self.regionCopier.inCopyMode:
-      self._compMgr.addComps(newComps)
-      self.activateRegionCopier(self.regionCopier.regionIds)
+    if self.regionMover.inCopyMode:
+      change = self._compMgr.addComps(newComps)
+      self.activateRegionCopier(change['added'])
     else: # Move mode
-      self.regionCopier.erase()
+      self.regionMover.erase()
       self._compMgr.addComps(newComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
     # if len(truncatedCompIds) > 0:
     #   warn(f'Some regions extended beyond image dimensions. Boundaries for the following'
@@ -473,3 +471,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
 
   def resetCompBounds(self):
     self.regionPlot.resetRegionList()
+
+  @property
+  def regionMover(self):
+      return self._mainImgArea.regionMover

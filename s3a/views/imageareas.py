@@ -13,7 +13,7 @@ from s3a.structures import XYVertices
 from utilitys import ParamEditor, PrjParam, RunOpts, fns, EditorPropsMixin, DeferredActionStackMixin as DASM
 from utilitys.widgets import ButtonCollection, ImageViewer, EasyWidget
 from .clickables import RightPanViewBox
-from .regions import RegionCopierPlot
+from .regions import RegionMoverPlot
 from .rois import SHAPE_ROI_MAPPING
 
 __all__ = ['MainImage']
@@ -68,7 +68,7 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
     # -----
     # DRAWING OPTIONS
     # -----
-    self.regionCopier = RegionCopierPlot(self)
+    self.regionMover = RegionMoverPlot(self)
 
     self.drawAction: PrjParam = CNST.DRAW_ACT_PAN
     self.shapeCollection = RoiCollection(drawShapes, self)
@@ -111,20 +111,20 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
 
   def shapeAssignment(self, newShapeParam: PrjParam):
     self.shapeCollection.curShapeParam = newShapeParam
-    if self.regionCopier.active:
-      self.regionCopier.erase()
+    if self.regionMover.active:
+      self.regionMover.erase()
 
   def actionAssignment(self, newActionParam: PrjParam):
     self.drawAction = newActionParam
-    if self.regionCopier.active:
-      self.regionCopier.erase()
+    if self.regionMover.active:
+      self.regionMover.erase()
     self.sigDrawActionChanged.emit(newActionParam)
 
   def maybeBuildRoi(self, ev: QtGui.QMouseEvent):
     ev.ignore()
     if (QtCore.Qt.MouseButton.LeftButton not in [ev.buttons(), ev.button()]
         or self.drawAction == CNST.DRAW_ACT_PAN
-        or self.regionCopier.active):
+        or self.regionMover.active):
       return False
     finished = self.shapeCollection.buildRoi(ev, self.imgItem)
     if not finished:
@@ -145,8 +145,8 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
     self.lastClickPos = ev.pos()
 
   def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent):
-    if self.regionCopier.active:
-      self.regionCopier.sigCopyStopped.emit()
+    if self.regionMover.active:
+      self.regionMover.sigMoveStopped.emit()
       ev.accept()
       self.shapeCollection.addLock(self)
     self.maybeBuildRoi(ev)
@@ -170,7 +170,7 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
       # Special case: Panning
       if (self.lastClickPos == ev.pos()
           and self.drawAction == CNST.DRAW_ACT_PAN
-          and not self.regionCopier.active):
+          and not self.regionMover.active):
         pos = self.imgItem.mapFromScene(ev.pos())
         xx, yy, = pos.x(), pos.y()
         # Simulate a click-wide boundary selection so points can be registered in pan mode
@@ -182,7 +182,7 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
   def clearCurRoi(self):
     """Clears the current ROI shape"""
     self.shapeCollection.clearAllRois()
-    self.regionCopier.erase()
+    self.regionMover.erase()
 
   def _widgetContainerChildren(self):
     return [self.drawActGrp, self.drawShapeGrp, self]
