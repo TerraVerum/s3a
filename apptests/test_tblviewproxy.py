@@ -160,6 +160,7 @@ def test_sorted_tbl(app, mgr):
 
 
 def compareCopiedCompDfs(old: pd.DataFrame, new: pd.DataFrame, newOffset, newStartIdx=0):
+  newOffset = newOffset.astype(int)
   for ii in range(len(old)):
     oldComp = old.iloc[ii, :].copy()
     for jj in range(len(oldComp[REQD_TBL_FIELDS.VERTICES])):
