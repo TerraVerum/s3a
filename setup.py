@@ -36,7 +36,7 @@ setup(
   ],
   entry_points={
     'console_scripts': [
-      's3a-gui = s3a.__main__:main',
+      's3a-gui = s3a.__main__:main_cli',
     ]
   },
 
