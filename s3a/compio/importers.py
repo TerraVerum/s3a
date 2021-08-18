@@ -148,6 +148,47 @@ class SuperannotateJsonImporter(AnnotationImporter):
     deserialize=parseTime,
   )
 
+class VGGImageAnnotatorImporter(CsvImporter):
+  def formatSingleInstance(self, inst, **kwargs):
+    out = json.loads(inst['region_attributes'])
+    return out
+
+  def getInstances(self, importObj: pd.DataFrame):
+    return importObj.to_dict(orient='records')
+
+  @staticmethod
+  def parseRegion(region):
+    region = json.loads(region)
+    if not region:
+      return ComplexXYVertices()
+    name = region['name']
+    if name in ['polygon', 'polyline']:
+      pts = XYVertices(np.column_stack((region['all_points_x'], region['all_points_y'])))
+      if name == 'polyline':
+        pts.connected = False
+    elif name == 'ellipse':
+      vals = region['cy'], region['cx'], region['ry'], region['rx'], np.rad2deg(region['theta']) + 90
+      pts = draw.ellipse_perimeter(*(int(v) for v in vals[:-1]), vals[-1])
+      pts = np.column_stack(pts[::-1])
+      pts = orderContourPts(pts)
+    elif name == 'rect':
+      x, y = region['x'], region['y']
+      width, height = region['width'], region['height']
+      pts = XYVertices([[x, y], [x + width, y], [x + width, y + height], [x, y + height]])
+    elif name == 'circle':
+      cx, cy, r = region['cx'], region['cy'], region['r']
+      pts = draw.circle_perimeter(int(cy), int(cx), int(r))
+      pts = np.column_stack(pts[::-1])
+      pts = orderContourPts(pts)
+    elif name == 'point':
+      cx, cy = region['cx'], region['cy']
+      pts = XYVertices([[cx, cy]])
+    else:
+      raise ValueError(f'Unknown region shape: "{name}')
+    return ComplexXYVertices([pts])
+
+  registerIoHandler('viaregion', deserialize=parseRegion)
+
 class LblPngImporter(AnnotationImporter):
   imgInfo = {}
   _canBulkImport = False
@@ -280,4 +321,3 @@ class CompImgsDfImporter(AnnotationImporter):
     out = importObj[['instId', 'label']].copy()
     out.columns = [RTF.INST_ID, self.opts['labelField']]
     return out
-
