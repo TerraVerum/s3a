@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from pyqtgraph.parametertree import Parameter
+from pyqtgraph.parametertree.Parameter import PARAM_TYPES
 
 from s3a.compio.helpers import serialize, deserialize
 from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
@@ -15,7 +16,7 @@ from s3a.structures import TwoDArr
 __all__ = ['CompTableView', 'PopupTableDialog']
 
 from utilitys import ParamEditor, EditorPropsMixin, RunOpts, ParamContainer, DeferredActionStackMixin as DASM, PrjParam
-from utilitys.params.pgregistered import PgParamDelegate
+from utilitys.params.pgregistered import PgParamDelegate, PgPopupDelegate
 
 Signal = QtCore.Signal
 
@@ -273,9 +274,13 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
       try:
         self.setItemDelegateForColumn(ii, PgParamDelegate(paramDict, self))
       except TypeError:
-        # Parameter doesn't have a registered pyqtgraph editor, so default to
-        # generic serdes editor
-        self.setItemDelegateForColumn(ii, SerDesDelegate(field, parent=self))
+        if paramDict['type'] in PARAM_TYPES:
+          paramDict['name'] = field.name
+          self.setItemDelegateForColumn(ii, PgPopupDelegate(paramDict, self))
+        else:
+          # Parameter doesn't have a registered pyqtgraph editor, so default to
+          # generic serdes editor
+          self.setItemDelegateForColumn(ii, SerDesDelegate(field, parent=self))
 
     self.horizontalHeader().setSectionsMovable(True)
 
