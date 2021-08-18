@@ -904,7 +904,7 @@ class ProjectData(QtCore.QObject):
     """
     image = self.getFullImgName(filename.stem, thorough=False)
     if filename.parent != self.annotationsDir:
-      if not overwriteOld:
+      if not overwriteOld and (self.annotationsDir/filename.name).exists():
         raise IOError(f'Cannot add annotation {filename} since a corresponding annotation with that name already'
                       f' exists and `overwriteOld` was False')
       newName = self.annotationsDir/filename.name
@@ -951,8 +951,14 @@ class ProjectData(QtCore.QObject):
 
     candidates = set()
     strName = str(name)
+    # Compare using "endswith" when folder names are included, otherwise a direct
+    # analysis of the name is preferred
+    if strName == name.name:
+      compare = lambda strName, selfImageName: strName == selfImageName.name
+    else:
+      compare = lambda strName, selfImageName: str(selfImageName).endswith(strName)
     for img in self.images:
-      if str(img).endswith(strName):
+      if compare(strName, img):
         if not thorough:
           return img
         candidates.add(img)
