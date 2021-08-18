@@ -1,5 +1,4 @@
 from ast import literal_eval
-from datetime import datetime
 
 import numpy as np
 
@@ -54,11 +53,3 @@ registerIoHandler(
   takesParam=True
 )
 
-def superAnnTime(val):
-  parsedTime = datetime.strptime(val, '%Y-%m-%dT%H:%M:%S.%fZ')
-  return str(parsedTime)
-
-registerIoHandler(
-  'superanntime',
-  deserialize = superAnnTime,
-)

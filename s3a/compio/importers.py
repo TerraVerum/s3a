@@ -2,6 +2,7 @@ import inspect
 import json
 import typing as t
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 
 import cv2 as cv
@@ -12,7 +13,7 @@ from skimage import draw
 
 from utilitys.typeoverloads import FilePath
 from .base import AnnotationImporter
-from .helpers import _getPdImporters
+from .helpers import _getPdImporters, registerIoHandler
 from ..constants import REQD_TBL_FIELDS as RTF
 from ..generalutils import DirectoryDict, orderContourPts, cvImread_rgb, deprecateKwargs
 from ..structures import ComplexXYVertices, XYVertices, AnnInstanceError, LabelFieldType
@@ -85,16 +86,15 @@ class SuperannotateJsonImporter(AnnotationImporter):
     out = {
       RTF.SRC_IMG_FILENAME: self.opts['name']
     }
-    verts = self._parsePts(inst)
+    verts = self.parseRegion(inst)
     if not isinstance(verts, AnnInstanceError):
       verts = ComplexXYVertices([verts])
-    out.update(self._parseAttrs(inst))
     # Need to serialize since wrapper function tries to deserialize
     out[RTF.VERTICES] = verts
     return out
 
   @staticmethod
-  def _parsePts(inst: dict) -> t.Union[XYVertices, AnnInstanceError]:
+  def parseRegion(inst: dict) -> t.Union[XYVertices, AnnInstanceError]:
     typ = inst['type']
     if typ == 'polygon':
       pts = inst['points']
@@ -131,10 +131,22 @@ class SuperannotateJsonImporter(AnnotationImporter):
     return pts
 
   @staticmethod
-  def _parseAttrs(inst):
-    attrs = inst.get('attributes', [])
-    notes = '\n'.join(a['groupName'] for a in attrs)
-    return {'Notes': notes}
+  def parseAttributes(attrs):
+    if attrs is None:
+      attrs = []
+    combined = '\n'.join(a['groupName'] for a in attrs)
+    return combined
+  registerIoHandler('superannattributes', deserialize=parseAttributes)
+
+  @staticmethod
+  def parseTime(val):
+    parsedTime = datetime.strptime(val, '%Y-%m-%dT%H:%M:%S.%fZ')
+    return str(parsedTime)
+
+  registerIoHandler(
+    'superanntime',
+    deserialize=parseTime,
+  )
 
 class LblPngImporter(AnnotationImporter):
   imgInfo = {}
