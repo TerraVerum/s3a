@@ -436,7 +436,9 @@ class DirectoryDict(MaxSizeDict):
   """
   _UNSET = object()
 
-  def __init__(self, initData:Union[FilePath, dict, 'DirectoryDict']=None, readFunc: Callable[[str], Any]=None, allowAbsolute=False,
+  def __init__(self, initData:Union[FilePath, dict, 'DirectoryDict']=None,
+               readFunc: Callable[[str], Any]=None,
+               allowAbsolute=False,
                **kwargs,):
     """
     :param initData: Either startup dict or backing directory path. If a DirectoryDict is passed, its attribute will

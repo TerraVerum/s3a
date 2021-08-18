@@ -99,8 +99,12 @@ class ComponentIO:
   Propagated to every exportByFileType call to provide user-specified defaults as desired
   """
 
-  def __init__(self):
-    td = self.tableData
+  def __init__(self, tableData=None):
+    if tableData is None:
+      tableData = self.tableData
+    else:
+      self.tableData = tableData
+    td = tableData
     self.importCsv = CsvImporter(td)
     self.importSuperannotateJson = SuperannotateJsonImporter(td)
     self.importGeojson = GeojsonImporter(td)

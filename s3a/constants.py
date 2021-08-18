@@ -101,7 +101,7 @@ class _ReqdTableFields(PrjParamGroup):
 
   INST_ID          : PrjParam = newParam('Instance ID', -1, readonly=True)
   VERTICES         : PrjParam = newParam('Vertices', ComplexXYVertices(), readonly=True)
-  SRC_IMG_FILENAME : PrjParam = newParam('Source Image Filename', "", readonly=True)
+  SRC_IMG_FILENAME : PrjParam = newParam('Source Image Filename', "Newly Added", readonly=True)
 
   def addField(self, field: PrjParam):
     if field not in self:
@@ -241,11 +241,6 @@ class _PrjConsts(PrjParamGroup):
   INCLUDE_FNAME_PATH : PrjParam = newParam('Include full image path on export', False,
   None, 'If *False*, only the image name is included in export information, e.g. <img>.png.'
         ' Otherwise, the full filepath is included, e.g. "C:/Users/.../<img>.png')
-
-  # --------------------------
-  # COMPONENT EXPORT PARAMETERS
-  # --------------------------
-  ANN_CUR_FILE_INDICATOR: PrjParam = newParam('Current image file string', 'Newly Added')
 
   # --------------------------
   # DRAWING

@@ -1,74 +1,15 @@
-import functools
 import typing as t
-from functools import wraps
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from utilitys import PrjParam
 from utilitys.typeoverloads import FilePath
-from .helpers import serialize, deserialize, checkVertBounds
-from ..constants import REQD_TBL_FIELDS as RTF, IO_TEMPLATES_DIR
+from .helpers import serialize, deserialize, checkVertBounds, IOTemplateManager
+from ..constants import REQD_TBL_FIELDS as RTF
 from ..parameditors.table import TableData
 from ..structures import AnnInstanceError, AnnParseError
-from pathlib import  Path
-
-# Turn mapping into a dict that knows how to find either strings or fields
-class _FancyMap(dict):
-  def __getitem__(self, item):
-    assert isinstance(item, PrjParam)
-    for key in item, item.name:
-      if super().__contains__(key):
-        return self[key]
-    return None
-
-
-def _destNameForSrcName(srcField, destTbl, mapping: _FancyMap):
-  potentialNames = lambda _field: set([_field.name] + _field.opts.get('aliases', []))
-
-  # Mapping takes priority, if it exists
-  outCol = mapping[srcField]
-  if outCol is not None:
-    return destTbl.fieldFromName(outCol)
-  elif srcField in destTbl.allFields:
-    # Exact match, don't rename
-    return srcField
-  else:
-    # Not in mapping, no exact match. TODO: what if multiple dest cols have a matching alias?
-    # Otherwise, a 'break' can be added
-    curOutName = srcField
-    for destField in destTbl.allFields:
-      if potentialNames(srcField) & potentialNames(destField):
-        # Match between source field's aliases and dest field aliases
-        # Make sure it didn't match multiple names that weren't itself with the assert statement
-        assert curOutName == srcField
-        curOutName = destField
-  return curOutName
-
-
-def renameDfColsFromAliases(compDf: pd.DataFrame,
-                            destTbl: TableData,
-                            mapping: dict=None
-                            ):
-    """
-    Several forms of imports / exports handle data that may not be compatible with the current table data.
-    In these cases, it is beneficial to determine a mapping between names to allow greater compatibility between
-    I/O formats. Mapping is also extended in both directions by parameter name aliases (param.opts['aliases']),
-    which are a list of strings of common mappings for that parameter (e.g. [Class, Label] are often used
-    interchangeably)
-
-    :param compDf: Dataframe with maybe foreign fields
-    :param destTbl: Destination table from the ComponentIO importer
-    :param mapping: Foreign to local field name mapping
-    """
-
-    mapping = _FancyMap(mapping or {})
-
-    outCols = []
-    for srcField in compDf.columns:
-      outCols.append(_destNameForSrcName(srcField, destTbl, mapping))
-    compDf.columns = outCols
-
 
 class AnnotationExporter:
   __name__ = None
@@ -78,7 +19,6 @@ class AnnotationExporter:
     self.tableData = tableData
     # Compatibility with function analysis done in ComponentIO
     self.__name__ = f'export{type(self).__name__.replace("Exporter", "")}'
-
 
   def writeFile(self, filename: FilePath, exportObj):
     raise NotImplementedError
@@ -136,16 +76,38 @@ class AnnotationExporter:
 class AnnotationImporter:
   __name__ = None
 
-  imageShape: tuple = None
-  tableData = TableData()
   importObj: t.Any
   opts = {}
   _canBulkImport = True
 
-  def __init__(self, destTableData: TableData=None):
-    self.destTableData = destTableData
+  def __init__(self, tableData: TableData=None, destTableMapping: TableData=None):
+    """
+    Provides access to a modularized version of the common import structure:
+
+      * read a file
+      * parse bulk columns, where applicable (one to many or many to one column mapping)
+      * parse individual instances, where applicable (one to one column mapping)
+      * apply formatting
+
+    This is all viewable under the `__call__` function
+    """
     # Compatibility with function analysis done in ComponentIO
     self.__name__ = self.__name__ or f'import{type(self).__name__.replace("Importer", "")}'
+    if tableData is None:
+      tableData = TableData(requiredFields=[], template=IOTemplateManager.getTableData(self.ioType))
+    if destTableMapping is None:
+      destTableMapping = TableData()
+    self.destTableMapping = destTableMapping
+
+    self.tableData = tableData
+
+  @property
+  def ioType(self):
+    out = self.__name__.lower()
+    if out.startswith('import') or out.startswith('export'):
+      # Clip off the starting phrase
+      out = out[6:]
+    return out
 
   def readFile(self, filename: FilePath, **kwargs):
     raise NotImplementedError
@@ -159,17 +121,7 @@ class AnnotationImporter:
   def formatSingleInstance(self, inst, **kwargs) -> dict:
     return {}
 
-  @classmethod
-  def getForeignTableData(cls, ioFuncName: str, templateCfg=None):
-    """Returns a TableData object responsible for importing / exporting data of this format"""
-    name = ioFuncName.lower().replace('import', '').replace('export', '')
-    cfgName = IO_TEMPLATES_DIR / (name + '.tblcfg')
-    if not cfgName.exists():
-      return None
-    out = TableData(cfgName, template=templateCfg)
-    return out
-
-  def finalizeImport(self, compDf, reindex=False, **kwargs):
+  def finalizeImport(self, compDf, **kwargs):
       """Deserializes any columns that are still strings"""
 
       # Objects in the original frame may be represented as strings, so try to convert these
@@ -192,24 +144,14 @@ class AnnotationImporter:
         elif isinstance(field, PrjParam):
           # All other data is transcribed without modification if it's a PrjParam
           outDf[field] = compDf[field]
-      # All recognized output fields should now be deserialied
-      if reindex or RTF.INST_ID not in outDf:
-        outDf[RTF.INST_ID] = np.arange(len(outDf), dtype=int)
-      return outDf.set_index(RTF.INST_ID, drop=False)
+      # All recognized output fields should now be deserialied; make sure required fields exist
+      return outDf
 
   def __call__(self,
                inFileOrObj: t.Union[FilePath, t.Any],
                parseErrorOk=False,
                **kwargs):
-    destTableData = self.destTableData
-    if destTableData is None:
-      destTableData = TableData()
     self.opts = {}
-    srcTableData = self.getForeignTableData(self.__name__, destTableData.cfg)
-    if srcTableData is not None:
-      self.tableData = srcTableData
-    else:
-      self.tableData = destTableData
 
     filename = Path(inFileOrObj) if isinstance(inFileOrObj, FilePath.__args__) else None
     if filename is not None:
@@ -231,8 +173,13 @@ class AnnotationImporter:
     parsedDf = self.finalizeImport(bulkParsedDf, **kwargs)
     parsedDf = self.validInstances(parsedDf, parseErrorOk)
 
-    # Finally, deal with any name aliases
-    renameDfColsFromAliases(parsedDf, destTableData, kwargs.get('mapping'))
+    # Determine any destination mappings
+    parsedDf.columns = self.destTableMapping.resolveFieldAliases(parsedDf.columns, kwargs.get('mapping', {}))
+
+    # Make sure IDs are present
+    if kwargs.get('reindex') or RTF.INST_ID not in parsedDf:
+      parsedDf[RTF.INST_ID] = np.arange(len(parsedDf), dtype=int)
+    parsedDf = parsedDf.set_index(RTF.INST_ID, drop=False)
 
     checkVertBounds(parsedDf[RTF.VERTICES], kwargs.get('imShape'))
     return parsedDf
@@ -258,9 +205,8 @@ class AnnotationImporter:
 
   def individualImport(self, importObj, **kwargs):
     parsed = []
-    for ii, inst in enumerate(self.getInstances(importObj)):
+    for inst in self.getInstances(importObj):
       parsedInst = self.formatSingleInstance(inst, **kwargs)
-      parsedInst[RTF.INST_ID] = ii
       parsed.append(parsedInst)
 
     indivParsedDf = pd.DataFrame(parsed)

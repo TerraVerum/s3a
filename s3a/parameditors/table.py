@@ -3,19 +3,20 @@ import sys
 import warnings
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Union, Tuple, Any, Optional, Callable, Dict
+from typing import List, Union, Tuple, Any, Optional, Callable, Dict, Sequence
 
 import numpy as np
+import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 from pyqtgraph.parametertree import Parameter
 
-from s3a.constants import TABLE_DIR, REQD_TBL_FIELDS, PRJ_CONSTS, TBL_BASE_TEMPLATE
+from s3a.constants import TABLE_DIR, REQD_TBL_FIELDS as RTF, TBL_BASE_TEMPLATE
 from s3a.generalutils import hierarchicalUpdate
 from s3a.structures import PrjParamGroup, FilePath
 from utilitys import ParamEditor, PrjParam
 from utilitys import fns
-from utilitys.fns import warnLater
+
 
 def genParamList(nameIter, paramType, defaultVal, defaultParam='value'):
   """Helper for generating children elements"""
@@ -122,6 +123,25 @@ def filterParamCol(compDf: df, column: PrjParam, filterOpts: dict):
               UserWarning)
   return compDf
 
+
+def getFieldAliases(field: PrjParam):
+  """
+  Returns the set of all potential aliases to a given field
+  """
+  return set([field.name] + field.opts.get('aliases', []))
+
+def aliasesToRequired(field: PrjParam):
+  """
+  Returns true or false depending on whether this field shares aliases with required
+  fields. This is useful when an alternative (incoming) representation of e.g. Vertices
+  must be suppressed on import, but still used on export
+  """
+  requiredAliases = set()
+  for reqdField in RTF:
+    requiredAliases.update(getFieldAliases(reqdField))
+  srcAliases = getFieldAliases(field)
+  return srcAliases & requiredAliases
+
 class TableFilterEditor(ParamEditor):
   def __init__(self, paramList: List[PrjParam]=None, parent=None):
     if paramList is None:
@@ -180,8 +200,19 @@ class TableData(QtCore.QObject):
   sigCfgUpdated = QtCore.Signal(object)
   """dict (self.cfg) during update"""
 
-  def __init__(self, cfgFname: FilePath=None, cfgDict: dict=None, template: Union[FilePath, dict]=None):
+  def __init__(self,
+               cfgFname: FilePath=None,
+               cfgDict: dict=None,
+               template: Union[FilePath, dict]=None,
+               requiredFields: Sequence[PrjParam]=None):
     super().__init__()
+    if requiredFields is None:
+      requiredFields = RTF
+    self._requiredFields = requiredFields
+    if template is None:
+      template = TBL_BASE_TEMPLATE
+    self._template = template
+
     self.factories: Dict[PrjParam, Callable[[], Any]] = {}
 
     self.filter = TableFilterEditor()
@@ -221,13 +252,12 @@ class TableData(QtCore.QObject):
       # each row no objects have the same reference
       df_list.append(copy.copy(populators))
     outDf = df(df_list, columns=self.allFields)
-    if sequentialIds:
-      outDf[REQD_TBL_FIELDS.INST_ID] = np.arange(len(outDf))
-    outDf = outDf.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
-    # Set the metadata for this application run
-    outDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME] = PRJ_CONSTS.ANN_CUR_FILE_INDICATOR.value
+    if RTF.INST_ID in self.allFields:
+      if sequentialIds:
+        outDf[RTF.INST_ID] = np.arange(len(outDf))
+      outDf = outDf.set_index(RTF.INST_ID, drop=False)
     if dropRow:
-      outDf = outDf.drop(index=REQD_TBL_FIELDS.INST_ID.value)
+      outDf = outDf.iloc[0:0]
     return outDf
 
   def addFieldFactory(self, fieldLbl: PrjParam, factory: Callable[[], Any]):
@@ -261,7 +291,7 @@ class TableData(QtCore.QObject):
     current config
     """
     if template is None:
-      template = TBL_BASE_TEMPLATE
+      template = self._template
     if isinstance(template, dict):
       baseCfgDict = template.copy()
     else:
@@ -301,13 +331,58 @@ class TableData(QtCore.QObject):
 
   def resetLists(self):
     self.allFields.clear()
-    self.allFields.extend(REQD_TBL_FIELDS)
+    self.allFields.extend(self._requiredFields)
 
   def fieldFromName(self, name: Union[str, PrjParam], default=None):
     """
     Helper function to retrieve the PrjParam corresponding to the field with this name
     """
     return PrjParamGroup.fieldFromParam(self.allFields, name, default)
+
+  def resolveFieldAliases(self,
+                          fields: Sequence[PrjParam],
+                          mapping: dict = None
+                          ):
+      """
+      Several forms of imports / exports handle data that may not be compatible with the current table data.
+      In these cases, it is beneficial to determine a mapping between names to allow greater compatibility between
+      I/O formats. Mapping is also extended in both directions by parameter name aliases (param.opts['aliases']),
+      which are a list of strings of common mappings for that parameter (e.g. [Class, Label] are often used
+      interchangeably)
+
+      :param fields: Dataframe with maybe foreign fields
+      :param mapping: Foreign to local field name mapping
+      """
+
+      outFields = []
+      for srcField in fields:
+        outFields.append(self._findMatchingField(srcField, mapping))
+      return outFields
+
+  def _findMatchingField(self, srcField, mapping: dict = None):
+    # Mapping takes priority, if it exists
+    potentialSrcNames = getFieldAliases(srcField)
+    outCol = None
+    for key in srcField, srcField.name:
+      outCol = outCol or mapping.get(key)
+      if outCol:
+        break
+
+    if outCol is not None:
+      return self.fieldFromName(outCol)
+    elif srcField in self.allFields:
+      return srcField
+    else:
+      # Not in mapping, no exact match. TODO: what if multiple dest cols have a matching alias?
+      # Otherwise, a 'break' can be added
+      curOutName = srcField
+      for destField in self.allFields:
+        if potentialSrcNames & getFieldAliases(destField):
+          # Match between source field's aliases and dest field aliases
+          # Make sure it didn't match multiple names that weren't itself with the assert statement
+          assert curOutName == srcField
+          curOutName = destField
+    return curOutName
 
 NestedIndexer = Union[str, Tuple[Union[str,int],...]]
 class YamlParser:

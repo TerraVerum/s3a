@@ -383,6 +383,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
                                  **kwargs)
     msgPath = os.path.join(outFname.parent.name, outFname.name)
     getAppLogger(__name__).attention(f'Exported current annotation to {msgPath}')
+
   @property
   def exportableDf(self):
     """
@@ -402,7 +403,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     elif srcImgFname is not None:
       srcImgFname = str(srcImgFname)
     # Assign correct export name for only new components
-    overwriteIdxs = exportDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME] == PRJ_CONSTS.ANN_CUR_FILE_INDICATOR.value
+    overwriteIdxs = exportDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME] == REQD_TBL_FIELDS.SRC_IMG_FILENAME.value
     # TODO: Maybe the current filename will match the current file indicator. What happens then?
     exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = srcImgFname
     return exportDf
