@@ -1,11 +1,11 @@
+import ast
 from ast import literal_eval
 
 import numpy as np
 
-from ..structures import ComplexXYVertices, XYVertices, PrjParamGroup
-
 from .componentio import ComponentIO, defaultIo
 from .helpers import registerIoHandler
+from ..structures import ComplexXYVertices, XYVertices, PrjParamGroup
 
 registerIoHandler(
   'ndarray',
@@ -38,18 +38,26 @@ registerIoHandler(
 )
 
 def listDeser(param, strVal):
-  val = type(param.value)(strVal)
+  # Slight adjustment to value interpretation for checklist
   fixedLims = param.opts.get('fixedLimits', False)
   lims = param.opts['limits']
-  if fixedLims and val not in lims:
-    raise ValueError(f'Limits cannot grow and "{val} is not in limits')
-  elif val not in lims:
-    lims.append(val)
-  return val
-registerIoHandler(
-  'list',
-  deserialize = listDeser,
-  serialize = lambda param, val: str(val),
-  takesParam=True
-)
+  if param.pType == 'checklist':
+    if param.opts.get('exclusive'):
+      val = [strVal]
+    else:
+      val = ast.literal_eval(strVal)
+    newLims = [v for v in val if v not in lims]
+  else:
+    val = type(param.value)(strVal)
+    newLims = [val] if val not in lims else []
 
+  if fixedLims and len(newLims):
+    raise ValueError(f'Limits cannot grow and "{newLims} not in limits')
+  lims.extend(newLims)
+  return val
+for typ in 'list', 'checklist':
+  registerIoHandler(
+    typ,
+    deserialize=listDeser,
+    takesParam=True
+  )
