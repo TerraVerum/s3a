@@ -1,3 +1,4 @@
+import sys
 from typing import Union, Sequence
 
 import numpy as np
@@ -83,8 +84,8 @@ class CompSortFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
     if isinstance(leftObj, ComplexXYVertices):
         leftObj = leftObj.stack()
         rightObj = rightObj.stack()
-    leftObj = np.min(leftObj, axis=0)
-    rightObj = np.min(rightObj, axis=0)
+    leftObj = np.min(leftObj, axis=0, initial=sys.maxsize)
+    rightObj = np.min(rightObj, axis=0, initial=sys.maxsize)
     sortCol = self.vertSortCol
     otherCol = 1 - sortCol
     return (leftObj[sortCol] < rightObj[sortCol]
