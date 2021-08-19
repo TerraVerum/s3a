@@ -1,0 +1,12 @@
+fields:
+  region_shape_attributes:
+    pType: 'complexxyvertices'
+    value: []
+    parser: 'viaregion'
+    aliases: ['Vertices']
+  filename:
+    value: ''
+    aliases: ['Source Image Filename']
+  region_id:
+    value: 0
+    aliases: ['Instance ID']

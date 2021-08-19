@@ -1,0 +1,11 @@
+fields:
+  Instance ID:
+    value: -1
+    readonly: True
+  Source Image Filename:
+    value: ''
+    readonly: True
+  Vertices:
+    pType: 'complexxyvertices'
+    readonly: True
+    value: []

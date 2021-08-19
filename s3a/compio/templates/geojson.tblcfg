@@ -1,0 +1,6 @@
+fields:
+  geometry:
+    pType: 'complexxyvertices'
+    parser: 'geojsonregion'
+    value: []
+    aliases: ['Vertices']

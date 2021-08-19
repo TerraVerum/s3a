@@ -106,8 +106,6 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
                                              )
 
     self.compMgr = ComponentMgr()
-    # Register exporter to allow user parameters
-    ComponentIO.tableData = attrs.tableData
 
     self.compTbl = CompTableView()
     self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl)

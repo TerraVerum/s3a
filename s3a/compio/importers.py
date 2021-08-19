@@ -19,9 +19,10 @@ from ..generalutils import DirectoryDict, orderContourPts, cvImread_rgb, depreca
 from ..structures import ComplexXYVertices, XYVertices, AnnInstanceError, LabelFieldType
 
 __all__ = ['SerialImporter', 'CsvImporter', 'SuperannotateJsonImporter', 'GeojsonImporter',
-           'LblPngImporter', 'PklImporter', 'CompImgsDfImporter']
+           'LblPngImporter', 'PklImporter', 'CompImgsDfImporter', 'VGGImageAnnotatorImporter']
 
 class SerialImporter(AnnotationImporter):
+  ioType = 's3a'
 
   def readFile(self, filename: FilePath, **kwargs):
     fType = Path(filename).suffix.lower().replace('.', '')
@@ -46,6 +47,7 @@ class CsvImporter(SerialImporter):
   pass
 
 class GeojsonImporter(AnnotationImporter):
+
   def readFile(self, filename: FilePath, **kwargs):
     with open(Path(filename), 'r') as ifile:
       return json.load(ifile)
@@ -63,6 +65,8 @@ class GeojsonImporter(AnnotationImporter):
     return out
 
 class SuperannotateJsonImporter(AnnotationImporter):
+  ioType = 'superannotate'
+
   def readFile(self, filename: FilePath, **kwargs):
     with open(Path(filename), 'r') as ifile:
       return json.load(ifile)
@@ -136,19 +140,22 @@ class SuperannotateJsonImporter(AnnotationImporter):
       attrs = []
     combined = '\n'.join(a['groupName'] for a in attrs)
     return combined
-  registerIoHandler('superannattributes', deserialize=parseAttributes)
 
   @staticmethod
   def parseTime(val):
     parsedTime = datetime.strptime(val, '%Y-%m-%dT%H:%M:%S.%fZ')
     return str(parsedTime)
 
-  registerIoHandler(
-    'superanntime',
-    deserialize=parseTime,
-  )
+registerIoHandler('superannattributes',
+                  deserialize=SuperannotateJsonImporter.parseAttributes)
+registerIoHandler(
+  'superanntime',
+  deserialize=SuperannotateJsonImporter.parseTime,
+)
 
 class VGGImageAnnotatorImporter(CsvImporter):
+  ioType = None # Will be auto-assigned in init
+
   def formatSingleInstance(self, inst, **kwargs):
     out = json.loads(inst['region_attributes'])
     return out
@@ -187,9 +194,11 @@ class VGGImageAnnotatorImporter(CsvImporter):
       raise ValueError(f'Unknown region shape: "{name}')
     return ComplexXYVertices([pts])
 
-  registerIoHandler('viaregion', deserialize=parseRegion)
+registerIoHandler('viaregion', deserialize=VGGImageAnnotatorImporter.parseRegion)
 
 class LblPngImporter(AnnotationImporter):
+  ioType = 's3a'
+
   imgInfo = {}
   _canBulkImport = False
 
@@ -286,6 +295,8 @@ class LblPngImporter(AnnotationImporter):
     return pd.DataFrame(parsed)
 
 class PklImporter(AnnotationImporter):
+  ioType = 's3a'
+
   def readFile(self, filename: FilePath, **importArgs) -> pd.DataFrame:
     """
     See docstring for :func:`self.importCsv`
@@ -296,6 +307,7 @@ class PklImporter(AnnotationImporter):
     return self.importObj
 
 class CompImgsDfImporter(AnnotationImporter):
+  ioType = 's3a'
 
   readFile = PklImporter.readFile
 

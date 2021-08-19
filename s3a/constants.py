@@ -4,10 +4,11 @@ from pathlib import Path
 __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'QUICK_LOAD_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'TABLE_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
            'SHORTCUT_BASE', 'MAIN_IMG_DIR', 'APP_STATE_DIR', 'CFG_DIR', 'IMG_PROC_DIR', 'MULT_PRED_DIR',
-           'REQD_TBL_FIELDS', 'PRJ_CONSTS', 'PRJ_ENUMS', 'PROJ_FILE_TYPE', 'PROJ_BASE_TEMPLATE',
+           'REQD_TBL_FIELDS', 'PRJ_CONSTS', 'PRJ_ENUMS', 'PROJ_FILE_TYPE',
            'IO_TEMPLATES_DIR']
 
 import utilitys.constants
+from utilitys import fns
 
 CODE_DIR = Path(__file__).parent
 BASE_DIR = Path.home()/'.s3a'
@@ -33,7 +34,6 @@ APP_STATE_DIR = BASE_DIR
 
 
 PROJ_BASE_TEMPLATE = CFG_DIR/'projectcfg.yml'
-TBL_BASE_TEMPLATE = CFG_DIR/'tablecfg.yml'
 PROJ_FILE_TYPE = 's3aprj'
 
 # Ensure menuopts and layouts directories exist
@@ -95,13 +95,29 @@ class PRJ_ENUMS:
   
 from s3a.structures import ComplexXYVertices, PrjParam, PrjParamGroup, newParam
 
-@dataclass
-class _ReqdTableFields(PrjParamGroup):
+class _ReqdTableFields:
   _extraRequired = []
 
-  INST_ID          : PrjParam = newParam('Instance ID', -1, readonly=True)
-  VERTICES         : PrjParam = newParam('Vertices', ComplexXYVertices(), readonly=True)
-  SRC_IMG_FILENAME : PrjParam = newParam('Source Image Filename', "Newly Added", readonly=True)
+  def __init__(self):
+    self._iterFields = []
+
+    # Can't use IOTemplateManager without creating cyclic reference
+    fields = fns.attemptFileLoad(IO_TEMPLATES_DIR/'s3a.tblcfg')['fields']
+
+    ctorItems = [{'name': kk, **vv} for kk, vv in fields.items()]
+    ii = 0
+    def constructNext():
+      nonlocal ii
+      ret = PrjParam(**ctorItems[ii])
+      ii += 1
+      self._iterFields.append(ret)
+      return ret
+
+    self.INST_ID = constructNext()
+    self.SRC_IMG_FILENAME = constructNext()
+    self.VERTICES = constructNext()
+    # Special case: Vertices is non-primitive type
+    self.VERTICES.value = ComplexXYVertices()
 
   def addField(self, field: PrjParam):
     if field not in self:
@@ -109,12 +125,11 @@ class _ReqdTableFields(PrjParamGroup):
 
   def removeField(self, field: PrjParam):
     if field in self._extraRequired:
-      self._extraRequired.pop(field)
+      self._extraRequired.remove(field)
 
   def __iter__(self):
-    yield from super().__iter__()
-    for field in self._extraRequired:
-      yield field
+    for lst in self._iterFields, self._extraRequired:
+      yield from lst.__iter__()
 
 
 REQD_TBL_FIELDS = _ReqdTableFields()

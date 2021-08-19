@@ -11,7 +11,7 @@ from apptests.helperclasses import CompDfTester
 from apptests.testingconsts import SAMPLE_SMALL_IMG_FNAME, SAMPLE_SMALL_IMG, SAMPLE_IMG_FNAME, TEST_FILE_DIR
 from apptests.conftest import dfTester
 from s3a import S3A
-from s3a.constants import TBL_BASE_TEMPLATE
+from s3a.parameditors.table import IOTemplateManager
 from s3a.plugins.file import ProjectData, absolutePath
 from utilitys import fns
 
@@ -49,6 +49,7 @@ def test_update_props(filePlg):
   filePlg.updateProjectProperties(annotationFormat=oldFmt)
   loc = filePlg.projData.location/'newcfg.tblcfg'
   newCfg = {'fields': {'Class': ''}}
+  fns.hierarchicalUpdate(newCfg, IOTemplateManager.getTableCfg('s3a'))
   fns.saveToFile(newCfg, loc)
   oldName = filePlg.projData.tableData.cfgFname
   filePlg.updateProjectProperties(tableConfig=loc)
@@ -180,7 +181,7 @@ def test_none_tblinfo(tmpdir):
   cfg = {}
   prj = ProjectData(tmpdir/'none-table.s3aprj', cfg)
   assert prj.tableData.cfgFname == prj.cfgFname
-  assert prj.tableData.cfg == fns.attemptFileLoad(TBL_BASE_TEMPLATE)
+  assert prj.tableData.cfg == IOTemplateManager.getTableCfg('s3a')
 
 def test_change_image_path(tmpProj):
   tmpProj.addImage(SAMPLE_SMALL_IMG_FNAME, copyToProj=False)

@@ -1,3 +1,4 @@
+import copy
 import typing as t
 from pathlib import Path
 
@@ -6,10 +7,20 @@ import pandas as pd
 
 from utilitys import PrjParam
 from utilitys.typeoverloads import FilePath
-from .helpers import serialize, deserialize, checkVertBounds, IOTemplateManager
+from .helpers import serialize, deserialize, checkVertBounds
+from ..parameditors.table.templatemgr import IOTemplateManager
 from ..constants import REQD_TBL_FIELDS as RTF
 from ..parameditors.table import TableData
 from ..structures import AnnInstanceError, AnnParseError
+from ..shims import typing_extensions
+
+class TableContainer:
+  """Dummy component io in case a raw tableData is directly given to an importer/exporter"""
+  def __init__(self, tableData=None):
+    self.tableData = tableData
+
+class TblContainer_T(typing_extensions.Protocol):
+  tableData: TableData
 
 class AnnotationExporter:
   __name__ = None
@@ -74,13 +85,17 @@ class AnnotationExporter:
     return exportObj
 
 class AnnotationImporter:
-  __name__ = None
+  class UNSET_IO_TYPE: pass
+
+  __name__: t.Optional[str] = None
+  ioType: t.Optional[str] = None
+  """Type indicating what required fields from the IOTemplateManager should be applied"""
 
   importObj: t.Any
   opts = {}
   _canBulkImport = True
 
-  def __init__(self, tableData: TableData=None, destTableMapping: TableData=None):
+  def __init__(self, tableData: t.Union[TableData, TblContainer_T]=None, ioType=UNSET_IO_TYPE):
     """
     Provides access to a modularized version of the common import structure:
 
@@ -89,31 +104,45 @@ class AnnotationImporter:
       * parse individual instances, where applicable (one to many or many to one column mapping)
       * apply formatting
 
-    This is all viewable under the `__call__` function
+    This is all viewable under the `__call__` function.
+
+    :param tableData: Table configuration for fields in the input file. If a container, ``container.tableData`` leads to
+      the table data. This allows references to be reassigned in e.g. an outer ComponentIO without losing connection
+      to this importer
+    :param ioType: Determines which config template's required fields are necessary for this input. That way,
+      required fields don't have to be explicitly enumerated in a project's table configuration
     """
     # Compatibility with function analysis done in ComponentIO
-    self.__name__ = self.__name__ or f'import{type(self).__name__.replace("Importer", "")}'
+    if isinstance(tableData, TableData):
+      container = TableContainer(tableData)
+    else:
+      container = tableData
+    self.container = container
+    fmtName = type(self).__name__.replace("Importer", "")
+    self.__name__ = self.__name__ or f'import{fmtName}'
+
+    useType = ioType
+    if useType is self.UNSET_IO_TYPE:
+      useType = self.ioType or fmtName.lower()
+    self.ioType = useType
+
     # Make a copy to allow for internal changes such as adding extra required fields, aliasing, etc.
-    tableData = TableData(requiredFields=[], template=tableData.cfg)
-    requiredTbl = IOTemplateManager.getTableData(self.ioType)
-    if requiredTbl is not None:
-      # Ensure fields specified by import template exist. If these fields are already present, it's no problem
-      # since internally `addField` checks for this
-      for field in requiredTbl.allFields:
-        tableData.addField(field)
-    if destTableMapping is None:
-      destTableMapping = TableData()
-    self.destTableMapping = destTableMapping
+    # 'and' avoids asking for 'cfg' of 'none' table
+    self.tableData = self.destTableMapping = None
+    self.refreshTableData()
 
-    self.tableData = tableData
+  def refreshTableData(self):
+    self.destTableMapping = tableData = self.container.tableData
+    requiredCfg = IOTemplateManager.getTableCfg(self.ioType)
+    if tableData is not None:
+      # Make sure not to incorporate fields that only exist to provide logistics for the other table setup
+      optionalFields = {key: val for key, val in tableData.cfg['fields'].items() if
+                        key not in tableData.template['fields']}
+      optionalCfg = {'fields': optionalFields}
+    else:
+      optionalCfg = None
+    self.tableData = TableData(cfgDict=optionalCfg, template=requiredCfg)
 
-  @property
-  def ioType(self):
-    out = self.__name__.lower()
-    if out.startswith('import') or out.startswith('export'):
-      # Clip off the starting phrase
-      out = out[6:]
-    return out
 
   def readFile(self, filename: FilePath, **kwargs):
     raise NotImplementedError
@@ -157,6 +186,7 @@ class AnnotationImporter:
                inFileOrObj: t.Union[FilePath, t.Any],
                parseErrorOk=False,
                **kwargs):
+    self.refreshTableData()
     self.opts = {}
 
     filename = Path(inFileOrObj) if isinstance(inFileOrObj, FilePath.__args__) else None
@@ -180,7 +210,8 @@ class AnnotationImporter:
     parsedDf = self.validInstances(parsedDf, parseErrorOk)
 
     # Determine any destination mappings
-    parsedDf.columns = self.destTableMapping.resolveFieldAliases(parsedDf.columns, kwargs.get('mapping', {}))
+    if self.destTableMapping:
+      parsedDf.columns = self.destTableMapping.resolveFieldAliases(parsedDf.columns, kwargs.get('mapping', {}))
 
     # Make sure IDs are present
     if kwargs.get('reindex') or RTF.INST_ID not in parsedDf:

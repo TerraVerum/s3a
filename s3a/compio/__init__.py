@@ -3,9 +3,9 @@ from ast import literal_eval
 
 import numpy as np
 
-from .componentio import ComponentIO, defaultIo
 from .helpers import registerIoHandler
 from ..structures import ComplexXYVertices, XYVertices, PrjParamGroup
+# Wait to import compio until after registry is populated
 
 registerIoHandler(
   'ndarray',
@@ -61,3 +61,5 @@ for typ in 'list', 'checklist':
     deserialize=listDeser,
     takesParam=True
   )
+
+from .componentio import ComponentIO, defaultIo

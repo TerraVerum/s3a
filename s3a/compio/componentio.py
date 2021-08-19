@@ -24,13 +24,13 @@ from PIL.PngImagePlugin import PngInfo
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
 from s3a.generalutils import augmentException, getCroppedImg, resize_pad, cvImsave_rgb, classproperty, \
   cvImread_rgb, imgPathtoHtml, deprecateKwargs, DirectoryDict
-from s3a.parameditors.table import TableData
+from ..parameditors.table.data import TableData
 from s3a.shims import typing_extensions
 from s3a.structures import FilePath, ComplexXYVertices, PrjParam
 from skimage.exposure import rescale_intensity
 from utilitys import fns
 
-from .helpers import serialize, _getPdExporters, _getPdImporters
+from .helpers import serialize, _getPdExporters
 from .importers import *
 
 FilePathOrDf = Union[FilePath, pd.DataFrame]
@@ -104,14 +104,16 @@ class ComponentIO:
       tableData = self.tableData
     else:
       self.tableData = tableData
-    td = tableData
+    td = self
     self.importCsv = CsvImporter(td)
-    self.importSuperannotateJson = SuperannotateJsonImporter(td)
-    self.importGeojson = GeojsonImporter(td)
     self.importSerialized = SerialImporter(td)
     self.importLblPng = LblPngImporter(td)
     self.importPkl = PklImporter(td)
     self.importCompImgsDf = CompImgsDfImporter(td)
+
+    self.importSuperannotateJson = SuperannotateJsonImporter(td)
+    self.importGeojson = GeojsonImporter(td)
+    self.importViaCsv = VGGImageAnnotatorImporter(td)
 
     # Propagate custom defaults to each desired function
     for typeDict, fnType in zip([self.importTypes, self.exportTypes],

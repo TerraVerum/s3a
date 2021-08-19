@@ -132,8 +132,7 @@ def test_opts_insertion(app, sampleComps, tmp_path):
 
 @pytest.mark.withcomps
 def test_compimgs_export(tmp_path, _simpleTbl):
-  io = ComponentIO()
-  io.tableData = _simpleTbl
+  io = ComponentIO(_simpleTbl)
   tester = CompDfTester(100, tableData=_simpleTbl)
   tester.compDf[REQD_TBL_FIELDS.INST_ID] = tester.index
   tester.fillRandomVerts(SAMPLE_SMALL_IMG.shape[:2])
@@ -184,8 +183,7 @@ def test_convert(app, tmp_path):
   assert np.array_equal(*reads)
 
 def test_lblpng_export(_simpleTbl):
-  io = ComponentIO()
-  io.tableData = _simpleTbl
+  io = ComponentIO(_simpleTbl)
   tester = CompDfTester(15, tableData=_simpleTbl)
   sampleComps = tester.compDf
 
