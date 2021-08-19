@@ -85,8 +85,8 @@ class AnnotationImporter:
     Provides access to a modularized version of the common import structure:
 
       * read a file
-      * parse bulk columns, where applicable (one to many or many to one column mapping)
-      * parse individual instances, where applicable (one to one column mapping)
+      * parse bulk columns, where applicable (one to one column mapping)
+      * parse individual instances, where applicable (one to many or many to one column mapping)
       * apply formatting
 
     This is all viewable under the `__call__` function
@@ -138,7 +138,7 @@ class AnnotationImporter:
         # Only handle string names that match stringified versions of existing table data names.
         if field in strNames:
           dfVals = compDf[field]
-          field = self.tableData.allFields[strNames.index(field)]
+          field = self.tableData.fieldFromName(field)
           # Parsing functions only know how to convert from strings to themselves.
           # So, assume the exting types can first convert themselves to strings
           serializedDfVals = serialize(field, dfVals, returnErrs=False)
