@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Union, Tuple, Any, Optional, Callable, Dict, Sequence
 
 import numpy as np
-import pandas as pd
+import pyqtgraph as pg
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 from pyqtgraph.parametertree import Parameter
@@ -210,7 +210,7 @@ class TableData(QtCore.QObject):
       requiredFields = RTF
     self._requiredFields = requiredFields
     if template is None:
-      template = TBL_BASE_TEMPLATE
+      template = fns.attemptFileLoad(TBL_BASE_TEMPLATE)
     self._template = template
 
     self.factories: Dict[PrjParam, Callable[[], Any]] = {}
@@ -219,13 +219,13 @@ class TableData(QtCore.QObject):
     self.paramParser: Optional[YamlParser] = None
 
     self.cfgFname: Optional[Path] = None
-    self.cfg: Optional[dict] = None
+    self.cfg: Optional[dict] = fns.attemptFileLoad(TBL_BASE_TEMPLATE)
 
     self.allFields: List[PrjParam] = []
     self.resetLists()
 
-    if cfgFname or cfgDict:
-      self.loadCfg(cfgFname, cfgDict, template)
+    cfgFname = cfgFname or None
+    self.loadCfg(cfgFname, cfgDict, template)
 
   def makeCompDf(self, numRows=1, sequentialIds=False) -> df:
     """
@@ -295,22 +295,18 @@ class TableData(QtCore.QObject):
     if isinstance(template, dict):
       baseCfgDict = template.copy()
     else:
-      _, baseCfgDict = fns.resolveYamlDict(template)
-    cfgFname, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
-    cfgFname = cfgFname.resolve()
-    if not force and self.cfgFname == cfgFname:
-      return None
-
+      baseCfgDict = fns.attemptFileLoad(template)
+    if cfgFname is not None:
+      cfgFname, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
+      cfgFname = cfgFname.resolve()
     # Often, a table config can be wrapped in a project config; look for this case first
-    if 'table-cfg' in cfgDict:
+    if cfgDict is not None and 'table-cfg' in cfgDict:
       cfgDict = cfgDict['table-cfg']
 
     hierarchicalUpdate(baseCfgDict, cfgDict)
-
     cfg = baseCfgDict
-    if not force and cfg == self.cfg:
-      # No need to update things
-      return
+    if not force and self.cfgFname == cfgFname and pg.eq(cfg, self.cfg):
+      return None
 
     self.cfgFname = cfgFname
     self.cfg = cfg
@@ -361,14 +357,18 @@ class TableData(QtCore.QObject):
 
   def _findMatchingField(self, srcField, mapping: dict = None):
     # Mapping takes priority, if it exists
+    if mapping is None:
+      mapping = {}
     potentialSrcNames = getFieldAliases(srcField)
     outCol = None
     for key in srcField, srcField.name:
+      # Mapping can either be by string or PrjParam, so account for either case
       outCol = outCol or mapping.get(key)
       if outCol:
         break
 
     if outCol is not None:
+      # A mapping was explicitly provided for this field, use that
       return self.fieldFromName(outCol)
     elif srcField in self.allFields:
       return srcField
