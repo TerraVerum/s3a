@@ -93,8 +93,14 @@ class AnnotationImporter:
     """
     # Compatibility with function analysis done in ComponentIO
     self.__name__ = self.__name__ or f'import{type(self).__name__.replace("Importer", "")}'
-    if tableData is None:
-      tableData = TableData(requiredFields=[], template=IOTemplateManager.getTableData(self.ioType))
+    # Make a copy to allow for internal changes such as adding extra required fields, aliasing, etc.
+    tableData = TableData(requiredFields=[], template=tableData.cfg)
+    requiredTbl = IOTemplateManager.getTableData(self.ioType)
+    if requiredTbl is not None:
+      # Ensure fields specified by import template exist. If these fields are already present, it's no problem
+      # since internally `addField` checks for this
+      for field in requiredTbl.allFields:
+        tableData.addField(field)
     if destTableMapping is None:
       destTableMapping = TableData()
     self.destTableMapping = destTableMapping

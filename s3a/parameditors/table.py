@@ -270,6 +270,22 @@ class TableData(QtCore.QObject):
     """
     self.factories[fieldLbl] = factory
 
+  def addField(self, field: PrjParam):
+    """
+    Adds a new field to the table. If the field already exists in the current table, no action is performed.
+    Returns *True* if a field really was added, *False* if this field is already in the table list or aliases to
+    an existing field
+    """
+
+    # Problems occur when fields alias to already existing ones. When this is the case, ignore the extra fields.
+    # Not only does this solve the many-to-one alias issue, but also allows table datas with different required
+    # fields to seamlessly share and swap fields with eachother while avoiding vestigial table columns
+    if field in self.allFields or self._findMatchingField(field) is not field:
+      return False
+    field.group = self.allFields
+    self.allFields.append(field)
+    return True
+
   def makeCompSer(self):
     return self.makeCompDf().squeeze()
 
@@ -314,10 +330,7 @@ class TableData(QtCore.QObject):
     self.resetLists()
     for field in cfg.get('fields', {}):
       param = self.paramParser['fields', field]
-      if param in self.allFields:
-        continue
-      param.group = self.allFields
-      self.allFields.append(param)
+      self.addField(param)
 
     self.filter.updateParamList(self.allFields)
     self.sigCfgUpdated.emit(self.cfg)
