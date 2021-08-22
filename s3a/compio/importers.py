@@ -1,3 +1,4 @@
+import ast
 import inspect
 import json
 import typing as t
@@ -56,13 +57,18 @@ class GeojsonImporter(AnnotationImporter):
     return importObj['features']
 
   def formatSingleInstance(self, inst, **kwargs):
-    geo = inst['geometry']
-    out = {}
-    if geo['type'] == 'Polygon':
-      out[RTF.VERTICES] = ComplexXYVertices(geo['coordinates'], coerceListElements=True)
+    return inst['properties']
+
+  @staticmethod
+  def parseRegion(geometry):
+    geometry = ast.literal_eval(geometry)
+    if geometry['type'] == 'Polygon':
+      return ComplexXYVertices(geometry['coordinates'], coerceListElements=True)
     else:
-      out[RTF.VERTICES] = AnnInstanceError(f'Unrecognized type "{geo["type"]}"')
-    return out
+      return AnnInstanceError(f'Unrecognized type "{geometry["type"]}"')
+
+registerIoHandler('geojsonregion',
+                  deserialize=GeojsonImporter.parseRegion)
 
 class SuperannotateJsonImporter(AnnotationImporter):
   ioType = 'superannotate'
