@@ -128,16 +128,18 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       return ret
     win.appStateEditor.addImportExportOpts('project', self.open, handleExport, 0)
 
-    def receiveAutosave(filenameOrBool):
+    def receiveAutosave(autosaveArg: Union[bool, FilePath, dict]):
       """Loads autosave configuration from file and starts autosaving"""
-      if isinstance(filenameOrBool, bool):
-        if not filenameOrBool:
+      if isinstance(autosaveArg, bool):
+        if not autosaveArg:
           # --autosave False means don't autosave
           self.autosaveTimer.stop()
           return
         cfg = {}
+      elif isinstance(autosaveArg, dict):
+        cfg = autosaveArg
       else:
-        cfg = fns.attemptFileLoad(filenameOrBool)
+        cfg = fns.attemptFileLoad(autosaveArg)
       self.startAutosave(**cfg)
 
     def exportAutosave(savePath: Path):
@@ -697,13 +699,14 @@ class ProjectData(QtCore.QObject):
   def saveCfg(self):
     location = self.location
     annDir = self.annotationsDir
+    imgDir = self.imagesDir
     strImgNames = []
     for folder in self.baseImgDirs:
       if location in folder.parents:
         folder = folder.relative_to(location)
       strImgNames.append(str(folder))
     for img in self.images:
-      if img.parent in self.baseImgDirs:
+      if img.parent == imgDir or img.parent in self.baseImgDirs:
         # This image is already accounted for in the base directories
         continue
       strImgNames.append(str(absolutePath(img)))
@@ -717,10 +720,10 @@ class ProjectData(QtCore.QObject):
       getAppLogger(__name__).warning('Encountered annotation(s) in project config, but not officially added.'
                                        ' Adding them now.  Offending files:\n'
                                        ',\n'.join(offendingAnns), UserWarning)
-    self.cfg['images'] = strImgNames
+    if len(strImgNames):
+      self.cfg['images'] = strImgNames
     # 'Ann' folder is always added on startup so no need to record it here. However,
     # if it is shown explicitly the user is aware.
-    self.cfg['annotations'] = [self.annotationsDir.name]
     tblName = Path(self.tableData.cfgFname).absolute()
     if tblName != self.cfgFname:
       if tblName.parent == self.location:
