@@ -159,7 +159,7 @@ def test_compimgs_export(tmp_path, _simpleTbl):
       with Image.open(outPath/'labels'/file.name) as lblImg:
         assert dataImg.size == lblImg.size
 
-  io.exportCompImgsZip(tester.compDf, outPath, (300,300))
+  io.exportCompImgsZip(tester.compDf, outPath, resizeOpts=dict(shape=(300,300)))
   for file in (outPath / 'data').iterdir():
     with Image.open(file) as dataImg:
       with Image.open(outPath / 'labels' / file.name) as lblImg:

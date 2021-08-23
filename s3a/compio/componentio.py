@@ -16,6 +16,7 @@ from stat import S_IREAD, S_IRGRP, S_IROTH
 from typing import Any, Optional, Union, Tuple, Callable
 from zipfile import ZipFile
 
+import cv2 as cv
 import numpy as np
 import pandas as pd
 from pandas.core.dtypes.missing import array_equivalent
@@ -70,6 +71,68 @@ def _writeImge_meta(
   if offset is not None:
     info.add_text('offset', str(offset))
   outImg.save(saveName, pnginfo=info)
+
+_defaultResizeOpts = dict(
+  shape=None,
+  keepAspectRatio=True,
+  padVal=np.nan,
+  allowReorient=True
+)
+
+def getCroppedImgWithPadding(fullImage, coords, margin, returnCoords, padVal=np.nan, **resizeOpts):
+  shape = np.array(resizeOpts.pop('shape'))
+  min_ = np.min(coords, 0)
+  max_ = np.max(coords, 0)
+  # x-y to row-col
+  span = (max_ - min_ + 1)[::-1]
+  ratios = shape / span
+  needsRotate = False
+  if resizeOpts.get('allowReorient'):
+    # Choose whichever orientation leads to the closest ratio to the original size
+    tmpRatios = shape / span[::-1]
+    if np.abs(1 - tmpRatios.min()/tmpRatios.max()) < np.abs(1 - ratios.min()/ratios.max()):
+      ratios = tmpRatios
+      span = span[::-1]
+      needsRotate = True
+  padAx = np.argmax(ratios)
+  padAmt = (ratios.max()/ratios.min()-1)*span[padAx]
+  # left/right could be top/bottom, but the concept is the same either way
+  leftPad = np.ceil(padAmt/2)
+  rightPad = padAmt.round() - leftPad
+  # Correction happens relative to xy
+  if not needsRotate:
+    padAx = 1 - padAx
+  if np.isnan(padVal):
+    # Non-nan value means user wants constant padding, not padding that came from image background
+    min_[padAx] -= leftPad
+    max_[padAx] += rightPad
+    resizeOpts.update(keepAspectRatio=False)
+  img, bounds = getCroppedImg(fullImage, np.vstack([min_, max_]), margin)
+  extraPadding = _computeEdgePadding(bounds, fullImage.shape[:2], max_, min_)
+  if any(extraPadding):
+    img = cv.copyMakeBorder(img, *extraPadding, cv.BORDER_CONSTANT, value=0)
+  # Due to custom padding, resized image can at most be off by one pixel. This is fine to allow a bit of stretch
+  img = resize_pad(img, shape, **resizeOpts, padVal=padVal)
+  if returnCoords:
+    return img, bounds
+  return img
+
+
+def _computeEdgePadding(bounds, fullImageShape, maxCoords, min_):
+  # If padding caused min or max to go beyond image borders, make sure to spoof this with yet another padding
+  needsMinPad = min_ < 0
+  topleftPad = np.array([0, 0])
+  minPad = -min_[needsMinPad]
+  topleftPad[needsMinPad] = minPad
+  bounds[0, needsMinPad] = minPad
+  needsMaxPad = maxCoords > fullImageShape
+  botRightPad = np.array([0, 0])
+  maxPad = (maxCoords - fullImageShape[::-1])[needsMaxPad]
+  botRightPad[needsMaxPad] = maxPad
+  bounds[1, needsMaxPad] += maxPad
+  extraPadding = [int(pad) for pad in [topleftPad[0], botRightPad[0], topleftPad[1], botRightPad[1]]]
+  return extraPadding
+
 
 class ComponentIO:
   """
@@ -354,6 +417,7 @@ class ComponentIO:
       asIndiv=False,
       returnLblMapping=False,
       missingOk=False,
+      resizeOpts=None,
       **kwargs
   ):
     """
@@ -378,6 +442,22 @@ class ComponentIO:
       top of a low ID, the low ID will still be covered in its export mask
     :param missingOk: Whether a missing image is acceptable. When no source image is found
       for an annotation, this will simpy the 'image' output property
+    :param resizeOpts: Options for reshaping the output to a uniform size if desired. The following keys may be supplied:
+
+      - ``shape``          : Required. It is the shape that all images will be resized to before
+                             being saved. This is useful for neural networks with a fixed input size which forces all
+                             inputs to be e.g. 100x100 pixels.
+      - ``keepAspectRatio``: default True. Whether to keep the aspect ratio and pad the problematic axis, or
+                             to stretch the image to the right fit. I.e. if a component with shape (25, 50) exists, and
+                             an export ``shape`` of (25, 25) is specified with ``keepAspectRatio``, the component will
+                             be resized to (12, 25) and padded on the top and bottom with 6 and 7 pixels of ``padVal``,
+                             respectively.
+      - ``padVal``         : default np.nan. How to fill the padded axis if `keepAspectRatio` is *True*.
+                             If *np.nan*, the values are grabbed from the image instead. If a component is on the image
+                             boundary, black (0) is used.
+      - ``allowReorient``  : default False. If *True*, the output image can be rotated 90 degrees if this reduces the
+                             amount of manipulation required to get the output to be the proper shape
+      - ``interpolation``  : Any interpolation value accepted by cv.resize
     :param returnLblMapping: Whether to return the mapping of label numeric values to table field values
     :return: Dataframe with the following keys:
       - instId: The component's Instance ID
@@ -404,6 +484,12 @@ class ComponentIO:
     # imshape is automatically inferred by the exporter
     kwargs.pop('imShape', None)
     mappings = {}
+    if resizeOpts is not None:
+      cropperFunc = getCroppedImgWithPadding
+    else:
+      resizeOpts = {}
+      cropperFunc = getCroppedImg
+
     for miniDf, fullImgName in zip(dfGroupingsByImg, uniqueImgs):
       img = srcDir.get(fullImgName)
       if img is None and not missingOk:
@@ -424,7 +510,7 @@ class ComponentIO:
           marginToUse = (compImgSz * (margin/100)).astype(int)
         else:
           marginToUse = margin
-        compImg, bounds = getCroppedImg(img, allVerts, marginToUse, coordsAsSlices=False)
+        compImg, bounds = cropperFunc(img, allVerts, marginToUse, returnCoords=True, **resizeOpts)
 
         if 'img' in useKeys:
           outDf['img'].append(compImg)
@@ -433,22 +519,15 @@ class ComponentIO:
         if 'label' in useKeys:
           outDf['label'].append(lbl)
 
-        # x-y to row-col, transpose to get min-max in axis 0 and row-col in axis 1
-        indexer = tuple(slice(*b) for b in bounds[:, ::-1].T)
-        xyOffset = bounds[0, :]
-        if lblImg.ndim > 2:
-          indexer += (..., )
         if 'labelMask' in useKeys:
-          mask = lblImg[indexer]
           if asIndiv:
-            # Only color in this id's region. Since it might've been covered over by a different ID, regenerate the
-            # mask from vertices, taking margin into account
-            colorVerts = row[RTF.VERTICES].removeOffset(bounds[0, :])
-            colorVerts.hierarchy = row[RTF.VERTICES].hierarchy
-            mask = np.full_like(mask, bgColor)
-            # 'Float' works for int and float orig values, required since opencv complains about some numpy
-            # dtypes
-            colorVerts.toMask(mask, float(invertedMap[lbl]), asBool=False)
+            curLblImg = row[RTF.VERTICES].toMask(np.full_like(lblImg, bgColor),
+                                                 float(invertedMap[lbl]),
+                                                 asBool=False)
+            useImg = curLblImg
+          else:
+            useImg = lblImg
+          mask = cropperFunc(useImg, allVerts, marginToUse, returnCoords=False, **resizeOpts)
 
           outDf['labelMask'].append(mask)
 
@@ -456,7 +535,7 @@ class ComponentIO:
           outDf['instId'].append(idx)
 
         if 'offset' in useKeys:
-          outDf['offset'].append(xyOffset)
+          outDf['offset'].append(bounds[0, :])
     outDf = pd.DataFrame(outDf)
     if len(mappings) == 1:
       # Common case where annotations for just one image were converted
@@ -581,7 +660,6 @@ class ComponentIO:
       self,
       compDf: pd.DataFrame,
       outDir: FilePath = 's3a-export',
-      resizeShape: Tuple[int, int] = None,
       archive=False,
       makeSummary=False,
       **kwargs
@@ -595,9 +673,6 @@ class ComponentIO:
       helpText: "Where to make the output directories. If `None`, defaults to current
       directory>compimgs_<margin>_margin"
       pType: filepicker
-    :param resizeShape: If provided, it is the shape that all images will be resized to before
-      being saved. This is useful for neural networks with a fixed input size which forces all
-      inputs to be e.g. 100x100 pixels.
     :param archive: Whether to compress into a zip archive instead of directly outputting a folder
     :param makeSummary: Whether to include an html table showing each component from the dataframe along with
       its image and mask representations
@@ -605,10 +680,6 @@ class ComponentIO:
     """
     outDir = Path(outDir)
     useDir = outDir
-
-    saveFn = lambda fname, img: cvImsave_rgb(fname, img)
-    if resizeShape is not None:
-      saveFn = lambda fname, img: cvImsave_rgb(fname, resize_pad(img, resizeShape))
 
     with ExitStack() as stack:
       if archive:
@@ -624,9 +695,9 @@ class ComponentIO:
       for idx, row in extractedImgs.iterrows():
         saveName = f'{row.instId}.png'
         if 'img' in row.index:
-          saveFn(dataDir / saveName, row.img)
+          cvImsave_rgb(dataDir / saveName, row.img)
         if 'labelMask' in row.index:
-          saveFn(labelsDir / saveName, row.labelMask)
+          cvImsave_rgb(labelsDir / saveName, row.labelMask)
 
       if makeSummary:
         extractedImgs = extractedImgs.rename({'instId': RTF.INST_ID.name}, axis=1)

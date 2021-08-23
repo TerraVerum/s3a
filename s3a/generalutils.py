@@ -253,7 +253,12 @@ def imgCornerVertices(img: NChanImg=None) -> XYVertices:
               [fullImShape_xy[0]-1, 0]
               ])
 
-def resize_pad(img: NChanImg, newSize: Tuple[int, int], interp=cv.INTER_NEAREST, padVal=0):
+def resize_pad(img: NChanImg,
+               newSize: Sequence[int],
+               allowReorient=False,
+               keepAspectRatio=True,
+               interp=cv.INTER_NEAREST,
+               padVal=0):
   """
   Resizes image to the requested size using the specified interpolation method.
   :param img: Image to resize
@@ -263,32 +268,33 @@ def resize_pad(img: NChanImg, newSize: Tuple[int, int], interp=cv.INTER_NEAREST,
     after resizing the image will be 7x15 to preserve aspect ratio. 2 pixels of padding
     will be added on the left and 1 pixel of padding will be added on the right so the final
     output is 10x15.
+  :param allowReorient: If *True*, the image can be rotated 90 degrees if it results in less padding to reach
+    the desired shape
+  param keepAspectRatio: If *False*, the image will be stretched instead of padded on the lacking dimension
   :param padVal: Value to pad dimension that couldn't be fully resized
   :param interp: Interpolation method to use during resizing
-  :param padVal: Constant value to use during padding
   :return: Resized and padded image
   """
-  needsRotate = False
-  # Make sure largest dimension is along rows for easier treatment and rotate back after
-  newSize = np.array(newSize)
-  resizeRatio = min(newSize/np.array(img.shape[:2]))
-  paddedImg = cv.resize(img, (0, 0), fx = resizeRatio, fy = resizeRatio, interpolation=interp)
-  padDimension = np.argmax(newSize - np.array(paddedImg.shape[:2]))
-  if padDimension != 1:
-    paddedImg = cv.rotate(paddedImg, cv.ROTATE_90_CLOCKWISE)
-    newSize = newSize[::-1]
-    needsRotate = True
-  # Now pad dimension is guaranteed to be index 1
-  padDimension = 1
-  padding = (newSize[padDimension] - paddedImg.shape[padDimension]) // 2
-  if padding > 0:
-    paddedImg = cv.copyMakeBorder(paddedImg, 0, 0, padding, padding, cv.BORDER_CONSTANT, value=padVal)
-  # Happens during off-by-one truncated division
-  remainingPadding = newSize[padDimension] - paddedImg.shape[padDimension]
-  if remainingPadding > 0:
-    paddedImg = cv.copyMakeBorder(paddedImg, 0, 0, remainingPadding, 0, cv.BORDER_CONSTANT, value=padVal)
-  if needsRotate:
-    paddedImg = cv.rotate(paddedImg, cv.ROTATE_90_COUNTERCLOCKWISE)
+  newSize = np.asarray(newSize)
+  ratios = newSize / img.shape[:2]
+  if allowReorient:
+    # Choose whichever orientation leads to the closest ratio to the original size
+    tmpRatios = newSize / img.shape[:2][::-1]
+    if np.abs(1 - tmpRatios[0] / tmpRatios[1]) < np.abs(1 - ratios[0] / ratios[1]):
+      img = cv.rotate(img, cv.ROTATE_90_CLOCKWISE)
+      ratios = tmpRatios
+
+  if not keepAspectRatio:
+    return cv.resize(img, newSize[::-1], interpolation=interp)
+
+  ratio = ratios.min()
+  paddedImg = cv.resize(img, (0, 0), fx=ratio, fy=ratio, interpolation=interp)
+  padding = (newSize - paddedImg.shape[:2])
+
+  if (padding > 0).any():
+    top, left = map(int, padding//2)
+    bottom, right = map(int, padding - padding//2)
+    paddedImg = cv.copyMakeBorder(paddedImg, top, bottom, left, right, cv.BORDER_CONSTANT, value=padVal)
   return paddedImg
 
 def showMaskDiff(oldMask: BlackWhiteImg, newMask: BlackWhiteImg):
