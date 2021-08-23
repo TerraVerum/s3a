@@ -128,7 +128,7 @@ class AnnotationImporter:
 
     # Make a copy to allow for internal changes such as adding extra required fields, aliasing, etc.
     # 'and' avoids asking for 'cfg' of 'none' table
-    self.tableData = self.destTableMapping = None
+    self.tableData = self.destTableMapping = TableData()
     self.refreshTableData()
 
   def refreshTableData(self):
@@ -141,7 +141,8 @@ class AnnotationImporter:
       optionalCfg = {'fields': optionalFields}
     else:
       optionalCfg = None
-    self.tableData = TableData(cfgDict=optionalCfg, template=requiredCfg)
+    self.tableData.template = requiredCfg
+    self.tableData.loadCfg(cfgDict=optionalCfg)
 
 
   def readFile(self, filename: FilePath, **kwargs):

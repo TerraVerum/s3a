@@ -106,6 +106,9 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
                                              )
 
     self.compMgr = ComponentMgr()
+    # Warning! If default IO table is not associated here, object refs throughout the application will point to the
+    # wrong table
+    ComponentIO.tableData = attrs.tableData
 
     self.compTbl = CompTableView()
     self.compDisplay = CompDisplayFilter(self.compMgr, self.mainImg, self.compTbl)

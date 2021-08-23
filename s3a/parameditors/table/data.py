@@ -153,7 +153,7 @@ class TableData(QtCore.QObject):
     if not force and self.cfgFname == cfgFname and pg.eq(cfg, self.cfg):
       return None
 
-    self.cfgFname = cfgFname
+    self.cfgFname = cfgFname or self.cfgFname
     self.cfg = cfg
     self.paramParser = YamlParser(cfg)
     self.resetLists()

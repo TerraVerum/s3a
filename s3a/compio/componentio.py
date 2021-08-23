@@ -163,9 +163,7 @@ class ComponentIO:
   """
 
   def __init__(self, tableData=None):
-    if tableData is None:
-      tableData = self.tableData
-    else:
+    if tableData is not None:
       self.tableData = tableData
     td = self
     self.importCsv = CsvImporter(td)
