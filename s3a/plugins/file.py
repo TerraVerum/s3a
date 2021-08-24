@@ -995,7 +995,7 @@ class ProjectData(QtCore.QObject):
     shutil.copytree(self.location, outputFolder)
     getAppLogger(__name__).info('Exported project')
 
-  @fns.dynamicDocstring(fileTypes=defaultIo.exportTypes)
+  @fns.dynamicDocstring(fileTypes=list(defaultIo.exportTypes))
   def exportAnnotations(self, outputFolder:FilePath= 's3a-export',
                         annotationFormat='csv',
                         combine=False,
