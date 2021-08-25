@@ -134,19 +134,27 @@ def test_opts_insertion(app, sampleComps, tmp_path):
 def test_compimgs_export(tmp_path, _simpleTbl):
   io = ComponentIO(_simpleTbl)
   tester = CompDfTester(100, tableData=_simpleTbl)
-  tester.compDf[REQD_TBL_FIELDS.INST_ID] = tester.index
   tester.fillRandomVerts(SAMPLE_SMALL_IMG.shape[:2])
   tester.compDf.loc[:50, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = SAMPLE_SMALL_IMG_FNAME
   tester.compDf.loc[50:, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = SAMPLE_IMG_FNAME
   tester.compDf.loc[50:, REQD_TBL_FIELDS.INST_ID] = tester.compDf.index[:50]
   tester.compDf.index = np.concatenate([tester.compDf.index[:50], tester.compDf.index[:50]])
+  tester.compDf[REQD_TBL_FIELDS.INST_ID] = tester.index
 
   # Do df export just to test the output file capability and various options
   io.exportCompImgsDf(tester.compDf, tmp_path/'test.pkl', lblField='List')
   assert (tmp_path/'test.pkl').exists()
-  df = io.exportCompImgsDf(tester.compDf, asIndiv=True)
+  df, mappings = io.exportCompImgsDf(tester.compDf, prioritizeById=False, returnLblMapping=True)
+  df['image_name'] = tester.compDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME].apply(lambda p: p.name).values
+  revMaps = {k: pd.Series(v.index, v.to_numpy()) for k, v in mappings.items()}
+
+  for row in df.to_dict(orient='records'):
+    revMap = revMaps[row['image_name']]
+    assert np.count_nonzero(row['labelMask'] == revMap[row['label']]) > 0
+
+  df = io.exportCompImgsDf(tester.compDf, resizeOpts=dict(shape=(150, 150)))
   for mask in df.labelMask:
-    assert len(np.unique(mask)) <= 2
+    assert mask.shape == (150, 150)
 
   outPath = tmp_path/'out'
   io.exportCompImgsZip(tester.compDf, outPath)

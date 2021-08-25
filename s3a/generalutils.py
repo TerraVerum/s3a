@@ -262,15 +262,14 @@ def resize_pad(img: NChanImg,
   """
   Resizes image to the requested size using the specified interpolation method.
   :param img: Image to resize
-  :param newSize: New size for image. Since aspect ratio is maintained, the portion of the
-    image which couldn't be resized fully is padded with a constant value of `padVal`.
-    For instance, if the original image is 5x10 and the requested new size is 10x15, then
-    after resizing the image will be 7x15 to preserve aspect ratio. 2 pixels of padding
-    will be added on the left and 1 pixel of padding will be added on the right so the final
-    output is 10x15.
+  :param newSize: New size for image
   :param allowReorient: If *True*, the image can be rotated 90 degrees if it results in less padding to reach
     the desired shape
-  param keepAspectRatio: If *False*, the image will be stretched instead of padded on the lacking dimension
+  :param keepAspectRatio: If *False*, the image will be stretched instead of padded on the lacking dimension.
+    The portion of the image which couldn't be resized fully is padded with a constant value of `padVal`.
+    For instance, if the original image is 5x10 and the requested new size is 10x15, then after resizing
+    the image will be 7x15 to preserve aspect ratio. 2 pixels of padding will be added on the left and
+    1 pixel of padding will be added on the right so the final output is 10x15.
   :param padVal: Value to pad dimension that couldn't be fully resized
   :param interp: Interpolation method to use during resizing
   :return: Resized and padded image
@@ -513,7 +512,7 @@ def deprecateKwargs(**oldToNewNameMapping):
             kwargs[replace] = kwargs[orig]
             del kwargs[orig]
           msg += f' Use the following replacement guide: {replacements}'
-        warnings.warn(msg, DeprecationWarning, stacklevel=2)
+        warnings.warn(msg, DeprecationWarning, stacklevel=3)
       return func(*args, **kwargs)
     return inner
   return deco

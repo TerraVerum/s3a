@@ -79,7 +79,7 @@ _defaultResizeOpts = dict(
   allowReorient=True
 )
 
-def getCroppedImgWithPadding(fullImage, coords, margin, returnCoords, padVal=np.nan, **resizeOpts):
+def getCroppedImg_resize_pad(fullImage, coords, margin, returnCoords, padVal=np.nan, **resizeOpts):
   shape = np.array(resizeOpts.pop('shape'))
   min_ = np.min(coords, 0)
   max_ = np.max(coords, 0)
@@ -102,7 +102,7 @@ def getCroppedImgWithPadding(fullImage, coords, margin, returnCoords, padVal=np.
   # Correction happens relative to xy
   if not needsRotate:
     padAx = 1 - padAx
-  if np.isnan(padVal):
+  if np.isnan(padVal) and resizeOpts.get('keepAspectRatio', True):
     # Non-nan value means user wants constant padding, not padding that came from image background
     min_[padAx] -= leftPad
     max_[padAx] += rightPad
@@ -401,7 +401,7 @@ class ComponentIO:
     """Exposed format from the more general exportSerialized"""
     return self.exportSerialized(*args, **kwargs)
 
-  @deprecateKwargs(imgDir='srcDir')
+  @deprecateKwargs(imgDir='srcDir', asIndiv='ignoreIdPriority')
   def exportCompImgsDf(
       self,
       compDf: pd.DataFrame,
@@ -412,7 +412,7 @@ class ComponentIO:
       marginAsPct=False,
       includeCols=('instId', 'img', 'labelMask', 'label', 'offset'),
       lblField='Instance ID',
-      asIndiv=False,
+      prioritizeById=False,
       returnLblMapping=False,
       missingOk=False,
       resizeOpts=None,
@@ -432,12 +432,13 @@ class ComponentIO:
     :param includeCols: Which columns to include in the export list
     :param lblField: See ComponentIO.exportLblPng. This label is provided in the output dataframe
       as well, if specified.
-    :param asIndiv: Whether components should be exported as individual units (i.e.
-      neighbors are guaranteed never to show up in the ground truth label mask) or whether
-      a cropped area around the component should be used as the label mask. This will
-      include mask values of neighbors if they are within mask range.
-      Note: When false, the mask is created with preference toward higher ids, i.e. if a high ID is on
-      top of a low ID, the low ID will still be covered in its export mask
+    :param prioritizeById: Since the label image export is only one channel (i.e. grayscale), problems arise when
+      there is overlap between components. Which one should be on top? If `prioritizeById` is *True*, higher
+      ids are always on top of lower ids. So, if ID 1 is a small component and ID 2 is a larger component completely
+      surrounding ID 1, ID 1's export will just look like ID 2's export. If *Fals*, the current component is always
+      on top in its label mask. In the case where more than 2 components overlap, the other components are ordered
+      by ID. So, in the previous scenario ID 1 will still show up on top of ID 2 in its own exported mask despite being
+      a lower ID, but ID 2 will be fully visible in its own export.
     :param missingOk: Whether a missing image is acceptable. When no source image is found
       for an annotation, this will simpy the 'image' output property
     :param resizeOpts: Options for reshaping the output to a uniform size if desired. The following keys may be supplied:
@@ -483,7 +484,7 @@ class ComponentIO:
     kwargs.pop('imShape', None)
     mappings = {}
     if resizeOpts is not None:
-      cropperFunc = getCroppedImgWithPadding
+      cropperFunc = getCroppedImg_resize_pad
     else:
       resizeOpts = {}
       cropperFunc = getCroppedImg
@@ -518,13 +519,14 @@ class ComponentIO:
           outDf['label'].append(lbl)
 
         if 'labelMask' in useKeys:
-          if asIndiv:
-            curLblImg = row[RTF.VERTICES].toMask(np.full_like(lblImg, bgColor),
+          if prioritizeById:
+            # ID indicates z-value, which is already the case for a label image
+            useImg = lblImg
+          else:
+            # The current component should always be drawn on top
+            useImg = row[RTF.VERTICES].toMask(lblImg.copy(),
                                                  float(invertedMap[lbl]),
                                                  asBool=False)
-            useImg = curLblImg
-          else:
-            useImg = lblImg
           mask = cropperFunc(useImg, allVerts, marginToUse, returnCoords=False, **resizeOpts)
 
           outDf['labelMask'].append(mask)
