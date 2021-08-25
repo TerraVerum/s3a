@@ -3,7 +3,7 @@ fields:
     value: -1
     readonly: True
   Source Image Filename:
-    value: ''
+    value: 'Newly Added'
     readonly: True
   Vertices:
     pType: 'complexxyvertices'
