@@ -288,7 +288,7 @@ class VertexDefinedImg(DASM, EditorPropsMixin, pg.ImageItem):
     if np.array_equal(oldImg>0, newMask):
       # Nothing to do
       return
-    verts = ComplexXYVertices.fromBwMask(newMask)
+    verts = ComplexXYVertices.fromBinaryMask(newMask)
     stackedVerts = verts.stack()
     newMask[stackedVerts.rows, stackedVerts.cols] = 2
     self.updateFromVertices(verts, srcImg=newMask)

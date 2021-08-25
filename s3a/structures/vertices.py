@@ -246,6 +246,12 @@ class ComplexXYVertices(list):
 
   @staticmethod
   def fromBwMask(bwMask: BlackWhiteImg, simplifyVerts=True, externOnly=False) -> ComplexXYVertices:
+    warn('"ComplexXYVertices.fromBwMask" is deprecated in favor of "ComplexXYVertices.fromBinaryMask".',
+         DeprecationWarning)
+    return ComplexXYVertices.fromBinaryMask(bwMask, simplifyVerts, externOnly)
+
+  @staticmethod
+  def fromBinaryMask(bwMask: BlackWhiteImg, simplifyVerts=True, externOnly=False) -> ComplexXYVertices:
     approxMethod = cv.CHAIN_APPROX_SIMPLE
     if not simplifyVerts:
       approxMethod = cv.CHAIN_APPROX_NONE

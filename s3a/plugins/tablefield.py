@@ -245,7 +245,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     data = self.region.regionData.copy()
     if compId is None:
       compId = data.index[0] if len(data) else -1
-    df = makeMultiRegionDf(vertices=[ComplexXYVertices.fromBwMask(mask)], idList=[compId])
+    df = makeMultiRegionDf(vertices=[ComplexXYVertices.fromBinaryMask(mask)], idList=[compId])
     self.updateRegion_undoable(df, offset=offset, oldProcCache=self.oldProcCache)
 
 
@@ -279,7 +279,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     """
     outVerts = ComplexXYVertices([verts for cplxVerts in self.region.regionData[RTF.VERTICES] for verts in cplxVerts])
     if simplify:
-      outVerts = ComplexXYVertices.fromBwMask(outVerts.toMask())
+      outVerts = ComplexXYVertices.fromBinaryMask(outVerts.toMask())
     return outVerts
 
   def clearFocusedRegion(self):

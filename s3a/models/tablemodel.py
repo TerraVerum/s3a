@@ -281,7 +281,7 @@ class ComponentMgr(CompTableModel):
     mask = np.zeros(maskShape, bool)
     for verts in mergeComps[RTF.VERTICES]: # type: ComplexXYVertices
       mask |= verts.toMask(tuple(maskShape))
-    newVerts = ComplexXYVertices.fromBwMask(mask)
+    newVerts = ComplexXYVertices.fromBinaryMask(mask)
     keepInfo[RTF.VERTICES] = newVerts
 
     deleted = self.rmComps(mergeComps.index, emitChange=False)['deleted']
@@ -311,7 +311,7 @@ class ComponentMgr(CompTableModel):
       nComps, ccompImg = cv.connectedComponents(tmpMask)
       newVerts = []
       for ii in range(1, nComps):
-        newVerts.append(ComplexXYVertices.fromBwMask(ccompImg == ii))
+        newVerts.append(ComplexXYVertices.fromBinaryMask(ccompImg == ii))
       childComps = pd.concat([comp.to_frame().T]*(nComps-1))
       childComps[RTF.VERTICES] = newVerts
       newComps_lst.append(childComps)
@@ -337,6 +337,6 @@ class ComponentMgr(CompTableModel):
     for ii, (_, comp) in enumerate(overlapComps.iterrows(), 1):
       comp[RTF.VERTICES].toMask(wholeMask, ii, asBool=False)
     for ii, compId in enumerate(overlapIds, 1):
-      verts = ComplexXYVertices.fromBwMask(wholeMask == ii)
+      verts = ComplexXYVertices.fromBinaryMask(wholeMask == ii)
       overlapComps.at[compId, RTF.VERTICES] = verts
     self.addComps(overlapComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)

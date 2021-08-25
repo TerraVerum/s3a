@@ -279,7 +279,7 @@ class LblPngImporter(AnnotationImporter):
   def formatSingleInstance(self, inst, **kwargs) -> dict:
     numericLbl, origVal = inst
     labelMask: np.ndarray = self.importObj
-    verts = ComplexXYVertices.fromBwMask(labelMask == numericLbl)
+    verts = ComplexXYVertices.fromBinaryMask(labelMask == numericLbl)
     out = defaultdict(list)
     if self.opts['distinctRegions']:
       newRegions = [ComplexXYVertices([v]) for v in verts]
@@ -331,7 +331,7 @@ class CompImgsDfImporter(AnnotationImporter):
     idx, row = inst
     out = {}
     mask = row.labelMask
-    verts = ComplexXYVertices.fromBwMask(mask).remove(-row.offset)
+    verts = ComplexXYVertices.fromBinaryMask(mask).remove(-row.offset)
     out[RTF.VERTICES] = verts
     return out
 

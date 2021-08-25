@@ -28,7 +28,7 @@ def _focusedResultConverter(result, component: pd.Series):
     newComp = component.copy()
     if mask is not None:
       offset = newComp[RTF.VERTICES].stack().min(0)
-      newVerts = ComplexXYVertices.fromBwMask(mask)
+      newVerts = ComplexXYVertices.fromBinaryMask(mask)
       for v in newVerts: v += offset
       newComp[RTF.VERTICES] = newVerts
     out['components'] = fns.serAsFrame(newComp)

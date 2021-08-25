@@ -200,7 +200,7 @@ def cornersToFullBoundary(cornerVerts: Union[XYVertices, ComplexXYVertices], siz
   if fillShape is not None:
     fillShape = tuple(fillShape)
   filledMask = cornerVerts.toMask(fillShape, warnIfTooSmall=False)
-  cornerVerts = ComplexXYVertices.fromBwMask(filledMask, simplifyVerts=False)
+  cornerVerts = ComplexXYVertices.fromBinaryMask(filledMask, simplifyVerts=False)
   if not stackResult:
     return cornerVerts
   cornerVerts = cornerVerts.filledVerts().stack()

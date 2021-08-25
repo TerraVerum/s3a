@@ -34,7 +34,7 @@ def test_split_selected_comps(app, mgr):
   cv.rectangle(compMask, (9, 9), (16, 16), 1, -1)
   cv.rectangle(compMask, (21, 21), (30, 30), 1, -1)
   cv.rectangle(compMask, (46, 46), (60, 60), 1, -1)
-  verts = ComplexXYVertices.fromBwMask(compMask > 0)
+  verts = ComplexXYVertices.fromBinaryMask(compMask > 0)
   comp = mgr.tableData.makeCompDf()
   comp.at[comp.index[0], REQD_TBL_FIELDS.VERTICES] = verts
   app.clearBoundaries()

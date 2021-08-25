@@ -54,7 +54,7 @@ class CompDfTester(CompositionMixin):
         cv.circle(mask, (o_x, o_y), radius, 1, -1)
       elif vertType == 'rectangle':
         cv.rectangle(mask, (o_x, o_y), (o_x+radius, o_y+radius), 1, -1)
-      verts = ComplexXYVertices.fromBwMask(mask)
+      verts = ComplexXYVertices.fromBinaryMask(mask)
       compDf.at[ii, REQD_TBL_FIELDS.VERTICES] = verts
       retVal.append(verts)
       mask.fill(0)

@@ -38,7 +38,7 @@ class ImgProcWrapper(NestedProcWrapper):
     return outImg
 
   def resultAsVerts(self, localEstimate=True):
-    initialList = ComplexXYVertices.fromBwMask(self.output)
+    initialList = ComplexXYVertices.fromBinaryMask(self.output)
     if len(initialList) == 0:
       return initialList
     if not localEstimate:
