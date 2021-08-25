@@ -376,6 +376,8 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
     """
     if selectionIdxs is None:
       selectionIdxs = self.ids_rows_colsFromSelection()
+    if len(selectionIdxs) == 0:
+      return
     overwriteData = self.mgr.compDf.loc[[selectionIdxs[0,0]]].copy()
     with self.actionStack.ignoreActions():
       self.popup.setData(overwriteData, pd.unique(selectionIdxs[:,2]),
