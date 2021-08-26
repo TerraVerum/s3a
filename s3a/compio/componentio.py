@@ -120,17 +120,21 @@ def getCroppedImg_resize_pad(fullImage, coords, margin, returnCoords, padVal=np.
 
 def _computeEdgePadding(bounds, fullImageShape, maxCoords, min_):
   # If padding caused min or max to go beyond image borders, make sure to spoof this with yet another padding
+  # Turn shape into x-y
+  fullImageShape = fullImageShape[::-1]
   needsMinPad = min_ < 0
-  topleftPad = np.array([0, 0])
+  leftTopPad = np.array([0, 0])
   minPad = -min_[needsMinPad]
-  topleftPad[needsMinPad] = minPad
+  leftTopPad[needsMinPad] = minPad
   bounds[0, needsMinPad] = minPad
+
   needsMaxPad = maxCoords > fullImageShape
-  botRightPad = np.array([0, 0])
-  maxPad = (maxCoords - fullImageShape[::-1])[needsMaxPad]
-  botRightPad[needsMaxPad] = maxPad
+  rightBotPad = np.array([0, 0])
+  maxPad = (maxCoords - fullImageShape)[needsMaxPad]
+  rightBotPad[needsMaxPad] = maxPad
   bounds[1, needsMaxPad] += maxPad
-  extraPadding = [int(pad) for pad in [topleftPad[0], botRightPad[0], topleftPad[1], botRightPad[1]]]
+  # Turn into order expected by cv2 -- top, bot, left, right
+  extraPadding = [int(pad) for pad in [leftTopPad[1], rightBotPad[1], leftTopPad[0], rightBotPad[0]]]
   return extraPadding
 
 
