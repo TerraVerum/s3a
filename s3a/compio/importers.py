@@ -336,6 +336,6 @@ class CompImgsDfImporter(AnnotationImporter):
     return out
 
   def bulkImport(self, importObj, errorOk=False, **kwargs):
-    out = importObj[['instId', 'label']].copy()
+    out = importObj[['instanceId', 'label']].copy()
     out.columns = [RTF.INST_ID, self.opts['labelField']]
     return out

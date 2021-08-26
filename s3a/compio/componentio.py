@@ -410,7 +410,7 @@ class ComponentIO:
       srcDir: Union[FilePath, dict, DirectoryDict] = None,
       margin=0,
       marginAsPct=False,
-      includeCols=('instId', 'img', 'labelMask', 'label', 'offset'),
+      includeCols=('instanceId', 'image', 'labelMask', 'label', 'offset'),
       lblField='Instance ID',
       prioritizeById=False,
       returnLblMapping=False,
@@ -467,7 +467,6 @@ class ComponentIO:
       - offset: Image (x,y) coordinate of the min component vertex.
     :param kwargs: Passed to ComponentIO.exportLblPng
     """
-    bgColor = kwargs.get('bgColor', 0)
     _imgCache = {}
     if srcDir is None:
       srcDir = Path('.')
@@ -511,8 +510,8 @@ class ComponentIO:
           marginToUse = margin
         compImg, bounds = cropperFunc(img, allVerts, marginToUse, returnCoords=True, **resizeOpts)
 
-        if 'img' in useKeys:
-          outDf['img'].append(compImg)
+        if 'image' in useKeys:
+          outDf['image'].append(compImg)
         lbl = row[lblField]
 
         if 'label' in useKeys:
@@ -531,8 +530,8 @@ class ComponentIO:
 
           outDf['labelMask'].append(mask)
 
-        if 'instId' in useKeys:
-          outDf['instId'].append(idx)
+        if 'instanceId' in useKeys:
+          outDf['instanceId'].append(idx)
 
         if 'offset' in useKeys:
           outDf['offset'].append(bounds[0, :])
@@ -693,14 +692,14 @@ class ComponentIO:
 
       extractedImgs = self.exportCompImgsDf(compDf, None, **kwargs)
       for idx, row in extractedImgs.iterrows():
-        saveName = f'{row.instId}.png'
-        if 'img' in row.index:
-          cvImsave_rgb(dataDir / saveName, row.img)
+        saveName = f'{row["instanceId"]}.png'
+        if 'image' in row.index:
+          cvImsave_rgb(dataDir / saveName, row['image'])
         if 'labelMask' in row.index:
           cvImsave_rgb(labelsDir / saveName, row.labelMask)
 
       if makeSummary:
-        extractedImgs = extractedImgs.rename({'instId': RTF.INST_ID.name}, axis=1)
+        extractedImgs = extractedImgs.rename({'instanceId': RTF.INST_ID.name}, axis=1)
         # Prevent merge error by renaming index
         # INST_ID.name has to be used instead of raw INST_ID due to strange pandas issue
         # throwing a TypeError: keywords must be a string
@@ -708,7 +707,7 @@ class ComponentIO:
         outDf = outDf.merge(
           extractedImgs, on=RTF.INST_ID.name
         )
-        for colName, imgDir in zip(['labelMask', 'img'], [labelsDir, dataDir]):
+        for colName, imgDir in zip(['labelMask', 'image'], [labelsDir, dataDir]):
           if colName not in extractedImgs:
             continue
           relDir = imgDir.relative_to(useDir)

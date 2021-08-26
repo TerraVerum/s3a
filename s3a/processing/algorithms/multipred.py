@@ -13,7 +13,7 @@ from utilitys import ProcessIO, fns, AtomicProcess
 
 def get_component_images(image: np.ndarray, components: pd.DataFrame):
   """
-  From a main image and dataframe of components, adds an 'img' column to `components` which holds the
+  From a main image and dataframe of components, returns a result which holds the
   subregion within the image each component occupies.
   """
   imgs = [getCroppedImg(image, verts.stack(), 0) for verts in components[RTF.VERTICES]]
