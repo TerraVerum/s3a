@@ -86,6 +86,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
 
   def _updateProjLbl(self):
     self.projNameLbl.setText(f'Project: {self.projData.cfgFname.name}')
+    self.projNameLbl.setToolTip(str(self.projData.cfgFname))
 
   def _buildIoOpts(self):
     """
