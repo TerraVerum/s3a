@@ -560,11 +560,10 @@ class ComponentIO:
     See the function signature for :func:`exportCsv <ComponentIO.exportCsv>`
     """
     # Since the write-out is a single operation there isn't an intermediate form to return
-    pklDf = None
     if outFile is not None:
-      pklDf = pickle.dumps(compDf)
       compDf.to_pickle(outFile)
-    return pklDf
+    # Pickle export doesn't change anything about the dataframe, so just return it
+    return compDf
 
   def exportLblPng(
       self,
