@@ -62,7 +62,9 @@ def serialize(param: PrjParam, values: t.Sequence[t.Any], returnErrs=True):
     return ret[retIdx]
   # Calling 'serialize' on already serialized data is a no-op
   # TODO: handle heterogeneous arrays?
-  if isinstance(values[0], str):
+  # Series objects will use loc-based indexing, so use an iterator to guarantee first access regardless of sequence
+  # type
+  if isinstance(next(iter(values)), str):
     ret[0] = pd.Series(values, name=param)
     return ret[retIdx]
   # Also account for when takesParam=True, where val will be the last option
@@ -73,7 +75,9 @@ def deserialize(param: PrjParam, values: t.Sequence[str], returnErrs=True):
   # Calling 'deserialize' on a stringified data is a no-op
   # TODO: heterogeneous arrays?
   # Unlike serialize, dtype could be different depending on 'param', so leave empty creation to the handler
-  if len(values) and not isinstance(values[0], str):
+  # Series objects will use loc-based indexing, so use an iterator to guarantee first access regardless of sequence
+  # type
+  if len(values) and not isinstance(next(iter(values)), str):
     return pd.Series(values, name=param)
   paramType = type(param.value)
   # Also account for when takesParam=True, where val will be the last option
