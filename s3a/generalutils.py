@@ -284,7 +284,7 @@ def resize_pad(img: NChanImg,
       ratios = tmpRatios
 
   if not keepAspectRatio:
-    return cv.resize(img, newSize[::-1], interpolation=interp)
+    return cv.resize(img, tuple(newSize[::-1]), interpolation=interp)
 
   ratio = ratios.min()
   paddedImg = cv.resize(img, (0, 0), fx=ratio, fy=ratio, interpolation=interp)
