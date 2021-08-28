@@ -32,12 +32,12 @@ Signal = QtCore.Signal
 
 def makeMultiRegionDf(numRows=1, idList: Sequence[int]=None, selected:Sequence[bool]=None,
                       focused: Sequence[bool]=None,
-                      vertices: Sequence[ComplexXYVertices]=None, lblField: PrjParam=None):
+                      vertices: Sequence[ComplexXYVertices]=None, labelField: PrjParam=None):
   """
   Helper for creating new dataframe holding information determining color data.
   `selected` and `focused` must be boolean arrays indicating whether or not each component
   is selected or focused, respectively.
-  If `lblField` is given, it is used as a value to color the components
+  If `labelField` is given, it is used as a value to color the components
   """
   outDict = {}
   if selected is None:
@@ -46,9 +46,9 @@ def makeMultiRegionDf(numRows=1, idList: Sequence[int]=None, selected:Sequence[b
   if focused is None:
     focused = np.zeros(numRows, bool)
   outDict[PRJ_ENUMS.FIELD_FOCUSED] = focused
-  if lblField is not None:
-    labels_tmp = np.tile(lblField.value, numRows)
-    labels = lblField.toNumeric(labels_tmp, rescale=True)
+  if labelField is not None:
+    labels_tmp = np.tile(labelField.value, numRows)
+    labels = labelField.toNumeric(labels_tmp, rescale=True)
   else:
     labels = np.zeros(numRows)
   outDict[PRJ_ENUMS.FIELD_LABEL] = labels
@@ -93,16 +93,16 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     self.sigPointsClicked = None
 
   def resetRegionList(self, newRegionDf: Optional[df]=None,
-                      lblField:PrjParam=RTF.INST_ID):
+                      labelField:PrjParam=RTF.INST_ID):
     idList = None
     if (newRegionDf is not None
-        and lblField in newRegionDf.columns):
+        and labelField in newRegionDf.columns):
       newRegionDf = newRegionDf.copy()
-      newRegionDf[PRJ_ENUMS.FIELD_LABEL] = lblField.toNumeric(newRegionDf[lblField], rescale=True)
+      newRegionDf[PRJ_ENUMS.FIELD_LABEL] = labelField.toNumeric(newRegionDf[labelField], rescale=True)
     numRows = len(newRegionDf)
     if newRegionDf is not None:
       idList = newRegionDf.index
-    self.regionData = makeMultiRegionDf(numRows, idList=idList, lblField=lblField)
+    self.regionData = makeMultiRegionDf(numRows, idList=idList, labelField=labelField)
     if newRegionDf is not None:
       self.regionData.update(newRegionDf)
     self.updatePlot()

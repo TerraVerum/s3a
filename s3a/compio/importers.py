@@ -239,7 +239,7 @@ class LblPngImporter(AnnotationImporter):
       details, since this is the mapping expected. If not provided, first the image metadata tags are searched for
       a 'lblMapping' text attribute (this is often added to label images saved by S3A). Note that metadata can only be
       read from the file if a file path is provided, of course. If this check fails, it is inferred based on the
-      allowed options of `lblField` (`lblField.opts['limits']`). Finally, if this is not present, it is assumed the
+      allowed options of `labelField` (`labelField.opts['limits']`). Finally, if this is not present, it is assumed the
       raw image values can be used directly as field values.
     :param offset: When `lblMapping` is not provided and field values are directly inferred from label values, this
       determines whether (and how much if not *None*) to offset numeric labels during import. I.e. if the png label

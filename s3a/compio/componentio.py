@@ -405,7 +405,7 @@ class ComponentIO:
     """Exposed format from the more general exportSerialized"""
     return self.exportSerialized(*args, **kwargs)
 
-  @deprecateKwargs(imgDir='srcDir', asIndiv='ignoreIdPriority')
+  @deprecateKwargs(imgDir='srcDir', asIndiv='ignoreIdPriority', lblField='labelField')
   def exportCompImgsDf(
       self,
       compDf: pd.DataFrame,
@@ -415,7 +415,7 @@ class ComponentIO:
       margin=0,
       marginAsPct=False,
       includeCols=('instanceId', 'image', 'labelMask', 'label', 'offset'),
-      lblField='Instance ID',
+      labelField='Instance ID',
       prioritizeById=False,
       returnLblMapping=False,
       missingOk=False,
@@ -434,7 +434,7 @@ class ComponentIO:
     :param marginAsPct: Whether the margin should be a percentage of the component size or
       a raw pixel value.
     :param includeCols: Which columns to include in the export list
-    :param lblField: See ComponentIO.exportLblPng. This label is provided in the output dataframe
+    :param labelField: See ComponentIO.exportLblPng. This label is provided in the output dataframe
       as well, if specified.
     :param prioritizeById: Since the label image export is only one channel (i.e. grayscale), problems arise when
       there is overlap between components. Which one should be on top? If `prioritizeById` is *True*, higher
@@ -467,7 +467,7 @@ class ComponentIO:
       - img: The (MxNxC) image corresponding to the component vertices, where MxN are
         the padded row sizes and C is the number of image channels
       - labelMask: Binary mask representing the component vertices
-      - label: Field value of the component for the field specified by `lblField`
+      - label: Field value of the component for the field specified by `labelField`
       - offset: Image (x,y) coordinate of the min component vertex.
     :param kwargs: Passed to ComponentIO.exportLblPng
     """
@@ -482,7 +482,7 @@ class ComponentIO:
 
     useKeys = set(includeCols)
     outDf = {k: [] for k in useKeys}
-    lblField = self.tableData.fieldFromName(lblField)
+    labelField = self.tableData.fieldFromName(labelField)
     # imshape is automatically inferred by the exporter
     kwargs.pop('imShape', None)
     mappings = {}
@@ -498,7 +498,7 @@ class ComponentIO:
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), fullImgName)
       shape = img if img is None else img.shape[:2]
       lblImg, mapping = self.exportLblPng(
-          miniDf, imShape=shape, lblField=lblField, returnLblMapping=True, **kwargs
+          miniDf, imShape=shape, labelField=labelField, returnLblMapping=True, **kwargs
       )
       mappings[Path(fullImgName).name] = mapping
       if img is None:
@@ -516,7 +516,7 @@ class ComponentIO:
 
         if 'image' in useKeys:
           outDf['image'].append(compImg)
-        lbl = row[lblField]
+        lbl = row[labelField]
 
         if 'label' in useKeys:
           outDf['label'].append(lbl)
@@ -565,12 +565,13 @@ class ComponentIO:
     # Pickle export doesn't change anything about the dataframe, so just return it
     return compDf
 
+  @deprecateKwargs(lblField='labelField')
   def exportLblPng(
       self,
       compDf: pd.DataFrame,
       outFile: FilePath = None,
       imShape: Tuple[int] = None,
-      lblField: Union[PrjParam, str] = 'Instance ID',
+      labelField: Union[PrjParam, str] = 'Instance ID',
       bgColor=0,
       rescaleOutput=False,
       returnLblMapping=False,
@@ -581,10 +582,10 @@ class ComponentIO:
     :param compDf: Dataframe to export
     :param outFile: Filename to save, leave *None* to avoid saving to a file
     :param imShape: MxN shape of image containing these annotations
-    :param lblField: Data field to use as an index label. E.g. "Class" will use the 'class'
+    :param labelField: Data field to use as an index label. E.g. "Class" will use the 'class'
       column, but any other column can be specified. The output ground truth masks
       will be colored according to this field.  See :meth:`PrjParam.toNumeric` for details.
-      If `lblField` is *None*, the foreground mask will be boolean instead of integer-colored.
+      If `labelField` is *None*, the foreground mask will be boolean instead of integer-colored.
     :param bgColor: Color of the mask background. Must be an integer.
     :param rescaleOutput: For images designed for human use, it is helpful to have
       outputs rescaled to the entire intensity range. Otherwise, they usually end
@@ -601,14 +602,14 @@ class ComponentIO:
     :return:
     """
 
-    lblField = self.tableData.fieldFromName(lblField)
+    labelField = self.tableData.fieldFromName(labelField)
 
     if bgColor < 0:
       raise ValueError(f'Background color must be >= 0, was {bgColor}')
 
     readMapping = returnLblMapping or (writeMeta and outFile is not None)
-    labels = compDf[lblField]
-    labels_numeric = lblField.toNumeric(labels, returnMapping=readMapping)
+    labels = compDf[labelField]
+    labels_numeric = labelField.toNumeric(labels, returnMapping=readMapping)
     # Make sure numeric labels aren't the same as background, otherwise they will be forever lost
     mapping = None
     if readMapping:

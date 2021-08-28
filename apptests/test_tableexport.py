@@ -142,7 +142,7 @@ def test_compimgs_export(tmp_path, _simpleTbl):
   tester.compDf[REQD_TBL_FIELDS.INST_ID] = tester.index
 
   # Do df export just to test the output file capability and various options
-  io.exportCompImgsDf(tester.compDf, tmp_path/'test.pkl', lblField='List')
+  io.exportCompImgsDf(tester.compDf, tmp_path /'test.pkl', labelField='List')
   assert (tmp_path/'test.pkl').exists()
   df, mappings = io.exportCompImgsDf(tester.compDf, prioritizeById=False, returnLblMapping=True)
   df['image_name'] = tester.compDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME].apply(lambda p: p.name).values
@@ -196,7 +196,7 @@ def test_lblpng_export(_simpleTbl):
   sampleComps = tester.compDf
 
   with pytest.raises(ValueError):
-    io.exportLblPng(sampleComps, lblField='badlbl')
+    io.exportLblPng(sampleComps, labelField='badlbl')
   with pytest.raises(ValueError):
     io.exportLblPng(sampleComps, bgColor=-1)
 
@@ -205,12 +205,12 @@ def test_lblpng_export(_simpleTbl):
   assert np.max(mapping.index) > np.max(sampleComps.index)
 
   field = _simpleTbl.fieldFromName('List')
-  export, mapping = io.exportLblPng(sampleComps, returnLblMapping=True, lblField=field)
+  export, mapping = io.exportLblPng(sampleComps, returnLblMapping=True, labelField=field)
   assert (mapping.to_numpy() == field.opts['limits']).all()
 
   sampleComps[field] = 'a'
   # Make sure full mapping is made even when not all values exist
-  export, mapping = io.exportLblPng(sampleComps, returnLblMapping=True, lblField=field)
+  export, mapping = io.exportLblPng(sampleComps, returnLblMapping=True, labelField=field)
   assert (mapping.to_numpy() == field.opts['limits']).all()
 
 def test_geojson_import():

@@ -211,7 +211,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
       return
 
     lblCol = self.win.compDisplay.labelCol
-    self.region.resetRegionList(newRegionDf=centeredData, lblField=lblCol)
+    self.region.resetRegionList(newRegionDf=centeredData, labelField=lblCol)
     self.region.focusById(centeredData.index)
 
     buffVerts = ComplexXYVertices()

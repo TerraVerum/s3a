@@ -207,7 +207,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     previouslyVisible = self.displayedIds
     # Update filter list: hide/unhide ids and verts as needed.
     self._updateDisplayedIds()
-    self.regionPlot.resetRegionList(compDf.loc[self.displayedIds], lblField=self.labelCol)
+    self.regionPlot.resetRegionList(compDf.loc[self.displayedIds], labelField=self.labelCol)
     # noinspection PyTypeChecker
     # self._reflectTableSelectionChange(np.intersect1d(self.displayedIds, self.selectedIds))
 
