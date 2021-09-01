@@ -8,7 +8,7 @@ from pyqtgraph.Qt import QtWidgets
 
 __all__ = ['appInst', 'S3A', 'REQD_TBL_FIELDS',
            'ComplexXYVertices', 'XYVertices', 'PRJ_CONSTS', 'ComponentIO',
-           'ProjectData', '__version__', 'PRJ_ENUMS']
+           'ProjectData', '__version__', 'PRJ_ENUMS', 'TableData']
 
 pg.setConfigOptions(imageAxisOrder='row-major')
 
@@ -40,3 +40,4 @@ from .views.s3agui import S3A
 
 from s3a.plugins.misc import RandomToolsPlugin
 from s3a.plugins.file import ProjectData
+from s3a.parameditors.table import TableData
