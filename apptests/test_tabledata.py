@@ -1,8 +1,7 @@
 import contextlib
-import warnings
+from io import StringIO
 from pathlib import Path
 from typing import Union, Sequence
-from io import StringIO
 
 import numpy as np
 import pytest
@@ -10,9 +9,8 @@ import pytest
 from apptests.testingconsts import RND
 from conftest import dfTester
 from s3a import REQD_TBL_FIELDS, ComplexXYVertices
-from utilitys import fns
-
 from s3a.parameditors.table import TableData
+from utilitys import fns
 
 cfgDict = {
   'fields': {
@@ -61,8 +59,9 @@ def test_no_change(app, newCfg):
   with newCfg(app.sharedAttrs.tableData.cfgFname, app.sharedAttrs.tableData.cfg):
     assert len(app.compMgr.compDf) > 0
 
-def test_filter(td, qtbot):
+def test_filter():
   # Try a bunch of types
+  td = TableData(makeFilter=True)
   mockCfg = """
   fields:
     List:

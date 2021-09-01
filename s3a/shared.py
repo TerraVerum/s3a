@@ -12,7 +12,7 @@ class SharedAppSettings(QtCore.QObject):
     super().__init__(parent)
     self.actionStack = ActionStack()
 
-    self.tableData = TableData()
+    self.tableData = TableData(makeFilter=True)
     self.filter = self.tableData.filter
 
     self.imgProcClctn = AlgCollection(ImgProcWrapper, ImageProcess, saveDir=IMG_PROC_DIR,

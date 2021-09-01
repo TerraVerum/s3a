@@ -44,7 +44,8 @@ class TableData(QtCore.QObject):
   def __init__(self,
                cfgFname: FilePath=None,
                cfgDict: dict=None,
-               template: Union[FilePath, dict]=None):
+               template: Union[FilePath, dict]=None,
+               makeFilter=False):
     super().__init__()
     if template is None:
       template = IOTemplateManager.getTableCfg('s3a')
@@ -52,7 +53,10 @@ class TableData(QtCore.QObject):
 
     self.factories: Dict[PrjParam, Callable[[], Any]] = {}
 
-    self.filter = TableFilterEditor()
+    if makeFilter:
+      self.filter = TableFilterEditor()
+    else:
+      self.filter = None
     self.paramParser: Optional[YamlParser] = None
 
     self.cfgFname: Optional[Path] = None
@@ -161,7 +165,8 @@ class TableData(QtCore.QObject):
       param = self.paramParser['fields', field]
       self.addField(param)
 
-    self.filter.updateParamList(self.allFields)
+    if self.filter:
+      self.filter.updateParamList(self.allFields)
     self.sigCfgUpdated.emit(self.cfg)
 
   def clear(self):
