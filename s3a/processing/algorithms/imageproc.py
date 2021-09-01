@@ -1,4 +1,3 @@
-import typing as t
 from typing import Tuple, Union, Dict, Any
 
 import cv2 as cv
@@ -9,11 +8,16 @@ from skimage import segmentation as seg
 from skimage.measure import regionprops, label
 from skimage.morphology import flood
 
+from s3a.constants import PRJ_ENUMS
 from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices, \
   showMaskDiff, tryCvResize
 from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg, GrayImg
 from utilitys import fns
 from utilitys.processing import *
+
+UNSPEC = PRJ_ENUMS.HISTORY_UNSPECIFIED
+FGND = PRJ_ENUMS.HISTORY_FOREGROUND
+BGND = PRJ_ENUMS.HISTORY_BACKGROUND
 
 # TODO: Establish better mechanism than global buffer
 procCache: Dict[str, Any] = {
@@ -85,8 +89,7 @@ def format_vertices(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
     _historyMask = procCache['mask'].copy()
 
   asForeground = True
-  # 0 = unspecified, 1 = background, 2 = foreground
-  for fillClr, verts in enumerate([bgVerts, fgVerts], 1):
+  for fillClr, verts in enumerate([bgVerts, fgVerts], PRJ_ENUMS.HISTORY_BACKGROUND):
     if not verts.empty and verts.connected:
       cv.fillPoly(_historyMask, [verts], fillClr)
 
@@ -100,15 +103,15 @@ def format_vertices(image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices,
     # Give whole image as input, trim from edges
     fgVerts = imgCornerVertices(image)
     fgVerts = cornersToFullBoundary(fgVerts)
-    _historyMask[fgVerts.rows, fgVerts.cols] = 1
+    _historyMask[fgVerts.rows, fgVerts.cols] = FGND
   procCache['mask'] = _historyMask
   curHistory = _historyMask.copy()
   if fgVerts.empty:
     # Invert the mask and paint foreground pixels
     asForeground = False
     # Invert the history mask too
-    curHistory[_historyMask == 2] = 1
-    curHistory[_historyMask == 1] = 2
+    curHistory[_historyMask == FGND] = BGND
+    curHistory[_historyMask == BGND] = FGND
     fgVerts = bgVerts
     bgVerts = XYVertices()
 
@@ -354,8 +357,8 @@ class _CvGrabcut(AtomicProcess):
     if historyMask.shape == mask.shape:
       mask[prevCompMask == 1] = cv.GC_PR_FGD
       mask[prevCompMask == 0] = cv.GC_PR_BGD
-      mask[historyMask == 2] = cv.GC_FGD
-      mask[historyMask == 1] = cv.GC_BGD
+      mask[historyMask == FGND] = cv.GC_FGD
+      mask[historyMask == BGND] = cv.GC_BGD
 
     cvRect = np.array([fgVerts.min(0), fgVerts.max(0) - fgVerts.min(0)]).flatten()
 

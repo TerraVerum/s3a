@@ -92,6 +92,10 @@ class PRJ_ENUMS:
   PROC_ADD_TOP  = 'top'
   PROC_ADD_PRIM = 'primitive'
   PROC_NO_ADD   = None
+
+  HISTORY_UNSPECIFIED = 0
+  HISTORY_BACKGROUND = 1
+  HISTORY_FOREGROUND = 2
   
 from s3a.structures import ComplexXYVertices, PrjParam, PrjParamGroup, newParam
 
