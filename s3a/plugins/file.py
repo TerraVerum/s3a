@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import inspect
 import os
 import pydoc
@@ -110,6 +111,8 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
           atomic.input.hyperParamKeys.remove(key)
       if atomic.input.hyperParamKeys:
         wrapper.addStage(atomic)
+    # Add catch-all that will be literally evaluated later
+    wrapper.parentParam.addChild(dict(name='extra', type='text', value='', expanded=False))
     return wrapper.parentParam
 
   def attachWinRef(self, win: models.s3abase.S3ABase):
@@ -173,6 +176,14 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     def exportWrapper(func):
       def wrapper(**kwargs):
         initial = {**self.exportOptsParam}
+        # Fixup the special "extra" parameter
+        extra = initial.pop('extra')
+        if extra:
+          try:
+            newOpts = eval(f'dict({extra})', {}, {})
+            initial.update(newOpts)
+          except Exception as ex:
+            warn(f'Could not parse extra arguments:\n{ex}')
         initial.update(kwargs)
         return func(**initial)
       return wrapper
