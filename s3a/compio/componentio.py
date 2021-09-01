@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import errno
-import inspect
 import json
 import os
-import pickle
 import sys
 import tempfile
 import warnings
@@ -16,23 +14,22 @@ from stat import S_IREAD, S_IRGRP, S_IROTH
 from typing import Any, Optional, Union, Tuple, Callable
 from zipfile import ZipFile
 
-import cv2 as cv
 import numpy as np
 import pandas as pd
-from pandas.core.dtypes.missing import array_equivalent
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
+from pandas.core.dtypes.missing import array_equivalent
+from skimage.exposure import rescale_intensity
+
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
-from s3a.generalutils import augmentException, getCroppedImg, resize_pad, cvImsave_rgb, classproperty, \
-  cvImread_rgb, imgPathtoHtml, deprecateKwargs, DirectoryDict
-from ..parameditors.table.data import TableData
+from s3a.generalutils import augmentException, getCroppedImg, cvImsave_rgb, cvImread_rgb, imgPathtoHtml, \
+  deprecateKwargs, DirectoryDict, getCroppedImg_resize_pad
 from s3a.shims import typing_extensions
 from s3a.structures import FilePath, ComplexXYVertices, PrjParam
-from skimage.exposure import rescale_intensity
 from utilitys import fns
-
 from .helpers import serialize, _getPdExporters
 from .importers import *
+from ..parameditors.table.data import TableData
 
 FilePathOrDf = Union[FilePath, pd.DataFrame]
 # Values are strings
@@ -78,65 +75,6 @@ _defaultResizeOpts = dict(
   padVal=np.nan,
   allowReorient=True
 )
-
-def getCroppedImg_resize_pad(fullImage, coords, margin, returnCoords, padVal=np.nan, **resizeOpts):
-  shape = np.array(resizeOpts.pop('shape'))
-  min_ = np.min(coords, 0)
-  max_ = np.max(coords, 0)
-  # x-y to row-col
-  span = (max_ - min_ + 1)[::-1]
-  ratios = shape / span
-  needsRotate = False
-  if resizeOpts.get('allowReorient'):
-    # Choose whichever orientation leads to the closest ratio to the original size
-    tmpRatios = shape / span[::-1]
-    if np.abs(1 - tmpRatios.min()/tmpRatios.max()) < np.abs(1 - ratios.min()/ratios.max()):
-      ratios = tmpRatios
-      span = span[::-1]
-      needsRotate = True
-  padAx = np.argmax(ratios)
-  padAmt = (ratios.max()/ratios.min()-1)*span[padAx]
-  # left/right could be top/bottom, but the concept is the same either way
-  leftPad = np.ceil(padAmt/2)
-  rightPad = padAmt.round() - leftPad
-  # Correction happens relative to xy
-  if not needsRotate:
-    padAx = 1 - padAx
-  if np.isnan(padVal) and resizeOpts.get('keepAspectRatio', True):
-    # Non-nan value means user wants constant padding, not padding that came from image background
-    min_[padAx] -= leftPad
-    max_[padAx] += rightPad
-    resizeOpts.update(keepAspectRatio=False)
-  img, bounds = getCroppedImg(fullImage, np.vstack([min_, max_]), margin)
-  extraPadding = _computeEdgePadding(bounds, fullImage.shape[:2], max_, min_)
-  if any(extraPadding):
-    img = cv.copyMakeBorder(img, *extraPadding, cv.BORDER_CONSTANT, value=0)
-  # Due to custom padding, resized image can at most be off by one pixel. This is fine to allow a bit of stretch
-  img = resize_pad(img, shape, **resizeOpts, padVal=padVal)
-  if returnCoords:
-    return img, bounds
-  return img
-
-
-def _computeEdgePadding(bounds, fullImageShape, maxCoords, min_):
-  # If padding caused min or max to go beyond image borders, make sure to spoof this with yet another padding
-  # Turn shape into x-y
-  fullImageShape = fullImageShape[::-1]
-  needsMinPad = min_ < 0
-  leftTopPad = np.array([0, 0])
-  minPad = -min_[needsMinPad]
-  leftTopPad[needsMinPad] = minPad
-  bounds[0, needsMinPad] = minPad
-
-  needsMaxPad = maxCoords > fullImageShape
-  rightBotPad = np.array([0, 0])
-  maxPad = (maxCoords - fullImageShape)[needsMaxPad]
-  rightBotPad[needsMaxPad] = maxPad
-  bounds[1, needsMaxPad] += maxPad
-  # Turn into order expected by cv2 -- top, bot, left, right
-  extraPadding = [int(pad) for pad in [leftTopPad[1], rightBotPad[1], leftTopPad[0], rightBotPad[0]]]
-  return extraPadding
-
 
 class ComponentIO:
   """
