@@ -254,16 +254,16 @@ def imgCornerVertices(img: NChanImg=None) -> XYVertices:
               ])
 
 def resize_pad(img: NChanImg,
-               newSize: Sequence[int],
+               shape: Sequence[int],
                allowReorient=False,
                keepAspectRatio=True,
-               interp=cv.INTER_NEAREST,
+               interpolation=cv.INTER_NEAREST,
                padVal=0,
                returnStats=False):
   """
   Resizes image to the requested size using the specified interpolation method.
   :param img: Image to resize
-  :param newSize: New size for image
+  :param shape: New shape for image
   :param allowReorient: If *True*, the image can be rotated 90 degrees if it results in less padding to reach
     the desired shape
   :param keepAspectRatio: If *False*, the image will be stretched instead of padded on the lacking dimension.
@@ -272,19 +272,20 @@ def resize_pad(img: NChanImg,
     the image will be 7x15 to preserve aspect ratio. 2 pixels of padding will be added on the left and
     1 pixel of padding will be added on the right so the final output is 10x15.
   :param padVal: Value to pad dimension that couldn't be fully resized
-  :param interp: Interpolation method to use during resizing
+  :param interpolation: Interpolation method to use during resizing
   :param returnStats: If *True*, the return value of this function will be a tuple where the first argument
     is the resized/padded image and the second is a dict of stats. Keys are:
 
       - 'top'/'left'/'bottom'/'right': Padding added to top, left, ... sides of the image
       - 'reoriented': Boolean, whether the image was rotated
   """
-  newSize = np.asarray(newSize)
-  ratios = newSize / img.shape[:2]
+  initialShape = img.shape[:2]
+  shape = np.asarray(shape)
+  ratios = shape / initialShape
   rotated = False
   if allowReorient:
     # Choose whichever orientation leads to the closest ratio to the original size
-    tmpRatios = newSize / img.shape[:2][::-1]
+    tmpRatios = shape / img.shape[:2][::-1]
     if np.abs(1 - tmpRatios[0] / tmpRatios[1]) < np.abs(1 - ratios[0] / ratios[1]):
       img = cv.rotate(img, cv.ROTATE_90_CLOCKWISE)
       ratios = tmpRatios
@@ -292,23 +293,25 @@ def resize_pad(img: NChanImg,
 
   # Dummy pad values, will be updated if padding actually occurs
   top, left, bottom, right = [0] * 4
-
+  stats = dict(initialShape=initialShape, rotated=rotated, interpolation=interpolation)
   if not keepAspectRatio:
-    paddedImg = cv.resize(img, tuple(newSize[::-1]), interpolation=interp)
+    paddedImg = cv.resize(img, tuple(shape[::-1]), interpolation=interpolation)
     if returnStats:
-      return paddedImg, dict(top=top, bottom=bottom, left=left, right=right, ratio=None, rotated=rotated)
+      return paddedImg, stats
     return paddedImg
 
   ratio = ratios.min()
-  paddedImg = cv.resize(img, (0, 0), fx=ratio, fy=ratio, interpolation=interp)
-  padding = (newSize - paddedImg.shape[:2])
+  paddedImg = cv.resize(img, (0, 0), fx=ratio, fy=ratio, interpolation=interpolation)
+  padding = (shape - paddedImg.shape[:2])
 
   if (padding > 0).any():
     top, left = map(int, padding//2)
     bottom, right = map(int, padding - padding//2)
     paddedImg = cv.copyMakeBorder(paddedImg, top, bottom, left, right, cv.BORDER_CONSTANT, value=padVal)
   if returnStats:
-    return paddedImg, dict(top=top, bottom=bottom, left=left, right=right, ratio=ratio, rotated=rotated)
+    # No pre-resize padding added
+    stats.update(postResizePadding=(top, bottom, left, right))
+    return paddedImg, stats
   return paddedImg
 
 def showMaskDiff(oldMask: BlackWhiteImg, newMask: BlackWhiteImg):
@@ -532,13 +535,22 @@ def deprecateKwargs(**oldToNewNameMapping):
     return inner
   return deco
 
+def _indexUsingPad(image, tblrPadding):
+  """Extracts an inner portion of an image accounting for top/bottom/left/right padding tuple"""
+  imshape = image.shape[:2]
+  rows = slice(tblrPadding[0], imshape[0] - tblrPadding[1])
+  cols = slice(tblrPadding[2], imshape[1] - tblrPadding[3])
+  return image[rows, cols, ...]
 
-def getCroppedImg_resize_pad(fullImage, coords, margin, returnCoords, padVal=np.nan, **resizeOpts):
+
+def getCroppedImg_resize_pad(fullImage, coords, margin=0, returnCoords=True, padVal=np.nan, **resizeOpts):
   shape = np.array(resizeOpts.pop('shape'))
   min_ = np.min(coords, 0)
   max_ = np.max(coords, 0)
   # x-y to row-col
   span = (max_ - min_ + 1)[::-1]
+  initialShape = tuple(map(int, span))
+
   ratios = shape / span
   needsRotate = False
   if resizeOpts.get('allowReorient'):
@@ -551,23 +563,33 @@ def getCroppedImg_resize_pad(fullImage, coords, margin, returnCoords, padVal=np.
   padAx = np.argmax(ratios)
   padAmt = (ratios.max()/ratios.min()-1)*span[padAx]
   # left/right could be top/bottom, but the concept is the same either way
-  leftPad = np.ceil(padAmt/2)
-  rightPad = padAmt.round() - leftPad
-  # Correction happens relative to xy
+  leftPad = int(np.ceil(padAmt/2))
+  rightPad = int(padAmt.round() - leftPad)
+  # Correction happens relative to xy unless the image will be rotated, in which case x will be height
   if not needsRotate:
     padAx = 1 - padAx
   if np.isnan(padVal) and resizeOpts.get('keepAspectRatio', True):
     # Non-nan value means user wants constant padding, not padding that came from image background
     min_[padAx] -= leftPad
     max_[padAx] += rightPad
+    # Extra padding means the aspect ratio should be 1, so no need to account for this in `resize_pad`
     resizeOpts.update(keepAspectRatio=False)
+  else:
+    # Zero out to avoid false accounting when updating `stats` below
+    leftPad = rightPad = 0
   img, bounds = getCroppedImg(fullImage, np.vstack([min_, max_]), margin)
+  # If padding caused min or max to go beyond image borders, make sure to spoof this with yet another padding
   extraPadding = _computeEdgePadding(bounds, fullImage.shape[:2], max_, min_)
   if any(extraPadding):
     img = cv.copyMakeBorder(img, *extraPadding, cv.BORDER_CONSTANT, value=0)
   # Due to custom padding, resized image can at most be off by one pixel. This is fine to allow a bit of stretch
   oldReturnStats = resizeOpts.pop('returnStats', False)
   img, stats = resize_pad(img, shape, **resizeOpts, padVal=padVal, returnStats=True)
+  # Since padding might have occured at this stack level, make sure the original width and height values are correct
+  # Also make sure the raw image size is correct
+  stats['preResizePadding'] = (0, 0, leftPad, rightPad) if padAx == 0 else (leftPad, rightPad, 0, 0)
+  stats['initialShape'] = initialShape
+
   ret = [img]
   if returnCoords:
     ret.append(bounds)
@@ -577,8 +599,30 @@ def getCroppedImg_resize_pad(fullImage, coords, margin, returnCoords, padVal=np.
     return ret[0]
   return tuple(ret)
 
+def inverseResize_pad(image, stats):
+  """
+  If `image` and `stats` are the result of a `resize_pad` operation with ``returnStats=True``, this will
+  return a version of `image` that is normalized back to the unresized, unpadded state.
+  """
+  NO_PADDING = [0]*4
+  image = _indexUsingPad(image, stats.get('postResizePadding', NO_PADDING))
+
+  # If the image was rotated, the initial shape should be altered to account for this during pad math
+  initialShape = stats['initialShape']
+  if stats.get('rotated'):
+    initialShape = initialShape[::-1]
+
+  prepad = stats.get('preResizePadding', NO_PADDING)
+  preresizeShape = np.array(initialShape, dtype=int) + [sum(prepad[:2]), sum(prepad[2:])]
+  image = cv.resize(image, tuple(preresizeShape[::-1].astype(int)), interpolation=stats.get('interpolation'))
+
+  image = _indexUsingPad(image, prepad)
+  if stats['rotated']:
+    image = cv.rotate(image, cv.ROTATE_90_COUNTERCLOCKWISE)
+  return image
+
+
 def _computeEdgePadding(bounds, fullImageShape, maxCoords, min_):
-  # If padding caused min or max to go beyond image borders, make sure to spoof this with yet another padding
   # Turn shape into x-y
   fullImageShape = fullImageShape[::-1]
   needsMinPad = min_ < 0
