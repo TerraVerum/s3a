@@ -142,10 +142,12 @@ def test_export_overlay(app, mgr, tmp_path):
   verts = imgCornerVertices(app.mainImg.image)
   comps = mgr.tableData.makeCompDf(1)
   comps[REQD_TBL_FIELDS.VERTICES] = [ComplexXYVertices([verts])]
+  app.compDisplay.regionPlot.showFocused = True
   app.add_focusComps(comps)
   app.compDisplay.regionPlot.updateColors(labelColormap='Reds', fillAlpha=1.0)
   exportLoc = str(tmp_path/'export.png')
   app.compDisplay.exportCompOverlay(outFile=exportLoc)
+  app.compDisplay.regionPlot.showFocused = False
   img = cvImread_rgb(exportLoc)
   checkPix = img[20,20,:]
   # Red channel should be largest for overlay export and red colormap

@@ -349,7 +349,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
       # TODO: If the user is allowed to reorder columns this needs to be revisited
       idAtIdx = idx.siblingAtColumn(self.instIdColIdx).data(QtCore.Qt.ItemDataRole.EditRole)
       retLists.append([idAtIdx, row, idx.column()])
-    retLists = np.array(retLists)
+    retLists = np.array(retLists, dtype=int)
     if excludeNoEditCols and len(retLists) > 0:
       # Set diff will eliminate any repeats, so use a slower op that at least preserves
       # duplicates

@@ -79,8 +79,12 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     self.setParent(parent)
     self.setZValue(50)
     self.regionData = makeMultiRegionDf(0)
+    self._symbolCache = None
     self.cmap = np.array([])
     self.updateColors()
+    self.showSelected = True
+    self.showFocused = True
+    self.normalFills = None
 
     # 'pointsAt' is an expensive operation if many points are in the scatterplot. Since
     # this will be called anyway when a selection box is made in the main image, disable
@@ -114,17 +118,18 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     """
     self.updateSelected_focused(selectedIds=selectedIds)
 
-  def focusById(self, focusedIds: OneDArr):
+  def focusById(self, focusedIds: OneDArr, **kwargs):
     """
     Colors 'focusedIds' to indicate they are present in a focused views.
     """
     self.updateSelected_focused(focusedIds=focusedIds)
 
   def updateSelected_focused(self, selectedIds:np.ndarray=None,
-                             focusedIds: np.ndarray=None):
+                             focusedIds: np.ndarray=None, updatePlot=True):
     """
     :param selectedIds: All currently selected Ids
     :param focusedIds: All currently focused Ids
+    :param updatePlot: Whether to also update the graphics plot (may be time consuming)
     """
     if len(self.regionData) == 0:
       return
@@ -133,29 +138,44 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
       self.regionData[col] = False
       idList = np.intersect1d(self.regionData.index, idList)
       self.regionData.loc[idList, col] = True
-    self.updateColors()
+    if updatePlot:
+      self.updatePlot(useCache=True)
 
-  def updatePlot(self):
+  def updatePlot(self, useCache=False):
     # -----------
     # Update data
     # -----------
-    boundLocs = []
-    boundSymbs = []
-    if self.regionData.empty:
+    usePoints = np.ones(len(self.regionData), dtype=bool)
+    if not self.showSelected:
+      usePoints[self.regionData[PRJ_ENUMS.FIELD_SELECTED]] = False
+    if not self.showFocused:
+      usePoints[self.regionData[PRJ_ENUMS.FIELD_FOCUSED]] = False
+
+    if self.regionData.empty or not np.any(usePoints):
       self.setData(x=[], y=[], data=[])
       return
 
-    for region, _id in zip(self.regionData[RTF.VERTICES],
-                           self.regionData.index):
+    if not useCache or self._symbolCache is None or len(self._symbolCache) != len(self.regionData):
+      self.updateSymbolCache()
+
+    plotRegions = np.vstack(self._symbolCache.loc[usePoints, 'location'])
+    self.setData(*plotRegions.T, symbol=self._symbolCache.loc[usePoints, 'symbol'].to_numpy(),
+                 data=self.regionData.index[usePoints])
+    self.updateColors()
+
+  def updateSymbolCache(self):
+    boundLocs = []
+    boundSymbs = []
+    for region in self.regionData[RTF.VERTICES]:
       boundSymbol, boundLoc = symbolFromVerts(region)
 
       boundLocs.append(boundLoc)
       boundSymbs.append(boundSymbol)
-
-    plotRegions = np.vstack(boundLocs)
-    self.setData(*plotRegions.T, symbol=boundSymbs,
-                          data=self.regionData.index)
-    self.updateColors()
+    cache = {
+      'location': boundLocs,
+      'symbol': boundSymbs
+    }
+    self._symbolCache = pd.DataFrame(cache)
 
   def toGrayImg(self, imShape: Sequence[int]=None):
     labelDf = pd.DataFrame()
@@ -189,7 +209,9 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
       limits: [0,1]
       step: 0.1
     """
-    if len(self.regionData) == 0 or len(self.data) == 0:
+    # Account for maybe hidden spots
+    regionData = self.regionData.loc[self.data['data']]
+    if len(regionData) == 0 or len(self.data) == 0:
       return
     def colorsWithAlpha(_numericLbls: np.ndarray):
       useAlpha = fillAlpha
@@ -201,25 +223,17 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
       colors = cmap(_numericLbls)
       colors[:,-1] = useAlpha
       return colors
-    selectedFill = pg.Color(selectedFill)
-    focusedFill = pg.Color(focusedFill)
 
-    focusedFill = np.array(focusedFill.getRgbF())
-    focusedFill[-1] = fillAlpha
-    selectedFill = np.array(selectedFill.getRgbF())
-    selectedFill[-1] = fillAlpha
-    # combinedFill = (focusedFill + selectedFill)/2
-    lbls = self.regionData[PRJ_ENUMS.FIELD_LABEL].to_numpy()
-    fillColors = colorsWithAlpha(lbls)
-    selected = self.regionData[PRJ_ENUMS.FIELD_SELECTED].to_numpy()
-    focused = self.regionData[PRJ_ENUMS.FIELD_FOCUSED].to_numpy()
-    fillColors[selected] = selectedFill
-    fillColors[focused] = focusedFill
-    # fillColors[focused & selected] = combinedFill
-    penColors = np.tile(pg.mkPen(color=penColor, width=penWidth), len(lbls))
-    self.setPen(penColors)
-    self.setBrush([f*255 for f in fillColors])
-    self.invalidate()
+    lbls = regionData[PRJ_ENUMS.FIELD_LABEL].to_numpy()
+    fills = colorsWithAlpha(lbls) * 255
+    self.normalFills = fills.copy()
+    for clr, typ in zip([selectedFill, focusedFill], [PRJ_ENUMS.FIELD_SELECTED, PRJ_ENUMS.FIELD_FOCUSED]):
+      clr = pg.Color(clr)
+      clr.setAlpha(int(fillAlpha * 255))
+      fills[regionData[typ].to_numpy()] = [c*255 for c in clr.getRgbF()]
+
+    self.setBrush(fills, update=False)
+    self.setPen(pg.mkPen(color=penColor, width=penWidth))
 
   def drop(self, ids):
     return self.regionData.drop(index=ids)

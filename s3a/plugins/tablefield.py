@@ -96,7 +96,6 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     imageproc.procCache['mask'] = np.zeros_like(imageproc.procCache['mask'])
 
   def updateFocusedComp(self, newComp:pd.Series = None):
-    self.updateFocusedPen_Fill()
     if self.mainImg.compSer[RTF.INST_ID] == -1:
       self.updateRegionFromDf(None)
       return
@@ -104,22 +103,6 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     self.updateRegionFromDf(self.mainImg.compSer_asFrame)
     if newComp is None or oldId != newComp[RTF.INST_ID]:
       self.firstRun = True
-
-  def updateFocusedPen_Fill(self):
-    disp = self.win.compDisplay
-    plt: MultiRegionPlot = disp.regionPlot
-    mgrDf = self.win.compMgr.compDf
-    regDf = plt.regionData.copy()
-    focused = regDf[PRJ_ENUMS.FIELD_FOCUSED].to_numpy(bool)
-    # Show IDs that were previously hidden
-    for showId in regDf.index[regDf[RTF.VERTICES].apply(ComplexXYVertices.isEmpty)]:
-      regDf.at[showId, RTF.VERTICES] = mgrDf.at[showId, RTF.VERTICES]
-
-    # Make 0-area regions where the plot must be hidden
-    for hideId in regDf.index[focused]:
-      # Bug: Can't set array of values without indexer error since pandas thinks ComplexXYVertices is a 2d array
-      regDf.at[hideId, RTF.VERTICES] = ComplexXYVertices()
-    plt.resetRegionList(regDf, self.win.compDisplay.labelCol)
 
   def _run_drawAct(self, verts: XYVertices, param: PrjParam):
     # noinspection PyTypeChecker
@@ -212,7 +195,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
     lblCol = self.win.compDisplay.labelCol
     self.region.resetRegionList(newRegionDf=centeredData, labelField=lblCol)
-    self.region.focusById(centeredData.index)
+    self.region.focusById(centeredData.index.values)
 
     buffVerts = ComplexXYVertices()
     for inner in centeredData[RTF.VERTICES]: buffVerts.extend(inner)
@@ -297,11 +280,11 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
   def _onActivate(self):
     self.region.show()
-    self.updateFocusedPen_Fill()
+    self.win.compDisplay.regionPlot.showFocused = False
 
   def _onDeactivate(self):
     self.region.hide()
-    self.win.compDisplay.regionPlot.updateColors()
+    self.win.compDisplay.regionPlot.showFocused = True
 
   def getRegionHistory(self):
     outImgs = []

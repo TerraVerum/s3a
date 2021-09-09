@@ -2,6 +2,7 @@ import sys
 from typing import Union, Sequence
 
 import numpy as np
+import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from pyqtgraph.parametertree import Parameter
@@ -118,6 +119,8 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     self.labelCol = REQD_TBL_FIELDS.INST_ID
     self.updateLabelCol()
 
+    mainImg.sigUpdatedFocusedComp.connect(self._onFocusedCompChange)
+
     attrs = self.sharedAttrs
 
     with attrs.colorScheme.setBaseRegisterPath(self.regionPlot.__groupingName__):
@@ -153,6 +156,9 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     self.fieldDisplay.callDelegateFunc('hide')
     # Populate initial field options
     self._reflectFieldsChanged()
+
+  def _onFocusedCompChange(self, newComp: pd.Series):
+    self.regionPlot.focusById(np.array([newComp[REQD_TBL_FIELDS.INST_ID]]))
 
   def _createFieldDisplayProc(self):
     io = {}
@@ -272,7 +278,8 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
 
   def _reflectTableSelectionChange(self, selectedIds: OneDArr):
     self.selectedIds = selectedIds
-    self.regionPlot.selectById(selectedIds)
+    # Silently update selected ids since focusById will force another graphic update
+    self.regionPlot.updateSelected_focused(selectedIds=selectedIds, updatePlot=False)
     selectedComps = self._compMgr.compDf.loc[selectedIds]
     self.sigCompsSelected.emit(selectedComps)
     if self.props[PRJ_CONSTS.PROP_FIELD_INFO_ON_SEL]:

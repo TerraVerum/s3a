@@ -257,7 +257,6 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     self.compMgr.addComps(modifiedDf, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)
     def undo():
       self.add_focusComps(oldComp, addType=PRJ_ENUMS.COMP_ADD_AS_MERGE)
-      self.compDisplay.regionPlot.focusById(modifiedDf.index)
       self.mainImg.updateFocusedComp(compSer)
     return undo
 
@@ -437,12 +436,9 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     if np.isscalar(compIds):
       compIds = [compIds]
     if compIds is None or len(compIds) != 1 or compIds[0] not in self.compMgr.compDf.index:
-      self.compDisplay.regionPlot.focusById([])
       self.mainImg.updateFocusedComp()
     else:
       newComp: pd.Series = self.compMgr.compDf.loc[compIds[0]]
-      newCompId = newComp[REQD_TBL_FIELDS.INST_ID]
-      self.compDisplay.regionPlot.focusById([newCompId])
       self.mainImg.updateFocusedComp(newComp)
 
   # Stolen and adapted for python from https://stackoverflow.com/a/42910109/9463643
