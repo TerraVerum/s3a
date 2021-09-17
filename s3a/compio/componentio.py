@@ -95,7 +95,7 @@ class ComponentIO:
   Propagated to every exportByFileType call to provide user-specified defaults as desired
   """
 
-  def __init__(self, tableData=None):
+  def __init__(self, tableData: TableData=None):
     if tableData is not None:
       self.tableData = tableData
     td = self
@@ -196,7 +196,7 @@ class ComponentIO:
 
   def importByFileType(
       self, inFile: Union[str, Path], imShape: Tuple[int] = None, strColumns=False, **importArgs
-  ):
+  ) -> pd.DataFrame:
     buildFn = self._ioFnFromFileType(inFile, PRJ_ENUMS.IO_IMPORT)
     outDf = buildFn(inFile, imShape=imShape, **importArgs)
     if strColumns:
