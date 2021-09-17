@@ -446,9 +446,9 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     #   warn(f'Some regions extended beyond image dimensions. Boundaries for the following'
     #        f' components were altered: {truncatedCompIds}', UserWarning)
 
-  def exportCompOverlay(self, outFile='', toClipboard=False):
+  def exportCompOverlay(self, file='', toClipboard=False):
     """
-    :param outFile:
+    :param file:
       pType: filepicker
       existing: False
     """
@@ -464,14 +464,14 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     for id_ in focusedIds:
       data.at[id_, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices()
     self.regionPlot.resetRegionList(data, self.labelCol)
-    if outFile:
-      # if outFile.endswith('svg'):
-      #   svgr = QtSvg.QSvgRenderer(outFile)
+    if file:
+      # if file.endswith('svg'):
+      #   svgr = QtSvg.QSvgRenderer(file)
       #   svgr.render(painter)
       #   painter.end()
       # else:
       painter.end()
-      pm.save(outFile)
+      pm.save(file)
     if toClipboard:
       QtWidgets.QApplication.clipboard().setImage(pm.toImage())
     return pm

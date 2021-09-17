@@ -297,25 +297,25 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     return plugin
 
   @DASM.undoable('Change Main Image')
-  def setMainImg(self, fileName: FilePath=None, imgData: NChanImg=None,
+  def setMainImg(self, file: FilePath=None, imgData: NChanImg=None,
                  clearExistingComps=True):
     """
-    * If fileName is None, the main and focused images are blacked out.
-    * If only fileName is provided, it is assumed to be an image. The image data
+    * If file is None, the main and focused images are blacked out.
+    * If only file is provided, it is assumed to be an image. The image data
     will be populated by reading in that file.
-    * If both fileName and imgData are provided, then imgData is used to populate the
-    image, and fileName is assumed to be the file associated with that data.
+    * If both file and imgData are provided, then imgData is used to populate the
+    image, and file is assumed to be the file associated with that data.
 
-    :param fileName: Filename either to load or that corresponds to imgData
+    :param file: Filename either to load or that corresponds to imgData
     :param imgData: N-Channel numpy image
     :param clearExistingComps: If True, erases all existing components on image load.
       Else, they are retained.
     """
     oldFile = self.srcImgFname
     oldData = self.mainImg.image
-    if fileName is not None:
-      fileName = Path(fileName).resolve()
-    if fileName == self.srcImgFname:
+    if file is not None:
+      file = Path(file).resolve()
+    if file == self.srcImgFname:
       return
 
     self.saveCurAnnotation()
@@ -323,17 +323,17 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     if imgData is not None:
       self.mainImg.setImage(imgData)
     else:
-      self.mainImg.setImage(fileName)
-    self.srcImgFname = fileName
+      self.mainImg.setImage(file)
+    self.srcImgFname = file
 
     self.clearBoundaries()
     self.mainImg.plotItem.vb.autoRange()
-    if fileName is not None:
+    if file is not None:
       # Add image data if the file doesn't exist
-      data = None if fileName.exists() else self.mainImg.image
-      self.filePlg.projData.addImage(fileName, data)
+      data = None if file.exists() else self.mainImg.image
+      self.filePlg.projData.addImage(file, data)
     self.loadNewAnnotations()
-    infoName = (fileName and fileName.name) or None
+    infoName = (file and file.name) or None
     getAppLogger(__name__).info(f'Changed main image to {infoName}')
     yield
     self.setMainImg(oldFile, oldData, clearExistingComps)
@@ -404,7 +404,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
       srcImgFname = str(srcImgFname)
     # Assign correct export name for only new components
     overwriteIdxs = exportDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME] == REQD_TBL_FIELDS.SRC_IMG_FILENAME.value
-    # TODO: Maybe the current filename will match the current file indicator. What happens then?
+    # TODO: Maybe the current file will match the current file indicator. What happens then?
     exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = srcImgFname
     return exportDf
 

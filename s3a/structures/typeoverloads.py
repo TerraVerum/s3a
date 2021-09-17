@@ -25,9 +25,9 @@ LabelFieldType = t.Union[str, PrjParam]
 
 
 class AnnParseError(ValueError):
-  def __init__(self, *args, fileName: Path=None, instances: list=None, **kwargs):
+  def __init__(self, *args, file: Path=None, instances: list=None, **kwargs):
     super().__init__(*args)
-    self.fileName = fileName
+    self.fileName = file
     self.instances = instances
 
 class AnnInstanceError(ValueError): pass

@@ -6,7 +6,7 @@ fields:
     aliases: [Class, Label]
   createdAt:
     value: ''
-    readOnly: True
+    readonly: True
     parser: 'superanntime'
     aliases: [Timestamp]
   probability: 100.0

@@ -184,9 +184,9 @@ class S3A(S3ABase):
       plugin.addToWindow(self, parentToolbarOrMenu=parentTb)
     return plugin
 
-  def setMainImg(self, fileName: FilePath = None, imgData: NChanImg = None,
+  def setMainImg(self, file: FilePath = None, imgData: NChanImg = None,
                  clearExistingComps=True):
-    gen = super().setMainImg(fileName, imgData, clearExistingComps)
+    gen = super().setMainImg(file, imgData, clearExistingComps)
     ret = fns.gracefulNext(gen)
     img = self.srcImgFname
     if img is not None:

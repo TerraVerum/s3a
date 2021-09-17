@@ -167,10 +167,10 @@ def test_load_independent_tbl_cfg(prjWithSavedStuff, tmpdir):
     }
   }
   outName = 'separate_tbl_cfg.tblcfg'
-  outFile = tmpdir/outName
-  fns.saveToFile(tblCfg, outFile)
+  file = tmpdir/outName
+  fns.saveToFile(tblCfg, file)
   prjCfg = {
-    'table-cfg': str(outFile)
+    'table-cfg': str(file)
   }
   prjWithSavedStuff.loadCfg(tmpdir/'new_loaded_cfg.s3aprj', prjCfg)
 
