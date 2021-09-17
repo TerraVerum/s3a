@@ -30,9 +30,9 @@ def prjWithSavedStuff(tmpProj):
 
 def test_create_project(app, sampleComps, tmpProj):
   dummyAnnFile  = SAMPLE_SMALL_IMG_FNAME.with_suffix(f'{SAMPLE_SMALL_IMG_FNAME.suffix}.pkl')
-  tmpProj.loadCfg(tmpProj.cfgFname, {'images': [SAMPLE_SMALL_IMG_FNAME], 'annotation-format': 'pkl'},
+  tmpProj.loadCfg(tmpProj.cfgFname, {'annotation-format': 'pkl'},
                   force=True)
-  tmpProj.addAnnotation(dummyAnnFile, dfTester.compDf, image=SAMPLE_SMALL_IMG_FNAME.name)
+  tmpProj.addAnnotation(dummyAnnFile, dfTester.compDf, image=SAMPLE_SMALL_IMG_FNAME)
 
   assert tmpProj.cfgFname.exists()
   assert tmpProj.annotationsDir.exists()
@@ -136,11 +136,12 @@ def test_img_ops(tmpProj, tmp_path):
   img = {'data': SAMPLE_SMALL_IMG, 'name': 'my image.png'}
   cfg = {'images': [img]}
   tmpProj.loadCfg(tmp_path/'test.s3aprj', cfg)
+  tmpProj._addConfigImages()
   assert len(tmpProj.images) == 1
   assert tmpProj.images[0].name == 'my image.png'
 
   with pytest.raises(IOError):
-    tmpProj.addImage('this image does not exist.png', copyToProj=True)
+    tmpProj.addImage('this image does not exist.png', copyToProject=True)
 
 def test_ann_opts(prjWithSavedStuff, sampleComps):
   img, toRemove = next(iter(prjWithSavedStuff.imgToAnnMapping.items()))
@@ -184,7 +185,7 @@ def test_none_tblinfo(tmpdir):
   assert prj.tableData.cfg == IOTemplateManager.getTableCfg('s3a')
 
 def test_change_image_path(tmpProj):
-  tmpProj.addImage(SAMPLE_SMALL_IMG_FNAME, copyToProj=False)
+  tmpProj.addImage(SAMPLE_SMALL_IMG_FNAME, copyToProject=False)
   newPath = Path('./ridiculous/but/different')/SAMPLE_SMALL_IMG_FNAME.name
   tmpProj.changeImgPath(SAMPLE_SMALL_IMG_FNAME, newPath)
   assert newPath.absolute() in tmpProj.images

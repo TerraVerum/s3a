@@ -345,7 +345,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     srcImg_proj = self.filePlg.imagesDir/srcImg.name
     if not srcImg_proj.exists() or srcImg_proj != srcImg:
       # Either the image didn't exist (i.e. was programmatically generated) or doesn't yet belong to the project
-      self.filePlg.addImage(srcImg, data=self.mainImg.image, copyToProj=True,
+      self.filePlg.addImage(srcImg, data=self.mainImg.image, copyToProject=True,
                             allowOverwrite=True)
     # srcImg_proj is guaranteed to exist at this point
     self.filePlg.addAnnotation(data=self.exportableDf, image=srcImg_proj, overwriteOld=True)

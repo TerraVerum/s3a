@@ -355,16 +355,22 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     prevTemplate = settings['Template Project']
     if prevTemplate is not None and len(prevTemplate) > 0:
       baseCfg = fns.attemptFileLoad(prevTemplate)
-      if not settings['Keep Existing Images'] or 'images' not in baseCfg:
-        baseCfg['images'] = []
-      if not settings['Keep Existing Annotations'] or 'annotations' not in baseCfg:
-        baseCfg['annotations'] = []
     else:
-      baseCfg = {'images': [], 'annotations': []}
-    baseCfg['images'].extend(images)
-    baseCfg['annotations'].extend(annotations)
+      baseCfg = {}
     projPath = Path(wiz.projSettings['Location'])/projName
     outPrj = self.projData.create(name=projPath, cfg=baseCfg)
+    if prevTemplate:
+      prevTemplateLoc = Path(prevTemplate).parent
+      if settings['Keep Existing Images']:
+        outPrj.addImageFolder(prevTemplateLoc/'images')
+      if settings['Keep Existing Annotations']:
+        outPrj.addImageFolder(prevTemplateLoc/'annotations')
+    for image in images:
+      outPrj.addImageByPath(image)
+    for ann in annotations:
+      outPrj.addAnnotation(ann)
+
+
     self.open(outPrj.cfgFname)
 
 
@@ -651,25 +657,17 @@ class ProjectData(QtCore.QObject):
 
     allAddedImages = []
     with self.suppressSignals():
-      allAddedImages.extend(self.addImageFolder(self.imagesDir, copyToProj=False))
-      for image in self.cfg['images']:
-        if isinstance(image, dict):
-          image.setdefault('copyToProj', True)
-          renamed = self.addImage(**image)
-          if renamed is not None:
-            allAddedImages.append(renamed)
-        else:
-          allAddedImages.extend(self.addImageByPath(image))
+      allAddedImages.extend(self.addImageFolder(self.imagesDir, copyToProject=False))
+      # Leave out for now due to the large number of problems with lacking idempotence
+      # allAddedImages.extend(self._addConfigImages())
     self._maybeEmit(self.sigImagesAdded, allAddedImages)
 
     with self.suppressSignals():
       for file in self.annotationsDir.glob(f'*.{self.cfg["annotation-format"]}'):
         self.addFormattedAnnotation(file)
-      for annotation in set(self.cfg['annotations']) - {self.annotationsDir}:
-        if isinstance(annotation, dict):
-          self.addAnnotation(**annotation)
-        else:
-          self.addAnnotationByPath(annotation)
+      # Leave out for now due to the large number of problems with lacking idempotence
+      # self._addConfigAnnotations()
+      
     self._maybeEmit(self.sigAnnotationsAdded, list(self.imgToAnnMapping.values()))
 
     self.sigCfgLoaded.emit()
@@ -705,9 +703,34 @@ class ProjectData(QtCore.QObject):
     parent.saveCfg()
     return parent
 
-  def saveCfg(self):
-    location = self.location
+  def saveCfg(self, copyMissingItems=False):
+    """
+    Saves the config file, optionally copying missing items to the project location as well. "Missing items" are
+    images and annotations in base folders / existing in the project config but not in the actual project directory
+    """
+    if copyMissingItems:
+      for image in  self._findMissingImages():
+        self.addImageByPath(image)
+      for annotation in self._findMissingAnnotations():
+        self.addAnnotationByPath(annotation)
+
+    tblName = Path(self.tableData.cfgFname).absolute()
+    if tblName != self.cfgFname:
+      if tblName.parent == self.location:
+        tblName = tblName.name
+      self.cfg['table-cfg'] = str(tblName)
+    fns.saveToFile(self.cfg, self.cfgFname)
+
+  def _findMissingAnnotations(self):
     annDir = self.annotationsDir
+    missingAnns = []
+    for img, ann in self.imgToAnnMapping.items():
+      if ann.parent != annDir:
+        missingAnns.append(str(ann))
+    return missingAnns
+
+  def _findMissingImages(self):
+    location = self.location
     imgDir = self.imagesDir
     strImgNames = []
     for folder in self.baseImgDirs:
@@ -719,28 +742,29 @@ class ProjectData(QtCore.QObject):
         # This image is already accounted for in the base directories
         continue
       strImgNames.append(str(absolutePath(img)))
+    return strImgNames
 
-    offendingAnns = []
-    for img, ann in self.imgToAnnMapping.items():
-      if ann.parent != annDir:
-        offendingAnns.append(str(ann))
-        self.addAnnotation(ann)
-    if len(offendingAnns) > 0:
-      getAppLogger(__name__).warning('Encountered annotation(s) in project config, but not officially added.'
-                                       ' Adding them now.  Offending files:\n'
-                                       ',\n'.join(offendingAnns), UserWarning)
-    if len(strImgNames):
-      self.cfg['images'] = strImgNames
-    # 'Ann' folder is always added on startup so no need to record it here. However,
-    # if it is shown explicitly the user is aware.
-    tblName = Path(self.tableData.cfgFname).absolute()
-    if tblName != self.cfgFname:
-      if tblName.parent == self.location:
-        tblName = tblName.name
-      self.cfg['table-cfg'] = str(tblName)
-    fns.saveToFile(self.cfg, self.cfgFname)
+  def _addConfigImages(self):
+    addedImages = []
+    for image in self.cfg.get('images', []):
+      if isinstance(image, dict):
+        image.setdefault('copyToProject', True)
+        renamed = self.addImage(**image)
+        if renamed is not None:
+          addedImages.append(renamed)
+      else:
+        addedImages.extend(self.addImageByPath(image))
+    return addedImages
 
-  def addImageByPath(self, name: FilePath, copyToProj=True):
+  def _addConfigAnnotations(self):
+    for annotation in set(self.cfg.get('annotations', [])) - {self.annotationsDir}:
+      if isinstance(annotation, dict):
+        self.addAnnotation(**annotation)
+      else:
+        self.addAnnotationByPath(annotation)
+
+
+  def addImageByPath(self, name: FilePath, copyToProject=True):
     """
     Determines whether to add as a folder or file based on filepath type. Since adding a folder returns a list of
     images and adding a single image returns a name or None, this function unifies the return signature by always
@@ -754,18 +778,18 @@ class ProjectData(QtCore.QObject):
       getAppLogger(__name__).attention(f'Provided image path does not exist: {image}\nNo action performed.')
       return []
     if image.is_dir():
-      ret = self.addImageFolder(image, copyToProj)
+      ret = self.addImageFolder(image, copyToProject)
     else:
-      ret = self.addImage(name, copyToProj=copyToProj)
+      ret = self.addImage(name, copyToProject=copyToProject)
       ret = [] if ret is None else [ret]
     return ret
 
-  def addImage(self, name: FilePath, data: NChanImg=None, copyToProj=True, allowOverwrite=False) -> Optional[FilePath]:
+  def addImage(self, name: FilePath, data: NChanImg=None, copyToProject=True, allowOverwrite=False) -> Optional[FilePath]:
     """Returns None if an image with the same name already exists in the project, else the new full filepath"""
     fullName = Path(name)
     if not fullName.is_absolute():
       fullName = self.imagesDir / fullName
-    if copyToProj or data is not None:
+    if copyToProject or data is not None:
       fullName = self._copyImgToProj(fullName, data, allowOverwrite)
     if fullName.name in [i.name for i in self.images]:
       # Indicate the image was already present to calling scope
@@ -797,7 +821,7 @@ class ProjectData(QtCore.QObject):
       self.images[oldIdx] = newName
     self._maybeEmit(self.sigImagesMoved, [(oldName, newName)])
 
-  def addImageFolder(self, folder: FilePath, copyToProj=True):
+  def addImageFolder(self, folder: FilePath, copyToProject=True):
     folder = absolutePath(folder)
     if folder in self.baseImgDirs:
       return []
@@ -807,7 +831,7 @@ class ProjectData(QtCore.QObject):
     addedImgs = []
     with self.suppressSignals():
       for img in folder.glob('*.*'):
-        finalName = self.addImage(img, copyToProj=copyToProj)
+        finalName = self.addImage(img, copyToProject=copyToProject)
         if finalName is not None:
           addedImgs.append(finalName)
     self._maybeEmit(self.sigImagesAdded, addedImgs)
@@ -836,7 +860,7 @@ class ProjectData(QtCore.QObject):
     fileFilter = "Image Files (*.png *.tif *.jpg *.jpeg *.bmp *.jfif);;All files(*.*)"
     fname = fns.popupFilePicker(None, 'Add Image to Project', fileFilter)
     if fname is not None:
-      self.addImage(fname, copyToProj=copyToProject)
+      self.addImage(fname, copyToProject=copyToProject)
 
   def removeImage(self, imgName: FilePath):
     imgName = absolutePath(imgName)
@@ -869,8 +893,7 @@ class ProjectData(QtCore.QObject):
         ann.unlink(missing_ok=True)
         break
 
-  def addAnnotation(self, name: FilePath=None, data: pd.DataFrame=None, image: FilePath=None,
-                    overwriteOld=False):
+  def addAnnotation(self, name: FilePath=None, data: pd.DataFrame=None, image: FilePath=None, overwriteOld=False):
     # Housekeeping for default arguments
     if name is None and data is None:
       raise IOError('`name` and `data` cannot both be `None`')
