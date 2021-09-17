@@ -5,7 +5,7 @@ __all__ = ['BASE_DIR', 'MENU_OPTS_DIR', 'ICON_DIR', 'QUICK_LOAD_DIR',
            'SCHEMES_DIR', 'LAYOUTS_DIR', 'TABLE_DIR', 'GEN_PROPS_DIR', 'SHORTCUTS_DIR',
            'SHORTCUT_BASE', 'MAIN_IMG_DIR', 'APP_STATE_DIR', 'CFG_DIR', 'IMG_PROC_DIR', 'MULT_PRED_DIR',
            'REQD_TBL_FIELDS', 'PRJ_CONSTS', 'PRJ_ENUMS', 'PROJ_FILE_TYPE',
-           'IO_TEMPLATES_DIR']
+           'IO_TEMPLATES_DIR', 'PROJ_BASE_TEMPLATE']
 
 import utilitys.constants
 from utilitys import fns
@@ -152,7 +152,7 @@ class _PrjConsts(PrjParamGroup):
   CLS_COMP_EXPORTER    : PrjParam = newParam('Component Exporter')
 
   CLS_VERT_IMG         : PrjParam = newParam('Focused Image Graphics')
-  CLS_MULT_REG_PLT     : PrjParam = newParam('Component Plot')
+  CLS_MULT_REG_PLT     : PrjParam = newParam('Main Image')
   CLS_ROI_CLCTN        : PrjParam = newParam('ROI Shapes')
 
   CLS_REGION_BUF       : PrjParam = newParam('Region Modification Buffer')
