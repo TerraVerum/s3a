@@ -7,8 +7,8 @@ from typing import Callable, Tuple, Union, Sequence, List, Collection, Any
 
 import cv2 as cv
 import numpy as np
+import pandas as pd
 import pyqtgraph as pg
-from pandas import DataFrame as df
 from skimage import io
 from skimage import transform
 from skimage.exposure import exposure
@@ -70,7 +70,7 @@ def getClippedBbox(arrShape: tuple, bbox: TwoDArr, margin: int):
   arrShape = arrShape[:2]
   return np.clip(bbox, 0, arrShape[::-1])
 
-def coerceDfTypes(dataframe: df, constParams: Collection[PrjParam]=None):
+def coerceDfTypes(dataframe: pd.DataFrame, constParams: Collection[PrjParam]=None):
   """
   Pandas currently has a bug where datatypes are not preserved after update operations.
   Current workaround is to coerce all types to their original values after each operation
@@ -639,3 +639,18 @@ def _computeEdgePadding(bounds, fullImageShape, maxCoords, min_):
   # Turn into order expected by cv2 -- top, bot, left, right
   extraPadding = [int(pad) for pad in [leftTopPad[1], rightBotPad[1], leftTopPad[0], rightBotPad[0]]]
   return extraPadding
+
+def pd_iterdict(df: pd.DataFrame, index=False):
+  """
+  pandas to_dict() keeps all rows in memory at once. This method is similar, but is a generator version only yielding
+  one row at a time.
+  """
+  cols = df.columns.to_list()
+  # Define out here to avoid if-statement in every evaluation
+  if index:
+    idx = df.index.to_list()
+    for ii, row in enumerate(df.itertuples(index=False)):
+      yield idx[ii], dict(zip(cols, row))
+  else:
+    for row in df.itertuples(index=False):
+      yield dict(zip(cols, row))

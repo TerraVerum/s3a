@@ -1,11 +1,13 @@
-import inspect
 import typing as t
 import warnings
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
+from pandas.core.dtypes.missing import array_equivalent
 
 from utilitys import PrjParam
+from ..constants import REQD_TBL_FIELDS as RTF
 
 _serFunc = t.Callable
 _deserFunc = t.Callable
@@ -85,20 +87,6 @@ def deserialize(param: PrjParam, values: t.Sequence[str], returnErrs=True):
   return _runFunc(param, values, 'deserialize', default, returnErrs)
 
 
-def _getPdExporters():
-  members = inspect.getmembers(
-      pd.DataFrame, lambda meth: inspect.isfunction(meth) and meth.__name__.startswith('to_')
-  )
-  return [mem[0].replace('to_', '') for mem in members]
-
-
-def _getPdImporters():
-  members = inspect.getmembers(
-      pd.DataFrame, lambda meth: inspect.isfunction(meth) and meth.__name__.startswith('read_')
-  )
-  return [mem[0].replace('read_', '') for mem in members]
-
-
 def checkVertBounds(vertSer: pd.Series, imShape: tuple):
   """
   Checks whether any vertices in the imported dataframe extend past image dimensions. This is an indicator
@@ -123,4 +111,35 @@ def checkVertBounds(vertSer: pd.Series, imShape: tuple):
         f'Vertices on some components extend beyond image dimensions. '
         f'Perhaps this export came from a different image?\n'
         f'Offending IDs: {offendingIds}', UserWarning
+    )
+
+def compareDataframes(compDf, loadedDf):
+  matchingCols = np.setdiff1d(compDf.columns, [RTF.INST_ID, RTF.SRC_IMG_FILENAME])
+  # For some reason, there are cases in which all values truly are equal but np.array_equal,
+  # x.equals(y), x.eq(y), etc. all fail. Something to do with block ordering?
+  # https://github.com/pandas-dev/pandas/issues/9330 indicates it should be fixed, but the error still occasionally
+  # happens for me. array_equivalent is not affected by this, in testing so far
+  dfCmp = array_equivalent(
+    loadedDf[matchingCols].values, compDf[matchingCols].values
+  )
+  problemCells = defaultdict(list)
+
+  if not dfCmp:
+    dfA = loadedDf[matchingCols]
+    dfB = compDf[matchingCols]
+    for ii in range(len(dfA)):
+      for jj in range(len(dfA.columns)):
+        if not np.array_equal(dfA.iat[ii, jj], dfB.iat[ii, jj]):
+          problemCells[compDf.at[dfB.index[ii], RTF.INST_ID]].append(str(matchingCols[jj]))
+    # The only way to prevent "truth value of array is ambiguous" is cell-by-cell iteration
+    problemMsg = [f'{idx}: {cols}' for idx, cols in problemCells.items()]
+    problemMsg = '\n'.join(problemMsg)
+    # Try to fix the problem with an iloc write
+    warnings.warn(
+      '<b>Warning!</b> Saved components do not match current component'
+      ' state. This can occur when pandas incorrectly caches some'
+      ' table values. Problem cells (shown as [id]: [columns]):\n'
+      f'{problemMsg}\n'
+      f'Please try manually altering these values before exporting again.',
+      UserWarning
     )

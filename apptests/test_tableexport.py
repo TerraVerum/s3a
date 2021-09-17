@@ -8,7 +8,7 @@ from PIL import Image
 from apptests.helperclasses import CompDfTester
 from apptests.testingconsts import SAMPLE_SMALL_IMG_FNAME, SAMPLE_IMG_FNAME, SAMPLE_SMALL_IMG, TEST_FILE_DIR
 from s3a.generalutils import augmentException
-from s3a import ComponentIO, REQD_TBL_FIELDS, ComplexXYVertices, XYVertices, PRJ_CONSTS as CNST
+from s3a import ComponentIO, REQD_TBL_FIELDS, ComplexXYVertices, XYVertices, PRJ_CONSTS as CNST, PRJ_ENUMS
 from s3a.parameditors.table import TableData
 
 @pytest.fixture
@@ -122,12 +122,10 @@ def test_impossible_io(tmp_path, sampleComps, app):
 
 @pytest.mark.withcomps
 def test_opts_insertion(app, sampleComps, tmp_path):
-  io = app.compIo
-  fn = io._ioWrapper(io.importSerialized)
-  io.importOpts['reindex'] = True
+  app.compIo.updateOpts(PRJ_ENUMS.IO_IMPORT, reindex=True)
   sampleComps.index = np.linspace(0, 10000, len(sampleComps), dtype=int)
-  io.exportSerialized(sampleComps, tmp_path/'test.csv')
-  imported = fn(tmp_path/'test.csv')
+  app.compIo.exportSerialized(sampleComps, tmp_path/'test.csv')
+  imported = app.compIo.importSerialized(tmp_path/'test.csv')
   assert not (imported.index == sampleComps.index).all()
 
 @pytest.mark.withcomps
@@ -144,7 +142,7 @@ def test_compimgs_export(tmp_path, _simpleTbl):
   # Do df export just to test the output file capability and various options
   io.exportCompImgsDf(tester.compDf, tmp_path /'test.pkl', labelField='List')
   assert (tmp_path/'test.pkl').exists()
-  df, mappings = io.exportCompImgsDf(tester.compDf, prioritizeById=False, returnLblMapping=True)
+  df, mappings = io.exportCompImgsDf(tester.compDf, prioritizeById=False, returnLabelMapping=True)
   df['image_name'] = tester.compDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME].apply(lambda p: p.name).values
   revMaps = {k: pd.Series(v.index, v.to_numpy()) for k, v in mappings.items()}
 
@@ -198,19 +196,19 @@ def test_lblpng_export(_simpleTbl):
   with pytest.raises(ValueError):
     io.exportLblPng(sampleComps, labelField='badlbl')
   with pytest.raises(ValueError):
-    io.exportLblPng(sampleComps, bgColor=-1)
+    io.exportLblPng(sampleComps, backgroundColor=-1)
 
-  export, mapping = io.exportLblPng(sampleComps, rescaleOutput=True, returnLblMapping=True)
+  export, mapping = io.exportLblPng(sampleComps, rescaleOutput=True, returnLabelMapping=True)
   assert np.all(np.isin(mapping.index, export))
   assert np.max(mapping.index) > np.max(sampleComps.index)
 
   field = _simpleTbl.fieldFromName('List')
-  export, mapping = io.exportLblPng(sampleComps, returnLblMapping=True, labelField=field)
+  export, mapping = io.exportLblPng(sampleComps, returnLabelMapping=True, labelField=field)
   assert (mapping.to_numpy() == field.opts['limits']).all()
 
   sampleComps[field] = 'a'
   # Make sure full mapping is made even when not all values exist
-  export, mapping = io.exportLblPng(sampleComps, returnLblMapping=True, labelField=field)
+  export, mapping = io.exportLblPng(sampleComps, returnLabelMapping=True, labelField=field)
   assert (mapping.to_numpy() == field.opts['limits']).all()
 
 def test_geojson_import():

@@ -14,7 +14,7 @@ from skimage import draw
 
 from utilitys.typeoverloads import FilePath
 from .base import AnnotationImporter
-from .helpers import _getPdImporters, registerIoHandler
+from .helpers import registerIoHandler
 from ..constants import REQD_TBL_FIELDS as RTF
 from ..generalutils import DirectoryDict, orderContourPts, cvImread_rgb, deprecateKwargs
 from ..structures import ComplexXYVertices, XYVertices, AnnInstanceError, LabelFieldType
@@ -25,23 +25,30 @@ __all__ = ['SerialImporter', 'CsvImporter', 'SuperannotateJsonImporter', 'Geojso
 class SerialImporter(AnnotationImporter):
   ioType = 's3a'
 
-  def readFile(self, filename: FilePath, **kwargs):
-    fType = Path(filename).suffix.lower().replace('.', '')
+  def readFile(self, file: FilePath, **kwargs):
+    fType = Path(file).suffix.lower().replace('.', '')
     importFn = getattr(pd, f'read_{fType}', None)
     if importFn is None:
       raise ValueError(
         f'File type {fType} cannot be handled by the serial importer.'
-        f' Must be one of {",".join(_getPdImporters())}'
+        f' Must be one of {",".join(self._getPdImporters())}'
       )
     # Special case: csv imports need to avoid interpreting nan results
     kwargs.update(na_filter=False, dtype=str)
     acceptedArgs = inspect.signature(importFn).parameters
     useArgs = kwargs.keys() & acceptedArgs
-    serialDf = importFn(filename, **{k: kwargs[k] for k in useArgs})
+    serialDf = importFn(file, **{k: kwargs[k] for k in useArgs})
     return serialDf
 
   def bulkImport(self, importObj, errorOk=False, **kwargs):
     return importObj
+
+  @staticmethod
+  def _getPdImporters():
+    members = inspect.getmembers(
+      pd.DataFrame, lambda meth: inspect.isfunction(meth) and meth.__name__.startswith('read_')
+    )
+    return [mem[0].replace('read_', '') for mem in members]
 
 class CsvImporter(SerialImporter):
   # Override to provide custom access to csv file type
@@ -49,8 +56,8 @@ class CsvImporter(SerialImporter):
 
 class GeojsonImporter(AnnotationImporter):
 
-  def readFile(self, filename: FilePath, **kwargs):
-    with open(Path(filename), 'r') as ifile:
+  def readFile(self, file: FilePath, **kwargs):
+    with open(Path(file), 'r') as ifile:
       return json.load(ifile)
 
   def getInstances(self, importObj):
@@ -73,17 +80,20 @@ registerIoHandler('geojsonregion',
 class SuperannotateJsonImporter(AnnotationImporter):
   ioType = 'superannotate'
 
-  def readFile(self, filename: FilePath, **kwargs):
-    with open(Path(filename), 'r') as ifile:
+  def readFile(self, file: FilePath, **kwargs):
+    with open(Path(file), 'r') as ifile:
       return json.load(ifile)
 
-  def populateMetadata(self, filename: FilePath=None, srcDir: t.Union[FilePath, dict] = None, **kwargs):
+  def populateMetadata(self,
+                       file: Path=None,
+                       srcDir: t.Union[FilePath, dict] = None,
+                       **kwargs):
     if srcDir is None:
-      srcDir = filename.parent
+      srcDir = file.parent
     srcDir = DirectoryDict(srcDir, readFunc=self.readFile, allowAbsolute=True)
     classes = srcDir.get('classes.json')
-    if classes is None and filename is not None:
-      classes = srcDir.get(filename.parent / 'classes' / 'classes.json')
+    if classes is None and file is not None:
+      classes = srcDir.get(file.parent / 'classes' / 'classes.json')
     if classes is not None:
       self.tableData.fieldFromName('className').opts['limits'] = [c['name'] for c in classes]
     self.opts = self.importObj['metadata']
@@ -208,19 +218,19 @@ class LblPngImporter(AnnotationImporter):
   imgInfo = {}
   _canBulkImport = False
 
-  def readFile(self, filename: FilePath,
+  def readFile(self, file: FilePath,
                labelMapping=None,
                offset=0,
                **kwargs):
     try:
-      image: Image.Image = Image.open(filename)
+      image: Image.Image = Image.open(file)
       self.imgInfo = image.info
       # False positive
       # noinspection PyTypeChecker
       image = np.asarray(image)
     except TypeError:
       # E.g. float image
-      return cvImread_rgb(str(filename), mode=cv.IMREAD_UNCHANGED)
+      return cvImread_rgb(str(file), mode=cv.IMREAD_UNCHANGED)
     return image
 
   @deprecateKwargs(lblMapping='labelMapping', lblField='labelField')
@@ -303,11 +313,11 @@ class LblPngImporter(AnnotationImporter):
 class PklImporter(AnnotationImporter):
   ioType = 's3a'
 
-  def readFile(self, filename: FilePath, **importArgs) -> pd.DataFrame:
+  def readFile(self, file: FilePath, **importArgs) -> pd.DataFrame:
     """
     See docstring for :func:`self.importCsv`
     """
-    return pd.read_pickle(filename)
+    return pd.read_pickle(file)
 
   def bulkImport(self, importObj, errorOk=False, **kwargs):
     return self.importObj

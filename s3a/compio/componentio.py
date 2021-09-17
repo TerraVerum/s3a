@@ -1,33 +1,24 @@
 from __future__ import annotations
 
-import errno
 import json
-import os
-import sys
-import tempfile
 import warnings
 from collections import defaultdict
-from contextlib import ExitStack
-from functools import wraps
 from pathlib import Path
-from stat import S_IREAD, S_IRGRP, S_IROTH
-from typing import Any, Optional, Union, Tuple, Callable
-from zipfile import ZipFile
+from typing import Optional, Union, Tuple, Callable
 
 import numpy as np
 import pandas as pd
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 from pandas.core.dtypes.missing import array_equivalent
-from skimage.exposure import rescale_intensity
 
 from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
-from s3a.generalutils import augmentException, getCroppedImg, cvImsave_rgb, cvImread_rgb, imgPathtoHtml, \
-  deprecateKwargs, DirectoryDict, getCroppedImg_resize_pad
 from s3a.shims import typing_extensions
-from s3a.structures import FilePath, ComplexXYVertices, PrjParam
+from s3a.structures import FilePath
 from utilitys import fns
-from .helpers import serialize, _getPdExporters
+from .base import AnnotationIOBase
+from .exporters import *
+from .helpers import compareDataframes
 from .importers import *
 from ..parameditors.table.data import TableData
 
@@ -35,7 +26,7 @@ FilePathOrDf = Union[FilePath, pd.DataFrame]
 # Values are strings
 # noinspection PyTypeHints
 _litLst = typing_extensions.Literal[PRJ_ENUMS.IO_IMPORT, PRJ_ENUMS.IO_EXPORT]
-_maybeCallable = Optional[Callable]
+_maybeCallable = Optional[Union[Callable, AnnotationIOBase]]
 
 
 def _attrNameFmt(buildOrExport: _litLst, obj):
@@ -118,17 +109,31 @@ class ComponentIO:
     self.importGeojson = GeojsonImporter(td)
     self.importViaCsv = VGGImageAnnotatorImporter(td)
 
+    self.exportCsv = CsvExporter()
+    self.exportLblPng = LblPngExporter()
+    self.exportCompImgsZip = CompImgsZipExporter()
+    self.exportCompImgsDf = CompImgsDfExporter()
+    self.exportPkl = PklExporter()
+    self.exportSerialized = SerialExporter()
+
+  def updateOpts(self, importOrExport: _litLst, **opts):
     # Propagate custom defaults to each desired function
-    for typeDict, fnType in zip([self.importTypes, self.exportTypes],
-                                [PRJ_ENUMS.IO_IMPORT, PRJ_ENUMS.IO_EXPORT]):
-      for fileExt in typeDict:
-        func, name = self._ioFnFromFileType(fileExt, fnType, returnAttrName=True)
-        setattr(self, name, self._ioWrapper(func, name))
+    if importOrExport == PRJ_ENUMS.IO_EXPORT:
+      typeDict = self.exportTypes
+    else:
+      typeDict = self.importTypes
+    for fileExt in typeDict:
+      ioFunc = self._ioFnFromFileType(fileExt, importOrExport)
+      try:
+        ioFunc.setInitialOpts(**opts)
+      except AttributeError:
+        # Can't set opts on a regular function
+        continue
 
   @property
   def exportTypes(self):
     """
-    File types this class can export. {file type: descriptoin} useful for adding to
+    File types this class can export. {file type: description} useful for adding to
     file picker dialog
     """
     return _attrNameFmt(PRJ_ENUMS.IO_EXPORT, self)
@@ -136,7 +141,7 @@ class ComponentIO:
   @property
   def importTypes(self):
     """
-    Types this class can import. {file type: descriptoin} useful for adding to
+    Types this class can import. {file type: description} useful for adding to
     file picker dialog
     """
     return _attrNameFmt(PRJ_ENUMS.IO_IMPORT, self)
@@ -173,62 +178,20 @@ class ComponentIO:
       fileFilters.append('All Files (*.*)')
     return ';;'.join(fileFilters)
 
-  def _ioWrapper(self, func: Callable, overrideName=None):
-    """Wraps build and export functions to provide defaults specified by build/exportOpts before the function call"""
-    checkName = overrideName or func.__name__
-    which = PRJ_ENUMS.IO_IMPORT if checkName.startswith(
-        PRJ_ENUMS.IO_IMPORT
-    ) else PRJ_ENUMS.IO_EXPORT
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-      useOpts = self.importOpts if which is PRJ_ENUMS.IO_IMPORT else self.exportOpts
-      # Turn args into kwargs
-      fnKwargs = {**useOpts, **kwargs}
-      return func(*args, **fnKwargs)
-
-    return wrapper
-
   def exportByFileType(
       self,
       compDf: pd.DataFrame,
-      outFile: Union[str, Path],
+      file: Union[str, Path],
       verifyIntegrity=True,
       **exportArgs,
   ):
-    outFile = Path(outFile)
-    outFn = self._ioFnFromFileType(outFile, PRJ_ENUMS.IO_EXPORT)
+    file = Path(file)
+    outFn = self._ioFnFromFileType(file, PRJ_ENUMS.IO_EXPORT)
 
-    ret = outFn(compDf, outFile, **exportArgs)
-    if verifyIntegrity and outFile.suffix[1:] in self.roundTripTypes:
-      matchingCols = np.setdiff1d(compDf.columns, [RTF.INST_ID, RTF.SRC_IMG_FILENAME])
-      loadedDf = self.importByFileType(outFile)
-      # For some reason, there are cases in which all values truly are equal but np.array_equal,
-      # x.equals(y), x.eq(y), etc. all fail. Something to do with block ordering?
-      # https://github.com/pandas-dev/pandas/issues/9330 indicates it should be fixed, but the error still occasionally
-      # happens for me. array_equivalent is not affected by this, in testing so far
-      dfCmp = array_equivalent(
-        loadedDf[matchingCols].values, compDf[matchingCols].values
-      )
-      problemCells = defaultdict(list)
-
-      if not dfCmp:
-        dfA = loadedDf[matchingCols]
-        dfB = compDf[matchingCols]
-        for ii in range(len(dfA)):
-          for jj in range(len(dfA.columns)):
-            if not np.array_equal(dfA.iat[ii, jj], dfB.iat[ii, jj]):
-              problemCells[compDf.at[dfB.index[ii], RTF.INST_ID]].append(str(matchingCols[jj]))
-        # The only way to prevent "truth value of array is ambiguous" is cell-by-cell iteration
-        problemMsg = [f'{idx}: {cols}' for idx, cols in problemCells.items()]
-        problemMsg = '\n'.join(problemMsg)
-        # Try to fix the problem with an iloc write
-        warnings.warn(
-            '<b>Warning!</b> Saved components do not match current component'
-            ' state. This can occur when pandas incorrectly caches some'
-            ' table values. Problem cells (shown as [id]: [columns]):\n' + f'{problemMsg}\n'
-            f'Please try manually altering these values before exporting again.', UserWarning
-        )
+    ret = outFn(compDf, file, **exportArgs)
+    if verifyIntegrity and file.suffix[1:] in self.roundTripTypes:
+      loadedDf = self.importByFileType(file)
+      compareDataframes(compDf, loadedDf)
     return ret
 
   def importByFileType(
@@ -244,7 +207,7 @@ class ComponentIO:
                         fpath: Union[str, Path],
                         buildOrExport=_litLst,
                         returnAttrName=False,
-                        missingOk=False) -> Union[_maybeCallable, Tuple[_maybeCallable, str]]:
+                        missingOk=False) -> _maybeCallable | Tuple[_maybeCallable, str]:
     fpath = Path(fpath)
     fname = fpath.name
     cmpTypes = np.array(list(_attrNameFmt(buildOrExport, self)))
@@ -260,420 +223,6 @@ class ComponentIO:
       return outFn, attrName
     return outFn
 
-  def _pandasSerialExport(
-      self,
-      exportDf: pd.DataFrame,
-      outFile: Union[str, Path] = None,
-      readOnly=True,
-      **pdExportArgs
-  ):
-    if outFile is None:
-      return
-
-    defaultExportParams = {
-        'na_rep': 'NaN',
-        'float_format': '{:0.10n}',
-        'index': False,
-    }
-    outPath = Path(outFile)
-    outPath.parent.mkdir(exist_ok=True, parents=True)
-    exporter = outPath.suffix.lower().replace('.', '')
-
-    defaultExportParams.update(pdExportArgs)
-    exportFn = getattr(exportDf, f'to_{exporter}', None)
-    if exportFn is None:
-      raise ValueError(
-          f'Exporter {exporter} not recognized. Acceptable options:\n' +
-          ', '.join(_getPdExporters())
-      )
-
-    with np.printoptions(threshold=sys.maxsize):
-      exportFn(outFile, index=False)
-    if readOnly:
-      outPath.chmod(S_IREAD | S_IRGRP | S_IROTH)
-
-  # -----
-  # Export options
-  # -----
-  def exportSerialized(
-      self, compDf: pd.DataFrame, outFile: Union[str, Path] = None, readOnly=True, **pdExportArgs
-  ):
-    """
-    Converts dataframe into a string-serialized version and uses pandas to write it to disk.
-
-    :param compDf: Dataframe to export
-    :param outFile: Name of the output file location. If *None*, no file is created. However,
-      the export object (string dtype dataframe) will still be created and returned.
-      The file suffix can be any option supported by a pandas exporter. This can be
-      csv, json, feather, etc.
-      Note: pickle is a special case. In some cases, it is significantly more benficial
-      to export the raw dataframe compared to a serialized version. In these cases, use
-      ComponentIO.exportPkl. Otherwise, `pickle` is still a valid option here for a serialized
-      format. For a full list of export options, see
-      `the documentation`https://pandas.pydata.org/pandas-docs/stable/user_guide/io.html`.
-    :param pdExportArgs: Dictionary of values passed to underlying pandas export function.
-      These will overwrite the default options for :func:`exportToFile <ComponentMgr.exportByFileType>`
-    :param readOnly: Whether this export should be read-only
-    :return: Export version of the component data.
-    """
-    # Make sure no rows are truncated
-    col = None
-    try:
-      # TODO: Currently the additional options are causing errors. Find out why and fix
-      #  them, since this may be useful if it can be modified
-      # Format special columns appropriately
-      # Since CSV export significantly modifies the df, make a copy before doing all these
-      # operations
-      exportDf = compDf.copy(deep=True)
-      for col in exportDf:
-        if not isinstance(col.value, str):
-          serial, errs = serialize(col, exportDf[col])
-          exportDf[col] = serial.to_numpy()
-          if len(errs):
-            raise ValueError(f'Encountered errors on the following rows:\n{errs.to_string()}')
-      self._pandasSerialExport(exportDf, outFile, readOnly, **pdExportArgs)
-    except Exception as ex:
-      errMsg = f'Error on parsing column "{col.name}"\n'
-      augmentException(ex, errMsg)
-      raise
-    return exportDf
-
-  @wraps(exportSerialized, assigned=('__doc__', '__annotations__'))
-  def exportCsv(self, *args, **kwargs):
-    """Exposed format from the more general exportSerialized"""
-    return self.exportSerialized(*args, **kwargs)
-
-  @deprecateKwargs(imgDir='srcDir', asIndiv='ignoreIdPriority', lblField='labelField')
-  def exportCompImgsDf(
-      self,
-      compDf: pd.DataFrame,
-      outFile: Union[str, Path] = None,
-      *,
-      srcDir: Union[FilePath, dict, DirectoryDict] = None,
-      margin=0,
-      marginAsPct=False,
-      includeCols=('instanceId', 'image', 'labelMask', 'label', 'offset'),
-      labelField='Instance ID',
-      prioritizeById=False,
-      returnLblMapping=False,
-      missingOk=False,
-      resizeOpts=None,
-      **kwargs
-  ):
-    """
-    Creates a dataframe consisting of extracted images around each component
-    :param compDf: Dataframe to export
-    :param outFile: Where to save the result, if it should be saved. Caution -- this
-      is currently a time-consuming process!
-    :param srcDir: Where images corresponding to this dataframe are kept. Source image
-      filenames are interpreted relative to this directory if they are not absolute. Alternatively, can be a dict
-      of {name: np.ndarray} image mappings
-    :param margin: How much padding to give around each component
-    :param marginAsPct: Whether the margin should be a percentage of the component size or
-      a raw pixel value.
-    :param includeCols: Which columns to include in the export list
-    :param labelField: See ComponentIO.exportLblPng. This label is provided in the output dataframe
-      as well, if specified.
-    :param prioritizeById: Since the label image export is only one channel (i.e. grayscale), problems arise when
-      there is overlap between components. Which one should be on top? If `prioritizeById` is *True*, higher
-      ids are always on top of lower ids. So, if ID 1 is a small component and ID 2 is a larger component completely
-      surrounding ID 1, ID 1's export will just look like ID 2's export. If *Fals*, the current component is always
-      on top in its label mask. In the case where more than 2 components overlap, the other components are ordered
-      by ID. So, in the previous scenario ID 1 will still show up on top of ID 2 in its own exported mask despite being
-      a lower ID, but ID 2 will be fully visible in its own export.
-    :param missingOk: Whether a missing image is acceptable. When no source image is found
-      for an annotation, this will simpy the 'image' output property
-    :param resizeOpts: Options for reshaping the output to a uniform size if desired. The following keys may be supplied:
-
-      - ``shape``          : Required. It is the shape that all images will be resized to before
-                             being saved. This is useful for neural networks with a fixed input size which forces all
-                             inputs to be e.g. 100x100 pixels.
-      - ``keepAspectRatio``: default True. Whether to keep the aspect ratio and pad the problematic axis, or
-                             to stretch the image to the right fit. I.e. if a component with shape (25, 50) exists, and
-                             an export ``shape`` of (25, 25) is specified with ``keepAspectRatio``, the component will
-                             be resized to (12, 25) and padded on the top and bottom with 6 and 7 pixels of ``padVal``,
-                             respectively.
-      - ``padVal``         : default np.nan. How to fill the padded axis if `keepAspectRatio` is *True*.
-                             If *np.nan*, the values are grabbed from the image instead. If a component is on the image
-                             boundary, black (0) is used.
-      - ``allowReorient``  : default False. If *True*, the output image can be rotated 90 degrees if this reduces the
-                             amount of manipulation required to get the output to be the proper shape
-      - ``interpolation``  : Any interpolation value accepted by cv.resize
-    :param returnLblMapping: Whether to return the mapping of label numeric values to table field values
-    :return: Dataframe with the following keys:
-      - instId: The component's Instance ID
-      - img: The (MxNxC) image corresponding to the component vertices, where MxN are
-        the padded row sizes and C is the number of image channels
-      - labelMask: Binary mask representing the component vertices
-      - label: Field value of the component for the field specified by `labelField`
-      - offset: Image (x,y) coordinate of the min component vertex.
-    :param kwargs: Passed to ComponentIO.exportLblPng
-    """
-    _imgCache = {}
-    if srcDir is None:
-      srcDir = Path('.')
-    srcDir = DirectoryDict(srcDir, allowAbsolute=True, readFunc=cvImread_rgb)
-    uniqueImgs = np.unique(compDf[RTF.SRC_IMG_FILENAME])
-    dfGroupingsByImg = []
-    for imgName in uniqueImgs:
-      dfGroupingsByImg.append(compDf[compDf[RTF.SRC_IMG_FILENAME] == imgName])
-
-    useKeys = set(includeCols)
-    outDf = {k: [] for k in useKeys}
-    labelField = self.tableData.fieldFromName(labelField)
-    # imshape is automatically inferred by the exporter
-    kwargs.pop('imShape', None)
-    mappings = {}
-    if resizeOpts is not None:
-      cropperFunc = getCroppedImg_resize_pad
-    else:
-      resizeOpts = {}
-      cropperFunc = getCroppedImg
-
-    for miniDf, fullImgName in zip(dfGroupingsByImg, uniqueImgs):
-      img = srcDir.get(fullImgName)
-      if img is None and not missingOk:
-        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), fullImgName)
-      shape = img if img is None else img.shape[:2]
-      lblImg, mapping = self.exportLblPng(
-          miniDf, imShape=shape, labelField=labelField, returnLblMapping=True, **kwargs
-      )
-      mappings[Path(fullImgName).name] = mapping
-      if img is None:
-        img = np.zeros_like(lblImg)
-      invertedMap = pd.Series(mapping.index, mapping)
-
-      for ii, (idx, row) in enumerate(miniDf.iterrows()):
-        allVerts = row[RTF.VERTICES].stack()
-        if marginAsPct:
-          compImgSz = allVerts.max(0) - allVerts.min(0)
-          marginToUse = (compImgSz * (margin/100)).astype(int)
-        else:
-          marginToUse = margin
-        compImg, bounds = cropperFunc(img, allVerts, marginToUse, returnCoords=True, **resizeOpts)
-
-        if 'image' in useKeys:
-          outDf['image'].append(compImg)
-        lbl = row[labelField]
-
-        if 'label' in useKeys:
-          outDf['label'].append(lbl)
-
-        if 'labelMask' in useKeys:
-          if prioritizeById:
-            # ID indicates z-value, which is already the case for a label image
-            useImg = lblImg
-          else:
-            # The current component should always be drawn on top
-            useImg = row[RTF.VERTICES].toMask(lblImg.copy(),
-                                                 float(invertedMap[lbl]),
-                                                 asBool=False)
-          mask = cropperFunc(useImg, allVerts, marginToUse, returnCoords=False, **resizeOpts)
-
-          outDf['labelMask'].append(mask)
-
-        if 'instanceId' in useKeys:
-          outDf['instanceId'].append(idx)
-
-        if 'offset' in useKeys:
-          outDf['offset'].append(bounds[0, :])
-    outDf = pd.DataFrame(outDf)
-    if len(mappings) == 1:
-      # Common case where annotations for just one image were converted
-      mappings = next(iter(mappings.values()))
-    outDf.attrs['mapping'] = mappings
-    if outFile is not None:
-      outDf.to_pickle(outFile)
-    if returnLblMapping:
-      return outDf, mappings
-    return outDf
-
-  def exportPkl(
-      self,
-      compDf: pd.DataFrame,
-      outFile: Union[str, Path] = None,
-      **exportArgs,
-  ) -> (Any, str):
-    """
-    See the function signature for :func:`exportCsv <ComponentIO.exportCsv>`
-    """
-    # Since the write-out is a single operation there isn't an intermediate form to return
-    if outFile is not None:
-      compDf.to_pickle(outFile)
-    # Pickle export doesn't change anything about the dataframe, so just return it
-    return compDf
-
-  @deprecateKwargs(lblField='labelField')
-  def exportLblPng(
-      self,
-      compDf: pd.DataFrame,
-      outFile: FilePath = None,
-      imShape: Tuple[int] = None,
-      labelField: Union[PrjParam, str] = 'Instance ID',
-      bgColor=0,
-      rescaleOutput=False,
-      returnLblMapping=False,
-      writeMeta=True,
-      **kwargs
-  ):
-    """
-    :param compDf: Dataframe to export
-    :param outFile: Filename to save, leave *None* to avoid saving to a file
-    :param imShape: MxN shape of image containing these annotations
-    :param labelField: Data field to use as an index label. E.g. "Class" will use the 'class'
-      column, but any other column can be specified. The output ground truth masks
-      will be colored according to this field.  See :meth:`PrjParam.toNumeric` for details.
-      If `labelField` is *None*, the foreground mask will be boolean instead of integer-colored.
-    :param bgColor: Color of the mask background. Must be an integer.
-    :param rescaleOutput: For images designed for human use, it is helpful to have
-      outputs rescaled to the entire intensity range. Otherwise, they usually end
-      up looking pure black and it is difficult to see components in the image.
-      When `rescaleOutput` is *True*, all numbers are scaled to the 'uint16' range.
-    :param returnLblMapping: Whether to return a pd.Series matching original index values
-      to their numeric counterparts. Note: this is important in cases where an offset must be applied to the underlying
-      data. If the background color is 0 and a valid numeric value is also 0, it will be impossible to detect this
-      object in the labeled output. So, an offset must be applied in these cases (background - min(data) + 1). This
-      mapping records the relevant information to import original values back during `importLblPng`.
-    :param writeMeta: Whether to write the field mapping/offset to the output image file as png metadata.
-      Useful to preserve label information when re-importing.
-    :param kwargs:
-    :return:
-    """
-
-    labelField = self.tableData.fieldFromName(labelField)
-
-    if bgColor < 0:
-      raise ValueError(f'Background color must be >= 0, was {bgColor}')
-
-    readMapping = returnLblMapping or (writeMeta and outFile is not None)
-    labels = compDf[labelField]
-    labels_numeric = labelField.toNumeric(labels, returnMapping=readMapping)
-    # Make sure numeric labels aren't the same as background, otherwise they will be forever lost
-    mapping = None
-    if readMapping:
-      labels_numeric, mapping = labels_numeric
-    diff = max(bgColor - np.min(labels_numeric, initial=0) + 1, 0)
-    if readMapping:
-      mapping.index += diff
-    labels_numeric += diff
-    asBool = np.issubdtype(labels_numeric.dtype, np.bool_)
-
-    if rescaleOutput:
-      if mapping is not None:
-        max_ = np.max(np.asarray(mapping.index), initial=bgColor)
-        mapping.index = rescale_intensity(
-            mapping.index, in_range=(bgColor, max_), out_range='uint16'
-        )
-      else:
-        max_ = np.max(labels_numeric, initial=bgColor)
-      labels_numeric = rescale_intensity(
-          labels_numeric, in_range=(bgColor, max_), out_range='uint16'
-      )
-
-    if imShape is None:
-      # Without any components the image is non-existant
-      if len(compDf) == 0:
-        raise ValueError('imShape cannot be *None* if no components are present')
-      vertMax = ComplexXYVertices.stackedMax(compDf[RTF.VERTICES])
-      imShape = tuple(vertMax[::-1] + 1)
-    maskType = 'uint16' if np.min(bgColor) >= 0 else 'int32'
-    outMask = np.full(imShape[:2], bgColor, dtype=maskType)
-    for fillClr, (_, comp) in zip(labels_numeric, compDf.iterrows()):
-      verts: ComplexXYVertices = comp[RTF.VERTICES]
-      outMask = verts.toMask(outMask, int(fillClr), False, False)
-    if asBool:
-      outMask = outMask > 0
-
-    if outFile is not None:
-      if writeMeta:
-        _writeImge_meta(outMask, outFile, mapping)
-      else:
-        cvImsave_rgb(outFile, outMask)
-    if returnLblMapping:
-      return outMask, mapping
-    return outMask
-
-  # def exportClassPng(self, compDf: pd.DataFrame, outFile: FilePath = None, imShape: Tuple[int]=None, **kwargs):
-  #   # Create label to output mapping
-  #   return self.exportLblPng(compDf, outFile, imShape, 'Class', **kwargs)
-
-  def exportCompImgsZip(
-      self,
-      compDf: pd.DataFrame,
-      outDir: FilePath = 's3a-export',
-      archive=False,
-      makeSummary=False,
-      **kwargs
-  ):
-    """
-    From a component dataframe, creates output directories for component images and masks.
-    This is useful for many neural networks etc. to read individual component images.
-
-    :param compDf: Dataframe to export
-    :param outDir:
-      helpText: "Where to make the output directories. If `None`, defaults to current
-      directory>compimgs_<margin>_margin"
-      pType: filepicker
-    :param archive: Whether to compress into a zip archive instead of directly outputting a folder
-    :param makeSummary: Whether to include an html table showing each component from the dataframe along with
-      its image and mask representations
-    :param kwargs: Passed directly to :meth:`ComponentIO.exportCompImgsDf`
-    """
-    outDir = Path(outDir)
-    useDir = outDir
-
-    with ExitStack() as stack:
-      if archive:
-        useDir = Path(stack.enter_context(tempfile.TemporaryDirectory()))
-      dataDir = useDir / 'data'
-      labelsDir = useDir / 'labels'
-      dataDir.mkdir(exist_ok=True, parents=True)
-      labelsDir.mkdir(exist_ok=True, parents=True)
-
-      summaryName = useDir / 'summary.html'
-
-      extractedImgs = self.exportCompImgsDf(compDf, None, **kwargs)
-      for idx, row in extractedImgs.iterrows():
-        saveName = f'{row["instanceId"]}.png'
-        if 'image' in row.index:
-          cvImsave_rgb(dataDir / saveName, row['image'])
-        if 'labelMask' in row.index:
-          cvImsave_rgb(labelsDir / saveName, row.labelMask)
-
-      if makeSummary:
-        extractedImgs = extractedImgs.rename({'instanceId': RTF.INST_ID.name}, axis=1)
-        # Prevent merge error by renaming index
-        # INST_ID.name has to be used instead of raw INST_ID due to strange pandas issue
-        # throwing a TypeError: keywords must be a string
-        outDf: pd.DataFrame = compDf.drop([RTF.VERTICES], axis=1).rename(str, axis=1)
-        outDf = outDf.merge(
-          extractedImgs, on=RTF.INST_ID.name
-        )
-        for colName, imgDir in zip(['labelMask', 'image'], [labelsDir, dataDir]):
-          if colName not in extractedImgs:
-            continue
-          relDir = imgDir.relative_to(useDir)
-          outDf[colName] = outDf[RTF.INST_ID.name].apply(
-              lambda el: imgPathtoHtml((relDir / str(el)).with_suffix('.png').as_posix())
-          )
-        outDf.columns = list(map(str, outDf.columns))
-        outDf.to_html(summaryName, escape=False, index=False)
-
-      if archive:
-        if outDir.suffix != '.zip':
-          outDir = outDir.with_suffix(outDir.suffix + '.zip')
-        with ZipFile(outDir, 'w') as ozip:
-          for dir_ in labelsDir, dataDir:
-            if not dir_.exists():
-              continue
-            for file in dir_.iterdir():
-              ozip.write(file, f'{dir_.name}/{file.name}')
-          if makeSummary:
-            ozip.write(summaryName, file.name)
-
-  # -----
-  # Import options
-  # -----
   def convert(
       self,
       fromData: FilePathOrDf,

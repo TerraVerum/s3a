@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import inspect
 import os
 import pydoc
@@ -15,18 +14,24 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtCore
+from pyqtgraph.parametertree.Parameter import PARAM_TYPES
 
-from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS
+from utilitys import CompositionMixin, AtomicProcess, NestedProcess
+from utilitys.params import *
 from .. import models
 from ..compio import ComponentIO, defaultIo
+from ..compio.base import AnnotationExporter
+from ..constants import (
+  APP_STATE_DIR,
+  PROJ_FILE_TYPE,
+  PROJ_BASE_TEMPLATE,
+  PRJ_ENUMS,
+  PRJ_CONSTS as CNST,
+  REQD_TBL_FIELDS)
 from ..generalutils import hierarchicalUpdate, cvImsave_rgb
 from ..graphicsutils import DropList
-from ..structures import FilePath, NChanImg
-from utilitys import CompositionMixin, AtomicProcess, NestedProcess
-from utilitys import fns
-from utilitys.params import *
-from ..constants import APP_STATE_DIR, PROJ_FILE_TYPE, PROJ_BASE_TEMPLATE
 from ..logger import getAppLogger
+from ..structures import FilePath, NChanImg
 
 
 def absolutePath(p: Optional[Path]):
@@ -96,24 +101,16 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     compIo = self.projData.compIo
     exportOptsParam = fns.getParamChild(self.toolsEditor.params, CNST.TOOL_PROJ_EXPORT.name, 'Export Options')
     # Use a wrapper to easily get hyperparams created
-    wrapper = NestedProcWrapper(NestedProcess('Export Options'), exportOptsParam, nestHyperparams=False)
-    for name, fn in inspect.getmembers(type(compIo), inspect.isfunction):
-      if not name.startswith('export'):
-        continue
-      # Make params to expose options per export type
-      atomic = AtomicProcess(fn)
-      for key in reversed(atomic.input.hyperParamKeys):
-        # Reverse to delete without issue
-        # Remove none values that can't be edited by the user
-        # TODO: This is awful! But it works... Get a list of all generally editable parameters, except for known internal
-        #   ones
-        if atomic.input[key] is None or key in ('outDir', 'returnLblMapping', 'offset'):
-          atomic.input.hyperParamKeys.remove(key)
-      if atomic.input.hyperParamKeys:
-        wrapper.addStage(atomic)
+    for name, fn in inspect.getmembers(compIo, lambda el: isinstance(el, AnnotationExporter)):
+      metadata = fn.optsMetadata()
+      for child in metadata.values():
+        if child['value'] is None or child['type'] not in PARAM_TYPES:
+          # Not representable
+          continue
+        fns.getParamChild(exportOptsParam, chOpts=child)
     # Add catch-all that will be literally evaluated later
-    wrapper.parentParam.addChild(dict(name='extra', type='text', value='', expanded=False))
-    return wrapper.parentParam
+    exportOptsParam.addChild(dict(name='extra', type='text', value='', expanded=False))
+    return exportOptsParam
 
   def attachWinRef(self, win: models.s3abase.S3ABase):
     super().attachWinRef(win)
@@ -680,8 +677,8 @@ class ProjectData(QtCore.QObject):
     if dirs:
       self.watcher.removePaths(dirs)
     self.watcher.addPaths([str(self.imagesDir), str(self.annotationsDir)])
-    for opts in self.compIo.importOpts, self.compIo.exportOpts:
-      opts['srcDir'] = self.imagesDir
+    for ioType in PRJ_ENUMS.IO_EXPORT, PRJ_ENUMS.IO_IMPORT:
+      self.compIo.updateOpts(ioType, srcDir=self.imagesDir)
     return self.cfgFname
 
   @classmethod
@@ -907,25 +904,25 @@ class ProjectData(QtCore.QObject):
     outAnn[REQD_TBL_FIELDS.INST_ID] = outAnn.index
     outFmt = f".{self.cfg['annotation-format']}"
     outName = self.annotationsDir / f'{image.name}{outFmt}'
-    self.compIo.exportByFileType(outAnn, outName, verifyIntegrity=False, readOnly=False)
+    self.compIo.exportByFileType(outAnn, outName, verifyIntegrity=False, readonly=False)
     self.imgToAnnMapping[image] = outName
 
-  def addFormattedAnnotation(self, filename: FilePath, overwriteOld=False):
+  def addFormattedAnnotation(self, file: FilePath, overwriteOld=False):
     """
     Adds an annotation file that is already formatted in the following ways:
-      * The right source image filename column (i.e. REQD_TBL_FIELDS.SRC_IMG_FILENAME set to the image name
+      * The right source image file column (i.e. REQD_TBL_FIELDS.SRC_IMG_FILENAME set to the image name
       * The file stem already matches a project image (not remote, i.e. an image in the `images` directory)
       * The annotations correspond to exactly one image
     """
-    image = self.getFullImgName(filename.stem, thorough=False)
-    if filename.parent != self.annotationsDir:
-      if not overwriteOld and (self.annotationsDir/filename.name).exists():
-        raise IOError(f'Cannot add annotation {filename} since a corresponding annotation with that name already'
+    image = self.getFullImgName(file.stem, thorough=False)
+    if file.parent != self.annotationsDir:
+      if not overwriteOld and (self.annotationsDir/file.name).exists():
+        raise IOError(f'Cannot add annotation {file} since a corresponding annotation with that name already'
                       f' exists and `overwriteOld` was False')
-      newName = self.annotationsDir/filename.name
-      shutil.copy2(filename, newName)
-      filename = newName
-    self.imgToAnnMapping[image] = filename
+      newName = self.annotationsDir/file.name
+      shutil.copy2(file, newName)
+      file = newName
+    self.imgToAnnMapping[image] = file
 
   def _copyImgToProj(self, name: Path, data: NChanImg=None, overwrite=False):
     newName = self.imagesDir/name.name
