@@ -251,6 +251,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
     Determines which columns to show. All unspecified columns will be hidden.
     :param visibleColumns:
       pType: checklist
+      expanded: False
     """
     for ii, col in enumerate(self.mgr.colTitles):
       self.setColumnHidden(ii, col not in visibleColumns)

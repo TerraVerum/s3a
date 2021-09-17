@@ -347,6 +347,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     :param fields:
       pType: checklist
       limits: []
+      expanded: False
     :param force:
       ignore: True
     """
