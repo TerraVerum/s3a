@@ -229,3 +229,6 @@ class TableData(QtCore.QObject):
           assert curOutName == srcField
           curOutName = destField
     return curOutName
+
+  def __reduce__(self):
+    return TableData, (self.cfgFname, self.cfg, self.template, self.filter is not None)
