@@ -16,7 +16,7 @@ from utilitys.typeoverloads import FilePath
 from .base import AnnotationImporter
 from .helpers import registerIoHandler
 from ..constants import REQD_TBL_FIELDS as RTF
-from ..generalutils import DirectoryDict, orderContourPts, cvImread_rgb, deprecateKwargs
+from ..generalutils import DirectoryDict, orderContourPts, cvImread_rgb, deprecateKwargs, pd_iterdict
 from ..structures import ComplexXYVertices, XYVertices, AnnInstanceError, LabelFieldType
 
 __all__ = ['SerialImporter', 'CsvImporter', 'SuperannotateJsonImporter', 'GeojsonImporter',
@@ -25,13 +25,14 @@ __all__ = ['SerialImporter', 'CsvImporter', 'SuperannotateJsonImporter', 'Geojso
 class SerialImporter(AnnotationImporter):
   ioType = 's3a'
 
-  def readFile(self, file: FilePath, **kwargs):
+  @classmethod
+  def readFile(cls, file: FilePath, **kwargs):
     fType = Path(file).suffix.lower().replace('.', '')
     importFn = getattr(pd, f'read_{fType}', None)
     if importFn is None:
       raise ValueError(
         f'File type {fType} cannot be handled by the serial importer.'
-        f' Must be one of {",".join(self._getPdImporters())}'
+        f' Must be one of {",".join(cls._getPdImporters())}'
       )
     # Special case: csv imports need to avoid interpreting nan results
     kwargs.update(na_filter=False, dtype=str)
@@ -40,8 +41,11 @@ class SerialImporter(AnnotationImporter):
     serialDf = importFn(file, **{k: kwargs[k] for k in useArgs})
     return serialDf
 
-  def bulkImport(self, importObj, errorOk=False, **kwargs):
+  def bulkImport(self, importObj, **kwargs):
     return importObj
+
+  def getInstances(self, importObj, **kwargs):
+    return pd_iterdict(importObj)
 
   @staticmethod
   def _getPdImporters():
@@ -60,7 +64,7 @@ class GeojsonImporter(AnnotationImporter):
     with open(Path(file), 'r') as ifile:
       return json.load(ifile)
 
-  def getInstances(self, importObj):
+  def getInstances(self, importObj, **kwargs):
     return importObj['features']
 
   def formatSingleInstance(self, inst, **kwargs):
@@ -73,6 +77,8 @@ class GeojsonImporter(AnnotationImporter):
       return ComplexXYVertices(geometry['coordinates'], coerceListElements=True)
     else:
       return AnnInstanceError(f'Unrecognized type "{geometry["type"]}"')
+
+  bulkImport = AnnotationImporter.defaultBulkImport
 
 registerIoHandler('geojsonregion',
                   deserialize=GeojsonImporter.parseRegion)
@@ -87,6 +93,7 @@ class SuperannotateJsonImporter(AnnotationImporter):
   def populateMetadata(self,
                        file: Path=None,
                        srcDir: t.Union[FilePath, dict] = None,
+                       imShape: tuple[int, int] = None,
                        **kwargs):
     if srcDir is None:
       srcDir = file.parent
@@ -96,15 +103,20 @@ class SuperannotateJsonImporter(AnnotationImporter):
       classes = srcDir.get(file.parent / 'classes' / 'classes.json')
     if classes is not None:
       self.tableData.fieldFromName('className').opts['limits'] = [c['name'] for c in classes]
-    self.opts = self.importObj['metadata']
-    self.opts['imShape'] = (self.opts['height'], self.opts['width'])
+    meta = self.importObj['metadata']
+    if imShape is None:
+      imShape = (meta.pop('height'), meta.pop('width'))
+    return self._updateOpts(locals())
 
-  def getInstances(self, importObj):
+  def getInstances(self, importObj, **kwargs):
     return importObj['instances']
 
-  def formatSingleInstance(self, inst, **kwargs):
+  def formatSingleInstance(self,
+                           inst,
+                           name=None,
+                           **kwargs):
     out = {
-      RTF.SRC_IMG_FILENAME: self.opts['name']
+      RTF.SRC_IMG_FILENAME: name
     }
     verts = self.parseRegion(inst)
     if not isinstance(verts, AnnInstanceError):
@@ -176,8 +188,8 @@ class VGGImageAnnotatorImporter(CsvImporter):
     out = json.loads(inst['region_attributes'])
     return out
 
-  def getInstances(self, importObj: pd.DataFrame):
-    return importObj.to_dict(orient='records')
+  def getInstances(self, importObj: pd.DataFrame, **kwargs):
+    return pd_iterdict(importObj)
 
   @staticmethod
   def parseRegion(region):
@@ -216,7 +228,6 @@ class LblPngImporter(AnnotationImporter):
   ioType = 's3a'
 
   imgInfo = {}
-  _canBulkImport = False
 
   def readFile(self, file: FilePath,
                labelMapping=None,
@@ -261,8 +272,8 @@ class LblPngImporter(AnnotationImporter):
     labelImage = self.importObj
     # "Offset" present for numeric data, "mapping" present for textual data
     info = self.imgInfo
-    if labelMapping is None and 'mapping' in info:
-      labelMapping = pd.Series(json.loads(info['mapping']), name=info.get('field', None))
+    if labelMapping is None and 'labelMapping' in info:
+      labelMapping = pd.Series(json.loads(info['labelMapping']), name=info.get('labelField', None))
       labelMapping.index = labelMapping.index.astype(int)
 
     if offset is None and 'offset' in info:
@@ -274,41 +285,25 @@ class LblPngImporter(AnnotationImporter):
       _, labelMapping = labelField.toNumeric(vals, returnMapping=True)
       labelMapping.index += offset
 
-    self.opts['labelField'] = labelField
-    self.opts['labelMapping'] = labelMapping
-    self.opts['distinctRegions'] = distinctRegions
-    self.opts['offset'] = offset
+    return self._updateOpts(locals())
 
-  def getInstances(self, importObj, **kwargs):
-    return self.opts['labelMapping'].iteritems()
+  def getInstances(self,
+                   importObj,
+                   labelMapping=None,
+                   distinctRegions=None,
+                   **kwargs):
+    labelMask = importObj
+    for numericLbl, origVal in labelMapping.iteritems(): # type: int, t.Any
+      verts = ComplexXYVertices.fromBinaryMask(labelMask == numericLbl)
+      if distinctRegions:
+        for vv in verts:
+          yield {RTF.INST_ID: numericLbl,
+                 RTF.VERTICES: ComplexXYVertices([vv])}
+      else:
+        yield {RTF.INST_ID: numericLbl,
+               RTF.VERTICES: verts}
 
-  def bulkImport(self, importObj, errorOk=False, **kwargs):
-    # Not possible to bulk import
-    return pd.DataFrame()
-
-  def formatSingleInstance(self, inst, **kwargs) -> dict:
-    numericLbl, origVal = inst
-    labelMask: np.ndarray = self.importObj
-    verts = ComplexXYVertices.fromBinaryMask(labelMask == numericLbl)
-    out = defaultdict(list)
-    if self.opts['distinctRegions']:
-      newRegions = [ComplexXYVertices([v]) for v in verts]
-      out[RTF.VERTICES].extend(newRegions)
-      orig = np.tile(origVal, len(verts))
-    else:
-      out[RTF.VERTICES].append(verts)
-      orig = [origVal]
-    out[self.opts['labelField']].extend(orig)
-    return out
-
-  def individualImport(self, importObj, **kwargs):
-    parsed = defaultdict(list)
-    for ii, inst in enumerate(self.getInstances(importObj)):
-      parsedInst = self.formatSingleInstance(inst, **kwargs)
-      for kk, vv in parsedInst.items():
-        parsed[kk].extend(vv)
-
-    return pd.DataFrame(parsed)
+  bulkImport = AnnotationImporter.defaultBulkImport
 
 class PklImporter(AnnotationImporter):
   ioType = 's3a'
@@ -319,23 +314,28 @@ class PklImporter(AnnotationImporter):
     """
     return pd.read_pickle(file)
 
-  def bulkImport(self, importObj, errorOk=False, **kwargs):
-    return self.importObj
+  def getInstances(self, importObj, **kwargs):
+    return pd_iterdict(importObj)
+
+  def bulkImport(self, importObj, **kwargs):
+    return importObj
 
 class CompImgsDfImporter(AnnotationImporter):
   ioType = 's3a'
 
   readFile = PklImporter.readFile
 
-  def getInstances(self, importObj):
+  def getInstances(self, importObj, **kwargs):
     return importObj.iterrows()
 
   def populateMetadata(self,
                        labelField: LabelFieldType = 'Instance ID',
                        **kwargs
                        ):
-    super().populateMetadata(**kwargs)
-    self.opts['labelField'] = self.tableData.fieldFromName(labelField)
+    labelField = self.tableData.fieldFromName(labelField)
+    ret = super().populateMetadata(**kwargs)
+    ret.update(self._updateOpts(locals()))
+    return ret
 
   def formatSingleInstance(self, inst, **kwargs) -> dict:
     idx, row = inst
@@ -345,7 +345,10 @@ class CompImgsDfImporter(AnnotationImporter):
     out[RTF.VERTICES] = verts
     return out
 
-  def bulkImport(self, importObj, errorOk=False, **kwargs):
+  def bulkImport(self,
+                 importObj,
+                 labelField=None,
+                 **kwargs):
     out = importObj[['instanceId', 'label']].copy()
-    out.columns = [RTF.INST_ID, self.opts['labelField']]
+    out.columns = [RTF.INST_ID, labelField]
     return out

@@ -101,7 +101,7 @@ class LblPngExporter(AnnotationExporter):
       vertMax = ComplexXYVertices.stackedMax(compDf[RTF.VERTICES])
       imShape = tuple(vertMax[::-1] + 1)
 
-    self._updateOpts(locals(), readMapping=readMapping)
+    return self._updateOpts(locals(), readMapping=readMapping)
 
   def formatReturnObj(self,
                       exportObj,
@@ -122,8 +122,8 @@ class LblPngExporter(AnnotationExporter):
       outImg = Image.fromarray(exportObj)
       info = PngInfo()
       if mapping is not None:
-        info.add_text('mapping', json.dumps(mapping.to_dict()))
-        info.add_text('field', str(mapping.name))
+        info.add_text('labelMapping', json.dumps(mapping.to_dict()))
+        info.add_text('labelField', str(mapping.name))
       if offset is not None:
         info.add_text('offset', str(offset))
       outImg.save(file, pnginfo=info)
@@ -270,7 +270,7 @@ class CompImgsDfExporter(AnnotationExporter):
       cropperFunc = getCroppedImg
     self.cropperFunc = cropperFunc
     labelField = PrjParamGroup.fieldFromParam(self.compDf, labelField)
-    self._updateOpts(locals())
+    return self._updateOpts(locals())
 
   def writeFile(self, file: FilePath, exportObj, **kwargs):
     return exportObj.to_pickle(file)
@@ -388,8 +388,9 @@ class CompImgsZipExporter(CompImgsDfExporter):
     :param makeSummary: Whether to include an html table showing each component from the dataframe along with
       its image and mask representations
     """
-    super().populateMetadata(**kwargs)
-    self._updateOpts(locals())
+    ret = super().populateMetadata(**kwargs)
+    ret.update(self._updateOpts(locals()))
+    return ret
 
   def writeFile(self,
                 file: FilePath,
@@ -478,9 +479,10 @@ class SerialExporter(AnnotationExporter):
     """
     :param readonly: Whether this export should be read-only
     """
-    self._updateOpts(locals())
+    return self._updateOpts(locals())
 
-  def writeFile(self,
+  @classmethod
+  def writeFile(cls,
                 file: FilePath,
                 exportObj,
                 readonly=None,
@@ -499,7 +501,7 @@ class SerialExporter(AnnotationExporter):
     if exportFn is None:
       raise ValueError(
         f'Exporter "{exporter}" not recognized. Acceptable options:\n' +
-        ', '.join(self._getPdExporters())
+        ', '.join(cls._getPdExporters())
       )
 
     with np.printoptions(threshold=sys.maxsize):

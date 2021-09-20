@@ -48,19 +48,6 @@ class AnnotationIOBase:
     ioType: t.Optional[str] = None
     """Type indicating what required fields from the IOTemplateManager should be applied"""
 
-    bulkExport: _GenericExportProtocol = None
-    """
-    Can be defined if bulk-exporting (whole dataframe at once) is possible. Must have the signature
-    def bulkExport(self, compDf: pd.DataFrame, exportObj, **kwargs) -> exportObj, error dataframe
-    """
-
-    updateExportObj: _UpdateExportObjProtocol = None
-    """
-    Can be defined if individual importing (row-by-row) is possible. This is fed the current dataframe row as a dict
-    of cell values and is expected to output the updated export object:
-    def updateExportObj(self, inst: dict, exportObj, **kwargs) -> exportObj
-    """
-
     def __init__(self, ioType=UNSET_IO_TYPE, options=None):
       """
       Provides access to a modularized version of the common import structure:
@@ -103,12 +90,11 @@ class AnnotationIOBase:
       """
       if clear:
         self.opts.clear()
-      else:
-        for kk in self._initialOpts.keys():
-          self.opts[kk] = self._initialOpts[kk]
+      for kk in self._initialOpts.keys():
+        self.opts[kk] = self._initialOpts[kk]
 
     def populateMetadata(self, **kwargs):
-      self._updateOpts(**kwargs)
+      return self._updateOpts(**kwargs)
 
     @classmethod
     def optsMetadata(cls):
@@ -141,12 +127,24 @@ class AnnotationIOBase:
 
       useKeys = set(kwargs).union(self.optsMetadata()).union(keys)
       # Can only populate requested keys if they exist in the keysource
-      for kk in useKeys.intersection(keySource):
-        self.opts[kk] = keySource[kk]
+      return {kk: keySource[kk] for kk in useKeys.intersection(keySource)}
 
 class AnnotationExporter(AnnotationIOBase):
   exportObj: t.Any
   compDf: pd.DataFrame
+
+  bulkExport: _GenericExportProtocol = None
+  """
+  Can be defined if bulk-exporting (whole dataframe at once) is possible. Must have the signature
+  def bulkExport(self, compDf: pd.DataFrame, exportObj, **kwargs) -> exportObj, error dataframe
+  """
+
+  updateExportObj: _UpdateExportObjProtocol = None
+  """
+  Can be defined if individual importing (row-by-row) is possible. This is fed the current dataframe row as a dict
+  of cell values and is expected to output the updated export object:
+  def updateExportObj(self, inst: dict, exportObj, **kwargs) -> exportObj
+  """
 
   class ERROR_COL: pass
   """Sentinel class to add errors to an explanatory message during export"""
@@ -181,12 +179,14 @@ class AnnotationExporter(AnnotationIOBase):
                errorOk=False,
                **kwargs):
     file = Path(file) if isinstance(file, FilePath.__args__) else None
+    self.resetOpts()
     # Use dict combo to allow duplicate keys
-    activeOpts = {**self._initialOpts, **kwargs}
+    kwargs.update(file=file)
+    activeOpts = {**self.opts, **kwargs}
     self.compDf = compDf
-    self.populateMetadata(**activeOpts)
+    meta = self.populateMetadata(**activeOpts)
     # Add new opts to kwargs
-    kwargs.update(self.opts, file=file)
+    kwargs.update(**meta)
 
     exportObj = self.createExportObj(**kwargs)
     for func in self.bulkExport, self.individualExport: # type: _GenericExportProtocol
@@ -204,7 +204,21 @@ class AnnotationExporter(AnnotationIOBase):
 
 class AnnotationImporter(AnnotationIOBase):
   importObj: t.Any
-  _canBulkImport = True
+
+  formatSingleInstance = None
+  """
+  Can be defined to cause row-by-row instance parsing. If defined, must have the signature:
+  ``def formatSingleInstance(self, inst, **kwargs) -> dict``
+  """
+
+  bulkImport = None
+  """
+  Can be defined to parse multiple traits from the imported object into a component dataframe all at once. Must have
+  the signature:
+  ``def bulkImport(self, importObj, **kwargs) -> pd.DataFrame``
+  Note that in some cases, a direct conversion of instances to a dataframe is convenient, so ``defaultBulkImport``
+  is provided for these cases. Simply set bulkImport = ``AnnotationImporter.defaultBulkImport`` if you wish.
+  """
 
   def __init__(self, tableData: TableData | TblContainer_T = None, ioType=AnnotationIOBase.UNSET_IO_TYPE):
     """
@@ -252,11 +266,8 @@ class AnnotationImporter(AnnotationIOBase):
   def readFile(self, file: FilePath, **kwargs):
     raise NotImplementedError
 
-  def getInstances(self, importObj):
-    return []
-
-  def formatSingleInstance(self, inst, **kwargs) -> dict:
-    return {}
+  def getInstances(self, importObj, **kwargs):
+    raise NotImplementedError
 
   def finalizeImport(self, compDf, **kwargs):
       """Deserializes any columns that are still strings"""
@@ -296,13 +307,18 @@ class AnnotationImporter(AnnotationIOBase):
       inFileOrObj = self.readFile(inFileOrObj, **kwargs)
     self.importObj = inFileOrObj
 
-    self.populateMetadata(file=file, **kwargs)
+    meta = self.populateMetadata(file=file, **self.opts, **kwargs)
     # Add new opts to kwargs
-    kwargs.update(self.opts)
+    kwargs.update(meta)
 
-    indivParsedDf = self.individualImport(inFileOrObj, **kwargs)
-    bulkParsedDf = self.bulkImport(inFileOrObj, **kwargs)
+    parsedDfs = []
+    for func in self.individualImport, self.bulkImport: # type: t.Callable[[t.Any, ...], pd.DataFrame]
+      if func is None:
+        parsedDfs.append(pd.DataFrame())
+      else:
+        parsedDfs.append(func(inFileOrObj, **kwargs))
 
+    indivParsedDf, bulkParsedDf = parsedDfs
     for col in indivParsedDf:
       # Overwrite bulk-parsed information with individual if needed, or add to it
       bulkParsedDf[col] = indivParsedDf[col]
@@ -336,14 +352,14 @@ class AnnotationImporter(AnnotationIOBase):
         f'Encountered problems on annotation import:\n{invalidInsts.to_string()}')
     return validInsts
 
-  def bulkImport(self, importObj, **kwargs):
-    if self._canBulkImport:
-      return pd.DataFrame(self.getInstances(importObj))
-    return pd.DataFrame()
+  def defaultBulkImport(self, importObj, **kwargs) -> pd.DataFrame:
+    return pd.DataFrame(self.getInstances(importObj, **kwargs))
 
   def individualImport(self, importObj, **kwargs):
     parsed = []
-    for inst in self.getInstances(importObj):
+    if self.formatSingleInstance is None:
+      return pd.DataFrame()
+    for inst in self.getInstances(importObj, **kwargs):
       parsedInst = self.formatSingleInstance(inst, **kwargs)
       parsed.append(parsedInst)
 
