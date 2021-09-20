@@ -23,7 +23,7 @@ def test_normal_export(sampleComps, tmp_path, app):
   app.props[CNST.EXP_ONLY_VISIBLE] = False
   for ftype in io.exportTypes:
     curPath = tmp_path / f'normalExport - All IDs.{ftype}'
-    doAndAssertExport(app, curPath, io, app.exportableDf, 'Normal export with all IDs not successful.')
+    doAndAssertExport(app, curPath, io, app.exportableDf, 'Normal export with all IDs not successful: ' + ftype)
 
 @pytest.mark.withcomps
 def test_filter_export(tmp_path, monkeypatch, app):
