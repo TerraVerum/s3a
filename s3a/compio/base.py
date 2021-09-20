@@ -77,24 +77,10 @@ class AnnotationIOBase:
 
       if options is None:
         options = {}
-      self._initialOpts = copy.copy(options)
       self.opts = options
 
-    def setInitialOpts(self, **opts):
-      self._initialOpts = opts
-
-    def resetOpts(self, clear=False):
-      """
-      Reset initially provided option keys to initial state without reassigning object reference.
-      :param clear: If *True*, options will be completely cleared instead of reset to initial options.
-      """
-      if clear:
-        self.opts.clear()
-      for kk in self._initialOpts.keys():
-        self.opts[kk] = self._initialOpts[kk]
-
     def populateMetadata(self, **kwargs):
-      return self._updateOpts(**kwargs)
+      return self._forwardMetadata(**kwargs)
 
     @classmethod
     def optsMetadata(cls):
@@ -115,9 +101,9 @@ class AnnotationIOBase:
           del metadata[kk]
       return metadata
 
-    def _updateOpts(self, locals_=None, *keys, **kwargs):
+    def _forwardMetadata(self, locals_=None, *keys, **kwargs):
       """
-      Convenience function to update self.opts from some locals and extra keywords, since this is a common
+      Convenience function to update __call__ kwargs from some locals and extra keywords, since this is a common
       paradigm in `populateMetadata`
       """
       if locals_ is None:
@@ -179,13 +165,11 @@ class AnnotationExporter(AnnotationIOBase):
                errorOk=False,
                **kwargs):
     file = Path(file) if isinstance(file, FilePath.__args__) else None
-    self.resetOpts()
-    # Use dict combo to allow duplicate keys
+    self.compDf = compDf
+
     kwargs.update(file=file)
     activeOpts = {**self.opts, **kwargs}
-    self.compDf = compDf
     meta = self.populateMetadata(**activeOpts)
-    # Add new opts to kwargs
     kwargs.update(**meta)
 
     exportObj = self.createExportObj(**kwargs)
@@ -300,15 +284,15 @@ class AnnotationImporter(AnnotationIOBase):
                parseErrorOk=False,
                **kwargs):
     self.refreshTableData()
-    self.resetOpts()
 
     file = Path(inFileOrObj) if isinstance(inFileOrObj, FilePath.__args__) else None
     if file is not None:
       inFileOrObj = self.readFile(inFileOrObj, **kwargs)
     self.importObj = inFileOrObj
 
-    meta = self.populateMetadata(file=file, **self.opts, **kwargs)
-    # Add new opts to kwargs
+    kwargs.update(file=file)
+    activeOpts = {**self.opts, **kwargs}
+    meta = self.populateMetadata(**activeOpts)
     kwargs.update(meta)
 
     parsedDfs = []

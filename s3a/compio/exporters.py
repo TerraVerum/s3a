@@ -101,7 +101,7 @@ class LblPngExporter(AnnotationExporter):
       vertMax = ComplexXYVertices.stackedMax(compDf[RTF.VERTICES])
       imShape = tuple(vertMax[::-1] + 1)
 
-    return self._updateOpts(locals(), readMapping=readMapping)
+    return self._forwardMetadata(locals(), readMapping=readMapping)
 
   def formatReturnObj(self,
                       exportObj,
@@ -270,7 +270,7 @@ class CompImgsDfExporter(AnnotationExporter):
       cropperFunc = getCroppedImg
     self.cropperFunc = cropperFunc
     labelField = PrjParamGroup.fieldFromParam(self.compDf, labelField)
-    return self._updateOpts(locals())
+    return self._forwardMetadata(locals())
 
   def writeFile(self, file: FilePath, exportObj, **kwargs):
     return exportObj.to_pickle(file)
@@ -389,7 +389,7 @@ class CompImgsZipExporter(CompImgsDfExporter):
       its image and mask representations
     """
     ret = super().populateMetadata(**kwargs)
-    ret.update(self._updateOpts(locals()))
+    ret.update(self._forwardMetadata(locals()))
     return ret
 
   def writeFile(self,
@@ -479,7 +479,7 @@ class SerialExporter(AnnotationExporter):
     """
     :param readonly: Whether this export should be read-only
     """
-    return self._updateOpts(locals())
+    return self._forwardMetadata(locals())
 
   @classmethod
   def writeFile(cls,

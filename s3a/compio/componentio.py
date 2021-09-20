@@ -125,7 +125,7 @@ class ComponentIO:
     for fileExt in typeDict:
       ioFunc = self._ioFnFromFileType(fileExt, importOrExport)
       try:
-        ioFunc.setInitialOpts(**opts)
+        ioFunc.opts.update(**opts)
       except AttributeError:
         # Can't set opts on a regular function
         continue

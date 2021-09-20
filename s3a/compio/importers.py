@@ -106,7 +106,7 @@ class SuperannotateJsonImporter(AnnotationImporter):
     meta = self.importObj['metadata']
     if imShape is None:
       imShape = (meta.pop('height'), meta.pop('width'))
-    return self._updateOpts(locals())
+    return self._forwardMetadata(locals())
 
   def getInstances(self, importObj, **kwargs):
     return importObj['instances']
@@ -285,7 +285,7 @@ class LblPngImporter(AnnotationImporter):
       _, labelMapping = labelField.toNumeric(vals, returnMapping=True)
       labelMapping.index += offset
 
-    return self._updateOpts(locals())
+    return self._forwardMetadata(locals())
 
   def getInstances(self,
                    importObj,
@@ -334,7 +334,7 @@ class CompImgsDfImporter(AnnotationImporter):
                        ):
     labelField = self.tableData.fieldFromName(labelField)
     ret = super().populateMetadata(**kwargs)
-    ret.update(self._updateOpts(locals()))
+    ret.update(self._forwardMetadata(locals()))
     return ret
 
   def formatSingleInstance(self, inst, **kwargs) -> dict:
