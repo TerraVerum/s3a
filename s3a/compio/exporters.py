@@ -31,7 +31,8 @@ from ..generalutils import (
   DirectoryDict,
   cvImread_rgb,
   pd_iterdict,
-  deprecateKwargs, cvImsave_rgb, imgPathtoHtml
+  cvImsave_rgb,
+  imgPathtoHtml
 )
 from ..structures import PrjParamGroup
 
@@ -49,7 +50,6 @@ class LblPngExporter(AnnotationExporter):
     maskType = 'uint16' if np.min(backgroundColor) >= 0 else 'int32'
     return np.full(imShape[:2], backgroundColor, dtype=maskType)
 
-  @deprecateKwargs(lblField='labelField', bgColor='backgroundColor')
   def populateMetadata(
       self,
       file: FilePath=None,

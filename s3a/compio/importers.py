@@ -1,8 +1,8 @@
+from __future__ import annotations
 import ast
 import inspect
 import json
 import typing as t
-from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -16,7 +16,7 @@ from utilitys.typeoverloads import FilePath
 from .base import AnnotationImporter
 from .helpers import registerIoHandler
 from ..constants import REQD_TBL_FIELDS as RTF
-from ..generalutils import DirectoryDict, orderContourPts, cvImread_rgb, deprecateKwargs, pd_iterdict
+from ..generalutils import DirectoryDict, orderContourPts, cvImread_rgb, pd_iterdict
 from ..structures import ComplexXYVertices, XYVertices, AnnInstanceError, LabelFieldType
 
 __all__ = ['SerialImporter', 'CsvImporter', 'SuperannotateJsonImporter', 'GeojsonImporter',
@@ -244,7 +244,6 @@ class LblPngImporter(AnnotationImporter):
       return cvImread_rgb(str(file), mode=cv.IMREAD_UNCHANGED)
     return image
 
-  @deprecateKwargs(lblMapping='labelMapping', lblField='labelField')
   def populateMetadata(self,
                        labelField: LabelFieldType = 'Instance ID',
                        labelMapping: pd.Series = None,
@@ -254,15 +253,15 @@ class LblPngImporter(AnnotationImporter):
     """
     :param labelField: label field to associate with this image. Pixels values within the image
       correspond to values from this field in the table data. If *None*, this is inferred by the mapping read
-      from the image file (see `lblMapping` description)
+      from the image file (see `labelMapping` description)
     :param labelMapping: For parameters that aren't numeric and don't have limits (e.g. arbitrary string values),
       this mapping determines how numeric values should be turned into field values. See `PrjParam.toNumeric` for
       details, since this is the mapping expected. If not provided, first the image metadata tags are searched for
-      a 'lblMapping' text attribute (this is often added to label images saved by S3A). Note that metadata can only be
+      a 'labelMapping' text attribute (this is often added to label images saved by S3A). Note that metadata can only be
       read from the file if a file path is provided, of course. If this check fails, it is inferred based on the
       allowed options of `labelField` (`labelField.opts['limits']`). Finally, if this is not present, it is assumed the
       raw image values can be used directly as field values.
-    :param offset: When `lblMapping` is not provided and field values are directly inferred from label values, this
+    :param offset: When `labelMapping` is not provided and field values are directly inferred from label values, this
       determines whether (and how much if not *None*) to offset numeric labels during import. I.e. if the png label
       is 1, but offset is 1, the corresponding *field* value will be 0 (1 - offset = 0).
     :param distinctRegions: Whether separate regions with the same ID should be separate IDs, or
