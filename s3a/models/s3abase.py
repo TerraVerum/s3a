@@ -66,7 +66,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     if scope is None:
       scope = ExitStack()
     newAttrs = SharedAppSettings()
-    scope.enter_context(EditorPropsMixin.setOpts(shared=newAttrs))
+    scope.enter_context(EditorPropsMixin.setEditorPropertyOpts(shared=newAttrs))
     scope.enter_context(DASM.setStack(newAttrs.actionStack))
     if returnAttrs:
       return scope, newAttrs

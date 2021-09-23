@@ -610,7 +610,7 @@ class ProjectData(QtCore.QObject):
     if not force and self.cfgFname == cfgFname:
       return None
 
-    hierarchicalUpdate(baseCfgDict, cfgDict)
+    hierarchicalUpdate(baseCfgDict, cfgDict, uniqueListElements=True)
 
     loadPrjPlugins = baseCfgDict.get('plugin-cfg', {})
     newPlugins = {k: v for (k, v) in loadPrjPlugins.items() if k not in self.pluginCfg}

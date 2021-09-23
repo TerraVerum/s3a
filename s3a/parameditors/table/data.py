@@ -152,7 +152,7 @@ class TableData(QtCore.QObject):
     if cfgDict is not None and 'table-cfg' in cfgDict:
       cfgDict = cfgDict['table-cfg']
 
-    hierarchicalUpdate(baseCfgDict, cfgDict)
+    hierarchicalUpdate(baseCfgDict, cfgDict, uniqueListElements=True)
     cfg = baseCfgDict
     if not force and self.cfgFname == cfgFname and pg.eq(cfg, self.cfg):
       return None

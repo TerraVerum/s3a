@@ -11,7 +11,7 @@ from s3a.constants import PRJ_CONSTS
 from utilitys import EditorPropsMixin
 
 shapes = tuple(SHAPE_ROI_MAPPING.keys())
-with EditorPropsMixin.setOpts(shared=SharedAppSettings()):
+with EditorPropsMixin.setEditorPropertyOpts(shared=SharedAppSettings()):
   editableImg = MainImage(drawShapes=shapes,
                           drawActions=(PRJ_CONSTS.DRAW_ACT_SELECT,),)
 clctn = editableImg.shapeCollection
