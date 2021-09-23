@@ -33,15 +33,16 @@ class ImageProcess(NestedProcess):
     return validInfos
 
 
-  def _stageSummaryWidget(self):
-    infoToDisplay = self.getAllStageInfos()
+  def _stageSummaryWidget(self, displayInfo=None):
+    if displayInfo is None:
+      displayInfo = self.getAllStageInfos()
 
-    numStages = len(infoToDisplay)
+    numStages = len(displayInfo)
     nrows = np.sqrt(numStages).astype(int)
     ncols = np.ceil(numStages/nrows)
     outGrid = pg.GraphicsLayoutWidget()
     sizeToAxMapping: t.Dict[tuple, pg.PlotItem] = {}
-    for ii, info in enumerate(infoToDisplay):
+    for ii, info in enumerate(displayInfo):
       pltItem: pg.PlotItem = outGrid.addPlot(title=info.get('name', None))
       vb = pltItem.getViewBox()
       vb.invertY(True)
