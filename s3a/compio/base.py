@@ -310,6 +310,7 @@ class AnnotationImporter(AnnotationIOBase):
   def __call__(self,
                inFileOrObj: t.Union[FilePath, t.Any],
                parseErrorOk=False,
+               reindex=False,
                **kwargs):
     self.refreshTableData()
 
@@ -318,7 +319,7 @@ class AnnotationImporter(AnnotationIOBase):
       inFileOrObj = self.readFile(inFileOrObj, **kwargs)
     self.importObj = inFileOrObj
 
-    kwargs.update(file=file)
+    kwargs.update(file=file, reindex=reindex)
     activeOpts = {**self.opts, **kwargs}
     meta = self.populateMetadata(**activeOpts)
     kwargs.update(meta)
@@ -343,11 +344,11 @@ class AnnotationImporter(AnnotationIOBase):
       parsedDf.columns = self.destTableMapping.resolveFieldAliases(parsedDf.columns, kwargs.get('mapping', {}))
 
     # Make sure IDs are present
-    if kwargs.get('reindex') or RTF.INST_ID not in parsedDf:
+    if reindex or RTF.INST_ID not in parsedDf:
       parsedDf[RTF.INST_ID] = np.arange(len(parsedDf), dtype=int)
     parsedDf = parsedDf.set_index(RTF.INST_ID, drop=False)
 
-    checkVertBounds(parsedDf[RTF.VERTICES], kwargs.get('imShape'))
+    checkVertBounds(parsedDf[RTF.VERTICES], kwargs.get('imageShape'))
     return parsedDf
 
   @classmethod

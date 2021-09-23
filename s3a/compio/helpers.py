@@ -87,25 +87,25 @@ def deserialize(param: PrjParam, values: t.Sequence[str], returnErrs=True):
   return _runFunc(param, values, 'deserialize', default, returnErrs)
 
 
-def checkVertBounds(vertSer: pd.Series, imShape: tuple):
+def checkVertBounds(vertSer: pd.Series, imageShape: tuple):
   """
   Checks whether any vertices in the imported dataframe extend past image dimensions. This is an indicator
   they came from the wrong import file.
 
   :param vertSer: Vertices from incoming component dataframe
-  :param imShape: Shape of the main image these vertices are drawn on
+  :param imageShape: Shape of the main image these vertices are drawn on
   :return: Raises error if offending vertices are present, since this is an indication the component file
     was from a different image
   """
-  if imShape is None or len(vertSer) == 0:
+  if imageShape is None or len(vertSer) == 0:
     # Nothing we can do if no shape is given
     return
   # Image shape from row-col -> x-y
-  imShape = np.array(imShape[1::-1])[None, :]
+  imageShape = np.array(imageShape[1::-1])[None, :]
   # Remove components whose vertices go over any image edges
   vertMaxs = [verts.stack().max(0) for verts in vertSer if len(verts) > 0]
   vertMaxs = np.vstack(vertMaxs)
-  offendingIds = np.nonzero(np.any(vertMaxs > imShape, axis=1))[0]
+  offendingIds = np.nonzero(np.any(vertMaxs > imageShape, axis=1))[0]
   if len(offendingIds) > 0:
     warnings.warn(
         f'Vertices on some components extend beyond image dimensions. '

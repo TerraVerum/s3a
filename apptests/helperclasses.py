@@ -40,16 +40,16 @@ class CompDfTester(CompositionMixin):
     newData = lims[RND.integers(0, len(lims), len(compDf))]
     compDf[field] = newData
 
-  def fillRandomVerts(self, imShape=(2000, 2000), compDf: pd.DataFrame=None, vertType='circle'):
+  def fillRandomVerts(self, imageShape=(2000, 2000), compDf: pd.DataFrame=None, vertType='circle'):
     if compDf is None:
       compDf = self.compDf
-    mask = np.zeros(imShape[:2], 'uint8')
+    mask = np.zeros(imageShape[:2], 'uint8')
 
     retVal = []
     for ii in range(len(compDf)):
-      radius = RND.integers(5, max(imShape) // 5)
-      o_x = RND.integers(0, imShape[1])
-      o_y = RND.integers(0, imShape[0])
+      radius = RND.integers(5, max(imageShape) // 5)
+      o_x = RND.integers(0, imageShape[1])
+      o_y = RND.integers(0, imageShape[0])
       if vertType == 'circle':
         cv.circle(mask, (o_x, o_y), radius, 1, -1)
       elif vertType == 'rectangle':

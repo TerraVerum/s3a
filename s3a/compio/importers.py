@@ -93,7 +93,7 @@ class SuperannotateJsonImporter(AnnotationImporter):
   def populateMetadata(self,
                        file: Path=None,
                        srcDir: t.Union[FilePath, dict] = None,
-                       imShape: tuple[int, int] = None,
+                       imageShape: tuple[int, int] = None,
                        **kwargs):
     if srcDir is None:
       srcDir = file.parent
@@ -104,8 +104,8 @@ class SuperannotateJsonImporter(AnnotationImporter):
     if classes is not None:
       self.tableData.fieldFromName('className').opts['limits'] = [c['name'] for c in classes]
     meta = self.importObj['metadata']
-    if imShape is None:
-      imShape = (meta.pop('height'), meta.pop('width'))
+    if imageShape is None:
+      imageShape = (meta.pop('height'), meta.pop('width'))
     return self._forwardMetadata(locals())
 
   def getInstances(self, importObj, **kwargs):

@@ -360,7 +360,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
       return
     imgAnns = self.filePlg.imgToAnnMapping.get(imgFname, None)
     if imgAnns is not None:
-      self.compMgr.addComps(self.compIo.importByFileType(imgAnns, imShape=self.mainImg.image.shape))
+      self.compMgr.addComps(self.compIo.importByFileType(imgAnns, imageShape=self.mainImg.image.shape))
       # 'hasUnsavedChanges' will be true after this, even though the changes are saved.
       self.hasUnsavedChanges = False
 
@@ -379,7 +379,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     :param kwargs: Passed to the exporter
     """
     outFname = Path(outFname)
-    self.compIo.exportByFileType(self.exportableDf, outFname, imShape=self.mainImg.image.shape,
+    self.compIo.exportByFileType(self.exportableDf, outFname, imageShape=self.mainImg.image.shape,
                                  **kwargs)
     msgPath = os.path.join(outFname.parent.name, outFname.name)
     getAppLogger(__name__).attention(f'Exported current annotation to {msgPath}')

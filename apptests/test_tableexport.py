@@ -97,7 +97,7 @@ def test_serial_export(tmp_path, sampleComps, app):
 def doAndAssertExport(app, fpath: Path, io: ComponentIO, compDf: pd.DataFrame, failMsg: str):
   fpath = Path(fpath)
   try:
-    io.exportByFileType(compDf, fpath, imShape=app.mainImg.image.shape[:2],
+    io.exportByFileType(compDf, fpath, imageShape=app.mainImg.image.shape[:2],
                         srcDir=SAMPLE_IMG_FNAME.parent)
   except ValueError as ve:
     if 'Full I/O' not in str(ve):

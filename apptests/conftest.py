@@ -14,7 +14,7 @@ from s3a.plugins.tablefield import VerticesPlugin
 from s3a.plugins.file import FilePlugin
 
 dfTester = CompDfTester(NUM_COMPS)
-dfTester.fillRandomVerts(imShape=SAMPLE_IMG.shape)
+dfTester.fillRandomVerts(imageShape=SAMPLE_IMG.shape)
 
 # @pytest.fixture(scope='session', autouse=True)
 # def cfg_warnings():

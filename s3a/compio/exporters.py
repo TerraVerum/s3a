@@ -43,17 +43,17 @@ class LblPngExporter(AnnotationExporter):
   mapping: pd.Series
 
   def createExportObj(self,
-                      imShape=None,
+                      imageShape=None,
                       backgroundColor=None,
                       **_kwargs
                       ):
     maskType = 'uint16' if np.min(backgroundColor) >= 0 else 'int32'
-    return np.full(imShape[:2], backgroundColor, dtype=maskType)
+    return np.full(imageShape[:2], backgroundColor, dtype=maskType)
 
   def populateMetadata(
       self,
       file: FilePath=None,
-      imShape: tuple[int] = None,
+      imageShape: tuple[int] = None,
       labelField: PrjParam | str = 'Instance ID',
       backgroundColor=0,
       offset: np.ndarray=None,
@@ -64,7 +64,7 @@ class LblPngExporter(AnnotationExporter):
   ):
     """
     :param file: File to save this object to, *None* will not write out the output.
-    :param imShape: MxN shape of image containing these annotations
+    :param imageShape: MxN shape of image containing these annotations
     :param labelField: Data field to use as an index label. E.g. "Class" will use the 'class'
       column, but any other column can be specified. The output ground truth masks
       will be colored according to this field.  See :meth:`PrjParam.toNumeric` for details.
@@ -94,12 +94,12 @@ class LblPngExporter(AnnotationExporter):
       raise ValueError(f'Background color must be >= 0, was {backgroundColor}')
 
     readMapping = returnLabelMapping or (writeMeta and file is not None)
-    if imShape is None:
+    if imageShape is None:
       # Without any components the image is non-existant
       if len(compDf) == 0:
-        raise ValueError('imShape cannot be *None* if no components are present')
+        raise ValueError('imageShape cannot be *None* if no components are present')
       vertMax = ComplexXYVertices.stackedMax(compDf[RTF.VERTICES])
-      imShape = tuple(vertMax[::-1] + 1)
+      imageShape = tuple(vertMax[::-1] + 1)
 
     return self._forwardMetadata(locals(), readMapping=readMapping)
 
@@ -288,8 +288,8 @@ class CompImgsDfExporter(AnnotationExporter):
                  exportObj,
                  missingOk=None,
                  **kwargs):
-    # imshape is automatically inferred by the exporter
-    kwargs.pop('imShape', None)
+    # imageShape is automatically inferred by the exporter
+    kwargs.pop('imageShape', None)
     # File is taken care of in outer scope
     kwargs.pop('file', None)
     mappings = {}
@@ -314,7 +314,7 @@ class CompImgsDfExporter(AnnotationExporter):
       raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), imageName)
     shape = img if img is None else img.shape[:2]
     # Make sure no options are duplicated
-    useKwargs = {**kwargs, **dict(returnLabelMapping=True, imShape=shape)}
+    useKwargs = {**kwargs, **dict(returnLabelMapping=True, imageShape=shape)}
     lblImg, mapping = self.exportLblPng(compDf, **useKwargs)
     if img is None:
       img = np.zeros_like(lblImg)

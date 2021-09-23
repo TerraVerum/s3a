@@ -73,7 +73,7 @@ def test_import_large_verts(sampleComps, tmp_path, app):
   io = app.compIo
   io.exportCsv(sampleComps, tmp_path/'Bad Verts.csv')
   with pytest.warns(UserWarning):
-    io.importCsv(tmp_path/'Bad Verts.csv', imShape=app.mainImg.image.shape)
+    io.importCsv(tmp_path/'Bad Verts.csv', imageShape=app.mainImg.image.shape)
 
 def test_change_comp(app, mgr):
   stack = app.actionStack

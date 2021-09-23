@@ -195,10 +195,10 @@ class ComponentIO:
     return ret
 
   def importByFileType(
-      self, inFile: Union[str, Path], imShape: Tuple[int] = None, strColumns=False, **importArgs
+      self, inFile: Union[str, Path], imageShape: Tuple[int] = None, strColumns=False, **importArgs
   ) -> pd.DataFrame:
     buildFn = self._ioFnFromFileType(inFile, PRJ_ENUMS.IO_IMPORT)
-    outDf = buildFn(inFile, imShape=imShape, **importArgs)
+    outDf = buildFn(inFile, imageShape=imageShape, **importArgs)
     if strColumns:
       outDf.columns = list(map(str, outDf.columns))
     return outDf

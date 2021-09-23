@@ -177,12 +177,12 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     }
     self._symbolCache = pd.DataFrame(cache)
 
-  def toGrayImg(self, imShape: Sequence[int]=None):
+  def toGrayImg(self, imageShape: Sequence[int]=None):
     labelDf = pd.DataFrame()
     labelDf[RTF.VERTICES] = self.regionData[RTF.VERTICES]
     # Override id column to avoid an extra parameter
     labelDf[RTF.INST_ID] = self.regionData[PRJ_ENUMS.FIELD_LABEL]
-    return defaultIo.exportLblPng(labelDf, imShape=imShape, rescaleOutput=True)
+    return defaultIo.exportLblPng(labelDf, imageShape=imageShape, rescaleOutput=True)
 
   @fns.dynamicDocstring(cmapVals=colormaps() + ['None'])
   def updateColors(self, penWidth=0, penColor='w',
