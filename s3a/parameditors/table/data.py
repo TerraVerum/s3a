@@ -206,10 +206,9 @@ class TableData(QtCore.QObject):
     if mapping is None:
       mapping = {}
     potentialSrcNames = getFieldAliases(srcField)
-    outCol = None
     for key in srcField, srcField.name:
       # Mapping can either be by string or PrjParam, so account for either case
-      outCol = outCol or mapping.get(key)
+      outCol = mapping.get(key)
       if outCol:
         break
 
@@ -226,6 +225,7 @@ class TableData(QtCore.QObject):
         if potentialSrcNames & getFieldAliases(destField):
           # Match between source field's aliases and dest field aliases
           # Make sure it didn't match multiple names that weren't itself with the assert statement
+          # In other words, if multiple dest fields have the same alias, this assert will fail
           assert curOutName == srcField
           curOutName = destField
     return curOutName

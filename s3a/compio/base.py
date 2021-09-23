@@ -14,6 +14,7 @@ from .helpers import serialize, deserialize, checkVertBounds
 from ..constants import REQD_TBL_FIELDS as RTF
 from ..generalutils import pd_iterdict
 from ..parameditors.table import TableData
+from ..parameditors.table.data import getFieldAliases
 from ..parameditors.table.templatemgr import IOTemplateManager
 from ..shims import typing_extensions
 from ..structures import AnnInstanceError, AnnParseError
@@ -253,29 +254,56 @@ class AnnotationImporter(AnnotationIOBase):
   def getInstances(self, importObj, **kwargs):
     raise NotImplementedError
 
+  @staticmethod
+  def _findSrcFieldForDest(destField, allSourceFields):
+    """
+    Helper function during ``finalizeImport`` to find a match between a yet-to-serialize dataframe and
+    destination tableData. Basically, a more primitive version of ``resolveFieldAliases``
+    Returns *None* if no sensible mapping could be found, and errs if multiple sources alias to the same destination
+    """
+    # Check for destination aliases primitively (one-way mappings). A full (two-way) check will occur
+    # later (see __call__ -> resolveFieldAliases)
+    match = tuple(getFieldAliases(destField) & allSourceFields)
+    if not match:
+      return
+    if len(match) == 1:
+      srcField = match[0]
+    else:
+      # Make sure there aren't multiple aliases, since this is not easily resolvable
+      # The only exception is that direct matches trump alias matches, so check for this directly
+      if destField.name in match:
+        srcField = destField.name
+      else:
+        raise IndexError(f'Multiple aliases to "{destField}": {match}\n'
+                         f'Cannot determine appropriate column matchup.')
+    return srcField
+
   def finalizeImport(self, compDf, **kwargs):
       """Deserializes any columns that are still strings"""
 
       # Objects in the original frame may be represented as strings, so try to convert these
       # as needed
       outDf = pd.DataFrame()
-      strNames = [f.name for f in self.tableData.allFields]
-      for field in compDf:
-        # Only handle string names that match stringified versions of existing table data names.
-        if field in strNames:
-          dfVals = compDf[field]
-          field = self.tableData.fieldFromName(field)
-          # Parsing functions only know how to convert from strings to themselves.
-          # So, assume the exting types can first convert themselves to strings
-          serializedDfVals = serialize(field, dfVals, returnErrs=False)
-          parsedDfVals, errs = deserialize(field, serializedDfVals)
-          # Turn problematic cells into instance errors for detecting problems in the outer scope
-          errs = errs.apply(AnnInstanceError)
-          parsedDfVals = parsedDfVals.append(errs)
-          outDf[field] = parsedDfVals
-        elif isinstance(field, PrjParam):
-          # All other data is transcribed without modification if it's a PrjParam
-          outDf[field] = compDf[field]
+      # Preserve / transcribe fields that are already PrjParams
+      for destField in [f for f in compDf.columns if isinstance(f, PrjParam)]:
+        outDf[destField] = compDf[destField]
+
+      # Need to serialize / convert string names since they indicate yet-to-serialize columns
+      toConvert = set(compDf.columns)
+      for destField in self.tableData.allFields:
+        srcField = self._findSrcFieldForDest(destField, toConvert)
+        if not srcField:
+          # No match
+          continue
+        dfVals = compDf[srcField]
+        # Parsing functions only know how to convert from strings to themselves.
+        # So, assume the exting types can first convert themselves to strings
+        serializedDfVals = serialize(destField, dfVals, returnErrs=False)
+        parsedDfVals, errs = deserialize(destField, serializedDfVals)
+        # Turn problematic cells into instance errors for detecting problems in the outer scope
+        errs = errs.apply(AnnInstanceError)
+        parsedDfVals = parsedDfVals.append(errs)
+        outDf[destField] = parsedDfVals
       # All recognized output fields should now be deserialied; make sure required fields exist
       return outDf
 
