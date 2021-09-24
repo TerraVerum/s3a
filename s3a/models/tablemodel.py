@@ -24,7 +24,11 @@ class CompTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
   # Emits 4-element dict: Deleted comp ids, changed comp ids, added comp ids, renamed indexes.
   # Renaming is useful when the new id for an added component should be propagated. "-1" new index indicates
   # that component was deleted (or never added in the first place, in the case of ADD_TYPE_NEW)
-  defaultEmitDict = {'deleted': np.array([]), 'changed': np.array([]), 'added': np.array([]), 'ids': np.array([])}
+  defaultEmitDict = {
+    'deleted': np.array([], int),
+    'changed': np.array([], int),
+    'added':   np.array([], int),
+    'ids':     np.array([], int)}
   sigCompsChanged = Signal(dict)
   sigFieldsChanged = Signal()
 
@@ -134,11 +138,20 @@ class ComponentMgr(CompTableModel):
       return toEmit
 
     # Delete entries with no vertices, since they make work within the app difficult.
-    # TODO: Is this the appropriate response?
-    verts = newCompsDf[RTF.VERTICES]
-    dropLocs = verts.map(ComplexXYVertices.isEmpty).to_numpy(bool)
-    dropIds = newCompsDf.index[dropLocs]
-    newCompsDf = newCompsDf.loc[~dropLocs].copy()
+    # It is allowed to merge without vertices present
+    if RTF.VERTICES in newCompsDf:
+      verts = newCompsDf[RTF.VERTICES]
+      dropLocs = verts.map(ComplexXYVertices.isEmpty).to_numpy(bool)
+      dropIds = newCompsDf.index[dropLocs]
+      newCompsDf = newCompsDf.loc[~dropLocs].copy()
+    elif addtype != PRJ_ENUMS.COMP_ADD_AS_MERGE:
+      warn('Cannot add new components without vertices. Returning.', UserWarning, stacklevel=2)
+      return
+    else:
+      dropLocs = np.zeros(len(newCompsDf), dtype=bool)
+      dropIds = np.array([], dtype=int)
+      newCompsDf = newCompsDf.copy()
+
     newIdsForOrigComps[dropLocs] = -1
 
     if RTF.INST_ID in newCompsDf:

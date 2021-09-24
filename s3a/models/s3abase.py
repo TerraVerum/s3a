@@ -349,6 +349,10 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
                             allowOverwrite=True)
     # srcImg_proj is guaranteed to exist at this point
     self.filePlg.addAnnotation(data=self.exportableDf, image=srcImg_proj, overwriteOld=True)
+    # Now all added components should be forced to belong to this image
+    names = self.compMgr.compDf[[REQD_TBL_FIELDS.IMG_FILE, REQD_TBL_FIELDS.INST_ID]].copy()
+    names.loc[:, REQD_TBL_FIELDS.IMG_FILE] = self.srcImgFname.name
+    self.compMgr.addComps(names, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)
     self.srcImgFname = srcImg_proj
     self.hasUnsavedChanges = False
     getAppLogger(__name__).info('Saved current annotation')
