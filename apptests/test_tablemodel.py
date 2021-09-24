@@ -120,7 +120,7 @@ def test_table_setdata(sampleComps, app, mgr):
   _ = REQD_TBL_FIELDS
   colVals = {
     _.VERTICES: ComplexXYVertices([XYVertices([[1, 2], [3, 4]])]),
-    _.SRC_IMG_FILENAME: 'newfilename'
+    _.IMG_FILE: 'newfilename'
   }
   intColMapping = {mgr.tableData.allFields.index(k):v
                    for k, v in colVals.items()}
@@ -138,7 +138,7 @@ def test_table_setdata(sampleComps, app, mgr):
 
 def test_table_getdata(sampleComps, mgr):
   mgr.addComps(sampleComps)
-  idx = mgr.index(0, list(REQD_TBL_FIELDS).index(REQD_TBL_FIELDS.SRC_IMG_FILENAME))
+  idx = mgr.index(0, list(REQD_TBL_FIELDS).index(REQD_TBL_FIELDS.IMG_FILE))
   dataVal = sampleComps.iat[0, idx.column()]
   assert mgr.data(idx, QtCore.Qt.ItemDataRole.EditRole) == dataVal
   assert mgr.data(idx, QtCore.Qt.ItemDataRole.DisplayRole) == str(dataVal)

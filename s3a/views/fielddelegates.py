@@ -238,7 +238,7 @@ class FieldDisplay(EditorPropsMixin):
     self.registerDelegate('xyvertices', XYVerticesDelegate, override=True)
     self.registerDelegate('complexxyvertices', ComplexXYVerticesDelegate, override=True)
     # Vertices are already displayed, source image is the same for all components
-    self.ignoreCols = [RTF.VERTICES, RTF.SRC_IMG_FILENAME]
+    self.ignoreCols = [RTF.VERTICES, RTF.IMG_FILE]
 
   def registerDelegate(self, pType, delegate: Type[FieldDisplayDelegate], override=False):
     """

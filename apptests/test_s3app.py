@@ -62,7 +62,7 @@ def test_load_comps_merge(tmp_path, app, sampleComps):
 
   app.openAnnotations(str(compFile))
   equalCols = np.setdiff1d(dfTester.compDf.columns, [REQD_TBL_FIELDS.INST_ID,
-                                                     REQD_TBL_FIELDS.SRC_IMG_FILENAME])
+                                                     REQD_TBL_FIELDS.IMG_FILE])
   dfCmp = app.compMgr.compDf[equalCols].values == dfTester.compDf[equalCols].values
   assert np.all(dfCmp), 'Loaded dataframe doesn\'t match daved dataframe'
 
@@ -178,7 +178,7 @@ def test_load_last_settings(tmp_path, sampleComps, app):
   app.appStateEditor.loadParamValues()
   app.appStateEditor.saveDir = oldSaveDir
   assert np.array_equal(app.mainImg.image, SAMPLE_IMG)
-  sampleComps[REQD_TBL_FIELDS.SRC_IMG_FILENAME] = SAMPLE_IMG_FNAME.name
+  sampleComps[REQD_TBL_FIELDS.IMG_FILE] = SAMPLE_IMG_FNAME.name
   sampleComps[REQD_TBL_FIELDS.INST_ID] = sampleComps.index
   assert np.array_equal(sampleComps, app.exportableDf)
 

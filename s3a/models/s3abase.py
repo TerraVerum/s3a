@@ -403,9 +403,9 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     elif srcImgFname is not None:
       srcImgFname = str(srcImgFname)
     # Assign correct export name for only new components
-    overwriteIdxs = exportDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME] == REQD_TBL_FIELDS.SRC_IMG_FILENAME.value
+    overwriteIdxs = exportDf[REQD_TBL_FIELDS.IMG_FILE] == REQD_TBL_FIELDS.IMG_FILE.value
     # TODO: Maybe the current file will match the current file indicator. What happens then?
-    exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = srcImgFname
+    exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.IMG_FILE] = srcImgFname
     return exportDf
 
   def openAnnotations(self, inFname: str, loadType=PRJ_ENUMS.COMP_ADD_AS_NEW):

@@ -118,7 +118,7 @@ class _ReqdTableFields:
       return ret
 
     self.INST_ID = constructNext()
-    self.SRC_IMG_FILENAME = constructNext()
+    self.IMG_FILE = constructNext()
     self.VERTICES = constructNext()
     # Special case: Vertices is non-primitive type
     self.VERTICES.value = ComplexXYVertices()

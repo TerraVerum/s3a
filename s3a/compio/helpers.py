@@ -114,7 +114,7 @@ def checkVertBounds(vertSer: pd.Series, imageShape: tuple):
     )
 
 def compareDataframes(compDf, loadedDf):
-  matchingCols = np.setdiff1d(compDf.columns, [RTF.INST_ID, RTF.SRC_IMG_FILENAME])
+  matchingCols = np.setdiff1d(compDf.columns, [RTF.INST_ID, RTF.IMG_FILE])
   # For some reason, there are cases in which all values truly are equal but np.array_equal,
   # x.equals(y), x.eq(y), etc. all fail. Something to do with block ordering?
   # https://github.com/pandas-dev/pandas/issues/9330 indicates it should be fixed, but the error still occasionally

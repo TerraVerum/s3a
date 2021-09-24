@@ -2,9 +2,10 @@ fields:
   Instance ID:
     value: -1
     readonly: True
-  Source Image Filename:
+  Image File:
     value: 'Newly Added'
     readonly: True
+    aliases: ['Source Image Filename']
   Vertices:
     pType: 'complexxyvertices'
     readonly: True

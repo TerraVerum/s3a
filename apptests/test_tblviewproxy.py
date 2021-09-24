@@ -75,11 +75,11 @@ def test_set_cells_as(app, mgr):
   # Even amount of comps for easy comparison
   if (len(mgr.compDf) % 2) == 1:
     mgr.rmComps(mgr.compDf.index[-1])
-  mgr.compDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME] = oldSrcFile
+  mgr.compDf[REQD_TBL_FIELDS.IMG_FILE] = oldSrcFile
   # Ensure the overwrite data will be different from what it's overwriting
   newFile = 'TestFile.png'
   newDf = mgr.compDf.loc[[0]]
-  srcFileIdx = mgr.tableData.allFields.index(REQD_TBL_FIELDS.SRC_IMG_FILENAME)
+  srcFileIdx = mgr.tableData.allFields.index(REQD_TBL_FIELDS.IMG_FILE)
   newDf.iat[0, srcFileIdx] = newFile
   selection = np.column_stack([mgr.compDf.index[::2], mgr.compDf.index[::2], np.tile(srcFileIdx, len(mgr.compDf)//2)])
   # Sometimes Qt doesn't process selections programmatically. Not sure what to do about that
@@ -89,7 +89,7 @@ def test_set_cells_as(app, mgr):
   matchList = np.tile([newFile, oldSrcFile], len(mgr.compDf)//2)
   # Irritating that sometimes windows path comparisons fail despite having the same str
   # representations
-  for entryA, entryB in zip(mgr.compDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME].to_list(),
+  for entryA, entryB in zip(mgr.compDf[REQD_TBL_FIELDS.IMG_FILE].to_list(),
                             matchList):
     assert str(entryA) == str(entryB)
 

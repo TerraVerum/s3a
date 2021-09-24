@@ -116,7 +116,7 @@ class SuperannotateJsonImporter(AnnotationImporter):
                            name=None,
                            **kwargs):
     out = {
-      RTF.SRC_IMG_FILENAME: name
+      RTF.IMG_FILE: name
     }
     verts = self.parseRegion(inst)
     if not isinstance(verts, AnnInstanceError):

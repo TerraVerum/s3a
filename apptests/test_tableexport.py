@@ -133,8 +133,8 @@ def test_compimgs_export(tmp_path, _simpleTbl):
   io = ComponentIO(_simpleTbl)
   tester = CompDfTester(100, tableData=_simpleTbl)
   tester.fillRandomVerts(SAMPLE_SMALL_IMG.shape[:2])
-  tester.compDf.loc[:50, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = SAMPLE_SMALL_IMG_FNAME
-  tester.compDf.loc[50:, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = SAMPLE_IMG_FNAME
+  tester.compDf.loc[:50, REQD_TBL_FIELDS.IMG_FILE] = SAMPLE_SMALL_IMG_FNAME
+  tester.compDf.loc[50:, REQD_TBL_FIELDS.IMG_FILE] = SAMPLE_IMG_FNAME
   tester.compDf.loc[50:, REQD_TBL_FIELDS.INST_ID] = tester.compDf.index[:50]
   tester.compDf.index = np.concatenate([tester.compDf.index[:50], tester.compDf.index[:50]])
   tester.compDf[REQD_TBL_FIELDS.INST_ID] = tester.index
@@ -143,7 +143,7 @@ def test_compimgs_export(tmp_path, _simpleTbl):
   io.exportCompImgsDf(tester.compDf, tmp_path /'test.pkl', labelField='List')
   assert (tmp_path/'test.pkl').exists()
   df, mappings = io.exportCompImgsDf(tester.compDf, prioritizeById=False, returnLabelMapping=True)
-  df['image_name'] = tester.compDf[REQD_TBL_FIELDS.SRC_IMG_FILENAME].apply(lambda p: p.name).values
+  df['image_name'] = tester.compDf[REQD_TBL_FIELDS.IMG_FILE].apply(lambda p: p.name).values
   revMaps = {k: pd.Series(v.index, v.to_numpy()) for k, v in mappings.items()}
 
   for row in df.to_dict(orient='records'):

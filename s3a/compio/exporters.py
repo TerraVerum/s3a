@@ -294,7 +294,7 @@ class CompImgsDfExporter(AnnotationExporter):
     kwargs.pop('file', None)
     mappings = {}
 
-    for fullImgName, miniDf in compDf.groupby(RTF.SRC_IMG_FILENAME): # type: str, pd.DataFrame
+    for fullImgName, miniDf in compDf.groupby(RTF.IMG_FILE): # type: str, pd.DataFrame
       exportedComps, mapping = self._formatSingleImage(miniDf, fullImgName, missingOk, **kwargs)
       mappings[Path(fullImgName).name] = mapping
       exportObj.extend(exportedComps)
@@ -337,7 +337,7 @@ class CompImgsDfExporter(AnnotationExporter):
                         **_kwargs):
     out = {}
     allVerts = inst[RTF.VERTICES].stack()
-    imageName = inst[RTF.SRC_IMG_FILENAME]
+    imageName = inst[RTF.IMG_FILE]
     if image is None:
       image = self.srcDir.get(imageName)
     if labelImage is None:

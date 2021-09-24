@@ -904,15 +904,15 @@ class ProjectData(QtCore.QObject):
       data = self.compIo.importByFileType(name)
     if image is None:
       # If no explicit matching to an image is provided, try to determine based on annotation name
-      xpondingImgs = np.unique(data[REQD_TBL_FIELDS.SRC_IMG_FILENAME].to_numpy())
+      xpondingImgs = np.unique(data[REQD_TBL_FIELDS.IMG_FILE].to_numpy())
       # Break into annotaitons by iamge
       for img in xpondingImgs:
         # Copy to avoid pandas warning
-        self.addAnnotation(name, data[data[REQD_TBL_FIELDS.SRC_IMG_FILENAME] == img].copy(), img)
+        self.addAnnotation(name, data[data[REQD_TBL_FIELDS.IMG_FILE] == img].copy(), img)
       return
     image = self.getFullImgName(Path(image))
     # Force provided annotations to now belong to this image
-    data.loc[:, REQD_TBL_FIELDS.SRC_IMG_FILENAME] = image.name
+    data.loc[:, REQD_TBL_FIELDS.IMG_FILE] = image.name
     # Since only one annotation file can exist per image, concatenate this with any existing files for the same image
     # if needed
     if image.parent != self.imagesDir:
@@ -933,7 +933,7 @@ class ProjectData(QtCore.QObject):
   def addFormattedAnnotation(self, file: FilePath, overwriteOld=False):
     """
     Adds an annotation file that is already formatted in the following ways:
-      * The right source image file column (i.e. REQD_TBL_FIELDS.SRC_IMG_FILENAME set to the image name
+      * The right source image file column (i.e. REQD_TBL_FIELDS.IMG_FILE set to the image name
       * The file stem already matches a project image (not remote, i.e. an image in the `images` directory)
       * The annotations correspond to exactly one image
     """
