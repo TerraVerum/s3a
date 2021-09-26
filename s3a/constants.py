@@ -214,6 +214,7 @@ class _PrjConsts(PrjParamGroup):
   TOOL_CLEAR_FOC_REGION   : PrjParam = newParam('Clear', f'{SHORTCUT_BASE},V,C', icon=str(ICON_DIR/'clear.svg'))
   TOOL_RESET_FOC_REGION   : PrjParam = newParam('Reset', f'{SHORTCUT_BASE},V,R', icon=str(ICON_DIR/'reset.svg'))
   TOOL_FILL_FOC_REGION    : PrjParam = newParam('Fill', f'{SHORTCUT_BASE},V,F', icon=str(ICON_DIR/'fill.svg'))
+  TOOL_INVERT_FOC_REGION  : PrjParam = newParam('Invert', f'{SHORTCUT_BASE},V,I', icon=str(ICON_DIR/'invert.svg'))
   TOOL_ACCEPT_FOC_REGION  : PrjParam = newParam('Accept', 'Ctrl+Shift+A', icon=str(ICON_DIR/'accept.svg'))
   TOOL_CLEAR_ROI          : PrjParam = newParam('Clear ROI', 'Esc')
   TOOL_CLEAR_HISTORY      : PrjParam = newParam('Clear Processor History', f'{SHORTCUT_BASE},V,H', icon=str(ICON_DIR/'clear_history.svg'))

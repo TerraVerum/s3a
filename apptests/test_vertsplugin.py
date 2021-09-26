@@ -1,6 +1,7 @@
 """Most other functionality is tested under procimpls, this is for other registered functions"""
 import pytest
 import numpy as np
+from skimage import draw
 
 from apptests.testingconsts import SAMPLE_SMALL_IMG
 from s3a import XYVertices, REQD_TBL_FIELDS, ComplexXYVertices
@@ -36,6 +37,19 @@ def test_registered_verts_funcs(vertsPlugin, app):
   vertsPlugin.clearFocusedRegion()
   vertsPlugin.resetFocusedRegion()
   assert np.array_equal(togray(), img)
+
+  coords = draw.disk((0, 0), 50, shape=(100,100))
+  img = np.zeros((100,100), bool)
+  img[coords] = True
+  vertsPlugin.updateRegionFromMask(img)
+  # Reassign image so the size is right
+  img = togray() > 0
+  vertsPlugin.invertRegion()
+  assert np.all((togray() > 0) == (~img))
+
+  # No sensible inverse of empty image
+  vertsPlugin.clearFocusedRegion()
+  assert (togray() > 0).sum() == 0
 
 def test_region_offset(vertsPlugin, sampleComps):
   vertsPlugin.updateRegionFromDf(sampleComps.iloc[[0]], offset=XYVertices([10000,10000]))
@@ -78,7 +92,6 @@ def test_region_history(vertsPlugin, app, monkeypatch):
     vertsPlugin.playbackRegionHistory()
     winImg = vertsPlugin.playbackWindow.displayPlt.imgItem.image
     assert np.array_equal(winImg, initial)
-
 
 def test_proj_wizard(filePlg):
   # Much is gui, just make sure mechanics work

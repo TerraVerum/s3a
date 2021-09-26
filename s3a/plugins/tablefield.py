@@ -63,9 +63,10 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     mainBufSize = win.sharedAttrs.generalProps.params.child(win.__groupingName__, 'maxLength')
     mainBufSize.sigValueChanged.connect(resetRegBuff)
 
-    funcLst = [self.resetFocusedRegion, self.fillRegionMask, self.clearFocusedRegion, self.clearProcessorHistory]
+    funcLst = [self.resetFocusedRegion, self.fillRegionMask, self.clearFocusedRegion, self.clearProcessorHistory,
+               self.invertRegion]
     paramLst = [CNST.TOOL_RESET_FOC_REGION, CNST.TOOL_FILL_FOC_REGION,
-                CNST.TOOL_CLEAR_FOC_REGION, CNST.TOOL_CLEAR_HISTORY]
+                CNST.TOOL_CLEAR_FOC_REGION, CNST.TOOL_CLEAR_HISTORY, CNST.TOOL_INVERT_FOC_REGION]
     for func, param in zip(funcLst, paramLst):
       self.registerFunc(func, btnOpts=param)
 
@@ -231,6 +232,17 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     df = makeMultiRegionDf(vertices=[ComplexXYVertices.fromBinaryMask(mask)], idList=[compId])
     self.updateRegion_undoable(df, offset=offset, oldProcCache=self.oldProcCache)
 
+  def invertRegion(self):
+    """
+    Swaps background and foreground in the area enclosed by the region mask
+    """
+    verts = ComplexXYVertices([verts for cplxVerts in self.region.regionData[RTF.VERTICES] for verts in cplxVerts])
+    if not len(verts):
+      # Doesn't make sense to invert an empty region
+      return
+    offset = np.min(verts.stack(), axis=0)
+    invertedMask = ~verts.removeOffset(offset).toMask()
+    self.updateRegionFromMask(invertedMask, offset)
 
   @DASM.undoable('Modify Focused Component')
   def updateRegion_undoable(self, newData: pd.DataFrame=None, offset: XYVertices=None, oldProcCache=None):
