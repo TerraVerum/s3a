@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from utilitys.params.parameditor import RunOpts
-
 import sys
 from typing import Callable, Sequence
 
@@ -10,7 +8,6 @@ import numpy as np
 import pandas as pd
 from pyqtgraph import console as pg_console
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-import pyqtgraph as pg
 
 from s3a import models, XYVertices, ComplexXYVertices
 from s3a.constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF, PRJ_ENUMS, GEN_PROPS_DIR, SCHEMES_DIR, \
@@ -21,6 +18,7 @@ from s3a.parameditors.quickloader import QuickLoaderEditor
 from s3a.plugins.base import ProcessorPlugin
 from s3a.shared import SharedAppSettings
 from utilitys import ParamEditorPlugin, ProcessIO, widgets as uw, ParamEditor, ParamContainer, ShortcutParameter
+from utilitys.params.parameditor import RunOpts
 
 
 class MainImagePlugin(ParamEditorPlugin):
@@ -177,6 +175,12 @@ class RandomToolsPlugin(ParamEditorPlugin):
   name = 'Tools'
   _showFuncDetails = True
 
+  _deferredRegisters: dict[Callable, dict] = {}
+  """
+  Keeps track of requested functions to register (the key) and the arguments to pass during registration
+  (kwargs are the value)
+  """
+
   def attachWinRef(self, win: s3abase.S3ABase):
     super().attachWinRef(win)
 
@@ -186,6 +190,9 @@ class RandomToolsPlugin(ParamEditorPlugin):
     self.registerFunc(lambda: win.setMainImg(None), name='Clear Current Image')
 
     self._hookupFieldDisplay(win)
+
+    for deferred, kwargs in self._deferredRegisters.items():
+      self.registerFunc(deferred, **kwargs)
 
   def _hookupFieldDisplay(self, win):
     display = win.compDisplay
@@ -247,6 +254,11 @@ class RandomToolsPlugin(ParamEditorPlugin):
     console.setWindowFlags(QtCore.Qt.WindowType.Window)
     console.show()
 
+  @classmethod
+  def deferredRegisterFunc(cls, func: Callable, **registerKwargs):
+    cls._deferredRegisters[func] = registerKwargs
+
+
 class HelpPlugin(ParamEditorPlugin):
   name = 'Help'
 
@@ -264,6 +276,8 @@ class HelpPlugin(ParamEditorPlugin):
     <div>Icons made by <a href="https://www.flaticon.com/authors/those-icons" title="Those Icons">Those Icons</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a></div>
 
     <div>Icons made by <a href="https://www.flaticon.com/authors/pixel-perfect" title="Pixel perfect">Pixel perfect</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a></div>
+    
+    <div>Icons made by <a href="https://www.flaticon.com/authors/google" title="Google">Google</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a></div>
     """
 
     QtWidgets.QMessageBox.information(self.win, 'Icon Attributions', htmlStr)
