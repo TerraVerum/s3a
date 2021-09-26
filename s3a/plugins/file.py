@@ -337,6 +337,8 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     page = NewProjectWizard.createFilePage('Annotations', wiz)
     wiz.addPage(page)
     if wiz.exec_():
+      # Make sure if a file is added on top of the current image, recent changes don't get lost
+      self.win.saveCurAnnotation()
       for file in page.fileList.files:
         self.projData.addAnnotationByPath(file)
 
@@ -891,6 +893,7 @@ class ProjectData(QtCore.QObject):
       if annName == ann:
         del self.imgToAnnMapping[key]
         ann.unlink(missing_ok=True)
+        self._maybeEmit(self.sigAnnotationsRemoved, [ann])
         break
 
   def addAnnotation(self, name: FilePath=None, data: pd.DataFrame=None, image: FilePath=None, overwriteOld=False):
@@ -927,8 +930,13 @@ class ProjectData(QtCore.QObject):
     outAnn[REQD_TBL_FIELDS.INST_ID] = outAnn.index
     outFmt = f".{self.cfg['annotation-format']}"
     outName = self.annotationsDir / f'{image.name}{outFmt}'
-    self.compIo.exportByFileType(outAnn, outName, verifyIntegrity=False, readonly=False)
-    self.imgToAnnMapping[image] = outName
+    # If no annotations exist, this is the same as deleting the old annotations since there's nothing to save
+    if len(outAnn):
+      self.compIo.exportByFileType(outAnn, outName, verifyIntegrity=False, readonly=False)
+      self.imgToAnnMapping[image] = outName
+      self._maybeEmit(self.sigAnnotationsAdded, [outName])
+    elif outName.exists():
+      self.removeAnnotation(outName)
 
   def addFormattedAnnotation(self, file: FilePath, overwriteOld=False):
     """

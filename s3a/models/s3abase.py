@@ -168,6 +168,8 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         ser.update(self.compMgr.compDf.loc[focusedId])
     self.compMgr.sigCompsChanged.connect(handleCompsChanged)
 
+    self.filePlg.projData.sigAnnotationsAdded.connect(self._maybeLoadActiveAnnotation)
+
     # -----
     # COMPONENT TABLE
     # -----
@@ -348,7 +350,9 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
       self.filePlg.addImage(srcImg, data=self.mainImg.image, copyToProject=True,
                             allowOverwrite=True)
     # srcImg_proj is guaranteed to exist at this point
-    self.filePlg.addAnnotation(data=self.exportableDf, image=srcImg_proj, overwriteOld=True)
+    # Suppress to avoid double-loading due to `sigAnnotationsAdded`
+    with self.filePlg.projData.suppressSignals():
+        self.filePlg.addAnnotation(data=self.exportableDf, image=srcImg_proj, overwriteOld=True)
     # Now all added components should be forced to belong to this image
     names = self.compMgr.compDf[[REQD_TBL_FIELDS.IMG_FILE, REQD_TBL_FIELDS.INST_ID]].copy()
     names.loc[:, REQD_TBL_FIELDS.IMG_FILE] = self.srcImgFname.name
@@ -364,9 +368,27 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
       return
     imgAnns = self.filePlg.imgToAnnMapping.get(imgFname, None)
     if imgAnns is not None:
-      self.compMgr.addComps(self.compIo.importByFileType(imgAnns, imageShape=self.mainImg.image.shape))
+      self.compMgr.addComps(self.compIo.importByFileType(imgAnns, imageShape=self.mainImg.image.shape),
+                            addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)
       # 'hasUnsavedChanges' will be true after this, even though the changes are saved.
       self.hasUnsavedChanges = False
+
+  def _maybeLoadActiveAnnotation(self, addedAnnotations: List[Path]):
+    """
+    When annotations are added to a project while an image is active, that image will not receive the new annotations.
+    This function looks through recently added annotations, checks if any match the current image, and loads them
+    in if so
+    """
+    # No worries if no main image is loaded
+    if self.srcImgFname is None:
+      return
+    srcImgName = self.srcImgFname.name
+    for annName in addedAnnotations:
+      if annName.stem == srcImgName:
+        self.loadNewAnnotations(self.srcImgFname)
+        # Not possible for multiple added annotations to have the same name, otherwise they would overwrite
+        # so it's safe to break here
+        break
 
   @fns.dynamicDocstring(filters=defaultIo.ioFileFilter(PRJ_ENUMS.IO_EXPORT))
   def exportCurAnnotation(self, outFname: Union[str, Path], **kwargs):
