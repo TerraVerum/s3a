@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import tempfile
+import textwrap
 import typing as t
 from contextlib import ExitStack
 from pathlib import Path
@@ -382,11 +383,14 @@ class CompImgsZipExporter(CompImgsDfExporter):
   def populateMetadata(self,
                        archive=False,
                        makeSummary=False,
+                       summaryImageWidth=None,
                        **kwargs):
     """
     :param archive: Whether to compress into a zip archive instead of directly outputting a folder
     :param makeSummary: Whether to include an html table showing each component from the dataframe along with
       its image and mask representations
+    :param summaryImageWidth: If `makeSummary` is *True*, this parameter can determine whether each image should have
+      a fixed width in the summary table. This can be useful to normalize the display of all images. Should be in pixels
     """
     ret = super().populateMetadata(**kwargs)
     ret.update(self._forwardMetadata(locals()))
@@ -397,6 +401,7 @@ class CompImgsZipExporter(CompImgsDfExporter):
                 exportObj,
                 archive=None,
                 makeSummary=None,
+                summaryImageWidth=None,
                 **kwargs):
     outDir = Path(file)
     useDir = outDir
@@ -419,7 +424,7 @@ class CompImgsZipExporter(CompImgsDfExporter):
           cvImsave_rgb(labelsDir / saveName, row.labelMask)
 
       if makeSummary:
-        self._createSummary(exportObj, useDir, dataDir, labelsDir, summaryName)
+        self._createSummary(exportObj, useDir, dataDir, labelsDir, summaryName, summaryImageWidth)
       else:
         summaryName = None
 
@@ -440,7 +445,7 @@ class CompImgsZipExporter(CompImgsDfExporter):
       if makeSummary:
         ozip.write(summaryName, file.name)
 
-  def _createSummary(self, exportObj, parentDir, dataDir, labelsDir, summaryName):
+  def _createSummary(self, exportObj, parentDir, dataDir, labelsDir, summaryName, imageWidth):
     extractedImgs = exportObj.rename({'instanceId': RTF.INST_ID.name}, axis=1)
     # Prevent merge error by renaming index
     # INST_ID.name has to be used instead of raw INST_ID due to strange pandas issue
@@ -457,7 +462,20 @@ class CompImgsZipExporter(CompImgsDfExporter):
         lambda el: imgPathtoHtml((relDir / str(el)).with_suffix('.png').as_posix())
       )
     outDf.columns = list(map(str, outDf.columns))
-    outDf.to_html(summaryName, escape=False, index=False)
+    htmlDf = outDf.to_html(None, escape=False, index=False)
+    if imageWidth is not None:
+      style = inspect.cleandoc(
+        f"""
+        <style>
+        img {{
+          width: {imageWidth}px
+        }}
+        </style>
+        """
+      )
+      htmlDf = f'{style}\n{htmlDf}'
+    with open(summaryName, 'w') as ofile:
+      ofile.write(htmlDf)
 
 class SerialExporter(AnnotationExporter):
   """
