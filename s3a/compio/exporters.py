@@ -33,7 +33,7 @@ from ..generalutils import (
   cvImread_rgb,
   pd_iterdict,
   cvImsave_rgb,
-  imgPathtoHtml
+  imgPathtoHtml, pd_toHtmlWithStyle
 )
 from ..structures import PrjParamGroup
 
@@ -462,20 +462,16 @@ class CompImgsZipExporter(CompImgsDfExporter):
         lambda el: imgPathtoHtml((relDir / str(el)).with_suffix('.png').as_posix())
       )
     outDf.columns = list(map(str, outDf.columns))
-    htmlDf = outDf.to_html(None, escape=False, index=False)
+    style = None
     if imageWidth is not None:
       style = inspect.cleandoc(
         f"""
-        <style>
         img {{
           width: {imageWidth}px
         }}
-        </style>
         """
       )
-      htmlDf = f'{style}\n{htmlDf}'
-    with open(summaryName, 'w') as ofile:
-      ofile.write(htmlDf)
+    pd_toHtmlWithStyle(outDf, summaryName, style, escape=False, index=False)
 
 class SerialExporter(AnnotationExporter):
   """

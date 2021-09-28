@@ -1,4 +1,5 @@
 import html
+import inspect
 import warnings
 from collections import defaultdict
 from functools import wraps
@@ -654,3 +655,26 @@ def pd_iterdict(df: pd.DataFrame, index=False):
   else:
     for row in df.itertuples(index=False):
       yield dict(zip(cols, row))
+
+def pd_toHtmlWithStyle(df: pd.DataFrame, file: FilePath=None, style: str=None, **exportArgs):
+  """
+  `to_html` doesn't allow any injection of style attributes, etc. This is an intermediate step which collects the
+  exported dataframe data, prepends <style> tags with the inserted style string, and completes the export.
+  If no style is provided, `to_html` is called normally.
+  """
+  if not style:
+    return df.to_html(file, **exportArgs)
+  htmlDf = df.to_html(None)
+  style = inspect.cleandoc(
+    f"""
+    <style>
+    {style}
+    </style>
+    """
+  )
+  htmlDf = f'{style}\n{htmlDf}'
+  if file is not None:
+    with open(file, 'w') as ofile:
+      ofile.write(htmlDf)
+  else:
+    return htmlDf
