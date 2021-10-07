@@ -3,17 +3,17 @@ import pytest
 from s3a import generalutils as gu, ComplexXYVertices, XYVertices
 import numpy as np
 
-from s3a.generalutils import deprecateKwargs, inverseResize_pad
+from s3a.generalutils import deprecateKwargs
 from s3a.plugins.misc import miscFuncsPluginFactory, MultiPredictionsPlugin
 
 
-def test_resize_pad():
+def test_sub_image():
   img = np.zeros((100, 500), 'uint8')
-
+  imgVerts = np.array([[0, 0], [499, 99]])
   for sz in (500,500), (100,500), (1000, 100):
-    rp, stats = gu.resize_pad(img, sz, returnStats=True)
-    assert rp.shape == sz
-    orig = inverseResize_pad(rp, stats)
+    subimg, stats = gu.subImageFromVerts(img, imgVerts, shape=sz, returnStats=True)
+    assert subimg.shape == sz
+    orig = gu.inverseSubImage(subimg, stats)
     assert orig.shape == img.shape
 
 def test_plg_factory(app):

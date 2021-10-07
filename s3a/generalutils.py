@@ -1,4 +1,5 @@
-import html
+from __future__ import annotations
+
 import inspect
 import warnings
 from collections import defaultdict
@@ -10,15 +11,16 @@ import cv2 as cv
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
-from skimage import io
-from skimage import transform
+from scipy import ndimage
+from skimage import io, transform as trans
 from skimage.exposure import exposure
 
-from utilitys import PrjParam, fns, ProcessStage
+from utilitys import PrjParam, ProcessStage
 # Needs to be visible outside this file
 # noinspection PyUnresolvedReferences
 from utilitys.fns import hierarchicalUpdate
 from utilitys.typeoverloads import FilePath
+from .constants import PRJ_ENUMS
 from .structures import TwoDArr, XYVertices, ComplexXYVertices, NChanImg, BlackWhiteImg
 
 
@@ -168,9 +170,9 @@ def tryCvResize(image: NChanImg, newSize: Union[tuple, float],
   except (TypeError, cv.error):
     oldRange = (image.min(), image.max())
     if asRatio:
-      rescaled = transform.rescale(image, newSize, multichannel=image.ndim > 2)
+      rescaled = trans.rescale(image, newSize, multichannel=image.ndim > 2)
     else:
-      rescaled = transform.resize(image, newSize[::-1])
+      rescaled = trans.resize(image, newSize[::-1])
     image = exposure.rescale_intensity(rescaled, out_range=oldRange).astype(image.dtype)
   return image
 
@@ -212,8 +214,13 @@ def cornersToFullBoundary(cornerVerts: Union[XYVertices, ComplexXYVertices], siz
   return cornerVerts
 
 
-def getCroppedImg(image: NChanImg, verts: np.ndarray, margin=0, *otherBboxes: np.ndarray,
-                  coordsAsSlices=False, returnCoords=True) -> (np.ndarray, np.ndarray):
+def getCroppedImg(
+    image: NChanImg,
+    verts: np.ndarray,
+    margin=0,
+    coordsAsSlices=False,
+    returnCoords=True
+) -> (np.ndarray, np.ndarray):
   """
   Crops an image according to the specified vertices such that the returned image does not extend
   past vertices plus margin (including other bboxes if specified). All bboxes and output coords
@@ -223,11 +230,6 @@ def getCroppedImg(image: NChanImg, verts: np.ndarray, margin=0, *otherBboxes: np
   verts = np.vstack(verts)
   img_np = image
   compCoords = np.vstack([verts.min(0), verts.max(0)])
-  if len(otherBboxes) > 0:
-    for dim in range(2):
-      for ii, cmpFunc in zip(range(2), [min, max]):
-        otherCmpVals = [curBbox[ii, dim] for curBbox in otherBboxes]
-        compCoords[ii,dim] = cmpFunc(compCoords[ii,dim], *otherCmpVals)
   compCoords = getClippedBbox(img_np.shape, compCoords, margin)
   coordSlices = (slice(compCoords[0,1], compCoords[1,1]),
                  slice(compCoords[0,0],compCoords[1,0]))
@@ -253,67 +255,6 @@ def imgCornerVertices(img: NChanImg=None) -> XYVertices:
               [fullImShape_xy[0]-1, fullImShape_xy[1]-1],
               [fullImShape_xy[0]-1, 0]
               ])
-
-def resize_pad(img: NChanImg,
-               shape: Sequence[int],
-               allowReorient=False,
-               keepAspectRatio=True,
-               interpolation=cv.INTER_NEAREST,
-               padVal=0,
-               returnStats=False):
-  """
-  Resizes image to the requested size using the specified interpolation method.
-  :param img: Image to resize
-  :param shape: New shape for image
-  :param allowReorient: If *True*, the image can be rotated 90 degrees if it results in less padding to reach
-    the desired shape
-  :param keepAspectRatio: If *False*, the image will be stretched instead of padded on the lacking dimension.
-    The portion of the image which couldn't be resized fully is padded with a constant value of `padVal`.
-    For instance, if the original image is 5x10 and the requested new size is 10x15, then after resizing
-    the image will be 7x15 to preserve aspect ratio. 2 pixels of padding will be added on the left and
-    1 pixel of padding will be added on the right so the final output is 10x15.
-  :param padVal: Value to pad dimension that couldn't be fully resized
-  :param interpolation: Interpolation method to use during resizing
-  :param returnStats: If *True*, the return value of this function will be a tuple where the first argument
-    is the resized/padded image and the second is a dict of stats. Keys are:
-
-      - 'top'/'left'/'bottom'/'right': Padding added to top, left, ... sides of the image
-      - 'reoriented': Boolean, whether the image was rotated
-  """
-  initialShape = img.shape[:2]
-  shape = np.asarray(shape)
-  ratios = shape / initialShape
-  rotated = False
-  if allowReorient:
-    # Choose whichever orientation leads to the closest ratio to the original size
-    tmpRatios = shape / img.shape[:2][::-1]
-    if np.abs(1 - tmpRatios[0] / tmpRatios[1]) < np.abs(1 - ratios[0] / ratios[1]):
-      img = cv.rotate(img, cv.ROTATE_90_CLOCKWISE)
-      ratios = tmpRatios
-      rotated = True
-
-  # Dummy pad values, will be updated if padding actually occurs
-  top, left, bottom, right = [0] * 4
-  stats = dict(initialShape=initialShape, rotated=rotated, interpolation=interpolation)
-  if not keepAspectRatio:
-    paddedImg = cv.resize(img, tuple(shape[::-1]), interpolation=interpolation)
-    if returnStats:
-      return paddedImg, stats
-    return paddedImg
-
-  ratio = ratios.min()
-  paddedImg = cv.resize(img, (0, 0), fx=ratio, fy=ratio, interpolation=interpolation)
-  padding = (shape - paddedImg.shape[:2])
-
-  if (padding > 0).any():
-    top, left = map(int, padding//2)
-    bottom, right = map(int, padding - padding//2)
-    paddedImg = cv.copyMakeBorder(paddedImg, top, bottom, left, right, cv.BORDER_CONSTANT, value=padVal)
-  if returnStats:
-    # No pre-resize padding added
-    stats.update(postResizePadding=(top, bottom, left, right))
-    return paddedImg, stats
-  return paddedImg
 
 def showMaskDiff(oldMask: BlackWhiteImg, newMask: BlackWhiteImg):
   infoMask = np.tile(oldMask[...,None].astype('uint8')*255, (1,1,3))
@@ -543,103 +484,202 @@ def _indexUsingPad(image, tblrPadding):
   cols = slice(tblrPadding[2], imshape[1] - tblrPadding[3])
   return image[rows, cols, ...]
 
+def subImageFromVerts(
+    image,
+    verts: ComplexXYVertices | np.ndarray,
+    margin=0,
+    shape=None,
+    returnCoords=False,
+    returnStats=False,
+    allowTranspose=False,
+    rotationDeg=0,
+    **kwargs
+):
+  """
+  extracts a region from an image cropped to the area of `verts`. Unlike `getCroppedImage`, this allows a constant-sized
+  output shape, rotation, and other features.
+  :param image: Full-sized image from which to extract a subregion
+  :param verts: Nx2 array of x-y vertices that determine the extracted region
+  :param margin: Margin in pixels to add to the [x, y] shapes of vertices
+  :param shape: (rows, cols) output shape
+  :param returnCoords: Whether to return a bounding box array of [[minx, miny], [maxx, maxy]] coordinates where this
+    subimage fits. With no scaling, rotation, padding, etc. this is the same region as the vertices bounding box
+  :param returnStats: Whether to return a dict of reshaping stats that can be passed to `inverseSubImage`
+  :param allowTranspose: If *True*, the image can be rotated 90 degrees if it results in less padding to reach
+    the desired shape
+  :param rotationDeg: Clockwise rotation to apply to the extracted image
+  :param kwargs: Passed to `cv.warpAffine`
+"""
+  if shape is not None:
+    shape = np.asarray(shape[:2])
 
-def getCroppedImg_resize_pad(fullImage, coords, margin=0, returnCoords=True, padVal=np.nan, **resizeOpts):
-  shape = np.array(resizeOpts.pop('shape'))
-  min_ = np.min(coords, 0)
-  max_ = np.max(coords, 0)
-  # x-y to row-col
-  span = (max_ - min_ + 1)[::-1]
-  initialShape = tuple(map(int, span))
-
-  ratios = shape / span
-  needsRotate = False
-  if resizeOpts.get('allowReorient'):
-    # Choose whichever orientation leads to the closest ratio to the original size
-    tmpRatios = shape / span[::-1]
-    if np.abs(1 - tmpRatios.min()/tmpRatios.max()) < np.abs(1 - ratios.min()/ratios.max()):
-      ratios = tmpRatios
-      span = span[::-1]
-      needsRotate = True
-  padAx = np.argmax(ratios)
-  padAmt = (ratios.max()/ratios.min()-1)*span[padAx]
-  # left/right could be top/bottom, but the concept is the same either way
-  leftPad = int(np.ceil(padAmt/2))
-  rightPad = int(padAmt.round() - leftPad)
-  # Correction happens relative to xy unless the image will be rotated, in which case x will be height
-  if not needsRotate:
-    padAx = 1 - padAx
-  if np.isnan(padVal) and resizeOpts.get('keepAspectRatio', True):
-    # Non-nan value means user wants constant padding, not padding that came from image background
-    min_[padAx] -= leftPad
-    max_[padAx] += rightPad
-    # Extra padding means the aspect ratio should be 1, so no need to account for this in `resize_pad`
-    resizeOpts.update(keepAspectRatio=False)
+  if isinstance(verts, ComplexXYVertices):
+    verts = verts.stack()
   else:
-    # Zero out to avoid false accounting when updating `stats` below
-    leftPad = rightPad = 0
-  img, bounds = getCroppedImg(fullImage, np.vstack([min_, max_]), margin)
-  # If padding caused min or max to go beyond image borders, make sure to spoof this with yet another padding
-  extraPadding = _computeEdgePadding(bounds, fullImage.shape[:2], max_, min_)
-  if any(extraPadding):
-    img = cv.copyMakeBorder(img, *extraPadding, cv.BORDER_CONSTANT, value=0)
-  # Due to custom padding, resized image can at most be off by one pixel. This is fine to allow a bit of stretch
-  oldReturnStats = resizeOpts.pop('returnStats', False)
-  img, stats = resize_pad(img, shape, **resizeOpts, padVal=padVal, returnStats=True)
-  # Since padding might have occured at this stack level, make sure the original width and height values are correct
-  # Also make sure the raw image size is correct
-  stats['preResizePadding'] = (0, 0, leftPad, rightPad) if padAx == 0 else (leftPad, rightPad, 0, 0)
-  stats['initialShape'] = initialShape
+    verts = verts.copy()
+  if np.isscalar(margin):
+    margin = [margin, margin]
 
-  ret = [img]
+  for ax in 0, 1:
+    verts[verts[:, ax].argmin()] -= margin
+    verts[verts[:, ax].argmax()] += margin
+
+  initialBbox = coordsToBbox(verts)
+  transformedPts, rotationDeg = _getRotationStats(verts, rotationDeg, shape, allowTranspose)
+  transformedBbox = coordsToBbox(transformedPts).astype(int)
+  xformedXYShape = (transformedBbox[1] - transformedBbox[0]).ravel()
+
+  newXYShape = xformedXYShape.copy()
+  if shape is not None:
+    # outputShape is row-col, intialShape is xy
+    xyRatios = shape[::-1] / newXYShape
+    padAx = np.argmax(xyRatios)
+    padAmt = (xyRatios.max() / xyRatios.min() - 1) * newXYShape[padAx]
+    # left/right could be top/bottom, but the concept is the same either way
+    leftPad = rightPad = padAmt/2
+
+    transformedBbox[0, padAx] -= np.ceil(leftPad)
+    transformedBbox[1, padAx] += np.floor(rightPad)
+
+    newXYShape[padAx] += padAmt
+  else:
+    shape = transformedBbox.ptp(0).astype(int)
+  # Recalculate ratios after padding
+
+  # In order for rotation not to clip any image pixels, make sure to capture a bounding box big enough to
+  # prevent border-filling where possible
+  if not np.isclose(rotationDeg, 0):
+    rotatedPoints = cv.boxPoints((transformedBbox.mean(0), transformedBbox.ptp(0).astype(float), rotationDeg + 90.0))
+    totalBbox = np.r_[initialBbox, rotatedPoints, transformedBbox]
+  else:
+    totalBbox = np.r_[initialBbox, transformedBbox]
+
+  subImage, stats = _getAffineSubregion(image, transformedBbox, totalBbox, shape, rotationDeg, **kwargs)
+  stats['initialBbox'] = initialBbox
+
+  ret = [subImage]
   if returnCoords:
-    ret.append(bounds)
-  if oldReturnStats:
+    ret.append(transformedBbox)
+  if returnStats:
     ret.append(stats)
   if len(ret) == 1:
     return ret[0]
   return tuple(ret)
 
-def inverseResize_pad(image, stats):
+
+def _getRotationStats(
+    verts: ComplexXYVertices | np.ndarray,
+    rotationDeg: float | Any,
+    outputShape: np.ndarray=None,
+    allowTranspose=False
+):
+  if isinstance(verts, ComplexXYVertices):
+    verts = verts.stack()
+  center, width_height, trueRotationDeg = cv.minAreaRect(verts)
+
+  if rotationDeg is PRJ_ENUMS.ROT_OPTIMAL:
+    # Use the rotation that most squarely aligns the component
+    rotationDeg = -trueRotationDeg
+    allowTranspose = True
+
+  points = cv.boxPoints((center, width_height, trueRotationDeg + rotationDeg))
+  if allowTranspose and outputShape is not None and _shapeTransposeNeeded(points.ptp(0)[::-1], outputShape):
+    # Redo the rotation with an extra 90 degrees to swap width and height
+    rotationDeg += 90
+    points = cv.boxPoints((center, width_height, trueRotationDeg + rotationDeg))
+
+  return points, rotationDeg
+
+def _shapeTransposeNeeded(inputShape, outputShape):
   """
-  If `image` and `stats` are the result of a `resize_pad` operation with ``returnStats=True``, this will
-  return a version of `image` that is normalized back to the unresized, unpadded state.
+  Determines whether the input shape would better fit to the output shope if it was transposed. This is evaluated
+  based on whether it results in a maintained aspect ratio during resizing
   """
-  NO_PADDING = [0]*4
-  image = _indexUsingPad(image, stats.get('postResizePadding', NO_PADDING))
+  ratios = outputShape / inputShape
+  # Choose whichever orientation leads to the closest ratio to the original size
+  transposedRatio = outputShape / inputShape[::-1]
+  return np.abs(1 - transposedRatio[0] / transposedRatio[1]) < np.abs(1 - ratios[0] / ratios[1])
 
-  # If the image was rotated, the initial shape should be altered to account for this during pad math
-  initialShape = stats['initialShape']
-  if stats.get('rotated'):
-    initialShape = initialShape[::-1]
+def _getAffineSubregion(
+    image,
+    transformedBbox: np.ndarray,
+    totalBbox: np.ndarray,
+    outputShape,
+    rotationDeg=0.0,
+    padBorderOpts: dict=None,
+    **affineKwargs
+):
+  # Add a few pixels of padding since sometimes a cutoff still does occur at fractional degree scalings
+  totalBbox = np.ceil(coordsToBbox(totalBbox, addOneToMax=False)).astype(int)
+  xyImageShape = image.shape[:2][::-1]
+  # It's possible for mins and maxs to be outside image regions
+  underoverPadding = np.zeros_like(totalBbox)
+  idx = totalBbox[0] < 0
+  underoverPadding[0, idx] = -totalBbox[0, idx]
+  idx = totalBbox[1] > xyImageShape
+  underoverPadding[1, idx] = (totalBbox[1] - xyImageShape)[idx]
+  midpoint = totalBbox.ptp(0)/2
+  subImageBbox = totalBbox
+  totalBbox = np.clip(totalBbox, 0, xyImageShape)
 
-  prepad = stats.get('preResizePadding', NO_PADDING)
-  preresizeShape = np.array(initialShape, dtype=int) + [sum(prepad[:2]), sum(prepad[2:])]
-  image = cv.resize(image, tuple(preresizeShape[::-1].astype(int)), interpolation=stats.get('interpolation'))
+  mins = totalBbox.min(0)
+  maxs = totalBbox.max(0)
 
-  image = _indexUsingPad(image, prepad)
-  if stats['rotated']:
-    image = cv.rotate(image, cv.ROTATE_90_COUNTERCLOCKWISE)
-  return image
+  subImage = image[mins[1]:maxs[1], mins[0]:maxs[0],...]
+  if np.any(underoverPadding):
+    padBorderOpts = padBorderOpts or dict(value=0, borderType=cv.BORDER_CONSTANT)
+    subImage = cv.copyMakeBorder(
+      subImage,
+      underoverPadding[0, 1],
+      underoverPadding[1, 1],
+      underoverPadding[0, 0],
+      underoverPadding[1, 0],
+      **padBorderOpts
+    )
+  # Now there's no offset to the warping relative to the subregion
+  xformedXYShape = transformedBbox.ptp(0).astype(int)
 
+  M = cv.getRotationMatrix2D(midpoint, rotationDeg, 1)
+  inter = affineKwargs.pop('interpolation', cv.INTER_NEAREST)
+  rotated = cv.warpAffine(subImage, M, subImage.shape[:2], flags=inter, **affineKwargs)
+  offset = (midpoint - xformedXYShape/2).astype(int)
+  assert np.all(offset >= 0)
+  toRescale = rotated[offset[1]:offset[1] + xformedXYShape[1], offset[0]:offset[0] + xformedXYShape[0],...]
+  stats = dict(
+    preResizedShape=toRescale.shape[:2],
+    subImageBbox=subImageBbox,
+    offsetWithinSubImage=offset,
+    rotationDeg=rotationDeg,
+    interpolation=inter,
+    **affineKwargs
+  )
+  return cv.resize(toRescale, outputShape[::-1], interpolation=inter), stats
 
-def _computeEdgePadding(bounds, fullImageShape, maxCoords, min_):
-  # Turn shape into x-y
-  fullImageShape = fullImageShape[::-1]
-  needsMinPad = min_ < 0
-  leftTopPad = np.array([0, 0])
-  minPad = -min_[needsMinPad]
-  leftTopPad[needsMinPad] = minPad
-  bounds[0, needsMinPad] = minPad
+def inverseSubImage(subImage, stats, finalBbox: np.ndarray=None):
+  """
+  From a subImage after a call from `subImageFromVerts`, turns it back into a regularly size, de-rotated version
 
-  needsMaxPad = maxCoords > fullImageShape
-  rightBotPad = np.array([0, 0])
-  maxPad = (maxCoords - fullImageShape)[needsMaxPad]
-  rightBotPad[needsMaxPad] = maxPad
-  bounds[1, needsMaxPad] += maxPad
-  # Turn into order expected by cv2 -- top, bot, left, right
-  extraPadding = [int(pad) for pad in [leftTopPad[1], rightBotPad[1], leftTopPad[0], rightBotPad[0]]]
-  return extraPadding
+  :param subImage: Image to resize and re-rotate
+  :param stats: dict of stats coming from the `subImageFromVerts` call
+  :param finalBbox: If provided, this is the region from within the inverted subImage to extract
+  """
+  subBbox = stats['subImageBbox']
+  preResizedShape = tuple(np.ptp(subBbox, 0)-2*stats['offsetWithinSubImage'])
+  unresized = cv.resize(subImage, preResizedShape, interpolation=stats.get('interpolation'))
+  unrotated = ndimage.rotate(unresized, -stats['rotationDeg'])
+  if finalBbox is None and 'initialBbox' not in stats:
+    return unrotated
+  elif finalBbox is None:
+    finalBbox = stats['initialBbox']
+  offset = finalBbox[0] - subBbox[0]
+  outputSizeXY = finalBbox.ptp(0)
+  return unrotated[offset[1]:offset[1]+outputSizeXY[1], offset[0]:offset[0]+outputSizeXY[0],...]
+
+def coordsToBbox(coords: np.ndarray, addOneToMax=True):
+  ret = np.r_[coords.min(0, keepdims=True), coords.max(0, keepdims=True)]
+  if addOneToMax:
+    ret[1] += 1
+  return ret
 
 def pd_iterdict(df: pd.DataFrame, index=False):
   """

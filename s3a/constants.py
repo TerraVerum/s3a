@@ -96,6 +96,8 @@ class PRJ_ENUMS:
   HISTORY_UNSPECIFIED = 0
   HISTORY_BACKGROUND = 1
   HISTORY_FOREGROUND = 2
+
+  ROT_OPTIMAL = None
   
 from s3a.structures import ComplexXYVertices, PrjParam, PrjParamGroup, newParam
 

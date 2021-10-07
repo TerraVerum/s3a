@@ -27,7 +27,7 @@ from .helpers import serialize
 from ..constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
 from ..structures import ComplexXYVertices
 from ..generalutils import (
-  getCroppedImg_resize_pad,
+  subImageFromVerts,
   getCroppedImg,
   DirectoryDict,
   cvImread_rgb,
@@ -265,7 +265,7 @@ class CompImgsDfExporter(AnnotationExporter):
     # Label masks are programmatically generated so no need for a backing directory
     self.labelMaskDir = {}
     if resizeOpts is not None:
-      cropperFunc = getCroppedImg_resize_pad
+      cropperFunc = subImageFromVerts
     else:
       resizeOpts = {}
       cropperFunc = getCroppedImg
