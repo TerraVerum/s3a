@@ -642,7 +642,7 @@ def _getAffineSubregion(
   M = cv.getRotationMatrix2D(midpoint, rotationDeg, 1)
   inter = affineKwargs.pop('interpolation', cv.INTER_NEAREST)
   rotated = cv.warpAffine(subImage, M, subImage.shape[:2], flags=inter, **affineKwargs)
-  offset = (midpoint - xformedXYShape/2).astype(int)
+  offset = (midpoint - xformedXYShape/2).round().astype(int)
   assert np.all(offset >= 0)
   toRescale = rotated[offset[1]:offset[1] + xformedXYShape[1], offset[0]:offset[0] + xformedXYShape[0],...]
   stats = dict(
