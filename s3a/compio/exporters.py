@@ -348,15 +348,30 @@ class CompImgsDfExporter(AnnotationExporter):
       marginToUse = (compImgSz * (margin / 100)).astype(int)
     else:
       marginToUse = margin
-    compImg, bounds = self.cropperFunc(image, allVerts, marginToUse, returnCoords=True, **resizeOpts)
+
+    ret = self.cropperFunc(image, allVerts, marginToUse, returnCoords=True, **resizeOpts)
+    if resizeOpts.get('returnStats'):
+      compImg, bounds, stats = ret
+    else:
+      compImg, bounds = ret
+      stats = None
     useKeys = includeCols
+
+    if 'instanceId' in useKeys:
+      out['instanceId'] = inst[RTF.INST_ID]
+
+    if 'offset' in useKeys:
+      out['offset'] = bounds[0, :]
+
+    lbl = inst[labelField]
+    if 'label' in useKeys:
+      out['label'] = lbl
 
     if 'image' in useKeys:
       out['image'] = compImg
-    lbl = inst[labelField]
 
-    if 'label' in useKeys:
-      out['label'] = lbl
+    if stats is not None:
+      out.update(stats)
 
     if 'labelMask' in useKeys:
       if prioritizeById:
@@ -371,11 +386,6 @@ class CompImgsDfExporter(AnnotationExporter):
 
       out['labelMask'] = mask
 
-    if 'instanceId' in useKeys:
-      out['instanceId'] = inst[RTF.INST_ID]
-
-    if 'offset' in useKeys:
-      out['offset'] = bounds[0, :]
     return out
 
 class CompImgsZipExporter(CompImgsDfExporter):
