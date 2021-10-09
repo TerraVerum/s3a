@@ -1,20 +1,45 @@
 import pytest
 
-from s3a import generalutils as gu, ComplexXYVertices, XYVertices
+from skimage import data
+
+from s3a import generalutils as gu, ComplexXYVertices, XYVertices, PRJ_ENUMS
 import numpy as np
 
 from s3a.generalutils import deprecateKwargs
 from s3a.plugins.misc import miscFuncsPluginFactory, MultiPredictionsPlugin
 
+_rots = list(np.linspace(-360, 360, 25)) + [PRJ_ENUMS.ROT_OPTIMAL]
 
-def test_sub_image():
+
+@pytest.mark.parametrize('size', [(500, 500), (100, 500), (1000, 100)])
+@pytest.mark.parametrize('rot', _rots)
+def test_sub_image_shape(size, rot):
   img = np.zeros((100, 500), 'uint8')
   imgVerts = np.array([[0, 0], [499, 99]])
-  for sz in (500,500), (100,500), (1000, 100):
-    subimg, stats = gu.subImageFromVerts(img, imgVerts, shape=sz, returnStats=True)
-    assert subimg.shape == sz
-    orig = gu.inverseSubImage(subimg, stats)
-    assert orig.shape == img.shape
+  subimg, stats = gu.subImageFromVerts(img, imgVerts, shape=size, returnStats=True, rotationDeg=rot)
+  assert subimg.shape == size
+  orig = gu.inverseSubImage(subimg, stats)
+  assert orig.shape == img.shape
+
+@pytest.mark.parametrize('rot', _rots[:-1:5] + [_rots[-1]])
+@pytest.mark.parametrize('transpose', [True, False])
+@pytest.mark.parametrize('shape', [(100,100), (200,200), None])
+@pytest.mark.parametrize('margin', [0, 5, [10, 10]])
+def test_sub_image_correctness(rot, transpose, shape, margin):
+  vertsBox = np.array(
+    [[96, 77],
+     [96, 179],
+     [356, 179],
+     [356, 77]]
+    )
+  im = data.chelsea()
+  bbox = gu.coordsToBbox(vertsBox)
+  sub, stats = gu.subImageFromVerts(
+    im, vertsBox, rotationDeg=rot, returnStats=True, allowTranspose=transpose, shape=shape, margin=margin)
+  inv = gu.inverseSubImage(sub, stats, finalBbox=bbox)
+  orig = gu.getCroppedImg(im, vertsBox, returnCoords=False)
+  diff = np.abs(orig.astype(float) - inv.astype(float))
+  assert diff.mean() < 17.5
 
 def test_plg_factory(app):
   count = 0

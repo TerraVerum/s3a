@@ -335,6 +335,7 @@ class CompImgsDfExporter(AnnotationExporter):
                         includeCols=None,
                         prioritizeById=None,
                         resizeOpts=None,
+                        returnStats=None,
                         **_kwargs):
     out = {}
     allVerts = inst[RTF.VERTICES].stack()
@@ -349,11 +350,15 @@ class CompImgsDfExporter(AnnotationExporter):
     else:
       marginToUse = margin
 
-    ret = self.cropperFunc(image, allVerts, marginToUse, returnCoords=True, **resizeOpts)
-    if resizeOpts.get('returnStats'):
-      compImg, bounds, stats = ret
+    returnStats = returnStats or resizeOpts.pop('returnStats', None)
+    if returnStats:
+      compImg, bounds, stats = self.cropperFunc(
+        image, allVerts, marginToUse, returnCoords=True, returnStats=returnStats, **resizeOpts
+      )
     else:
-      compImg, bounds = ret
+      compImg, bounds = self.cropperFunc(
+        image, allVerts, marginToUse, returnCoords=True, **resizeOpts
+      )
       stats = None
     useKeys = includeCols
 
@@ -367,11 +372,11 @@ class CompImgsDfExporter(AnnotationExporter):
     if 'label' in useKeys:
       out['label'] = lbl
 
+    if stats is not None:
+        out.update(stats)
+
     if 'image' in useKeys:
       out['image'] = compImg
-
-    if stats is not None:
-      out.update(stats)
 
     if 'labelMask' in useKeys:
       if prioritizeById:

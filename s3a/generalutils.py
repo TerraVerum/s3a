@@ -11,7 +11,6 @@ import cv2 as cv
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
-from scipy import ndimage
 from skimage import io, transform as trans
 from skimage.exposure import exposure
 
@@ -23,6 +22,7 @@ from utilitys.typeoverloads import FilePath
 from .constants import PRJ_ENUMS
 from .structures import TwoDArr, XYVertices, ComplexXYVertices, NChanImg, BlackWhiteImg
 
+_ROT_PX_PAD_MARGIN = 2
 
 def stackedVertsPlusConnections(vertList: ComplexXYVertices) -> Tuple[XYVertices, np.ndarray]:
   """
@@ -525,31 +525,29 @@ def subImageFromVerts(
     verts[verts[:, ax].argmax()] += margin
 
   initialBbox = coordsToBbox(verts)
+  if shape is None:
+    shape = initialBbox.ptp(0)[::-1]
   transformedPts, rotationDeg = _getRotationStats(verts, rotationDeg, shape, allowTranspose)
-  transformedBbox = coordsToBbox(transformedPts).astype(int)
-  transformedXYShape = (transformedBbox[1] - transformedBbox[0]).ravel()
+  transformedBbox = coordsToBbox(transformedPts)
+  # Handle half-coordinates by preserving both ends of the spectrum
+  transformedBbox[0] = np.floor(transformedBbox[0])
+  transformedBbox[1] = np.ceil(transformedBbox[1])
 
-  newXYShape = transformedXYShape.copy()
-  if shape is not None:
-    # outputShape is row-col, intialShape is xy
-    xyRatios = shape[::-1] / newXYShape
-    padAx = np.argmax(xyRatios)
-    padAmt = (xyRatios.max() / xyRatios.min() - 1) * newXYShape[padAx]
-    # left/right could be top/bottom, but the concept is the same either way
-    leftPad = rightPad = padAmt/2
+  newXYShape = transformedBbox.ptp(0).astype(int)
+  # outputShape is row-col, intialShape is xy
+  xyRatios = shape[::-1] / newXYShape
+  padAx = np.argmax(xyRatios)
+  padAmt = np.round((xyRatios.max() / xyRatios.min() - 1) * newXYShape[padAx])
+  # left/right could be top/bottom, but the concept is the same either way
+  leftPad = rightPad = padAmt/2
 
-    transformedBbox[0, padAx] -= np.ceil(leftPad)
-    transformedBbox[1, padAx] += np.floor(rightPad)
-
-    newXYShape[padAx] += padAmt
-  else:
-    shape = transformedBbox.ptp(0).astype(int)
-  # Recalculate ratios after padding
+  transformedBbox[0, padAx] -= leftPad
+  transformedBbox[1, padAx] += rightPad
 
   # In order for rotation not to clip any image pixels, make sure to capture a bounding box big enough to
   # prevent border-filling where possible
   if not np.isclose(rotationDeg, 0):
-    rotatedPoints = cv.boxPoints((transformedBbox.mean(0), transformedBbox.ptp(0).astype(float), rotationDeg + 90.0))
+    rotatedPoints = cv.boxPoints((transformedBbox.mean(0), transformedBbox.ptp(0), rotationDeg + 90.0))
     totalBbox = np.r_[initialBbox, rotatedPoints, transformedBbox]
   else:
     totalBbox = np.r_[initialBbox, transformedBbox]
@@ -577,6 +575,9 @@ def _getRotationStats(
     verts = verts.stack()
   center, width_height, trueRotationDeg = cv.minAreaRect(verts)
 
+  # Box calculation behaves very poorly with small-area vertices
+  width_height = np.clip(width_height, 1, np.inf)
+
   if rotationDeg is PRJ_ENUMS.ROT_OPTIMAL:
     # Use the rotation that most squarely aligns the component
     rotationDeg = -trueRotationDeg
@@ -585,7 +586,9 @@ def _getRotationStats(
   points = cv.boxPoints((center, width_height, trueRotationDeg + rotationDeg))
   if allowTranspose and outputShape is not None and _shapeTransposeNeeded(points.ptp(0)[::-1], outputShape):
     # Redo the rotation with an extra 90 degrees to swap width and height
-    rotationDeg += 90
+    # Use whichever re-orientation leads closer to a 0 degree angle
+    newRots = [rotationDeg + 90, rotationDeg - 90]
+    rotationDeg = newRots[np.argmin(np.abs(newRots) % 360)]
     points = cv.boxPoints((center, width_height, trueRotationDeg + rotationDeg))
 
   return points, rotationDeg
@@ -610,22 +613,26 @@ def _getAffineSubregion(
     **affineKwargs
 ):
   # Add a few pixels of padding since sometimes a cutoff still does occur at fractional degree scalings
-  combined = coordsToBbox(totalBbox, addOneToMax=False)
-  combined[0] = combined[0]-1
-  combined[1] = combined[1]+1
-  totalBbox = combined.astype(int)
+  totalBbox = coordsToBbox(totalBbox, addOneToMax=False)
+  # Fractional midpoints cause lots of hassle when applying affine transforms
+  # An easy solution is to simply ensure an integer midpoint by extending the bounds in those cases
+  totalBbox[1, (totalBbox.ptp(0) % 2) == 1] += 1
+  # It's also common for rotation angles to cut off fractions of a pixel during warping. This is
+  # easily resolved by adding just a few more pixels to the total box
+  hasRotation = not np.isclose(rotationDeg, 0)
+  if hasRotation:
+    totalBbox[0] -= _ROT_PX_PAD_MARGIN
+    totalBbox[1] += _ROT_PX_PAD_MARGIN
   xyImageShape = image.shape[:2][::-1]
   # It's possible for mins and maxs to be outside image regions
-  underoverPadding = np.zeros_like(totalBbox)
+  underoverPadding = np.zeros_like(totalBbox, dtype=int)
   idx = totalBbox[0] < 0
   underoverPadding[0, idx] = -totalBbox[0, idx]
   idx = totalBbox[1] > xyImageShape
   underoverPadding[1, idx] = (totalBbox[1] - xyImageShape)[idx]
-  subImageBbox = totalBbox
-  # Account for the 1-pixel addition to subimage bbox
-  normedTransormedBbox = transformedBbox - subImageBbox[0] + 1
-  totalBbox = np.clip(totalBbox, 0, xyImageShape)
-  midpoint = transformedBbox.mean(0) - subImageBbox[0]
+  subImageBbox = totalBbox.astype(int)
+  normedTransformedBbox = (transformedBbox - subImageBbox[0]).astype(int)
+  totalBbox = np.clip(totalBbox, 0, xyImageShape).astype(int)
 
   mins = totalBbox.min(0)
   maxs = totalBbox.max(0)
@@ -644,21 +651,26 @@ def _getAffineSubregion(
   # Now there's no offset to the warping relative to the subregion
   transformedXYShape = transformedBbox.ptp(0).astype(int)
 
-  M = cv.getRotationMatrix2D(midpoint, rotationDeg, 1)
   inter = affineKwargs.pop('interpolation', cv.INTER_NEAREST)
-  rotated = cv.warpAffine(subImage, M, subImage.shape[:2][::-1], flags=inter, **affineKwargs)
-  offset = normedTransormedBbox[0].astype(int)
+  if hasRotation:
+    midpoint = transformedBbox.mean(0) - 0.5 - subImageBbox[0]
+    M = cv.getRotationMatrix2D(midpoint, rotationDeg, 1)
+    rotated = cv.warpAffine(subImage, M, subImage.shape[:2][::-1], flags=inter, **affineKwargs)
+  else:
+    rotated = subImage
+  offset = normedTransformedBbox[0]
   assert np.all(offset >= 0)
+  assert np.all(normedTransformedBbox[1] <= rotated.shape[:2][::-1])
+  # plt.imshow(rotated)
   toRescale = rotated[
-              normedTransormedBbox[0, 1]:normedTransormedBbox[1,1],
-              normedTransormedBbox[0, 0]:normedTransormedBbox[1,0],
+              normedTransformedBbox[0, 1]:normedTransformedBbox[1,1],
+              normedTransformedBbox[0, 0]:normedTransformedBbox[1,0],
               ...
               ]
   stats = dict(
-    preResizedShape=toRescale.shape[:2],
     subImageBbox=subImageBbox,
-    offsetWithinSubImage=offset,
-    rotationDeg=rotationDeg,
+    normedTransformedBbox=normedTransformedBbox,
+    rotation=rotationDeg,
     interpolation=inter,
     **affineKwargs
   )
@@ -673,16 +685,22 @@ def inverseSubImage(subImage, stats, finalBbox: np.ndarray=None):
   :param finalBbox: If provided, this is the region from within the inverted subImage to extract
   """
   subBbox = stats['subImageBbox']
-  preResizedShape = tuple(np.ptp(subBbox, 0)-2*stats['offsetWithinSubImage'])
+  transBbox = stats['normedTransformedBbox']
+  preResizedShape = transBbox.ptp(0)
   unresized = cv.resize(subImage, preResizedShape, interpolation=stats.get('interpolation'))
-  unrotated = ndimage.rotate(unresized, -stats['rotationDeg'])
+  # De-rotate around the same center as the rotation occurred, accounting for an offset from subindexing (transBbox[0])
+  midpoint = transBbox.mean(0) + 0.5 - transBbox[0]
+  Minv = cv.getRotationMatrix2D(midpoint, -stats['rotation'], 1)
+  unrotated = cv.warpAffine(unresized, Minv, subBbox.ptp(0).astype(int))
   if finalBbox is None and 'initialBbox' not in stats:
     return unrotated
   elif finalBbox is None:
     finalBbox = stats['initialBbox']
-  offset = finalBbox[0] - subBbox[0]
+  idxOffset = np.clip(finalBbox[0] - (subBbox[0] + transBbox[0]), 0, np.inf).astype(int)
   outputSizeXY = finalBbox.ptp(0)
-  return unrotated[offset[1]:offset[1]+outputSizeXY[1], offset[0]:offset[0]+outputSizeXY[0],...]
+  out = unrotated[idxOffset[1]:idxOffset[1]+outputSizeXY[1], idxOffset[0]:idxOffset[0]+outputSizeXY[0],...]
+  assert np.all(out.shape[:2][::-1] == outputSizeXY)
+  return out
 
 def coordsToBbox(coords: np.ndarray, addOneToMax=True):
   ret = np.r_[coords.min(0, keepdims=True), coords.max(0, keepdims=True)]
