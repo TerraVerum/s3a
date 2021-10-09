@@ -527,9 +527,9 @@ def subImageFromVerts(
   initialBbox = coordsToBbox(verts)
   transformedPts, rotationDeg = _getRotationStats(verts, rotationDeg, shape, allowTranspose)
   transformedBbox = coordsToBbox(transformedPts).astype(int)
-  xformedXYShape = (transformedBbox[1] - transformedBbox[0]).ravel()
+  transformedXYShape = (transformedBbox[1] - transformedBbox[0]).ravel()
 
-  newXYShape = xformedXYShape.copy()
+  newXYShape = transformedXYShape.copy()
   if shape is not None:
     # outputShape is row-col, intialShape is xy
     xyRatios = shape[::-1] / newXYShape
@@ -610,7 +610,10 @@ def _getAffineSubregion(
     **affineKwargs
 ):
   # Add a few pixels of padding since sometimes a cutoff still does occur at fractional degree scalings
-  totalBbox = np.ceil(coordsToBbox(totalBbox, addOneToMax=False)).astype(int)
+  combined = coordsToBbox(totalBbox, addOneToMax=False)
+  combined[0] = combined[0]-1
+  combined[1] = combined[1]+1
+  totalBbox = combined.astype(int)
   xyImageShape = image.shape[:2][::-1]
   # It's possible for mins and maxs to be outside image regions
   underoverPadding = np.zeros_like(totalBbox)
@@ -618,9 +621,11 @@ def _getAffineSubregion(
   underoverPadding[0, idx] = -totalBbox[0, idx]
   idx = totalBbox[1] > xyImageShape
   underoverPadding[1, idx] = (totalBbox[1] - xyImageShape)[idx]
-  midpoint = totalBbox.ptp(0)/2
   subImageBbox = totalBbox
+  # Account for the 1-pixel addition to subimage bbox
+  normedTransormedBbox = transformedBbox - subImageBbox[0] + 1
   totalBbox = np.clip(totalBbox, 0, xyImageShape)
+  midpoint = transformedBbox.mean(0) - subImageBbox[0]
 
   mins = totalBbox.min(0)
   maxs = totalBbox.max(0)
@@ -637,14 +642,18 @@ def _getAffineSubregion(
       **padBorderOpts
     )
   # Now there's no offset to the warping relative to the subregion
-  xformedXYShape = transformedBbox.ptp(0).astype(int)
+  transformedXYShape = transformedBbox.ptp(0).astype(int)
 
   M = cv.getRotationMatrix2D(midpoint, rotationDeg, 1)
   inter = affineKwargs.pop('interpolation', cv.INTER_NEAREST)
-  rotated = cv.warpAffine(subImage, M, subImage.shape[:2], flags=inter, **affineKwargs)
-  offset = (midpoint - xformedXYShape/2).round().astype(int)
+  rotated = cv.warpAffine(subImage, M, subImage.shape[:2][::-1], flags=inter, **affineKwargs)
+  offset = normedTransormedBbox[0].astype(int)
   assert np.all(offset >= 0)
-  toRescale = rotated[offset[1]:offset[1] + xformedXYShape[1], offset[0]:offset[0] + xformedXYShape[0],...]
+  toRescale = rotated[
+              normedTransormedBbox[0, 1]:normedTransormedBbox[1,1],
+              normedTransormedBbox[0, 0]:normedTransormedBbox[1,0],
+              ...
+              ]
   stats = dict(
     preResizedShape=toRescale.shape[:2],
     subImageBbox=subImageBbox,
