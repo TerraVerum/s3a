@@ -32,7 +32,7 @@ setup(
   data_files=[
     ('s3a/s3a/icons', _mltGlob('s3a/icons', '*.svg', '*.png')),
     ('s3a/s3a', _mltGlob('s3a/cfg', '*.yml')),
-    ('s3a/s3a/_io/templates', _mltGlob('s3a/_io/templates', '*.tblcfg')),
+    ('s3a/s3a/compio/templates', _mltGlob('s3a/compio/templates', '*.tblcfg')),
   ],
   entry_points={
     'console_scripts': [
