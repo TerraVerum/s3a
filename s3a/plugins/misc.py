@@ -201,7 +201,6 @@ class RandomToolsPlugin(ParamEditorPlugin):
       display.fieldInfoProc,
       name='Show Field Info',
       returnParam=True,
-      runOpts=RunOpts.ON_CHANGED,
     )
 
     # There should also be an option that *does* show in the menu, which displays field info
@@ -331,14 +330,18 @@ class MultiPredictionsPlugin(ProcessorPlugin):
     if not isinstance(newComps, ProcessIO):
       newComps = ProcessIO(components=newComps)
     compsToAdd = newComps['components']
+    if not len(compsToAdd):
+      return
     addType = newComps.get('addType', PRJ_ENUMS.COMP_ADD_AS_NEW)
     self.mgr.addComps(compsToAdd, addType)
 
 
   def predictFromSelection(self):
-    selectedIds = self.win.compDisplay.selectedIds
-    if len(selectedIds) == 0:
-      return
+    # It is possible for a previously selected id to be deleted before a redraw occurs, in which case the
+    # selected id won't correspond to a valid index. Resolve using intersection with all components
+    selectedIds = np.intersect1d(self.win.compDisplay.selectedIds, self.win.compMgr.compDf.index)
+    # if len(selectedIds) == 0:
+    #   return
     self.makePrediction(self.mgr.compDf.loc[selectedIds])
 
   def lastRunAnalytics(self):
