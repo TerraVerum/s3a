@@ -414,7 +414,7 @@ def k_means_segmentation(image: NChanImg, kVal=5, attempts=10):
   ret, lbls, imgMeans = cv.kmeans(clrs, kVal, None, criteria, attempts,
                              cv.KMEANS_RANDOM_CENTERS)
   # Now convert back into uint8, and make original image
-  imgMeans = imgMeans.astype('uint8')
+  imgMeans = imgMeans.astype(image.dtype)
   lbls = lbls.reshape(image.shape[:2])
 
   return ProcessIO(labels=lbls, means=imgMeans)
