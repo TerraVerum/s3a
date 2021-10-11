@@ -48,6 +48,7 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
                toolbar: QtWidgets.QToolBar=None,
                **kargs):
     super().__init__(parent, viewBox=RightPanViewBox(), **kargs)
+    self.menu.clear()
 
     if drawShapes is None:
       drawShapes = SHAPE_ROI_MAPPING.keys()
