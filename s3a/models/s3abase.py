@@ -165,7 +165,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
       if focusedId in changedDict['deleted']:
         self.changeFocusedComp()
       elif focusedId in changedDict['changed']:
-        ser.update(self.compMgr.compDf.loc[focusedId])
+        self.changeFocusedComp(self.compMgr.compDf.loc[focusedId])
     self.compMgr.sigCompsChanged.connect(handleCompsChanged)
 
     self.filePlg.projData.sigAnnotationsAdded.connect(self._maybeLoadActiveAnnotation)
