@@ -399,10 +399,14 @@ class DirectoryDict(MaxSizeDict):
   """
   _UNSET = object()
 
-  def __init__(self, initData:Union[FilePath, dict, 'DirectoryDict']=None,
-               readFunc: Callable[[str], Any]=None,
-               allowAbsolute=False,
-               **kwargs,):
+  def __init__(
+    self,
+    initData:Union[FilePath, dict, 'DirectoryDict']=None,
+    readFunc: Callable[[str], Any]=None,
+    allowAbsolute=False,
+    cacheOnRead=True,
+    **kwargs
+  ):
     """
     :param initData: Either startup dict or backing directory path. If a DirectoryDict is passed, its attribute will
       be used instead of the value passed for allowAbsolute. Its readFunc will be used if the passed
@@ -412,6 +416,7 @@ class DirectoryDict(MaxSizeDict):
     :param allowAbsolute: Whether to allow reading absolute paths
     :param kwargs: Passed to super constructor
     """
+    self.fileDir = None
     if isinstance(initData, FilePath.__args__):
       self.fileDir = Path(initData)
       super().__init__(**kwargs)
@@ -420,9 +425,12 @@ class DirectoryDict(MaxSizeDict):
         readFunc = readFunc or initData.readFunc
         allowAbsolute = initData.allowAbsolute
         self.fileDir = initData.fileDir
+      if initData is None:
+        initData = {}
       super().__init__(initData, **kwargs)
     self.readFunc = readFunc
     self.allowAbsolute = allowAbsolute
+    self.cacheReads = cacheOnRead
 
   def __missing__(self, key):
     key = str(key)
@@ -442,7 +450,9 @@ class DirectoryDict(MaxSizeDict):
       raise KeyError(f'"{key}" corresponds to {len(candidates)} files{grammar}{", ".join(c.name for c in candidates)}')
     else:
       file = candidates[0]
-      ret = self[key] = self.readFunc(file)
+      ret = self.readFunc(file)
+      if self.cacheReads:
+        self[key] = ret
     return ret
 
   def get(self, key, default=None):
@@ -498,7 +508,8 @@ def subImageFromVerts(
   output shape, rotation, and other features.
   :param image: Full-sized image from which to extract a subregion
   :param verts: Nx2 array of x-y vertices that determine the extracted region
-  :param margin: Margin in pixels to add to the [x, y] shapes of vertices
+  :param margin: Margin in pixels to add to the [x, y] shapes of vertices. Can be a scalar or [x,y].
+    If float values are specified, the margin is interpreted as a percentage (1.0 = 100% margin) of the [x,y] sizes.
   :param shape: (rows, cols) output shape
   :param returnCoords: Whether to return a bounding box array of [[minx, miny], [maxx, maxy]] coordinates where this
     subimage fits. With no scaling, rotation, padding, etc. this is the same region as the vertices bounding box
@@ -517,6 +528,9 @@ def subImageFromVerts(
     verts = verts.copy()
   if np.isscalar(margin):
     margin = [margin, margin]
+  margin = np.asarray(margin)
+  if np.issubdtype(margin.dtype, float):
+    margin = (margin*verts.ptp(0)).astype(int)
 
   for ax in 0, 1:
     verts[verts[:, ax].argmin()] -= margin

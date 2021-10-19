@@ -15,6 +15,7 @@ from zipfile import ZipFile
 
 import numpy as np
 import pandas as pd
+import cv2 as cv
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 from skimage.exposure import rescale_intensity
@@ -140,7 +141,7 @@ class LblPngExporter(AnnotationExporter):
     return exportObj
 
   def individualExport(self, compDf: pd.DataFrame, exportObj, **kwargs):
-    labels_numeric, self.mapping = self._resolveMapping(**kwargs)
+    labels_numeric, self.mapping = self.resolveMapping(**kwargs)
     self.compDf[PRJ_ENUMS.FIELD_LABEL] = labels_numeric
     asBool = np.issubdtype(labels_numeric.dtype, np.bool_)
     exportObj, errs = super().individualExport(self.compDf, exportObj, **kwargs)
@@ -148,16 +149,17 @@ class LblPngExporter(AnnotationExporter):
       exportObj = exportObj > 0
     return exportObj, errs
 
-  def _resolveMapping(
+  def resolveMapping(
       self,
+      labels: pd.Series=None,
       labelField=None,
       readMapping=None,
       rescaleOutput=None,
       backgroundColor=None,
       **_kwargs
   ):
-    compDf = self.compDf
-    labels = compDf[labelField]
+    if labels is None:
+      labels = self.compDf[labelField]
     labels_numeric = labelField.toNumeric(labels, returnMapping=readMapping)
     # Make sure numeric labels aren't the same as background, otherwise they will be forever lost
     mapping = None
@@ -199,10 +201,9 @@ class CompImgsDfExporter(AnnotationExporter):
 
   @dynamicDocstring(cols=list(allOutputColumns))
   def populateMetadata(self,
-                       srcDir: t.Union[FilePath, dict, DirectoryDict] = None,
-                       margin=0,
-                       marginAsPct=False,
+                       srcDir: FilePath | dict | DirectoryDict = None,
                        labelField='Instance ID',
+                       labelMaskDir: FilePath | dict | DirectoryDict = None,
                        includeCols=allOutputColumns,
                        prioritizeById=False,
                        returnLabelMapping=False,
@@ -214,9 +215,6 @@ class CompImgsDfExporter(AnnotationExporter):
     :param srcDir: Where images corresponding to this dataframe are kept. Source image
       filenames are interpreted relative to this directory if they are not absolute. Alternatively, can be a dict
       of name to np.ndarray image mappings
-    :param margin: How much padding to give around each component
-    :param marginAsPct: Whether the margin should be a percentage of the component size or
-      a raw pixel value.
     :param includeCols: Which columns to include in the export list
       pType: checklist
       limits: {cols}
@@ -224,6 +222,8 @@ class CompImgsDfExporter(AnnotationExporter):
       expanded: False
     :param labelField: See ComponentIO.exportLblPng. This label is provided in the output dataframe
       as well, if specified.
+    :param labelMaskDir: Similar to ``srcDir``, this is where label masks can be found. If not specified,
+      a new label mask is generated for each image based on its components in the exported component table
     :param prioritizeById: Since the label image export is only one channel (i.e. grayscale), problems arise when
       there is overlap between components. Which one should be on top? If `prioritizeById` is *True*, higher
       ids are always on top of lower ids. So, if ID 1 is a small component and ID 2 is a larger component completely
@@ -259,11 +259,12 @@ class CompImgsDfExporter(AnnotationExporter):
       - offset: Image (x,y) coordinate of the min component vertex.
     """
     if srcDir is None:
-      srcDir = Path('.')
-    srcDir = DirectoryDict(srcDir, allowAbsolute=True, readFunc=cvImread_rgb)
+      srcDir = Path()
+    imageReaderFunc = lambda file: cvImread_rgb(file, cv.IMREAD_UNCHANGED)
+    srcDir = DirectoryDict(srcDir, allowAbsolute=True, readFunc=imageReaderFunc, cacheOnRead=False)
     self.srcDir = srcDir
     # Label masks are programmatically generated so no need for a backing directory
-    self.labelMaskDir = {}
+    self.labelMaskDir = DirectoryDict(labelMaskDir, allowAbsolute=True, readFunc=imageReaderFunc, cacheOnRead=False)
     if resizeOpts is not None:
       cropperFunc = subImageFromVerts
     else:
@@ -284,11 +285,12 @@ class CompImgsDfExporter(AnnotationExporter):
   def createExportObj(self, **kwargs):
     return []
 
-  def bulkExport(self,
-                 compDf,
-                 exportObj,
-                 missingOk=None,
-                 **kwargs):
+  def bulkExport(
+    self,
+    compDf,
+    exportObj,
+    **kwargs
+  ):
     # imageShape is automatically inferred by the exporter
     kwargs.pop('imageShape', None)
     # File is taken care of in outer scope
@@ -296,7 +298,7 @@ class CompImgsDfExporter(AnnotationExporter):
     mappings = {}
 
     for fullImgName, miniDf in compDf.groupby(RTF.IMG_FILE): # type: str, pd.DataFrame
-      exportedComps, mapping = self._formatSingleImage(miniDf, fullImgName, missingOk, **kwargs)
+      exportedComps, mapping = self._formatSingleImage(miniDf, fullImgName, **kwargs)
       mappings[Path(fullImgName).name] = mapping
       exportObj.extend(exportedComps)
 
@@ -308,56 +310,73 @@ class CompImgsDfExporter(AnnotationExporter):
     self.mappings = mappings
     return exportObj, NO_ERRORS
 
-  def _formatSingleImage(self, compDf: pd.DataFrame, imageName, missingOk=False, **kwargs):
+  def _formatSingleImage(self, compDf: pd.DataFrame, imageName, labelMask=None, labelMapping=None, missingOk=False, **kwargs):
     exportObj = []
     img = self.srcDir.get(imageName)
     if img is None and not missingOk:
       raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), imageName)
     shape = img if img is None else img.shape[:2]
     # Make sure no options are duplicated
-    useKwargs = {**kwargs, **dict(returnLabelMapping=True, imageShape=shape)}
-    lblImg, mapping = self.exportLblPng(compDf, **useKwargs)
+    kwargs.update(imageShape=shape)
+    labelMask, labelMapping = self._resolveLabelMaskAndMapping(labelMask, labelMapping, compDf, imageName, **kwargs)
     if img is None:
-      img = np.zeros_like(lblImg)
-    self.invertedMap = pd.Series(mapping.index, mapping)
+      img = np.zeros_like(labelMask)
+    invertedMap = pd.Series(labelMapping.index, labelMapping)
     for row in pd_iterdict(compDf):
-      exportObj.append(self._formatSingleComp(row, image=img, labelImage=lblImg, **kwargs))
+      labelValue = invertedMap[row[kwargs.get('labelField')]]
+      exportObj.append(self._formatSingleComp(row, image=img, labelMask=labelMask, labelValue=labelValue, **kwargs))
 
-    return exportObj, mapping
+    return exportObj, labelMapping
 
-  def _formatSingleComp(self,
-                        inst: t.Any, *,
-                        image=None,
-                        labelImage=None,
-                        labelField=None,
-                        margin=None,
-                        marginAsPct=None,
-                        includeCols=None,
-                        prioritizeById=None,
-                        resizeOpts=None,
-                        returnStats=None,
-                        **_kwargs):
+  def _resolveLabelMaskAndMapping(self, labelMask, labelMapping, compDf, imageName, **lblPngKwargs):
+    """
+    Allows for any combination of missing mask, label mask, or both. Requires many edge cases, since
+    masks can come from user, directory object, or
+    """
+    lblPngKwargs.update(returnLabelMapping=True)
+    if labelMask is None:
+      labelMask =  self.labelMaskDir.get(imageName)
+    # Label mask can still be none if there is no source directory hit
+    generatedMapping = None
+    if labelMask is None:
+      labelMask, generatedMapping = self.exportLblPng(compDf, **lblPngKwargs)
+    if labelMapping is None:
+      if generatedMapping is not None:
+        labelMapping = generatedMapping
+      else:
+        labels = compDf[lblPngKwargs.get('labelField')]
+        labelMapping = self.exportLblPng.resolveMapping(labels, **lblPngKwargs)
+    return labelMask, labelMapping
+
+  def _formatSingleComp(
+    self,
+    inst: t.Any, *,
+    image=None,
+    labelMask=None,
+    labelField=None,
+    labelValue=None,
+    includeCols=None,
+    prioritizeById=None,
+    resizeOpts=None,
+    returnStats=None,
+    **_kwargs
+  ):
     out = {}
     allVerts = inst[RTF.VERTICES].stack()
     imageName = inst[RTF.IMG_FILE]
     if image is None:
       image = self.srcDir.get(imageName)
-    if labelImage is None:
-      labelImage = self.labelMaskDir.get(imageName)
-    if marginAsPct:
-      compImgSz = allVerts.max(0) - allVerts.min(0)
-      marginToUse = (compImgSz * (margin / 100)).astype(int)
-    else:
-      marginToUse = margin
+    if labelMask is None:
+      labelMask = self.labelMaskDir.get(imageName)
 
     returnStats = returnStats or resizeOpts.pop('returnStats', None)
     if returnStats:
       compImg, bounds, stats = self.cropperFunc(
-        image, allVerts, marginToUse, returnCoords=True, returnStats=returnStats, **resizeOpts
+        image, allVerts, returnCoords=True, returnStats=returnStats, **resizeOpts
       )
     else:
       compImg, bounds = self.cropperFunc(
-        image, allVerts, marginToUse, returnCoords=True, **resizeOpts
+        image, allVerts, returnCoords=True, **resizeOpts
       )
       stats = None
     useKeys = includeCols
@@ -381,13 +400,13 @@ class CompImgsDfExporter(AnnotationExporter):
     if 'labelMask' in useKeys:
       if prioritizeById:
         # ID indicates z-value, which is already the case for a label image
-        useImg = labelImage
+        useImg = labelMask
       else:
         # The current component should always be drawn on top
-        useImg = inst[RTF.VERTICES].toMask(labelImage.copy(),
-                                          float(self.invertedMap[lbl]),
-                                          asBool=False)
-      mask = self.cropperFunc(useImg, allVerts, marginToUse, returnCoords=False, **resizeOpts)
+        useImg = inst[RTF.VERTICES].toMask(labelMask.copy(),
+                                           float(labelValue),
+                                           asBool=False)
+      mask = self.cropperFunc(useImg, allVerts, returnCoords=False, **resizeOpts)
 
       out['labelMask'] = mask
 
