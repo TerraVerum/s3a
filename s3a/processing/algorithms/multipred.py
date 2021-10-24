@@ -1,3 +1,4 @@
+import copy
 import typing as t
 
 import cv2 as cv
@@ -7,7 +8,8 @@ from scipy.ndimage import maximum_filter
 
 from s3a.constants import PRJ_ENUMS, REQD_TBL_FIELDS as RTF
 from s3a.generalutils import getCroppedImg, bboxIou
-from s3a.structures import ComplexXYVertices
+from s3a.structures import ComplexXYVertices, XYVertices
+from utilitys import PrjParam
 from utilitys import ProcessIO, fns, AtomicProcess
 
 
@@ -133,3 +135,62 @@ def _cv_template_match(component: pd.Series, image: np.ndarray, viewbox: np.ndar
 
 def cv_template_match_factory():
   return _dispatchFactory(_cv_template_match)
+
+def make_grid_components(
+  image: np.ndarray,
+  components: pd.DataFrame,
+  viewbox: np.ndarray,
+  area='viewbox',
+  windowParam: int=5,
+  winType='Row/Col Divisions',
+  maxNumComponents=1000
+):
+  """
+  :param image: Main image
+  :param components: Reference components, needed to determine proper output columns
+  :param viewbox: zoomed-in bbox coordinates relative to the main image
+  :param area: Area to apply gridding
+  type: list
+  limits: ['image', 'viewbox']
+  :param windowParam: Number used during the calculation of window size. Its meaning changes depending on ``winType``
+  :param winType: If "Row/Col Divisions", the image area is divided into ``windowParam`` rows or columns,
+    selcting the number resulting in a greater number of divisions. For instance, if ``windowParam`` is 5 and
+    image shape is (500, 300, 3), winSize will be 60x60 since min(500/5, 300/5) is 60. If "Raw Size",
+    the window size is directly set to ``windowParam``.
+    type: list
+    limits: ['Row/Col Divisions', 'Raw Size']
+  :param maxNumComponents: To prevent instances where the window parameters create too many regions, the number
+    of outputs will be clipped to ``maxNumComponents``
+  """
+  offset = np.array([[0, 0]])
+  if area == 'viewbox':
+    image, coords = getCroppedImg(image, viewbox)
+    offset = coords[[0]]
+  imageH, imageW = image.shape[:2]
+  if winType == 'Row/Col Divisions':
+    winSize = np.min(np.asarray(image.shape[:2]) / windowParam).astype(int)
+  else:
+    winSize = windowParam
+  winSize = max(1, winSize)
+  winH = winW = winSize
+  spacing = winSize
+  rrange = np.arange(0, imageH, spacing)
+  crange = np.arange(0, imageW, spacing)
+  # Shorten number of loops by truncatnig rrange beyond max components
+  rrangeTruncate = int(np.ceil(maxNumComponents/len(crange)))
+  rrange = rrange[:rrangeTruncate]
+  boxes = []
+  for ii in rrange:
+    for jj in crange:
+      verts = np.array([[winW, winH]]) * [[0, 0], [0, 1], [1, 1], [1, 0]] + [[jj, ii]]
+      verts = np.clip(verts + offset, 0, [[imageW - 1, imageH - 1]]).astype(int).view(XYVertices)
+      boxes.append(ComplexXYVertices([verts]))
+  boxes = boxes[:maxNumComponents]
+  # Fill in other dummy fields based on passed in component dataframe fields. Assume input df has PrjParam headers
+  # since it should've come from a prediction input
+  df = pd.DataFrame(columns=components.columns)
+  numOutputs = len(boxes)
+  for field in components: # type: PrjParam
+    df[field] = [copy.copy(field.value) for _ in range(numOutputs)]
+  df[RTF.VERTICES] = boxes
+  return ProcessIO(components=df)

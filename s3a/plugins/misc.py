@@ -12,6 +12,7 @@ from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from s3a import models, XYVertices, ComplexXYVertices
 from s3a.constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF, PRJ_ENUMS, GEN_PROPS_DIR, SCHEMES_DIR, \
   SHORTCUTS_DIR
+from s3a.generalutils import getCroppedImg
 from s3a.logger import getAppLogger
 from s3a.models import s3abase
 from s3a.parameditors.quickloader import QuickLoaderEditor
@@ -321,19 +322,19 @@ class MultiPredictionsPlugin(ProcessorPlugin):
     self.mainImg = win.mainImg
     win.mainImg.toolsEditor.registerFunc(self.predictFromSelection, btnOpts=CNST.TOOL_PRED_SEL)
 
-  def makePrediction(self, comps: pd.DataFrame):
+  def makePrediction(self, comps: pd.DataFrame, **runKwargs):
     if self.win.mainImg.image is None:
       return
     vbRange = np.array(self.mainImg.getViewBox().viewRange()).T
     newComps = self.curProcessor.run(components=comps, image=self.win.mainImg.image,
-                                     viewbox=vbRange)
+                                     viewbox=vbRange, **runKwargs)
     if not isinstance(newComps, ProcessIO):
       newComps = ProcessIO(components=newComps)
     compsToAdd = newComps['components']
     if not len(compsToAdd):
       return
-    addType = newComps.get('addType', PRJ_ENUMS.COMP_ADD_AS_NEW)
-    self.mgr.addComps(compsToAdd, addType)
+    addType = runKwargs.get('addType') or newComps.get('addType', PRJ_ENUMS.COMP_ADD_AS_NEW)
+    return self.mgr.addComps(compsToAdd, addType)
 
 
   def predictFromSelection(self):

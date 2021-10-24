@@ -5,10 +5,11 @@ import pandas as pd
 import pytest
 from skimage import util
 
+from apptests.testingconsts import SAMPLE_IMG
 from s3a import ComplexXYVertices, REQD_TBL_FIELDS
 from s3a.generalutils import imgCornerVertices
 from s3a.processing import ImageProcess
-from s3a.processing.algorithms import multipred as mulp
+from s3a.processing.algorithms import multipred as mulp, make_grid_components
 from s3a.structures import XYVertices
 from s3a.processing.algorithms import imageproc as ip
 from conftest import SAMPLE_SMALL_IMG
@@ -110,3 +111,30 @@ def test_focused_dispatch(sampleComps):
   dispatched = mulp._dispatchFactory(dummy2, mulp._focusedResultConverter)
   result = dispatched(image=SAMPLE_SMALL_IMG, components=sampleComps)
   assert 'components' in result
+
+@pytest.mark.parametrize('area', ('viewbox', 'image'))
+@pytest.mark.parametrize('windowParam', [5, 500])
+@pytest.mark.parametrize('winType', ['Row/Col Divisions', 'Row Size'])
+@pytest.mark.parametrize('maxNumComponents', [10, 100])
+def test_grid(sampleComps, area, windowParam, winType, maxNumComponents):
+  comps = make_grid_components(
+    SAMPLE_IMG,
+    sampleComps,
+    np.array([[0, 0], [50,50]]),
+    area=area,
+    windowParam=windowParam,
+    winType=winType,
+    maxNumComponents=maxNumComponents
+  )
+  assert len(comps) <= maxNumComponents
+
+def test_empty_components(sampleComps):
+  assert np.array_equal(
+    make_grid_components(
+      SAMPLE_SMALL_IMG,
+      sampleComps.iloc[0:0],
+      np.array([[0, 0], [3,3]]),
+      area='image'
+    )['components'].columns,
+    sampleComps.columns
+  )
