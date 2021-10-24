@@ -574,7 +574,7 @@ class ProjectData(QtCore.QObject):
 
   @property
   def location(self):
-      return self.cfgFname.parent
+    return self.cfgFname.parent if self.cfgFname else None
   @property
   def imagesDir(self):
       return self.location/'images'
@@ -639,8 +639,6 @@ class ProjectData(QtCore.QObject):
     self.cfgFname = cfgFname
     cfg = self.cfg = baseCfgDict
 
-    self.annotationsDir.mkdir(exist_ok=True)
-    self.imagesDir.mkdir(exist_ok=True)
     self.clearImgs_anns()
 
     tableInfo = cfg.get('table-cfg', None)
@@ -653,9 +651,23 @@ class ProjectData(QtCore.QObject):
       tableDict = tableInfo
       tableName = cfgFname
     tableName = Path(tableName)
-    if not tableName.is_absolute():
+    if not tableName.is_absolute() and cfgFname:
       tableName = self.location/tableName
     self.tableData.loadCfg(tableName, tableDict, force=True)
+
+    if cfgFname:
+      self._hookupProjDirInfo()
+
+    self.sigCfgLoaded.emit()
+    return self.cfgFname
+
+  def _hookupProjDirInfo(self):
+    """
+    For projects that have backing files (i.e. the config is a file instead of a dict in memory), this function
+    handles creating images/annotations dirs, adding project images/annotations, and adding file watchers
+    """
+    self.annotationsDir.mkdir(exist_ok=True)
+    self.imagesDir.mkdir(exist_ok=True)
 
     allAddedImages = []
     with self.suppressSignals():
@@ -669,17 +681,15 @@ class ProjectData(QtCore.QObject):
         self.addFormattedAnnotation(file)
       # Leave out for now due to the large number of problems with lacking idempotence
       # self._addConfigAnnotations()
-      
+
     self._maybeEmit(self.sigAnnotationsAdded, list(self.imgToAnnMapping.values()))
 
-    self.sigCfgLoaded.emit()
     dirs = self.watcher.directories()
     if dirs:
       self.watcher.removePaths(dirs)
     self.watcher.addPaths([str(self.imagesDir), str(self.annotationsDir)])
     for ioType in PRJ_ENUMS.IO_EXPORT, PRJ_ENUMS.IO_IMPORT:
       self.compIo.updateOpts(ioType, srcDir=self.imagesDir)
-    return self.cfgFname
 
   @classmethod
   def create(cls, *, name: FilePath= f'./{PROJ_FILE_TYPE}', cfg: dict=None, parent: ProjectData=None):
