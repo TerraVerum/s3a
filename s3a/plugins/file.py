@@ -190,7 +190,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
     doctoredAll = AtomicProcess(exportWrapper(self.projData.exportAnnotations),
                                 docFunc=self.projData.exportAnnotations)
     self.registerPopoutFuncs([self.projData.exportProj, doctoredAll, doctoredCur],
-                         ['Project', 'All Annotations', 'Current Annotation'], btnOpts=CNST.TOOL_PROJ_EXPORT)
+                             ['Project', 'All Annotations', 'Current Annotation'], btnOpts=CNST.TOOL_PROJ_EXPORT)
     self._projImgMgr.hide()
     self._updateProjLbl()
     win.addTabbedDock(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self._projImgMgr)
@@ -213,9 +213,9 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       return
     _, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
     if (cfgFname is not None
-        and (absolutePath(cfgFname) != self.projData.cfgFname
-          or not pg.eq(cfgDict, self.projData.cfg)
-        )
+      and (absolutePath(cfgFname) != self.projData.cfgFname
+           or not pg.eq(cfgDict, self.projData.cfg)
+      )
     ):
       self.win.setMainImg(None)
       self.projData.loadCfg(cfgFname, cfgDict, force=True)
@@ -247,8 +247,8 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
       tableConfig = Path(tableConfig)
       self.projData.tableData.loadCfg(tableConfig)
     if (annotationFormat is not None
-        and annotationFormat in self.projData.compIo.importTypes
-        and annotationFormat in self.projData.compIo.exportTypes):
+      and annotationFormat in self.projData.compIo.importTypes
+      and annotationFormat in self.projData.compIo.exportTypes):
       self.projData.cfg['annotation-format'] = annotationFormat
 
 
@@ -577,20 +577,20 @@ class ProjectData(QtCore.QObject):
     return self.cfgFname.parent if self.cfgFname else None
   @property
   def imagesDir(self):
-      return self.location/'images'
+    return self.location/'images'
   @property
   def annotationsDir(self):
-      return self.location/'annotations'
+    return self.location/'annotations'
   @property
   def startup(self):
     return self.cfg['startup']
   @property
   def pluginCfg(self) -> Dict[str, str]:
-      return self.cfg['plugin-cfg']
+    return self.cfg['plugin-cfg']
 
   @property
   def tableData(self):
-      return self.compIo.tableData
+    return self.compIo.tableData
 
   def clearImgs_anns(self):
     oldImgs = self.images.copy()
@@ -634,7 +634,7 @@ class ProjectData(QtCore.QObject):
         warnPlgs.append(plgPath)
     if warnPlgs:
       warn(f'Some project plugins were specified, but could not be found:\n'
-                    f'{warnPlgs}', UserWarning)
+           f'{warnPlgs}', UserWarning)
 
     self.cfgFname = cfgFname
     cfg = self.cfg = baseCfgDict
@@ -978,7 +978,7 @@ class ProjectData(QtCore.QObject):
       cvImsave_rgb(newName, data)
     else:
       raise IOError(f'No image data associated with {name.name}. Either the file does not exist or no'
-                       f' image information was provided.')
+                    f' image information was provided.')
     if name in self.images:
       self.changeImgPath(name, newName)
       self._maybeEmit(self.sigImagesMoved, [(name, newName)])
