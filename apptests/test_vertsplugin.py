@@ -53,8 +53,8 @@ def test_registered_verts_funcs(vertsPlugin, app):
 
 def test_region_offset(vertsPlugin, sampleComps):
   vertsPlugin.updateRegionFromDf(sampleComps.iloc[[0]], offset=XYVertices([10000,10000]))
-  vMax = ComplexXYVertices.stackedMax(vertsPlugin.region.regionData[REQD_TBL_FIELDS.VERTICES])
-  assert max(vMax) > max(ComplexXYVertices.stackedMax(sampleComps[REQD_TBL_FIELDS.VERTICES]))
+  vMax = vertsPlugin.region.regionData[REQD_TBL_FIELDS.VERTICES].s3averts.max()
+  assert max(vMax) > max(sampleComps[REQD_TBL_FIELDS.VERTICES].s3averts.max())
 
 @pytest.mark.withcomps
 def test_accept_region(app, vertsPlugin):

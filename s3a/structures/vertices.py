@@ -6,6 +6,7 @@ from warnings import warn
 
 import cv2 as cv
 import numpy as np
+import pandas as pd
 
 from .typeoverloads import NChanImg, BlackWhiteImg
 
@@ -167,18 +168,6 @@ class ComplexXYVertices(list):
         return out, offset
       return out
 
-  @classmethod
-  def stackedMax(cls, complexVertList: Sequence[ComplexXYVertices]):
-    """
-    Returns the max along dimension 0 for a list of complex vertices
-    """
-    return np.vstack([v.stack() for v in complexVertList]).max(0)
-
-  @classmethod
-  def stackedMin(cls, complexVertList: Sequence[ComplexXYVertices]):
-    return np.vstack([v.stack() for v in complexVertList]).min(0)
-
-
   def filledVerts(self) -> ComplexXYVertices:
     """
     Retrieves all vertex lists corresponding to filled regions in the complex shape
@@ -314,3 +303,65 @@ class ComplexXYVertices(list):
     #  and "filledVerts()"
     outerLst = literal_eval(strObj)
     return ComplexXYVertices([XYVertices(lst) for lst in outerLst])
+
+
+@pd.api.extensions.register_series_accessor('s3averts')
+class S3AVertsAccessor:
+  def __init__(self, vertsSer: pd.Series):
+    self.verts = vertsSer
+
+  def max(self):
+    """
+    Returns the max along dimension 0 for a list of complex vertices
+    """
+    return np.vstack([v.stack() for v in self.verts]).max(0)
+
+  def min(self):
+    """
+    Returns the min along dimension 0 for a list of complex vertices
+    """
+    return np.vstack([v.stack() for v in self.verts]).min(0)
+
+  def split(self):
+    """
+    Makes a separate component for each distinct boundary in all selected components.
+    For instance, if two components are selected, and each has two separate circles as
+    vertices, then 4 total rows will exist after this operation.
+    """
+    newVerts = []
+    newIds = []
+    for idx, verts in self.verts.iteritems():
+      tmpMask = verts.toMask(asBool=False).astype('uint8')
+      nComps, ccompImg = cv.connectedComponents(tmpMask)
+      for ii in range(1, nComps):
+        newVerts.append(ComplexXYVertices.fromBinaryMask(ccompImg == ii))
+        newIds.append(idx)
+    return pd.Series(newVerts, index=newIds, name=self.verts.name)
+
+  def merge(self):
+    """
+    Forms one single ComplexXYVertices object from a series of ComplexXYVertices regions. Overlapping is allowed.
+    The output is determined by placing all vertices in a binary image and calling ``ComplexXYVertices.fromBinaryMask``
+    on the final mask.
+    """
+    # x-y -> row-col
+    maskShape = (self.max() + 1)[::-1]
+    mask = np.zeros(maskShape, bool)
+    for verts in self.verts:  # type: ComplexXYVertices
+      mask |= verts.toMask(tuple(maskShape))
+    return ComplexXYVertices.fromBinaryMask(mask)
+
+  def removeOverlap(self):
+    """
+    Makes sure all specified vertices have no overlap. Preference is given
+    in order of the given IDs, i.e. the last ID in the list is guaranteed to
+    keep its full shape.
+    """
+    wholeMask = np.zeros(self.max()[::-1] + 1, dtype='uint16')
+    for ii, verts in enumerate(self.verts, 1):
+       verts.toMask(wholeMask, ii, asBool=False)
+    outVerts = []
+    for ii in range(1, len(self.verts) + 1):
+      verts = ComplexXYVertices.fromBinaryMask(wholeMask == ii)
+      outVerts.append(verts)
+    return pd.Series(outVerts, index=self.verts.index, name=self.verts.name)

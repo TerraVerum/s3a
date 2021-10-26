@@ -284,18 +284,12 @@ class ComponentMgr(CompTableModel):
     if mergeIds is None or len(mergeIds) < 2:
       warn(f'Less than two components are selected, so "merge" is a no-op.', UserWarning)
       return
-    mergeComps: pd.DataFrame = self.compDf.loc[mergeIds].copy()
+    mergeComps: pd.DataFrame = self.compDf.loc[mergeIds]
     if keepId is None:
       keepId = mergeIds[0]
 
     keepInfo = mergeComps.loc[keepId].copy()
-    allVerts = [v.stack() for v in mergeComps[RTF.VERTICES]]
-    maskShape = np.max(np.vstack(allVerts), 0)[::-1] + 1
-    mask = np.zeros(maskShape, bool)
-    for verts in mergeComps[RTF.VERTICES]: # type: ComplexXYVertices
-      mask |= verts.toMask(tuple(maskShape))
-    newVerts = ComplexXYVertices.fromBinaryMask(mask)
-    keepInfo[RTF.VERTICES] = newVerts
+    keepInfo[RTF.VERTICES] = mergeComps[RTF.VERTICES].s3averts.merge()
 
     deleted = self.rmComps(mergeComps.index, emitChange=False)['deleted']
     toEmit = self.addComps(keepInfo.to_frame().T, PRJ_ENUMS.COMP_ADD_AS_MERGE, emitChange=False)
@@ -306,7 +300,7 @@ class ComponentMgr(CompTableModel):
     self.addComps(mergeComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
 
   @DASM.undoable('Split Components')
-  def splitCompVertsById(self, splitIds: OneDArr):
+  def splitCompVertsById(self, splitIds:  OneDArr):
     """
     Makes a separate component for each distinct boundary in all selected components.
     For instance, if two components are selected, and each has two separate circles as
@@ -316,19 +310,10 @@ class ComponentMgr(CompTableModel):
 
     :param splitIds: Ids of components to split up
     """
-    splitComps = self.compDf.loc[splitIds].copy()
-    newComps_lst = []
-    for _, comp in splitComps.iterrows():
-      verts: ComplexXYVertices = comp[RTF.VERTICES]
-      tmpMask = verts.toMask(asBool=False).astype('uint8')
-      nComps, ccompImg = cv.connectedComponents(tmpMask)
-      newVerts = []
-      for ii in range(1, nComps):
-        newVerts.append(ComplexXYVertices.fromBinaryMask(ccompImg == ii))
-      childComps = pd.concat([comp.to_frame().T]*(nComps-1))
-      childComps[RTF.VERTICES] = newVerts
-      newComps_lst.append(childComps)
-    newComps = pd.concat(newComps_lst)
+    splitComps = self.compDf.loc[splitIds]
+    splitVerts = splitComps[RTF.VERTICES].s3averts.split()
+    newComps = splitComps.loc[splitVerts.index].copy()
+    newComps[RTF.VERTICES] = splitVerts
     # Keep track of which comps were removed and added by this op
     outDict = self.rmComps(splitComps.index)
     outDict.update(self.addComps(newComps))
@@ -345,11 +330,5 @@ class ComponentMgr(CompTableModel):
     IDs, i.e. the largest ID is guaranteed to keep its full original shape.
     """
     overlapComps = self.compDf.loc[overlapIds].copy()
-    allVerts = np.vstack([v.stack() for v in overlapComps[RTF.VERTICES]])
-    wholeMask = np.zeros(allVerts.max(0)[::-1] + 1, dtype='uint16')
-    for ii, (_, comp) in enumerate(overlapComps.iterrows(), 1):
-      comp[RTF.VERTICES].toMask(wholeMask, ii, asBool=False)
-    for ii, compId in enumerate(overlapIds, 1):
-      verts = ComplexXYVertices.fromBinaryMask(wholeMask == ii)
-      overlapComps.at[compId, RTF.VERTICES] = verts
+    overlapComps[RTF.VERTICES] = overlapComps[RTF.VERTICES].s3averts.removeOverlap()
     self.addComps(overlapComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)

@@ -100,7 +100,7 @@ class LblPngExporter(AnnotationExporter):
       # Without any components the image is non-existant
       if len(compDf) == 0:
         raise ValueError('imageShape cannot be *None* if no components are present')
-      vertMax = ComplexXYVertices.stackedMax(compDf[RTF.VERTICES])
+      vertMax = compDf[RTF.VERTICES].s3averts.max()
       imageShape = tuple(vertMax[::-1] + 1)
 
     return self._forwardMetadata(locals(), readMapping=readMapping)
