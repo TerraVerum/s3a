@@ -82,19 +82,6 @@ class BoundScatterPlot(pg.ScatterPlotItem):
       spotsAtPos[ii] = checkSymb.contains(pos)
     return spotsAtPos
 
-  def _updateMaxSpotSizes(self, **kwargs):
-    w = -1
-    try:
-      for symbol in self.data['symbol']:
-        br = symbol.boundingRect()
-        w = max(w, br.width()*2, br.height()*2)
-    except AttributeError:
-      # Don't have a painter symbol
-      return super()._updateMaxSpotSizes(**kwargs)
-    self._maxSpotWidth = max(self._maxSpotPxWidth, w)
-    self._maxSpotPxWidth = w
-    self.bounds = [None, None]
-
 class RightPanViewBox(pg.ViewBox):
   def mouseDragEvent(self, ev: MouseDragEvent, axis=None):
     btns = QtCore.Qt.MouseButton

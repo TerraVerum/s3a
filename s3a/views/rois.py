@@ -49,6 +49,14 @@ class PlotDataROI(BoundScatterPlot):
     symbol, pos = symbolFromVerts(ComplexXYVertices([connectData]))
     self.setData(*pos.T, symbol=[symbol])
 
+  def dataBounds(self, ax, frac=1.0, orthoRange=None):
+    if frac >= 1.0 and orthoRange is None and self.bounds[ax] is not None:
+      return self.bounds[ax]
+    if not len(self.vertices):
+      return (None, None)
+    self.bounds[ax] = self.vertices[:, ax].min() - 2, self.vertices[:, ax].max() + 2
+    return super().dataBounds(ax, frac, orthoRange)
+
 
   def setRoiPoints(self, pts: XYVertices=None):
     if pts is None:
