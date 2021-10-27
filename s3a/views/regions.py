@@ -72,7 +72,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
       container=self.props)
       setattr(self, 'updateColors', proc)
 
-  def __init__(self, parent=None):
+  def __init__(self, parent=None, disableMouseClick=False):
     super().__init__(size=1, pxMode=False)
     # Wrapping in atomic process means when users make changes to properties, these are maintained when calling the
     # function internally with no parameters
@@ -90,11 +90,12 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     # this will be called anyway when a selection box is made in the main image, disable
     # mouse click listener to avoid doing all that work for nothing.
     # self.centroidPlts.mouseClickEvent = lambda ev: None
-    self.mouseClickEvent = lambda ev: None
-    # Also disable sigClicked. This way, users who try connecting to this signal won't get
-    # code that runs but never triggers
-    # self.centroidPlts.sigClicked = None
-    self.sigPointsClicked = None
+    if disableMouseClick:
+      self.mouseClickEvent = lambda ev: None
+      # Also disable sigClicked. This way, users who try connecting to this signal won't get
+      # code that runs but never triggers
+      # self.centroidPlts.sigClicked = None
+      self.sigClicked = None
 
   def resetRegionList(self, newRegionDf: Optional[df]=None,
                       labelField:PrjParam=RTF.INST_ID):

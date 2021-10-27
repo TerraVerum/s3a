@@ -210,7 +210,7 @@ class XYVerticesDelegate(SceneItemContainer, FieldDisplayDelegate):
 class ComplexXYVerticesDelegate(SceneItemContainer, FieldDisplayDelegate):
   LBL_PARAM = PrjParam('complex delegate label')
   def __init__(self):
-    self.region = MultiRegionPlot()
+    self.region = MultiRegionPlot(disableMouseClick=True)
     self.items = [self.region]
   
   def setData(self, comps: pd.DataFrame, field: PrjParam, **kwargs):

@@ -100,9 +100,14 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
 
   def __initEditorParams__(self, shared: SharedAppSettings):
     self.props = ParamContainer()
-    shared.generalProps.registerProps([PRJ_CONSTS.PROP_COMP_SEL_BHV,
-                                      PRJ_CONSTS.PROP_FIELD_INFO_ON_SEL],
-                                            container=self.props)
+    boundaryOnly, _ = shared.generalProps.registerProps(
+      [PRJ_CONSTS.PROP_COMP_SEL_BHV, PRJ_CONSTS.PROP_FIELD_INFO_ON_SEL],
+      container=self.props,
+      asProperty=False
+    )
+    def _onChange(param, val):
+      self.regionPlot.boundaryOnly = val
+    boundaryOnly.sigValueChanged.connect(_onChange)
     self.sharedAttrs = shared
 
   def __init__(self, compMgr: ComponentMgr, mainImg: MainImage,
@@ -113,7 +118,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     self._filter = filterEditor
     self._compTbl = compTbl
     self._compMgr = compMgr
-    self.regionPlot = MultiRegionPlot()
+    self.regionPlot = MultiRegionPlot(disableMouseClick=True)
     self.displayedIds = np.array([], dtype=int)
     self.selectedIds = np.array([], dtype=int)
     self.labelCol = REQD_TBL_FIELDS.INST_ID
@@ -388,7 +393,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
       checkPlt = self.regionPlot
     if len(selection) == 1 or np.abs(selection[0] - selection[1]).sum() < 0.01:
       qtPoint = QtCore.QPointF(*selection[0])
-      selectedSpots = checkPlt.pointsAt(qtPoint, self.props[PRJ_CONSTS.PROP_COMP_SEL_BHV]=='Boundary Only')
+      selectedSpots = checkPlt.pointsAt(qtPoint)
       selectedIds = [spot.data() for spot in selectedSpots]
     else:
       selectedIds = checkPlt.boundsWithin(selection)

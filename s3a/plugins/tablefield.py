@@ -37,7 +37,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
   def __init__(self):
     super().__init__()
-    self.region = MultiRegionPlot()
+    self.region = MultiRegionPlot(disableMouseClick=True)
     self.region.hide()
     self.firstRun = True
     self.playbackWindow = RegionHistoryViewer()
