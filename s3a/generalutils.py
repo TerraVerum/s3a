@@ -529,7 +529,7 @@ def subImageFromVerts(
   if np.isscalar(margin):
     margin = [margin, margin]
   margin = np.asarray(margin)
-  if np.issubdtype(margin.dtype, float):
+  if np.issubdtype(margin.dtype, np.float_):
     margin = (margin*verts.ptp(0)).astype(int)
 
   for ax in 0, 1:
