@@ -39,7 +39,7 @@ def getAltRequirements():
       # Test should raise assertion error on failure
       scope = dict(VERSION=pkg_resources.parse_version)
       exec(obj, scope, scope)
-    except (AssertionError, ModuleNotFoundError):
+    except:
       # Module not available or test went badly, assume the worst
       altRequired.append(module)
   return altRequired
