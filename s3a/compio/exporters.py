@@ -368,7 +368,7 @@ class CompImgsDfExporter(AnnotationExporter):
       image = self.srcDir.get(imageName)
     if labelMask is None:
       labelMask = self.labelMaskDir.get(imageName)
-
+    resizeOpts = resizeOpts.copy()
     returnStats = returnStats or resizeOpts.pop('returnStats', None)
     if returnStats:
       compImg, bounds, stats = self.cropperFunc(
