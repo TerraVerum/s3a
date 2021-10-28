@@ -484,7 +484,7 @@ class CompImgsZipExporter(CompImgsDfExporter):
     # Prevent merge error by renaming index
     # INST_ID.name has to be used instead of raw INST_ID due to strange pandas issue
     # throwing a TypeError: keywords must be a string
-    outDf: pd.DataFrame = self.compDf.drop([RTF.VERTICES], axis=1).rename(str, axis=1)
+    outDf: pd.DataFrame = self.compDf.drop([RTF.VERTICES, RTF.INST_ID], axis=1).rename(str, axis=1)
     outDf = outDf.merge(
       extractedImgs, on=RTF.INST_ID.name
     )
