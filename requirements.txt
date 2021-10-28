@@ -1,12 +1,10 @@
 typing_extensions; python_version < '3.8'
 importlib_metadata; python_version < '3.8'
-opencv_python>=4.1.2.30
 numpy
 pandas
 scipy
 scikit-image
-PyQt5>=5.11
-pyqtgraph>=0.12.1
+pyqtgraph>=0.12.3
 Pillow
 qdarkstyle
 matplotlib
