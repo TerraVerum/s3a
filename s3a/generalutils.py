@@ -744,7 +744,7 @@ def pd_toHtmlWithStyle(df: pd.DataFrame, file: FilePath=None, style: str=None, *
   """
   if not style:
     return df.to_html(file, **exportArgs)
-  htmlDf = df.to_html(None)
+  htmlDf = df.to_html(None, **exportArgs)
   style = inspect.cleandoc(
     f"""
     <style>
