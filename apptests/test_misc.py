@@ -50,7 +50,6 @@ def test_pred(app):
   predPlg: MultiPredictionsPlugin = app.clsToPluginMapping[MultiPredictionsPlugin]
   # Correctness of algo already tested elsewhere, run to assert no errors
   predPlg.makePrediction(app.exportableDf)
-  predPlg.predictFromSelection()
 
 def test_vertices_offset():
   subVerts = [[50, 50]], [[100,100], [200, 200], [300,300]]

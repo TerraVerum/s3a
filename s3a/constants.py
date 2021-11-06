@@ -250,7 +250,7 @@ class _PrjConsts(PrjParamGroup):
   # --------------------------
   # GLOBAL PREDICTIONS
   # --------------------------
-  TOOL_PRED_SEL     : PrjParam = newParam('Predict From Selection', f'{SHORTCUT_BASE},M,P', icon=str(ICON_DIR/'predict.svg'))
+  TOOL_MULT_PRED     : PrjParam = newParam('Make Multi-Prediction', f'{SHORTCUT_BASE},M,P', icon=str(ICON_DIR / 'predict.svg'))
 
 
   # --------------------------

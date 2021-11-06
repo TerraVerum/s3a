@@ -88,7 +88,7 @@ def test_template_dispatch(app):
   dummyComp.at[dummyComp.index[0], REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices([templateVerts], coerceListElements=True)
   tm = mulp.cv_template_match_factory()
   out = tm(image=x, components=dummyComp, viewbox=np.zeros((2,2), int), area='image')
-  assert len(out['components']) == 1
+  assert len(out['components']) == 2
   assert np.all(out['scores'] == 1)
 
   with pytest.raises(ValueError):
@@ -101,7 +101,7 @@ def test_template_dispatch(app):
 def test_focused_dispatch(sampleComps):
   def dummyFunc(component: pd.Series, image=None):
     return ProcessIO(components=fns.serAsFrame(component), image=image)
-  dispatched = mulp._dispatchFactory(dummyFunc, mulp._focusedResultConverter)
+  dispatched = mulp._dispatchFactory(dummyFunc, resultConverter=mulp._focusedResultConverter)
   result = dispatched(image=SAMPLE_SMALL_IMG, components=sampleComps)
   assert 'addType' in result
   assert sampleComps is not result['components']

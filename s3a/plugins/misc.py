@@ -320,14 +320,27 @@ class MultiPredictionsPlugin(ProcessorPlugin):
     super().attachWinRef(win)
     self.mgr = win.compMgr
     self.mainImg = win.mainImg
-    win.mainImg.toolsEditor.registerFunc(self.predictFromSelection, btnOpts=CNST.TOOL_PRED_SEL)
+    win.mainImg.toolsEditor.registerFunc(self.makePrediction, btnOpts=CNST.TOOL_MULT_PRED, ignoreKeys=['comps'])
 
-  def makePrediction(self, comps: pd.DataFrame, **runKwargs):
+  def makePrediction(self, comps: pd.DataFrame=None, **runKwargs):
     if self.win.mainImg.image is None:
       return
+    if comps is None:
+      comps = self.win.exportableDf
+    # It is possible for a previously selected id to be deleted before a redraw occurs, in which case the
+    # selected id won't correspond to a valid index. Resolve using intersection with all components
+    selectedIds = np.intersect1d(self.win.compDisplay.selectedIds, self.win.compMgr.compDf.index)
     vbRange = np.array(self.mainImg.getViewBox().viewRange()).T
-    newComps = self.curProcessor.run(components=comps, image=self.win.mainImg.image,
-                                     viewbox=vbRange, **runKwargs)
+    image = self.win.mainImg.image
+    newComps = self.curProcessor.run(
+      components=comps,
+      fullComponents=comps,
+      fullImage=image,
+      image=image,
+      viewbox=vbRange,
+      selectedIds=selectedIds,
+      **runKwargs
+    )
     if not isinstance(newComps, ProcessIO):
       newComps = ProcessIO(components=newComps)
     compsToAdd = newComps['components']
@@ -336,14 +349,6 @@ class MultiPredictionsPlugin(ProcessorPlugin):
     addType = runKwargs.get('addType') or newComps.get('addType', PRJ_ENUMS.COMP_ADD_AS_NEW)
     return self.mgr.addComps(compsToAdd, addType)
 
-
-  def predictFromSelection(self):
-    # It is possible for a previously selected id to be deleted before a redraw occurs, in which case the
-    # selected id won't correspond to a valid index. Resolve using intersection with all components
-    selectedIds = np.intersect1d(self.win.compDisplay.selectedIds, self.win.compMgr.compDf.index)
-    # if len(selectedIds) == 0:
-    #   return
-    self.makePrediction(self.mgr.compDf.loc[selectedIds])
 
   def lastRunAnalytics(self):
     raise NotImplementedError
