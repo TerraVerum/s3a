@@ -9,8 +9,10 @@ from skimage.measure import regionprops, label
 from skimage.morphology import flood
 
 from s3a.constants import PRJ_ENUMS
-from s3a.generalutils import cornersToFullBoundary, getCroppedImg, imgCornerVertices, \
+from s3a.generalutils import (
+  cornersToFullBoundary, getCroppedImg, imgCornerVertices,
   showMaskDiff, tryCvResize
+)
 from s3a.structures import BlackWhiteImg, XYVertices, ComplexXYVertices, NChanImg, GrayImg
 from utilitys import fns
 from utilitys.processing import *
@@ -303,11 +305,8 @@ def morph_op(image: NChanImg, radius=1, op: str='', shape='rectangle'):
   outImg = cv.morphologyEx(image.copy(), opType, strel)
   return ProcessIO(image=outImg)
 
-def opening_factory():
-  return AtomicProcess(morph_op, 'Opening', op='MORPH_OPEN')
-
-def closing_factory():
-  return AtomicProcess(morph_op, 'Closing', op='MORPH_CLOSE')
+opening = AtomicProcess(morph_op, 'Opening', op='MORPH_OPEN')
+closing = AtomicProcess(morph_op, 'Closing', op='MORPH_CLOSE')
 
 def keep_largest_comp(image: NChanImg):
   if not np.any(image):
@@ -338,9 +337,7 @@ def convert_to_squares(image: NChanImg):
 def _grabcutResultToMask(gcResult):
   return np.where((gcResult==2)|(gcResult==0), False, True)
 
-class _CvGrabcut(AtomicProcess):
-
-
+class CvGrabcut(AtomicProcess):
   def __init__(self, **kwargs):
     super().__init__(self.grabcut, 'Cv Grabcut', **kwargs)
 
@@ -379,22 +376,24 @@ class _CvGrabcut(AtomicProcess):
     outMask = np.where((mask==2)|(mask==0), False, True)
     return ProcessIO(labels=outMask, fgdModel=fgdModel, bgdModel=bgdModel)
 
-def cv_grabcut_factory():
-  return _CvGrabcut()
+class QuickshiftSeg(AtomicProcess):
+  def __init__(self, **kwargs):
+    kwargs.update(docFunc=seg.quickshift)
+    super().__init__(self.segmentation, 'Quickshift Segmentation', **kwargs)
 
-def quickshift_seg(image: NChanImg, ratio=1.0, max_dist=10.0, kernel_size=5,
+  @staticmethod
+  def segmentation(image: NChanImg, ratio=1.0, max_dist=10.0, kernel_size=5,
                    sigma=0.0):
-  # For max_dist of 0, the input isn't changed and it takes a long time
-  key = (max_dist, kernel_size, sigma)
-  if max_dist == 0:
-    # Make sure output is still 1-channel
-    segImg = image.mean(2).astype(int) if image.ndim > 2 else image
-  else:
-    if image.ndim < 3:
-      image = np.tile(image[:,:,None], (1,1,3))
-    segImg = seg.quickshift(image, ratio=ratio, kernel_size=kernel_size, max_dist=max_dist, sigma=sigma)
-  return ProcessIO(labels=segImg)
-quickshift_seg.__doc__ = seg.quickshift.__doc__
+    # For max_dist of 0, the input isn't changed and it takes a long time
+    key = (max_dist, kernel_size, sigma)
+    if max_dist == 0:
+      # Make sure output is still 1-channel
+      segImg = image.mean(2).astype(int) if image.ndim > 2 else image
+    else:
+      if image.ndim < 3:
+        image = np.tile(image[:,:,None], (1,1,3))
+      segImg = seg.quickshift(image, ratio=ratio, kernel_size=kernel_size, max_dist=max_dist, sigma=sigma)
+    return ProcessIO(labels=segImg)
 
 # Taken from example page: https://scikit-image.org/docs/dev/auto_examples/segmentation/plot_morphsnakes.html
 def morph_acwe(image: NChanImg, initialCheckerSize=6, iters=35, smoothing=3):
@@ -500,9 +499,17 @@ def region_grow_segmentation(image: NChanImg, fgVerts: XYVertices, seedThresh=10
 
   return ProcessIO(image=outMask)
 
-def slic_segmentation(image, n_segments=100, compactness=10.0, sigma=0, min_size_factor=0.5, max_size_factor=3):
-  return ProcessIO(labels=seg.slic(**locals(), start_label=1))
-slic_segmentation.__doc__ = seg.slic.__doc__
+slic_segmentation = AtomicProcess(
+  seg.slic,
+  'SLIC Segmentation',
+  ignoreKeys=[
+    'max_iter', 'spacing', 'multichannel','convert2lab',
+    'enforce_connectivity', 'slic_zero', 'start_label', 'mask'
+  ],
+  sigma=dict(limits=[0, None], step=0.1, type='float'),
+  start_label=1,
+  wrapWith=['labels']
+)
 
 @fns.dynamicDocstring(inters=[attr for attr in vars(cv) if attr.startswith('INTER_')])
 def cv_resize(image: np.ndarray, newSize: Union[float, tuple]=0.5, asRatio=True, interpolation='INTER_CUBIC'):

@@ -43,7 +43,7 @@ top:
 
   Quickshift:
     - Default Preprocess
-    - Quickshift Seg
+    - Quickshift Segmentation
     - Binarize Labels
     - Default Postprocess
 
