@@ -6,9 +6,10 @@ import numpy as np
 import pandas as pd
 from scipy.ndimage import maximum_filter
 
-from s3a.constants import PRJ_ENUMS, REQD_TBL_FIELDS as RTF
-from s3a.generalutils import getCroppedImg, bboxIou
-from s3a.structures import ComplexXYVertices, XYVertices
+from ...constants import PRJ_ENUMS, REQD_TBL_FIELDS as RTF
+from ... import generalutils as gutils
+from ...structures import ComplexXYVertices, XYVertices
+from ...compio.componentio import defaultIo
 from utilitys import PrjParam
 from utilitys import ProcessIO, fns, AtomicProcess
 
@@ -18,7 +19,7 @@ def get_component_images(image: np.ndarray, components: pd.DataFrame):
   From a main image and dataframe of components, returns a result which holds the
   subregion within the image each component occupies.
   """
-  imgs = [getCroppedImg(image, verts.stack(), 0) for verts in components[RTF.VERTICES]]
+  imgs = [gutils.getCroppedImg(image, verts.stack(), 0) for verts in components[RTF.VERTICES]]
   return ProcessIO(subimages=imgs)
 
 def _focusedResultConverter(result, component: pd.Series):
@@ -37,7 +38,10 @@ def _focusedResultConverter(result, component: pd.Series):
   out['addType'] = PRJ_ENUMS.COMP_ADD_AS_MERGE
   return out
 
-def _dispatchFactory(func, resultConverter: t.Callable[[t.Union[dict, t.Any], pd.Series], ProcessIO]=None):
+def _dispatchFactory(
+  func,
+  resultConverter: t.Callable[[t.Union[dict, t.Any], pd.Series], ProcessIO]=None
+):
   def dispatcher(image: np.ndarray, components: pd.DataFrame, **kwargs):
     compList = []
     kwargs.update(image=image)
@@ -78,9 +82,14 @@ def pts_to_components(matchPts: np.ndarray, component: pd.Series):
 
 
 @fns.dynamicDocstring(metricTypes=[d for d in dir(cv) if d.startswith('TM')])
-def _cv_template_match(component: pd.Series, image: np.ndarray, viewbox: np.ndarray,
-                       threshold=0.8, metric='TM_CCOEFF_NORMED', area='viewbox',
-                       refOverlapThresh=0.5):
+def _cv_template_match(
+  component: pd.Series,
+  image: np.ndarray,
+  viewbox: np.ndarray,
+  threshold=0.8,
+  metric='TM_CCOEFF_NORMED',
+  area='viewbox'
+):
   """
   Performs template matching using default opencv functions
   :param component: Template component
@@ -97,15 +106,10 @@ def _cv_template_match(component: pd.Series, image: np.ndarray, viewbox: np.ndar
     helpText: Where to apply the new components
     pType: list
     limits: ['image', 'viewbox']
-  :param refOverlapThresh:
-    helpText: "How much overlap can exist between the found bounding box and reference box. This helps
-    prevent detecting the original as a new component"
-    limits: [0,1]
-    step: 0.1
   """
-  template, templateBbox = getCroppedImg(image, component[RTF.VERTICES].stack())
+  template, templateBbox = gutils.getCroppedImg(image, component[RTF.VERTICES].stack())
   if area == 'viewbox':
-    image, coords = getCroppedImg(image, viewbox)
+    image, coords = gutils.getCroppedImg(image, viewbox)
   else:
     coords = np.array([[0,0], image.shape[:2][::-1]])
   grayImg = image if image.ndim < 3 else cv.cvtColor(image, cv.COLOR_RGB2GRAY)
@@ -127,10 +131,7 @@ def _cv_template_match(component: pd.Series, image: np.ndarray, viewbox: np.ndar
   # Don't allow matches on top of originals
   ious = []
   for pt in matchPts:
-    ious.append(bboxIou(templateBbox, np.vstack([pt, pt + templateShp[::-1]])))
-  keep = np.array(ious) < refOverlapThresh
-  scores = scores[keep]
-  matchPts = matchPts[keep]
+    ious.append(gutils.bboxIou(templateBbox, np.vstack([pt, pt + templateShp[::-1]])))
   return ProcessIO(scores=scores, matchImg=maxFilter, components=pts_to_components(matchPts, component))
 
 def cv_template_match_factory():
@@ -164,7 +165,7 @@ def make_grid_components(
   """
   offset = np.array([[0, 0]])
   if area == 'viewbox':
-    image, coords = getCroppedImg(image, viewbox)
+    image, coords = gutils.getCroppedImg(image, viewbox)
     offset = coords[[0]]
   imageH, imageW = image.shape[:2]
   if winType == 'Row/Col Divisions':
@@ -194,3 +195,67 @@ def make_grid_components(
     df[field] = [copy.copy(field.value) for _ in range(numOutputs)]
   df[RTF.VERTICES] = boxes
   return ProcessIO(components=df)
+
+def get_selected_components(components: pd.DataFrame, selectedIds: np.ndarray):
+  return ProcessIO(components=components.loc[selectedIds])
+
+def remove_overlapping_components(
+  components: pd.DataFrame,
+  fullComponents: pd.DataFrame,
+  overlapThreshold=0.5,
+  removeOverlapWithExisting=True,
+  removeOverlapWithNew=True
+):
+  """
+  Discards overlapping components. Can either check against existing components, other new components, or both
+  :param fullComponents: Complete list of original components
+  :param components: Working list of (newly created) components
+  :param overlapThreshold: Percentage overlap between any new component and existing component over which the new
+    component will be discarded
+    limits: [0,1]
+    step: 0.1
+  :param removeOverlapWithExisting: If *True*, new components overlapping with pre-existing components will be removed
+  :param removeOverlapWithNew: If *True*, new components overlapping with other new components will be removed
+  """
+  if not len(components):
+    # Nothing to do...
+    return ProcessIO(components=components)
+  if removeOverlapWithExisting:
+    outShape = pd.concat([fullComponents, components], ignore_index=True)[RTF.VERTICES].s3averts.max()[::-1]
+    referenceMask = defaultIo.exportLblPng(fullComponents, imageShape=outShape)
+    referenceMask[referenceMask > 0] = 1
+  else:
+    outShape = components[RTF.VERTICES].s3averts.max()[::-1]
+    referenceMask = np.zeros(outShape, 'uint8')
+  keepComps = []
+  for idx, comp in components.iterrows():
+    # Check the indexable area with a component footprint
+    verts: ComplexXYVertices = comp[RTF.VERTICES]
+    checkArea, coords = gutils.getCroppedImg(referenceMask, verts.stack(), coordsAsSlices=True)
+    vertsMask = verts.removeOffset().toMask(checkArea.shape)
+    # Don't count on pixels outside the current footprint
+    if np.count_nonzero(checkArea & vertsMask)/checkArea.size < overlapThreshold:
+      keepComps.append(comp)
+    if removeOverlapWithNew:
+      # Make sure no new checks can overlap with this component
+      referenceMask[coords] |= vertsMask
+  # Force columns to match in the event output dataframe is empty
+  return ProcessIO(components=pd.DataFrame(keepComps, columns=components.columns))
+
+
+
+def simplify_components(
+  components: pd.DataFrame
+):
+  """
+  Simplifies a list of components by merging adjacent/overlapping regions
+  :param components: Dataframe of components to simplify
+  """
+  if not len(components):
+    outComps = components
+  else:
+    merged = components[RTF.VERTICES].s3averts.merge()
+    newVerts = pd.Series([merged], index=[components.index[0]]).s3averts.split()
+    outComps = components.loc[newVerts.index].copy()
+    outComps[RTF.VERTICES] = newVerts
+  return ProcessIO(components=outComps)
