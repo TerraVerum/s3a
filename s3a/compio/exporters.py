@@ -541,7 +541,6 @@ class SerialExporter(AnnotationExporter):
       'index': False,
     }
     outPath = Path(file)
-    outPath.parent.mkdir(exist_ok=True, parents=True)
     exporter = outPath.suffix.lower().replace('.', '')
 
     defaultExportParams.update(kwargs)
