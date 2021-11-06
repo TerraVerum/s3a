@@ -40,7 +40,8 @@ def _focusedResultConverter(result, component: pd.Series):
 
 def _dispatchFactory(
   func,
-  resultConverter: t.Callable[[t.Union[dict, t.Any], pd.Series], ProcessIO]=None
+  resultConverter: t.Callable[[t.Union[dict, t.Any], pd.Series], ProcessIO]=None,
+  name=None,
 ):
   def dispatcher(image: np.ndarray, components: pd.DataFrame, **kwargs):
     compList = []
@@ -61,7 +62,7 @@ def _dispatchFactory(
     out = ProcessIO(**result, components=outComps)
     return out
 
-  proc = AtomicProcess(dispatcher, docFunc=func, ignoreKeys=['component'])
+  proc = AtomicProcess(dispatcher, name, docFunc=func, ignoreKeys=['component'])
   proc.input['components'] = ProcessIO.FROM_PREV_IO
   return proc
 
@@ -184,7 +185,7 @@ def make_grid_components(
   for ii in rrange:
     for jj in crange:
       verts = np.array([[winW, winH]]) * [[0, 0], [0, 1], [1, 1], [1, 0]] + [[jj, ii]]
-      verts = np.clip(verts + offset, 0, [[imageW - 1, imageH - 1]]).astype(int).view(XYVertices)
+      verts = np.clip(verts, 0, [[imageW - 1, imageH - 1]]).astype(int).view(XYVertices) + offset
       boxes.append(ComplexXYVertices([verts]))
   boxes = boxes[:maxNumComponents]
   # Fill in other dummy fields based on passed in component dataframe fields. Assume input df has PrjParam headers
@@ -195,6 +196,22 @@ def make_grid_components(
     df[field] = [copy.copy(field.value) for _ in range(numOutputs)]
   df[RTF.VERTICES] = boxes
   return ProcessIO(components=df)
+
+def simplify_components(
+  components: pd.DataFrame
+):
+  """
+  Simplifies a list of components by merging adjacent/overlapping regions
+  :param components: Dataframe of components to simplify
+  """
+  if not len(components):
+    outComps = components
+  else:
+    merged = components[RTF.VERTICES].s3averts.merge()
+    newVerts = pd.Series([merged], index=[components.index[0]]).s3averts.split()
+    outComps = components.loc[newVerts.index].copy()
+    outComps[RTF.VERTICES] = newVerts
+  return ProcessIO(components=outComps)
 
 def get_selected_components(components: pd.DataFrame, selectedIds: np.ndarray):
   return ProcessIO(components=components.loc[selectedIds])
@@ -242,20 +259,47 @@ def remove_overlapping_components(
   # Force columns to match in the event output dataframe is empty
   return ProcessIO(components=pd.DataFrame(keepComps, columns=components.columns))
 
+def model_prediction_factory():
+  return _dispatchFactory(categorical_prediction)
 
-
-def simplify_components(
-  components: pd.DataFrame
+def single_categorical_prediction(
+  component: pd.Series,
+  image: np.ndarray,
+  model,
+  expectedImageShape=None
 ):
   """
-  Simplifies a list of components by merging adjacent/overlapping regions
-  :param components: Dataframe of components to simplify
+  :param component: Component on which categorical mask prediction should be run
+  :param image: Image data to index
+  :param model: Model which will run prediction. If ``expectedImageShape`` is not specified, ``model.input_shape[1:3]``
+    will be used
+  :param expectedImageShape: Specifies the image shape the model requires to run a prediction
+    ignore: True
   """
-  if not len(components):
-    outComps = components
-  else:
-    merged = components[RTF.VERTICES].s3averts.merge()
-    newVerts = pd.Series([merged], index=[components.index[0]]).s3averts.split()
-    outComps = components.loc[newVerts.index].copy()
-    outComps[RTF.VERTICES] = newVerts
-  return ProcessIO(components=outComps)
+  if expectedImageShape is None:
+    expectedImageShape = model.input_shape[1:3]
+  verts = component[RTF.VERTICES].stack()
+  resized_image, coords, stats = gutils.subImageFromVerts(
+    image, verts,
+    returnCoords=True,
+    returnStats=True,
+    shape=expectedImageShape[:2],
+    interpolation=cv.INTER_NEAREST
+  )
+
+  resized_image = np.array([resized_image])
+  prediction = model.predict(resized_image)
+  prediction = np.argmax(prediction[0], axis = -1)
+  prediction[prediction > 0] = 1
+  prediction = gutils.inverseSubImage(prediction.astype('uint8'), stats, gutils.coordsToBbox(verts))
+  out = component.copy()
+  paddingOffset = verts.min(0) - stats['subImageBbox'][0]
+  totalOffset = -(coords[0] + paddingOffset).astype(int)
+  out[RTF.VERTICES] = ComplexXYVertices.fromBinaryMask(prediction).removeOffset(totalOffset)
+  #return np.random.random((image.shape[:2])) > 0
+  return ProcessIO(components=fns.serAsFrame(out), addType=PRJ_ENUMS.COMP_ADD_AS_MERGE)
+
+categorical_prediction = _dispatchFactory(
+  single_categorical_prediction,
+  name='Categorical Prediction'
+)
