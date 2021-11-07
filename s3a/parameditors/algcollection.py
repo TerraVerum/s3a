@@ -244,13 +244,18 @@ class AlgCollection(ParamEditor):
       self.addProcess(out, top=add is PRJ_ENUMS.PROC_ADD_TOP, force=allowOverwrite)
     return out
 
+  # Several unwarranted false positives on type info
+  # noinspection PyTypeChecker
   @classmethod
   def parseProcQualname(cls, procName: str, **kwargs):
-    # False positive
-    # noinspection PyTypeChecker
+
+    # Special case: Qualname-loaded procs should be added under their qualname
+    # otherwise they won't be rediscoverable after saving->restarting S3A
     proc = pydoc.locate(procName)
+    kwargs.update(name=procName)
     if isinstance(proc, ProcessStage):
-      return proc
+      proc = copy.deepcopy(proc)
+      proc.name = procName
     elif (
       inspect.isclass(proc)
       and issubclass(proc, (AtomicProcess, NestedProcess))
@@ -284,8 +289,8 @@ class AlgCollection(ParamEditor):
       self.parseProcQualname,
       self.searchModulesForProc
     ]
-    for f in searchFuncs:
-      proc = f(procName, **kwargs)
+    for loader in searchFuncs:
+      proc = loader(procName, **kwargs)
       if proc is not None:
         break
     else:
@@ -378,11 +383,11 @@ class AlgCollection(ParamEditor):
       if (
         name.lower().endswith('factory')
         or (
-          inspect.isclass(attr)
-          and issubclass(attr, (AtomicProcess, NestedProcess))
-          # Ensure "import AtomicProcess" does not pass this check
-          and attr not in [AtomicProcess, NestedProcess]
-        )
+        inspect.isclass(attr)
+        and issubclass(attr, (AtomicProcess, NestedProcess))
+        # Ensure "import AtomicProcess" does not pass this check
+        and attr not in [AtomicProcess, NestedProcess]
+      )
       ):
         try:
           attr = attr(**factoryArgs)
