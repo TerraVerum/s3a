@@ -311,6 +311,7 @@ class AlgCollection(ParamEditor):
   def parseProcDict(self, procDict: dict, topFirst=False):
     # 1. First key is always the process name, values are new inputs for any matching process
     # 2. Second key is whether the process is disabled
+    procDict = procDict.copy()
     procName, updateArgs = next(iter(procDict.items()))
     procDict.pop(procName)
     proc = self.parseProcName(procName, topFirst=topFirst)
