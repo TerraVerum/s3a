@@ -18,7 +18,7 @@ from s3a.models import s3abase
 from s3a.parameditors.quickloader import QuickLoaderEditor
 from s3a.plugins.base import ProcessorPlugin
 from s3a.shared import SharedAppSettings
-from utilitys import ParamEditorPlugin, ProcessIO, widgets as uw, ParamEditor, ParamContainer, ShortcutParameter
+from utilitys import ParamEditorPlugin, ProcessIO, widgets as uw, ParamEditor, ParamContainer, ShortcutParameter, fns
 from utilitys.params.parameditor import RunOpts
 
 
@@ -54,7 +54,7 @@ class MainImagePlugin(ParamEditorPlugin):
           verts = verts.mean(0, keepdims=True)
         # Make sure to check vertices plugin regions since they suppress disp's regions for focused ids
         # Must be done first, since a no-find in disp's regions will deselect them
-        with uw.makeDummySignal(win.compTbl, 'sigSelectionChanged'):
+        with fns.makeDummySignal(win.compTbl, 'sigSelectionChanged'):
           # Second call should handle the true selection signal
           disp.reflectSelectionBoundsMade(verts, self.win.vertsPlg.region)
           disp.reflectSelectionBoundsMade(verts, clearExisting=False)

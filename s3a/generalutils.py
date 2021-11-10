@@ -18,6 +18,7 @@ from utilitys import PrjParam, ProcessStage
 # Needs to be visible outside this file
 # noinspection PyUnresolvedReferences
 from utilitys.fns import hierarchicalUpdate
+from utilitys import fns
 from utilitys.typeoverloads import FilePath
 from .constants import PRJ_ENUMS
 from .structures import TwoDArr, XYVertices, ComplexXYVertices, NChanImg, BlackWhiteImg
@@ -218,7 +219,7 @@ def getCroppedImg(
     margin=0,
     coordsAsSlices=False,
     returnCoords=True
-) -> (np.ndarray, np.ndarray):
+) -> Tuple[np.ndarray, np.ndarray]:
   """
   Crops an image according to the specified vertices such that the returned image does not extend
   past vertices plus margin (including other bboxes if specified). All bboxes and output coords
@@ -633,13 +634,11 @@ def _getAffineSubregion(
     padBorderOpts: dict=None,
     **affineKwargs
 ):
-  # Add a few pixels of padding since sometimes a cutoff still does occur at fractional degree scalings
   totalBbox = coordsToBbox(totalBbox, addOneToMax=False)
-  # Fractional midpoints cause lots of hassle when applying affine transforms
-  # An easy solution is to simply ensure an integer midpoint by extending the bounds in those cases
-  totalBbox[1, (totalBbox.ptp(0) % 2) == 1] += 1
-  # It's also common for rotation angles to cut off fractions of a pixel during warping. This is
+  # It's common for rotation angles to cut off fractions of a pixel during warping. This is
   # easily resolved by adding just a few more pixels to the total box
+  totalBbox[0] -= 1
+  totalBbox[1] += 1
   hasRotation = not np.isclose(rotationDeg, 0)
   xyImageShape = image.shape[:2][::-1]
   # It's possible for mins and maxs to be outside image regions
@@ -668,7 +667,7 @@ def _getAffineSubregion(
     )
   inter = affineKwargs.pop('interpolation', cv.INTER_NEAREST)
   if hasRotation:
-    midpoint = transformedBbox.mean(0) - 0.5 - subImageBbox[0]
+    midpoint = transformedBbox.mean(0) - subImageBbox[0]
     M = cv.getRotationMatrix2D(midpoint, rotationDeg, 1)
     rotated = cv.warpAffine(subImage, M, subImage.shape[:2][::-1], flags=inter, **affineKwargs)
   else:
@@ -758,3 +757,26 @@ def pd_toHtmlWithStyle(df: pd.DataFrame, file: FilePath=None, style: str=None, *
       ofile.write(htmlDf)
   else:
     return htmlDf
+
+def _cvtImage(file, ext='png', replace=True):
+  if file.suffix[1:] == ext:
+    return
+  try:
+    cv.imwrite(str(file.with_suffix(f'.{ext}')), cv.imread(str(file)))
+    if replace:
+      file.unlink()
+  except Exception as ex:
+    return file, ex
+
+def convertImages(globstr:str='*.*', ext='png', replace=True, folder: FilePath=None):
+  if folder is None:
+    folder = Path()
+  folder = Path(folder)
+  files = list(folder.glob(globstr))
+  ret = fns.mproc_apply(_cvtImage, files, 'Converting Files', extraArgs=(ext, replace))
+  errs = [f'{r[0].name}: {r[1]}' for r in ret if r is not None]
+  if errs:
+    print(
+      f'Conversion errors occurred in the following files:\n'
+      + '\n'.join(errs)
+    )

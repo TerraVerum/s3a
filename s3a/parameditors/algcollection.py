@@ -18,7 +18,6 @@ from s3a.shims import typing_extensions as t_e
 from utilitys import NestedProcess, RunOpts, ProcessIO
 from utilitys import ParamEditor, NestedProcWrapper, fns, ProcessStage, AtomicProcess
 from utilitys.typeoverloads import FilePath
-from utilitys.widgets import makeDummySignal
 
 Signal = QtCore.Signal
 _procDict = t.Dict[str, t.List[t.Union[str, dict]]]
@@ -61,7 +60,7 @@ class AlgParamEditor(ParamEditor):
     self.clctn.sigChangesApplied.connect(lambda: procSelector.setLimits(list(self.clctn.topProcs)))
     self.clctn.sigChangesApplied.emit({})
     def onChange(name):
-      with makeDummySignal(procSelector, 'sigValueChanged'):
+      with fns.makeDummySignal(procSelector, 'sigValueChanged'):
         procSelector.setValue(name)
         # Manually set item labels since valueChange was forcefully disconnected
         for item in procSelector.items:

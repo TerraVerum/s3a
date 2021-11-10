@@ -325,7 +325,8 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     if imgData is not None:
       self.mainImg.setImage(imgData)
     else:
-      self.mainImg.setImage(file)
+      # Alpha channel usually causes difficulties with image proesses
+      self.mainImg.setImage(file, stripAlpha=True)
     self.srcImgFname = file
 
     self.clearBoundaries()
