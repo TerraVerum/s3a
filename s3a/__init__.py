@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pkg_resources import parse_version
 import sys
 
 import pyqtgraph as pg
@@ -11,6 +12,17 @@ __all__ = ['appInst', 'S3A', 'REQD_TBL_FIELDS',
            'ProjectData', '__version__', 'PRJ_ENUMS', 'TableData']
 
 pg.setConfigOptions(imageAxisOrder='row-major')
+
+# OpenCV can be satisfied by many different libraries, so check for it early with a helpful error message
+try:
+    import cv2
+    assert parse_version(cv2.__version__) >= parse_version('4.1.2.30')
+
+except (ImportError, AssertionError):
+    raise ImportError(
+      'S3A requires OpenCV (cv2) >= 4.1.2.30. This can come from "opencv-python-headless" (preferred),'
+      ' "opencv-python", "opencv-contrib-python", etc.'
+    )
 
 from .__version__ import __version__
 

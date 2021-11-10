@@ -1,2 +1,0 @@
-opencv-python-headless>=4.1.2.30 # test import cv2; assert VERSION(cv2.__version__) >= VERSION('4.1.2.30')
-PyQt5>=5.12.0                    # test from pydoc import locate as _; assert any(VERSION(_(f'{lib}.__version__')  or '') >= VERSION('5.12.0') for lib in ['PyQt5', 'PyQt6', 'PySide2', 'PySide6'])

@@ -1,10 +1,9 @@
 from pathlib import Path
 
-import pkg_resources
 from setuptools import setup, find_packages
 
 __version__ = ''
-line = open(Path(__file__).parent/f's3a/__version__.py').readline()
+line = open(Path(__file__).parent/'s3a/__version__.py').readline()
 exec(line)
 
 def _mltGlob(curDir, *globs):
@@ -25,31 +24,10 @@ def getRequirements():
       required.append(line.strip('\n'))
   return required
 
-def getAltRequirements():
-  altRequired = []
-  for req in here.joinpath('alt-requirements.txt').open('r').readlines():
-    parts = req.split('# test ')
-    module = parts[0].strip()
-    if len(parts) < 2:
-      # No test available
-      altRequired.append(module)
-    obj = parts[1].strip()
-    # noinspection PyBroadException
-    try:
-      # Test should raise assertion error on failure
-      scope = dict(VERSION=pkg_resources.parse_version)
-      exec(obj, scope, scope)
-    except:
-      # Module not available or test went badly, assume the worst
-      altRequired.append(module)
-  return altRequired
-
-
 # Get the long description from the README file
 long_description = (here / 'README.md').read_text(encoding='utf-8')
 
-INSTALL_REQUIRES = getRequirements() + getAltRequirements()
-
+INSTALL_REQUIRES = getRequirements()
 
 if __name__ == '__main__':
   setup(
@@ -67,8 +45,10 @@ if __name__ == '__main__':
         's3a-gui = s3a.__main__:main_cli',
       ]
     },
-
     install_requires=INSTALL_REQUIRES,
+    extras_require={
+      'full': ['opencv-python-headless>=4.1.2.30', 'PyQt5>=5.13.0']
+    },
     include_package_data=True,
     url='https://gitlab.com/ficsresearch/s3a',
     download_url='https://gitlab.com/ficsresearch/s3a',

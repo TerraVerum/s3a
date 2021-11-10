@@ -16,11 +16,19 @@ ___
 
 ## Installation
 
-The easiest method for installing `s3a` is via `pip` after cloning the repository:
+The easiest method for installing `s3a` is via `pip` after cloning the repository, or directly from pypi:
 
 ```bash
 git clone https://gitlab.com/ficsresearch/s3a
 pip install -e ./s3a
+
+# Or from pypi using "pip install s3a"
+```
+
+Note that a version of OpenCV and Qt binding are required for S3A to work. These can be installed for you with the "turnkey" option:
+```bash
+pip install -e ./s3a[full]
+# Or "pip install s3a[full]"
 ```
 
 ## Running the App
