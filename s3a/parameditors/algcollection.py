@@ -243,6 +243,15 @@ class AlgCollection(ParamEditor):
       self.addProcess(out, top=add is PRJ_ENUMS.PROC_ADD_TOP, force=allowOverwrite)
     return out
 
+  @staticmethod
+  def _shallowCopyProcess(proc):
+    out = copy.copy(proc)
+    # Regular dict can be copied, parameters should be deep copied
+    for attr in 'input', 'result': # 'defaultInput' should be unmodified and therefore doesn't need a copy
+      io: ProcessIO = getattr(proc, attr)
+      setattr(out, attr, copy.copy(io))
+    return out
+
   # Several unwarranted false positives on type info
   # noinspection PyTypeChecker
   @classmethod
@@ -253,7 +262,7 @@ class AlgCollection(ParamEditor):
     proc = pydoc.locate(procName)
     kwargs.update(name=procName)
     if isinstance(proc, ProcessStage):
-      proc = copy.deepcopy(proc)
+      proc = cls._shallowCopyProcess(proc)
       proc.name = procName
     elif (
       inspect.isclass(proc)
@@ -299,7 +308,7 @@ class AlgCollection(ParamEditor):
     if not isinstance(proc, ProcessStage):
       proc = self.parseProcStages(proc, procName)
     else:
-      proc = copy.deepcopy(proc)
+      proc = self._shallowCopyProcess(proc)
       # Default to disableale stages. For non-disablable, use parseDict
       proc.allowDisable = True
     # Make sure to cache newly discovered procs
