@@ -249,6 +249,9 @@ def remove_overlapping_components(
     # Check the indexable area with a component footprint
     verts: ComplexXYVertices = comp[RTF.VERTICES]
     checkArea, coords = gutils.getCroppedImg(referenceMask, verts.stack(), coordsAsSlices=True)
+    # Prediction is entirely outside the image
+    if checkArea.size <= 0:
+      continue
     vertsMask = verts.removeOffset().toMask(checkArea.shape)
     # Don't count on pixels outside the current footprint
     if np.count_nonzero(checkArea & vertsMask)/checkArea.size < overlapThreshold:
