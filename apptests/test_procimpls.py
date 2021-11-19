@@ -101,14 +101,14 @@ def test_template_dispatch(app):
 def test_focused_dispatch(sampleComps):
   def dummyFunc(component: pd.Series, image=None):
     return ProcessIO(components=fns.serAsFrame(component), image=image)
-  dispatched = mulp._dispatchFactory(dummyFunc, resultConverter=mulp._focusedResultConverter)
+  dispatched = mulp.ProcessDispatcher(dummyFunc, resultConverter=mulp.focusedResultConverter)
   result = dispatched(image=SAMPLE_SMALL_IMG, components=sampleComps)
   assert 'addType' in result
   assert sampleComps is not result['components']
   assert len(result['components']) == len(sampleComps)
   def dummy2(component: pd.Series, image):
     return image.mean(2) > 0
-  dispatched = mulp._dispatchFactory(dummy2, mulp._focusedResultConverter)
+  dispatched = mulp.ProcessDispatcher(dummy2, mulp.focusedResultConverter)
   result = dispatched(image=SAMPLE_SMALL_IMG, components=sampleComps)
   assert 'components' in result
 

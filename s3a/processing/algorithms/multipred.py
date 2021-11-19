@@ -22,7 +22,7 @@ def get_component_images(image: np.ndarray, components: pd.DataFrame):
   imgs = [gutils.getCroppedImg(image, verts.stack(), 0) for verts in components[RTF.VERTICES]]
   return ProcessIO(subimages=imgs)
 
-def _focusedResultConverter(result, component: pd.Series):
+def focusedResultConverter(result, component: pd.Series):
   out = result
   if not isinstance(result, ProcessIO):
     out = ProcessIO(image=result)
@@ -38,21 +38,32 @@ def _focusedResultConverter(result, component: pd.Series):
   out['addType'] = PRJ_ENUMS.COMP_ADD_AS_MERGE
   return out
 
-def _dispatchFactory(
-  func,
-  resultConverter: t.Callable[[t.Union[dict, t.Any], pd.Series], ProcessIO]=None,
-  name=None,
-):
-  def dispatcher(image: np.ndarray, components: pd.DataFrame, **kwargs):
+class ProcessDispatcher(AtomicProcess):
+  def __init__(
+    self,
+    func,
+    resultConverter: t.Callable[[t.Union[dict, t.Any], pd.Series], ProcessIO]=None,
+    **kwargs
+  ):
+    self.singleRunner = func
+    self.resultConverter = resultConverter
+    kwargs.setdefault('docFunc', func)
+    ignores = list(kwargs.setdefault('ignoreKeys', []))
+    ignores.append('component')
+    kwargs['ignoreKeys'] = ignores
+    super().__init__(self.dispatcher, **kwargs)
+    self.input['components'] = ProcessIO.FROM_PREV_IO
+
+  def dispatcher(self, image: np.ndarray, components: pd.DataFrame, **kwargs):
     compList = []
     kwargs.update(image=image)
     result = ProcessIO()
     for ii, comp in components.iterrows():
       kwargs.update(component=comp)
       # TODO: Determine appropriate behavior. For now, just remember last result metadata other than comps
-      result = func(**kwargs)
-      if resultConverter is not None:
-        result = resultConverter(result, comp)
+      result = self.singleRunner(**kwargs)
+      if self.resultConverter is not None:
+        result = self.resultConverter(result, comp)
       compList.append(result.pop('components'))
     if compList:
       # Concat fails with empty list
@@ -61,10 +72,6 @@ def _dispatchFactory(
       outComps = components.drop(components.index).copy()
     out = ProcessIO(**result, components=outComps)
     return out
-
-  proc = AtomicProcess(dispatcher, name, docFunc=func, ignoreKeys=['component'])
-  proc.input['components'] = ProcessIO.FROM_PREV_IO
-  return proc
 
 def pts_to_components(matchPts: np.ndarray, component: pd.Series):
   numOutComps = len(matchPts)
@@ -83,7 +90,7 @@ def pts_to_components(matchPts: np.ndarray, component: pd.Series):
 
 
 @fns.dynamicDocstring(metricTypes=[d for d in dir(cv) if d.startswith('TM')])
-def _cv_template_match(
+def cv_template_match_single(
   component: pd.Series,
   image: np.ndarray,
   viewbox: np.ndarray,
@@ -135,8 +142,7 @@ def _cv_template_match(
     ious.append(gutils.bboxIou(templateBbox, np.vstack([pt, pt + templateShp[::-1]])))
   return ProcessIO(scores=scores, matchImg=maxFilter, components=pts_to_components(matchPts, component))
 
-def cv_template_match_factory():
-  return _dispatchFactory(_cv_template_match)
+cv_template_match = ProcessDispatcher(cv_template_match_single, name='Cv Template Match')
 
 def make_grid_components(
   image: np.ndarray,
@@ -263,30 +269,32 @@ def remove_overlapping_components(
   return ProcessIO(components=pd.DataFrame(keepComps, columns=components.columns))
 
 def model_prediction_factory():
-  return _dispatchFactory(categorical_prediction)
+  return ProcessDispatcher(categorical_prediction)
 
 def single_categorical_prediction(
   component: pd.Series,
   image: np.ndarray,
   model,
-  expectedImageShape=None
+  inputShape=None
 ):
   """
   :param component: Component on which categorical mask prediction should be run
   :param image: Image data to index
   :param model: Model which will run prediction. If ``expectedImageShape`` is not specified, ``model.input_shape[1:3]``
     will be used
-  :param expectedImageShape: Specifies the image shape the model requires to run a prediction
+  :param inputShape: Specifies the image shape the model requires to run a prediction
     ignore: True
   """
-  if expectedImageShape is None:
-    expectedImageShape = model.input_shape[1:3]
+  if inputShape is None:
+    raise ValueError('"inputShape" must be specified either as a (h, w) tuple or string eval with namespace "model=model"')
+  elif isinstance(inputShape, str):
+    inputShape = eval(inputShape, dict(model=model))
   verts = component[RTF.VERTICES].stack()
   resized_image, coords, stats = gutils.subImageFromVerts(
     image, verts,
     returnCoords=True,
     returnStats=True,
-    shape=expectedImageShape[:2],
+    shape=inputShape[:2],
     interpolation=cv.INTER_NEAREST
   )
 
@@ -302,7 +310,7 @@ def single_categorical_prediction(
   #return np.random.random((image.shape[:2])) > 0
   return ProcessIO(components=fns.serAsFrame(out), addType=PRJ_ENUMS.COMP_ADD_AS_MERGE)
 
-categorical_prediction = _dispatchFactory(
+categorical_prediction = ProcessDispatcher(
   single_categorical_prediction,
   name='Categorical Prediction'
 )
