@@ -32,4 +32,5 @@ def EXTERNAL_PLUGINS():
   return externPlgs
 
 def addExternalPlugin(pluginClass: typing.Type[ParamEditorPlugin]):
-  _nonEntryPointExternalPlugins.append(pluginClass)
+  if pluginClass not in _nonEntryPointExternalPlugins:
+    _nonEntryPointExternalPlugins.append(pluginClass)
