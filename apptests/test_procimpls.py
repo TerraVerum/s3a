@@ -86,7 +86,7 @@ def test_template_dispatch(app):
   dummyComp = app.compIo.tableData.makeCompDf(1)
   templateVerts = XYVertices([[0, 0], [templateSize, templateSize]])
   dummyComp.at[dummyComp.index[0], REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices([templateVerts], coerceListElements=True)
-  tm = mulp.cv_template_match_factory()
+  tm = mulp.cv_template_match
   out = tm(image=x, components=dummyComp, viewbox=np.zeros((2,2), int), area='image')
   assert len(out['components']) == 2
   assert np.all(out['scores'] == 1)
