@@ -143,7 +143,7 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
     self.maybeBuildRoi(ev)
     if not ev.isAccepted():
       super().mousePressEvent(ev)
-    self.lastClickPos = ev.pos()
+    self.lastClickPos = ev.position() if hasattr(ev, 'position') else ev.localPos()
 
   def mouseDoubleClickEvent(self, ev: QtGui.QMouseEvent):
     if self.regionMover.active:
@@ -169,10 +169,11 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
       self.maybeBuildRoi(ev)
 
       # Special case: Panning
-      if (self.lastClickPos == ev.pos()
+      eventPos = ev.position() if hasattr(ev, 'position') else ev.localPos()
+      if (self.lastClickPos == eventPos
           and self.drawAction == CNST.DRAW_ACT_PAN
           and not self.regionMover.active):
-        pos = self.imgItem.mapFromScene(ev.pos())
+        pos = self.imgItem.mapFromScene(eventPos)
         xx, yy, = pos.x(), pos.y()
         # Simulate a click-wide boundary selection so points can be registered in pan mode
         pt = XYVertices([[xx, yy]], dtype=float)

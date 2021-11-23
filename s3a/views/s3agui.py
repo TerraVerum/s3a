@@ -101,7 +101,7 @@ class S3A(S3ABase):
     self.setCentralWidget(centralWidget)
     layout = QtWidgets.QVBoxLayout(centralWidget)
 
-    self.toolbarWidgets: Dict[PrjParam, List[QtWidgets.QAction]] = defaultdict(list)
+    self.toolbarWidgets: Dict[PrjParam, List[QtGui.QAction]] = defaultdict(list)
     layout.addWidget(self.mainImg)
 
     self.tblFieldToolbar.setObjectName('Table Field Plugins')

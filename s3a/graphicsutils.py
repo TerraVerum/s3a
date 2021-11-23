@@ -27,13 +27,13 @@ def disableAppDuringFunc(func):
   return disableApp
 
 def create_addMenuAct(mainWin: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, title: str, asMenu=False) \
-    -> Union[QtWidgets.QMenu, QtWidgets.QAction]:
+    -> Union[QtWidgets.QMenu, QtGui.QAction]:
   menu = None
   if asMenu:
     menu = QtWidgets.QMenu(title, mainWin)
     act = menu.menuAction()
   else:
-    act = QtWidgets.QAction(title)
+    act = QtGui.QAction(title)
   parentMenu.addAction(act)
   if asMenu:
     return menu
@@ -100,7 +100,7 @@ class DropList(QtWidgets.QListWidget):
     self.setAcceptDrops(True)
     self.setSelectionMode(self.ExtendedSelection)
     seq = QtGui.QKeySequence(QtCore.Qt.Key.Key_Delete)
-    self.delShc = QtWidgets.QShortcut(seq, self, self.deleteSelected)
+    self.delShc = QtGui.QShortcut(seq, self, self.deleteSelected)
 
   def deleteSelected(self):
     selectedIdxs = self.selectionModel().selectedIndexes()

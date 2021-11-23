@@ -93,10 +93,11 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
         and ev.button() == QtCore.Qt.MouseButton.LeftButton):
       self.removeLock(self)
     if self.locked: return False
+    eventPos = ev.position() if hasattr(ev, 'position') else ev.localPos()
     if imgItem is not None:
-      posRelToImg = imgItem.mapFromScene(ev.pos())
+      posRelToImg = imgItem.mapFromScene(eventPos)
     else:
-      posRelToImg = ev.pos()
+      posRelToImg = eventPos
     # Form of rate-limiting -- only simulate click if the next pixel is at least one away
     # from the previous pixel location
     xyCoord = XYVertices([[posRelToImg.x(), posRelToImg.y()]], dtype=float)

@@ -23,7 +23,7 @@ class BoundScatterPlot(pg.ScatterPlotItem):
 
   # Not working at the moment :/
   # def mouseMoveEvent(self, ev):
-  #   if self.pointsAt(ev.pos()):
+  #   if self.pointsAt(ev.position() if hasattr(ev, 'position') else ev.localPos()):
   #     self.setCursor(self.hoverCursor)
   #   else:
   #     self.unsetCursor()
