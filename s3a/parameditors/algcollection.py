@@ -244,12 +244,23 @@ class AlgCollection(ParamEditor):
     return out
 
   @staticmethod
-  def _shallowCopyProcess(proc):
-    out = copy.copy(proc)
-    # Regular dict can be copied, parameters should be deep copied
-    for attr in 'input', 'result': # 'defaultInput' should be unmodified and therefore doesn't need a copy
-      io: ProcessIO = getattr(proc, attr)
-      setattr(out, attr, copy.copy(io))
+  def _deepCopyProcShallowCopyIo(proc):
+    """
+    Inputs/outputs get regenerated each run cycle, and can be potentially large. No need to deep copy them
+    every run. Instead, deep copy the internal state of a process and add a shallow copy of the inputs
+    """
+    attrs = {}
+    for attr in 'input', 'result', 'defaultInput':
+      attrs[attr] = getattr(proc, attr)
+      setattr(proc, attr, None)
+    try:
+      out = copy.deepcopy(proc)
+    finally:
+      # Force re-attachment of original process attributes
+      for attr in attrs:
+        setattr(proc, attr, attrs[attr])
+    for attr in attrs:
+      setattr(out, attr, copy.copy(attrs[attr]))
     return out
 
   # Several unwarranted false positives on type info
@@ -262,7 +273,7 @@ class AlgCollection(ParamEditor):
     proc = pydoc.locate(procName)
     kwargs.update(name=procName)
     if isinstance(proc, ProcessStage):
-      proc = cls._shallowCopyProcess(proc)
+      proc = cls._deepCopyProcShallowCopyIo(proc)
       proc.name = procName
     elif (
       inspect.isclass(proc)
@@ -308,7 +319,7 @@ class AlgCollection(ParamEditor):
     if not isinstance(proc, ProcessStage):
       proc = self.parseProcStages(proc, procName)
     else:
-      proc = self._shallowCopyProcess(proc)
+      proc = self._deepCopyProcShallowCopyIo(proc)
       # Default to disableale stages. For non-disablable, use parseDict
       proc.allowDisable = True
     # Make sure to cache newly discovered procs
