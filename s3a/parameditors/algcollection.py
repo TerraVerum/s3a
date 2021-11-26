@@ -96,7 +96,7 @@ class AlgParamEditor(ParamEditor):
 
   def saveParamValues(self, saveName: str=None, paramState: dict=None, *, includeDefaults=False, **kwargs):
     """
-    The algorithm editor also needs to store information about the selected algorithm, so lump
+    The algorithm editor also needs to store information about the selected process, so lump
     this in with the other parameter information before calling default save.
     """
     proc = self.curProcessor.processor
@@ -108,16 +108,20 @@ class AlgParamEditor(ParamEditor):
       paramState['modules'] = self.clctn.includeModules
     self.clctn.loadParamValues(self.clctn.stateName, paramState)
     clctnState = self.clctn.saveParamValues(saveName, blockWrite=True)
-    paramState = {'Selected Algorithm': self.curProcessor.algName, **clctnState}
+    paramState = {'active': self.curProcessor.algName, **clctnState}
     return super().saveParamValues(saveName, paramState, includeDefaults=includeDefaults, **kwargs)
 
   def loadParamValues(self, stateName: t.Union[str, Path],
                       stateDict: dict=None, **kwargs):
     stateDict = self._parseStateDict(stateName, stateDict)
-    procName = stateDict.pop('Selected Algorithm', None)
+    # Check also for deprecated 'selected algorithm' key
+    if 'Selected Algorithm' in stateDict:
+      warnings.warn('"Selected Algorithm" is a deprecated key, use "active" instead', DeprecationWarning)
+      stateDict['active'] = stateDict.pop('Selected Algorithm')
+    procName = stateDict.pop('active', None)
     if 'Parameters' in stateDict:
       warnings.warn('"Parameters" is deprecated for a loaded state. In the future, set "top", "primitive", etc. at the'
-                    ' top dictionary level along with "Selected Algorithm"', DeprecationWarning)
+                    ' top dictionary level along with "active"', DeprecationWarning)
       stateDict = stateDict['Parameters']
     if not procName:
       procName = next(iter(self.clctn.topProcs))
