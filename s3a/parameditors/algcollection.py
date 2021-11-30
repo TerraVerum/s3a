@@ -247,14 +247,24 @@ class AlgCollection(ParamEditor):
       self.addProcess(out, top=add is PRJ_ENUMS.PROC_ADD_TOP, force=allowOverwrite)
     return out
 
-  @staticmethod
-  def _deepCopyProcShallowCopyIo(proc):
+  @classmethod
+  def _deepCopyProcShallowCopyIo(cls, proc) -> ProcessStage:
     """
     Inputs/outputs get regenerated each run cycle, and can be potentially large. No need to deep copy them
     every run. Instead, deep copy the internal state of a process and add a shallow copy of the inputs
     """
+    if isinstance(proc, NestedProcess):
+      stages = [cls._deepCopyProcShallowCopyIo(stage) for stage in proc.stages]
+      originalStages = proc.stages
+      try:
+        proc.stages = []
+        out = copy.deepcopy(proc) # Deepcopy doesn't know to shallow copy inputs, so remove stages before this
+      finally:
+        proc.stages = originalStages
+      out.stages = stages
+      return out
     attrs = {}
-    for attr in 'input', 'result', 'defaultInput':
+    for attr in 'input', 'result', 'defaultInput', 'inputForResult':
       attrs[attr] = getattr(proc, attr)
       setattr(proc, attr, None)
     try:
