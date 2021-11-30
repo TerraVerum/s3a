@@ -1,3 +1,4 @@
+import functools
 from typing import Tuple, Union, Dict, Any
 
 import cv2 as cv
@@ -376,24 +377,23 @@ class CvGrabcut(AtomicProcess):
     outMask = np.where((mask==2)|(mask==0), False, True)
     return ProcessIO(labels=outMask, fgdModel=fgdModel, bgdModel=bgdModel)
 
-class QuickshiftSeg(AtomicProcess):
-  def __init__(self, **kwargs):
-    kwargs.update(docFunc=seg.quickshift)
-    super().__init__(self.segmentation, 'Quickshift Segmentation', **kwargs)
 
-  @staticmethod
-  def segmentation(image: NChanImg, ratio=1.0, max_dist=10.0, kernel_size=5,
-                   sigma=0.0):
-    # For max_dist of 0, the input isn't changed and it takes a long time
-    key = (max_dist, kernel_size, sigma)
-    if max_dist == 0:
-      # Make sure output is still 1-channel
-      segImg = image.mean(2).astype(int) if image.ndim > 2 else image
-    else:
-      if image.ndim < 3:
-        image = np.tile(image[:,:,None], (1,1,3))
-      segImg = seg.quickshift(image, ratio=ratio, kernel_size=kernel_size, max_dist=max_dist, sigma=sigma)
-    return ProcessIO(labels=segImg)
+@functools.partial(
+  AtomicProcess,
+  docFunc=seg.quickshift,
+  name='Quickshift Segmentation',
+  ignoreKeys={'return_tree', 'convert2lab', 'random_seed'}
+)
+def quickshift_segmentation(image: NChanImg, ratio=1.0, max_dist=10.0, kernel_size=5,
+                 sigma=0.0):
+  if max_dist == 0:
+    # Make sure output is still 1-channel
+    segImg = image.mean(2).astype(int) if image.ndim > 2 else image
+  else:
+    if image.ndim < 3:
+      image = np.tile(image[:,:,None], (1,1,3))
+    segImg = seg.quickshift(image, ratio=ratio, kernel_size=kernel_size, max_dist=max_dist, sigma=sigma)
+  return ProcessIO(labels=segImg)
 
 # Taken from example page: https://scikit-image.org/docs/dev/auto_examples/segmentation/plot_morphsnakes.html
 def morph_acwe(image: NChanImg, initialCheckerSize=6, iters=35, smoothing=3):
