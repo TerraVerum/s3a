@@ -285,18 +285,23 @@ class AlgCollection(ParamEditor):
     # Special case: Qualname-loaded procs should be added under their qualname
     # otherwise they won't be rediscoverable after saving->restarting S3A
     proc = pydoc.locate(procName)
-    kwargs.update(name=procName)
+    success = True
     if isinstance(proc, ProcessStage):
-      proc = cls._deepCopyProcShallowCopyIo(proc)
-      proc.name = procName
+      proc: ProcessStage = cls._deepCopyProcShallowCopyIo(proc)
     elif (
       inspect.isclass(proc)
       and issubclass(proc, (AtomicProcess, NestedProcess))
     ):
       proc: t.Type
-      return proc(**kwargs)
+      proc = proc(**kwargs)
     elif callable(proc):
-      return AtomicProcess(proc, **kwargs)
+      proc = AtomicProcess(proc, **kwargs)
+    else:
+      success = False
+    if success:
+      proc.nameForState = procName
+      return proc
+    # else
     return None
 
   def searchModulesForProc(self, procName, **kwargs):
