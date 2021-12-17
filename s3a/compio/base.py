@@ -311,6 +311,7 @@ class AnnotationImporter(AnnotationIOBase):
                inFileOrObj: t.Union[FilePath, t.Any],
                parseErrorOk=False,
                reindex=False,
+               keepExtraColumns=False,
                **kwargs):
     self.refreshTableData()
 
@@ -342,6 +343,12 @@ class AnnotationImporter(AnnotationIOBase):
     # Determine any destination mappings
     if self.destTableMapping:
       parsedDf.columns = self.destTableMapping.resolveFieldAliases(parsedDf.columns, kwargs.get('mapping', {}))
+
+    if keepExtraColumns:
+      # Columns not specified in the table data should be added back in their unmodified state
+      assignCols = set(bulkParsedDf).difference(parsedDf)
+      for col in assignCols:
+        parsedDf[col] = bulkParsedDf[col]
 
     # Make sure IDs are present
     if reindex or RTF.INST_ID not in parsedDf:
