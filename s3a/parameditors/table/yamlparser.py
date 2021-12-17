@@ -32,6 +32,8 @@ class YamlParser:
       value = value.copy()
       # Format nicely for PrjParam creation
       pVal = value.pop('value', None)
+      # Ignore name, since it comes from the leaf name
+      value.pop('name', None)
       nameArgs = {'value': pVal,
                   'pType': value.pop('pType', type(pVal).__name__.lower()),
                   'helpText': value.pop('helpText', '')}
