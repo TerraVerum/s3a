@@ -4,11 +4,11 @@ import typing as t
 
 import numpy as np
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtWidgets
+from pyqtgraph.Qt import QtCore
 from utilitys.processing import *
 
 __all__ = ['ProcessIO', 'ProcessStage', 'NestedProcess', 'ImageProcess',
-           'AtomicProcess', 'MultiPredictionProcess']
+           'AtomicProcess', 'ThreadedFuncWrapper', 'AbortableThreadContainer']
 
 _infoType = t.List[t.Union[t.List, t.Dict[str, t.Any]]]
 StrList = t.List[str]
@@ -92,13 +92,159 @@ class ImageProcess(NestedProcess):
 
 _winRefs = {}
 
-class MultiPredictionProcess(ImageProcess):
-  def _stageSummaryWidget(self):
-    return QtWidgets.QWidget()
-  outMap = ['components']
+class _ThreadedFuncWrapperSignals(QtCore.QObject):
+  doneSuccess = QtCore.Signal(object)
+  """ThreadedFuncWrapper instance, emmitted on successful function run"""
+  doneFailure = QtCore.Signal(object, object)
+  """ThreadedFuncWrapper instance, exception instance, emmitted on any exception during function run"""
 
-class CategoricalProcess(NestedProcess):
-  def _stageSummaryWidget(self):
-    pass
+class _RunnableFuncWrapper(QtCore.QRunnable):
+  signals = _ThreadedFuncWrapperSignals()
 
-  inMap = ['categories', 'confidences']
+  def __init__(self, func, **kwargs):
+    super().__init__()
+    if not isinstance(func, AtomicProcess):
+      kwargs.update(interactive=False)
+      func = AtomicProcess(func, **kwargs)
+    self.proc= func
+    self.inProgress = False
+
+  def run(self):
+    self.inProgress = True
+    try:
+      self.proc.run()
+      # This could go in a "finally" block to avoid duplication below, but now "inProgress" will be false before
+      # the signal is emitted
+      self.inProgress = False
+      self.signals.doneSuccess.emit(self)
+    except Exception as ex:
+      self.inProgress = False
+      self.signals.doneFailure.emit(self, ex)
+
+  @property
+  def result(self):
+      return self.proc.result
+
+class ThreadedFuncWrapper(QtCore.QThread):
+  sigResultReady = QtCore.Signal(object)
+  """ThreadedFuncWrapper instance, emmitted on successful function run"""
+  sigFailed = QtCore.Signal(object, object)
+  """ThreadedFuncWrapper instance, exception instance, emmitted on any exception during function run"""
+
+  def __init__(self, func, **kwargs):
+    super().__init__()
+    if not isinstance(func, AtomicProcess):
+      kwargs.update(interactive=False)
+      func = AtomicProcess(func, **kwargs)
+    self.proc= func
+
+  def run(self):
+    try:
+      self.proc.run()
+      self.sigResultReady.emit(self)
+    except Exception as ex:
+      self.sigFailed.emit(self, ex)
+
+  @property
+  def result(self):
+      return self.proc.result
+
+class ThreadPoolContainer(QtCore.QObject):
+  sigTasksUpdated = QtCore.Signal()
+
+  def __init__(self, pool: QtCore.QThreadPool=None, maxThreadCount=1):
+    if pool is None:
+      pool = QtCore.QThreadPool()
+      pool.setMaxThreadCount(maxThreadCount)
+    self.pool = pool
+    # QThreadPool doesn't expose pending workers, so keep track of these manually
+    self.unfinishedRunners = []
+    super().__init__()
+
+  def discardUnfinishedRunners(self):
+    # Reverse to avoid race condition where first runner is supposed to happen before second, first is deleted,
+    # and second runs regardless
+    for runner in reversed(self.unfinishedRunners):
+      if self.pool.tryTake(runner):
+        self._onRunnerFinish(runner)
+
+  def addRunner(self, runner: t.Callable | RunnableFuncWrapper, **kwargs):
+    if not isinstance(runner, RunnableFuncWrapper):
+      runner = RunnableFuncWrapper(runner, **kwargs)
+    self.unfinishedRunners.append(runner)
+    runner.signals.doneSuccess.connect(self._onRunnerFinish)
+    self.pool.start(runner)
+    self.sigTasksUpdated.emit()
+
+  def _onRunnerFinish(self, runner):
+    if runner in self.unfinishedRunners:
+      self.unfinishedRunners.remove(runner)
+    self.sigTasksUpdated.emit()
+
+tabs = 0
+
+class AbortableThreadContainer(QtCore.QObject):
+  sigThreadsUpdated = QtCore.Signal()
+
+  def __init__(self, maxConcurrentThreads=1):
+    self.threads: list[ThreadedFuncWrapper] = []
+    self.maxConcurrentThreads = maxConcurrentThreads
+    super().__init__()
+
+  def addThread(self, thread: ThreadedFuncWrapper | t.Callable=None, **addedKwargs):
+    if not isinstance(thread, ThreadedFuncWrapper):
+      thread = ThreadedFuncWrapper(thread, **addedKwargs)
+    self.threads.append(thread)
+    self.updateThreads()
+    return thread
+
+  def _threadFinishedWrapper(self, thread):
+    """QThread.finished doesn't have an argument for the thread, so wrap a no-arg slot to accomodate"""
+    def slot():
+      self.terminateThreads(thread)
+    # Without a reference, there's no way to disconnect() it later
+    thread.__dict__['terminationSlot'] = slot
+    return slot
+
+  def updateThreads(self):
+    for thread in self.threads[:self.maxConcurrentThreads]:
+      if thread.isRunning() or thread.isFinished():
+        # Either the max number of threads are already active or recycling is falling behind
+        continue
+      thread.finished.connect(self._threadFinishedWrapper(thread))
+      thread.start()
+    self.sigThreadsUpdated.emit()
+
+  def terminateThreads(
+    self,
+    threads: ThreadedFuncWrapper | t.Iterable[ThreadedFuncWrapper],
+    killRunning=False,
+  ):
+    """
+    Abort a thread or thread at an index. Optionally does nothing if the requested thread is in progress.
+    :return: Boolean indicating whether the thread was terminated
+    """
+    returnScalar = False
+    if isinstance(threads, ThreadedFuncWrapper):
+      threads = [threads]
+      returnScalar = True
+    returns = []
+    for thread in threads:
+      if thread not in self.threads or (thread.isRunning() and not killRunning):
+        returns.append(False)
+      else:
+        self._removeThread(thread)
+        returns.append(True)
+    if any(returns):
+      self.updateThreads()
+    if returnScalar:
+      return returns[0]
+    return returns
+
+  def _removeThread(self, thread: ThreadedFuncWrapper):
+    # Already-connected threads need to be disconnected to avoid infinite waiting for termination
+    if 'terminationSlot' in thread.__dict__:
+      thread.finished.disconnect(thread.__dict__['terminationSlot'])
+    thread.terminate()
+    thread.wait()
+    self.threads.remove(thread)

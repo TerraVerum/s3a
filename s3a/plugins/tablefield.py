@@ -1,25 +1,26 @@
 from __future__ import annotations
 
 import copy
-from collections import deque, namedtuple, defaultdict
 import typing as t
+from collections import deque, namedtuple
 from functools import lru_cache
 from warnings import warn
 
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
+from pyqtgraph.Qt import QtWidgets
+from utilitys import PrjParam, DeferredActionStackMixin as DASM, ProcessIO, RunOpts
 
 import s3a
 from s3a import PRJ_CONSTS as CNST, XYVertices, REQD_TBL_FIELDS as RTF, ComplexXYVertices
 from s3a.processing.algorithms import imageproc
 from s3a.structures import BlackWhiteImg
 from s3a.views.regions import MultiRegionPlot, makeMultiRegionDf
-from utilitys import PrjParam, DeferredActionStackMixin as DASM, ProcessStage, ProcessIO, RunOpts, fns
 from .base import TableFieldPlugin
-from ..constants import PRJ_ENUMS
 from ..generalutils import getCroppedImg, showMaskDiff, tryCvResize, incrStageNames
 from ..graphicsutils import RegionHistoryViewer
+from ..processing.processing import ThreadPoolContainer, AbortableThreadContainer
 from ..shared import SharedAppSettings
 
 
@@ -45,6 +46,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     self.stageInfoImage = pg.ImageItem()
     self.stageInfoImage.hide()
     self._displayedStage = ''
+    self.statusBtn: QtWidgets.QPushButton | None = None
+    self.taskMgr = AbortableThreadContainer()
+    self.taskMgr.sigThreadsUpdated.connect(self.updateTaskLbl)
 
     self.oldProcCache = None
     """Holds the last result from a region run so undoables reset the proc cache"""
@@ -79,6 +83,12 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     win.mainImg.registerDrawAction([CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self._run_drawAct)
     win.mainImg.addTools(self.toolsEditor)
     self.vb: pg.ViewBox = win.mainImg.getViewBox()
+
+    self.statusBtn = QtWidgets.QPushButton('No pending actions')
+    self.statusBtn.setToolTip('Click to abort all active/pending actions')
+    self.statusBtn.clicked.connect(self.abortAllThreads)
+    win.statBar.addPermanentWidget(self.statusBtn)
+
     super().attachWinRef(win)
 
   def fillRegionMask(self):
@@ -109,9 +119,25 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     # noinspection PyTypeChecker
     verts : XYVertices = verts.astype(int)
     if param == CNST.DRAW_ACT_ADD:
-      self.run(fgVerts=verts)
+      vertsKey = 'fgVerts'
     else:
-      self.run(bgVerts=verts)
+      vertsKey = 'bgVerts'
+    kwargs = {vertsKey: verts}
+    self.taskMgr.addThread(self.run, **kwargs, name='Vertices Update')
+
+  def updateTaskLbl(self):
+    if not self.statusBtn:
+      return
+    active = sum([th.isRunning() for th in self.taskMgr.threads])
+    pending = len(self.taskMgr.threads) - active
+    if active or pending:
+      self.statusBtn.setText(f'{active} active, {pending} pending action(s)')
+    else:
+      self.statusBtn.setText('No pending actions')
+
+  def abortAllThreads(self):
+    # Reversing kills unstarted tasks first
+    self.taskMgr.terminateThreads(reversed(self.taskMgr.threads), killRunning=True)
 
   def run(self, fgVerts: XYVertices=None, bgVerts: XYVertices=None):
     vertsDict = {}
@@ -218,9 +244,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     updated = regionId != focusedId
     if updated:
       if regionId in self.win.compMgr.compDf.index:
-        self.win.compDisplay.selectRowsById([regionId])
+        self.win.changeFocusedComp([regionId])
       else:
-        self.win.compDisplay.selectRowsById([])
+        self.win.changeFocusedComp()
     return updated
 
   def updateRegionFromMask(self, mask: BlackWhiteImg, offset=None, compId=None):
