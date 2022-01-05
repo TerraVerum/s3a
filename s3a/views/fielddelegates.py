@@ -101,7 +101,10 @@ class TextFieldDelegate(SceneItemContainer, FieldDisplayDelegate):
       comps[RTF.VERTICES].apply(lambda el: minVertsCoord(el.stack()))
     )
     symbols_scales = np.row_stack(comps[field].apply(self.makeTextSymbol, returnScale=True))
-    bgSymbols = [self.makeBgSymbol(symb) for symb in symbols_scales[:,0]]
+    keepLocs = [s is not None for s in symbols_scales[:, 0]]
+    positions = positions[keepLocs]
+    symbols_scales = symbols_scales[keepLocs]
+    bgSymbols = [self.makeBgSymbol(symb) for symb in symbols_scales[:,0] if symb is not None]
     multiplier = fontSize/12
     sizes = multiplier/symbols_scales[:,1]
 
@@ -121,6 +124,12 @@ class TextFieldDelegate(SceneItemContainer, FieldDisplayDelegate):
 
   @staticmethod
   def makeTextSymbol(txt: str, fontSize=12, returnScale=False):
+    if not txt:
+      # No way to draw symbol
+      if returnScale:
+        return None, 1
+      else:
+        return None
     outSymbol = QtGui.QPainterPath()
     txtLabel = QtGui.QFont("Sans Serif", fontSize)
     # txtLabel.setStyleStrategy(QtGui.QFont.StyleStrategy.PreferBitmap)
@@ -129,7 +138,7 @@ class TextFieldDelegate(SceneItemContainer, FieldDisplayDelegate):
     height = outSymbol.boundingRect().height()
     heightWithMargin = height * 1.2
     for ii, line in enumerate(lines[1:]):
-        outSymbol.addText(0, heightWithMargin*(ii+1), txtLabel, line)
+      outSymbol.addText(0, heightWithMargin*(ii+1), txtLabel, line)
     br = outSymbol.boundingRect()
     scale = 1./max(br.width(), br.height())
     tr = QtGui.QTransform()
@@ -289,7 +298,7 @@ class FieldDisplay(EditorPropsMixin):
   @classmethod
   def _replaceDefaultData(cls, comps: pd.DataFrame, fields):
     """Concats all data into text for display with the default delagate, and drops the original fields"""
-    converter = lambda comp: '\n'.join(f'{index}: {data}' for index, data in comp.iteritems())
+    converter = lambda comp: '\n'.join(f'{index}: {data}' for index, data in comp.iteritems() if len(str(data)))
     text = comps[fields].apply(converter, axis=1)
     text.name = cls.DEFAULT_FIELD
     keepColumns = np.setdiff1d(comps.columns, fields)
