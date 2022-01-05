@@ -136,7 +136,7 @@ class ThreadedFuncWrapper(QtCore.QThread):
     if not isinstance(func, AtomicProcess):
       kwargs.update(interactive=False)
       func = AtomicProcess(func, **kwargs)
-    self.proc= func
+    self.proc = func
 
   def run(self):
     try:
@@ -180,8 +180,6 @@ class ThreadPoolContainer(QtCore.QObject):
     if runner in self.unfinishedRunners:
       self.unfinishedRunners.remove(runner)
     self.sigTasksUpdated.emit()
-
-tabs = 0
 
 class AbortableThreadContainer(QtCore.QObject):
   sigThreadsUpdated = QtCore.Signal()
@@ -245,6 +243,6 @@ class AbortableThreadContainer(QtCore.QObject):
     # Already-connected threads need to be disconnected to avoid infinite waiting for termination
     if 'terminationSlot' in thread.__dict__:
       thread.finished.disconnect(thread.__dict__['terminationSlot'])
-    thread.terminate()
+    thread.quit()
     thread.wait()
     self.threads.remove(thread)

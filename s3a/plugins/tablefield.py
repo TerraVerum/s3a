@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
-from utilitys import PrjParam, DeferredActionStackMixin as DASM, ProcessIO, RunOpts
+from utilitys import PrjParam, DeferredActionStackMixin as DASM, ProcessIO, RunOpts, NestedProcess
 
 import s3a
 from s3a import PRJ_CONSTS as CNST, XYVertices, REQD_TBL_FIELDS as RTF, ComplexXYVertices
@@ -20,7 +20,7 @@ from s3a.views.regions import MultiRegionPlot, makeMultiRegionDf
 from .base import TableFieldPlugin
 from ..generalutils import getCroppedImg, showMaskDiff, tryCvResize, incrStageNames
 from ..graphicsutils import RegionHistoryViewer
-from ..processing.processing import ThreadPoolContainer, AbortableThreadContainer
+from ..processing.processing import ThreadPoolContainer, AbortableThreadContainer, ThreadedFuncWrapper
 from ..shared import SharedAppSettings
 
 
@@ -123,7 +123,8 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     else:
       vertsKey = 'bgVerts'
     kwargs = {vertsKey: verts}
-    self.taskMgr.addThread(self.run, **kwargs, name='Vertices Update')
+    thread = self.taskMgr.addThread(self.run, **kwargs, name='Vertices Update')
+    thread.sigResultReady.connect(self._onThreadFinished)
 
   def updateTaskLbl(self):
     if not self.statusBtn:
@@ -139,31 +140,17 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     # Reversing kills unstarted tasks first
     self.taskMgr.terminateThreads(reversed(self.taskMgr.threads), killRunning=True)
 
-  def run(self, fgVerts: XYVertices=None, bgVerts: XYVertices=None):
-    vertsDict = {}
-    if fgVerts is not None:
-      vertsDict['fgVerts'] = fgVerts
-    if bgVerts is not None:
-      vertsDict['bgVerts'] = bgVerts
+  def _onThreadFinished(self, thread: ThreadedFuncWrapper):
+    self.updateGuiFromProcessor(thread.result)
+
+  def updateGuiFromProcessor(self, procResult: dict | np.ndarray):
     img = self.mainImg.image
     if img is None:
       compGrayscale = None
-      compMask = None
     else:
       compGrayscale = self.region.toGrayImg(img.shape[:2])
-      compMask = compGrayscale > 0
-    # TODO: When multiple classes can be represented within focused image, this is where
-    #  change will have to occur
-    viewbox = self.mainImg.viewboxCoords()
-    self.oldProcCache = imageproc.procCache.copy()
-    newGrayscale = self.curProcessor.run(
-      image=img,
-      prevCompMask=compMask,
-      **vertsDict,
-      firstRun=self.firstRun,
-      viewbox=XYVertices(viewbox),
-      prevCompVerts=ComplexXYVertices([r.stack() for r in self.region.regionData[RTF.VERTICES]])
-    )
+
+    newGrayscale = procResult
     if isinstance(newGrayscale, dict):
       newGrayscale = newGrayscale['image']
     elif newGrayscale is None:
@@ -171,7 +158,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
       return
     newGrayscale = newGrayscale.astype('uint8')
 
-    matchNames = incrStageNames(self.curProcessor.processor.stages_flattened)
+    matchNames = incrStageNames(self.curProcessor.stages_flattened)
     type(self).displayableInfos.fget.cache_clear()
     if self._displayedStage in matchNames:
       self.overlayStageInfo(self._displayedStage, self.stageInfoImage.opacity())
@@ -184,6 +171,32 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     self.firstRun = False
     if not np.array_equal(newGrayscale, compGrayscale):
       self.updateRegionFromMask(newGrayscale)
+
+  def run(self, fgVerts: XYVertices=None, bgVerts: XYVertices=None):
+    vertsDict = {}
+    if fgVerts is not None:
+      vertsDict['fgVerts'] = fgVerts
+    if bgVerts is not None:
+      vertsDict['bgVerts'] = bgVerts
+    img = self.mainImg.image
+    if img is None:
+      compMask = None
+    else:
+      compGrayscale = self.region.toGrayImg(img.shape[:2])
+      compMask = compGrayscale > 0
+    # TODO: When multiple classes can be represented within focused image, this is where
+    #  change will have to occur
+    viewbox = self.mainImg.viewboxCoords()
+    self.oldProcCache = imageproc.procCache.copy()
+    return self.curProcessor.run(
+      image=img,
+      prevCompMask=compMask,
+      **vertsDict,
+      firstRun=self.firstRun,
+      viewbox=XYVertices(viewbox),
+      prevCompVerts=ComplexXYVertices([r.stack() for r in self.region.regionData[RTF.VERTICES]])
+    )
+
 
   def updateRegionFromDf(self, newData: pd.DataFrame=None, offset: XYVertices=None):
     """
