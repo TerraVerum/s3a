@@ -462,7 +462,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     #   For now, treat ambiguity by not focusing anything
     if np.isscalar(compIds):
       compIds = [compIds]
-    if compIds is None or len(compIds) < 1 or compIds[0] not in self.compMgr.compDf.index:
+    if compIds is None or len(compIds) != 1 or compIds[0] not in self.compMgr.compDf.index:
       self.mainImg.updateFocusedComp()
     else:
       newComp: pd.Series = self.compMgr.compDf.loc[compIds[0]]
