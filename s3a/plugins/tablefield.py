@@ -236,7 +236,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     # Since some calls to this function make an undo entry and others don't, be sure to save state for the undoable ones
     # revertId is only used when changedComp is true and an undo is valid
     newId = fImg.compSer[RTF.INST_ID]
-    if newData is None or np.all(newData[RTF.VERTICES].apply(ComplexXYVertices.isEmpty)):
+    if newData is None:
       newData = makeMultiRegionDf(0)
 
     self._maybeChangeFocusedComp(newData.index)
@@ -347,7 +347,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     # Only perform action if image currently exists
     if self.mainImg.compSer is None:
       return
-    self.updateRegion_undoable(None)
+    self.updateRegionFromMask(np.zeros((1,1), bool))
 
   def resetFocusedRegion(self):
     """Reset the focused image by restoring the region mask to the last saved state"""
