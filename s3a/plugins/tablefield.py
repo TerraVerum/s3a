@@ -156,7 +156,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         'Killing in-progress actions may cause memory leaks or unintended side effects. Are you sure you want to'
         ' continue?'
       )
-      if confirm:
+      if confirm == QtWidgets.QMessageBox.StandardButton.Yes:
         self.endQueuedActions(endRunning=True)
     else:
       # By default, only end not-yet-started actions
