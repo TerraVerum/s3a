@@ -38,6 +38,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
   def __init__(self):
     super().__init__()
+    self.queueActions = True
     self.region = MultiRegionPlot(disableMouseClick=True)
     self.region.hide()
     self.firstRun = True
@@ -86,7 +87,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
     self.statusBtn = QtWidgets.QPushButton('No pending actions')
     self.statusBtn.setToolTip('Click to abort all active/pending actions')
-    self.statusBtn.clicked.connect(self.abortAllThreads)
+    self.statusBtn.clicked.connect(self.endQueuedActions_gui)
     win.statBar.addPermanentWidget(self.statusBtn)
 
     super().attachWinRef(win)
@@ -123,8 +124,13 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     else:
       vertsKey = 'bgVerts'
     kwargs = {vertsKey: verts}
-    thread = self.taskMgr.addThread(self.run, **kwargs, name='Vertices Update')
-    thread.sigResultReady.connect(self._onThreadFinished)
+    if self.queueActions:
+      thread = self.taskMgr.addThread(self.run, **kwargs, name='Vertices Update')
+      thread.sigResultReady.connect(self._onThreadFinished)
+    else:
+      # Run immediately
+      result = self.run(**kwargs)
+      self.updateGuiFromProcessor(result)
 
   def updateTaskLbl(self):
     if not self.statusBtn:
@@ -136,9 +142,26 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     else:
       self.statusBtn.setText('No pending actions')
 
-  def abortAllThreads(self):
+  def endQueuedActions(self, endRunning=False):
     # Reversing kills unstarted tasks first
-    self.taskMgr.terminateThreads(reversed(self.taskMgr.threads), killRunning=True)
+    self.taskMgr.endThreads(reversed(self.taskMgr.threads), endRunning=endRunning)
+      
+  def endQueuedActions_gui(self):
+    statuses = [t.isRunning() for t in self.taskMgr.threads]
+    if len(statuses) and all(statuses):
+      # Only running threads are left, ensure the user really wants to violently kill them
+      confirm = QtWidgets.QMessageBox.question(
+        self.win,
+        'Kill Running Actions?',
+        'Killing in-progress actions may cause memory leaks or unintended side effects. Are you sure you want to'
+        ' continue?'
+      )
+      if confirm:
+        self.endQueuedActions(endRunning=True)
+    else:
+      # By default, only end not-yet-started actions
+      self.endQueuedActions()
+      
 
   def _onThreadFinished(self, thread: ThreadedFuncWrapper):
     self.updateGuiFromProcessor(thread.result)
@@ -172,7 +195,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     if not np.array_equal(newGrayscale, compGrayscale):
       self.updateRegionFromMask(newGrayscale)
 
-  def run(self, fgVerts: XYVertices=None, bgVerts: XYVertices=None):
+  def run(self, fgVerts: XYVertices=None, bgVerts: XYVertices=None, updateGui=False):
     vertsDict = {}
     if fgVerts is not None:
       vertsDict['fgVerts'] = fgVerts
@@ -188,7 +211,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     #  change will have to occur
     viewbox = self.mainImg.viewboxCoords()
     self.oldProcCache = imageproc.procCache.copy()
-    return self.curProcessor.run(
+    result = self.curProcessor.run(
       image=img,
       prevCompMask=compMask,
       **vertsDict,
@@ -196,6 +219,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
       viewbox=XYVertices(viewbox),
       prevCompVerts=ComplexXYVertices([r.stack() for r in self.region.regionData[RTF.VERTICES]])
     )
+    if updateGui:
+      self.updateGuiFromProcessor(result)
+    return result
 
 
   def updateRegionFromDf(self, newData: pd.DataFrame=None, offset: XYVertices=None):

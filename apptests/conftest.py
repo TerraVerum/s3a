@@ -54,10 +54,13 @@ def mgr(app):
 @pytest.fixture(scope='session', autouse=True)
 def vertsPlugin(app) -> VerticesPlugin:
   try:
-    plg = app.clsToPluginMapping[VerticesPlugin]
+    # False positive, since clsToPluginMapping returns valid subclasses of plugins too
+    # noinspection PyTypeChecker
+    plg: VerticesPlugin = app.clsToPluginMapping[VerticesPlugin]
   except KeyError:
     raise RuntimeError('Vertices plugin was not provided. Some tests are guaranteed to fail.')
 
+  plg.queueActions = False
   plg.procEditor.changeActiveProcessor('Basic Shapes')
   return plg
 

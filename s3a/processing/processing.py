@@ -147,7 +147,7 @@ class ThreadedFuncWrapper(QtCore.QThread):
 
   @property
   def result(self):
-      return self.proc.result
+    return self.proc.result
 
 class ThreadPoolContainer(QtCore.QObject):
   sigTasksUpdated = QtCore.Signal()
@@ -168,9 +168,9 @@ class ThreadPoolContainer(QtCore.QObject):
       if self.pool.tryTake(runner):
         self._onRunnerFinish(runner)
 
-  def addRunner(self, runner: t.Callable | RunnableFuncWrapper, **kwargs):
-    if not isinstance(runner, RunnableFuncWrapper):
-      runner = RunnableFuncWrapper(runner, **kwargs)
+  def addRunner(self, runner: t.Callable | _RunnableFuncWrapper, **kwargs):
+    if not isinstance(runner, _RunnableFuncWrapper):
+      runner = _RunnableFuncWrapper(runner, **kwargs)
     self.unfinishedRunners.append(runner)
     runner.signals.doneSuccess.connect(self._onRunnerFinish)
     self.pool.start(runner)
@@ -199,7 +199,7 @@ class AbortableThreadContainer(QtCore.QObject):
   def _threadFinishedWrapper(self, thread):
     """QThread.finished doesn't have an argument for the thread, so wrap a no-arg slot to accomodate"""
     def slot():
-      self.terminateThreads(thread)
+      self.endThreads(thread)
     # Without a reference, there's no way to disconnect() it later
     thread.__dict__['terminationSlot'] = slot
     return slot
@@ -213,10 +213,10 @@ class AbortableThreadContainer(QtCore.QObject):
       thread.start()
     self.sigThreadsUpdated.emit()
 
-  def terminateThreads(
+  def endThreads(
     self,
     threads: ThreadedFuncWrapper | t.Iterable[ThreadedFuncWrapper],
-    killRunning=False,
+    endRunning=False,
   ):
     """
     Abort a thread or thread at an index. Optionally does nothing if the requested thread is in progress.
@@ -228,10 +228,10 @@ class AbortableThreadContainer(QtCore.QObject):
       returnScalar = True
     returns = []
     for thread in threads:
-      if thread not in self.threads or (thread.isRunning() and not killRunning):
+      if thread not in self.threads or (thread.isRunning() and not endRunning):
         returns.append(False)
       else:
-        self._removeThread(thread)
+        self._removeThread(thread, endFunc='terminate' if thread.isRunning() else 'quit')
         returns.append(True)
     if any(returns):
       self.updateThreads()
@@ -239,10 +239,13 @@ class AbortableThreadContainer(QtCore.QObject):
       return returns[0]
     return returns
 
-  def _removeThread(self, thread: ThreadedFuncWrapper):
+  def _removeThread(self, thread: ThreadedFuncWrapper, endFunc='quit'):
     # Already-connected threads need to be disconnected to avoid infinite waiting for termination
     if 'terminationSlot' in thread.__dict__:
       thread.finished.disconnect(thread.__dict__['terminationSlot'])
-    thread.quit()
+    if endFunc == 'quit':
+      thread.quit()
+    else:
+      thread.terminate()
     thread.wait()
     self.threads.remove(thread)

@@ -16,7 +16,7 @@ def test_registered_verts_funcs(vertsPlugin, app):
   imsize = np.prod(SAMPLE_SMALL_IMG.shape[:2])
   editor = vertsPlugin.procEditor
   editor.changeActiveProcessor('Basic Shapes')
-  vertsPlugin.run()
+  vertsPlugin.run(updateGui=True)
   assert imageproc.procCache['mask'].sum()
 
   vertsPlugin.clearProcessorHistory()
@@ -78,8 +78,8 @@ def test_region_history(vertsPlugin, app, monkeypatch):
   comp = app.compMgr.compDf.iloc[[0]]
   app.changeFocusedComp(comp.index)
 
-  vertsPlugin.run(bgVerts=imgCornerVertices(SAMPLE_SMALL_IMG))
-  vertsPlugin.run()
+  vertsPlugin.run(bgVerts=imgCornerVertices(SAMPLE_SMALL_IMG), updateGui=True)
+  vertsPlugin.run(updateGui=True)
 
   initial, history = vertsPlugin.getRegionHistory()
   assert np.array_equal(initial, SAMPLE_SMALL_IMG)
