@@ -25,7 +25,7 @@ _serdesHandlers = pd.DataFrame(columns=list(_newHandlerTemplate()))
 def registerIoHandler(pType: str, force=False, **kwargs):
   global _serdesHandlers
   if pType not in _serdesHandlers.index:
-    _serdesHandlers = _serdesHandlers.append(pd.Series(_newHandlerTemplate(), name=pType))
+    _serdesHandlers.loc[pType] = _newHandlerTemplate()
   for which in {'serialize', 'deserialize'} & set(kwargs):
     if _serdesHandlers.loc[pType, which] is not None and not force:
       raise KeyError(f'Already have {which} handler for "{pType}"')

@@ -152,7 +152,8 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
       df = self.stateFuncsDf
       self.stateFuncsDf = pd.concat([df.iloc[:index], serAsFrame(newRow), df.iloc[index:]])
     else:
-      self.stateFuncsDf: pd.DataFrame = self.stateFuncsDf.append(newRow)
+      self.stateFuncsDf: pd.DataFrame
+      self.stateFuncsDf.loc[optName] = newRow
 
   @property
   def RECENT_STATE_FNAME(self):

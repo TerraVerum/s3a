@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from conftest import NUM_COMPS, dfTester
@@ -103,12 +104,12 @@ def test_autosave(tmp_path, app, filePlg):
   filePlg.autosaveTimer.timeout.emit()
   appInst.processEvents()
   dfTester.fillRandomVerts()
-  testComps2 = testComps1.append(dfTester.compDf.copy())
+  testComps2 = pd.concat([testComps1, dfTester.compDf.copy()])
   app.compMgr.addComps(testComps2)
   filePlg.autosaveTimer.timeout.emit()
   appInst.processEvents()
 
-  testComps3 = testComps2.append(dfTester.compDf.copy())
+  testComps3 = pd.concat([testComps2, dfTester.compDf.copy()])
   app.compMgr.addComps(testComps3)
   filePlg.autosaveTimer.timeout.emit()
   filePlg.stopAutosave()

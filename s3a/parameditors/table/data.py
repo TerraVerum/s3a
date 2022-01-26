@@ -95,7 +95,7 @@ class TableData(QtCore.QObject):
     outDf = df(df_list, columns=self.allFields)
     if RTF.INST_ID in self.allFields:
       if sequentialIds:
-        outDf[RTF.INST_ID] = np.arange(len(outDf))
+        outDf[RTF.INST_ID] = np.arange(len(outDf), dtype=int)
       outDf = outDf.set_index(RTF.INST_ID, drop=False)
     if dropRow:
       outDf = outDf.iloc[0:0]

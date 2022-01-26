@@ -156,6 +156,9 @@ class ComponentMgr(CompTableModel):
 
     if RTF.INST_ID in newCompsDf:
       # IDs take precedence over native index if present
+      # Pandas 1.4 warns FutureWarning without guaranteed int dtype
+      # A copy was already made above, so this is potentially redundant
+      newCompsDf[RTF.INST_ID] = newCompsDf[RTF.INST_ID].astype(int, copy=False)
       newCompsDf = newCompsDf.set_index(RTF.INST_ID, drop=False)
 
     if addtype == PRJ_ENUMS.COMP_ADD_AS_NEW:
