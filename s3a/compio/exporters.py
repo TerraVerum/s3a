@@ -575,7 +575,9 @@ class SerialExporter(AnnotationExporter):
     # Since CSV export significantly modifies the df, make a copy before doing all these
     # operations
     for col in exportObj:
-      if not isinstance(col.value, str):
+      if not isinstance(col, PrjParam):
+        exportObj[col] = exportObj[col].apply(str)
+      elif not isinstance(col.value, str):
         serial, errs = serialize(col, exportObj[col])
         exportObj[col] = serial.to_numpy()
         allErrs.append(errs)
