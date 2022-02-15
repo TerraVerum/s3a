@@ -283,7 +283,7 @@ def single_categorical_prediction(
   :param model: Model which will run prediction. If ``expectedImageShape`` is not specified, ``model.input_shape[1:3]``
     will be used
   :param inputShape: Specifies the image shape the model requires to run a prediction
-    ignore: True
+    type: str
   """
   if inputShape is None:
     raise ValueError('"inputShape" must be specified either as a (h, w) tuple or string eval with namespace "model=model"')
