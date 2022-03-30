@@ -522,7 +522,7 @@ class SerialExporter(AnnotationExporter):
     return self.compDf.copy()
 
   def populateMetadata(self,
-                       readonly=True,
+                       readonly=False,
                        **kwargs):
     """
     :param readonly: Whether this export should be read-only
