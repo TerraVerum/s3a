@@ -133,7 +133,7 @@ def test_scale_viewbox(app, mgr):
   comps[REQD_TBL_FIELDS.VERTICES] = [verts]
   changeDict = mgr.addComps(comps)
 
-  app.compDisplay.scaleViewboxToSelectedIds(changeDict['ids'], padding=0)
+  app.compDisplay.scaleViewboxToSelectedIds(changeDict['ids'], paddingPct=0)
   bounds = np.array(app.mainImg.getViewBox().targetRange())
   assert np.array_equal(bounds, [[0, 35], [0, 35]])
 

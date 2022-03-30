@@ -290,12 +290,12 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     if self.props[PRJ_CONSTS.PROP_FIELD_INFO_ON_SEL]:
       self.fieldInfoProc(ids=selectedIds, force=True)
 
-  def scaleViewboxToSelectedIds(self, selectedIds: OneDArr=None, padding: int=None):
+  def scaleViewboxToSelectedIds(self, selectedIds: OneDArr=None, paddingPct: float=0.1):
     """
     Rescales the main image viewbox to encompass the selection
 
     :param selectedIds: Ids to scale to. If *None*, this is the current selection
-    :param padding: Padding around the selection. If *None*, defaults to
+    :param paddingPct: Padding around the selection. If *None*, defaults to
       pyqtgraph padding behavior
     """
     if selectedIds is None:
@@ -306,12 +306,12 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     allVerts = np.vstack([v.stack() for v in selectedVerts])
     mins = allVerts.min(0)
     maxs = allVerts.max(0)
-    if padding is not None:
-      mins -= padding//2
-      maxs += padding//2
+    # if paddingPct is not None:
+    #   mins -= paddingPct // 2
+    #   maxs += paddingPct // 2
     vb: pg.ViewBox = self._mainImgArea.getViewBox()
     viewRect = QtCore.QRectF(*mins, *(maxs - mins))
-    vb.setRange(viewRect, padding=padding)
+    vb.setRange(viewRect, padding=paddingPct)
 
   def selectRowsById(self, ids: Sequence[int],
                      selectionMode=QISM.Rows|QISM.ClearAndSelect,
