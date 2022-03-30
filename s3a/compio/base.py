@@ -298,11 +298,19 @@ class AnnotationImporter(AnnotationIOBase):
         dfVals = compDf[srcField]
         # Parsing functions only know how to convert from strings to themselves.
         # So, assume the exting types can first convert themselves to strings
-        serializedDfVals = serialize(destField, dfVals, returnErrs=False)
-        parsedDfVals, errs = deserialize(destField, serializedDfVals)
+        serializedDfVals, errs = serialize(destField, dfVals)
+        # Reorder to align with initial indexing, not 0->len-1 indexing
+        for ser in serializedDfVals, errs:
+          ser.index = dfVals.index[ser.index]
+        parsedDfVals, parsedErrs = deserialize(destField, serializedDfVals)
+        # Rinse and repeat with second round of serdes, except now they come from only the successfully stringified
+        # index
+        for ser in parsedDfVals, parsedErrs:
+          ser.index = serializedDfVals.index[ser.index]
         # Turn problematic cells into instance errors for detecting problems in the outer scope
         errs = errs.apply(AnnInstanceError)
-        parsedDfVals = pd.concat([parsedDfVals, errs])
+        parsedErrs = parsedErrs.apply(AnnInstanceError)
+        parsedDfVals = pd.concat([parsedDfVals, errs, parsedErrs])
         outDf[destField] = parsedDfVals
       # All recognized output fields should now be deserialied; make sure required fields exist
       return outDf
@@ -338,7 +346,11 @@ class AnnotationImporter(AnnotationIOBase):
       bulkParsedDf[col] = indivParsedDf[col]
     # Some cols could be deserialized, others could be serialized still. Handle the still serialized cases
     parsedDf = self.finalizeImport(bulkParsedDf, **kwargs)
-    parsedDf = self.validInstances(parsedDf, parseErrorOk)
+    validDf = self.validInstances(parsedDf, parseErrorOk)
+    # If only a subset is kept, `copy` is necessary to avoid SettingsWithCopyWarning
+    if len(validDf) < len(parsedDf):
+      validDf = validDf.copy()
+    parsedDf = validDf
 
     # Determine any destination mappings
     if self.destTableMapping:
@@ -352,7 +364,7 @@ class AnnotationImporter(AnnotationIOBase):
 
     # Make sure IDs are present
     if reindex or RTF.INST_ID not in parsedDf:
-      parsedDf[RTF.INST_ID] = np.arange(len(parsedDf), dtype=int)
+      parsedDf.insert(0, RTF.INST_ID, np.arange(len(parsedDf), dtype=int))
     else:
       # pandas 1.4 introduced FutureWarnings for object-dtype assignments so ensure
       # Instance ID is integer type
