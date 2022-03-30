@@ -54,6 +54,9 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
       roi.setRoiPoints()
       roi.hide()
       self.addLock(self)
+      # If all ROIs share the same action stack, calling "flush" on one should take care of everything
+      # But this is a failsafe against separate undo buffers for each shape
+      roi.flushBuildActions()
 
   def addLock(self, lock):
     """
