@@ -213,9 +213,9 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     # TODO: Find out why this isn't working. For now, just reset the whole comp list
     #  each time components are changed, since the overhead isn't too terrible.
 
-    # Component deleted: Nothing to do, since only displayed IDs will remain in the
-    # region manager anyway
-    previouslyVisible = self.displayedIds
+    # Note that components that were visible but then deleted shouldn't trigger false positives
+    previouslyVisible = np.intersect1d(self.displayedIds, compDf.index)
+
     # Update filter list: hide/unhide ids and verts as needed.
     self._updateDisplayedIds()
     self.regionPlot.resetRegionList(compDf.loc[self.displayedIds], labelField=self.labelCol)
