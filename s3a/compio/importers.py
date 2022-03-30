@@ -111,10 +111,17 @@ class SuperannotateJsonImporter(AnnotationImporter):
   def getInstances(self, importObj, **kwargs):
     return importObj['instances']
 
+  def bulkImport(self, importObj, srcDir=None, **kwargs) -> pd.DataFrame:
+    df = super().defaultBulkImport(importObj, **kwargs, srcDir=srcDir)
+    df[RTF.IMG_FILE] = importObj['metadata']['name']
+    return df
+
   def formatSingleInstance(self,
                            inst,
                            name=None,
+                           srcDir=None,
                            **kwargs):
+    name = srcDir['file']['metadata']['name'] if name else ''
     out = {
       RTF.IMG_FILE: name
     }
