@@ -299,14 +299,7 @@ class AnnotationImporter(AnnotationIOBase):
         # Parsing functions only know how to convert from strings to themselves.
         # So, assume the exting types can first convert themselves to strings
         serializedDfVals, errs = serialize(destField, dfVals)
-        # Reorder to align with initial indexing, not 0->len-1 indexing
-        for ser in serializedDfVals, errs:
-          ser.index = dfVals.index[ser.index]
         parsedDfVals, parsedErrs = deserialize(destField, serializedDfVals)
-        # Rinse and repeat with second round of serdes, except now they come from only the successfully stringified
-        # index
-        for ser in parsedDfVals, parsedErrs:
-          ser.index = serializedDfVals.index[ser.index]
         # Turn problematic cells into instance errors for detecting problems in the outer scope
         errs = errs.apply(AnnInstanceError)
         parsedErrs = parsedErrs.apply(AnnInstanceError)
@@ -363,9 +356,15 @@ class AnnotationImporter(AnnotationIOBase):
         parsedDf[col] = bulkParsedDf[col]
 
     # Make sure IDs are present
-    if reindex or RTF.INST_ID not in parsedDf:
-      parsedDf.insert(0, RTF.INST_ID, np.arange(len(parsedDf), dtype=int))
-    else:
+    alreadyExists = RTF.INST_ID in parsedDf
+    if reindex or not alreadyExists:
+      sequentialIds = np.arange(len(parsedDf), dtype=int)
+      if alreadyExists: # Just reindexing
+        parsedDf[RTF.INST_ID] = sequentialIds
+      # Ensure instance ID is the first column if new
+      else:
+        parsedDf.insert(0, RTF.INST_ID, sequentialIds)
+    elif not pd.api.types.is_integer_dtype(parsedDf[RTF.INST_ID]):
       # pandas 1.4 introduced FutureWarnings for object-dtype assignments so ensure
       # Instance ID is integer type
       parsedDf[RTF.INST_ID] = parsedDf[RTF.INST_ID].astype(int)

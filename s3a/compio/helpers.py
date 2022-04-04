@@ -32,8 +32,9 @@ def registerIoHandler(pType: str, force=False, **kwargs):
   _serdesHandlers.loc[pType, list(kwargs)] = list(kwargs.values())
 
 def _runFunc(param: PrjParam, values, which: str, default: t.Callable, returnErrs=True):
-  out = {}
-  errs = {}
+  # Using a dictionary instead of list of (value, key) pairs would clash on duplicate keys
+  out = []
+  errs = []
   parseType = param.opts.get('parser', param.pType)
   if parseType not in _serdesHandlers.index:
     handlerRow = _newHandlerTemplate()
@@ -41,12 +42,18 @@ def _runFunc(param: PrjParam, values, which: str, default: t.Callable, returnErr
     handlerRow = _serdesHandlers.loc[parseType]
   _handler = handlerRow[which] or default
   takesParam = handlerRow['takesParam']
-  for ii, val in enumerate(values):
+  # Retain initial index if series-like is passed
+  if isinstance(values, pd.Series):
+    enumerator = values.iteritems()
+  else:
+    enumerator = enumerate(values)
+  for ii, val in enumerator:
     try:
-      out[ii] = _handler(param, val) if takesParam else _handler(val)
+      valIndexPair = (_handler(param, val) if takesParam else _handler(val), ii)
+      out.append(valIndexPair)
     except Exception as ex:
-      errs[ii] = ex
-  out = pd.Series(out, name=param, dtype=object)
+      errs.append((ex, ii))
+  out = pd.Series(*zip(*out), name=param, dtype=object)
   if returnErrs:
     return out, pd.Series(errs, name=param, dtype=object)
   return out
