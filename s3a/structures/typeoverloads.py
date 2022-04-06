@@ -5,6 +5,7 @@ import typing as t
 from utilitys import PrjParam
 
 from numpy import ndarray
+
 """
 Functions that just return a `np.ndarray` are often hard to interpret. Is the output a simple array, image, 
 etc.? If it _is_ an image, what is the output shape? Developers and users will have to comb through the function body
@@ -25,9 +26,11 @@ LabelFieldType = t.Union[str, PrjParam]
 
 
 class AnnParseError(ValueError):
-  def __init__(self, *args, file: Path=None, instances: list=None, **kwargs):
-    super().__init__(*args)
-    self.fileName = file
-    self.instances = instances
+    def __init__(self, *args, file: Path = None, instances: list = None, **kwargs):
+        super().__init__(*args)
+        self.fileName = file
+        self.instances = instances
 
-class AnnInstanceError(ValueError): pass
+
+class AnnInstanceError(ValueError):
+    pass

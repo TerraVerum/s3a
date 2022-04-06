@@ -25,15 +25,22 @@ pip install -e ./s3a
 # Or from pypi using "pip install s3a"
 ```
 
-Note that a version of OpenCV and Qt binding are required for S3A to work. These can be installed for you with the "turnkey" option:
+Note that a version of OpenCV and Qt binding are required for S3A to work. These can be installed for you with the "full" option:
 ```bash
 pip install -e ./s3a[full]
 # Or "pip install s3a[full]"
 ```
 
 ## Running the App
-Running the app is as easy as calling `s3a` as a module:
-`python -m s3a`
+Running the app is as easy as calling `s3a` as a module or using a provided entry point:
+```bash
+python -m s3a
+```
+Or, equivalently:
+```bash
+s3a-gui
+```
+
 
 From here, projects can be created to host groups of related images, or images can be annotated in the default project. Both options are available through the `File` menu.
 
@@ -41,6 +48,10 @@ From here, projects can be created to host groups of related images, or images c
 
 More information about the capabilities of this tool are outlined in the [project wiki](https://gitlab.com/ficsresearch/s3a/-/wikis/home).
 
+## <span style="color:red">Please Note</span>
+S3A's programmatic API is still largely under development. It still needs refinement to allow for consistent naming schemes, removing vestigial elements, confirming private vs. public-facing elements, and a few other line items. However, the graphical interface should be minimally affected by these alterations.
+
+Thus, while the GUI entry point should be consistently useful, be aware of these developments when using the scripting portion of S3A in great detail.
 
 ## License
 

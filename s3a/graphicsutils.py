@@ -14,179 +14,194 @@ from utilitys.widgets import ImageViewer, EasyWidget
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
 
-def disableAppDuringFunc(func):
-  @wraps(func)
-  def disableApp(*args, **kwargs):
-    # Captures 'self' instance
-    mainWin = args[0]
-    try:
-      mainWin.setEnabled(False)
-      return func(*args, **kwargs)
-    finally:
-      mainWin.setEnabled(True)
-  return disableApp
 
-def create_addMenuAct(mainWin: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, title: str, asMenu=False) \
-    -> Union[QtWidgets.QMenu, QtGui.QAction]:
-  menu = None
-  if asMenu:
-    menu = QtWidgets.QMenu(title, mainWin)
-    act = menu.menuAction()
-  else:
-    act = QtGui.QAction(title)
-  parentMenu.addAction(act)
-  if asMenu:
-    return menu
-  else:
-    return act
+def disableAppDuringFunc(func):
+    @wraps(func)
+    def disableApp(*args, **kwargs):
+        # Captures 'self' instance
+        mainWin = args[0]
+        try:
+            mainWin.setEnabled(False)
+            return func(*args, **kwargs)
+        finally:
+            mainWin.setEnabled(True)
+
+    return disableApp
+
+
+def create_addMenuAct(
+    mainWin: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, title: str, asMenu=False
+) -> Union[QtWidgets.QMenu, QtGui.QAction]:
+    menu = None
+    if asMenu:
+        menu = QtWidgets.QMenu(title, mainWin)
+        act = menu.menuAction()
+    else:
+        act = QtGui.QAction(title)
+    parentMenu.addAction(act)
+    if asMenu:
+        return menu
+    else:
+        return act
 
 
 def autosaveOptsDialog(parent):
-  dlg = QtWidgets.QDialog(parent)
-  layout = QtWidgets.QGridLayout(dlg)
-  dlg.setLayout(layout)
+    dlg = QtWidgets.QDialog(parent)
+    layout = QtWidgets.QGridLayout(dlg)
+    dlg.setLayout(layout)
 
-  fileBtn = QtWidgets.QPushButton('Select Output Folder')
-  folderNameDisplay = QtWidgets.QLabel('', dlg)
-  def retrieveFolderName():
-    folderDlg = QtWidgets.QFileDialog(dlg)
-    folderDlg.setModal(True)
-    folderName = folderDlg.getExistingDirectory(dlg, 'Select Output Folder')
+    fileBtn = QtWidgets.QPushButton("Select Output Folder")
+    folderNameDisplay = QtWidgets.QLabel("", dlg)
 
-    dlg.folderName = folderName
-    folderNameDisplay.setText(folderName)
-  fileBtn.clicked.connect(retrieveFolderName)
+    def retrieveFolderName():
+        folderDlg = QtWidgets.QFileDialog(dlg)
+        folderDlg.setModal(True)
+        folderName = folderDlg.getExistingDirectory(dlg, "Select Output Folder")
 
-  layout.addWidget(folderNameDisplay, 0, 0)
-  layout.addWidget(fileBtn, 0, 1)
+        dlg.folderName = folderName
+        folderNameDisplay.setText(folderName)
 
-  saveLbl = QtWidgets.QLabel('Save Name:', dlg)
-  baseFileNameEdit = QtWidgets.QLineEdit(dlg)
-  dlg.baseFileNameEdit = baseFileNameEdit
+    fileBtn.clicked.connect(retrieveFolderName)
 
-  layout.addWidget(saveLbl, 1, 0)
-  layout.addWidget(baseFileNameEdit, 1, 1)
+    layout.addWidget(folderNameDisplay, 0, 0)
+    layout.addWidget(fileBtn, 0, 1)
 
-  intervalLbl = QtWidgets.QLabel('Save Interval (mins):', dlg)
-  intervalEdit = QtWidgets.QSpinBox(dlg)
-  intervalEdit.setMinimum(1)
-  dlg.intervalEdit = intervalEdit
+    saveLbl = QtWidgets.QLabel("Save Name:", dlg)
+    baseFileNameEdit = QtWidgets.QLineEdit(dlg)
+    dlg.baseFileNameEdit = baseFileNameEdit
 
-  layout.addWidget(intervalLbl, 2, 0)
-  layout.addWidget(intervalEdit, 2, 1)
+    layout.addWidget(saveLbl, 1, 0)
+    layout.addWidget(baseFileNameEdit, 1, 1)
 
-  saveDescr = QtWidgets.QLabel('Every <em>interval</em> minutes, a new autosave is'
-                               ' created from the component list. Its name is'
-                               ' [Parent Folder]/[base name]_[counter].csv, where'
-                               ' counter is the current save file number.', dlg)
-  saveDescr.setWordWrap(True)
-  layout.addWidget(saveDescr, 3, 0, 1, 2)
+    intervalLbl = QtWidgets.QLabel("Save Interval (mins):", dlg)
+    intervalEdit = QtWidgets.QSpinBox(dlg)
+    intervalEdit.setMinimum(1)
+    dlg.intervalEdit = intervalEdit
 
+    layout.addWidget(intervalLbl, 2, 0)
+    layout.addWidget(intervalEdit, 2, 1)
 
-  okBtn = QtWidgets.QPushButton('Ok')
-  cancelBtn = QtWidgets.QPushButton('Cancel')
-  cancelBtn.clicked.connect(dlg.reject)
-  okBtn.clicked.connect(dlg.accept)
-  dlg.okBtn = okBtn
+    saveDescr = QtWidgets.QLabel(
+        "Every <em>interval</em> minutes, a new autosave is"
+        " created from the component list. Its name is"
+        " [Parent Folder]/[base name]_[counter].csv, where"
+        " counter is the current save file number.",
+        dlg,
+    )
+    saveDescr.setWordWrap(True)
+    layout.addWidget(saveDescr, 3, 0, 1, 2)
 
-  layout.addWidget(okBtn, 4, 0)
-  layout.addWidget(cancelBtn, 4, 1)
-  return dlg
+    okBtn = QtWidgets.QPushButton("Ok")
+    cancelBtn = QtWidgets.QPushButton("Cancel")
+    cancelBtn.clicked.connect(dlg.reject)
+    okBtn.clicked.connect(dlg.accept)
+    dlg.okBtn = okBtn
+
+    layout.addWidget(okBtn, 4, 0)
+    layout.addWidget(cancelBtn, 4, 1)
+    return dlg
+
 
 # Taken directly from https://stackoverflow.com/questions/60663793/drop-one-or-more-files-into-listwidget-or-lineedit
 class DropList(QtWidgets.QListWidget):
-  def __init__(self, parent=None):
-    super(DropList, self).__init__(parent)
-    self.setAcceptDrops(True)
-    self.setSelectionMode(self.ExtendedSelection)
-    seq = QtGui.QKeySequence(QtCore.Qt.Key.Key_Delete)
-    self.delShc = QtGui.QShortcut(seq, self, self.deleteSelected)
+    def __init__(self, parent=None):
+        super(DropList, self).__init__(parent)
+        self.setAcceptDrops(True)
+        self.setSelectionMode(self.ExtendedSelection)
+        seq = QtGui.QKeySequence(QtCore.Qt.Key.Key_Delete)
+        self.delShc = QtGui.QShortcut(seq, self, self.deleteSelected)
 
-  def deleteSelected(self):
-    selectedIdxs = self.selectionModel().selectedIndexes()
-    selectedRows = np.sort([i.row() for i in selectedIdxs])[::-1]
-    for row in selectedRows:
-      self.takeItem(row)
+    def deleteSelected(self):
+        selectedIdxs = self.selectionModel().selectedIndexes()
+        selectedRows = np.sort([i.row() for i in selectedIdxs])[::-1]
+        for row in selectedRows:
+            self.takeItem(row)
 
-  def dragEnterEvent(self, event):
-    if event.mimeData().hasUrls():
-      event.acceptProposedAction()
-    else:
-      event.ignore()
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
 
-  def dragMoveEvent(self, event):
-    if event.mimeData().hasUrls():
-      event.acceptProposedAction()
-    else:
-      event.ignore()
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
 
-  def dropEvent(self, event):
-    md = event.mimeData()
-    if md.hasUrls():
-      for url in md.urls():
-        self.addItem(url.toLocalFile())
-      event.acceptProposedAction()
+    def dropEvent(self, event):
+        md = event.mimeData()
+        if md.hasUrls():
+            for url in md.urls():
+                self.addItem(url.toLocalFile())
+            event.acceptProposedAction()
 
-  @property
-  def files(self):
-    model = self.model()
-    return [model.index(ii, 0).data() for ii in range(model.rowCount())]
+    @property
+    def files(self):
+        model = self.model()
+        return [model.index(ii, 0).data() for ii in range(model.rowCount())]
+
 
 class RegionHistoryViewer(QtWidgets.QMainWindow):
-  sigDiffsChanged = QtCore.Signal()
+    sigDiffsChanged = QtCore.Signal()
 
-  def __init__(self, parent=None):
-    super().__init__(parent)
-    self.diffs: List[np.ndarray] = []
-    self.histTimer = QtCore.QTimer(self)
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.diffs: List[np.ndarray] = []
+        self.histTimer = QtCore.QTimer(self)
 
-    self.diffImg = pg.ImageItem()
-    dp = self.displayPlt = ImageViewer()
-    self.displayPlt.addItem(self.diffImg)
-    self.diffImg.setOpacity(0.5)
+        self.diffImg = pg.ImageItem()
+        dp = self.displayPlt = ImageViewer()
+        self.displayPlt.addItem(self.diffImg)
+        self.diffImg.setOpacity(0.5)
 
-    _, param = dp.toolsEditor.registerFunc(self.updateImg, runOpts=RunOpts.ON_CHANGED, returnParam=True)
-    self.slider = param.child('curSlice')
-    self.sigDiffsChanged.connect(lambda: self.slider.setLimits([0, len(self.diffs)-1]))
-    self.histTimer.timeout.connect(self.incrSlicer)
+        _, param = dp.toolsEditor.registerFunc(
+            self.updateImg, runOpts=RunOpts.ON_CHANGED, returnParam=True
+        )
+        self.slider = param.child("curSlice")
+        self.sigDiffsChanged.connect(
+            lambda: self.slider.setLimits([0, len(self.diffs) - 1])
+        )
+        self.histTimer.timeout.connect(self.incrSlicer)
 
-    dp.toolsEditor.registerFunc(self.autoPlay)
-    dp.toolsEditor.registerFunc(lambda: self.histTimer.stop(), name='Stop Autoplay')
-    dp.toolsEditor.registerFunc(self.discardLeftEntries, name='Discard Entries Left of Slider')
+        dp.toolsEditor.registerFunc(self.autoPlay)
+        dp.toolsEditor.registerFunc(lambda: self.histTimer.stop(), name="Stop Autoplay")
+        dp.toolsEditor.registerFunc(
+            self.discardLeftEntries, name="Discard Entries Left of Slider"
+        )
 
-    EasyWidget.buildMainWin([dp], layout='H', win=self)
-    self.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dp.toolsEditor)
+        EasyWidget.buildMainWin([dp], layout="H", win=self)
+        self.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dp.toolsEditor)
 
+    def setDiffs(self, diffs: List[np.ndarray]):
+        self.diffs = diffs
+        self.sigDiffsChanged.emit()
 
-  def setDiffs(self, diffs: List[np.ndarray]):
-    self.diffs = diffs
-    self.sigDiffsChanged.emit()
+    def autoPlay(self, timestep=500):
+        """
+        :param timestep:
+          title: Timestep (ms)
+        """
+        self.histTimer.start(timestep)
 
-  def autoPlay(self, timestep=500):
-    """
-    :param timestep:
-      title: Timestep (ms)
-    """
-    self.histTimer.start(timestep)
+    def incrSlicer(self):
+        if self.slider.value() < len(self.diffs) - 1:
+            self.slider.setValue(self.slider.value() + 1)
+        else:
+            self.histTimer.stop()
 
-  def incrSlicer(self):
-    if self.slider.value() < len(self.diffs)-1:
-      self.slider.setValue(self.slider.value()+1)
-    else:
-      self.histTimer.stop()
+    def show(self):
+        super().show()
+        self.displayPlt.toolsEditor.show()
 
-  def show(self):
-    super().show()
-    self.displayPlt.toolsEditor.show()
+    def updateImg(self, curSlice=0):
+        """
+        :param curSlice:
+          pType: slider
+          limits: [0, 10]
+        :return:
+        """
+        self.diffImg.setImage(self.diffs[curSlice])
 
-  def updateImg(self, curSlice=0):
-    """
-    :param curSlice:
-      pType: slider
-      limits: [0, 10]
-    :return:
-    """
-    self.diffImg.setImage(self.diffs[curSlice])
-
-  def discardLeftEntries(self):
-    self.setDiffs(self.diffs[self.slider.value():])
+    def discardLeftEntries(self):
+        self.setDiffs(self.diffs[self.slider.value() :])
