@@ -297,12 +297,14 @@ class CompImgsDfExporter(AnnotationExporter):
     kwargs.pop('file', None)
     mappings = {}
 
+    exportIndexes = []
     for fullImgName, miniDf in compDf.groupby(RTF.IMG_FILE): # type: str, pd.DataFrame
       exportedComps, mapping = self._formatSingleImage(miniDf, fullImgName, **kwargs)
       mappings[Path(fullImgName).name] = mapping
       exportObj.extend(exportedComps)
+      exportIndexes.extend(miniDf.index)
 
-    exportObj = pd.DataFrame(exportObj)
+    exportObj = pd.DataFrame(exportObj, index=exportIndexes)
     if len(mappings) == 1:
       # Common case where annotations for just one image were converted
       mappings = next(iter(mappings.values()))
