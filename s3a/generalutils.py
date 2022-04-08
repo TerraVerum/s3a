@@ -13,14 +13,14 @@ import pandas as pd
 import pyqtgraph as pg
 from skimage import io, transform as trans
 from skimage.exposure import exposure
-
 from utilitys import PrjParam, ProcessStage
+from utilitys import fns
 
 # Needs to be visible outside this file
 # noinspection PyUnresolvedReferences
 from utilitys.fns import hierarchicalUpdate
-from utilitys import fns
 from utilitys.typeoverloads import FilePath
+
 from .constants import PRJ_ENUMS
 from .structures import TwoDArr, XYVertices, ComplexXYVertices, NChanImg, BlackWhiteImg
 

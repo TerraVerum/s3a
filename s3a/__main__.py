@@ -1,11 +1,11 @@
 from argparse import Action
 
 from pyqtgraph.Qt import QtCore
-
-from s3a.constants import PRJ_ENUMS
 from utilitys import fns
+
 from . import __version__
 from . import appInst
+from .constants import PRJ_ENUMS
 from .views.s3agui import S3A
 
 

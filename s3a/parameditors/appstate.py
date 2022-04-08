@@ -5,14 +5,14 @@ from typing import List, Dict, Union, Callable, Any
 
 import pandas as pd
 from pyqtgraph.parametertree import Parameter
-
-from s3a.constants import APP_STATE_DIR
-from s3a.generalutils import safeCallFuncList, hierarchicalUpdate, safeCallFunc
-from s3a.logger import getAppLogger
-from s3a.shared import SharedAppSettings
-from s3a.structures import FilePath
 from utilitys import ParamEditor, EditorPropsMixin
 from utilitys.fns import serAsFrame, attemptFileLoad
+
+from ..constants import APP_STATE_DIR
+from ..generalutils import safeCallFuncList, hierarchicalUpdate, safeCallFunc
+from ..logger import getAppLogger
+from ..shared import SharedAppSettings
+from ..structures import FilePath
 
 
 class AppStateEditor(EditorPropsMixin, ParamEditor):

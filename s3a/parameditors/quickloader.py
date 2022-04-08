@@ -3,12 +3,12 @@ from pathlib import Path
 from typing import List, Union
 
 from pyqtgraph.Qt import QtCore, QtWidgets
-from pyqtgraph.parametertree.parameterTypes import GroupParameter
 from pyqtgraph.parametertree import Parameter
-
+from pyqtgraph.parametertree.parameterTypes import GroupParameter
 from utilitys import ParamEditor, ParamEditorDockGrouping, widgets as uw
 from utilitys.params.pgregistered import ShortcutKeySeqParameter as ShcKeySeq
 from utilitys.typeoverloads import FilePath
+
 from ..constants import QUICK_LOAD_DIR
 from ..generalutils import lowerNoSpaces
 from ..logger import getAppLogger

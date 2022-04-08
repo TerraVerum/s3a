@@ -5,9 +5,9 @@ from typing import List
 import numpy as np
 from pandas import DataFrame as df
 from pyqtgraph.parametertree import Parameter
+from utilitys import PrjParam, ParamEditor, fns
 
 from ...constants import TABLE_DIR
-from utilitys import PrjParam, ParamEditor, fns
 
 
 def genParamList(nameIter, paramType, defaultVal, defaultParam="value"):

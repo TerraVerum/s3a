@@ -7,11 +7,11 @@ from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.Parameter import PARAM_TYPES
 
-from s3a.compio.helpers import serialize, deserialize
-from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
-from s3a.models.tablemodel import ComponentMgr
-from s3a.shared import SharedAppSettings
-from s3a.structures import TwoDArr
+from ..compio.helpers import serialize, deserialize
+from ..constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
+from ..models.tablemodel import ComponentMgr
+from ..shared import SharedAppSettings
+from ..structures import TwoDArr
 
 __all__ = ["CompTableView", "PopupTableDialog"]
 

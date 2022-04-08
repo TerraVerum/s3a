@@ -8,24 +8,24 @@ from skimage import morphology as morph, img_as_float
 from skimage import segmentation as seg
 from skimage.measure import regionprops, label
 from skimage.morphology import flood
+from utilitys import fns
+from utilitys.processing import *
 
-from s3a.constants import PRJ_ENUMS
-from s3a.generalutils import (
+from ...constants import PRJ_ENUMS
+from ...generalutils import (
     cornersToFullBoundary,
     getCroppedImg,
     imgCornerVertices,
     showMaskDiff,
     tryCvResize,
 )
-from s3a.structures import (
+from ...structures import (
     BlackWhiteImg,
     XYVertices,
     ComplexXYVertices,
     NChanImg,
     GrayImg,
 )
-from utilitys import fns
-from utilitys.processing import *
 
 UNSPEC = PRJ_ENUMS.HISTORY_UNSPECIFIED
 FGND = PRJ_ENUMS.HISTORY_FOREGROUND

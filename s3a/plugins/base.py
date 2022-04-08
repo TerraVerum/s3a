@@ -5,8 +5,8 @@ from typing import Union
 import pandas as pd
 from utilitys import ParamEditorPlugin, NestedProcWrapper
 
-from s3a.parameditors import algcollection
-from s3a.constants import PRJ_CONSTS
+from ..constants import PRJ_CONSTS
+from ..parameditors import algcollection
 
 
 class ProcessorPlugin(ParamEditorPlugin):

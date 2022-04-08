@@ -1,4 +1,5 @@
 import pytest
+
 from s3a.structures import PrjParam, PrjParamGroup
 
 pgroup = [PrjParam("test"), PrjParam("this")]

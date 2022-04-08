@@ -3,11 +3,11 @@ from __future__ import annotations
 import warnings
 
 import numpy as np
-
-from s3a.generalutils import augmentException
-from s3a.structures import ComplexXYVertices, XYVertices
 from utilitys import NestedProcWrapper
+
 from .processing import *
+from ..generalutils import augmentException
+from ..structures import ComplexXYVertices, XYVertices
 
 __all__ = ["ImgProcWrapper", "NestedProcWrapper"]
 

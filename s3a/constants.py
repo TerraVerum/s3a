@@ -119,7 +119,7 @@ class PRJ_ENUMS:
     ROT_OPTIMAL = None
 
 
-from s3a.structures import ComplexXYVertices, PrjParam, PrjParamGroup, newParam
+from .structures import ComplexXYVertices, PrjParam, PrjParamGroup, newParam
 
 
 class _ReqdTableFields:

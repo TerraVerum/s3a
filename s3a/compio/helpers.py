@@ -5,8 +5,8 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 from pandas.core.dtypes.missing import array_equivalent
-
 from utilitys import PrjParam
+
 from ..constants import REQD_TBL_FIELDS as RTF
 
 _serFunc = t.Callable

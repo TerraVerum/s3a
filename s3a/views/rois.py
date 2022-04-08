@@ -5,14 +5,14 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 from skimage.draw import draw
-
-from s3a.constants import PRJ_CONSTS
-from s3a.generalutils import orderContourPts, symbolFromVerts
-from s3a.structures import XYVertices, ComplexXYVertices
 from utilitys import PrjParam, DeferredActionStackMixin as DASM
 
+from ..constants import PRJ_CONSTS
+from ..generalutils import orderContourPts, symbolFromVerts
+from ..structures import XYVertices, ComplexXYVertices
+from ..views.clickables import BoundScatterPlot
+
 __all__ = ["RectROI", "PlotDataROI", "PolygonROI", "PointROI", "SHAPE_ROI_MAPPING"]
-from s3a.views.clickables import BoundScatterPlot
 
 qe = QtCore.QEvent
 _ROI_PT_DESCR = "Add ROI Points"

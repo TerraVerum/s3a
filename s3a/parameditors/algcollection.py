@@ -11,13 +11,12 @@ import webbrowser
 from pathlib import Path
 
 from pyqtgraph.Qt import QtCore
-
-from s3a import PRJ_ENUMS
-from s3a.constants import MENU_OPTS_DIR
-from s3a.shims import typing_extensions as t_e
 from utilitys import NestedProcess, RunOpts, ProcessIO
 from utilitys import ParamEditor, NestedProcWrapper, fns, ProcessStage, AtomicProcess
 from utilitys.typeoverloads import FilePath
+
+from ..constants import MENU_OPTS_DIR, PRJ_ENUMS
+from ..shims import typing_extensions as t_e
 
 Signal = QtCore.Signal
 _procDict = t.Dict[str, t.List[t.Union[str, dict]]]

@@ -3,13 +3,12 @@ from warnings import warn
 
 import numpy as np
 import pandas as pd
-import cv2 as cv
 from pyqtgraph.Qt import QtCore
 
-from s3a.generalutils import coerceDfTypes
-from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
-from s3a.shared import SharedAppSettings
-from s3a.structures import ComplexXYVertices, OneDArr
+from ..constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
+from ..generalutils import coerceDfTypes
+from ..shared import SharedAppSettings
+from ..structures import ComplexXYVertices, OneDArr
 
 __all__ = ["ComponentMgr", "CompTableModel"]
 

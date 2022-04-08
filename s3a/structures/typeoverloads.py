@@ -1,10 +1,11 @@
-# noinspection PyUnresolvedReferences
-from utilitys.typeoverloads import FilePath
-from pathlib import Path
 import typing as t
-from utilitys import PrjParam
+from pathlib import Path
 
 from numpy import ndarray
+from utilitys import PrjParam
+
+# noinspection PyUnresolvedReferences
+from utilitys.typeoverloads import FilePath
 
 """
 Functions that just return a `np.ndarray` are often hard to interpret. Is the output a simple array, image, 

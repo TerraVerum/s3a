@@ -8,22 +8,6 @@ import numpy as np
 import pandas as pd
 from pyqtgraph import console as pg_console
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-
-from s3a import models, XYVertices, ComplexXYVertices
-from s3a.constants import (
-    PRJ_CONSTS as CNST,
-    REQD_TBL_FIELDS as RTF,
-    PRJ_ENUMS,
-    GEN_PROPS_DIR,
-    SCHEMES_DIR,
-    SHORTCUTS_DIR,
-)
-from s3a.generalutils import getCroppedImg
-from s3a.logger import getAppLogger
-from s3a.models import s3abase
-from s3a.parameditors.quickloader import QuickLoaderEditor
-from s3a.plugins.base import ProcessorPlugin
-from s3a.shared import SharedAppSettings
 from utilitys import (
     ParamEditorPlugin,
     ProcessIO,
@@ -33,7 +17,21 @@ from utilitys import (
     ShortcutParameter,
     fns,
 )
-from utilitys.params.parameditor import RunOpts
+
+from .. import models, XYVertices, ComplexXYVertices
+from ..constants import (
+    PRJ_CONSTS as CNST,
+    REQD_TBL_FIELDS as RTF,
+    PRJ_ENUMS,
+    GEN_PROPS_DIR,
+    SCHEMES_DIR,
+    SHORTCUTS_DIR,
+)
+from ..logger import getAppLogger
+from ..models import s3abase
+from ..parameditors.quickloader import QuickLoaderEditor
+from ..plugins.base import ProcessorPlugin
+from ..shared import SharedAppSettings
 
 
 class MainImagePlugin(ParamEditorPlugin):

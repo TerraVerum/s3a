@@ -2,12 +2,11 @@ from typing import Dict, Collection
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
-
-from s3a.shared import SharedAppSettings
 from utilitys import EditorPropsMixin, RunOpts
 
-from s3a.structures import PrjParam, XYVertices
-from s3a.views.rois import SHAPE_ROI_MAPPING, PlotDataROI, PointROI
+from ..shared import SharedAppSettings
+from ..structures import PrjParam, XYVertices
+from ..views.rois import SHAPE_ROI_MAPPING, PlotDataROI, PointROI
 
 __all__ = ["RoiCollection"]
 

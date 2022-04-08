@@ -6,7 +6,7 @@ from pyqtgraph.GraphicsScene.mouseEvents import MouseDragEvent
 from pyqtgraph.Qt import QtCore, QtGui
 from skimage.measure import points_in_poly
 
-from s3a.structures import XYVertices
+from ..structures import XYVertices
 
 Signal = QtCore.Signal
 

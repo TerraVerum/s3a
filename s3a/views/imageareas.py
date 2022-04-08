@@ -5,11 +5,6 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-
-from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_CONSTS as CNST
-from s3a.controls.drawctrl import RoiCollection
-from s3a.generalutils import getCroppedImg, coerceDfTypes
-from s3a.structures import XYVertices
 from utilitys import (
     ParamEditor,
     PrjParam,
@@ -18,10 +13,15 @@ from utilitys import (
     EditorPropsMixin,
     DeferredActionStackMixin as DASM,
 )
-from utilitys.widgets import ButtonCollection, ImageViewer, EasyWidget
+from utilitys.widgets import ButtonCollection, ImageViewer
+
 from .clickables import RightPanViewBox
 from .regions import RegionMoverPlot
 from .rois import SHAPE_ROI_MAPPING
+from ..constants import REQD_TBL_FIELDS as RTF, PRJ_CONSTS as CNST
+from ..controls.drawctrl import RoiCollection
+from ..generalutils import getCroppedImg, coerceDfTypes
+from ..structures import XYVertices
 
 __all__ = ["MainImage"]
 
@@ -83,7 +83,7 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
         # -----
         # DRAWING OPTIONS
         # -----
-        self.regionMover = RegionMoverPlot(self)
+        self.regionMover = RegionMoverPlot()
 
         self.drawAction: PrjParam = CNST.DRAW_ACT_PAN
         self.shapeCollection = RoiCollection(drawShapes, self)

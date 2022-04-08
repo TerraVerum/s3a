@@ -15,28 +15,20 @@ from utilitys import (
     DeferredActionStackMixin as DASM,
     ProcessIO,
     RunOpts,
-    NestedProcess,
 )
 
-import s3a
-from s3a import (
-    PRJ_CONSTS as CNST,
-    XYVertices,
-    REQD_TBL_FIELDS as RTF,
-    ComplexXYVertices,
-)
-from s3a.processing.algorithms import imageproc
-from s3a.structures import BlackWhiteImg
-from s3a.views.regions import MultiRegionPlot, makeMultiRegionDf
 from .base import TableFieldPlugin
+from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
 from ..generalutils import getCroppedImg, showMaskDiff, tryCvResize, incrStageNames
 from ..graphicsutils import RegionHistoryViewer
+from ..processing.algorithms import imageproc
 from ..processing.processing import (
-    ThreadPoolContainer,
     AbortableThreadContainer,
     ThreadedFuncWrapper,
 )
 from ..shared import SharedAppSettings
+from ..structures import BlackWhiteImg, XYVertices, ComplexXYVertices
+from ..views.regions import MultiRegionPlot, makeMultiRegionDf
 
 
 class _REG_ACCEPTED:

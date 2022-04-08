@@ -1,17 +1,15 @@
 import stat
-from pathlib import Path
-from typing import List, Union
+from typing import Union
 
 import cv2 as cv
 import numpy as np
 import pandas as pd
+from utilitys import PrjParam, CompositionMixin
 
-from s3a import S3A
 from s3a.constants import REQD_TBL_FIELDS
 from s3a.parameditors.table import TableData
 from s3a.structures import ComplexXYVertices
 from testingconsts import RND, TEST_FILE_DIR
-from utilitys import PrjParam, CompositionMixin
 
 
 class CompDfTester(CompositionMixin):

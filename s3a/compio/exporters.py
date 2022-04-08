@@ -6,27 +6,25 @@ import json
 import os
 import sys
 import tempfile
-import textwrap
 import typing as t
 from contextlib import ExitStack
 from pathlib import Path
 from stat import S_IREAD, S_IRGRP, S_IROTH
 from zipfile import ZipFile
 
+import cv2 as cv
 import numpy as np
 import pandas as pd
-import cv2 as cv
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 from skimage.exposure import rescale_intensity
-
 from utilitys import PrjParam
 from utilitys.fns import dynamicDocstring
 from utilitys.typeoverloads import FilePath
+
 from .base import AnnotationExporter, NO_ERRORS
 from .helpers import serialize
 from ..constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
-from ..structures import ComplexXYVertices
 from ..generalutils import (
     subImageFromVerts,
     getCroppedImg,
@@ -37,7 +35,7 @@ from ..generalutils import (
     imgPathtoHtml,
     toHtmlWithStyle,
 )
-from ..structures import PrjParamGroup
+from ..structures import ComplexXYVertices, PrjParamGroup
 
 __all__ = [
     "LblPngExporter",

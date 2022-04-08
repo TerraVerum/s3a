@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-import warnings
-from collections import defaultdict
 from pathlib import Path
 from typing import Optional, Union, Tuple, Callable
 
@@ -10,17 +8,16 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
-from pandas.core.dtypes.missing import array_equivalent
-
-from s3a.constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
-from s3a.shims import typing_extensions
-from s3a.structures import FilePath
 from utilitys import fns
+
 from .base import AnnotationIOBase
 from .exporters import *
 from .helpers import compareDataframes
 from .importers import *
+from ..constants import PRJ_ENUMS
 from ..parameditors.table.data import TableData
+from ..shims import typing_extensions
+from ..structures import FilePath
 
 FilePathOrDf = Union[FilePath, pd.DataFrame]
 # Values are strings

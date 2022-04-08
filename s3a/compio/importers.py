@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import ast
 import inspect
 import json
@@ -11,8 +12,8 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from skimage import draw
-
 from utilitys.typeoverloads import FilePath
+
 from .base import AnnotationImporter
 from .helpers import registerIoHandler
 from ..constants import REQD_TBL_FIELDS as RTF

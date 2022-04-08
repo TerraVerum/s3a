@@ -15,9 +15,9 @@ import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree.Parameter import PARAM_TYPES
-
-from utilitys import CompositionMixin, AtomicProcess, NestedProcess
+from utilitys import CompositionMixin, AtomicProcess
 from utilitys.params import *
+
 from .. import models
 from ..compio import ComponentIO, defaultIo
 from ..compio.base import AnnotationExporter

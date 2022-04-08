@@ -1,21 +1,18 @@
-from inspect import isdatadescriptor
-import typing as t
+from datetime import datetime
 
 import numpy as np
+import pandas as pd
 from pyqtgraph import SignalProxy
+from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
+from pyqtgraph.Qt import isQObjectAlive
+from utilitys import ParamContainer
 from utilitys import ParamEditorPlugin
-from utilitys.fns import serAsFrame
 from utilitys.widgets import ImageViewer
 
+from ..constants import PRJ_CONSTS as CNST
 from ..logger import getAppLogger
 from ..shared import SharedAppSettings
-from utilitys import ParamContainer
-from ..constants import PRJ_CONSTS as CNST
 from ..views.imageareas import MainImage
-import pandas as pd
-from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
-from datetime import datetime, timedelta
-from pyqtgraph.Qt import isQObjectAlive
 
 METRIC_TICK_INTERVAL_S = 0.25
 

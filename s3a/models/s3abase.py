@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
-
 from utilitys import (
     EditorPropsMixin,
     RunOpts,
@@ -21,6 +20,7 @@ from utilitys import (
     ParamEditorDockGrouping,
     ParamEditor,
 )
+
 from .. import ComponentIO, defaultIo
 from ..constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
 from ..controls.tableviewproxy import CompDisplayFilter, CompSortFilter

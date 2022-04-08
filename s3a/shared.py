@@ -1,13 +1,10 @@
-from pyqtgraph.Qt import QtCore
-
-
 class SharedAppSettings:
     def __init__(self):
-        from s3a.constants import IMG_PROC_DIR, MULT_PRED_DIR, CFG_DIR
-        from s3a.parameditors.algcollection import AlgCollection
-        from s3a.parameditors.table import TableData
-        from s3a.plugins.misc import SettingsPlugin, ShortcutsPlugin
-        from s3a.processing import ImgProcWrapper, ImageProcess
+        from .constants import IMG_PROC_DIR, MULT_PRED_DIR, CFG_DIR
+        from .parameditors.algcollection import AlgCollection
+        from .parameditors.table import TableData
+        from .plugins.misc import SettingsPlugin, ShortcutsPlugin
+        from .processing import ImgProcWrapper, ImageProcess
         from utilitys import ActionStack
 
         self.actionStack = ActionStack()

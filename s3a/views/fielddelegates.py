@@ -7,10 +7,11 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui
+from utilitys import EditorPropsMixin, PrjParam
+
+from .regions import MultiRegionPlot
 from ..constants import REQD_TBL_FIELDS as RTF
 from ..generalutils import minVertsCoord, symbolFromVerts
-from utilitys import EditorPropsMixin, PrjParam
-from .regions import MultiRegionPlot
 from ..shared import SharedAppSettings
 
 

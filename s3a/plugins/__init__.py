@@ -2,8 +2,10 @@ import pydoc
 import typing
 import warnings
 from functools import lru_cache
-from s3a.shims import entry_points
+
 from utilitys import ParamEditorPlugin
+
+from ..shims import entry_points
 
 
 def INTERNAL_PLUGINS():

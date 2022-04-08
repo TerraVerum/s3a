@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional, Sequence, Tuple
+from typing import Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -8,22 +8,20 @@ import pyqtgraph as pg
 from matplotlib import cm
 from matplotlib.pyplot import colormaps
 from pandas import DataFrame as df
-from pyqtgraph.Qt import QtCore, QtGui
-from s3a.constants import PRJ_CONSTS, PRJ_ENUMS
-from s3a.constants import REQD_TBL_FIELDS as RTF
-from s3a.generalutils import minVertsCoord, stackedVertsPlusConnections, symbolFromVerts
-from s3a.structures import (
+from pyqtgraph.Qt import QtCore
+from utilitys import DeferredActionStackMixin as DASM
+from utilitys import EditorPropsMixin, ParamContainer, PrjParam, RunOpts, fns
+
+from .clickables import BoundScatterPlot
+from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS as RTF
+from ..generalutils import stackedVertsPlusConnections, symbolFromVerts
+from ..structures import (
     BlackWhiteImg,
     ComplexXYVertices,
     GrayImg,
     OneDArr,
     XYVertices,
 )
-from utilitys import DeferredActionStackMixin as DASM
-from utilitys import EditorPropsMixin, ParamContainer, PrjParam, RunOpts, fns
-
-from . import imageareas
-from .clickables import BoundScatterPlot
 
 __all__ = ["MultiRegionPlot", "VertexDefinedImg", "RegionMoverPlot"]
 
@@ -364,7 +362,7 @@ class RegionMoverPlot(QtCore.QObject):
     sigMoveStarted = QtCore.Signal()
     sigMoveStopped = QtCore.Signal()
 
-    def __init__(self, mainImg: imageareas.MainImage = None, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
         self.active = False
         self.inCopyMode = True

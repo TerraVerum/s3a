@@ -1,2 +1,2 @@
-from .processing import *
 from .guiwrapper import *
+from .processing import *

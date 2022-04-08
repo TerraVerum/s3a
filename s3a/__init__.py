@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import os
-from pkg_resources import parse_version
 import sys
 
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtWidgets
+from pkg_resources import parse_version
 
 __all__ = [
     "appInst",
@@ -49,18 +48,11 @@ appInst = pg.mkQApp()
 appInst.setStyleSheet("QMessageBox { messagebox-text-interaction-flags: 5; }")
 
 from . import graphicsutils as gutils
-
-
-# Import here to resolve resolution order
-import s3a.constants
-import s3a.structures
-
+from .constants import REQD_TBL_FIELDS, PRJ_CONSTS, CFG_DIR, PRJ_ENUMS
+from .structures import ComplexXYVertices, XYVertices
 from .compio import ComponentIO, defaultIo
-from s3a.structures import XYVertices, ComplexXYVertices
-from s3a.constants import REQD_TBL_FIELDS, PRJ_CONSTS, CFG_DIR, PRJ_ENUMS
-
 from .views.s3agui import S3A
 
-from s3a.plugins.misc import RandomToolsPlugin
-from s3a.plugins.file import ProjectData
-from s3a.parameditors.table import TableData
+from .plugins.misc import RandomToolsPlugin
+from .plugins.file import ProjectData
+from .parameditors.table import TableData

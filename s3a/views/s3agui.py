@@ -7,15 +7,15 @@ import pyqtgraph as pg
 import qdarkstyle
 from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
+from utilitys import ParamEditor, ParamEditorPlugin, RunOpts, PrjParam, fns, widgets
 
 from ..constants import LAYOUTS_DIR, REQD_TBL_FIELDS, ICON_DIR, PRJ_ENUMS, PRJ_CONSTS
+from ..generalutils import hierarchicalUpdate
 from ..logger import getAppLogger
-from s3a.generalutils import hierarchicalUpdate
-from s3a.models.s3abase import S3ABase
-from s3a.plugins.misc import RandomToolsPlugin, MainImagePlugin, CompTablePlugin
-from s3a.shared import SharedAppSettings
-from s3a.structures import FilePath, NChanImg
-from utilitys import ParamEditor, ParamEditorPlugin, RunOpts, PrjParam, fns, widgets
+from ..models.s3abase import S3ABase
+from ..plugins.misc import RandomToolsPlugin, MainImagePlugin, CompTablePlugin
+from ..shared import SharedAppSettings
+from ..structures import FilePath, NChanImg
 
 __all__ = ["S3A"]
 

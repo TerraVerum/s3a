@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import copy
 import inspect
 import typing as t
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
 from utilitys import PrjParam, fns, RunOpts
 from utilitys.typeoverloads import FilePath
+
 from .helpers import serialize, deserialize, checkVertBounds
 from ..constants import REQD_TBL_FIELDS as RTF
 from ..generalutils import toDictGen

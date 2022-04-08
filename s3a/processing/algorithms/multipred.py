@@ -5,13 +5,13 @@ import cv2 as cv
 import numpy as np
 import pandas as pd
 from scipy.ndimage import maximum_filter
-
-from ...constants import PRJ_ENUMS, REQD_TBL_FIELDS as RTF
-from ... import generalutils as gutils
-from ...structures import ComplexXYVertices, XYVertices
-from ...compio.componentio import defaultIo
 from utilitys import PrjParam
 from utilitys import ProcessIO, fns, AtomicProcess
+
+from ... import generalutils as gutils
+from ...compio.componentio import defaultIo
+from ...constants import PRJ_ENUMS, REQD_TBL_FIELDS as RTF
+from ...structures import ComplexXYVertices, XYVertices
 
 
 def get_component_images(image: np.ndarray, components: pd.DataFrame):

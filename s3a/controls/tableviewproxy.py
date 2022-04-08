@@ -5,20 +5,19 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from pyqtgraph.parametertree import Parameter
-from utilitys.processing import AtomicProcess, ProcessIO
-
-from s3a.constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
-from s3a.models.tablemodel import ComponentMgr
-from s3a.shared import SharedAppSettings
-from s3a.structures import OneDArr
-from s3a.structures import XYVertices, ComplexXYVertices
-from s3a.views import tableview
-from s3a.views.imageareas import MainImage
-from s3a.views.regions import MultiRegionPlot
-from s3a.views.fielddelegates import FieldDisplay
 from utilitys import DeferredActionStackMixin as DASM
 from utilitys import EditorPropsMixin, RunOpts, ParamContainer
+from utilitys.processing import AtomicProcess, ProcessIO
+
+from ..constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
+from ..models.tablemodel import ComponentMgr
+from ..shared import SharedAppSettings
+from ..structures import OneDArr
+from ..structures import XYVertices, ComplexXYVertices
+from ..views.fielddelegates import FieldDisplay
+from ..views.imageareas import MainImage
+from ..views.regions import MultiRegionPlot
+from ..views.tableview import CompTableView
 
 __all__ = ["CompSortFilter", "CompDisplayFilter"]
 
@@ -119,7 +118,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         self,
         compMgr: ComponentMgr,
         mainImg: MainImage,
-        compTbl: tableview.CompTableView,
+        compTbl: CompTableView,
         parent=None,
     ):
         super().__init__(parent)
