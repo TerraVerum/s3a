@@ -1,16 +1,16 @@
-import pytest
 from typing import Tuple
 
-from pyqtgraph.Qt import QtCore, QtGui
-import pyqtgraph as pg
 import numpy as np
+import pyqtgraph as pg
+import pytest
+from pyqtgraph.Qt import QtCore, QtGui
+from utilitys import EditorPropsMixin
 
 from s3a import XYVertices
+from s3a.constants import PRJ_CONSTS
 from s3a.shared import SharedAppSettings
 from s3a.views.imageareas import MainImage
 from s3a.views.rois import SHAPE_ROI_MAPPING
-from s3a.constants import PRJ_CONSTS
-from utilitys import EditorPropsMixin
 
 shapes = tuple(SHAPE_ROI_MAPPING.keys())
 with EditorPropsMixin.setEditorPropertyOpts(shared=SharedAppSettings()):

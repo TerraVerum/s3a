@@ -1,12 +1,14 @@
+from utilitys import ActionStack
+from .constants import IMG_PROC_DIR, MULT_PRED_DIR, CFG_DIR
+from .parameditors.algcollection import AlgCollection
+from .parameditors.table import TableData
+from .plugins.settings import SettingsPlugin
+from .plugins.shortucts import ShortcutsPlugin
+from .processing import ImgProcWrapper, ImageProcess
+
+
 class SharedAppSettings:
     def __init__(self):
-        from .constants import IMG_PROC_DIR, MULT_PRED_DIR, CFG_DIR
-        from .parameditors.algcollection import AlgCollection
-        from .parameditors.table import TableData
-        from .plugins.misc import SettingsPlugin, ShortcutsPlugin
-        from .processing import ImgProcWrapper, ImageProcess
-        from utilitys import ActionStack
-
         self.actionStack = ActionStack()
 
         self.tableData = TableData(makeFilter=True)

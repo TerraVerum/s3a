@@ -13,7 +13,9 @@ from ..constants import LAYOUTS_DIR, REQD_TBL_FIELDS, ICON_DIR, PRJ_ENUMS, PRJ_C
 from ..generalutils import hierarchicalUpdate
 from ..logger import getAppLogger
 from ..models.s3abase import S3ABase
-from ..plugins.misc import RandomToolsPlugin, MainImagePlugin, CompTablePlugin
+from ..plugins.comptable import CompTablePlugin
+from ..plugins.mainimage import MainImagePlugin
+from ..plugins.misc import RandomToolsPlugin
 from ..shared import SharedAppSettings
 from ..structures import FilePath, NChanImg
 

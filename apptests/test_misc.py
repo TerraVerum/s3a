@@ -4,7 +4,8 @@ from skimage import data
 
 from s3a import generalutils as gu, ComplexXYVertices, PRJ_ENUMS
 from s3a.generalutils import deprecateKwargs
-from s3a.plugins.misc import miscFuncsPluginFactory, MultiPredictionsPlugin
+from s3a.plugins.misc import miscFuncsPluginFactory
+from s3a.plugins.multipred import MultiPredictionsPlugin
 
 _rots = list(np.linspace(-180, 180, 25)) + [PRJ_ENUMS.ROT_OPTIMAL]
 

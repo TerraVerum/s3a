@@ -10,13 +10,13 @@ from ..shims import entry_points
 
 def INTERNAL_PLUGINS():
     from .misc import (
-        MainImagePlugin,
-        CompTablePlugin,
         RandomToolsPlugin,
-        EditPlugin,
-        HelpPlugin,
-        MultiPredictionsPlugin,
     )
+    from .edit import EditPlugin
+    from .comptable import CompTablePlugin
+    from .mainimage import MainImagePlugin
+    from .help import HelpPlugin
+    from .multipred import MultiPredictionsPlugin
     from .usermetrics import UserMetricsPlugin
     from .file import FilePlugin
     from .tablefield import VerticesPlugin

@@ -1,12 +1,13 @@
-import shutil
-from io import StringIO
-from pathlib import Path
 import pickle as pkl
+import shutil
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
+from utilitys import fns
 
+from apptests.conftest import dfTester
 from apptests.helperclasses import CompDfTester
 from apptests.testingconsts import (
     SAMPLE_SMALL_IMG_FNAME,
@@ -14,11 +15,9 @@ from apptests.testingconsts import (
     SAMPLE_IMG_FNAME,
     TEST_FILE_DIR,
 )
-from apptests.conftest import dfTester
 from s3a import S3A
 from s3a.parameditors.table import IOTemplateManager
 from s3a.plugins.file import ProjectData, absolutePath
-from utilitys import fns
 
 
 @pytest.fixture
