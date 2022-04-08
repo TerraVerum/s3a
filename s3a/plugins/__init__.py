@@ -1,5 +1,6 @@
 import pydoc
 import typing
+import warnings
 from functools import lru_cache
 from s3a.shims import entry_points
 from utilitys import ParamEditorPlugin
@@ -38,12 +39,21 @@ _nonEntryPointExternalPlugins = []
 def EXTERNAL_PLUGINS():
     discoveredPlgs = entry_points().get("s3a.plugins", [])
     externPlgs = _nonEntryPointExternalPlugins.copy()
-    # noinspection PyTypeChecker
+
+    def fallback():
+        warnings.warn(
+            f"'{ep.value}' did not expose a callable. No plugins were found.",
+            UserWarning,
+        )
+        return []
+
     for ep in discoveredPlgs:
         # ALL_PLUGINS is usually exposed here
         member = pydoc.locate(ep.value)
         if member:
-            plgs = member()
+            # Avoid "pydoc returns object" warning by getattr access to callable
+            # Also defaults to no plugins if a bogus entry point was specified
+            plgs = getattr(member, "__call__", fallback)()
             for plg in plgs:
                 if plg not in externPlgs:
                     externPlgs.append(plg)
