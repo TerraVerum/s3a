@@ -397,7 +397,9 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         self.mgr = win.compMgr
         self.mainImg = win.mainImg
         win.mainImg.toolsEditor.registerFunc(
-            self.makePrediction, btnOpts=CNST.TOOL_MULT_PRED, ignoreKeys=["comps"]
+            self.makePrediction,
+            btnOpts=CNST.TOOL_MULT_PRED,
+            ignoreKeys=["comps"],
         )
 
     def makePrediction(self, comps: pd.DataFrame = None, **runKwargs):

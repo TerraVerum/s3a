@@ -19,6 +19,7 @@ from utilitys import (
     ParamContainer,
     DeferredActionStackMixin as DASM,
     ParamEditorDockGrouping,
+    ParamEditor,
 )
 from .. import ComponentIO, defaultIo
 from ..constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
@@ -327,7 +328,9 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         self.clsToPluginMapping[pluginCls] = plugin
         if plugin.dock is not None and plugin.dock not in self.docks:
             self.docks.append(plugin.dock)
-        plugin.attachWinRef(self)
+        # Many plugins register functions when attaching win
+        with ParamEditor.setBaseRegisterPath(plugin.__groupingName__):
+            plugin.attachWinRef(self)
         if plugin.dock:
             plugin.dock.setParent(self)
         return plugin
