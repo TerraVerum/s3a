@@ -189,7 +189,9 @@ def tryCvResize(
     except (TypeError, cv.error):
         oldRange = (image.min(), image.max())
         if asRatio:
-            rescaled = trans.rescale(image, newSize, multichannel=image.ndim > 2)
+            rescaled = trans.rescale(
+                image, newSize, channel_axis=2 if image.ndim > 2 else None
+            )
         else:
             rescaled = trans.resize(image, newSize[::-1])
         image = exposure.rescale_intensity(rescaled, out_range=oldRange).astype(
