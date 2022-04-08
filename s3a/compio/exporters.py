@@ -202,7 +202,14 @@ class CompImgsDfExporter(AnnotationExporter):
     srcDir: DirectoryDict
     labelMaskDir: dict
 
-    allOutputColumns = ("instanceId", "image", "labelMask", "label", "offset")
+    allOutputColumns = (
+        "instanceId",
+        "image",
+        "labelMask",
+        "label",
+        "numericLabel",
+        "offset",
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -432,6 +439,9 @@ class CompImgsDfExporter(AnnotationExporter):
         lbl = inst[labelField]
         if "label" in useKeys:
             out["label"] = lbl
+
+        if "numericLabel" in useKeys:
+            out["numericLabel"] = labelValue
 
         if stats is not None:
             out.update(stats)
