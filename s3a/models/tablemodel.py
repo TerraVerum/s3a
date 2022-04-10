@@ -265,7 +265,6 @@ class ComponentMgr(CompTableModel):
         elif not hasattr(idsToRemove, "__iter__"):
             # single number passed in
             idsToRemove = [idsToRemove]
-            pass
         idsToRemove = np.array(idsToRemove)
 
         # Do nothing for IDs not actually in the existing list
