@@ -47,7 +47,6 @@ def absolutePath(p: Optional[Path]):
 
 class FilePlugin(CompositionMixin, ParamEditorPlugin):
     name = "File"
-    win: models.s3abase.S3A
 
     def __init__(self, startupName: FilePath = None, startupCfg: dict = None):
         super().__init__()
@@ -132,7 +131,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         )
         return exportOptsParam
 
-    def attachWinRef(self, win: models.s3abase.S3ABase):
+    def attachWinRef(self, win):
         super().attachWinRef(win)
         self.projData.compIo.tableData = win.sharedAttrs.tableData
         win.statBar.addPermanentWidget(self.projNameLbl)

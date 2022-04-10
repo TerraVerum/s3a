@@ -8,7 +8,6 @@ from pyqtgraph.Qt import QtCore
 from utilitys import ParamEditorPlugin, widgets as uw
 
 from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
-from ..models import s3abase
 
 
 class RandomToolsPlugin(ParamEditorPlugin):
@@ -21,7 +20,7 @@ class RandomToolsPlugin(ParamEditorPlugin):
   (kwargs are the value)
   """
 
-    def attachWinRef(self, win: s3abase.S3ABase):
+    def attachWinRef(self, win):
         super().attachWinRef(win)
 
         self.registerFunc(self.showDevConsoleGui, name="Show Dev Console")
