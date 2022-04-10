@@ -479,7 +479,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         newComps = self.regionMover.baseData
         # TODO: Truncate vertices that lie outside image boundaries
         # Invalid if any verts are outside image bounds
-        truncatedCompIds = []
+        # truncatedCompIds = []
         # imShape_xy = self._mainImgArea.image.shape[:2][::-1]
         for idx in newComps.index:
             verts = newComps.at[idx, REQD_TBL_FIELDS.VERTICES].removeOffset(
