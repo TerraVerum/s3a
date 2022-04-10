@@ -8,6 +8,7 @@ from pyqtgraph.Qt import QtCore
 from ..constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
 from ..generalutils import coerceDfTypes
 from ..shared import SharedAppSettings
+from ..logger import getAppLogger
 from ..structures import ComplexXYVertices, OneDArr
 
 __all__ = ["ComponentMgr", "CompTableModel"]
@@ -96,11 +97,10 @@ class CompTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
             # Numpy array-like
             cmp = np.any(cmp)
         if cmp:
-            warnLater(
-                "Warning! An error occurred setting this value. Please try again using a"
-                " *multi-cell* edit. E.g. do not just set this value, set it along with"
-                " at least one other selected cell.",
-                UserWarning,
+            getAppLogger(__name__).warning(
+                "Warning! An error occurred setting this value. Please try again using"
+                " a *multi-cell* edit. E.g. do not just set this value, set it along"
+                " with at least one other selected cell.",
             )
         toEmit = self.defaultEmitDict.copy()
         toEmit["changed"] = np.array([self.compDf.index[index.row()]])
