@@ -60,26 +60,23 @@ def _runFunc(param: PrjParam, values, which: str, default: t.Callable, returnErr
 
 
 def serialize(param: PrjParam, values: t.Sequence[t.Any], returnErrs=True):
-    if returnErrs:
-        retCnt = 2
-        retIdx = slice(None)
-    else:
-        retCnt = 1
-        retIdx = 0
-    ret = [pd.Series(name=param, dtype=str).copy() for _ in range(retCnt)]
-    if not len(values):
-        # Nothing to do
-        return ret[retIdx]
-    # Calling 'serialize' on already serialized data is a no-op
-    # TODO: handle heterogeneous arrays?
-    # Series objects will use loc-based indexing, so use an iterator to guarantee first access regardless of sequence
-    # type
-    if isinstance(next(iter(values)), str):
-        ret[0] = pd.Series(values, name=param)
-        return ret[retIdx]
-    # Also account for when takesParam=True, where val will be the last option
     default = lambda *args: str(args[-1])
-    return _runFunc(param, values, "serialize", default, returnErrs)
+    hasValues = len(values) > 0
+    # Series objects will use loc-based indexing, so use an iterator to guarantee first
+    # access regardless of sequence type
+    alreadyStr = hasValues and isinstance(next(iter(values)), str)
+    defaultRet = [pd.Series(name=param, dtype=str) for _ in range(2)]
+    if hasValues and not alreadyStr:
+        return _runFunc(param, values, "serialize", default, returnErrs)
+    elif alreadyStr:
+        # TODO: handle heterogeneous arrays?
+        # Calling 'serialize' on already serialized data is a no-op
+        defaultRet[0] = pd.Series(values, name=param)
+    # If no values, return type is already set and no need to do anything more
+    if returnErrs:
+        return defaultRet
+    # Just values
+    return defaultRet[0]
 
 
 def deserialize(param: PrjParam, values: t.Sequence[str], returnErrs=True):
