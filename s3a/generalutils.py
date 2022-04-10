@@ -298,17 +298,30 @@ def showMaskDiff(oldMask: BlackWhiteImg, newMask: BlackWhiteImg):
     return infoMask
 
 
-# Poor man's LRU dict, since I don't yet feel like including another pypi dependency
 class MaxSizeDict(dict):
+    """
+    Poor man's LRU dict, since I don't yet feel like including another pypi dependency
+    Rather than evicting the least recently used, it evicts the oldest set value.
+    Allows simpler implementation since no logic is needed to track last accesses.
+    Use something more effective than this if true LRU behavior is required.
+    """
+
     def __init__(self, *args, maxsize: int = np.inf, **kwargs):
         super().__init__(*args, **kwargs)
         self.maxsize = maxsize
 
     def __setitem__(self, key, value):
-        if len(self) >= self.maxsize:
-            # Evict oldest inserted entry
-            self.pop(next(iter(self.keys())))
+        # Perform set before pop in case errors arise
         super().__setitem__(key, value)
+        if len(self) > self.maxsize:
+            # Evict oldest accessed entry
+            self.pop(next(iter(self.keys())))
+
+    def __eq__(self, other):
+        # Silence LGTM alert by providing custom equality function. Note that
+        # a different `maxsize` doesn't change whether two dicts have equal values,
+        # which is why the `super` implementation holds here.
+        return super().__eq__(other)
 
 
 def _getPtAngles(pts):
