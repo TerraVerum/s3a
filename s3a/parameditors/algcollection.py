@@ -492,11 +492,13 @@ class AlgCollection(ParamEditor):
                 # Ensure "import AtomicProcess" does not pass this check
                 and attr not in [AtomicProcess, NestedProcess]
             ):
+                # So many things can go wrong that a broad exception *should* be caught
+                # noinspection PyBroadException
                 try:
                     attr = attr(**factoryArgs)
                     if not isinstance(attr, ProcessStage):
                         continue
-                except:
+                except Exception:
                     # Don't plan on handling non-process stage factory objects / badly constructed objects
                     continue
             if isinstance(attr, ProcessStage):

@@ -351,7 +351,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
             # noinspection PyBroadException
             try:
                 isEqual = curDf.equals(lastSavedDf)
-            except:
+            except Exception:
                 isEqual = False
             if not isEqual:
                 self.win.exportCurAnnotation(baseSaveNamePlusFolder)
