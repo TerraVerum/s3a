@@ -3,9 +3,24 @@ from pathlib import Path
 
 from numpy import ndarray
 from utilitys import PrjParam
-
-# noinspection PyUnresolvedReferences
 from utilitys.typeoverloads import FilePath
+
+# `FilePath` Exposed for convenience
+
+__all__ = [
+    "BlackWhiteImg",
+    "GrayImg",
+    "RgbImg",
+    "RgbaImg",
+    "NChanImg",
+    "OneDArr",
+    "TwoDArr",
+    "ThreeDArr",
+    "LabelFieldType",
+    "AnnParseError",
+    "AnnInstanceError",
+    "FilePath",
+]
 
 """
 Functions that just return a `np.ndarray` are often hard to interpret. Is the output a simple array, image, 

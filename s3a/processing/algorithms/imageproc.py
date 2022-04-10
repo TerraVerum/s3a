@@ -18,6 +18,7 @@ from ...generalutils import (
     imgCornerVertices,
     showMaskDiff,
     tryCvResize,
+    getObjsDefinedInSelfModule,
 )
 from ...structures import (
     BlackWhiteImg,
@@ -26,6 +27,8 @@ from ...structures import (
     NChanImg,
     GrayImg,
 )
+
+# `__all__` is defined at the bottom programmatically
 
 UNSPEC = PRJ_ENUMS.HISTORY_UNSPECIFIED
 FGND = PRJ_ENUMS.HISTORY_FOREGROUND
@@ -653,3 +656,15 @@ def cv_resize(
     if isinstance(interpolation, str):
         interpolation = getattr(cv, interpolation)
     return tryCvResize(image, newSize, asRatio, interpolation)
+
+
+# Lots of functions, __all__ should just take everything public defined in this
+# module
+_selfModule = cv_resize.__module__
+# Prepopulate with functions that won't be programmatically found
+__all__ = [
+    "procCache",
+    "opening",
+    "closing",
+    "slic_segmentation",
+] + getObjsDefinedInSelfModule(vars(), _selfModule)

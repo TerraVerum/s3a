@@ -10,6 +10,8 @@ import pandas as pd
 
 from .typeoverloads import NChanImg, BlackWhiteImg
 
+__all__ = ["XYVertices", "ComplexXYVertices", "S3AVertsAccessor"]
+
 
 class XYVertices(np.ndarray):
     connected = True

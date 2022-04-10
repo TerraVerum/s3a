@@ -879,3 +879,15 @@ def convertImages(
     errs = [f"{r[0].name}: {r[1]}" for r in ret if r is not None]
     if errs:
         print(f"Conversion errors occurred in the following files:\n" + "\n".join(errs))
+
+
+def getObjsDefinedInSelfModule(moduleVars, moduleName, ignorePrefix="_"):
+    # Prepopulate to avoid "dictionary changed on iteration"
+    _iterVars = list(moduleVars.items())
+    out = []
+    for name, obj in _iterVars:
+        if name.startswith(ignorePrefix):
+            continue
+        if hasattr(obj, "__module__") and obj.__module__ == moduleName:
+            out.append(name)
+    return out

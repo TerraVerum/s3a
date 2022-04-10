@@ -13,6 +13,8 @@ from ...compio.componentio import defaultIo
 from ...constants import PRJ_ENUMS, REQD_TBL_FIELDS as RTF
 from ...structures import ComplexXYVertices, XYVertices
 
+# __all__ defined programmatically at the end of this module
+
 
 def get_component_images(image: np.ndarray, components: pd.DataFrame):
     """
@@ -359,3 +361,9 @@ def single_categorical_prediction(
 categorical_prediction = ProcessDispatcher(
     single_categorical_prediction, name="Categorical Prediction"
 )
+
+_selfModule = single_categorical_prediction.__module__
+__all__ = [
+    "categorical_prediction",
+    "cv_template_match",
+] + gutils.getObjsDefinedInSelfModule(vars(), _selfModule)
