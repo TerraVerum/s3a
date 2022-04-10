@@ -76,16 +76,15 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
 
     def __initEditorParams__(self, shared: SharedAppSettings):
         self.props = ParamContainer()
-        with shared.colorScheme.setBaseRegisterPath(self.__groupingName__):
-            # Use setattr so pycharm autocomplete doesn't forget arg hints
-            proc = shared.colorScheme.registerFunc(
-                self.updateColors,
-                runOpts=RunOpts.ON_CHANGED,
-                nest=False,
-                ignoreKeys=["hideFocused"],
-                container=self.props,
-            )
-            setattr(self, "updateColors", proc)
+        # Use setattr so pycharm autocomplete doesn't forget arg hints
+        proc = shared.colorScheme.registerFunc(
+            self.updateColors,
+            runOpts=RunOpts.ON_CHANGED,
+            nest=False,
+            ignoreKeys=["hideFocused"],
+            container=self.props,
+        )
+        setattr(self, "updateColors", proc)
 
     def __init__(self, parent=None, disableMouseClick=False):
         super().__init__(size=1, pxMode=False)
@@ -136,15 +135,15 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
         Marks 'selectedIds' as currently selected by changing their scheme to user-specified
         selection values.
         """
-        self.updateSelected_focused(selectedIds=selectedIds)
+        self.updateSelectedAndFocused(selectedIds=selectedIds)
 
     def focusById(self, focusedIds: OneDArr, **kwargs):
         """
         Colors 'focusedIds' to indicate they are present in a focused views.
         """
-        self.updateSelected_focused(focusedIds=focusedIds)
+        self.updateSelectedAndFocused(focusedIds=focusedIds)
 
-    def updateSelected_focused(
+    def updateSelectedAndFocused(
         self,
         selectedIds: np.ndarray = None,
         focusedIds: np.ndarray = None,

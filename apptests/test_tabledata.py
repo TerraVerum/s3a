@@ -51,7 +51,7 @@ def test_no_opt_fields(app, newCfg):
         newComps = app.sharedAttrs.tableData.makeCompDf(3).reset_index(drop=True)
         dfTester.fillRandomVerts(compDf=newComps)
         # Just make sure no errors are thrown on adding comps
-        app.add_focusComps(newComps)
+        app.addAndFocusComps(newComps)
         assert len(app.compMgr.compDf) == 3
 
 

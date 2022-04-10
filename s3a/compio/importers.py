@@ -16,7 +16,7 @@ from utilitys.typeoverloads import FilePath
 from .base import AnnotationImporter
 from .helpers import registerIoHandler
 from ..constants import REQD_TBL_FIELDS as RTF
-from ..generalutils import DirectoryDict, orderContourPts, cvImread_rgb, pd_iterdict
+from ..generalutils import DirectoryDict, orderContourPts, cvImreadRgb, toDictGen
 from ..structures import ComplexXYVertices, XYVertices, AnnInstanceError, LabelFieldType
 
 __all__ = [
@@ -54,7 +54,7 @@ class SerialImporter(AnnotationImporter):
         return importObj
 
     def getInstances(self, importObj, **kwargs):
-        return pd_iterdict(importObj)
+        return toDictGen(importObj)
 
     @staticmethod
     def _getPdImporters():
@@ -211,7 +211,7 @@ class VGGImageAnnotatorImporter(CsvImporter):
         return out
 
     def getInstances(self, importObj: pd.DataFrame, **kwargs):
-        return pd_iterdict(importObj)
+        return toDictGen(importObj)
 
     @staticmethod
     def parseRegion(region):
@@ -272,7 +272,7 @@ class LblPngImporter(AnnotationImporter):
             image = np.asarray(image)
         except TypeError:
             # E.g. float image
-            return cvImread_rgb(str(file), mode=cv.IMREAD_UNCHANGED)
+            return cvImreadRgb(str(file), mode=cv.IMREAD_UNCHANGED)
         return image
 
     def populateMetadata(
@@ -349,7 +349,7 @@ class PklImporter(AnnotationImporter):
         return pd.read_pickle(file)
 
     def getInstances(self, importObj, **kwargs):
-        return pd_iterdict(importObj)
+        return toDictGen(importObj)
 
     def bulkImport(self, importObj, **kwargs):
         return importObj

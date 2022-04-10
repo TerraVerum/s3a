@@ -91,9 +91,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             newBuff.extend(self.regionBuffer)
             self.regionBuffer = newBuff
 
-        mainBufSize = win.sharedAttrs.generalProps.params.child(
-            win.__groupingName__, "maxLength"
-        )
+        mainBufSize = win.props.params["maxLength"]
         mainBufSize.sigValueChanged.connect(resetRegBuff)
 
         funcLst = [
@@ -121,14 +119,14 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         win.mainImg.imgItem.sigImageChanged.connect(onChange)
 
         win.mainImg.registerDrawAction(
-            [CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self._run_drawAct
+            [CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self._runFromDrawAct
         )
         win.mainImg.addTools(self.toolsEditor)
         self.vb: pg.ViewBox = win.mainImg.getViewBox()
 
         self.statusBtn = QtWidgets.QPushButton("No pending actions")
         self.statusBtn.setToolTip("Click to abort all active/pending actions")
-        self.statusBtn.clicked.connect(self.endQueuedActions_gui)
+        self.statusBtn.clicked.connect(self.endQueuedActionsGui)
         win.statBar.addPermanentWidget(self.statusBtn)
 
         super().attachWinRef(win)
@@ -154,11 +152,11 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             self.updateRegionFromDf(None)
             return
         oldId = self.mainImg.compSer[RTF.INST_ID]
-        self.updateRegionFromDf(self.mainImg.compSer_asFrame)
+        self.updateRegionFromDf(self.mainImg.compSerAsFrame)
         if newComp is None or oldId != newComp[RTF.INST_ID]:
             self.firstRun = True
 
-    def _run_drawAct(self, verts: XYVertices, param: PrjParam):
+    def _runFromDrawAct(self, verts: XYVertices, param: PrjParam):
         # noinspection PyTypeChecker
         verts: XYVertices = verts.astype(int)
         if param == CNST.DRAW_ACT_ADD:
@@ -188,7 +186,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         # Reversing kills unstarted tasks first
         self.taskMgr.endThreads(reversed(self.taskMgr.threads), endRunning=endRunning)
 
-    def endQueuedActions_gui(self):
+    def endQueuedActionsGui(self):
         statuses = [t.isRunning() for t in self.taskMgr.threads]
         if len(statuses) and all(statuses):
             # Only running threads are left, ensure the user really wants to violently kill them
@@ -222,7 +220,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             return
         newGrayscale = newGrayscale.astype("uint8")
 
-        matchNames = incrStageNames(self.curProcessor.stages_flattened)
+        matchNames = incrStageNames(self.curProcessor.stagesFlattened)
         type(self).displayableInfos.fget.cache_clear()
         if self._displayedStage in matchNames:
             self.overlayStageInfo(self._displayedStage, self.stageInfoImage.opacity())
@@ -346,7 +344,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         df = makeMultiRegionDf(
             vertices=[ComplexXYVertices.fromBinaryMask(mask)], idList=[compId]
         )
-        self.updateRegion_undoable(df, offset=offset, oldProcCache=self.oldProcCache)
+        self.updateRegionUndoable(df, offset=offset, oldProcCache=self.oldProcCache)
 
     def invertRegion(self):
         """
@@ -367,7 +365,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         self.updateRegionFromMask(invertedMask, offset)
 
     @DASM.undoable("Modify Focused Component")
-    def updateRegion_undoable(
+    def updateRegionUndoable(
         self, newData: pd.DataFrame = None, offset: XYVertices = None, oldProcCache=None
     ):
         # Preserve cache state in argument list so it can be restored on undo. Otherwise, a separate undo buffer must
@@ -418,7 +416,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         """Reset the focused image by restoring the region mask to the last saved state"""
         if self.mainImg.compSer is None:
             return
-        self.updateRegion_undoable(self.mainImg.compSer_asFrame)
+        self.updateRegionUndoable(self.mainImg.compSerAsFrame)
 
     def _onActivate(self):
         self.region.show()
@@ -492,7 +490,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     @lru_cache()
     def displayableInfos(self):
         outInfos = {}
-        stages = self.curProcessor.processor.stages_flattened
+        stages = self.curProcessor.processor.stagesFlattened
         matchNames = incrStageNames(stages)
         boundSlices = None
 

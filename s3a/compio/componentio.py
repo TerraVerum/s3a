@@ -49,7 +49,7 @@ def _attrNameFmt(buildOrExport: _litLst, obj):
     return out
 
 
-def _writeImge_meta(
+def _writeImgWithMetadata(
     outImg: np.ndarray,
     saveName: FilePath,
     mapping: pd.Series = None,

@@ -73,7 +73,7 @@ class CompSortFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
 
         # Special case: Handle vertices
         if isinstance(leftObj, (ComplexXYVertices, XYVertices)):
-            return self.lessThan_vertices(leftObj, rightObj)
+            return self.lessThanVertices(leftObj, rightObj)
 
         # General case
         try:
@@ -82,7 +82,7 @@ class CompSortFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
             # If that doesn't work, default to stringified comparison
             return str(leftObj) < str(rightObj)
 
-    def lessThan_vertices(self, leftObj, rightObj):
+    def lessThanVertices(self, leftObj, rightObj):
         """Sort implementation for vertices objects"""
         if isinstance(leftObj, ComplexXYVertices):
             leftObj = leftObj.stack()
@@ -107,7 +107,6 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         boundaryOnly, _ = shared.generalProps.registerProps(
             [PRJ_CONSTS.PROP_COMP_SEL_BHV, PRJ_CONSTS.PROP_FIELD_INFO_ON_SEL],
             container=self.props,
-            asProperty=False,
         )
 
         def _onChange(param, val):
@@ -139,13 +138,12 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
 
         attrs = self.sharedAttrs
 
-        with attrs.colorScheme.setBaseRegisterPath(self.regionPlot.__groupingName__):
-            self.updateLabelProc = attrs.colorScheme.registerFunc(
-                self.updateLabelCol, runOpts=RunOpts.ON_CHANGED, nest=False
-            )
-            attrs.generalProps.registerProp(
-                PRJ_CONSTS.PROP_SCALE_PEN_WIDTH, container=self.props
-            )
+        self.updateLabelProc = attrs.colorScheme.registerFunc(
+            self.updateLabelCol, runOpts=RunOpts.ON_CHANGED, nest=False
+        )
+        attrs.generalProps.registerProp(
+            PRJ_CONSTS.PROP_SCALE_PEN_WIDTH, container=self.props
+        )
 
         # Attach to UI signals
         def _maybeRedraw():
@@ -312,7 +310,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     def _reflectTableSelectionChange(self, selectedIds: OneDArr):
         self.selectedIds = selectedIds
         # Silently update selected ids since focusById will force another graphic update
-        self.regionPlot.updateSelected_focused(
+        self.regionPlot.updateSelectedAndFocused(
             selectedIds=selectedIds, updatePlot=False
         )
         selectedComps = self._compMgr.compDf.loc[selectedIds]

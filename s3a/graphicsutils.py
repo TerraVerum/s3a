@@ -29,7 +29,7 @@ def disableAppDuringFunc(func):
     return disableApp
 
 
-def create_addMenuAct(
+def createAndAddMenuAct(
     mainWin: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, title: str, asMenu=False
 ) -> Union[QtWidgets.QMenu, QtGui.QAction]:
     menu = None

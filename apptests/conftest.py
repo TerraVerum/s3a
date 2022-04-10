@@ -83,7 +83,7 @@ def vertsPlugin(app) -> VerticesPlugin:
 # Each test can request wheter it starts with components, small image, etc.
 # After each test, all components are removed from the app
 @pytest.fixture(autouse=True)
-def resetApp_tester(request, app, filePlg, mgr):
+def resetAppAndTester(request, app, filePlg, mgr):
     for img in filePlg.projData.images:
         try:
             if img != app.srcImgFname:

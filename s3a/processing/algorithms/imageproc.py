@@ -59,7 +59,7 @@ def growSeedpoint(img: NChanImg, seeds: XYVertices, thresh: float) -> BlackWhite
     return bwOut
 
 
-# def _growSeedpoint_cv_fastButErratic(img: NChanImg, seeds: XYVertices, thresh: float):
+# def _growSeedpointCvFastButErratic(img: NChanImg, seeds: XYVertices, thresh: float):
 #   if len(seeds) == 0:
 #     return np.zeros(img.shape[:2], bool)
 #   nChans = img.shape[2] if img.ndim > 2 else 1

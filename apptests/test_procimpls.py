@@ -40,7 +40,7 @@ def test_disable_top_stages(app, vertsPlugin):
     for name in pe.clctn.topProcs:
         proc = pe.clctn.parseProcName(name)
         pe.changeActiveProcessor(proc, saveBeforeChange=False)
-        for stage in proc.stages_flattened:
+        for stage in proc.stagesFlattened:
             if stage.allowDisable and isinstance(stage, ImageProcess):
                 pe.curProcessor.setStageEnabled([stage.name], False)
         # Some exceptions may occur in the processor, this is fine since behavior might be undefined

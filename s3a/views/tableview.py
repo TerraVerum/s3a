@@ -234,14 +234,13 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
             type(self), name="Component Table Tools"
         )
 
-        with shared.generalProps.setBaseRegisterPath(self.__groupingName__):
-            proc, params = shared.generalProps.registerFunc(
-                self.setVisibleColumns,
-                runOpts=RunOpts.ON_CHANGED,
-                nest=False,
-                returnParam=True,
-                visibleColumns=[],
-            )
+        proc, params = shared.generalProps.registerFunc(
+            self.setVisibleColumns,
+            runOpts=RunOpts.ON_CHANGED,
+            nest=False,
+            returnParam=True,
+            visibleColumns=[],
+        )
         props["visibleColumns"] = params.child("visibleColumns")
         shared.tableData.sigCfgUpdated.connect(self._onTableChange)
 
@@ -361,7 +360,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         self._prevSelRows = newRows
         self.sigSelectionChanged.emit(newRows)
 
-    def removeSelectedRows_gui(self):
+    def removeSelectedRowsGui(self):
         if self.minimal:
             return
 
@@ -387,7 +386,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
             self.mgr.rmComps(idList)
             self.clearSelection()
 
-    def ids_rows_colsFromSelection(
+    def idsRowsColsFromSelection(
         self,
         excludeNoEditCols=True,
         warnNoneSelection=True,
@@ -431,17 +430,17 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         Sets all cells in the selection to be the same as the first row in the selection.
         See the project wiki for a detailed description
         """
-        selection = self.ids_rows_colsFromSelection()
+        selection = self.idsRowsColsFromSelection()
         overwriteData = self.mgr.compDf.loc[selection[0, 0]]
         self.setSelectedCellsAs(selection, overwriteData)
 
-    def setSelectedCellsAs_gui(self, selectionIdxs: TwoDArr = None):
+    def setSelectedCellsAsGui(self, selectionIdxs: TwoDArr = None):
         """
         Sets all cells in the selection to the values specified in the popup table. See
         the project wiki for a detailed description
         """
         if selectionIdxs is None:
-            selectionIdxs = self.ids_rows_colsFromSelection()
+            selectionIdxs = self.idsRowsColsFromSelection()
         if len(selectionIdxs) == 0:
             return
         overwriteData = self.mgr.compDf.loc[[selectionIdxs[0, 0]]].copy()

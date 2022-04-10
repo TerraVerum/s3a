@@ -8,7 +8,7 @@ from pyqtgraph.Qt import QtCore
 
 from s3a import appInst
 from s3a.constants import REQD_TBL_FIELDS
-from s3a.generalutils import imgCornerVertices, cvImread_rgb
+from s3a.generalutils import imgCornerVertices, cvImreadRgb
 from s3a.structures import ComplexXYVertices, XYVertices
 from s3a.views.tableview import CompTableView, PopupTableDialog
 
@@ -38,7 +38,7 @@ def test_split_selected_comps(app, mgr):
     comp = mgr.tableData.makeCompDf()
     comp.at[comp.index[0], REQD_TBL_FIELDS.VERTICES] = verts
     app.clearBoundaries()
-    app.add_focusComps(comp)
+    app.addAndFocusComps(comp)
 
     app.compTbl.selectAll()
     app.compDisplay.splitSelectedComps()
@@ -55,7 +55,7 @@ def test_rm_overlap(app):
     comps = app.sharedAttrs.tableData.makeCompDf(2)
     comps[REQD_TBL_FIELDS.VERTICES] = [ComplexXYVertices([v]) for v in verts]
     cd = app.compDisplay
-    changeDict = app.add_focusComps(comps)
+    changeDict = app.addAndFocusComps(comps)
     comps[REQD_TBL_FIELDS.INST_ID] = changeDict["ids"]
     old = comps.copy()
     cd.selectedIds = changeDict["ids"]
@@ -63,7 +63,7 @@ def test_rm_overlap(app):
     assert len(app.compMgr.compDf) == 1
 
     app.clearBoundaries()
-    changeDict = app.add_focusComps(old)
+    changeDict = app.addAndFocusComps(old)
     cd.selectedIds = changeDict["ids"][::-1]
     cd.removeSelectedCompOverlap()
     assert len(app.compMgr.compDf) == 2
@@ -161,12 +161,12 @@ def test_export_overlay(app, mgr, tmp_path):
     comps = mgr.tableData.makeCompDf(1)
     comps[REQD_TBL_FIELDS.VERTICES] = [ComplexXYVertices([verts])]
     app.compDisplay.regionPlot.showFocused = True
-    app.add_focusComps(comps)
+    app.addAndFocusComps(comps)
     app.compDisplay.regionPlot.updateColors(labelColormap="Reds", fillAlpha=1.0)
     exportLoc = str(tmp_path / "export.png")
     app.compDisplay.exportCompOverlay(file=exportLoc)
     app.compDisplay.regionPlot.showFocused = False
-    img = cvImread_rgb(exportLoc)
+    img = cvImreadRgb(exportLoc)
     checkPix = img[20, 20, :]
     # Red channel should be largest for overlay export and red colormap
     assert np.array_equal(checkPix, [255, 0, 0])

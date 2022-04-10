@@ -31,11 +31,11 @@ from ..generalutils import (
     subImageFromVerts,
     getCroppedImg,
     DirectoryDict,
-    cvImread_rgb,
-    pd_iterdict,
-    cvImsave_rgb,
+    cvImreadRgb,
+    toDictGen,
+    cvImsaveRgb,
     imgPathtoHtml,
-    pd_toHtmlWithStyle,
+    toHtmlWithStyle,
 )
 from ..structures import PrjParamGroup
 
@@ -136,7 +136,7 @@ class LblPngExporter(AnnotationExporter):
                 info.add_text("offset", str(offset))
             outImg.save(file, pnginfo=info)
         else:
-            cvImsave_rgb(file, exportObj)
+            cvImsaveRgb(file, exportObj)
 
     def updateExportObj(self, inst: dict, exportObj, **kwargs):
         verts: ComplexXYVertices = inst[RTF.VERTICES]
@@ -270,7 +270,7 @@ class CompImgsDfExporter(AnnotationExporter):
         """
         if srcDir is None:
             srcDir = Path()
-        imageReaderFunc = lambda file: cvImread_rgb(file, cv.IMREAD_UNCHANGED)
+        imageReaderFunc = lambda file: cvImreadRgb(file, cv.IMREAD_UNCHANGED)
         srcDir = DirectoryDict(
             srcDir,
             allowAbsolute=True,
@@ -353,7 +353,7 @@ class CompImgsDfExporter(AnnotationExporter):
         if img is None:
             img = np.zeros_like(labelMask)
         invertedMap = pd.Series(labelMapping.index, labelMapping)
-        for row in pd_iterdict(compDf):
+        for row in toDictGen(compDf):
             labelValue = invertedMap[row[kwargs.get("labelField")]]
             exportObj.append(
                 self._formatSingleComp(
@@ -495,9 +495,9 @@ class CompImgsZipExporter(CompImgsDfExporter):
             for idx, row in exportObj.iterrows():
                 saveName = f'{row["instanceId"]}.png'
                 if "image" in row.index:
-                    cvImsave_rgb(dataDir / saveName, row["image"])
+                    cvImsaveRgb(dataDir / saveName, row["image"])
                 if "labelMask" in row.index:
-                    cvImsave_rgb(labelsDir / saveName, row.labelMask)
+                    cvImsaveRgb(labelsDir / saveName, row.labelMask)
 
             if makeSummary:
                 self._createSummary(
@@ -564,7 +564,7 @@ class CompImgsZipExporter(CompImgsDfExporter):
         }}
         """
             )
-        pd_toHtmlWithStyle(outDf, summaryName, style, escape=False, index=False)
+        toHtmlWithStyle(outDf, summaryName, style, escape=False, index=False)
 
 
 class SerialExporter(AnnotationExporter):

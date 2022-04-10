@@ -10,7 +10,7 @@ from utilitys import ParamEditor, ParamEditorDockGrouping, widgets as uw
 from utilitys.params.pgregistered import ShortcutKeySeqParameter as ShcKeySeq
 from utilitys.typeoverloads import FilePath
 from ..constants import QUICK_LOAD_DIR
-from ..generalutils import lower_NoSpaces
+from ..generalutils import lowerNoSpaces
 from ..logger import getAppLogger
 
 
@@ -143,11 +143,11 @@ class QuickLoaderEditor(ParamEditor):
         # base and apply other settings on top of it
         errSettings = []
         # Ignore case and spacing on input keys
-        startupSrc = {lower_NoSpaces(kk): vv for kk, vv in startupSrc.items()}
+        startupSrc = {lowerNoSpaces(kk): vv for kk, vv in startupSrc.items()}
 
         for editor in [self] + self.listModel.uniqueEditors:  # type: ParamEditor
             paramStateInfo: Union[dict, str] = startupSrc.get(
-                lower_NoSpaces(editor.name), None
+                lowerNoSpaces(editor.name), None
             )
             try:
                 if isinstance(paramStateInfo, dict):

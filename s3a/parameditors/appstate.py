@@ -83,7 +83,7 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
                 stateDict = {}
             if isinstance(stateDict, str):
                 stateDict = {"quickloader": stateDict}
-            stateDict = self._parseStateDict_includeRequired(stateName, stateDict)
+            stateDict = self._parseStateDictIncludeRequired(stateName, stateDict)
             paramDict = stateDict.pop("Parameters", {}) or {}
 
             # It's possible for some functions (e.g. project load) to add or remove startup args,
@@ -121,7 +121,7 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
             hierarchicalUpdate(self.startupSettings, oldStartup)
         return ret
 
-    def _parseStateDict_includeRequired(
+    def _parseStateDictIncludeRequired(
         self,
         stateName: t.Union[str, Path],
         stateDict: dict = None,

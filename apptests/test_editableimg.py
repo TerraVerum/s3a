@@ -91,7 +91,7 @@ def test_update(app, mgr, vertsPlugin):
 def test_region_modify(sampleComps, app, mgr, vertsPlugin):
     vertsPlugin.procEditor.changeActiveProcessor("Basic Shapes")
     mImg = app.mainImg
-    app.add_focusComps(sampleComps)
+    app.addAndFocusComps(sampleComps)
     shapeBnds = mImg.image.shape[:2]
     reach = np.min(shapeBnds)
     oldData = vertsPlugin.region.regionData

@@ -21,7 +21,6 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
             PointROI.updateRadius,
             name="Point ROI Features",
             runOpts=RunOpts.ON_CHANGED,
-            namePath=(self.__groupingName__,),
         )
 
     def __init__(

@@ -37,7 +37,7 @@ from utilitys.params.parameditor import RunOpts
 
 
 class MainImagePlugin(ParamEditorPlugin):
-    name = __groupingName__ = "Main Image"
+    name = __groupingName__ = "Application"
     _makeMenuShortcuts = False
 
     def __initEditorParams__(self, shared: SharedAppSettings, **kwargs):
@@ -78,7 +78,7 @@ class MainImagePlugin(ParamEditorPlugin):
                     disp.reflectSelectionBoundsMade(verts, self.win.vertsPlg.region)
                     disp.reflectSelectionBoundsMade(verts, clearExisting=False)
 
-                nonUniqueIds = win.compTbl.ids_rows_colsFromSelection(
+                nonUniqueIds = win.compTbl.idsRowsColsFromSelection(
                     excludeNoEditCols=False, warnNoneSelection=False
                 )[:, 0]
                 selection = pd.unique(nonUniqueIds)
@@ -145,7 +145,7 @@ class MainImagePlugin(ParamEditorPlugin):
         verts = ComplexXYVertices([verts])
         newComps = self.tableData.makeCompDf()
         newComps[RTF.VERTICES] = [verts]
-        self.win.add_focusComps(newComps)
+        self.win.addAndFocusComps(newComps)
 
 
 class CompTablePlugin(ParamEditorPlugin):
@@ -160,8 +160,8 @@ class CompTablePlugin(ParamEditorPlugin):
         tbl = win.compTbl
         for func, param in zip(
             [
-                lambda: tbl.setSelectedCellsAs_gui(),
-                tbl.removeSelectedRows_gui,
+                lambda: tbl.setSelectedCellsAsGui(),
+                tbl.removeSelectedRowsGui,
                 tbl.setSelectedCellsAsFirst,
                 lambda: win.compDisplay.scaleViewboxToSelectedIds(),
             ],
@@ -232,7 +232,7 @@ class RandomToolsPlugin(ParamEditorPlugin):
     def attachWinRef(self, win: s3abase.S3ABase):
         super().attachWinRef(win)
 
-        self.registerFunc(self.showDevConsole_gui, name="Show Dev Console")
+        self.registerFunc(self.showDevConsoleGui, name="Show Dev Console")
         self.registerFunc(win.clearBoundaries, btnOpts=CNST.TOOL_CLEAR_BOUNDARIES)
         self.registerFunc(
             win.compDisplay.exportCompOverlay,
@@ -280,7 +280,7 @@ class RandomToolsPlugin(ParamEditorPlugin):
         win.sharedAttrs.tableData.sigCfgUpdated.connect(updateLims)
         updateLims()
 
-    def showDevConsole_gui(self):
+    def showDevConsoleGui(self):
         """
         Opens a console that allows dynamic interaction with current variables. If IPython
         is on your system, a qt console will be loaded. Otherwise, a (less capable) standard
@@ -336,9 +336,9 @@ class HelpPlugin(ParamEditorPlugin):
         self.registerFunc(
             lambda: QtWidgets.QMessageBox.aboutQt(win, "About Qt"), name="About Qt"
         )
-        self.registerFunc(self.iconAttributions_gui, name="Icon Attributions")
+        self.registerFunc(self.iconAttributionsGui, name="Icon Attributions")
 
-    def iconAttributions_gui(self):
+    def iconAttributionsGui(self):
         htmlStr = """
     <div>Icons made by <a href="https://www.freepik.com" title="Freepik">Freepik</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a></div>
 

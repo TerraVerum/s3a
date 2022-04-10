@@ -29,7 +29,7 @@ from ..constants import (
     PRJ_CONSTS as CNST,
     REQD_TBL_FIELDS,
 )
-from ..generalutils import hierarchicalUpdate, cvImsave_rgb
+from ..generalutils import hierarchicalUpdate, cvImsaveRgb
 from ..graphicsutils import DropList
 from ..logger import getAppLogger
 from ..structures import FilePath, NChanImg
@@ -55,23 +55,23 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         self.autosaveTimer = QtCore.QTimer()
 
         self.registerFunc(self.save, btnOpts=CNST.TOOL_PROJ_SAVE)
-        self.registerFunc(self.showProjImgs_gui, btnOpts=CNST.TOOL_PROJ_OPEN_IMG)
+        self.registerFunc(self.showProjImgsGui, btnOpts=CNST.TOOL_PROJ_OPEN_IMG)
         self.menu.addSeparator()
 
-        self.registerFunc(self.create_gui, btnOpts=CNST.TOOL_PROJ_CREATE)
-        self.registerFunc(self.open_gui, btnOpts=CNST.TOOL_PROJ_OPEN)
+        self.registerFunc(self.createGui, btnOpts=CNST.TOOL_PROJ_CREATE)
+        self.registerFunc(self.openGui, btnOpts=CNST.TOOL_PROJ_OPEN)
 
         self.registerPopoutFuncs(
-            [self.updateProjectProperties, self.addImages_gui, self.addAnnotations_gui],
+            [self.updateProjectProperties, self.addImagesGui, self.addAnnotationsGui],
             ["Update Project Properties", "Add Images", "Add Annotations"],
             btnOpts=CNST.TOOL_PROJ_SETTINGS,
         )
 
         self.registerFunc(
-            lambda: self.win.setMainImg_gui(), btnOpts=CNST.TOOL_PROJ_ADD_IMG
+            lambda: self.win.setMainImgGui(), btnOpts=CNST.TOOL_PROJ_ADD_IMG
         )
         self.registerFunc(
-            lambda: self.win.openAnnotation_gui(), btnOpts=CNST.TOOL_PROJ_ADD_ANN
+            lambda: self.win.openAnnotationGui(), btnOpts=CNST.TOOL_PROJ_ADD_ANN
         )
 
         self.registerPopoutFuncs(
@@ -256,7 +256,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
             self.win.setMainImg(None)
             self.projData.loadCfg(cfgFname, cfgDict, force=True)
 
-    def open_gui(self):
+    def openGui(self):
         fname = fns.popupFilePicker(
             None, "Select Project File", f"S3A Project (*.{PROJ_FILE_TYPE})"
         )
@@ -337,7 +337,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
                 + 1
             )
 
-        def save_incrementCounter():
+        def saveAndIncrementCounter():
             nonlocal counter, lastSavedDf
             baseSaveNamePlusFolder = (
                 backupFolder / f"{baseName}_{counter}.{annotationFormat}"
@@ -355,7 +355,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
                 lastSavedDf = curDf.copy()
 
         if saveToBackup:
-            self.autosaveTimer.timeout.connect(save_incrementCounter)
+            self.autosaveTimer.timeout.connect(saveAndIncrementCounter)
         self.autosaveTimer.timeout.connect(self.win.saveCurAnnotation)
         self.autosaveTimer.start(int(interval * 60 * 1000))
         getAppLogger(__name__).attention(f"Started autosaving")
@@ -364,7 +364,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         self.autosaveTimer.stop()
         getAppLogger(__name__).attention(f"Stopped autosaving")
 
-    def showProjImgs_gui(self):
+    def showProjImgsGui(self):
         if len(self.projData.images) == 0:
             getAppLogger(__name__).warning(
                 "This project does not have any images yet. You can add them either in\n"
@@ -375,7 +375,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         self._projImgMgr.show()
         self._projImgMgr.raise_()
 
-    def addImages_gui(self):
+    def addImagesGui(self):
         wiz = QtWidgets.QWizard()
         page = NewProjectWizard.createFilePage("Images", wiz)
         wiz.addPage(page)
@@ -383,7 +383,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
             for file in page.fileList.files:
                 self.projData.addImageByPath(file)
 
-    def addAnnotations_gui(self):
+    def addAnnotationsGui(self):
         wiz = QtWidgets.QWizard()
         page = NewProjectWizard.createFilePage("Annotations", wiz)
         wiz.addPage(page)
@@ -393,7 +393,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
             for file in page.fileList.files:
                 self.projData.addAnnotationByPath(file)
 
-    def create_gui(self):
+    def createGui(self):
         wiz = NewProjectWizard(self)
         ok = wiz.exec_()
         if not ok:
@@ -503,14 +503,14 @@ class NewProjectWizard(QtWidgets.QWizard):
             selectFolder = "Folder" in title
             btn = QtWidgets.QPushButton(title, wizard)
             btn.clicked.connect(
-                partial(getFileList_gui, wizard, flist, title, selectFolder)
+                partial(getFileListGui, wizard, flist, title, selectFolder)
             )
             fileBtnLayout.addWidget(btn)
         curLayout.addLayout(fileBtnLayout)
         return page
 
 
-def getFileList_gui(wizard, _flist: DropList, _title: str, _selectFolder=False):
+def getFileListGui(wizard, _flist: DropList, _title: str, _selectFolder=False):
     dlg = QtWidgets.QFileDialog()
     dlg.setModal(True)
     getFn = lambda *args, **kwargs: dlg.getOpenFileNames(
@@ -671,7 +671,7 @@ class ProjectData(QtCore.QObject):
     def tableData(self):
         return self.compIo.tableData
 
-    def clearImgs_anns(self):
+    def clearImgsAndAnns(self):
         oldImgs = self.images.copy()
         for lst in self.images, self.imgToAnnMapping, self.baseImgDirs:
             lst.clear()
@@ -725,7 +725,7 @@ class ProjectData(QtCore.QObject):
         self.cfgFname = cfgFname
         cfg = self.cfg = baseCfgDict
 
-        self.clearImgs_anns()
+        self.clearImgsAndAnns()
 
         tableInfo = cfg.get("table-cfg", None)
         if isinstance(tableInfo, str):
@@ -971,7 +971,7 @@ class ProjectData(QtCore.QObject):
         for file in folder.glob("*.*"):
             self.addAnnotation(file)
 
-    def addImage_gui(self, copyToProject=True):
+    def addImageGui(self, copyToProject=True):
         fileFilter = (
             "Image Files (*.png *.tif *.jpg *.jpeg *.bmp *.jfif);;All files(*.*)"
         )
@@ -1092,7 +1092,7 @@ class ProjectData(QtCore.QObject):
         elif data is not None:
             # Programmatically created or not from a local file
             # noinspection PyTypeChecker
-            cvImsave_rgb(newName, data)
+            cvImsaveRgb(newName, data)
         else:
             raise IOError(
                 f"No image data associated with {name.name}. Either the file does not exist or no"

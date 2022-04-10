@@ -1,8 +1,8 @@
 from pyqtgraph.Qt import QtCore
 
 
-class SharedAppSettings(QtCore.QObject):
-    def __init__(self, parent=None):
+class SharedAppSettings:
+    def __init__(self):
         from s3a.constants import IMG_PROC_DIR, MULT_PRED_DIR, CFG_DIR
         from s3a.parameditors.algcollection import AlgCollection
         from s3a.parameditors.table import TableData
@@ -10,7 +10,6 @@ class SharedAppSettings(QtCore.QObject):
         from s3a.processing import ImgProcWrapper, ImageProcess
         from utilitys import ActionStack
 
-        super().__init__(parent)
         self.actionStack = ActionStack()
 
         self.tableData = TableData(makeFilter=True)

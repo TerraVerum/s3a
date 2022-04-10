@@ -27,7 +27,7 @@ def main(loadLastState=True, **load):
     return win
 
 
-def main_cli():
+def mainCli():
     parser = fns.makeCli(main, parserKwargs=dict(prog="S3A", add_help=False))
     parser.register("action", "help", S3AHelp)
     parser.add_argument("--version", action="version", version=__version__)
@@ -52,4 +52,4 @@ class S3AHelp(Action):
 
 
 if __name__ == "__main__":
-    main_cli()
+    mainCli()

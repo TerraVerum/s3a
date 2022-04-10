@@ -74,7 +74,7 @@ class UserMetricsPlugin(ParamEditorPlugin):
         super().__initEditorParams__(shared=shared)
         self.props = ParamContainer()
         param = shared.generalProps.registerProp(
-            CNST.PROP_COLLECT_USR_METRICS, container=self.props, asProperty=False
+            CNST.PROP_COLLECT_USR_METRICS, container=self.props
         )
 
         def onPropChange(param, value):

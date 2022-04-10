@@ -96,7 +96,6 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
             "Shapes",
             drawShapes,
             self.shapeAssignment,
-            namePath=(self.__groupingName__,),
             checkable=True,
         )
         self.drawActGrp = ButtonCollection(self, "Actions")
@@ -128,7 +127,7 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
         vb.setRange(xRange=(0, imShape[1]), yRange=(0, imShape[0]))
 
     @property
-    def compSer_asFrame(self):
+    def compSerAsFrame(self):
         return coerceDfTypes(fns.serAsFrame(self.compSer))
 
     def shapeAssignment(self, newShapeParam: PrjParam):
@@ -286,7 +285,7 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
         else:
             self.sigShapeFinished.connect(wrapper)
         for actParam in actParams:
-            self.drawActGrp.create_addBtn(
+            self.drawActGrp.createAndAddBtn(
                 actParam,
                 self.actionAssignment,
                 checkable=True,

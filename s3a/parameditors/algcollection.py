@@ -62,7 +62,6 @@ class AlgParamEditor(ParamEditor):
             self.changeActiveProcessor,
             runOpts=RunOpts.ON_CHANGED,
             returnParam=True,
-            overrideBasePath=(),
             parentParam=self._metaParamGrp,
             proc=procName,
         )
@@ -199,7 +198,7 @@ class AlgParamEditor(ParamEditor):
             return None
         return proc
 
-    def editParamValues_gui(self):
+    def editParamValuesGui(self):
         webbrowser.open(self.formatFileName(self.stateName))
 
 
@@ -263,7 +262,7 @@ class AlgCollection(ParamEditor):
         saveObj = (
             {proc.name: proc}
             if isinstance(proc, AtomicProcess)
-            else proc.saveState_flattened()
+            else proc.saveStateFlattened()
         )
         if force or proc.name not in addDict:
             addDict.update(saveObj)

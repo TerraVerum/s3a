@@ -25,11 +25,11 @@ _MENU_PLUGINS = [RandomToolsPlugin]
 class S3A(S3ABase):
     sigLayoutSaved = QtCore.Signal()
 
-    __groupingName__ = "Main Window"
+    __groupingName__ = "Application"
 
     def __initEditorParams__(self, shared: SharedAppSettings):
         super().__initEditorParams__(shared)
-        self.toolsEditor = ParamEditor.buildClsToolsEditor(type(self), "Main Window")
+        self.toolsEditor = ParamEditor.buildClsToolsEditor(type(self), "Application")
         shared.colorScheme.registerFunc(
             self.updateTheme, runOpts=RunOpts.ON_CHANGED, nest=False
         )
@@ -184,7 +184,7 @@ class S3A(S3ABase):
         )
         return ret
 
-    def resetTblFields_gui(self):
+    def resetTblFieldsGui(self):
         outFname = fns.popupFilePicker(
             None, "Select Table Config File", "All Files (*.*);; Config Files (*.yml)"
         )
@@ -223,7 +223,7 @@ class S3A(S3ABase):
         yield ret
         yield fns.gracefulNext(gen)
 
-    def setMainImg_gui(self):
+    def setMainImgGui(self):
         fileFilter = (
             "Image Files (*.png *.tif *.jpg *.jpeg *.bmp *.jfif);;All files(*.*)"
         )
@@ -232,7 +232,7 @@ class S3A(S3ABase):
             with pg.BusyCursor():
                 self.setMainImg(fname)
 
-    def exportAnnotations_gui(self):
+    def exportAnnotationsGui(self):
         """Saves the component table to a file"""
         fileFilters = self.compIo.ioFileFilter(**{"*": "All Files"})
         outFname = fns.popupFilePicker(
@@ -241,7 +241,7 @@ class S3A(S3ABase):
         if outFname is not None:
             super().exportCurAnnotation(outFname)
 
-    def openAnnotation_gui(self):
+    def openAnnotationGui(self):
         # TODO: See note about exporting comps. Delegate the filepicker activity to importer
         fileFilter = self.compIo.ioFileFilter(which=PRJ_ENUMS.IO_IMPORT)
         fname = fns.popupFilePicker(None, "Select Load File", fileFilter)
@@ -249,7 +249,7 @@ class S3A(S3ABase):
             return
         self.openAnnotations(fname)
 
-    def saveLayout_gui(self):
+    def saveLayoutGui(self):
         outName = fns.dialogGetSaveFileName(self, "Layout Name")
         if outName is None or outName == "":
             return
@@ -301,8 +301,8 @@ class S3A(S3ABase):
             style = qdarkstyle.load_stylesheet()
         self.setStyleSheet(style)
 
-    def add_focusComps(self, newComps: df, addType=PRJ_ENUMS.COMP_ADD_AS_NEW):
-        changeDict = super().add_focusComps(newComps, addType=addType)
+    def addAndFocusComps(self, newComps: df, addType=PRJ_ENUMS.COMP_ADD_AS_NEW):
+        changeDict = super().addAndFocusComps(newComps, addType=addType)
         keepIds = changeDict["ids"]
         keepIds = keepIds[keepIds >= 0]
         selection = self.compDisplay.selectRowsById(keepIds)
@@ -312,7 +312,7 @@ class S3A(S3ABase):
         ):
             # For some reason sometimes the actual table selection doesn't propagate in time, so
             # directly forward the selection here
-            self.compTbl.setSelectedCellsAs_gui(selection)
+            self.compTbl.setSelectedCellsAsGui(selection)
         return changeDict
 
 

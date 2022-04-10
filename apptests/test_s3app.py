@@ -200,7 +200,7 @@ def test_load_last_settings(tmp_path, sampleComps, app):
     oldSaveDir = app.appStateEditor.saveDir
     app.appStateEditor.saveDir = tmp_path
     app.setMainImg(SAMPLE_IMG_FNAME, SAMPLE_IMG)
-    app.add_focusComps(sampleComps)
+    app.addAndFocusComps(sampleComps)
     app.appStateEditor.saveParamValues()
     app.forceClose()
     app.appStateEditor.loadParamValues()

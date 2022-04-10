@@ -55,7 +55,7 @@ class TableFieldPlugin(ProcessorPlugin):
     def processorAnalytics(self):
         proc = self.curProcessor
         try:
-            proc.processor.stageSummary_gui()
+            proc.processor.stageSummaryGui()
         except NotImplementedError:
             raise TypeError(
                 f"Processor type {type(proc)} does not implement summary analytics."

@@ -110,7 +110,7 @@ def augmentException(ex: Exception, prependedMsg: str):
     ex.args = (prependedMsg + exMsg,)
 
 
-def lower_NoSpaces(name: str):
+def lowerNoSpaces(name: str):
     return name.replace(" ", "").lower()
 
 
@@ -151,7 +151,7 @@ def _maybeBgrToRgb(image: np.ndarray):
     return image
 
 
-def cvImsave_rgb(fname: FilePath, image: np.ndarray, *args, errOk=False, **kwargs):
+def cvImsaveRgb(fname: FilePath, image: np.ndarray, *args, errOk=False, **kwargs):
     image = _maybeBgrToRgb(image)
     try:
         cv.imwrite(str(fname), image, *args, **kwargs)
@@ -162,7 +162,7 @@ def cvImsave_rgb(fname: FilePath, image: np.ndarray, *args, errOk=False, **kwarg
         io.imsave(fname, image)
 
 
-def cvImread_rgb(fname: FilePath, *args, **kwargs):
+def cvImreadRgb(fname: FilePath, *args, **kwargs):
     image = cv.imread(str(fname), *args, **kwargs)
     return _maybeBgrToRgb(image)
 
@@ -800,7 +800,7 @@ def coordsToBbox(coords: np.ndarray, addOneToMax=True):
     return ret
 
 
-def pd_iterdict(df: pd.DataFrame, index=False):
+def toDictGen(df: pd.DataFrame, index=False):
     """
     pandas to_dict() keeps all rows in memory at once. This method is similar, but is a generator version only yielding
     one row at a time.
@@ -816,7 +816,7 @@ def pd_iterdict(df: pd.DataFrame, index=False):
             yield dict(zip(cols, row))
 
 
-def pd_toHtmlWithStyle(
+def toHtmlWithStyle(
     df: pd.DataFrame, file: FilePath = None, style: str = None, **exportArgs
 ):
     """
@@ -860,9 +860,7 @@ def convertImages(
         folder = Path()
     folder = Path(folder)
     files = list(folder.glob(globstr))
-    ret = fns.mproc_apply(
-        _cvtImage, files, "Converting Files", extraArgs=(ext, replace)
-    )
+    ret = fns.mprocApply(_cvtImage, files, "Converting Files", extraArgs=(ext, replace))
     errs = [f"{r[0].name}: {r[1]}" for r in ret if r is not None]
     if errs:
         print(f"Conversion errors occurred in the following files:\n" + "\n".join(errs))

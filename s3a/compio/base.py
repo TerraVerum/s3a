@@ -12,7 +12,7 @@ from utilitys import PrjParam, fns, RunOpts
 from utilitys.typeoverloads import FilePath
 from .helpers import serialize, deserialize, checkVertBounds
 from ..constants import REQD_TBL_FIELDS as RTF
-from ..generalutils import pd_iterdict
+from ..generalutils import toDictGen
 from ..parameditors.table import TableData
 from ..parameditors.table.data import getFieldAliases
 from ..parameditors.table.templatemgr import IOTemplateManager
@@ -166,7 +166,7 @@ class AnnotationExporter(AnnotationIOBase):
             # Can't do anything, don't modify the object and save time not iterating over rows
             return exportObj, NO_ERRORS
         errs = {}
-        for row in pd_iterdict(compDf):
+        for row in toDictGen(compDf):
             try:
                 exportObj = self.updateExportObj(row, exportObj)
             except Exception as err:

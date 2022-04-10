@@ -64,11 +64,10 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
 
     def __initEditorParams__(self, shared: SharedAppSettings):
         self.props = ParamContainer()
-        with shared.generalProps.setBaseRegisterPath(PRJ_CONSTS.CLS_COMP_EXPORTER.name):
-            shared.generalProps.registerProps(
-                [PRJ_CONSTS.EXP_ONLY_VISIBLE, PRJ_CONSTS.INCLUDE_FNAME_PATH],
-                container=self.props,
-            )
+        shared.generalProps.registerProps(
+            [PRJ_CONSTS.EXP_ONLY_VISIBLE, PRJ_CONSTS.INCLUDE_FNAME_PATH],
+            container=self.props,
+        )
 
     @staticmethod
     def createScope(scope: ExitStack = None, returnAttrs=False):
@@ -103,12 +102,15 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         )
         _, param = attrs.generalProps.registerFunc(
             attrs.actionStack.resizeStack,
-            name=self.__groupingName__,
             runOpts=RunOpts.ON_CHANGED,
-            maxLength=PRJ_CONSTS.PROP_UNDO_BUF_SZ.value,
+            maxLength={
+                **PRJ_CONSTS.PROP_UNDO_BUF_SZ.toPgDict(),
+                "title": PRJ_CONSTS.PROP_UNDO_BUF_SZ.name,
+            },
             returnParam=True,
+            nest=False,
+            container=self.props,
         )
-        param.child("maxLength").setOpts(title=PRJ_CONSTS.PROP_UNDO_BUF_SZ.name)
         self.statBar = QtWidgets.QStatusBar(self)
         self.menuBar_ = self.menuBar()
 
@@ -260,14 +262,14 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             return
 
         if exists:
-            undo = self._acceptFocused_existing(ser)
+            undo = self._acceptFocusedExisting(ser)
         else:
-            undo = self._acceptFocused_new(ser)
+            undo = self._acceptFocusedNew(ser)
         self.changeFocusedComp()
         yield
         undo()
 
-    def _acceptFocused_new(self, compSer: pd.Series):
+    def _acceptFocusedNew(self, compSer: pd.Series):
         # New, make a brand new table entry
         compAsDf = fns.serAsFrame(compSer)
         newIds = self.compMgr.addComps(compAsDf)["added"]
@@ -281,13 +283,13 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
 
         return undo
 
-    def _acceptFocused_existing(self, compSer: pd.Series):
+    def _acceptFocusedExisting(self, compSer: pd.Series):
         oldComp = self.compMgr.compDf.loc[[compSer[REQD_TBL_FIELDS.INST_ID]]].copy()
         modifiedDf = fns.serAsFrame(compSer)
         self.compMgr.addComps(modifiedDf, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)
 
         def undo():
-            self.add_focusComps(oldComp, addType=PRJ_ENUMS.COMP_ADD_AS_MERGE)
+            self.addAndFocusComps(oldComp, addType=PRJ_ENUMS.COMP_ADD_AS_MERGE)
             self.mainImg.updateFocusedComp(compSer)
 
         return undo
@@ -494,7 +496,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         self.compMgr.addComps(newComps, loadType)
 
     @DASM.undoable("Create New Component", asGroup=True)
-    def add_focusComps(self, newComps: df, addType=PRJ_ENUMS.COMP_ADD_AS_NEW):
+    def addAndFocusComps(self, newComps: df, addType=PRJ_ENUMS.COMP_ADD_AS_NEW):
         changeDict = self.compMgr.addComps(newComps, addType)
         # Focus is performed by comp table
         # Arbitrarily choose the last possible component
