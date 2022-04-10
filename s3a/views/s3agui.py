@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Union, Dict, List, Sequence
 
 import pyqtgraph as pg
+import pandas as pd
 import qdarkstyle
-from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from utilitys import ParamEditor, ParamEditorPlugin, RunOpts, PrjParam, fns, widgets
 
@@ -303,7 +303,9 @@ class S3A(S3ABase):
             style = qdarkstyle.load_stylesheet()
         self.setStyleSheet(style)
 
-    def addAndFocusComps(self, newComps: df, addType=PRJ_ENUMS.COMP_ADD_AS_NEW):
+    def addAndFocusComps(
+        self, newComps: pd.DataFrame, addType=PRJ_ENUMS.COMP_ADD_AS_NEW
+    ):
         changeDict = super().addAndFocusComps(newComps, addType=addType)
         keepIds = changeDict["ids"]
         keepIds = keepIds[keepIds >= 0]

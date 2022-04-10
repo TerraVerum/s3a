@@ -1,4 +1,3 @@
-import typing as t
 import warnings
 from pathlib import Path
 from typing import List, Dict, Union, Callable, Any
@@ -123,7 +122,7 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
 
     def _parseStateDictIncludeRequired(
         self,
-        stateName: t.Union[str, Path],
+        stateName: Union[str, Path],
         stateDict: dict = None,
     ):
         if self.RECENT_STATE_FNAME.exists():

@@ -8,7 +8,6 @@ from warnings import warn
 
 import numpy as np
 import pandas as pd
-from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore, QtWidgets
 from utilitys import (
     EditorPropsMixin,
@@ -471,7 +470,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             exportIds = displayIds
         else:
             exportIds = self.compMgr.compDf.index
-        exportDf: df = self.compMgr.compDf.loc[exportIds].copy()
+        exportDf: pd.DataFrame = self.compMgr.compDf.loc[exportIds].copy()
         if not self.props[PRJ_CONSTS.INCLUDE_FNAME_PATH] and srcImgFname is not None:
             # Only use the file name, not the whole path
             srcImgFname = srcImgFname.name
@@ -499,7 +498,9 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         self.compMgr.addComps(newComps, loadType)
 
     @DASM.undoable("Create New Component", asGroup=True)
-    def addAndFocusComps(self, newComps: df, addType=PRJ_ENUMS.COMP_ADD_AS_NEW):
+    def addAndFocusComps(
+        self, newComps: pd.DataFrame, addType=PRJ_ENUMS.COMP_ADD_AS_NEW
+    ):
         changeDict = self.compMgr.addComps(newComps, addType)
         # Focus is performed by comp table
         # Arbitrarily choose the last possible component

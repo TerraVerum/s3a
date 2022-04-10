@@ -7,7 +7,6 @@ import pandas as pd
 import pyqtgraph as pg
 from matplotlib import cm
 from matplotlib.pyplot import colormaps
-from pandas import DataFrame as df
 from pyqtgraph.Qt import QtCore
 from utilitys import DeferredActionStackMixin as DASM
 from utilitys import EditorPropsMixin, ParamContainer, PrjParam, RunOpts, fns
@@ -110,7 +109,9 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
             self.sigClicked = None
 
     def resetRegionList(
-        self, newRegionDf: Optional[df] = None, labelField: PrjParam = RTF.INST_ID
+        self,
+        newRegionDf: Optional[pd.DataFrame] = None,
+        labelField: PrjParam = RTF.INST_ID,
     ):
         idList = None
         if newRegionDf is not None and labelField in newRegionDf.columns:

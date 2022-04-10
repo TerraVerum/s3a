@@ -1,5 +1,4 @@
 import ast
-from ast import literal_eval
 
 import numpy as np
 
@@ -10,7 +9,7 @@ from ..structures import ComplexXYVertices, XYVertices, PrjParamGroup
 
 registerIoHandler(
     "ndarray",
-    deserialize=lambda strVal: np.array(literal_eval(strVal)),
+    deserialize=lambda strVal: np.array(ast.literal_eval(strVal)),
     serialize=lambda val: str(val.tolist()),
 )
 

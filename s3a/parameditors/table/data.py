@@ -3,9 +3,9 @@ from pathlib import Path
 from typing import Union, Dict, Callable, Any, Optional, List, Sequence
 
 import numpy as np
+import pandas as pd
 import pyqtgraph as pg
-from pandas import DataFrame as df
-from pyqtgraph import QtCore
+from pyqtgraph.Qt import QtCore
 from utilitys import PrjParam, fns
 from utilitys.fns import hierarchicalUpdate
 from utilitys.typeoverloads import FilePath
@@ -70,7 +70,7 @@ class TableData(QtCore.QObject):
         cfgFname = cfgFname or None
         self.loadCfg(cfgFname, cfgDict, force=True)
 
-    def makeCompDf(self, numRows=1, sequentialIds=False) -> df:
+    def makeCompDf(self, numRows=1, sequentialIds=False) -> pd.DataFrame:
         """
         Creates a dataframe for the requested number of components.
         This is the recommended method for component instantiation prior to table insertion.
@@ -94,7 +94,7 @@ class TableData(QtCore.QObject):
             # Make sure to construct a separate component instance for
             # each row no objects have the same reference
             df_list.append(copy.copy(populators))
-        outDf = df(df_list, columns=self.allFields)
+        outDf = pd.DataFrame(df_list, columns=self.allFields)
         if RTF.INST_ID in self.allFields:
             if sequentialIds:
                 outDf[RTF.INST_ID] = np.arange(len(outDf), dtype=int)
@@ -222,7 +222,7 @@ class TableData(QtCore.QObject):
                 if potentialSrcNames & getFieldAliases(destField):
                     # Match between source field's aliases and dest field aliases
                     # Make sure it didn't match multiple names that weren't itself with the assert statement
-                    # In other words, if multiple dest fields have the same alias, this assert will fail
+                    # In other words, if multiple dest fields have the same alias, this assertion will fail
                     assert curOutName == srcField
                     curOutName = destField
         return curOutName

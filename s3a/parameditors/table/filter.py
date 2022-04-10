@@ -3,7 +3,7 @@ import warnings
 from typing import List
 
 import numpy as np
-from pandas import DataFrame as df
+import pandas as pd
 from pyqtgraph.parametertree import Parameter
 from utilitys import PrjParam, ParamEditor, fns
 
@@ -60,7 +60,7 @@ def _filterForParam(param: PrjParam):
     return paramWithChildren
 
 
-def filterParamCol(compDf: df, column: PrjParam, filterOpts: dict):
+def filterParamCol(compDf: pd.DataFrame, column: PrjParam, filterOpts: dict):
     # TODO: Each type should probably know how to filter itself. That is,
     #  find some way of keeping this logic from just being an if/else tree...
     pType = column.pType
@@ -182,7 +182,7 @@ class TableFilterEditor(ParamEditor):
                 filters[child.name()] = cState
         return filters
 
-    def filterCompDf(self, compDf: df):
+    def filterCompDf(self, compDf: pd.DataFrame):
         strNames = [str(f) for f in compDf.columns]
         for fieldName, opts in self.activeFilters.items():
             try:
