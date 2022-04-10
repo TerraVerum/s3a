@@ -55,7 +55,7 @@ class FieldDisplayDelegate(ABC):
         raise NotImplementedError
 
 
-class SceneItemContainer(ABC):
+class SceneItemContainer(FieldDisplayDelegate):
     """
     This base class handles all cases where all visual representations are scene items, which already support
     show, hide, removeItem, addItem. So, classes which inherit this must indicate a list of `item`s
@@ -89,7 +89,7 @@ class SceneItemContainer(ABC):
             item.clear()
 
 
-class TextFieldDelegate(SceneItemContainer, FieldDisplayDelegate):
+class TextFieldDelegate(SceneItemContainer):
     def __init__(self):
         super().__init__()
         self.scatter = pg.ScatterPlotItem()
@@ -169,7 +169,7 @@ class TextFieldDelegate(SceneItemContainer, FieldDisplayDelegate):
         return outSymbol
 
 
-class XYVerticesDelegate(SceneItemContainer, FieldDisplayDelegate):
+class XYVerticesDelegate(SceneItemContainer):
     def __init__(self):
         self.polyScatter = pg.ScatterPlotItem()
         self.polyScatter.setPxMode(False)
@@ -251,7 +251,7 @@ class XYVerticesDelegate(SceneItemContainer, FieldDisplayDelegate):
         return np.row_stack([minVertsCoord(compVerts), point])
 
 
-class ComplexXYVerticesDelegate(SceneItemContainer, FieldDisplayDelegate):
+class ComplexXYVerticesDelegate(SceneItemContainer):
     LBL_PARAM = PrjParam("complex delegate label")
 
     def __init__(self):
