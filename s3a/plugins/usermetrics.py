@@ -1,4 +1,5 @@
 from datetime import datetime
+import typing as t
 
 import numpy as np
 import pandas as pd
@@ -63,8 +64,8 @@ class UserMetricsPlugin(ParamEditorPlugin):
         self.mainImgMouseFilter = MetricsEventFilter(metrics=self)
         self._metricsImage = None
         self._metricsViewer = self._metricsViewerContainer = None
-        self.collectorProxies = []
-        self.registerFunc(self.showMetricsWidget)
+        self.collectorProxies: t.List[SignalProxy] = []
+        self.registerFunc(self.showMetricsWidgetGui, name="Show Metrics Widget")
         self.registerFunc(self.resetMetrics)
 
     def __initEditorParams__(self, shared: SharedAppSettings):
@@ -123,8 +124,8 @@ class UserMetricsPlugin(ParamEditorPlugin):
         mImg: MainImage = self.win.mainImg
         mImg.scene().removeEventFilter(self.mainImgMouseFilter)
         for proxy in self.collectorProxies:
-            proxy.disconnect
-        self.collectorProxies = []
+            proxy.disconnect()
+        self.collectorProxies.clear()
 
     def updateUserMetrics(self, **kwargs):
         """
@@ -133,7 +134,7 @@ class UserMetricsPlugin(ParamEditorPlugin):
         getAppLogger(__name__).debug(f"Recorded stats: {kwargs}")
         time = kwargs.pop("time", datetime.now())
         toInsert = pd.Series(kwargs, name=time)
-        self.collectedMetrics = self.collectedMetrics.append(toInsert)
+        self.collectedMetrics.loc[time] = toInsert
 
         lowerBound = 1 if "viewbox_range" in kwargs else 2
         self.incrementUserMetricsImage(n=lowerBound)
@@ -216,7 +217,7 @@ class UserMetricsPlugin(ParamEditorPlugin):
         wgts = np.clip(dists.max() / dists, 0, maxVoteWeight) * distWgt
         # Since diff is used, the first coordinate must be discarded
         xyCoords = xyCoords[1:].astype(int)
-        pxSizes = np.round(votes["pixel_size"])[1:].astype(int)
+        pxSizes = votes["pixel_size"].to_numpy(float).round()[1:].astype(int)
         # Dilate each coordinate by the pixel size to account for potential variances
         # The smaller the device pixel size, the stronger the confidence/weight should be too
         for coord, pxSize, wgt in zip(xyCoords, pxSizes, wgts):
@@ -228,7 +229,7 @@ class UserMetricsPlugin(ParamEditorPlugin):
                 wgt + pxWeight
             )
 
-    def showMetricsWidget(self):
+    def showMetricsWidgetGui(self):
         if (
             self._metricsViewer is not None
             and isQObjectAlive(self._metricsViewer)
