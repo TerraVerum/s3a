@@ -299,3 +299,12 @@ def test_superannotate_import():
     assert len(df) == 3
     loadedVerts = df.at[df.index[1], REQD_TBL_FIELDS.VERTICES].stack()
     assert len(loadedVerts) == 17
+
+
+def test_vgg_annotator_import():
+    cfg = {"fields": {"name": "", "type": ""}}
+    io = ComponentIO(tableData=TableData(cfgDict=cfg))
+    file = TEST_FILE_DIR / "sample.vgg.csv"
+    df = io.importViaCsv(file)
+    assert np.any(np.isin(df["type"], ["human"]))
+    assert len(df) == 9

@@ -232,7 +232,7 @@ class VGGImageAnnotatorImporter(CsvImporter):
                 region["cx"],
                 region["ry"],
                 region["rx"],
-                np.rad2deg(region["theta"]) + 90,
+                region.get("theta", 0),
             )
             pts = draw.ellipse_perimeter(*(int(v) for v in vals[:-1]), vals[-1])
             pts = np.column_stack(pts[::-1])
