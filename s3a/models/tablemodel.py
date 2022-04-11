@@ -15,7 +15,6 @@ __all__ = ["ComponentMgr", "CompTableModel"]
 
 from utilitys import EditorPropsMixin
 
-from utilitys.fns import warnLater
 from utilitys.misc import DeferredActionStackMixin as DASM
 
 Signal = QtCore.Signal
