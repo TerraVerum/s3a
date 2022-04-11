@@ -55,7 +55,7 @@ def _runFunc(param: PrjParam, values, which: str, default: t.Callable, returnErr
             errs.append((ex, ii))
     out = pd.Series(*zip(*out), name=param, dtype=object)
     if returnErrs:
-        return out, pd.Series(errs, name=param, dtype=object)
+        return out, pd.Series(*zip(*errs), name=param, dtype=object)
     return out
 
 

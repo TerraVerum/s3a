@@ -1,13 +1,17 @@
+import ast
+
 import numpy as np
 import pytest
 from skimage import data
+from utilitys import PrjParam
 
 from s3a import generalutils as gu, ComplexXYVertices, PRJ_ENUMS
 from s3a.generalutils import deprecateKwargs
 from s3a.plugins.misc import miscFuncsPluginFactory
 from s3a.plugins.multipred import MultiPredictionsPlugin
+from s3a.compio.helpers import deserialize
 
-_rots = list(np.linspace(-180, 180, 25)) + [PRJ_ENUMS.ROT_OPTIMAL]
+_rots = list(np.linspace(-180, 180, 5)) + [PRJ_ENUMS.ROT_OPTIMAL]
 
 
 @pytest.mark.parametrize("rot", _rots)
@@ -78,3 +82,23 @@ def test_deprecation():
 
     with pytest.warns(DeprecationWarning):
         assert sampleFunc(b=10) == 10
+
+
+@pytest.mark.parametrize("ptype", ["checklist", "list"])
+@pytest.mark.parametrize("fixedLims", [True, False])
+@pytest.mark.parametrize("limits", [["a"], ["a", "b"]])
+@pytest.mark.parametrize("value", ["['a', 'b']", "['a']"])
+def test_list_serdes(ptype, fixedLims, value, limits):
+    trueValue = ast.literal_eval(value)
+    if ptype == "checklist":
+        initialValue = limits
+    else:
+        initialValue = limits[0]
+        # 'a' or 'b'
+        value = trueValue = trueValue[-1]
+    param = PrjParam("test", initialValue, ptype, fixedLimits=fixedLims, limits=limits)
+    out, errs = deserialize(param, [value])
+    if trueValue in limits or not set(trueValue).difference(limits) or not fixedLims:
+        assert len(out) == 1 and out[0] == trueValue
+    else:
+        assert len(errs) == 1 and isinstance(errs[0], ValueError)

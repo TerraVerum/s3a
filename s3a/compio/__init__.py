@@ -53,7 +53,7 @@ def listDeser(param, strVal):
         newLims = [val] if val not in lims else []
 
     if fixedLims and len(newLims):
-        raise ValueError(f'Limits cannot grow and "{newLims} not in limits')
+        raise ValueError(f"Limits cannot grow and '{newLims}' not in limits")
     lims.extend(newLims)
     return val
 
