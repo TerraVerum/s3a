@@ -79,8 +79,9 @@ class CompTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
         try:
             if noChange:
                 return True
-        except ValueError:
-            # Happens with array comparison
+        except ValueError: # lgtm[py/unreachable-statement]
+            # LGTM false positive: ValueError is indeed possible with numpy rich bool
+            # logic
             pass
         self.compDf.iat[row, col] = value
         # !!! Serious issue! Using iat sometimes doesn't work and I have no idea why since it is
@@ -93,8 +94,8 @@ class CompTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
         )
         try:
             cmp = bool(cmp)
-        except ValueError:
-            # Numpy array-like
+        except ValueError: # lgtm[py/unreachable-statement]
+            # See comment on previous ValueError block
             cmp = np.any(cmp)
         if cmp:
             getAppLogger(__name__).warning(
