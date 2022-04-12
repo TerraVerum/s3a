@@ -24,6 +24,8 @@ from utilitys.typeoverloads import FilePath
 from .constants import PRJ_ENUMS
 from .structures import TwoDArr, XYVertices, ComplexXYVertices, NChanImg, BlackWhiteImg
 
+_coordType = Union[np.ndarray, Tuple[slice, slice]]
+
 
 def stackedVertsPlusConnections(
     vertList: ComplexXYVertices,
@@ -246,7 +248,7 @@ def getCroppedImg(
     margin=0,
     coordsAsSlices=False,
     returnCoords=True,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, _coordType] | np.ndarray:
     """
     Crops an image according to the specified vertices such that the returned image does not extend
     past vertices plus margin (including other bboxes if specified). All bboxes and output coords
