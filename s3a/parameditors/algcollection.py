@@ -300,7 +300,7 @@ class AlgCollection(ParamEditor):
         exists = out.name in self.topProcs
         if add is not PRJ_ENUMS.PROC_NO_ADD and (not exists or allowOverwrite):
             self.addProcess(
-                out, top=add is PRJ_ENUMS.PROC_ADD_TOP, force=allowOverwrite
+                out, top=add == PRJ_ENUMS.PROC_ADD_TOP, force=allowOverwrite
             )
         return out
 
