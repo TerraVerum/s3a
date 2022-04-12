@@ -31,21 +31,6 @@ def test_change_img_none(app):
     assert app.srcImgFname is None
 
 
-"""For some reason, the test below works if performed manually. However, I can't
-seem to get the programmatically allocated keystrokes to work."""
-# def test_ambig_shc(qtbot):
-#   param = PrjParam('Dummy', 'T', 'registeredaction')
-#
-#   p2 = copy(param)
-#   p2.name = 'dummy2'
-#   app.sharedAttrs.shortcuts.registerButton(param, app.mainImg)
-#   app.sharedAttrs.shortcuts.registerButton(p2, app.mainImg)
-#   keypress = QtGui.QKeyEvent(QtGui.QKeyEvent.KeyPress, QtCore.Qt.Key_T, QtCore.Qt.NoModifier, "T")
-#   with pytest.warns(UserWarning):
-#     QtGui.QGuiApplication.sendEvent(app.mainImg, keypress)
-#     appInst.processEvents()
-
-
 @pytest.mark.withcomps
 def test_clear_bounds(app, vertsPlugin):
     assert len(app.compMgr.compDf) > 0

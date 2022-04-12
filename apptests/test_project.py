@@ -19,6 +19,8 @@ from s3a import S3A
 from s3a.parameditors.table import IOTemplateManager
 from s3a.plugins.file import ProjectData, absolutePath
 
+_autosaveFile = "autosave.param"
+
 
 @pytest.fixture
 def tmpProj(tmp_path):
@@ -283,13 +285,13 @@ def test_abspath_none():
 def test_load_autosave(app, filePlg, tmp_path):
     state = app.appStateEditor
 
-    fns.saveToFile({"interval": 10}, tmp_path / "autosave.param")
+    fns.saveToFile({"interval": 10}, tmp_path / _autosaveFile)
 
     importer = state.stateFuncsDf.at["autosave", "importFunc"]
     importer(True)
     assert filePlg.autosaveTimer.isActive()
 
-    importer(tmp_path / "autosave.param")
+    importer(tmp_path / _autosaveFile)
     assert filePlg.autosaveTimer.interval() == 1000 * 60 * 10
 
     importer(False)
@@ -299,7 +301,7 @@ def test_load_autosave(app, filePlg, tmp_path):
 def test_export_autosave(app, filePlg, tmp_path):
     state = app.appStateEditor
 
-    fns.saveToFile({"interval": 10}, tmp_path / "autosave.param")
+    fns.saveToFile({"interval": 10}, tmp_path / _autosaveFile)
 
     exporter = state.stateFuncsDf.at["autosave", "exportFunc"]
     for proc, params in filePlg.toolsEditor.procToParamsMapping.items():

@@ -31,7 +31,6 @@ class MetricsEventFilter(QtCore.QObject):
         self.metrics = metrics
 
     def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent):
-        event: QtGui.QMouseEvent
         mImg = self.metrics.win.mainImg
         if not (
             QtWidgets.QApplication.mouseButtons() == QtCore.Qt.MouseButton.LeftButton

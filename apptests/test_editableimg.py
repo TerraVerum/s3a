@@ -105,7 +105,6 @@ def test_region_modify(sampleComps, app, mgr, vertsPlugin):
 
     newVerts = XYVertices([[5, 5], [reach, reach], [reach, 5], [5, 5]])
     cplxVerts = ComplexXYVertices([newVerts])
-    newMask = cplxVerts.toMask(shapeBnds, asBool=False) > 0
 
     # 2nd action
     app.mainImg.updateFocusedComp(sampleComps.iloc[-1])

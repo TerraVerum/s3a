@@ -122,10 +122,7 @@ class DropList(QtWidgets.QListWidget):
             event.ignore()
 
     def dragMoveEvent(self, event):
-        if event.mimeData().hasUrls():
-            event.acceptProposedAction()
-        else:
-            event.ignore()
+        return self.dragEnterEvent(event)
 
     def dropEvent(self, event):
         md = event.mimeData()

@@ -26,8 +26,3 @@ for impath, im in zip(
 ):
     impath.parent.mkdir(exist_ok=True, parents=True)
     io.imsave(impath, im)
-
-# from warnings import simplefilter
-# simplefilter('error', DeprecationWarning)
-# simplefilter('error', VisibleDeprecationWarning)
-# simplefilter('error', UserWarning)

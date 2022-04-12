@@ -22,20 +22,6 @@ from s3a.plugins.file import FilePlugin
 dfTester = CompDfTester(NUM_COMPS)
 dfTester.fillRandomVerts(imageShape=SAMPLE_IMG.shape)
 
-# @pytest.fixture(scope='session', autouse=True)
-# def cfg_warnings():
-#   oldWarnings = warnings.showwarning
-#   def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
-#
-#     log = file if hasattr(file,'write') else sys.stderr
-#     traceback.print_stack(file=log)
-#     log.write(warnings.formatwarning(message, category, filename, lineno, line))
-#
-#   warnings.showwarning = warn_with_traceback
-#   yield
-#   # Set back to normal
-#   warnings.showwarning = oldWarnings
-
 
 @pytest.fixture(scope="module")
 def sampleComps():
