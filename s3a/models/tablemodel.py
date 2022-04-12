@@ -78,7 +78,7 @@ class CompTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
         try:
             if noChange:
                 return True
-        except ValueError: # lgtm[py/unreachable-statement]
+        except ValueError:  # lgtm[py/unreachable-statement]
             # LGTM false positive: ValueError is indeed possible with numpy rich bool
             # logic
             pass
@@ -93,7 +93,7 @@ class CompTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
         )
         try:
             cmp = bool(cmp)
-        except ValueError: # lgtm[py/unreachable-statement]
+        except ValueError:  # lgtm[py/unreachable-statement]
             # See comment on previous ValueError block
             cmp = np.any(cmp)
         if cmp:
