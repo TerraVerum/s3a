@@ -2,9 +2,8 @@ import cv2 as cv
 import numpy as np
 import pandas as pd
 import pytest
-from pyqtgraph.Qt import QtCore
+from pyqtgraph.Qt import QtCore, mkQApp
 
-from s3a import appInst
 from s3a.constants import REQD_TBL_FIELDS
 from s3a.generalutils import imgCornerVertices, cvImreadRgb
 from s3a.structures import ComplexXYVertices, XYVertices
@@ -15,7 +14,7 @@ from s3a.views.tableview import CompTableView, PopupTableDialog
 def test_merge_selected_comps(app, mgr):
     oldLen = len(mgr.compDf)
     app.compTbl.selectAll()
-    appInst.processEvents()
+    mkQApp().processEvents()
     assert len(app.compDisplay.selectedIds) > 0
     app.compDisplay.mergeSelectedComps()
     assert len(mgr.compDf) == 1

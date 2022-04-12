@@ -6,7 +6,7 @@ from typing import Type
 import pytest
 
 from s3a.constants import PRJ_ENUMS
-from s3a import constants
+from s3a import constants, mkQApp
 from helperclasses import CompDfTester
 from s3a.views.s3agui import S3A
 from testingconsts import (
@@ -18,6 +18,8 @@ from testingconsts import (
 )
 from s3a.plugins.tablefield import VerticesPlugin
 from s3a.plugins.file import FilePlugin
+
+mkQApp()
 
 dfTester = CompDfTester(NUM_COMPS)
 dfTester.fillRandomVerts(imageShape=SAMPLE_IMG.shape)

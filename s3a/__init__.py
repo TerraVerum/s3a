@@ -8,6 +8,7 @@ from pkg_resources import parse_version
 
 __all__ = [
     "appInst",
+    "mkQApp",
     "S3A",
     "REQD_TBL_FIELDS",
     "ComplexXYVertices",
@@ -35,18 +36,6 @@ except (ImportError, AssertionError):
     )
 
 from .__version__ import __version__
-
-# Makes sure that when the folder is run as a module, the app exists in the outermost
-# scope of the application
-customPlatform = os.environ.get("S3A_PLATFORM")
-args = list(sys.argv)
-if customPlatform is not None:
-    args += ["-platform", customPlatform]
-sys.argv = args
-appInst = pg.mkQApp()
-# Allow selectable text in message boxes
-appInst.setStyleSheet("QMessageBox { messagebox-text-interaction-flags: 5; }")
-
 from . import graphicsutils as gutils
 from .constants import REQD_TBL_FIELDS, PRJ_CONSTS, CFG_DIR, PRJ_ENUMS
 from .structures import ComplexXYVertices, XYVertices
@@ -56,3 +45,29 @@ from .views.s3agui import S3A
 from .plugins.misc import RandomToolsPlugin
 from .plugins.file import ProjectData
 from .parameditors.table import TableData
+
+appInst = None
+
+
+def mkQApp(*args):
+    global appInst
+    if appInst is not None:
+        return appInst
+    if pg.QAPP is not None:
+        appInst = pg.QAPP
+        return appInst
+    # else
+    args = list(sys.argv) + list(args)
+    # Makes sure that when the folder is run as a module, the app exists in the outermost
+    # scope of the application
+    customPlatform = os.environ.get("S3A_PLATFORM")
+    if customPlatform is not None:
+        args += ["-platform", customPlatform]
+    oldArgs = sys.argv
+    sys.argv = args
+    # No option to pass custom args to mkQApp, so temporarily override sys.argv
+    appInst = pg.mkQApp()
+    sys.argv = oldArgs
+    # Allow selectable text in message boxes
+    appInst.setStyleSheet("QMessageBox { messagebox-text-interaction-flags: 5; }")
+    return appInst

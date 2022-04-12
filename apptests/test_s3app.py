@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from conftest import NUM_COMPS, dfTester
-from s3a import appInst
+from s3a import mkQApp
 from s3a.constants import REQD_TBL_FIELDS, LAYOUTS_DIR, PRJ_CONSTS as CNST
 from s3a.plugins.mainimage import MainImagePlugin
 from s3a.structures import XYVertices, ComplexXYVertices
@@ -94,6 +94,7 @@ def test_save_layout(app):
 
 
 def test_autosave(tmp_path, app, filePlg):
+    appInst = mkQApp()
     interval = 0.01
     # Wrap in path otherwise some path ops don't work as expected
     filePlg.startAutosave(interval, tmp_path, "autosave")

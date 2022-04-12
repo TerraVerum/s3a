@@ -3,8 +3,7 @@ from argparse import Action
 from pyqtgraph.Qt import QtCore
 from utilitys import fns
 
-from . import __version__
-from . import appInst
+from . import __version__, mkQApp
 from .constants import PRJ_ENUMS
 from .views.s3agui import S3A
 
@@ -20,6 +19,7 @@ def main(loadLastState=True, **load):
     # Handle here for faster bootup
     win = S3A(log=PRJ_ENUMS.LOG_GUI, loadLastState=loadLastState, **load)
     QtCore.QTimer.singleShot(0, win.showMaximized)
+    appInst = mkQApp()
     try:
         appInst.exec_()
     except AttributeError:
