@@ -1,21 +1,41 @@
-from contextlib import ExitStack
-
 import pytest
 import time
 
-from s3a.processing import RunnableFuncWrapper, ThreadedFuncWrapper
-from s3a.processing.processing import (
+from pyqtgraph.Qt import QtCore
+from s3a.processing import (
+    RunnableFuncWrapper,
+    ThreadedFuncWrapper,
     AbortableThreadContainer,
     RunnableThreadContainer,
 )
 
 
+class GlobalThreadPoolContainer(RunnableThreadContainer):
+    """
+    See https://github.com/pytest-dev/pytest-qt/issues/199#issuecomment-366518687
+    for why this might work
+    """
+
+    def __init__(self, maxThreadCount=1):
+        super().__init__(QtCore.QThreadPool.globalInstance(), maxThreadCount)
+
+
+def sleepUntilCallback(cb, timeoutSeconds=5.0):
+    startTime = time.time()
+    timeout = False
+    while not cb() and not timeout:
+        timeout = (time.time() - startTime) > timeoutSeconds
+        time.sleep(0.1)
+    if timeout:
+        raise TimeoutError(f"{cb} never occurred")
+
+
 @pytest.mark.parametrize(
-    "container", [RunnableThreadContainer, AbortableThreadContainer]
+    "container", [GlobalThreadPoolContainer, AbortableThreadContainer]
 )
 def test_containers(qtbot, container):
     pool = container()
-    if isinstance(pool, RunnableThreadContainer):
+    if isinstance(pool, GlobalThreadPoolContainer):
         addFunc = pool.addRunner
         queue = pool.unfinishedRunners
     else:
@@ -36,7 +56,7 @@ def test_containers(qtbot, container):
 
 
 def test_terminate_waiting(qtbot):
-    pool = RunnableThreadContainer()
+    pool = GlobalThreadPoolContainer()
     end = False
     runner = pool.addRunner(sleepUntilCallback, cb=lambda: end)
     pool.addRunner(sleepUntilCallback, cb=lambda: end)
@@ -46,18 +66,7 @@ def test_terminate_waiting(qtbot):
         end = True
 
 
-def sleepUntilCallback(cb, timeoutSeconds=5.0):
-    startTime = time.time()
-    timeout = False
-    while not cb() and not timeout:
-        timeout = (time.time() - startTime) > timeoutSeconds
-        time.sleep(0.1)
-    if timeout:
-        raise TimeoutError(f"{cb} never occurred")
-
-
 def test_abort_during_run(qtbot):
-
     end = False
     pool = AbortableThreadContainer()
     threads = [pool.addThread(sleepUntilCallback, cb=lambda: end) for _ in range(2)]

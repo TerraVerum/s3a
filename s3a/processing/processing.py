@@ -114,10 +114,9 @@ class RunnableFuncWrapperSignals(QtCore.QObject):
 
 
 class RunnableFuncWrapper(QtCore.QRunnable):
-    signals = RunnableFuncWrapperSignals()
-
     def __init__(self, func, **kwargs):
         super().__init__()
+        self.signals = RunnableFuncWrapperSignals()
         if not isinstance(func, AtomicProcess):
             kwargs.update(interactive=False)
             func = AtomicProcess(func, **kwargs)
@@ -189,23 +188,28 @@ class RunnableThreadContainer(QtCore.QObject):
     def discardUnfinishedRunners(self):
         # Reverse to avoid race condition where first runner is supposed to happen before second, first is deleted,
         # and second runs regardless
-        for runner in reversed(self.unfinishedRunners):
-            if self.pool.tryTake(runner):
-                self._onRunnerFinish(runner)
+        update = False
+        for runner in reversed(self.unfinishedRunners):  # type: RunnableFuncWrapper
+            if runner in self.unfinishedRunners and self.pool.tryTake(runner):
+                self.unfinishedRunners.remove(runner)
+                update = True
+        if update:
+            self.sigTasksUpdated.emit()
 
     def addRunner(self, runner: t.Callable | RunnableFuncWrapper, **kwargs):
         if not isinstance(runner, RunnableFuncWrapper):
             runner = RunnableFuncWrapper(runner, **kwargs)
         self.unfinishedRunners.append(runner)
-        runner.signals.resultReady.connect(self._onRunnerFinish)
+
+        def onFinish(*_):
+            if runner in self.unfinishedRunners:
+                self.unfinishedRunners.remove(runner)
+
+        for signal in runner.sigResultReady, runner.sigFailed:
+            signal.connect(onFinish)
         self.pool.start(runner)
         self.sigTasksUpdated.emit()
         return runner
-
-    def _onRunnerFinish(self, runner):
-        if runner in self.unfinishedRunners:
-            self.unfinishedRunners.remove(runner)
-        self.sigTasksUpdated.emit()
 
 
 class AbortableThreadContainer(QtCore.QObject):
