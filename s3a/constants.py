@@ -119,7 +119,7 @@ class PRJ_ENUMS:
     ROT_OPTIMAL = None
 
 
-from .structures import ComplexXYVertices, PrjParam, PrjParamGroup, newParam
+from .structures import ComplexXYVertices, PrjParam
 
 
 class _ReqdTableFields:
@@ -163,54 +163,51 @@ class _ReqdTableFields:
 REQD_TBL_FIELDS = _ReqdTableFields()
 
 
-@dataclass
-class _PrjConsts(PrjParamGroup):
+class PRJ_CONSTS:
     # --------------------------
     # CLASS NAMES
     # --------------------------
-    CLS_ANNOTATOR: PrjParam = newParam("S3A Window")
-    CLS_S3A_MODEL: PrjParam = newParam("S3A Model")
+    CLS_ANNOTATOR = PrjParam("S3A Window")
+    CLS_S3A_MODEL = PrjParam("S3A Model")
 
-    CLS_COMP_TBL: PrjParam = newParam("Component Table")
-    CLS_COMP_MGR: PrjParam = newParam("Component Manager")
-    CLS_COMP_EXPORTER: PrjParam = newParam("Component Exporter")
+    CLS_COMP_TBL = PrjParam("Component Table")
+    CLS_COMP_MGR = PrjParam("Component Manager")
+    CLS_COMP_EXPORTER = PrjParam("Component Exporter")
 
-    CLS_VERT_IMG: PrjParam = newParam("Focused Image Graphics")
-    CLS_MULT_REG_PLT: PrjParam = newParam("Main Image")
-    CLS_ROI_CLCTN: PrjParam = newParam("ROI Shapes")
+    CLS_VERT_IMG = PrjParam("Focused Image Graphics")
+    CLS_MULT_REG_PLT = PrjParam("Main Image")
+    CLS_ROI_CLCTN = PrjParam("ROI Shapes")
 
-    CLS_REGION_BUF: PrjParam = newParam("Region Modification Buffer")
+    CLS_REGION_BUF = PrjParam("Region Modification Buffer")
 
-    CLS_IMG_AREA: PrjParam = newParam("Base Image Area")
-    CLS_MAIN_IMG_AREA: PrjParam = newParam("Main Image Area")
-    CLS_FOCUSED_IMG_AREA: PrjParam = newParam("Focused Image Area")
+    CLS_IMG_AREA = PrjParam("Base Image Area")
+    CLS_MAIN_IMG_AREA = PrjParam("Main Image Area")
+    CLS_FOCUSED_IMG_AREA = PrjParam("Focused Image Area")
     # --------------------------
     # SCHEME PARAMETERS
     # --------------------------
-    SCHEME_USE_DARK_THEME: PrjParam = newParam("Use dark theme", False)
-    SCHEME_BOUND_CLR: PrjParam = newParam("Normal Boundary Color", "#ff0", "color")
-    SCHEME_SEL_BOUND_CLR: PrjParam = newParam(
-        "Selected Boundary Color", "#00f", "color"
-    )
-    SCHEME_FOC_BRUSH_CLR: PrjParam = newParam("Focused Brush Color", "#f007", "color")
-    SCHEME_BOUND_WIDTH: PrjParam = newParam("Boundary Width", 7)
-    SCHEME_REG_VERT_COLOR: PrjParam = newParam("Vertex Color", "#0f0", "color")
-    SCHEME_REG_FILL_COLOR: PrjParam = newParam("Fill Color", "#00ff0046", "color")
-    SCHEME_ROI_LINE_CLR: PrjParam = newParam("ROI Line Color", "#fff", "color")
-    SCHEME_ROI_LINE_WIDTH: PrjParam = newParam("ROI Line Width", 1)
-    SCHEME_GRID_LINE_WIDTH: PrjParam = newParam("Grid Line Width", 1)
-    SCHEME_GRID_CLR: PrjParam = newParam("Grid Line Color", "#fff", "color")
-    SCHEME_SHOW_GRID: PrjParam = newParam("Show Grid", False)
-    SCHEME_LBL_COL: PrjParam = newParam(
+    SCHEME_USE_DARK_THEME = PrjParam("Use dark theme", False)
+    SCHEME_BOUND_CLR = PrjParam("Normal Boundary Color", "#ff0", "color")
+    SCHEME_SEL_BOUND_CLR = PrjParam("Selected Boundary Color", "#00f", "color")
+    SCHEME_FOC_BRUSH_CLR = PrjParam("Focused Brush Color", "#f007", "color")
+    SCHEME_BOUND_WIDTH = PrjParam("Boundary Width", 7)
+    SCHEME_REG_VERT_COLOR = PrjParam("Vertex Color", "#0f0", "color")
+    SCHEME_REG_FILL_COLOR = PrjParam("Fill Color", "#00ff0046", "color")
+    SCHEME_ROI_LINE_CLR = PrjParam("ROI Line Color", "#fff", "color")
+    SCHEME_ROI_LINE_WIDTH = PrjParam("ROI Line Width", 1)
+    SCHEME_GRID_LINE_WIDTH = PrjParam("Grid Line Width", 1)
+    SCHEME_GRID_CLR = PrjParam("Grid Line Color", "#fff", "color")
+    SCHEME_SHOW_GRID = PrjParam("Show Grid", False)
+    SCHEME_LBL_COL = PrjParam(
         "Labeling Column", REQD_TBL_FIELDS.INST_ID.name, pType="list", limits=[]
     )
 
     # --------------------------
     # REGION-CREATION PARAMETERS
     # --------------------------
-    PROP_MIN_COMP_SZ: PrjParam = newParam("Minimum New Component Size (px)", 50)
-    PROP_UNDO_BUF_SZ: PrjParam = newParam("Undo Buffer Size", 300)
-    PROP_COMP_SEL_BHV: PrjParam = newParam(
+    PROP_MIN_COMP_SZ = PrjParam("Minimum New Component Size (px)", 50)
+    PROP_UNDO_BUF_SZ = PrjParam("Undo Buffer Size", 300)
+    PROP_COMP_SEL_BHV = PrjParam(
         "Component Selection Behavior",
         "Entire Component",
         "list",
@@ -219,27 +216,25 @@ class _PrjConsts(PrjParamGroup):
         "When `Entire Component`, clicking anywhere within the component"
         " will select it",
     )
-    PROP_FIELD_INFO_ON_SEL: PrjParam = newParam(
+    PROP_FIELD_INFO_ON_SEL = PrjParam(
         "Show field info after selection",
         False,
         helpText="Whether to show field information in the main image"
         " every time the current selection changes",
     )
-    PROP_VERT_SORT_BHV: PrjParam = newParam(
+    PROP_VERT_SORT_BHV = PrjParam(
         "Vertices Sorting",
         "X First",
         "list",
         limits=["X First", "Y First"],
         helpText="Whether to sort first by X or Y when sorting a vertices-like field",
     )
-    PROP_SHOW_TBL_ON_COMP_CREATE: PrjParam = newParam(
+    PROP_SHOW_TBL_ON_COMP_CREATE = PrjParam(
         "Show popup table when creating component", False
     )
-    PROP_SCALE_PEN_WIDTH: PrjParam = newParam(
-        "Scale pen width to image pixel size", True
-    )
+    PROP_SCALE_PEN_WIDTH = PrjParam("Scale pen width to image pixel size", True)
 
-    PROP_COLLECT_USR_METRICS: PrjParam = newParam(
+    PROP_COLLECT_USR_METRICS = PrjParam(
         "Collect user metrics",
         False,
         helpText="Collect user metrics for smarter segmentation algorithms",
@@ -247,94 +242,84 @@ class _PrjConsts(PrjParamGroup):
     # --------------------------
     # MISC TOOLS
     # --------------------------
-    TOOL_UNDO: PrjParam = newParam("Undo", "Ctrl+Z")
-    TOOL_REDO: PrjParam = newParam("Redo", "Ctrl+Y")
+    TOOL_UNDO = PrjParam("Undo", "Ctrl+Z")
+    TOOL_REDO = PrjParam("Redo", "Ctrl+Y")
     # --------------------------
     # IMAGE TOOLS
     # --------------------------
-    TOOL_MERGE_COMPS: PrjParam = newParam(
+    TOOL_MERGE_COMPS = PrjParam(
         "Merge Selected", f"{SHORTCUT_BASE},S,M", icon=str(ICON_DIR / "merge.svg")
     )
-    TOOL_SPLIT_COMPS: PrjParam = newParam(
+    TOOL_SPLIT_COMPS = PrjParam(
         "Split Selected", f"{SHORTCUT_BASE},S,S", icon=str(ICON_DIR / "split.svg")
     )
-    TOOL_REM_OVERLAP: PrjParam = newParam(
+    TOOL_REM_OVERLAP = PrjParam(
         "Remove Component Overlap",
         f"{SHORTCUT_BASE},S,E",
         icon=str(ICON_DIR / "mutex.svg"),
     )
-    TOOL_COPY_REGIONS: PrjParam = newParam(
+    TOOL_COPY_REGIONS = PrjParam(
         "Copy Selected", f"{SHORTCUT_BASE},S,C", icon=str(ICON_DIR / "copy.svg")
     )
-    TOOL_MOVE_REGIONS: PrjParam = newParam(
+    TOOL_MOVE_REGIONS = PrjParam(
         "Move Selected", f"{SHORTCUT_BASE},S,V", icon=str(ICON_DIR / "move.svg")
     )
-    TOOL_CLEAR_FOC_REGION: PrjParam = newParam(
+    TOOL_CLEAR_FOC_REGION = PrjParam(
         "Clear", f"{SHORTCUT_BASE},V,C", icon=str(ICON_DIR / "clear.svg")
     )
-    TOOL_RESET_FOC_REGION: PrjParam = newParam(
+    TOOL_RESET_FOC_REGION = PrjParam(
         "Reset", f"{SHORTCUT_BASE},V,R", icon=str(ICON_DIR / "reset.svg")
     )
-    TOOL_FILL_FOC_REGION: PrjParam = newParam(
+    TOOL_FILL_FOC_REGION = PrjParam(
         "Fill", f"{SHORTCUT_BASE},V,F", icon=str(ICON_DIR / "fill.svg")
     )
-    TOOL_INVERT_FOC_REGION: PrjParam = newParam(
+    TOOL_INVERT_FOC_REGION = PrjParam(
         "Invert", f"{SHORTCUT_BASE},V,I", icon=str(ICON_DIR / "invert.svg")
     )
-    TOOL_ACCEPT_FOC_REGION: PrjParam = newParam(
+    TOOL_ACCEPT_FOC_REGION = PrjParam(
         "Accept", "Ctrl+Shift+A", icon=str(ICON_DIR / "accept.svg")
     )
-    TOOL_CLEAR_ROI: PrjParam = newParam("Clear ROI", "Esc")
-    TOOL_CLEAR_HISTORY: PrjParam = newParam(
+    TOOL_CLEAR_ROI = PrjParam("Clear ROI", "Esc")
+    TOOL_CLEAR_HISTORY = PrjParam(
         "Clear Processor History",
         f"{SHORTCUT_BASE},V,H",
         icon=str(ICON_DIR / "clear_history.svg"),
     )
-    TOOL_PROC_ANALYTICS: PrjParam = newParam(
+    TOOL_PROC_ANALYTICS = PrjParam(
         "Show Analytics", icon=str(ICON_DIR / "analytics.svg")
     )
-    TOOL_RESET_ZOOM: PrjParam = newParam(
+    TOOL_RESET_ZOOM = PrjParam(
         "Reset Zoom", f"{SHORTCUT_BASE},Z,R", icon=str(ICON_DIR / "reset_zoom.svg")
     )
 
     # --------------------------
     # WINDOW TOOLS
     # --------------------------
-    TOOL_ESTIMATE_BOUNDARIES: PrjParam = newParam(
-        "Estimate Boundaries", "Ctrl+Alt+Shift+E"
-    )
-    TOOL_CLEAR_BOUNDARIES: PrjParam = newParam("Clear Boundaries", "Ctrl+Alt+Shift+C")
-    TOOL_EXPORT_COMP_LIST: PrjParam = newParam(
-        "Export Current Table", f"{SHORTCUT_BASE},E,T"
-    )
-    TOOL_TBL_SET_SAME_AS_FIRST: PrjParam = newParam("Set Cells as First", "Ctrl+D")
-    TOOL_TBL_SET_AS: PrjParam = newParam("Set Cells As...", "Ctrl+Shift+D")
-    TOOL_TBL_DEL_ROWS: PrjParam = newParam("Delete Table Rows", "Del")
-    TOOL_TBL_ZOOM_TO_COMPS: PrjParam = newParam(
-        "Zoom to Selection  ", f"{SHORTCUT_BASE},Z,S"
-    )
+    TOOL_ESTIMATE_BOUNDARIES = PrjParam("Estimate Boundaries", "Ctrl+Alt+Shift+E")
+    TOOL_CLEAR_BOUNDARIES = PrjParam("Clear Boundaries", "Ctrl+Alt+Shift+C")
+    TOOL_EXPORT_COMP_LIST = PrjParam("Export Current Table", f"{SHORTCUT_BASE},E,T")
+    TOOL_TBL_SET_SAME_AS_FIRST = PrjParam("Set Cells as First", "Ctrl+D")
+    TOOL_TBL_SET_AS = PrjParam("Set Cells As...", "Ctrl+Shift+D")
+    TOOL_TBL_DEL_ROWS = PrjParam("Delete Table Rows", "Del")
+    TOOL_TBL_ZOOM_TO_COMPS = PrjParam("Zoom to Selection  ", f"{SHORTCUT_BASE},Z,S")
 
     # --------------------------
     # PROJECT
     # --------------------------
-    TOOL_PROJ_SAVE: PrjParam = newParam("Save", "Ctrl+S")
-    TOOL_PROJ_OPEN: PrjParam = newParam("Open Project", f"{SHORTCUT_BASE},P,O")
-    TOOL_PROJ_OPEN_IMG: PrjParam = newParam(
-        "Open Project Image", f"{SHORTCUT_BASE},I,O"
-    )
-    TOOL_PROJ_CREATE: PrjParam = newParam("Create Project", f"{SHORTCUT_BASE},P,C")
-    TOOL_PROJ_ADD_IMG: PrjParam = newParam("Add New Image", f"{SHORTCUT_BASE},I,A")
-    TOOL_PROJ_ADD_ANN: PrjParam = newParam("Add New Annotation", f"{SHORTCUT_BASE},A,A")
-    TOOL_PROJ_SETTINGS: PrjParam = newParam(
-        "Project Settings...", f"{SHORTCUT_BASE},P,S"
-    )
-    TOOL_PROJ_EXPORT: PrjParam = newParam("Export...", f"{SHORTCUT_BASE},P,E")
-    TOOL_AUTOSAVE: PrjParam = newParam("Autosave...", f"{SHORTCUT_BASE},A,O")
+    TOOL_PROJ_SAVE = PrjParam("Save", "Ctrl+S")
+    TOOL_PROJ_OPEN = PrjParam("Open Project", f"{SHORTCUT_BASE},P,O")
+    TOOL_PROJ_OPEN_IMG = PrjParam("Open Project Image", f"{SHORTCUT_BASE},I,O")
+    TOOL_PROJ_CREATE = PrjParam("Create Project", f"{SHORTCUT_BASE},P,C")
+    TOOL_PROJ_ADD_IMG = PrjParam("Add New Image", f"{SHORTCUT_BASE},I,A")
+    TOOL_PROJ_ADD_ANN = PrjParam("Add New Annotation", f"{SHORTCUT_BASE},A,A")
+    TOOL_PROJ_SETTINGS = PrjParam("Project Settings...", f"{SHORTCUT_BASE},P,S")
+    TOOL_PROJ_EXPORT = PrjParam("Export...", f"{SHORTCUT_BASE},P,E")
+    TOOL_AUTOSAVE = PrjParam("Autosave...", f"{SHORTCUT_BASE},A,O")
 
     # --------------------------
     # GLOBAL PREDICTIONS
     # --------------------------
-    TOOL_MULT_PRED: PrjParam = newParam(
+    TOOL_MULT_PRED = PrjParam(
         "Make Multi-Prediction",
         f"{SHORTCUT_BASE},M,P",
         icon=str(ICON_DIR / "predict.svg"),
@@ -343,13 +328,13 @@ class _PrjConsts(PrjParamGroup):
     # --------------------------
     # COMPONENT EXPORT PARAMETERS
     # --------------------------
-    EXP_ONLY_VISIBLE: PrjParam = newParam(
+    EXP_ONLY_VISIBLE = PrjParam(
         "Only Export Visible Components",
         False,
         helpText="If *True*, only components showing on the main image will be included in"
         " file exports.",
     )
-    INCLUDE_FNAME_PATH: PrjParam = newParam(
+    INCLUDE_FNAME_PATH = PrjParam(
         "Include full image path on export",
         False,
         None,
@@ -361,7 +346,7 @@ class _PrjConsts(PrjParamGroup):
     # DRAWING
     # -------------------
     # Modes
-    DRAW_MODE_FOCUSED: PrjParam = newParam(
+    DRAW_MODE_FOCUSED = PrjParam(
         'Activate "Edit" draw mode',
         f"{SHORTCUT_BASE},D,E",
         "registeredaction",
@@ -369,38 +354,38 @@ class _PrjConsts(PrjParamGroup):
     )
 
     # Shapes
-    DRAW_SHAPE_RECT: PrjParam = newParam(
+    DRAW_SHAPE_RECT = PrjParam(
         'Activate "Rectangular" draw shape',
         f"{SHORTCUT_BASE},D,R",
         "registeredaction",
         icon=str(ICON_DIR / "rectangle.svg"),
     )
-    DRAW_SHAPE_POLY: PrjParam = newParam(
+    DRAW_SHAPE_POLY = PrjParam(
         'Activate "Polygon" draw shape',
         f"{SHORTCUT_BASE},D,Y",
         "registeredaction",
         icon=str(ICON_DIR / "polygon.svg"),
     )
-    DRAW_SHAPE_ELLIPSE: PrjParam = newParam(
+    DRAW_SHAPE_ELLIPSE = PrjParam(
         'Activate "Ellipse" draw shape',
         f"{SHORTCUT_BASE},D,L",
         "registeredaction",
         icon=str(ICON_DIR / "ellipse.svg"),
     )
-    DRAW_SHAPE_FREE: PrjParam = newParam(
+    DRAW_SHAPE_FREE = PrjParam(
         'Activate "Freehand" draw shape',
         f"{SHORTCUT_BASE},D,H",
         icon=str(ICON_DIR / "freehand.svg"),
     )
-    DRAW_SHAPE_POINT: PrjParam = newParam(
+    DRAW_SHAPE_POINT = PrjParam(
         'Activate "Point" draw shape',
         f"{SHORTCUT_BASE},D,N",
         icon=str(ICON_DIR / "point.svg"),
     )
-    DRAW_SHAPE_NONE: PrjParam = newParam("None")
+    DRAW_SHAPE_NONE = PrjParam("None")
 
     # Actions
-    DRAW_ACT_CREATE: PrjParam = newParam(
+    DRAW_ACT_CREATE = PrjParam(
         'Activate "Create Component" action',
         f"{SHORTCUT_BASE},D,C",
         "registeredaction",
@@ -408,7 +393,7 @@ class _PrjConsts(PrjParamGroup):
         helpText="When an ROI is created, the image processor will attempt to make a new"
         " component at that location. Right-click and drag to pan.",
     )
-    DRAW_ACT_ADD: PrjParam = newParam(
+    DRAW_ACT_ADD = PrjParam(
         'Activate "Add to Foreground" action',
         f"{SHORTCUT_BASE},D,F",
         "registeredaction",
@@ -416,7 +401,7 @@ class _PrjConsts(PrjParamGroup):
         helpText="When an ROI is created, the image processor will attempt to make a new"
         " component at that location. Right-click and drag to pan.",
     )
-    DRAW_ACT_REM: PrjParam = newParam(
+    DRAW_ACT_REM = PrjParam(
         'Activate "Add to Background" action',
         f"{SHORTCUT_BASE},D, B",
         "registeredaction",
@@ -424,7 +409,7 @@ class _PrjConsts(PrjParamGroup):
         helpText="When an ROI is created, the image processor will attempt to take the enclosed"
         " area away from the current component shape. Right-click and drag to pan.",
     )
-    DRAW_ACT_SELECT: PrjParam = newParam(
+    DRAW_ACT_SELECT = PrjParam(
         'Activate "Select" draw action',
         f"{SHORTCUT_BASE},D, S",
         "registeredaction",
@@ -432,13 +417,10 @@ class _PrjConsts(PrjParamGroup):
         helpText="When component boundaries are enclosed by this ROI, they will be selected"
         " in the component table. Right-click and drag to pan.",
     )
-    DRAW_ACT_PAN: PrjParam = newParam(
+    DRAW_ACT_PAN = PrjParam(
         'Activate "Pan" draw action',
         f"{SHORTCUT_BASE},D,P",
         "registeredaction",
         icon=str(ICON_DIR / "pan.svg"),
         helpText="No ROI will be drawn in this mode. Right- or left-click and drag to pan.",
     )
-
-
-PRJ_CONSTS = _PrjConsts()

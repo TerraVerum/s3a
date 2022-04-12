@@ -1,20 +1,21 @@
 from __future__ import annotations
 
 import weakref
-from dataclasses import dataclass, fields, field
-from typing import Any, Optional, Collection, Union
+from typing import Optional, Collection, Union
 from warnings import warn
 
 from utilitys import PrjParam
 
-__all__ = ["PrjParam", "PrjParamGroup", "newParam"]
+__all__ = ["PrjParam", "PrjParamGroup"]
 
 
-@dataclass
 class PrjParamGroup:
     """
     Hosts all child parameters and offers convenience function for iterating over them
     """
+
+    def __init__(self, fields=None):
+        self.fields = fields if len(fields) else []
 
     def paramNames(self):
         """
@@ -23,16 +24,13 @@ class PrjParamGroup:
         return [curField.name for curField in self]
 
     def __iter__(self):
-        # 'self' is an instance of the class, so the warning is a false positive
-        # noinspection PyDataclass
-        for curField in fields(self):
-            yield getattr(self, curField.name)
+        yield from self.fields
 
     def __len__(self):
-        return len(fields(self))
+        return len(self.fields)
 
     def __str__(self):
-        return f"{[f.name for f in self]}"
+        return f", ".join([f.name for f in self])
 
     def __post_init__(self):
         for param in self:
@@ -40,7 +38,7 @@ class PrjParamGroup:
 
     @staticmethod
     def fieldFromParam(
-        group: Union[Collection[PrjParam], PrjParamGroup],
+        group: Collection[PrjParam],
         param: Union[str, PrjParam],
         default: PrjParam = None,
     ):
@@ -73,14 +71,3 @@ class PrjParamGroup:
         fallback class if the :func:`fieldFromParam` method fails.
         """
         return None
-
-
-def newParam(name: str, val: Any = None, pType: str = None, helpText="", **opts):
-    """
-    Factory for creating new parameters within a :class:`PrjParamGroup`.
-
-    See parameter documentation from :class:PrjParam for arguments.
-
-    :return: Field that can be inserted within the :class:`PrjParamGroup` dataclass.
-    """
-    return field(default_factory=lambda: PrjParam(name, val, pType, helpText, **opts))
