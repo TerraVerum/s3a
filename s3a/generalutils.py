@@ -298,7 +298,9 @@ def showMaskDiff(oldMask: BlackWhiteImg, newMask: BlackWhiteImg):
     return infoMask
 
 
-class MaxSizeDict(dict):
+# A different `maxsize` doesn't change whether two dicts have equal values,
+# which is why dict.__eq__ holds here.
+class MaxSizeDict(dict):  # lgtm [py/missing-equals]
     """
     Poor man's LRU dict, since I don't yet feel like including another pypi dependency
     Rather than evicting the least recently used, it evicts the oldest set value.
@@ -316,12 +318,6 @@ class MaxSizeDict(dict):
         if len(self) > self.maxsize:
             # Evict oldest accessed entry
             self.pop(next(iter(self.keys())))
-
-    def __eq__(self, other):
-        # Silence LGTM alert by providing custom equality function. Note that
-        # a different `maxsize` doesn't change whether two dicts have equal values,
-        # which is why the `super` implementation holds here.
-        return super().__eq__(other)
 
 
 def _getPtAngles(pts):
@@ -456,6 +452,9 @@ class DirectoryDict(MaxSizeDict):
     """
 
     _UNSET = object()
+    # Define readFunc and allowAbsolute here to suppress PyCharm warnings in __init__
+    readFunc: Any
+    allowAbsolute: Any
 
     def __init__(
         self,
@@ -512,7 +511,7 @@ class DirectoryDict(MaxSizeDict):
             )
         else:
             file = candidates[0]
-            ret = self.readFunc(file)
+            ret = self.readFunc(str(file))
             if self.cacheReads:
                 self[key] = ret
         return ret
@@ -526,6 +525,19 @@ class DirectoryDict(MaxSizeDict):
             except KeyError:
                 return default
         return ret
+
+    def __eq__(self, other):
+        contentsEq = super().__eq__(other)
+        if not contentsEq or not isinstance(other, DirectoryDict):
+            return contentsEq
+        # Since additional keys can come from the directory (in theory determining
+        # dict contents), check for equality on those attributes
+        return (
+            self.fileDir.resolve() == other.fileDir.resolve()
+            # TODO: Should readfuncs be allowed to differ? This would require some sort
+            #   of type-checking on its output
+            and self.readFunc == other.readFunc
+        )
 
 
 def deprecateKwargs(**oldToNewNameMapping):
