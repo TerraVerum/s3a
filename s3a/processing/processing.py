@@ -15,6 +15,8 @@ __all__ = [
     "AtomicProcess",
     "ThreadedFuncWrapper",
     "AbortableThreadContainer",
+    "RunnableFuncWrapper",
+    "RunnableThreadContainer",
 ]
 
 _infoType = t.List[t.Union[t.List, t.Dict[str, t.Any]]]
@@ -104,15 +106,15 @@ class ImageProcess(NestedProcess):
 _winRefs = {}
 
 
-class _ThreadedFuncWrapperSignals(QtCore.QObject):
-    doneSuccess = QtCore.Signal(object)
+class RunnableFuncWrapperSignals(QtCore.QObject):
+    resultReady = QtCore.Signal(object)
     """ThreadedFuncWrapper instance, emmitted on successful function run"""
-    doneFailure = QtCore.Signal(object, object)
+    failed = QtCore.Signal(object, object)
     """ThreadedFuncWrapper instance, exception instance, emmitted on any exception during function run"""
 
 
-class _RunnableFuncWrapper(QtCore.QRunnable):
-    signals = _ThreadedFuncWrapperSignals()
+class RunnableFuncWrapper(QtCore.QRunnable):
+    signals = RunnableFuncWrapperSignals()
 
     def __init__(self, func, **kwargs):
         super().__init__()
@@ -129,14 +131,22 @@ class _RunnableFuncWrapper(QtCore.QRunnable):
             # This could go in a "finally" block to avoid duplication below, but now "inProgress" will be false before
             # the signal is emitted
             self.inProgress = False
-            self.signals.doneSuccess.emit(self)
+            self.signals.resultReady.emit(self)
         except Exception as ex:
             self.inProgress = False
-            self.signals.doneFailure.emit(self, ex)
+            self.signals.failed.emit(self, ex)
 
     @property
     def result(self):
         return self.proc.result
+
+    @property
+    def sigResultReady(self):
+        return self.signals.resultReady
+
+    @property
+    def sigFailed(self):
+        return self.signals.failed
 
 
 class ThreadedFuncWrapper(QtCore.QThread):
@@ -164,7 +174,7 @@ class ThreadedFuncWrapper(QtCore.QThread):
         return self.proc.result
 
 
-class ThreadPoolContainer(QtCore.QObject):
+class RunnableThreadContainer(QtCore.QObject):
     sigTasksUpdated = QtCore.Signal()
 
     def __init__(self, pool: QtCore.QThreadPool = None, maxThreadCount=1):
@@ -183,13 +193,14 @@ class ThreadPoolContainer(QtCore.QObject):
             if self.pool.tryTake(runner):
                 self._onRunnerFinish(runner)
 
-    def addRunner(self, runner: t.Callable | _RunnableFuncWrapper, **kwargs):
-        if not isinstance(runner, _RunnableFuncWrapper):
-            runner = _RunnableFuncWrapper(runner, **kwargs)
+    def addRunner(self, runner: t.Callable | RunnableFuncWrapper, **kwargs):
+        if not isinstance(runner, RunnableFuncWrapper):
+            runner = RunnableFuncWrapper(runner, **kwargs)
         self.unfinishedRunners.append(runner)
-        runner.signals.doneSuccess.connect(self._onRunnerFinish)
+        runner.signals.resultReady.connect(self._onRunnerFinish)
         self.pool.start(runner)
         self.sigTasksUpdated.emit()
+        return runner
 
     def _onRunnerFinish(self, runner):
         if runner in self.unfinishedRunners:
