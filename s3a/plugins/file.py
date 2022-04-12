@@ -327,7 +327,8 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
             )
         backupFolder = Path(backupFolder)
         backupFolder.mkdir(exist_ok=True, parents=True)
-        lastSavedDf = self.win.exportableDf.copy()
+        # LGTM false positive, used in closure below
+        lastSavedDf = self.win.exportableDf.copy()  # lgtm [py/unused-local-variable]
         # Qtimer expects ms, turn mins->s->ms
         # Figure out where to start the counter
         globExpr = lambda: backupFolder.glob(f"{baseName}*.{annotationFormat}")

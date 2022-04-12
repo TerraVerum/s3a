@@ -18,7 +18,7 @@ from utilitys import fns
 
 # Needs to be visible outside this file
 # noinspection PyUnresolvedReferences
-from utilitys.fns import hierarchicalUpdate
+from utilitys.fns import hierarchicalUpdate  # lgtm [py/unused-import]
 from utilitys.typeoverloads import FilePath
 
 from .constants import PRJ_ENUMS

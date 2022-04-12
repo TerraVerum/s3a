@@ -340,7 +340,6 @@ class VertexDefinedImg(DASM, EditorPropsMixin, pg.ImageItem):
     def updateFromMask(self, newMask: BlackWhiteImg):
         # It is expensive to color the vertices, so only find contours if specified by the user
         oldImg = self.image
-        oldVerts = self.verts
 
         newMask = newMask.astype("uint8")
         if np.array_equal(oldImg > 0, newMask):
