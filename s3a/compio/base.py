@@ -135,13 +135,13 @@ class AnnotationExporter(AnnotationIOBase):
     exportObj: t.Any
     compDf: pd.DataFrame
 
-    bulkExport: _GenericExportProtocol = None
+    bulkExport: _GenericExportProtocol | None = None
     """
   Can be defined if bulk-exporting (whole dataframe at once) is possible. Must have the signature
   def bulkExport(self, compDf: pd.DataFrame, exportObj, **kwargs) -> exportObj, error dataframe
   """
 
-    updateExportObj: _UpdateExportObjProtocol = None
+    updateExportObj: _UpdateExportObjProtocol | None = None
     """
   Can be defined if individual importing (row-by-row) is possible. This is fed the current dataframe row as a dict
   of cell values and is expected to output the updated export object:
