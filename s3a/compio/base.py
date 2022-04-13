@@ -367,52 +367,59 @@ class AnnotationImporter(AnnotationIOBase):
             self.individualImport,
             self.bulkImport,
         ):  # type: t.Callable[[t.Any, ...], pd.DataFrame]
+            # Default to empty dataframes for unspecified importers
             if func is None:
-                parsedDfs.append(pd.DataFrame())
-            else:
-                parsedDfs.append(func(inFileOrObj, **kwargs))
+                func = lambda *_args, **_kw: pd.DataFrame()
+            parsedDfs.append(func(inFileOrObj, **kwargs))
 
         indivParsedDf, bulkParsedDf = parsedDfs
-        for col in indivParsedDf:
-            # Overwrite bulk-parsed information with individual if needed, or add to it
-            bulkParsedDf[col] = indivParsedDf[col]
+        # Overwrite bulk-parsed information with individual if needed, or add to it
+        bulkParsedDf[indivParsedDf.columns] = indivParsedDf
         # Some cols could be deserialized, others could be serialized still. Handle the still serialized cases
         parsedDf = self.finalizeImport(bulkParsedDf, **kwargs)
         validDf = self.validInstances(parsedDf, parseErrorOk)
-        # If only a subset is kept, `copy` is necessary to avoid SettingsWithCopyWarning
-        if len(validDf) < len(parsedDf):
-            validDf = validDf.copy()
+        # Rename for clarity
         parsedDf = validDf
 
         # Determine any destination mappings
+        importedCols = parsedDf.columns.copy()
         if self.destTableMapping:
             parsedDf.columns = self.destTableMapping.resolveFieldAliases(
                 parsedDf.columns, kwargs.get("mapping", {})
             )
 
         if keepExtraColumns:
-            # Columns not specified in the table data should be added back in their unmodified state
-            assignCols = set(bulkParsedDf).difference(parsedDf)
-            for col in assignCols:
-                parsedDf[col] = bulkParsedDf[col]
+            # Columns not specified in the table data should be kept in their unmodified state
+            extraCols = bulkParsedDf.columns.difference(importedCols)
+            alreadyParsed = np.isin(bulkParsedDf, importedCols)
+            # Make sure column ordering matches original
+            newOrder = np.array(bulkParsedDf.columns)
+            newOrder[alreadyParsed] = parsedDf.columns
+
+            parsedDf[extraCols] = bulkParsedDf[extraCols]
+            parsedDf = parsedDf[newOrder]
 
         # Make sure IDs are present
-        alreadyExists = RTF.INST_ID in parsedDf
-        if reindex or not alreadyExists:
-            sequentialIds = np.arange(len(parsedDf), dtype=int)
-            if alreadyExists:  # Just reindexing
-                parsedDf[RTF.INST_ID] = sequentialIds
-            # Ensure instance ID is the first column if new
-            else:
-                parsedDf.insert(0, RTF.INST_ID, sequentialIds)
-        elif not pd.api.types.is_integer_dtype(parsedDf[RTF.INST_ID]):
-            # pandas 1.4 introduced FutureWarnings for object-dtype assignments so ensure
-            # Instance ID is integer type
-            parsedDf[RTF.INST_ID] = parsedDf[RTF.INST_ID].astype(int)
-        parsedDf = parsedDf.set_index(RTF.INST_ID, drop=False)
-
+        parsedDf = self._ensureInstIdIndex(parsedDf, reindex=reindex)
+        # Ensure vertices present, optionally check against known image shape
         checkVertBounds(parsedDf[RTF.VERTICES], kwargs.get("imageShape"))
         return parsedDf
+
+    @staticmethod
+    def _ensureInstIdIndex(df, reindex=None):
+        alreadyExists = RTF.INST_ID in df
+        if reindex or not alreadyExists:
+            sequentialIds = np.arange(len(df), dtype=int)
+            if alreadyExists:  # Just reindexing
+                df[RTF.INST_ID] = sequentialIds
+            # Ensure instance ID is the first column if new
+            else:
+                df.insert(0, RTF.INST_ID, sequentialIds)
+        elif not pd.api.types.is_integer_dtype(df[RTF.INST_ID]):
+            # pandas 1.4 introduced FutureWarnings for object-dtype assignments so ensure
+            # Instance ID is integer type
+            df[RTF.INST_ID] = df[RTF.INST_ID].astype(int)
+        return df.set_index(RTF.INST_ID, drop=False)
 
     @classmethod
     def validInstances(cls, parsedDf: pd.DataFrame, parseErrorOk=False):
@@ -428,7 +435,9 @@ class AnnotationImporter(AnnotationIOBase):
             raise AnnParseError(
                 f"Encountered problems on annotation import:\n{invalidInsts.to_string()}"
             )
-        return validInsts
+        # If only a subset is kept, `copy` is necessary to avoid SettingsWithCopyWarning
+        # when this df is modified elsewhere
+        return validInsts.copy()
 
     def defaultBulkImport(self, importObj, **kwargs) -> pd.DataFrame:
         return pd.DataFrame(self.getInstances(importObj, **kwargs))
