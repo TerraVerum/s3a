@@ -95,7 +95,7 @@ def test_waiting(qtbot):
     thread = pool.addThread(sleepUntilCallback, cb=lambda: end)
     thread.sigResultReady.connect(doneHandle)
     assert pool.threads[0].isRunning()
-    for ii in range(5):
+    for _ in range(5):
         pool.updateThreads()
     with qtbot.waitSignal(thread.sigResultReady):
         end = True
