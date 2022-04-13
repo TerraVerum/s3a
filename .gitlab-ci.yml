@@ -15,7 +15,7 @@ pytest:
   - pip install pytest-cov
   - pip install pytest-qt
   script:
-    - pytest -l ./apptests --cov-report term --cov=.
+    - pytest -l ./apptests --cov-report term --cov-report xml --cov=./s3a
 
 sonarcloud-check:
   stage: CodeCov
