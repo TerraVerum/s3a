@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import inspect
+import itertools
 import json
 import typing as t
 from datetime import datetime
@@ -152,25 +153,17 @@ class SuperannotateJsonImporter(AnnotationImporter):
         elif typ in ("bbox", "rbbox"):
             dictPts = inst["points"]
 
-            def keys():
-                ii = 1
-                while True:
-                    yield f"x{ii}"
-                    yield f"y{ii}"
-                    ii += 1
-
             pts = []
-            for kk in keys():
+            for number, plane in itertools.product(range(1, 5), ["x", "y"]):
+                kk = f"{plane}{number}"
                 if kk not in dictPts:
                     break
                 pts.append(dictPts[kk])
             # x-y list is not formatted like a box -- fix this
-            tempVerts = np.column_stack([pts[::2], pts[1::2]])
-            wh = np.diff(tempVerts, axis=0)
-            if len(tempVerts) == 2:
-                pts = wh * [[0, 0], [1, 0], [1, 1], [0, 1]] + tempVerts[0]
-            else:
-                pts = tempVerts
+            pts = np.column_stack([pts[::2], pts[1::2]])
+            wh = np.diff(pts, axis=0)
+            if len(pts) == 2:
+                pts = wh * [[0, 0], [1, 0], [1, 1], [0, 1]] + pts[0]
         elif typ == "ellipse":
             vals = inst["cy"], inst["cx"], inst["ry"], inst["rx"], inst["angle"]
             pts = draw.ellipse_perimeter(*(int(v) for v in vals))
