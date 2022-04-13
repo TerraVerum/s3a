@@ -47,7 +47,7 @@ if __name__ == "__main__":
         ],
         entry_points={
             "console_scripts": [
-                "s3a-gui = s3a.__main__:main_cli",
+                "s3a-gui = s3a.__main__:mainCli",
             ]
         },
         install_requires=INSTALL_REQUIRES,

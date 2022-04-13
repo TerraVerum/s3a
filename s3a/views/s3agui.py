@@ -63,7 +63,7 @@ class S3A(S3ABase):
             # unless 'terminal' is also specified
             if PRJ_ENUMS.LOG_TERM not in log:
                 logger.propagate = False
-        self.APP_TITLE = "FICS Semi-Supervised Semantic Annotator"
+        self.APP_TITLE = "Semi-Supervised Semantic Annotator"
         self.CUR_COMP_LBL = "Current Component ID:"
         self.setWindowTitle(self.APP_TITLE)
         self.setWindowIconText(self.APP_TITLE)

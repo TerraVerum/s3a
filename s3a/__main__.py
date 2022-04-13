@@ -16,10 +16,9 @@ def main(loadLastState=True, **load):
       these settings are restored on startup. If *False*, they aren't.
     :param load: States to load, see the help output for possible values
     """
-    # Handle here for faster bootup
+    appInst = mkQApp()
     win = S3A(log=PRJ_ENUMS.LOG_GUI, loadLastState=loadLastState, **load)
     QtCore.QTimer.singleShot(0, win.showMaximized)
-    appInst = mkQApp()
     try:
         appInst.exec_()
     except AttributeError:
