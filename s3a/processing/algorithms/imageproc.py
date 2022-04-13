@@ -559,7 +559,6 @@ def binarize_labels(
         raise ValueError(
             "Cannot handle multichannel labels.\n" f"(labelss.shape={labels.shape})"
         )
-    # seeds = cornersToFullBoundary(fgVerts, 50e3)[:, ::-1]
     seeds = np.clip(fgVerts[:, ::-1], 0, np.array(labels.shape) - 1)
     if image.ndim < 3:
         image = image[..., None]

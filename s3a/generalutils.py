@@ -53,7 +53,6 @@ def stackedVertsPlusConnections(
     isfinite = np.ones(len(allVerts), bool)
     isfinite[separationIdxs] = False
     return XYVertices(allVerts, dtype=float), isfinite
-    # return XYVertices(dtype=float)
 
 
 def getClippedBbox(arrShape: tuple, bbox: TwoDArr, margin: int):
@@ -818,7 +817,6 @@ def inverseSubImage(subImage, stats, finalBbox: np.ndarray = None):
         idxOffset[0] : idxOffset[0] + outputSizeXY[0],
         ...,
     ]
-    # assert np.all(out.shape[:2][::-1] == outputSizeXY)
     return out
 
 

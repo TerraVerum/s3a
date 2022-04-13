@@ -352,7 +352,6 @@ def single_categorical_prediction(
     out[RTF.VERTICES] = ComplexXYVertices.fromBinaryMask(prediction).removeOffset(
         totalOffset
     )
-    # return np.random.random((image.shape[:2])) > 0
     return ProcessIO(
         components=fns.serAsFrame(out), addType=PRJ_ENUMS.COMP_ADD_AS_MERGE
     )

@@ -336,9 +336,6 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         allVerts = np.vstack([v.stack() for v in selectedVerts])
         mins = allVerts.min(0)
         maxs = allVerts.max(0)
-        # if paddingPct is not None:
-        #   mins -= paddingPct // 2
-        #   maxs += paddingPct // 2
         vb: pg.ViewBox = self._mainImgArea.getViewBox()
         viewRect = QtCore.QRectF(*mins, *(maxs - mins))
         vb.setRange(viewRect, padding=paddingPct)

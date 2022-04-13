@@ -202,7 +202,6 @@ class AlgParamEditor(ParamEditor):
 
 
 class AlgCollection(ParamEditor):
-    # sigProcessorCreated = Signal(object) # Signal(AlgCollectionEditor)
     def __init__(
         self,
         procWrapType=NestedProcWrapper,
