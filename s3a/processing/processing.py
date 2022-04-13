@@ -179,7 +179,7 @@ class RunnableThreadContainer(QtCore.QObject):
     def __init__(self, pool: QtCore.QThreadPool = None, maxThreadCount=1):
         if pool is None:
             pool = QtCore.QThreadPool()
-            pool.setMaxThreadCount(maxThreadCount)
+        pool.setMaxThreadCount(maxThreadCount)
         self.pool = pool
         # QThreadPool doesn't expose pending workers, so keep track of these manually
         self.unfinishedRunners = []
