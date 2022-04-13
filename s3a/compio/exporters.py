@@ -553,24 +553,24 @@ class CompImgsZipExporter(CompImgsDfExporter):
             [RTF.VERTICES, RTF.INST_ID], axis=1
         ).rename(str, axis=1)
         outDf = outDf.merge(extractedImgs, on=RTF.INST_ID.name)
+
+        def imgFormatter(el):
+            return imgPathtoHtml((relDir / str(el)).with_suffix(".png").as_posix())
+
         for colName, imgDir in zip(["labelMask", "image"], [labelsDir, dataDir]):
             if colName not in extractedImgs:
                 continue
             relDir = imgDir.relative_to(parentDir)
-            outDf[colName] = outDf[RTF.INST_ID.name].apply(
-                lambda el: imgPathtoHtml(
-                    (relDir / str(el)).with_suffix(".png").as_posix()
-                )
-            )
+            outDf[colName] = outDf[RTF.INST_ID.name].apply(imgFormatter)
         outDf.columns = list(map(str, outDf.columns))
         style = None
         if imageWidth is not None:
             style = inspect.cleandoc(
                 f"""
-        img {{
-          width: {imageWidth}px
-        }}
-        """
+                img {{
+                  width: {imageWidth}px
+                }}
+                """
             )
         toHtmlWithStyle(outDf, summaryName, style, escape=False, index=False)
 
