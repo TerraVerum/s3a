@@ -315,20 +315,15 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
         # self.toolsGrp.fromToolsEditors(self._focusedTools, checkable=False, ownerClctn=self.toolsGrp)
         retClctn = None
         # Define some helper functions for listening to toolsEditor changes
-        def _onChildAdd(_param, child, _idx):
-            # Recursively listen for more changes
-            child.sigChildAdded.connect(_onChildAdd)
-            # Only add non-groups to avoid repeatedly adding old children
-            if child.type() != "group":
-                retClctn.addByParam(child, copy=False)
-
-        def visit(param):
+        def visit(param, child=None):
+            if child:
+                param = child
             if param.type() == "group":
-                param.sigChildAdded.connect(_onChildAdd)
+                param.sigChildAdded.connect(visit)
                 for ch in param:
                     visit(ch)
             else:
-                retClctn.addByParam(param)
+                retClctn.addByParam(param, copy=False)
 
         if self.toolbar is not None:
             retClctn = ButtonCollection(title=toolsEditor.name)
