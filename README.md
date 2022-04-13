@@ -1,9 +1,17 @@
+<div align="center">
+<img src="https://gitlab.com/s3a/s3a/-/wikis/imgs/home/s3alogo-square.svg" width="150px"/>
+<h1>Semi-Supervised Semantic Annotator (S3A)</h1>
+
 [![pipeline status](https://gitlab.com/s3a/s3a/badges/development/pipeline.svg)](https://gitlab.com/s3a/s3a/-/commits/development)
 [![coverage report](https://gitlab.com/s3a/s3a/badges/development/coverage.svg)](https://gitlab.com/s3a/s3a/-/commits/development)
-[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=s3a&metric=sqale_rating)](https://sonarcloud.io/dashboard?id=s3a)
 [![Total alerts](https://img.shields.io/lgtm/alerts/g/ntjess/s3a.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/ntjess/s3a/alerts/)
 [![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/ntjess/s3a.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/ntjess/s3a/context:python)
-# Semi-Supervised Semantic Annotator (S3A)
+[![SonarCloud](https://img.shields.io/static/v1?label=Scanned%20On&message=SonarCloud&color=orange)](https://sonarcloud.io/summary/new_code?id=s3a_s3a)
+
+<img src="https://gitlab.com/s3a/s3a/-/wikis/s3a-window.jpg" width="75%"/>
+</div>
+
+## Description
 
 A highly adaptable tool for both visualizing and generating semantic annotations for generic images.
 
