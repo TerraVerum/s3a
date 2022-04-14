@@ -391,7 +391,7 @@ class AnnotationImporter(AnnotationIOBase):
         if keepExtraColumns:
             # Columns not specified in the table data should be kept in their unmodified state
             extraCols = bulkParsedDf.columns.difference(importedCols)
-            alreadyParsed = np.isin(bulkParsedDf, importedCols)
+            alreadyParsed = np.isin(bulkParsedDf.columns, importedCols)
             # Make sure column ordering matches original
             newOrder = np.array(bulkParsedDf.columns)
             newOrder[alreadyParsed] = parsedDf.columns
