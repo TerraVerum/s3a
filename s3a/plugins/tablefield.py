@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import typing as t
+import warnings
 from collections import deque, namedtuple
 from functools import lru_cache
 from warnings import warn
@@ -159,6 +160,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         if self.queueActions:
             thread = self.taskMgr.addThread(self.run, **kwargs, name="Vertices Update")
             thread.sigResultReady.connect(self._onThreadFinished)
+            thread.sigFailed.connect(self._onThreadFinished)
         else:
             # Run immediately
             result = self.run(**kwargs)
@@ -194,8 +196,11 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             # By default, only end not-yet-started actions
             self.endQueuedActions()
 
-    def _onThreadFinished(self, thread: ThreadedFuncWrapper):
-        self.updateGuiFromProcessor(thread.result)
+    def _onThreadFinished(self, thread: ThreadedFuncWrapper, ex=None):
+        if not ex:
+            self.updateGuiFromProcessor(thread.result)
+        else:
+            warnings.warn(str(ex), UserWarning)
 
     def updateGuiFromProcessor(self, procResult: dict | np.ndarray):
         img = self.mainImg.image
@@ -253,6 +258,8 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             prevCompVerts=ComplexXYVertices(
                 [r.stack() for r in self.region.regionData[RTF.VERTICES]]
             ),
+            # Warnings render dialogs on the GUI thread but not otherwise
+            errorsToWarnings=not self.queueActions,
         )
         if updateGui:
             self.updateGuiFromProcessor(result)

@@ -15,7 +15,7 @@ __all__ = ["ImgProcWrapper", "NestedProcWrapper"]
 class ImgProcWrapper(NestedProcWrapper):
     output: np.ndarray
 
-    def run(self, **kwargs):
+    def run(self, errorsToWarnings=False, **kwargs):
         newIo = self._ioDictFromRunKwargs(kwargs)
         try:
             with warnings.catch_warnings():
@@ -31,8 +31,11 @@ class ImgProcWrapper(NestedProcWrapper):
                 f"Stage: {stagePath}\nMessage: " + "\n".join(ex.args[len(stages) :]),
             )
             augmentException(ex, msg)
-            warnings.warn(str(ex), UserWarning)
-            return
+            if errorsToWarnings:
+                warnings.warn(str(ex), UserWarning)
+                return None
+            else:
+                raise
 
         outImg = result["image"].astype(bool)
         if outImg.ndim > 2:

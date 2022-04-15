@@ -159,7 +159,8 @@ def test_proc_err(tmp_path):
     clctn.addProcess(proc, top=True)
 
     algEditor.changeActiveProcessor("Bad")
+    kwargs = dict(image=np.array([[True]], dtype=bool), fgVerts=XYVertices([[0, 0]]))
     with pytest.warns(UserWarning):
-        algEditor.curProcessor.run(
-            image=np.array([[True]], dtype=bool), fgVerts=XYVertices([[0, 0]])
-        )
+        algEditor.curProcessor.run(errorsToWarnings=True, **kwargs)
+    with pytest.raises(ZeroDivisionError):
+        algEditor.curProcessor.run(**kwargs)
