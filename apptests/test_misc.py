@@ -75,12 +75,15 @@ def test_vertices_offset():
     assert verts != vertsCopy
 
 
-def test_deprecation():
-    @deprecateKwargs(b="a")
+@pytest.mark.parametrize(
+    "warningType", [DeprecationWarning, FutureWarning]
+)
+def test_deprecation(warningType):
+    @deprecateKwargs(b="a", warningType=warningType)
     def sampleFunc(a=5):
         return a
 
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(warningType):
         assert sampleFunc(b=10) == 10
 
 

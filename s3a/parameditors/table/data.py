@@ -127,6 +127,11 @@ class TableData(QtCore.QObject):
             return False
         field.group = self.allFields
         self.allFields.append(field)
+        if field.name not in self.cfg["fields"]:
+            # Added programmatically outside cfg, ensure file representation is not lost
+            self.cfg["fields"][field.name] = newFieldCfg = dict(field)
+            # Remove redundant `name` field
+            newFieldCfg.pop("name")
         return True
 
     def makeCompSer(self):

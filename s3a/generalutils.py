@@ -541,7 +541,7 @@ class DirectoryDict(MaxSizeDict):
         )
 
 
-def deprecateKwargs(**oldToNewNameMapping):
+def deprecateKwargs(warningType=DeprecationWarning, **oldToNewNameMapping):
     def deco(func):
         @wraps(func)
         def inner(*args, **kwargs):
@@ -559,7 +559,7 @@ def deprecateKwargs(**oldToNewNameMapping):
                         kwargs[replace] = kwargs[orig]
                         del kwargs[orig]
                     msg += f" Use the following replacement guide: {replacements}"
-                warnings.warn(msg, DeprecationWarning, stacklevel=3)
+                warnings.warn(msg, warningType, stacklevel=3)
             return func(*args, **kwargs)
 
         return inner

@@ -11,7 +11,7 @@ from utilitys.typeoverloads import FilePath
 
 from .helpers import serialize, deserialize, checkVertBounds
 from ..constants import REQD_TBL_FIELDS as RTF
-from ..generalutils import toDictGen
+from ..generalutils import toDictGen, deprecateKwargs
 from ..parameditors.table import TableData
 from ..parameditors.table.data import getFieldAliases
 from ..parameditors.table.templatemgr import IOTemplateManager
@@ -342,12 +342,14 @@ class AnnotationImporter(AnnotationIOBase):
         # All recognized output fields should now be deserialied; make sure required fields exist
         return outDf
 
+    @deprecateKwargs(keepExtraColumns="keepExtraFields", warningType=FutureWarning)
     def __call__(
         self,
         inFileOrObj: t.Union[FilePath, t.Any],
         parseErrorOk=False,
         reindex=False,
-        keepExtraColumns=False,
+        keepExtraFields=False,
+        addMissingFields=False,
         **kwargs,
     ):
         self.refreshTableData()
@@ -388,7 +390,7 @@ class AnnotationImporter(AnnotationIOBase):
                 parsedDf.columns, kwargs.get("mapping", {})
             )
 
-        if keepExtraColumns:
+        if keepExtraFields:
             # Columns not specified in the table data should be kept in their unmodified state
             extraCols = bulkParsedDf.columns.difference(importedCols)
             alreadyParsed = np.isin(bulkParsedDf.columns, importedCols)
@@ -398,6 +400,12 @@ class AnnotationImporter(AnnotationIOBase):
 
             parsedDf[extraCols] = bulkParsedDf[extraCols]
             parsedDf = parsedDf[newOrder]
+        if addMissingFields:
+            # Desintation fields that never showed up should be appended
+            for field in self.destTableMapping.allFields:
+                # Special case: Don't allow vertices to be auto-populated
+                if field not in parsedDf and field != RTF.VERTICES:
+                    parsedDf[field] = field.value
 
         # Make sure IDs are present
         parsedDf = self._ensureInstIdIndex(parsedDf, reindex=reindex)
