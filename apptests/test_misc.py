@@ -6,7 +6,7 @@ from skimage import data
 from utilitys import PrjParam
 
 from s3a import generalutils as gu, ComplexXYVertices, PRJ_ENUMS
-from s3a.generalutils import deprecateKwargs
+from s3a.generalutils import deprecateKwargs, DirectoryDict
 from s3a.plugins.misc import miscFuncsPluginFactory
 from s3a.plugins.multipred import MultiPredictionsPlugin
 from s3a.compio.helpers import deserialize
@@ -75,9 +75,7 @@ def test_vertices_offset():
     assert verts != vertsCopy
 
 
-@pytest.mark.parametrize(
-    "warningType", [DeprecationWarning, FutureWarning]
-)
+@pytest.mark.parametrize("warningType", [DeprecationWarning, FutureWarning])
 def test_deprecation(warningType):
     @deprecateKwargs(b="a", warningType=warningType)
     def sampleFunc(a=5):
@@ -105,3 +103,40 @@ def test_list_serdes(ptype, fixedLims, value, limits):
         assert len(out) == 1 and out[0] == trueValue
     else:
         assert len(errs) == 1 and isinstance(errs[0], ValueError)
+
+
+def test_directorydict(tmp_path):
+    tmp_path.joinpath("testfile.txt").touch()
+    numReads = 0
+
+    def reader(filename):
+        nonlocal numReads
+        numReads += 1
+        with open(filename, "r") as ifile:
+            return ifile.read()
+
+    dd = DirectoryDict(tmp_path, reader)
+    assert dd.get("testfile.txt", None) is not None
+
+    dd.cacheReads = True
+    numReads = 0
+    dd.clear()
+    for ii in range(10):
+        # Test that the file isn't read multiple times as a side effect
+        # noinspection PyStatementEffect
+        dd["testfile.txt"]
+    assert numReads == 1
+
+
+def test_directorydict_equality():
+    def reader(file):
+        return ""
+
+    dd1 = DirectoryDict("./somefolder", readFunc=reader)
+    dd2 = DirectoryDict("./differentfolder", readFunc=reader)
+
+    assert dd1 != dd2
+    dd2.fileDir = dd1.fileDir
+    assert dd1 == dd2
+
+    assert dd1 == {}

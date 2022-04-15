@@ -543,6 +543,11 @@ class DirectoryDict(MaxSizeDict):
             and self.readFunc == other.readFunc
         )
 
+    def __ne__(self, other):
+        # since dict is a base class, __ne__ doesn't work out of the box unless it is
+        # also expliticly defined
+        return not self.__eq__(other)
+
 
 def deprecateKwargs(warningType=DeprecationWarning, **oldToNewNameMapping):
     def deco(func):
