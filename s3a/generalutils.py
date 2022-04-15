@@ -5,13 +5,14 @@ import warnings
 from collections import defaultdict
 from functools import wraps
 from pathlib import Path
+from pkg_resources import parse_version
 from typing import Callable, Tuple, Union, Sequence, List, Collection, Any
 
 import cv2 as cv
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
-from skimage import io, transform as trans
+from skimage import io, transform as trans, __version__ as _skimage_version
 from skimage.exposure import exposure
 from utilitys import PrjParam, ProcessStage
 from utilitys import fns
@@ -25,6 +26,7 @@ from .constants import PRJ_ENUMS
 from .structures import TwoDArr, XYVertices, ComplexXYVertices, NChanImg, BlackWhiteImg
 
 _coordType = Union[np.ndarray, Tuple[slice, slice]]
+USE_MULTICHANNEL_KWARG = parse_version(_skimage_version) < parse_version("0.19.0")
 
 
 def stackedVertsPlusConnections(
@@ -190,9 +192,10 @@ def tryCvResize(
     except (TypeError, cv.error):
         oldRange = (image.min(), image.max())
         if asRatio:
-            rescaled = trans.rescale(
-                image, newSize, channel_axis=2 if image.ndim > 2 else None
-            )
+            kwarg = dict(channel_axis=2 if image.ndim > 2 else None)
+            if USE_MULTICHANNEL_KWARG:
+                kwarg = dict(multichannel=kwarg["channel_axis"] is not None)
+            rescaled = trans.rescale(image, newSize, **kwarg)
         else:
             rescaled = trans.resize(image, newSize[::-1])
         image = exposure.rescale_intensity(rescaled, out_range=oldRange).astype(
