@@ -5,7 +5,6 @@ import typing as t
 import warnings
 from collections import deque, namedtuple
 from functools import lru_cache
-from warnings import warn
 
 import numpy as np
 import pandas as pd
@@ -532,7 +531,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     def playbackRegionHistory(self):
         initialImg, history = self.getRegionHistory()
         if initialImg is None:
-            warn("No edits found, nothing to do", UserWarning)
+            warnings.warn("No edits found, nothing to do", UserWarning)
             return
         # Add current state as final result
         history += [history[-1]]
