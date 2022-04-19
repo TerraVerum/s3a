@@ -41,6 +41,7 @@ class S3AHelp(Action):
         super().__init__(**kwargs)
 
     def __call__(self, parser, *args, **kwargs) -> None:
+        mkQApp()
         win = S3A(loadLastState=False, log=PRJ_ENUMS.LOG_NONE)
         win.makeHelpOpts(parser)
         # Prevent settings overwrite
