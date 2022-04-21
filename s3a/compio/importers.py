@@ -122,8 +122,8 @@ class SuperannotateJsonImporter(AnnotationImporter):
                 c["name"] for c in classes
             ]
         meta = self.importObj["metadata"]
-        if imageShape is None:
-            imageShape = (meta.pop("height"), meta.pop("width"))
+        if imageShape is None and "height" in meta and "width" in meta:
+            imageShape = (meta["height"], meta["width"])
         return self._forwardMetadata(locals())
 
     def getInstances(self, importObj, **kwargs):
