@@ -19,6 +19,8 @@ __all__ = [
     "__version__",
     "PRJ_ENUMS",
     "TableData",
+    "defaultIo",
+    "SharedAppSettings"
 ]
 
 pg.setConfigOptions(imageAxisOrder="row-major")
@@ -41,6 +43,7 @@ from .constants import REQD_TBL_FIELDS, PRJ_CONSTS, CFG_DIR, PRJ_ENUMS
 from .structures import ComplexXYVertices, XYVertices
 from .compio import ComponentIO, defaultIo
 from .views.s3agui import S3A
+from .shared import SharedAppSettings
 
 from .plugins.misc import RandomToolsPlugin
 from .plugins.file import ProjectData
