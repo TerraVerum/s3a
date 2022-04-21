@@ -104,8 +104,8 @@ def test_region_history(vertsPlugin, app, monkeypatch):
         assert np.array_equal(winImg, initial)
 
 
-def test_proj_wizard(filePlg):
+def test_proj_wizard(filePlugin):
     # Much is gui, just make sure mechanics work
-    npw = NewProjectWizard(filePlg)
+    npw = NewProjectWizard(filePlugin)
     for fileLst in npw.fileLists.values():
         assert not fileLst.files

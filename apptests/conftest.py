@@ -35,15 +35,15 @@ def sampleComps():
 def app(tmpdir_factory):
     constants.APP_STATE_DIR = tmpdir_factory.mktemp("settings")
     app_ = S3A(Image=SAMPLE_IMG_FNAME, log=PRJ_ENUMS.LOG_TERM, loadLastState=False)
-    app_.filePlg.projData.create(
-        name=str(tmpdir_factory.mktemp("proj")), parent=app_.filePlg.projData
+    app_.filePlugin.projData.create(
+        name=str(tmpdir_factory.mktemp("proj")), parent=app_.filePlugin.projData
     )
     return app_
 
 
 @pytest.fixture(scope="session")
-def filePlg(app):
-    plg: FilePlugin = app.filePlg
+def filePlugin(app):
+    plg: FilePlugin = app.filePlugin
     return plg
 
 
@@ -71,11 +71,11 @@ def vertsPlugin(app) -> VerticesPlugin:
 # Each test can request wheter it starts with components, small image, etc.
 # After each test, all components are removed from the app
 @pytest.fixture(autouse=True)
-def resetAppAndTester(request, app, filePlg, mgr):
-    for img in filePlg.projData.images:
+def resetAppAndTester(request, app, filePlugin, mgr):
+    for img in filePlugin.projData.images:
         try:
             if img != app.srcImgFname:
-                filePlg.projData.removeImage(img)
+                filePlugin.projData.removeImage(img)
         except (FileNotFoundError,):
             pass
     app.mainImg.shapeCollection.forceUnlock()

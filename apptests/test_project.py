@@ -51,20 +51,20 @@ def test_create_project(app, sampleComps, tmpProj):
     assert len(list(tmpProj.annotationsDir.glob(dummyAnnFile.name))) == 1
 
 
-def test_update_props(filePlg):
-    annFmt = lambda: filePlg.projData.cfg["annotation-format"]
+def test_update_props(filePlugin):
+    annFmt = lambda: filePlugin.projData.cfg["annotation-format"]
     oldFmt = annFmt()
-    filePlg.updateProjectProperties(annotationFormat="pkl")
+    filePlugin.updateProjectProperties(annotationFormat="pkl")
     assert annFmt() == "pkl"
-    filePlg.updateProjectProperties(annotationFormat=oldFmt)
-    loc = filePlg.projData.location / "newcfg.tblcfg"
+    filePlugin.updateProjectProperties(annotationFormat=oldFmt)
+    loc = filePlugin.projData.location / "newcfg.tblcfg"
     newCfg = {"fields": {"Class": ""}}
     fns.hierarchicalUpdate(newCfg, IOTemplateManager.getTableCfg("s3a"))
     fns.saveToFile(newCfg, loc)
-    oldName = filePlg.projData.tableData.cfgFname
-    filePlg.updateProjectProperties(tableConfig=loc)
-    assert newCfg == filePlg.projData.tableData.cfg
-    filePlg.updateProjectProperties(tableConfig=oldName)
+    oldName = filePlugin.projData.tableData.cfgFname
+    filePlugin.updateProjectProperties(tableConfig=loc)
+    assert newCfg == filePlugin.projData.tableData.cfg
+    filePlugin.updateProjectProperties(tableConfig=oldName)
 
 
 @pytest.mark.withcomps
@@ -99,43 +99,45 @@ def test_export_anns(prjWithSavedStuff, tmp_path):
     prj.exportAnnotations(prj.location)
 
 
-def test_load_startup_img(tmp_path, app, filePlg):
+def test_load_startup_img(tmp_path, app, filePlugin):
     prjcfg = {"startup": {"image": str(SAMPLE_SMALL_IMG_FNAME)}}
-    oldCfg = filePlg.projData.cfgFname, filePlg.projData.cfg
-    filePlg.open(tmp_path / "test-startup.s3aprj", prjcfg)
-    assert app.srcImgFname == filePlg.projData.imagesDir / SAMPLE_SMALL_IMG_FNAME.name
-    for img in None, filePlg.projData.imagesDir / "my-image.jpg":
+    oldCfg = filePlugin.projData.cfgFname, filePlugin.projData.cfg
+    filePlugin.open(tmp_path / "test-startup.s3aprj", prjcfg)
+    assert (
+        app.srcImgFname == filePlugin.projData.imagesDir / SAMPLE_SMALL_IMG_FNAME.name
+    )
+    for img in None, filePlugin.projData.imagesDir / "my-image.jpg":
         app.srcImgFname = img
         app.appStateEditor.stateFuncsDf.at["project", "exportFunc"](
             tmp_path / "another"
         )
-        assert bool(img) == ("image" in filePlg.projData.startup)
+        assert bool(img) == ("image" in filePlugin.projData.startup)
 
-    filePlg.open(*oldCfg)
+    filePlugin.open(*oldCfg)
 
 
 def test_load_with_plg(monkeypatch, tmp_path):
     # Make separate win to avoid clobbering existing menus/new projs
     app = S3A(loadLastState=False)
-    filePlg = app.filePlg
+    filePlugin = app.filePlugin
     with monkeypatch.context() as m:
         m.syspath_prepend(str(TEST_FILE_DIR))
         from files.sample_plg import SamplePlugin
 
         cfg = {"plugin-cfg": {"Test": "files.sample_plg.SamplePlugin"}}
-        filePlg.open(tmp_path / "plgprj.s3aprj", cfg)
+        filePlugin.open(tmp_path / "plgprj.s3aprj", cfg)
         assert SamplePlugin in app.clsToPluginMapping
-        assert len(filePlg.projData.spawnedPlugins) == 1
-        assert filePlg.projData.spawnedPlugins[0].win
+        assert len(filePlugin.projData.spawnedPlugins) == 1
+        assert filePlugin.projData.spawnedPlugins[0].win
 
     # Remove existing plugin
     cfg = {"plugin-cfg": {"New Name": "nonsense.Plugin"}}
     with pytest.raises(ValueError):
-        filePlg.open(tmp_path / "plgprj2.s3aprj", cfg)
+        filePlugin.open(tmp_path / "plgprj2.s3aprj", cfg)
     # Add nonsense plugin
     cfg["plugin-cfg"]["Test"] = "files.sample_plg.SamplePlugin"
     with pytest.warns(UserWarning):
-        filePlg.open(tmp_path / "plgprj2.s3aprj", cfg)
+        filePlugin.open(tmp_path / "plgprj2.s3aprj", cfg)
 
 
 def test_unique_tblcfg(tmp_path, tmpProj):
@@ -169,10 +171,10 @@ def test_ann_opts(prjWithSavedStuff, sampleComps):
         prjWithSavedStuff.addAnnotation(data=sampleComps, image="garbage.png")
 
 
-def test_filter_proj_imgs(filePlg, prjWithSavedStuff):
+def test_filter_proj_imgs(filePlugin, prjWithSavedStuff):
     for img in prjWithSavedStuff.images:
-        filePlg.projData.addImage(img)
-    fMgr = filePlg._projImgMgr
+        filePlugin.projData.addImage(img)
+    fMgr = filePlugin._projImgMgr
     fMgr.completer.setText("hubble")
     assert "*hubble*" in fMgr.fileModel.nameFilters()
 
@@ -282,29 +284,29 @@ def test_abspath_none():
     assert absolutePath(None) is None
 
 
-def test_load_autosave(app, filePlg, tmp_path):
+def test_load_autosave(app, filePlugin, tmp_path):
     state = app.appStateEditor
 
     fns.saveToFile({"interval": 10}, tmp_path / _autosaveFile)
 
     importer = state.stateFuncsDf.at["autosave", "importFunc"]
     importer(True)
-    assert filePlg.autosaveTimer.isActive()
+    assert filePlugin.autosaveTimer.isActive()
 
     importer(tmp_path / _autosaveFile)
-    assert filePlg.autosaveTimer.interval() == 1000 * 60 * 10
+    assert filePlugin.autosaveTimer.interval() == 1000 * 60 * 10
 
     importer(False)
-    assert not filePlg.autosaveTimer.isActive()
+    assert not filePlugin.autosaveTimer.isActive()
 
 
-def test_export_autosave(app, filePlg, tmp_path):
+def test_export_autosave(app, filePlugin, tmp_path):
     state = app.appStateEditor
 
     fns.saveToFile({"interval": 10}, tmp_path / _autosaveFile)
 
     exporter = state.stateFuncsDf.at["autosave", "exportFunc"]
-    for proc, params in filePlg.toolsEditor.procToParamsMapping.items():
+    for proc, params in filePlugin.toolsEditor.procToParamsMapping.items():
         if proc.name == "Start Autosave":
             break
     else:
@@ -323,7 +325,7 @@ def test_export_autosave(app, filePlg, tmp_path):
     assert "interval" in cfg and cfg["interval"] == 10
     assert "backupFolder" in cfg and cfg["backupFolder"] == str(tmp_path)
 
-    filePlg.stopAutosave()
+    filePlugin.stopAutosave()
     for file in outpath.iterdir():
         file.unlink()
     assert not exporter(outpath)

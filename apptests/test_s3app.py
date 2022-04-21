@@ -93,25 +93,25 @@ def test_save_layout(app):
     savePath.unlink()
 
 
-def test_autosave(tmp_path, app, filePlg):
+def test_autosave(tmp_path, app, filePlugin):
     appInst = mkQApp()
     interval = 0.01
     # Wrap in path otherwise some path ops don't work as expected
-    filePlg.startAutosave(interval, tmp_path, "autosave")
+    filePlugin.startAutosave(interval, tmp_path, "autosave")
     testComps1 = dfTester.compDf.copy()
     app.compMgr.addComps(testComps1)
-    filePlg.autosaveTimer.timeout.emit()
+    filePlugin.autosaveTimer.timeout.emit()
     appInst.processEvents()
     dfTester.fillRandomVerts()
     testComps2 = pd.concat([testComps1, dfTester.compDf.copy()])
     app.compMgr.addComps(testComps2)
-    filePlg.autosaveTimer.timeout.emit()
+    filePlugin.autosaveTimer.timeout.emit()
     appInst.processEvents()
 
     testComps3 = pd.concat([testComps2, dfTester.compDf.copy()])
     app.compMgr.addComps(testComps3)
-    filePlg.autosaveTimer.timeout.emit()
-    filePlg.stopAutosave()
+    filePlugin.autosaveTimer.timeout.emit()
+    filePlugin.stopAutosave()
     savedFiles = list(tmp_path.glob("autosave*.csv"))
     assert len(savedFiles) >= 3, "Not enough autosaves generated"
 

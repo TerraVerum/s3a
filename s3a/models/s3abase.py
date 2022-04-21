@@ -157,16 +157,16 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
 
         # Create links for commonly used plugins
         # noinspection PyTypeChecker
-        self.filePlg: FilePlugin = self.clsToPluginMapping[FilePlugin]
+        self.filePlugin: FilePlugin = self.clsToPluginMapping[FilePlugin]
         attrs.tableData.sigCfgUpdated.connect(lambda: self.resetTblFields())
 
         # noinspection PyTypeChecker
-        self.vertsPlg: tablefield.VerticesPlugin = self.clsToPluginMapping[
+        self.verticesPlugin: tablefield.VerticesPlugin = self.clsToPluginMapping[
             tablefield.VerticesPlugin
         ]
         # noinspection PyTypeChecker
         self.miscPlugin: RandomToolsPlugin = self.clsToPluginMapping[RandomToolsPlugin]
-        self.compIo = self.filePlg.projData.compIo
+        self.compIo = self.filePlugin.projData.compIo
 
         # Connect signals
         # -----
@@ -190,7 +190,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
 
         self.compMgr.sigCompsChanged.connect(handleCompsChanged)
 
-        self.filePlg.projData.sigAnnotationsAdded.connect(
+        self.filePlugin.projData.sigAnnotationsAdded.connect(
             self._maybeLoadActiveAnnotation
         )
 
@@ -214,7 +214,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         # Even if the field names are the same, e.g. classes may added or default values could
         # be changed. So, reset the cell editor delegates no matter what
         # Start by adding any potentially new plugins
-        for plg in self.filePlg.projData.spawnedPlugins:
+        for plg in self.filePlugin.projData.spawnedPlugins:
             self._addPluginObj(plg)
         self.compTbl.setColDelegates()
         self.compTbl.popup.reflectDelegateChange()
@@ -279,7 +279,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         def undo():
             self.compMgr.rmComps(newIds)
             # Make sure the old, previously existing outline re-exists at this point
-            self.vertsPlg.updateRegionFromDf(compAsDf)
+            self.verticesPlugin.updateRegionFromDf(compAsDf)
 
         return undo
 
@@ -371,7 +371,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         if file is not None:
             # Add image data if the file doesn't exist
             data = None if file.exists() else self.mainImg.image
-            self.filePlg.projData.addImage(file, data)
+            self.filePlugin.projData.addImage(file, data)
         self.loadNewAnnotations()
         infoName = (file and file.name) or None
         getAppLogger(__name__).info(f"Changed main image to {infoName}")
@@ -382,16 +382,16 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         srcImg = self.srcImgFname
         if srcImg is None:
             return
-        srcImg_proj = self.filePlg.imagesDir / srcImg.name
+        srcImg_proj = self.filePlugin.imagesDir / srcImg.name
         if not srcImg_proj.exists() or srcImg_proj != srcImg:
             # Either the image didn't exist (i.e. was programmatically generated) or doesn't yet belong to the project
-            self.filePlg.addImage(
+            self.filePlugin.addImage(
                 srcImg, data=self.mainImg.image, copyToProject=True, allowOverwrite=True
             )
         # srcImg_proj is guaranteed to exist at this point
         # Suppress to avoid double-loading due to `sigAnnotationsAdded`
-        with self.filePlg.projData.suppressSignals():
-            self.filePlg.addAnnotation(
+        with self.filePlugin.projData.suppressSignals():
+            self.filePlugin.addAnnotation(
                 data=self.exportableDf, image=srcImg_proj, overwriteOld=True
             )
         # Now all added components should be forced to belong to this image
@@ -409,7 +409,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             imgFname = self.srcImgFname
         if imgFname is None:
             return
-        imgAnns = self.filePlg.imgToAnnMapping.get(imgFname, None)
+        imgAnns = self.filePlugin.imgToAnnMapping.get(imgFname, None)
         if imgAnns is not None:
             self.compMgr.addComps(
                 self.compIo.importByFileType(

@@ -38,7 +38,7 @@ class MainImagePlugin(ParamEditorPlugin):
             # When editing, only want to select if nothing is already started
             if (
                 param not in [CNST.DRAW_ACT_REM, CNST.DRAW_ACT_ADD]
-                or len(self.win.vertsPlg.region.regionData) == 0
+                or len(self.win.verticesPlugin.region.regionData) == 0
             ):
                 # Special case: Selection with point shape should be a point
                 if (
@@ -50,7 +50,9 @@ class MainImagePlugin(ParamEditorPlugin):
                 # Must be done first, since a no-find in disp's regions will deselect them
                 with fns.makeDummySignal(win.compTbl, "sigSelectionChanged"):
                     # Second call should handle the true selection signal
-                    disp.reflectSelectionBoundsMade(verts, self.win.vertsPlg.region)
+                    disp.reflectSelectionBoundsMade(
+                        verts, self.win.verticesPlugin.region
+                    )
                     disp.reflectSelectionBoundsMade(verts, clearExisting=False)
 
                 nonUniqueIds = win.compTbl.idsRowsColsFromSelection(
