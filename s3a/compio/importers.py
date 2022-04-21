@@ -135,8 +135,7 @@ class SuperannotateJsonImporter(AnnotationImporter):
         return df
 
     def formatSingleInstance(self, inst, name=None, srcDir=None, **kwargs):
-        name = srcDir["file"]["metadata"]["name"] if name else ""
-        out = {RTF.IMG_FILE: name}
+        out = {}
         verts = self.parseRegion(inst)
         if not isinstance(verts, AnnInstanceError):
             verts = ComplexXYVertices([verts])
