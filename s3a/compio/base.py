@@ -401,8 +401,8 @@ class AnnotationImporter(AnnotationIOBase):
         if addMissingFields:
             # Desintation fields that never showed up should be appended
             for field in self.destTableMapping.allFields:
-                # Special case: Don't allow vertices to be auto-populated
-                if field not in parsedDf and field != RTF.VERTICES:
+                # Special case: instance id is handled below
+                if field not in parsedDf and field != RTF.INST_ID:
                     parsedDf[field] = field.value
 
         # Make sure IDs are present
