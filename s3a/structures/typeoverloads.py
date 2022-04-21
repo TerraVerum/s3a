@@ -1,6 +1,7 @@
 import typing as t
 from pathlib import Path
 
+import pandas as pd
 from numpy import ndarray
 from utilitys import PrjParam
 from utilitys.typeoverloads import FilePath
@@ -42,10 +43,26 @@ LabelFieldType = t.Union[str, PrjParam]
 
 
 class AnnParseError(ValueError):
-    def __init__(self, *args, file: Path = None, instances: list = None, **kwargs):
-        super().__init__(*args)
+    def __init__(
+        self,
+        msg=None,
+        file: Path = None,
+        instances=None,
+        invalidIndexes=None,
+        **kwargs,
+    ):
         self.fileName = file
         self.instances = instances
+        self.invalidIndexes = invalidIndexes
+        if msg is None and instances is not None and invalidIndexes is not None:
+            msg = self.defaultErrorMsg()
+        super().__init__(msg)
+
+    def defaultErrorMsg(self):
+        invalidInsts = self.instances[self.invalidIndexes]
+        if isinstance(invalidInsts, pd.DataFrame):
+            invalidInsts = invalidInsts.to_string()
+        return f"{self.fileName}: Encountered problems on annotation import:\n{invalidInsts}"
 
 
 class AnnInstanceError(ValueError):

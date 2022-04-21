@@ -346,6 +346,7 @@ class AnnotationImporter(AnnotationIOBase):
     def __call__(
         self,
         inFileOrObj: t.Union[FilePath, t.Any],
+        *,
         parseErrorOk=False,
         reindex=False,
         keepExtraFields=False,
@@ -379,9 +380,6 @@ class AnnotationImporter(AnnotationIOBase):
         bulkParsedDf[indivParsedDf.columns] = indivParsedDf
         # Some cols could be deserialized, others could be serialized still. Handle the still serialized cases
         parsedDf = self.finalizeImport(bulkParsedDf, **kwargs)
-        validDf = self.validInstances(parsedDf, parseErrorOk)
-        # Rename for clarity
-        parsedDf = validDf
 
         # Determine any destination mappings
         importedCols = parsedDf.columns.copy()
@@ -409,10 +407,17 @@ class AnnotationImporter(AnnotationIOBase):
 
         # Make sure IDs are present
         parsedDf = self._ensureInstIdIndex(parsedDf, reindex=reindex)
+
+        # Now that all column names and settings are resolve, handle any bad imports
+        validDf = self.validInstances(parsedDf, parseErrorOk)
+        # Ensure reindexing still takes place if requested
+        if reindex and len(validDf) != len(parsedDf):
+            validDf[RTF.INST_ID] = validDf.index = np.arange(len(validDf))
+
         # Ensure vertices present, optionally check against known image shape
-        if "imageShape" in kwargs and RTF.VERTICES in parsedDf:
-            checkVertBounds(parsedDf[RTF.VERTICES], kwargs.get("imageShape"))
-        return parsedDf
+        if "imageShape" in kwargs and RTF.VERTICES in validDf:
+            checkVertBounds(validDf[RTF.VERTICES], kwargs.get("imageShape"))
+        return validDf
 
     @staticmethod
     def _ensureInstIdIndex(df, reindex=None):
@@ -434,19 +439,14 @@ class AnnotationImporter(AnnotationIOBase):
     def validInstances(cls, parsedDf: pd.DataFrame, parseErrorOk=False):
         errIdxs = parsedDf.apply(
             lambda row: any(isinstance(vv, AnnInstanceError) for vv in row), axis=1
-        )
-        errIdxs = errIdxs.to_numpy()
+        ).to_numpy(bool)
         if not np.any(errIdxs):
             return parsedDf
-        validInsts = parsedDf[~errIdxs]
-        invalidInsts = parsedDf[errIdxs]
         if not parseErrorOk:
-            raise AnnParseError(
-                f"Encountered problems on annotation import:\n{invalidInsts.to_string()}"
-            )
+            raise AnnParseError(instances=parsedDf, invalidIndexes=errIdxs)
         # If only a subset is kept, `copy` is necessary to avoid SettingsWithCopyWarning
         # when this df is modified elsewhere
-        return validInsts.copy()
+        return parsedDf[~errIdxs].copy()
 
     def defaultBulkImport(self, importObj, **kwargs) -> pd.DataFrame:
         return pd.DataFrame(self.getInstances(importObj, **kwargs))
