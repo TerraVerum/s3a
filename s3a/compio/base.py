@@ -410,7 +410,8 @@ class AnnotationImporter(AnnotationIOBase):
         # Make sure IDs are present
         parsedDf = self._ensureInstIdIndex(parsedDf, reindex=reindex)
         # Ensure vertices present, optionally check against known image shape
-        checkVertBounds(parsedDf[RTF.VERTICES], kwargs.get("imageShape"))
+        if "imageShape" in kwargs and RTF.VERTICES in parsedDf:
+            checkVertBounds(parsedDf[RTF.VERTICES], kwargs.get("imageShape"))
         return parsedDf
 
     @staticmethod
