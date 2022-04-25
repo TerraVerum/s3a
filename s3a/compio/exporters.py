@@ -334,7 +334,7 @@ class CompImgsDfExporter(AnnotationExporter):
             mappings = next(iter(mappings.values()))
         exportObj.attrs["mapping"] = mappings
         self.mappings = mappings
-        return exportObj, NO_ERRORS
+        return exportObj, NO_ERRORS.copy()
 
     def _formatSingleImage(
         self,
@@ -640,7 +640,11 @@ class SerialExporter(AnnotationExporter):
                 serial, errs = serialize(col, exportObj[col])
                 exportObj[col] = serial.to_numpy()
                 allErrs.append(errs)
-        allErrs = pd.concat(allErrs, axis=1)
+        # Pandas raises error concatenating empty list
+        if len(allErrs):
+            allErrs = pd.concat(allErrs, axis=1)
+        else:
+            allErrs = NO_ERRORS.copy()
         return exportObj, allErrs
 
 

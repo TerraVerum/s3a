@@ -34,7 +34,7 @@ class _GenericExportProtocol(typing_extensions.Protocol):
     def __call__(
         self, compDf: pd.DataFrame, exportObj, **kwargs
     ) -> (t.Any, pd.DataFrame):
-        return exportObj, NO_ERRORS
+        return exportObj, NO_ERRORS.copy()
 
 
 class _UpdateExportObjProtocol(typing_extensions.Protocol):
@@ -163,7 +163,7 @@ class AnnotationExporter(AnnotationIOBase):
         """Returns an export object + dataframe of row + errors, if any occurred for some rows"""
         if self.updateExportObj is None:
             # Can't do anything, don't modify the object and save time not iterating over rows
-            return exportObj, NO_ERRORS
+            return exportObj, NO_ERRORS.copy()
         errs = {}
         for row in toDictGen(compDf):
             try:
