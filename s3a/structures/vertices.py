@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ast import literal_eval
-from typing import Union, List, Sequence
+from typing import Union, List, Sequence, TypeVar
 from warnings import warn
 
 import cv2 as cv
@@ -10,6 +10,8 @@ import pandas as pd
 
 from .typeoverloads import NChanImg, BlackWhiteImg
 
+
+T = TypeVar("T")
 __all__ = ["XYVertices", "ComplexXYVertices", "S3AVertsAccessor"]
 
 
@@ -282,24 +284,35 @@ class ComplexXYVertices(list):
             '"ComplexXYVertices.fromBwMask" is deprecated in favor of "ComplexXYVertices.fromBinaryMask".',
             DeprecationWarning,
         )
-        return ComplexXYVertices.fromBinaryMask(bwMask, simplifyVerts, externOnly)
+        out = ComplexXYVertices.fromBinaryMask(bwMask, externOnly)
+        if simplifyVerts:
+            return out.simplify()
+        return out
 
     @staticmethod
     def fromBinaryMask(
-        bwMask: BlackWhiteImg, simplifyVerts=True, externOnly=False
+        bwMask: BlackWhiteImg, approximation=cv.CHAIN_APPROX_SIMPLE, externalOnly=False
     ) -> ComplexXYVertices:
-        approxMethod = cv.CHAIN_APPROX_SIMPLE
-        if not simplifyVerts:
-            approxMethod = cv.CHAIN_APPROX_NONE
+        """
+        Creates ComplexXYVertices from a numpy binary image
+        :param bwMask: Mask to locate connected components. Nonzero pixels are considered
+            part of the component.
+        :param approximation: One of "CHAIN_APPROX_*" from opencv constants. ``None``
+            is an alias for CHAIN_APPROX_NONE.
+        :param externalOnly: If *True*, finds contours using RETR_EXTERNAL, otherwise
+            uses RETR_CCOMP.
+        """
+        if approximation is None:
+            approximation = cv.CHAIN_APPROX_NONE
         retrMethod = cv.RETR_CCOMP
-        if externOnly:
+        if externalOnly:
             retrMethod = cv.RETR_EXTERNAL
-        # Contours are on the inside of components, so dilate first to make sure they are on the
-        # outside
+        # Contours are on the inside of components, so dilate first to make sure they
+        # are on the outside
         # bwmask = dilation(bwmask, np.ones((3,3), dtype=bool))
         if bwMask.dtype != np.uint8:
             bwMask = bwMask.astype("uint8")
-        contours, hierarchy = cv.findContours(bwMask, retrMethod, approxMethod)
+        contours, hierarchy = cv.findContours(bwMask, retrMethod, approximation)
         compVertices = ComplexXYVertices()
         for contour in contours:
             compVertices.append(XYVertices(contour[:, 0, :]))
@@ -309,6 +322,89 @@ class ComplexXYVertices(list):
             hierarchy = hierarchy[0, :, :]
         compVertices.hierarchy = hierarchy
         return compVertices
+
+    @staticmethod
+    def _diagPairsToCorners(poly: T) -> T:
+        """
+        cv2.findContours has a habit of turning right-angles into pairs of 45-degree
+        offset contour indices. This becomes a problem when using simplification methods
+        like "approxPolyDP", since one of these edges is thrown out and the result is
+        no longer rectangular. This method searches for pairs of 45-degree legs with
+        side lengths of 1 to convert them into a single coordinate that makes proper
+        right-angles. The resulting call to "fillPoly" produces an equivalent result,
+        and "approxPolyDP" maintains rectangular shapes.
+
+        :param poly: Nx2 XYVertices to check (works with regular ndarray too)
+        :return: Copy of ``poly`` with a single right-angle for every pair found as
+            described in the documentation above.
+        """
+        polyDiff = np.diff(poly, axis=0, append=poly[[0]])
+        # Cutoff corner segments are 45 degrees and sqrt(2) length long
+        # So, find segments whose x and y diffs are both 1 and form 45-degree angles
+        # 45 degree angles must also occur in pairs
+        sqrt2Segs = np.all(np.abs(polyDiff) == 1, axis=1)
+        segmentAngles = np.rad2deg(np.arctan2(polyDiff[:, 1], polyDiff[:, 0]))
+        angleDiffs = np.diff(segmentAngles, prepend=segmentAngles[-1])
+        # Ensure each angle is comparable using the least-magnitude representation
+        # (Adding/subtracting 360 degrees doesn't change the angle)
+        angleDiffsStackedTmp = angleDiffs[:, None] + np.array([[0, 360, -360]])
+        angleDiffs = angleDiffsStackedTmp[
+            np.arange(len(angleDiffs)), np.abs(angleDiffsStackedTmp).argmin(axis=1)
+        ]
+        diagAngles = np.bitwise_and(
+            np.abs(angleDiffs) == 45, angleDiffs == np.roll(angleDiffs, -1)
+        )
+
+        replaceInds = np.flatnonzero(sqrt2Segs & diagAngles)
+        # Also, curves should only be replaced where the diagonals share one coordinate
+        # with a previous vertex (i.e. continues a line)
+        # False positive
+        # noinspection PyTypeChecker
+        sharesPrevCoord: np.ndarray = poly[replaceInds] == poly[replaceInds - 1]
+        # One shared and one non-shared coordinate
+        falsePositives = np.sum(sharesPrevCoord, axis=1) != 1
+        replaceInds = replaceInds[~falsePositives]
+        # Negative angles curve inward, positive curve outward. If we want to always
+        # prefer the outer edge, keep the first point in the pair during a positive
+        # angle change and the second point for negative curve
+        keepFirstPt = angleDiffs[replaceInds] > 0
+
+        keepInds = np.where(keepFirstPt, replaceInds, replaceInds + 1)
+        deleteInds = np.where(keepFirstPt, replaceInds + 1, replaceInds)
+        # To replace a diagonal with a corner, substitute either the leading or following
+        # point's coordinates depending on whether the diagonal curves inward or outward
+        # "argmax" will point to either x or y coordinate depending on which is *not* shared
+        replaceDims = sharesPrevCoord[~falsePositives].argmin(axis=1)
+        # If the following instead of leading edge is preferred, keep the opposite
+        # coordinate since the rules for the point are swapped
+        replaceDims[~keepFirstPt] = 1 - replaceDims[~keepFirstPt]
+
+        returnPoly = poly.copy()
+        returnPoly[keepInds, replaceDims] = poly[deleteInds, replaceDims]
+        # Corners are turned into one vertex, so delete the far side and replce the near
+        # side with the corner itself
+        returnPoly = np.delete(returnPoly, deleteInds, axis=0)
+        return returnPoly
+
+    def simplify(self, epsilon=1.0):
+        """
+        Uses ``cv.approxPolyDP`` to reduce the number of vertices in each subregion.
+        :param epsilon: Passed to ``cv.approxPolyDP``. Two special cases: if 0,
+            diagonal pairs of vertices in each polygon are converted into corners.
+            < 0 is considered a no-op.
+        :return: Simplified version of ComplexXYVertices
+        """
+        # Special case: No simplification performed
+        if epsilon < 0:
+            return self.copy()
+        out = type(self)(hierarchy=self.hierarchy)
+        for contour in self:  # type: XYVertices
+            # See function documentation for justification of this step
+            contour = self._diagPairsToCorners(contour)
+            if epsilon > 0:
+                contour = cv.approxPolyDP(contour, epsilon, contour.connected)[:, 0, :]
+            out.append(XYVertices(contour))
+        return out
 
     def __str__(self) -> str:
         """

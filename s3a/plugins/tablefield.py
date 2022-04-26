@@ -15,6 +15,7 @@ from utilitys import (
     DeferredActionStackMixin as DASM,
     ProcessIO,
     RunOpts,
+    ParamContainer,
 )
 
 from .base import TableFieldPlugin
@@ -49,6 +50,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
         self.dock.addEditors([self.procEditor])
 
+        self.props = ParamContainer()
+        shared.generalProps.registerProp(CNST.PROP_REG_APPROX_EPS, container=self.props)
+
     def __init__(self):
         super().__init__()
         self.queueActions = True
@@ -74,7 +78,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             runOpts=RunOpts.ON_CHANGED,
         )
 
-    def attachWinRef(self, win: s3a.S3A):
+    def attachWinRef(self, win):
         win.mainImg.addItem(self.region)
         win.mainImg.addItem(self.stageInfoImage)
 
@@ -339,9 +343,10 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         data = self.region.regionData.copy()
         if compId is None:
             compId = data.index[0] if len(data) else -1
-        df = makeMultiRegionDf(
-            vertices=[ComplexXYVertices.fromBinaryMask(mask)], idList=[compId]
+        newVerts = ComplexXYVertices.fromBinaryMask(mask).simplify(
+            self.props[CNST.PROP_REG_APPROX_EPS]
         )
+        df = makeMultiRegionDf(vertices=[newVerts], idList=[compId])
         self.updateRegionUndoable(df, offset=offset, oldProcCache=self.oldProcCache)
 
     def invertRegion(self):
@@ -400,7 +405,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             ]
         )
         if simplify:
-            outVerts = ComplexXYVertices.fromBinaryMask(outVerts.toMask())
+            return outVerts.simplify(epsilon=self.props[CNST.PROP_REG_APPROX_EPS])
         return outVerts
 
     def clearFocusedRegion(self):

@@ -206,6 +206,9 @@ class PRJ_CONSTS:
     # --------------------------
     PROP_MIN_COMP_SZ = PrjParam("Minimum New Component Size (px)", 50)
     PROP_UNDO_BUF_SZ = PrjParam("Undo Buffer Size", 300)
+    PROP_REG_APPROX_EPS = PrjParam(
+        "Region Simplification Tolerance", 1.0, dec=True, limits=[-1, None]
+    )
     PROP_COMP_SEL_BHV = PrjParam(
         "Component Selection Behavior",
         "Entire Component",

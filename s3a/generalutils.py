@@ -233,7 +233,7 @@ def cornersToFullBoundary(
     if fillShape is not None:
         fillShape = tuple(fillShape)
     filledMask = cornerVerts.toMask(fillShape, warnIfTooSmall=False)
-    cornerVerts = ComplexXYVertices.fromBinaryMask(filledMask, simplifyVerts=False)
+    cornerVerts = ComplexXYVertices.fromBinaryMask(filledMask, approximation=None)
     if not stackResult:
         return cornerVerts
     cornerVerts = cornerVerts.filledVerts().stack()

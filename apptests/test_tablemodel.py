@@ -3,11 +3,11 @@ import pytest
 from pyqtgraph.Qt import QtCore
 
 from conftest import NUM_COMPS, dfTester
-from helperclasses import clearTmpFiles
-from testingconsts import RND
+from testingconsts import RND, TEST_FILE_DIR
 from s3a.constants import PRJ_ENUMS
 from s3a.constants import REQD_TBL_FIELDS
 from s3a.structures import ComplexXYVertices, XYVertices
+from s3a.compio.importers import SerialImporter
 
 oldIds = np.arange(NUM_COMPS, dtype=int)
 
@@ -154,6 +154,28 @@ def test_table_getdata(sampleComps, mgr):
     assert mgr.data(idx, QtCore.Qt.ItemDataRole.EditRole) == dataVal
     assert mgr.data(idx, QtCore.Qt.ItemDataRole.DisplayRole) == str(dataVal)
     assert mgr.data(idx, 854) is None
+
+
+def test_simplify_diags():
+    # Ensure removal of diagonal vertices has no effect on output accuracy
+    df = SerialImporter()(TEST_FILE_DIR / "simplify_verts.csv")
+    verts = df.at[0, "Vertices"]
+    mask = verts.toMask()
+    verts2 = ComplexXYVertices.fromBinaryMask(mask)
+    assert verts != verts2
+    assert (verts2.toMask() == mask).all()
+
+
+def test_simplify_triang():
+    verts = ComplexXYVertices([[[0, 0], [40, 50], [0, 100]]], coerceListElements=True)
+    lotsOfPoints = verts.fromBinaryMask(verts.toMask(), approximation=None)
+    assert len(lotsOfPoints) == 1 and len(lotsOfPoints[0]) > 3
+    simplified = lotsOfPoints.simplify()
+    assert (
+        len(simplified) == 1
+        and len(simplified[0]) == 3
+        and np.isin(simplified[0], verts).all()
+    )
 
 
 def cmpChangeList(

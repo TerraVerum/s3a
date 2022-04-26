@@ -5,7 +5,7 @@ from typing import Type
 
 import pytest
 
-from s3a.constants import PRJ_ENUMS
+from s3a.constants import PRJ_ENUMS, PRJ_CONSTS
 from s3a import constants, mkQApp
 from helperclasses import CompDfTester
 from s3a.views.s3agui import S3A
@@ -38,6 +38,8 @@ def app(tmpdir_factory):
     app_.filePlugin.projData.create(
         name=str(tmpdir_factory.mktemp("proj")), parent=app_.filePlugin.projData
     )
+    # Disable region simplification for accurate testing
+    app_.verticesPlugin.props[PRJ_CONSTS.PROP_REG_APPROX_EPS] = -1
     return app_
 
 
