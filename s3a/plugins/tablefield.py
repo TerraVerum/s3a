@@ -364,7 +364,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             # Doesn't make sense to invert an empty region
             return
         offset = np.min(verts.stack(), axis=0)
-        invertedMask = ~verts.removeOffset(offset).toMask()
+        invertedMask = verts.removeOffset(offset).toMask() == 0
         self.updateRegionFromMask(invertedMask, offset)
 
     @DASM.undoable("Modify Focused Component")
@@ -452,7 +452,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         for singleRegionVerts in bufferRegions:
             # Copy to avoid screwing up undo buffer!
             copied = singleRegionVerts.removeOffset(offset)
-            img = copied.toMask(imShape, warnIfTooSmall=False)
+            img = copied.toMask(imShape, warnIfTooSmall=False) > 0
             outImgs.append(img)
         return initialImg, outImgs
 

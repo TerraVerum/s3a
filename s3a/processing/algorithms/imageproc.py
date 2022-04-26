@@ -409,9 +409,7 @@ def remove_small_comps(image: NChanImg, minSzThreshold=30):
 
 
 def draw_vertices(image: NChanImg, fgVerts: XYVertices):
-    return ProcessIO(
-        image=ComplexXYVertices([fgVerts]).toMask(image.shape[:2], asBool=True)
-    )
+    return ProcessIO(image=ComplexXYVertices([fgVerts]).toMask(image.shape[:2]) > 0)
 
 
 def convert_to_squares(image: NChanImg):

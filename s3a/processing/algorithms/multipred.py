@@ -297,7 +297,7 @@ def remove_overlapping_components(
         # Prediction is entirely outside the image
         if checkArea.size <= 0:
             continue
-        vertsMask = verts.removeOffset().toMask(checkArea.shape)
+        vertsMask = verts.removeOffset().toMask(checkArea.shape) > 0
         # Don't count on pixels outside the current footprint
         if np.count_nonzero(checkArea & vertsMask) / checkArea.size < overlapThreshold:
             keepComps.append(comp)

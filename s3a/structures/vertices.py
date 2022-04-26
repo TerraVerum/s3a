@@ -216,7 +216,6 @@ class ComplexXYVertices(list):
         self,
         maskShape: Union[Sequence, NChanImg] = None,
         fillColor: Union[int, float, np.ndarray] = None,
-        asBool=True,
         checkForDisconnectedVerts=False,
         warnIfTooSmall=True,
     ):
@@ -225,8 +224,7 @@ class ComplexXYVertices(list):
                 maskShape = tuple(self.stack().max(0)[::-1] + 1)
             except ValueError:
                 # Mask is zero-sized
-                dtype = "bool" if asBool else "uint16"
-                return np.zeros((0, 0), dtype)
+                return np.zeros((0, 0), "uint16")
             # Guaranteed not to be too small
             warnIfTooSmall = False
         if warnIfTooSmall:
@@ -271,10 +269,7 @@ class ComplexXYVertices(list):
                 "Fill color is larger or smaller than mask range can represent"
             )
         cv.fillPoly(out, fillArg, fillColor)
-        if asBool:
-            return out > 0
-        else:
-            return out
+        return out
 
     @staticmethod
     def fromBwMask(
@@ -477,7 +472,7 @@ class S3AVertsAccessor:
         newVerts = []
         newIds = []
         for idx, verts in self.verts.iteritems():
-            tmpMask = verts.toMask(asBool=False).astype("uint8")
+            tmpMask = verts.toMask().astype("uint8")
             nComps, ccompImg = cv.connectedComponents(tmpMask)
             for ii in range(1, nComps):
                 newVerts.append(ComplexXYVertices.fromBinaryMask(ccompImg == ii))
@@ -492,9 +487,9 @@ class S3AVertsAccessor:
         """
         # x-y -> row-col
         maskShape = (self.max() + 1)[::-1]
-        mask = np.zeros(maskShape, bool)
+        mask = np.zeros(maskShape, "uint8")
         for verts in self.verts:  # type: ComplexXYVertices
-            mask |= verts.toMask(tuple(maskShape))
+            verts.toMask(mask)
         return ComplexXYVertices.fromBinaryMask(mask)
 
     def removeOverlap(self):
@@ -505,7 +500,7 @@ class S3AVertsAccessor:
         """
         wholeMask = np.zeros(self.max()[::-1] + 1, dtype="uint16")
         for ii, verts in enumerate(self.verts, 1):
-            verts.toMask(wholeMask, ii, asBool=False)
+            verts.toMask(wholeMask, ii)
         outVerts = []
         for ii in range(1, len(self.verts) + 1):
             verts = ComplexXYVertices.fromBinaryMask(wholeMask == ii)

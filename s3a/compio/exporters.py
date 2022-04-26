@@ -141,7 +141,6 @@ class LblPngExporter(AnnotationExporter):
         verts.toMask(
             exportObj,
             int(inst[PRJ_ENUMS.FIELD_LABEL]),
-            asBool=False,
             checkForDisconnectedVerts=False,
         )
         return exportObj
@@ -453,9 +452,7 @@ class CompImgsDfExporter(AnnotationExporter):
                 useImg = labelMask
             else:
                 # The current component should always be drawn on top
-                useImg = inst[RTF.VERTICES].toMask(
-                    labelMask.copy(), float(labelValue), asBool=False
-                )
+                useImg = inst[RTF.VERTICES].toMask(labelMask.copy(), float(labelValue))
             mask = self.cropperFunc(useImg, allVerts, returnCoords=False, **resizeOpts)
 
             out["labelMask"] = mask

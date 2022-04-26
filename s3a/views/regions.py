@@ -327,7 +327,7 @@ class VertexDefinedImg(DASM, EditorPropsMixin, pg.ImageItem):
         else:
             if srcImg is None:
                 stackedVerts = newVerts.stack()
-                regionData = newVerts.toMask(asBool=False)
+                regionData = newVerts.toMask()
                 # Make vertices full brightness
                 regionData[stackedVerts.rows, stackedVerts.cols] = 2
             else:
