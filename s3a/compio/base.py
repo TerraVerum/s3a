@@ -255,6 +255,8 @@ class AnnotationImporter(AnnotationIOBase):
         # Make a copy to allow for internal changes such as adding extra required fields, aliasing, etc.
         # 'and' avoids asking for 'cfg' of 'none' table
         super().__init__(ioType=ioType)
+        if tableData is None:
+            tableData = TableData()
         if isinstance(tableData, TableData):
             container = TableContainer(tableData)
         else:
