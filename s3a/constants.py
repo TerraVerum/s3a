@@ -59,7 +59,7 @@ PROJ_FILE_TYPE = "s3aprj"
 LAYOUTS_DIR.mkdir(parents=True, exist_ok=True)
 APP_STATE_DIR.mkdir(parents=True, exist_ok=True)
 
-SHORTCUT_BASE = "Ctrl+Q"
+SHORTCUT_BASE = "Shift"
 
 
 class PRJ_ENUMS:
@@ -249,33 +249,33 @@ class PRJ_CONSTS:
     # IMAGE TOOLS
     # --------------------------
     TOOL_MERGE_COMPS = PrjParam(
-        "Merge Selected", f"{SHORTCUT_BASE},S,M", icon=str(ICON_DIR / "merge.svg")
+        "Merge Selected", f"{SHORTCUT_BASE}+S,M", icon=str(ICON_DIR / "merge.svg")
     )
     TOOL_SPLIT_COMPS = PrjParam(
-        "Split Selected", f"{SHORTCUT_BASE},S,S", icon=str(ICON_DIR / "split.svg")
+        "Split Selected", f"{SHORTCUT_BASE}+S,S", icon=str(ICON_DIR / "split.svg")
     )
     TOOL_REM_OVERLAP = PrjParam(
         "Remove Component Overlap",
-        f"{SHORTCUT_BASE},S,E",
+        f"{SHORTCUT_BASE}+S,E",
         icon=str(ICON_DIR / "mutex.svg"),
     )
     TOOL_COPY_REGIONS = PrjParam(
-        "Copy Selected", f"{SHORTCUT_BASE},S,C", icon=str(ICON_DIR / "copy.svg")
+        "Copy Selected", f"{SHORTCUT_BASE}+S,C", icon=str(ICON_DIR / "copy.svg")
     )
     TOOL_MOVE_REGIONS = PrjParam(
-        "Move Selected", f"{SHORTCUT_BASE},S,V", icon=str(ICON_DIR / "move.svg")
+        "Move Selected", f"{SHORTCUT_BASE}+S,V", icon=str(ICON_DIR / "move.svg")
     )
     TOOL_CLEAR_FOC_REGION = PrjParam(
-        "Clear", f"{SHORTCUT_BASE},V,C", icon=str(ICON_DIR / "clear.svg")
+        "Clear", f"{SHORTCUT_BASE}+V,C", icon=str(ICON_DIR / "clear.svg")
     )
     TOOL_RESET_FOC_REGION = PrjParam(
-        "Reset", f"{SHORTCUT_BASE},V,R", icon=str(ICON_DIR / "reset.svg")
+        "Reset", f"{SHORTCUT_BASE}+V,R", icon=str(ICON_DIR / "reset.svg")
     )
     TOOL_FILL_FOC_REGION = PrjParam(
-        "Fill", f"{SHORTCUT_BASE},V,F", icon=str(ICON_DIR / "fill.svg")
+        "Fill", f"{SHORTCUT_BASE}+V,F", icon=str(ICON_DIR / "fill.svg")
     )
     TOOL_INVERT_FOC_REGION = PrjParam(
-        "Invert", f"{SHORTCUT_BASE},V,I", icon=str(ICON_DIR / "invert.svg")
+        "Invert", f"{SHORTCUT_BASE}+V,I", icon=str(ICON_DIR / "invert.svg")
     )
     TOOL_ACCEPT_FOC_REGION = PrjParam(
         "Accept", "Ctrl+Shift+A", icon=str(ICON_DIR / "accept.svg")
@@ -283,14 +283,14 @@ class PRJ_CONSTS:
     TOOL_CLEAR_ROI = PrjParam("Clear ROI", "Esc")
     TOOL_CLEAR_HISTORY = PrjParam(
         "Clear Processor History",
-        f"{SHORTCUT_BASE},V,H",
+        f"{SHORTCUT_BASE}+V,H",
         icon=str(ICON_DIR / "clear_history.svg"),
     )
     TOOL_PROC_ANALYTICS = PrjParam(
         "Show Analytics", icon=str(ICON_DIR / "analytics.svg")
     )
     TOOL_RESET_ZOOM = PrjParam(
-        "Reset Zoom", f"{SHORTCUT_BASE},Z,R", icon=str(ICON_DIR / "reset_zoom.svg")
+        "Reset Zoom", f"{SHORTCUT_BASE}+Z,R", icon=str(ICON_DIR / "reset_zoom.svg")
     )
 
     # --------------------------
@@ -298,31 +298,31 @@ class PRJ_CONSTS:
     # --------------------------
     TOOL_ESTIMATE_BOUNDARIES = PrjParam("Estimate Boundaries", "Ctrl+Alt+Shift+E")
     TOOL_CLEAR_BOUNDARIES = PrjParam("Clear Boundaries", "Ctrl+Alt+Shift+C")
-    TOOL_EXPORT_COMP_LIST = PrjParam("Export Current Table", f"{SHORTCUT_BASE},E,T")
+    TOOL_EXPORT_COMP_LIST = PrjParam("Export Current Table", f"{SHORTCUT_BASE}+E,T")
     TOOL_TBL_SET_SAME_AS_FIRST = PrjParam("Set Cells as First", "Ctrl+D")
     TOOL_TBL_SET_AS = PrjParam("Set Cells As...", "Ctrl+Shift+D")
     TOOL_TBL_DEL_ROWS = PrjParam("Delete Table Rows", "Del")
-    TOOL_TBL_ZOOM_TO_COMPS = PrjParam("Zoom to Selection  ", f"{SHORTCUT_BASE},Z,S")
+    TOOL_TBL_ZOOM_TO_COMPS = PrjParam("Zoom to Selection  ", f"{SHORTCUT_BASE}+Z,S")
 
     # --------------------------
     # PROJECT
     # --------------------------
     TOOL_PROJ_SAVE = PrjParam("Save", "Ctrl+S")
-    TOOL_PROJ_OPEN = PrjParam("Open Project", f"{SHORTCUT_BASE},P,O")
-    TOOL_PROJ_OPEN_IMG = PrjParam("Open Project Image", f"{SHORTCUT_BASE},I,O")
-    TOOL_PROJ_CREATE = PrjParam("Create Project", f"{SHORTCUT_BASE},P,C")
-    TOOL_PROJ_ADD_IMG = PrjParam("Add New Image", f"{SHORTCUT_BASE},I,A")
-    TOOL_PROJ_ADD_ANN = PrjParam("Add New Annotation", f"{SHORTCUT_BASE},A,A")
-    TOOL_PROJ_SETTINGS = PrjParam("Project Settings...", f"{SHORTCUT_BASE},P,S")
-    TOOL_PROJ_EXPORT = PrjParam("Export...", f"{SHORTCUT_BASE},P,E")
-    TOOL_AUTOSAVE = PrjParam("Autosave...", f"{SHORTCUT_BASE},A,O")
+    TOOL_PROJ_OPEN = PrjParam("Open Project", f"{SHORTCUT_BASE}+P,O")
+    TOOL_PROJ_OPEN_IMG = PrjParam("Open Project Image", f"{SHORTCUT_BASE}+I,O")
+    TOOL_PROJ_CREATE = PrjParam("Create Project", f"{SHORTCUT_BASE}+P,C")
+    TOOL_PROJ_ADD_IMG = PrjParam("Add New Image", f"{SHORTCUT_BASE}+I,A")
+    TOOL_PROJ_ADD_ANN = PrjParam("Add New Annotation", f"{SHORTCUT_BASE}+A,A")
+    TOOL_PROJ_SETTINGS = PrjParam("Project Settings...", f"{SHORTCUT_BASE}+P,S")
+    TOOL_PROJ_EXPORT = PrjParam("Export...", f"{SHORTCUT_BASE}+P,E")
+    TOOL_AUTOSAVE = PrjParam("Autosave...", f"{SHORTCUT_BASE}+A,O")
 
     # --------------------------
     # GLOBAL PREDICTIONS
     # --------------------------
     TOOL_MULT_PRED = PrjParam(
         "Make Multi-Prediction",
-        f"{SHORTCUT_BASE},M,P",
+        f"{SHORTCUT_BASE}+M,P",
         icon=str(ICON_DIR / "predict.svg"),
     )
 
@@ -349,7 +349,7 @@ class PRJ_CONSTS:
     # Modes
     DRAW_MODE_FOCUSED = PrjParam(
         'Activate "Edit" draw mode',
-        f"{SHORTCUT_BASE},D,E",
+        f"{SHORTCUT_BASE}+D,E",
         "registeredaction",
         icon=str(ICON_DIR / "edit.svg"),
     )
@@ -357,30 +357,30 @@ class PRJ_CONSTS:
     # Shapes
     DRAW_SHAPE_RECT = PrjParam(
         'Activate "Rectangular" draw shape',
-        f"{SHORTCUT_BASE},D,R",
+        f"{SHORTCUT_BASE}+D,R",
         "registeredaction",
         icon=str(ICON_DIR / "rectangle.svg"),
     )
     DRAW_SHAPE_POLY = PrjParam(
         'Activate "Polygon" draw shape',
-        f"{SHORTCUT_BASE},D,Y",
+        f"{SHORTCUT_BASE}+D,Y",
         "registeredaction",
         icon=str(ICON_DIR / "polygon.svg"),
     )
     DRAW_SHAPE_ELLIPSE = PrjParam(
         'Activate "Ellipse" draw shape',
-        f"{SHORTCUT_BASE},D,L",
+        f"{SHORTCUT_BASE}+D,L",
         "registeredaction",
         icon=str(ICON_DIR / "ellipse.svg"),
     )
     DRAW_SHAPE_FREE = PrjParam(
         'Activate "Freehand" draw shape',
-        f"{SHORTCUT_BASE},D,H",
+        f"{SHORTCUT_BASE}+D,H",
         icon=str(ICON_DIR / "freehand.svg"),
     )
     DRAW_SHAPE_POINT = PrjParam(
         'Activate "Point" draw shape',
-        f"{SHORTCUT_BASE},D,N",
+        f"{SHORTCUT_BASE}+D,N",
         icon=str(ICON_DIR / "point.svg"),
     )
     DRAW_SHAPE_NONE = PrjParam("None")
@@ -388,7 +388,7 @@ class PRJ_CONSTS:
     # Actions
     DRAW_ACT_CREATE = PrjParam(
         'Activate "Create Component" action',
-        f"{SHORTCUT_BASE},D,C",
+        f"{SHORTCUT_BASE}+D,C",
         "registeredaction",
         icon=str(ICON_DIR / "create.svg"),
         helpText="When an ROI is created, the image processor will attempt to make a new"
@@ -396,7 +396,7 @@ class PRJ_CONSTS:
     )
     DRAW_ACT_ADD = PrjParam(
         'Activate "Add to Foreground" action',
-        f"{SHORTCUT_BASE},D,F",
+        f"{SHORTCUT_BASE}+D,F",
         "registeredaction",
         icon=str(ICON_DIR / "foreground.svg"),
         helpText="When an ROI is created, the image processor will attempt to make a new"
@@ -404,7 +404,7 @@ class PRJ_CONSTS:
     )
     DRAW_ACT_REM = PrjParam(
         'Activate "Add to Background" action',
-        f"{SHORTCUT_BASE},D, B",
+        f"{SHORTCUT_BASE}+D, B",
         "registeredaction",
         icon=str(ICON_DIR / "background.svg"),
         helpText="When an ROI is created, the image processor will attempt to take the enclosed"
@@ -412,7 +412,7 @@ class PRJ_CONSTS:
     )
     DRAW_ACT_SELECT = PrjParam(
         'Activate "Select" draw action',
-        f"{SHORTCUT_BASE},D, S",
+        f"{SHORTCUT_BASE}+D, S",
         "registeredaction",
         icon=str(ICON_DIR / "select.svg"),
         helpText="When component boundaries are enclosed by this ROI, they will be selected"
@@ -420,7 +420,7 @@ class PRJ_CONSTS:
     )
     DRAW_ACT_PAN = PrjParam(
         'Activate "Pan" draw action',
-        f"{SHORTCUT_BASE},D,P",
+        f"{SHORTCUT_BASE}+D,P",
         "registeredaction",
         icon=str(ICON_DIR / "pan.svg"),
         helpText="No ROI will be drawn in this mode. Right- or left-click and drag to pan.",
