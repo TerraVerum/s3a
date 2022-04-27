@@ -1,5 +1,10 @@
 from pathlib import Path
 
+import utilitys.constants
+from utilitys import fns
+
+from .structures import ComplexXYVertices, PrjParam
+
 __all__ = [
     "BASE_DIR",
     "MENU_OPTS_DIR",
@@ -23,9 +28,6 @@ __all__ = [
     "IO_TEMPLATES_DIR",
     "PROJ_BASE_TEMPLATE",
 ]
-
-import utilitys.constants
-from utilitys import fns
 
 CODE_DIR = Path(__file__).parent
 BASE_DIR = Path.home() / ".s3a"
@@ -116,9 +118,6 @@ class PRJ_ENUMS:
     HISTORY_FOREGROUND = 2
 
     ROT_OPTIMAL = None
-
-
-from .structures import ComplexXYVertices, PrjParam
 
 
 class _ReqdTableFields:
