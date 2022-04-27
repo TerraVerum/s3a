@@ -397,12 +397,20 @@ class VerticesPlugin(DASM, TableFieldPlugin):
           an image. This can be computationally intensive at times, in which case `simplify` can
           be set to *False*
         """
+        try:
+            hierarchy = np.row_stack(
+                [v.hierarchy for v in self.region.regionData[RTF.VERTICES]]
+            )
+        except ValueError:
+            # Numpy error when all verts are empty or no verts present
+            hierarchy = np.empty((0, 4), dtype=int)
         outVerts = ComplexXYVertices(
             [
                 verts
                 for cplxVerts in self.region.regionData[RTF.VERTICES]
                 for verts in cplxVerts
-            ]
+            ],
+            hierarchy=hierarchy,
         )
         if simplify:
             return outVerts.simplify(epsilon=self.props[CNST.PROP_REG_APPROX_EPS])
