@@ -17,7 +17,7 @@ from utilitys import (
     ParamContainer,
     DeferredActionStackMixin as DASM,
     ParamEditorDockGrouping,
-    ParamEditor,
+    ParamEditor, ActionStack,
 )
 
 from .. import ComponentIO, defaultIo
@@ -184,6 +184,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             ser = self.mainImg.compSer
             focusedId = ser[REQD_TBL_FIELDS.INST_ID]
             if focusedId in changedDict["deleted"]:
+                self.compDisplay.selectRowsById([])
                 self.changeFocusedComp()
             elif focusedId in changedDict["changed"]:
                 self.changeFocusedComp(self.compMgr.compDf.loc[focusedId])
@@ -265,7 +266,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             undo = self._acceptFocusedExisting(ser)
         else:
             undo = self._acceptFocusedNew(ser)
-        self.changeFocusedComp()
+        self.compDisplay.selectRowsById([])
         yield
         undo()
 
@@ -497,18 +498,26 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         newComps = self.compIo.importByFileType(inFname, self.mainImg.image.shape)
         self.compMgr.addComps(newComps, loadType)
 
-    @DASM.undoable("Create New Component", asGroup=True)
+    @DASM.undoable("Create New Component")
     def addAndFocusComps(
         self, newComps: pd.DataFrame, addType=PRJ_ENUMS.COMP_ADD_AS_NEW
     ):
-        changeDict = self.compMgr.addComps(newComps, addType)
+        # Capture undo action here since current stack might be disabled
+        dummyStack = ActionStack()
+        undoableAddComps = dummyStack.undoable()(ComponentMgr.addComps)
+        changeDict = undoableAddComps(self.compMgr, newComps, addType)
         # Focus is performed by comp table
         # Arbitrarily choose the last possible component
         changeList = np.concatenate([changeDict["added"], changeDict["changed"]])
-        if len(changeList) == 0:
-            return changeDict
-        self.changeFocusedComp(changeList[-1])
-        return changeDict
+        oldFocused = self.mainImg.compSer[REQD_TBL_FIELDS.INST_ID]
+        # Nothing to undo if there were no changes
+        if len(changeList) > 0:
+            self.compDisplay.selectRowsById([changeList[-1]])
+        yield changeDict
+        # Explicitly call the captured "undo" from adding comps if needed
+        if len(dummyStack.actions):
+            dummyStack.undo()
+        self.compDisplay.selectRowsById([oldFocused])
 
     def changeFocusedComp(self, compIds: Union[int, Sequence[int]] = None):
         # TODO: More robust scenario if multiple comps are in the dataframe

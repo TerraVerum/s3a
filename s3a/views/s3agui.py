@@ -306,7 +306,8 @@ class S3A(S3ABase):
     def addAndFocusComps(
         self, newComps: pd.DataFrame, addType=PRJ_ENUMS.COMP_ADD_AS_NEW
     ):
-        changeDict = super().addAndFocusComps(newComps, addType=addType)
+        gen = super().addAndFocusComps(newComps, addType=addType)
+        changeDict = fns.gracefulNext(gen)
         keepIds = changeDict["ids"]
         keepIds = keepIds[keepIds >= 0]
         selection = self.compDisplay.selectRowsById(keepIds)
@@ -317,7 +318,9 @@ class S3A(S3ABase):
             # For some reason sometimes the actual table selection doesn't propagate in time, so
             # directly forward the selection here
             self.compTbl.setSelectedCellsAsGui(selection)
-        return changeDict
+        yield changeDict
+        yield fns.gracefulNext(gen)
+
 
 
 if __name__ == "__main__":

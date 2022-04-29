@@ -40,27 +40,28 @@ def roiFactory(app):
     return _polyRoi
 
 
-@pytest.mark.withcomps
-def test_update(app, mgr, vertsPlugin):
+def test_update(app, mgr, vertsPlugin, sampleComps):
+    # Disable region simplification for accurate testing
+    vertsPlugin.props[PRJ_CONSTS.PROP_REG_APPROX_EPS] = -1
     mImg = app.mainImg
-    focusedId = NUM_COMPS - 1
-    newCompSer = mgr.compDf.loc[focusedId]
+    newCompSer = sampleComps.iloc[-1].copy()
 
     masks = RND.random((3, 500, 500)) > 0.5
 
     def regionCmp(mask):
         assert np.array_equal(mask > 0, vertsPlugin.region.toGrayImg(mask.shape) > 0)
 
-    mImg.updateFocusedComp(newCompSer)
+    changeDict = app.addAndFocusComps(newCompSer.to_frame().T)
+    newCompSer[REQD_TBL_FIELDS.INST_ID] = changeDict["added"][0]
     assert mImg.compSer.equals(newCompSer)
-    oldestMask = vertsPlugin.region.toGrayImg()
     # Add two updates so one is undoable and still comparable
     for ii in range(2):
         vertsPlugin.updateRegionFromMask(masks[ii])
         regionCmp(masks[ii])
 
-    newerSer = mgr.compDf.loc[0]
-    mImg.updateFocusedComp(newerSer)
+    newerSer = sampleComps.iloc[0].copy()
+    changeDict = app.addAndFocusComps(newerSer.to_frame().T)
+    newerSer[REQD_TBL_FIELDS.INST_ID] = changeDict["added"][0]
     oldMask = vertsPlugin.region.toGrayImg()
     vertsPlugin.updateRegionFromMask(masks[2])
     regionCmp(masks[2])
@@ -71,32 +72,34 @@ def test_update(app, mgr, vertsPlugin):
     assert mImg.compSer.equals(newerSer)
 
     vertsPlugin.actionStack.undo()
-    assert mImg.compSer.equals(newCompSer)
-    regionCmp(masks[0])
+    assert mImg.compSer[REQD_TBL_FIELDS.INST_ID] == newCompSer[REQD_TBL_FIELDS.INST_ID]
+    # Undo create new comp, nothing is selected
 
     app.sharedAttrs.actionStack.undo()
-    regionCmp(oldestMask)
-
-    for ii in range(2):
-        app.sharedAttrs.actionStack.redo()
-        assert mImg.compSer.equals(newCompSer)
-        regionCmp(masks[ii])
+    # Undo earlier region edit, region should now equal the second-to-last edit
+    regionCmp(masks[0])
+    assert mImg.compSer[REQD_TBL_FIELDS.INST_ID] == newCompSer[REQD_TBL_FIELDS.INST_ID]
 
     app.sharedAttrs.actionStack.redo()
+    regionCmp(masks[1])
+    app.sharedAttrs.actionStack.redo()
+    app.sharedAttrs.actionStack.redo()
+    regionCmp(masks[2])
     assert mImg.compSer.equals(newerSer)
-    with pytest.warns(UserWarning):
-        app.sharedAttrs.actionStack.redo()
+    assert not app.sharedAttrs.actionStack.canRedo
 
 
 def test_region_modify(sampleComps, app, mgr, vertsPlugin):
+    # Disable region simplification for accurate testing
+    vertsPlugin.props[PRJ_CONSTS.PROP_REG_APPROX_EPS] = -1
     vertsPlugin.procEditor.changeActiveProcessor("Basic Shapes")
     mImg = app.mainImg
     app.addAndFocusComps(sampleComps)
     shapeBnds = mImg.image.shape[:2]
     reach = np.min(shapeBnds)
-    oldData = vertsPlugin.region.regionData
+    oldData = vertsPlugin.region.regionData.copy()
     mImg.shapeCollection.curShapeParam = PRJ_CONSTS.DRAW_SHAPE_POLY
-    mImg.drawAction = PRJ_CONSTS.DRAW_ACT_ADD
+    mImg.drawAction = PRJ_CONSTS.DRAW_ACT_CREATE
     imsum = lambda: vertsPlugin.region.toGrayImg(shapeBnds).sum()
 
     # 1st action
@@ -111,9 +114,10 @@ def test_region_modify(sampleComps, app, mgr, vertsPlugin):
     checkpointMask = vertsPlugin.region.toGrayImg(shapeBnds)
     assert np.any(checkpointMask)
 
+    mImg.drawAction = PRJ_CONSTS.DRAW_ACT_ADD
+
     app.sharedAttrs.actionStack.undo()
-    app.sharedAttrs.actionStack.undo()
-    # Once for the shape, again for the focus
+    # app.sharedAttrs.actionStack.undo()
     # Cmp to first action
     assert imsum() == 0
     app.sharedAttrs.actionStack.undo()
@@ -125,9 +129,7 @@ def test_region_modify(sampleComps, app, mgr, vertsPlugin):
     app.sharedAttrs.actionStack.redo()
     assert imsum() == 0
     app.sharedAttrs.actionStack.redo()
-    app.sharedAttrs.actionStack.redo()
-    pluginMask = vertsPlugin.region.toGrayImg(shapeBnds)
-    assert np.array_equal(pluginMask, checkpointMask)
+    assert imsum() == checkpointMask.sum()
 
 
 @pytest.mark.withcomps

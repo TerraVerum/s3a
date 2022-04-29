@@ -4,7 +4,7 @@ import numpy as np
 from skimage import draw
 
 from apptests.testingconsts import SAMPLE_SMALL_IMG
-from s3a import XYVertices, REQD_TBL_FIELDS, ComplexXYVertices
+from s3a import XYVertices, REQD_TBL_FIELDS, PRJ_CONSTS
 from s3a.generalutils import imgCornerVertices
 from s3a.plugins.file import NewProjectWizard
 from s3a.processing.algorithms import imageproc
@@ -13,6 +13,8 @@ from s3a.processing.algorithms import imageproc
 @pytest.mark.withcomps
 @pytest.mark.smallimage
 def test_registered_verts_funcs(vertsPlugin, app):
+    # Disable region simplification for accurate testing
+    vertsPlugin.props[PRJ_CONSTS.PROP_REG_APPROX_EPS] = -1
     togray = lambda: vertsPlugin.region.toGrayImg(SAMPLE_SMALL_IMG.shape)
     imsize = np.prod(SAMPLE_SMALL_IMG.shape[:2])
     editor = vertsPlugin.procEditor
