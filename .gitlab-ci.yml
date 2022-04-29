@@ -16,6 +16,7 @@ pytest:
   - pip install pytest-qt
   script:
     - pytest -l ./apptests --cov-report term --cov-report xml --cov=./s3a
+  coverage: /^TOTAL.+?(\d+\%)$/
 
 sonarcloud-check:
   stage: CodeCov
