@@ -1,5 +1,5 @@
 import sys
-from typing import Union, Sequence
+from typing import Union, Sequence, Tuple, Optional
 
 import numpy as np
 import pandas as pd
@@ -133,6 +133,14 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         self.labelCol = REQD_TBL_FIELDS.INST_ID
         self.updateLabelCol()
 
+        self._regionIntersectionCache: Tuple[Optional[np.ndarray], Optional[np.ndarray]] = (None, None)
+        """
+        Checking whether a region intersction occurred is expensive when several thousand
+        regions exist. Results are cached until the region plot changes. "lru_cache"
+        could be used, except "selection" is not a hashable argument. The primitive
+        solution is to simply preserve the cache across at most one "selection" value
+        """
+
         mainImg.sigUpdatedFocusedComp.connect(self._onFocusedCompChange)
 
         attrs = self.sharedAttrs
@@ -229,6 +237,9 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         # Note that hiding the ID is chosen instead of deleting, since that is a costly graphics
         # operation
         compDf = self._compMgr.compDf
+
+        # Invalidate selection cache
+        self._regionIntersectionCache = (None, None)
 
         # Update and add changed/new components
         # TODO: Find out why this isn't working. For now, just reset the whole comp list
@@ -412,26 +423,17 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
     def reflectSelectionBoundsMade(
         self,
         selection: Union[OneDArr, XYVertices],
-        checkPlt: MultiRegionPlot = None,
         clearExisting=True,
     ):
         """
         :param selection: bounding box of user selection: [xmin ymin; xmax ymax]
-        :param checkPlt: Plot to look for selected regions. Some plugins provide their own, and can use this parameter
-           to define their selection
+        :param clearExisting: If *True*, already selected points are cleared before
+             this selection is incorporated
         """
         # If min and max are the same, just check for points at mouse position
         if selection.size == 0:
             return
-        if checkPlt is None:
-            checkPlt = self.regionPlot
-        if len(selection) == 1 or np.abs(selection[0] - selection[1]).sum() < 0.01:
-            qtPoint = QtCore.QPointF(*selection[0])
-            selectedSpots = checkPlt.pointsAt(qtPoint)
-            selectedIds = [spot.data() for spot in selectedSpots]
-        else:
-            selectedIds = checkPlt.boundsWithin(selection)
-            selectedIds = np.unique(selectedIds)
+        selectedIds = self.regionPlot.boundsWithin(selection)
 
         # -----
         # Obtain table idxs corresponding to ids so rows can be highlighted
@@ -454,6 +456,21 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         if not self.regionMover.active:
             self.selectRowsById(selectedIds, mode)
         # TODO: Better management of widget focus here
+
+    def selectionIntersectsRegion(self, selection):
+        cache = self._regionIntersectionCache
+        result = False
+        if cache[0] is not None and np.array_equal(cache[0], selection):
+            result = cache[-1]
+        elif len(self.regionPlot.boundsWithin(selection)):
+          result = True
+        else:
+            for pt in selection:
+                if len(self.regionPlot.pointsAt(pt)):
+                    result = True
+                    break
+        self._regionIntersectionCache = (selection, result)
+        return result
 
     def _updateDisplayedIds(self):
         curComps = self._filter.filterCompDf(self._compMgr.compDf.copy())
@@ -527,9 +544,6 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         if toClipboard:
             QtWidgets.QApplication.clipboard().setImage(pm.toImage())
         return pm
-
-    def resetCompBounds(self):
-        self.regionPlot.resetRegionList()
 
     @property
     def regionMover(self):

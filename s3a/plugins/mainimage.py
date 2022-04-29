@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import warnings
+
 import cv2 as cv
 import numpy as np
-import pandas as pd
-from utilitys import ParamEditorPlugin, ParamContainer, fns
+from utilitys import ParamEditorPlugin, ParamContainer
 
 from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
 from ..models import s3abase
@@ -20,6 +21,8 @@ class MainImagePlugin(ParamEditorPlugin):
         shared.generalProps.registerProp(CNST.PROP_MIN_COMP_SZ, container=self.props)
         self.tableData = shared.tableData
         super().__initEditorParams__(shared=shared, **kwargs)
+        self._cachedRegionIntersection = False
+
 
     def attachWinRef(self, win: s3abase.S3ABase):
         self._hookupCopier(win)
@@ -35,31 +38,29 @@ class MainImagePlugin(ParamEditorPlugin):
         disp = win.compDisplay
 
         def actHandler(verts, param):
-            # When editing, only want to select if nothing is already started
+            activeEdits = any(
+                len(v) for v in self.win.verticesPlugin.region.regionData["Vertices"]
+            )
             if (
-                param not in [CNST.DRAW_ACT_REM, CNST.DRAW_ACT_ADD]
-                or len(self.win.verticesPlugin.region.regionData) == 0
+                param in [CNST.DRAW_ACT_REM, CNST.DRAW_ACT_ADD]
+                and not activeEdits
+                and self.win.compDisplay.selectionIntersectsRegion(verts)
             ):
-                # Special case: Selection with point shape should be a point
-                if (
-                    self.win.mainImg.shapeCollection.curShapeParam
-                    == CNST.DRAW_SHAPE_POINT
-                ):
-                    verts = verts.mean(0, keepdims=True)
-                # Make sure to check vertices plugin regions since they suppress disp's regions for focused ids
-                # Must be done first, since a no-find in disp's regions will deselect them
-                with fns.makeDummySignal(win.compTbl, "sigSelectionChanged"):
-                    # Second call should handle the true selection signal
-                    disp.reflectSelectionBoundsMade(
-                        verts, self.win.verticesPlugin.region
-                    )
-                    disp.reflectSelectionBoundsMade(verts, clearExisting=False)
-
-                nonUniqueIds = win.compTbl.idsRowsColsFromSelection(
-                    excludeNoEditCols=False, warnNoneSelection=False
-                )[:, 0]
-                selection = pd.unique(nonUniqueIds)
-                win.compTbl.sigSelectionChanged.emit(selection)
+                warnings.warn(
+                    "Made a selection on top of an existing component. It is ambiguous"
+                    " whether the existing component should be selected or a new"
+                    " component should be created on top. Use either 'Select' or"
+                    " 'Create' action first",
+                    UserWarning, stacklevel=2
+                )
+                return
+            elif param in [CNST.DRAW_ACT_REM, CNST.DRAW_ACT_ADD] and activeEdits:
+                # Don't make selection if edits are already in progress
+                return
+            # Special case: Selection with point shape should be a point
+            if self.win.mainImg.shapeCollection.curShapeParam == CNST.DRAW_SHAPE_POINT:
+                verts = verts.mean(0, keepdims=True)
+            disp.reflectSelectionBoundsMade(verts)
 
         acts = [
             CNST.DRAW_ACT_ADD,
@@ -68,6 +69,7 @@ class MainImagePlugin(ParamEditorPlugin):
             CNST.DRAW_ACT_PAN,
         ]
         win.mainImg.registerDrawAction(acts, actHandler)
+        # Create checks an edge case for selection, so no need to add to above acts
         win.mainImg.registerDrawAction(CNST.DRAW_ACT_CREATE, self.createComponent)
 
     def _hookupCopier(self, win):

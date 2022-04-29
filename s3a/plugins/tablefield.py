@@ -9,7 +9,7 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtWidgets
+from pyqtgraph.Qt import QtWidgets, QtCore
 from utilitys import (
     PrjParam,
     DeferredActionStackMixin as DASM,
@@ -155,6 +155,11 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     def _runFromDrawAct(self, verts: XYVertices, param: PrjParam):
         # noinspection PyTypeChecker
         verts: XYVertices = verts.astype(int)
+        activeEdits = any(len(v) for v in self.region.regionData['Vertices'])
+        if not activeEdits and self.win.compDisplay.selectionIntersectsRegion(verts):
+            # Warning already handled by main image
+            return
+
         if param == CNST.DRAW_ACT_ADD:
             vertsKey = "fgVerts"
         else:

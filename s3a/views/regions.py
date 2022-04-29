@@ -71,8 +71,11 @@ def makeMultiRegionDf(
 class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     __groupingName__ = PRJ_CONSTS.CLS_MULT_REG_PLT.name
 
-    def __initEditorParams__(self, shared: SharedAppSettings):
+    def __initEditorParams__(self, shared: SharedAppSettings = None):
         self.props = ParamContainer()
+        # Allow working without centralized color settings if needed
+        if shared is None:
+            return
         # Use setattr so pycharm autocomplete doesn't forget arg hints
         proc = shared.colorScheme.registerFunc(
             self.updateColors,
@@ -164,15 +167,20 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
         if updatePlot:
             self.updatePlot(useCache=True)
 
-    def updatePlot(self, useCache=False):
-        # -----------
-        # Update data
-        # -----------
+    def getShownIdxs(self):
+        """Returns a boolean mask of rows in regionData which should be shown"""
         usePoints = np.ones(len(self.regionData), dtype=bool)
         if not self.showSelected:
             usePoints[self.regionData[PRJ_ENUMS.FIELD_SELECTED]] = False
         if not self.showFocused:
             usePoints[self.regionData[PRJ_ENUMS.FIELD_FOCUSED]] = False
+        return usePoints
+
+    def updatePlot(self, useCache=False):
+        # -----------
+        # Update data
+        # -----------
+        usePoints = self.getShownIdxs()
 
         if self.regionData.empty or not np.any(usePoints):
             self.setData(x=[], y=[], data=[])
@@ -183,7 +191,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
             or self._symbolCache is None
             or len(self._symbolCache) != len(self.regionData)
         ):
-            self.updateSymbolCache()
+            self._symbolCache = self.createSybolLUT()
 
         plotRegions = np.vstack(self._symbolCache.loc[usePoints, "location"])
         self.setData(
@@ -193,16 +201,18 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
         )
         self.updateColors()
 
-    def updateSymbolCache(self):
+    def createSybolLUT(self, regionData: pd.DataFrame = None):
+        if regionData is None:
+            regionData = self.regionData
         boundLocs = []
         boundSymbs = []
-        for region in self.regionData[RTF.VERTICES]:
+        for region in regionData[RTF.VERTICES]:
             boundSymbol, boundLoc = symbolFromVerts(region)
 
             boundLocs.append(boundLoc)
             boundSymbs.append(boundSymbol)
         cache = {"location": boundLocs, "symbol": boundSymbs}
-        self._symbolCache = pd.DataFrame(cache)
+        return pd.DataFrame(cache)
 
     def toGrayImg(self, imageShape: Sequence[int] = None):
         labelDf = pd.DataFrame()
@@ -212,6 +222,49 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
         return defaultIo.exportLblPng(
             labelDf, imageShape=imageShape, rescaleOutput=True
         )
+
+    def pointsAt(self, pos):
+        if not isinstance(pos, QtCore.QPointF):
+            pos = QtCore.QPointF(*pos)
+        return self._selectionOnHiddenIds(pos, "pointsAt")
+
+    def boundsWithin(self, selection: XYVertices):
+        return self._selectionOnHiddenIds(selection, "boundsWithin")
+
+    def _selectionOnHiddenIds(
+        self, selection: XYVertices | QtCore.QPoint, checkFunc: str
+    ):
+        """
+        Must be overridden since MultiRegionPlot might be hiding focused IDs, in which
+        case they won't show up when testing point data.
+        Logic is the same for ``pointsAt`` or ``boundsWithin``
+        """
+        pts = getattr(super(), checkFunc)(selection)
+        hiddenPts = ~self.getShownIdxs()
+        if not hiddenPts.any():
+            # Nothing was hidden, so parent impl. checked every point
+            return pts
+
+        needsCheck = self.regionData.loc[hiddenPts]
+        # TODO: Probably a better way to do this instead of creating a new plot to check
+        checkPlt = self._createPlotForHiddenRegions(needsCheck)
+        hiddenAndSelected = getattr(checkPlt, checkFunc)(selection)
+        if len(hiddenAndSelected):
+            return np.concatenate([pts, hiddenAndSelected])
+        return pts
+
+    def _createPlotForHiddenRegions(self, hiddenDf):
+        symbLut = self.createSybolLUT(hiddenDf)
+        with type(self).setEditorPropertyOpts(shared=None):
+            checkerPlot = BoundScatterPlot()
+
+        plotRegions = np.vstack(symbLut["location"])
+        checkerPlot.setData(
+            *plotRegions.T,
+            symbol=symbLut["symbol"].to_numpy(),
+            data=hiddenDf.index,
+        )
+        return checkerPlot
 
     @fns.dynamicDocstring(cmapVals=colormaps() + ["None"])
     def updateColors(

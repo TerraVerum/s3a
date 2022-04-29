@@ -33,8 +33,17 @@ class BoundScatterPlot(pg.ScatterPlotItem):
         # TODO: Optimize for rectangular selections
         # polyPoints = [QtCore.QPointF(*row) for row in selection]
         # selectionPoly = QtGui.QPolygonF(polyPoints)
+
+        # No matter what, empty plot will never have points returned
         if self.data["x"] is None:
-            return np.array([])
+            return np.array([], dtype=int)
+
+        # Allow selection to be point-like
+        if len(selection) == 1 or np.abs(selection[0] - selection[1]).sum() < 0.01:
+            qtPoint = QtCore.QPointF(*selection[0])
+            selectedSpots = self.pointsAt(qtPoint)
+            return np.array([spot.data() for spot in selectedSpots])
+
         pointLocs = np.column_stack(self.getData())
         # tfIsInSelection = (pointLocs[0] >= bbox[0]) \
         #   & (pointLocs[0] <= bbox[2]) \
