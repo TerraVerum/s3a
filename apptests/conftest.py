@@ -5,7 +5,7 @@ from typing import Type
 
 import pytest
 
-from s3a.constants import PRJ_ENUMS, PRJ_CONSTS
+from s3a.constants import PRJ_ENUMS
 from s3a import constants, mkQApp
 from helperclasses import CompDfTester
 from s3a.views.s3agui import S3A

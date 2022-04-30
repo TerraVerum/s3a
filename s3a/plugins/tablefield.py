@@ -9,7 +9,7 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtWidgets, QtCore
+from pyqtgraph.Qt import QtWidgets
 from utilitys import (
     PrjParam,
     DeferredActionStackMixin as DASM,
