@@ -486,11 +486,12 @@ class S3AVertsAccessor:
         on the final mask.
         """
         # x-y -> row-col
-        maskShape = (self.max() + 1)[::-1]
+        offset = self.min()
+        maskShape = (self.max() - offset + 1)[::-1]
         mask = np.zeros(maskShape, "uint8")
         for verts in self.verts:  # type: ComplexXYVertices
-            verts.toMask(mask)
-        return ComplexXYVertices.fromBinaryMask(mask)
+            verts.removeOffset(offset).toMask(mask)
+        return ComplexXYVertices.fromBinaryMask(mask).removeOffset(-offset)
 
     def removeOverlap(self):
         """
