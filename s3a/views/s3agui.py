@@ -322,7 +322,6 @@ class S3A(S3ABase):
         yield fns.gracefulNext(gen)
 
 
-
 if __name__ == "__main__":
     import sys
 

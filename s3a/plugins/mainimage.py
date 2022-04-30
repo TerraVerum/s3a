@@ -23,7 +23,6 @@ class MainImagePlugin(ParamEditorPlugin):
         super().__initEditorParams__(shared=shared, **kwargs)
         self._cachedRegionIntersection = False
 
-
     def attachWinRef(self, win: s3abase.S3ABase):
         self._hookupCopier(win)
         self._hookupDrawActions(win)
@@ -51,7 +50,8 @@ class MainImagePlugin(ParamEditorPlugin):
                     " whether the existing component should be selected or a new"
                     " component should be created on top. Use either 'Select' or"
                     " 'Create' action first",
-                    UserWarning, stacklevel=2
+                    UserWarning,
+                    stacklevel=2,
                 )
                 return
             elif param in [CNST.DRAW_ACT_REM, CNST.DRAW_ACT_ADD] and activeEdits:

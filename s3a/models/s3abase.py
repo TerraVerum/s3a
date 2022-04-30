@@ -17,7 +17,8 @@ from utilitys import (
     ParamContainer,
     DeferredActionStackMixin as DASM,
     ParamEditorDockGrouping,
-    ParamEditor, ActionStack,
+    ParamEditor,
+    ActionStack,
 )
 
 from .. import ComponentIO, defaultIo

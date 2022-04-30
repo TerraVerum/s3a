@@ -136,7 +136,7 @@ def test_copy_comps(app, mgr, copyHelper):
     compareCopiedCompDfs(
         oldComps,
         mgr.compDf,
-        np.array([0,0]),
+        np.array([0, 0]),
         newStartIdx=len(oldComps),
     )
 

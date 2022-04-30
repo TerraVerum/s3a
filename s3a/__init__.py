@@ -20,7 +20,7 @@ __all__ = [
     "PRJ_ENUMS",
     "TableData",
     "defaultIo",
-    "SharedAppSettings"
+    "SharedAppSettings",
 ]
 
 pg.setConfigOptions(imageAxisOrder="row-major")

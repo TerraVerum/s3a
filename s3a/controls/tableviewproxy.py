@@ -133,7 +133,9 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         self.labelCol = REQD_TBL_FIELDS.INST_ID
         self.updateLabelCol()
 
-        self._regionIntersectionCache: Tuple[Optional[np.ndarray], Optional[np.ndarray]] = (None, None)
+        self._regionIntersectionCache: Tuple[
+            Optional[np.ndarray], Optional[np.ndarray]
+        ] = (None, None)
         """
         Checking whether a region intersction occurred is expensive when several thousand
         regions exist. Results are cached until the region plot changes. "lru_cache"
@@ -463,7 +465,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         if cache[0] is not None and np.array_equal(cache[0], selection):
             result = cache[-1]
         elif len(self.regionPlot.boundsWithin(selection)):
-          result = True
+            result = True
         else:
             for pt in selection:
                 if len(self.regionPlot.pointsAt(pt)):
