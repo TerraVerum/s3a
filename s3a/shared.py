@@ -24,10 +24,10 @@ class SharedAppSettings:
             saveDir=MULT_PRED_DIR, template=CFG_DIR / "multipred.yml"
         )
 
-        self.settingsPlg = SettingsPlugin()
-        self.colorScheme = self.settingsPlg.colorScheme
-        self.generalProps = self.settingsPlg.generalProps
+        self.settingsPlugin = SettingsPlugin()
+        self.colorScheme = self.settingsPlugin.colorScheme
+        self.generalProps = self.settingsPlugin.generalProps
 
-        self.shortcutsPlg = ShortcutsPlugin()
-        self.shortcuts = self.shortcutsPlg.shortcuts
-        self.quickLoader = self.shortcutsPlg.quickLoader
+        self.shortcutsPlugin = ShortcutsPlugin()
+        self.shortcuts = self.shortcutsPlugin.shortcuts
+        self.quickLoader = self.shortcutsPlugin.quickLoader

@@ -147,7 +147,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         # Insert "settings" and "shortcuts" in a more logical location (after file + edit)
         toAdd = (
             toAdd[:2]
-            + [self.sharedAttrs.settingsPlg, self.sharedAttrs.shortcutsPlg]
+            + [self.sharedAttrs.settingsPlugin, self.sharedAttrs.shortcutsPlugin]
             + toAdd[2:]
         )
         for plg in toAdd:
