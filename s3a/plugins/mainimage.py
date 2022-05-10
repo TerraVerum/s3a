@@ -120,8 +120,9 @@ class MainImagePlugin(ParamEditorPlugin):
             self.win.compDisplay.reflectSelectionBoundsMade(roiVerts[[0]])
             return
 
-        # noinspection PyTypeChecker
-        verts = ComplexXYVertices([verts])
+        verts = ComplexXYVertices([verts]).simplify(
+            self.win.verticesPlugin.props[CNST.PROP_REG_APPROX_EPS]
+        )
         newComps = self.tableData.makeCompDf()
         newComps[RTF.VERTICES] = [verts]
         self.win.addAndFocusComps(newComps)
