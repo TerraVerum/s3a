@@ -116,24 +116,23 @@ class AnnotationIOBase:
                 del metadata[kk]
         return metadata
 
-    def _forwardMetadata(self, locals_=None, *keys, **kwargs):
+    def _forwardMetadata(self, locals_=None, **kwargs):
         """
         Convenience function to update __call__ kwargs from some locals and extra keywords, since this is a common
         paradigm in `populateMetadata`
         """
         if locals_ is None:
             locals_ = {}
-        keySource = kwargs.copy()
-        keySource.update(locals_)
+        keySource = {**locals_, **kwargs}
 
-        useKeys = set(kwargs).union(self.optsMetadata()).union(keys)
+        useKeys = set(kwargs).union(self.optsMetadata())
         # Can only populate requested keys if they exist in the keysource
         return {kk: keySource[kk] for kk in useKeys.intersection(keySource)}
 
 
 class AnnotationExporter(AnnotationIOBase):
     exportObj: t.Any
-    compDf: pd.DataFrame
+    compDf: t.Optional[pd.DataFrame] = None
 
     bulkExport: _GenericExportProtocol | None = None
     """
@@ -164,13 +163,13 @@ class AnnotationExporter(AnnotationIOBase):
         if self.updateExportObj is None:
             # Can't do anything, don't modify the object and save time not iterating over rows
             return exportObj, NO_ERRORS.copy()
-        errs = {}
+        errs = []
         for row in toDictGen(compDf):
             try:
-                exportObj = self.updateExportObj(row, exportObj)
+                exportObj = self.updateExportObj(row, exportObj, **kwargs)
             except Exception as err:
-                errs.update(row)
-                errs[self.ERROR_COL] = err
+                row[self.ERROR_COL] = err
+                errs.append(row)
         return exportObj, pd.DataFrame(errs)
 
     def formatReturnObj(self, exportObj, **kwargs):
@@ -209,6 +208,7 @@ class AnnotationExporter(AnnotationIOBase):
         if file is not None:
             self.writeFile(kwargs.pop("file"), exportObj, **kwargs)
         toReturn = self.formatReturnObj(exportObj, **kwargs)
+        self.compDf = None
         return toReturn
 
 

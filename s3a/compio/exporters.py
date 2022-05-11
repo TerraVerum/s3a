@@ -17,9 +17,8 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
-from skimage.exposure import rescale_intensity
 from utilitys import PrjParam
-from utilitys.fns import dynamicDocstring
+from utilitys import fns
 from utilitys.typeoverloads import FilePath
 
 from .base import AnnotationExporter, NO_ERRORS
@@ -48,12 +47,21 @@ __all__ = [
 
 
 class LblPngExporter(AnnotationExporter):
-    compDf: pd.DataFrame
-    mapping: pd.Series
+    mapping: pd.Series = None
+    inverseMapping: pd.Series = None
 
-    def createExportObj(self, imageShape=None, backgroundColor=None, **_kwargs):
-        maskType = "uint16" if np.min(backgroundColor) >= 0 else "int32"
-        return np.full(imageShape[:2], backgroundColor, dtype=maskType)
+    def createExportObj(
+        self, imageShape=None, backgroundColor=None, colormap=None, **_kwargs
+    ):
+        shape = imageShape[:2]
+        if colormap:
+            maskType = "uint8"
+            shape = (*shape, 3)
+        elif np.min(backgroundColor) >= 0:
+            maskType = "uint16"
+        else:
+            maskType = "int32"
+        return np.full(shape, backgroundColor, dtype=maskType)
 
     def populateMetadata(
         self,
@@ -62,7 +70,7 @@ class LblPngExporter(AnnotationExporter):
         labelField: PrjParam | str = "Instance ID",
         backgroundColor=0,
         offset: np.ndarray = None,
-        rescaleOutput=False,
+        colormap: str = None,
         returnLabelMapping=False,
         writeMeta=True,
         **kwargs,
@@ -77,10 +85,12 @@ class LblPngExporter(AnnotationExporter):
         :param backgroundColor: Color of the mask background. Must be an integer.
         :param offset: For label png exports where an offset is added or subtracted, providing this information
           to the exporter allows that metadata to exist in the exported file
-        :param rescaleOutput: For images designed for human use, it is helpful to have
-          outputs rescaled to the entire intensity range. Otherwise, they usually end
-          up looking pure black and it is difficult to see components in the image.
-          When `rescaleOutput` is *True*, all numbers are scaled to the 'uint16' range.
+        :param colormap: If provided, must correspond to a pyqtgraph colormap. Results
+          in an RGB output instead of grayscale mask where each label is indexed into
+          the colormap (including the background label). Note that providing a colormap
+          prevents the export from being re-imported later by a LblPngImporter.
+          type: str
+          value: ''
         :param returnLabelMapping: Whether to return a pd.Series matching original index values
           to their numeric counterparts. Note: this is important in cases where an offset must be applied to the underlying
           data. If the background color is 0 and a valid numeric value is also 0, it will be impossible to detect this
@@ -92,23 +102,19 @@ class LblPngExporter(AnnotationExporter):
         :return:
         """
         labelField = PrjParamGroup.fieldFromParam(list(self.compDf.columns), labelField)
-        compDf = self.compDf
-        self.compDf = compDf.copy()
-
-        if backgroundColor < 0:
+        if backgroundColor < 0 and not colormap:
             raise ValueError(f"Background color must be >= 0, was {backgroundColor}")
 
-        readMapping = returnLabelMapping or (writeMeta and file is not None)
         if imageShape is None:
             # Without any components the image is non-existant
-            if len(compDf) == 0:
+            if len(self.compDf) == 0:
                 raise ValueError(
                     "imageShape cannot be *None* if no components are present"
                 )
-            vertMax = compDf[RTF.VERTICES].s3averts.max()
+            vertMax = self.compDf[RTF.VERTICES].s3averts.max()
             imageShape = tuple(vertMax[::-1] + 1)
 
-        return self._forwardMetadata(locals(), readMapping=readMapping)
+        return self._forwardMetadata(locals())
 
     def formatReturnObj(self, exportObj, returnLabelMapping=None, **kwargs):
         if returnLabelMapping:
@@ -140,61 +146,98 @@ class LblPngExporter(AnnotationExporter):
         verts: ComplexXYVertices = inst[RTF.VERTICES]
         verts.toMask(
             exportObj,
-            int(inst[PRJ_ENUMS.FIELD_LABEL]),
+            inst[PRJ_ENUMS.FIELD_LABEL],
             checkForDisconnectedVerts=False,
         )
         return exportObj
 
-    def individualExport(self, compDf: pd.DataFrame, exportObj, **kwargs):
-        labels_numeric, self.mapping = self.resolveMapping(**kwargs)
-        self.compDf[PRJ_ENUMS.FIELD_LABEL] = labels_numeric
-        asBool = np.issubdtype(labels_numeric.dtype, np.bool_)
-        exportObj, errs = super().individualExport(self.compDf, exportObj, **kwargs)
-        if asBool:
-            exportObj = exportObj > 0
-        return exportObj, errs
+    def individualExport(
+        self,
+        compDf: pd.DataFrame,
+        exportObj,
+        labelField=None,
+        **kwargs,
+    ):
+        labels, mapping, backgroundColor = self.resolveMappings(
+            compDf[labelField], labelField, **kwargs
+        )
+        exportObj[:] = backgroundColor
+        compDf = compDf.copy()
+        compDf[PRJ_ENUMS.FIELD_LABEL] = labels
+        return super().individualExport(compDf, exportObj, **kwargs)
 
-    def resolveMapping(
+    def resolveMappings(
         self,
         labels: pd.Series = None,
         labelField=None,
-        readMapping=None,
-        rescaleOutput=None,
         backgroundColor=None,
+        colormap=None,
+        storeMappings=True,
         **_kwargs,
     ):
-        if labels is None:
-            labels = self.compDf[labelField]
-        labels_numeric = labelField.toNumeric(labels, returnMapping=readMapping)
-        # Make sure numeric labels aren't the same as background, otherwise they will be forever lost
-        mapping = None
-        if readMapping:
-            labels_numeric, mapping = labels_numeric
-        diff = max(backgroundColor - np.min(labels_numeric, initial=0) + 1, 0)
-        if readMapping:
-            mapping.index += diff
-        labels_numeric += diff
-
-        if rescaleOutput:
-            if mapping is not None:
-                max_ = np.max(np.asarray(mapping.index), initial=backgroundColor)
-                mapping.index = rescale_intensity(
-                    mapping.index, in_range=(backgroundColor, max_), out_range="uint16"
-                )
-            else:
-                max_ = np.max(labels_numeric, initial=backgroundColor)
-
-            # False positive
-            # noinspection PyTypeChecker
-            labels_numeric: np.ndarray = rescale_intensity(
-                labels_numeric, in_range=(backgroundColor, max_), out_range="uint16"
+        labels_numeric, mapping = labelField.toNumeric(labels, returnMapping=True)
+        if colormap:
+            mapping, backgroundColor = self.labelsToLutSer(
+                mapping.to_numpy(), colormap, backgroundColor
             )
-        return labels_numeric, mapping
+        else:
+            # Make sure numeric labels aren't the same as background, otherwise they will be forever lost
+            diff = max(backgroundColor - np.min(labels_numeric, initial=0) + 1, 0)
+            mapping.index += diff
+            labels_numeric += diff
+
+            # TODO: Determine appropriate course of action for float values
+            #   For now, just ensure everything is int-like
+            if not np.issubdtype(labels_numeric.dtype, np.integer):
+                labels_numeric = labels_numeric.astype(int)
+                mapping.index = mapping.index.astype(int)
+        if storeMappings:
+            self.mapping = mapping
+            self.inverseMapping = pd.Series(data=list(mapping.index), index=mapping)
+        if colormap:
+            labels_numeric = list(self.inverseMapping[labels])
+        return labels_numeric, mapping, backgroundColor
+
+    @staticmethod
+    def labelsToLutSer(uniqueLabels, colormap, backgroundIndex=0):
+        """
+        Creates a LUT from mapping values and associates each numeric label with a
+        LUT entry. Useful for e.g. painting an RGB output rather than making a
+        grayscale mask
+
+        :param uniqueLabels: array of all possible label values. The ordering of labels
+            here determines the LUT index for each label. If a label in ``labels`` is not
+            present in ``uniqueLabels``, it will be given the background index.
+        :param colormap: String name of colormap to use, e.g. 'viridis'. Raises
+            ``ValueError`` if colormap name is not recognized among pyqtgraph options
+        :param backgroundIndex: LUT index to use for the background label, i.e. allows
+            labels to be distinct from a unique background color. May be negative, i.e.
+            -1, to refer to colors at the end of the LUT. May be *None* to have
+            no reserved background label. Note that if backgroundIndex is *None*,
+            labels not in ``uniqueLabels`` will be given 0 as an index.
+        :return: (indexes, lut) tuple where ``indexes`` are the locations within
+            the lut for each initial label
+        """
+        numUniques = len(uniqueLabels)
+        cmap = fns.getAnyPgColormap(colormap, forceExist=True)
+        lut = cmap.getLookupTable(nPts=len(uniqueLabels) + 1)  # + 1 for bg label
+        if backgroundIndex is not None:
+            # Handle negative indexers
+            backgroundIndex %= len(lut)
+            lutIdxEnum = np.delete(np.arange(numUniques + 1), backgroundIndex)
+        else:
+            backgroundIndex = 0
+            lutIdxEnum = np.arange(numUniques)
+        return (
+            # Dataframe *would* make more sense conceptually, but series allows
+            # this return value to function like traditional label mappings
+            pd.Series(data=uniqueLabels, index=lut[lutIdxEnum].T.tolist()),
+            lut[backgroundIndex],
+        )
 
 
 class CompImgsDfExporter(AnnotationExporter):
     cropperFunc: t.Callable
-    invertedMap: pd.Series
     mappings: t.Union[pd.Series, t.Dict[str, pd.Series]]
     srcDir: DirectoryDict
     labelMaskDir: dict
@@ -212,7 +255,7 @@ class CompImgsDfExporter(AnnotationExporter):
         super().__init__(*args, **kwargs)
         self.exportLblPng = LblPngExporter()
 
-    @dynamicDocstring(cols=list(allOutputColumns))
+    @fns.dynamicDocstring(cols=list(allOutputColumns))
     def populateMetadata(
         self,
         srcDir: FilePath | dict | DirectoryDict = None,
@@ -356,15 +399,13 @@ class CompImgsDfExporter(AnnotationExporter):
         )
         if img is None:
             img = np.zeros_like(labelMask)
-        invertedMap = pd.Series(labelMapping.index, labelMapping)
-        for row in toDictGen(compDf):
-            labelValue = invertedMap[row[kwargs.get("labelField")]]
+        labelValues = self.exportLblPng.inverseMapping[compDf[kwargs["labelField"]]]
+        for row, labelValue in zip(toDictGen(compDf), labelValues):
             exportObj.append(
                 self._formatSingleComp(
                     row, image=img, labelMask=labelMask, labelValue=labelValue, **kwargs
                 )
             )
-
         return exportObj, labelMapping
 
     def _resolveLabelMaskAndMapping(
@@ -378,15 +419,21 @@ class CompImgsDfExporter(AnnotationExporter):
         if labelMask is None:
             labelMask = self.labelMaskDir.get(imageName)
         # Label mask can still be none if there is no source directory hit
-        generatedMapping = None
+        upToDate = False
         if labelMask is None:
-            labelMask, generatedMapping = self.exportLblPng(compDf, **lblPngKwargs)
-        if labelMapping is None:
-            if generatedMapping is not None:
-                labelMapping = generatedMapping
-            else:
-                labels = compDf[lblPngKwargs.get("labelField")]
-                labelMapping = self.exportLblPng.resolveMapping(labels, **lblPngKwargs)
+            return self.exportLblPng(compDf, **lblPngKwargs)
+        # Else, Need to ensure lblPng mappings are up to date for numeric label retrieval
+        if labelMapping is not None and "colormap" not in lblPngKwargs:
+            self.exportLblPng.mapping = labelMapping
+            self.exportLblPng.inverseMapping = pd.Series(
+                data=labelMapping.index, index=labelMapping.to_numpy()
+            )
+        else:
+            labelField = lblPngKwargs["labelField"]
+            _, labelMapping, _ = self.exportLblPng.resolveMappings(
+                compDf[labelField], labelField, **lblPngKwargs
+            )
+
         return labelMask, labelMapping
 
     def _formatSingleComp(
@@ -452,7 +499,7 @@ class CompImgsDfExporter(AnnotationExporter):
                 useImg = labelMask
             else:
                 # The current component should always be drawn on top
-                useImg = inst[RTF.VERTICES].toMask(labelMask.copy(), float(labelValue))
+                useImg = inst[RTF.VERTICES].toMask(labelMask.copy(), labelValue)
             mask = self.cropperFunc(useImg, allVerts, returnCoords=False, **resizeOpts)
 
             out["labelMask"] = mask

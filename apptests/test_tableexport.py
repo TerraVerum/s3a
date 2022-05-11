@@ -257,11 +257,9 @@ def test_lblpng_export(_simpleTbl):
     with pytest.raises(ValueError):
         io.exportLblPng(sampleComps, backgroundColor=-1)
 
-    export, mapping = io.exportLblPng(
-        sampleComps, rescaleOutput=True, returnLabelMapping=True
-    )
+    export, mapping = io.exportLblPng(sampleComps, returnLabelMapping=True)
     assert np.all(np.isin(mapping.index, export))
-    assert np.max(mapping.index) > np.max(sampleComps.index)
+    assert np.max(mapping.index) > np.max(sampleComps[REQD_TBL_FIELDS.INST_ID])
 
     field = _simpleTbl.fieldFromName("List")
     export, mapping = io.exportLblPng(
