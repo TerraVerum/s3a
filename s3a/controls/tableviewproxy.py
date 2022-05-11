@@ -521,20 +521,20 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
           pType: filepicker
           existing: False
         """
-        data = self.regionPlot.regionData
-        focusedIds = data.index[data[PRJ_ENUMS.FIELD_FOCUSED]]
-        # Temporarily fill in focused ids
-        data.loc[focusedIds, REQD_TBL_FIELDS.VERTICES] = self._compMgr.compDf.loc[
-            focusedIds, REQD_TBL_FIELDS.VERTICES
-        ]
-        self.regionPlot.resetRegionList(data, self.labelCol)
+        oldShowFocused = self.regionPlot.showFocused
+        oldShowSelected = self.regionPlot.showSelected
+
         pm = self._mainImgArea.imgItem.getPixmap()
         painter = QtGui.QPainter(pm)
-        self.regionPlot.paint(painter)
-        # Pandas bug setting vertices to empty as a set, must be done individually
-        for id_ in focusedIds:
-            data.at[id_, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices()
-        self.regionPlot.resetRegionList(data, self.labelCol)
+        try:
+            self.regionPlot.showFocused = True
+            self.regionPlot.showSelected = True
+            self.regionPlot.updatePlot()
+            self.regionPlot.paint(painter)
+        finally:
+            self.regionPlot.showFocused = oldShowFocused
+            self.regionPlot.showSelected = oldShowSelected
+            self.regionPlot.updatePlot()
         if file:
             # if file.endswith('svg'):
             #   svgr = QtSvg.QSvgRenderer(file)
