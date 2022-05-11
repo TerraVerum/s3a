@@ -5,8 +5,6 @@ from typing import Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
-from matplotlib import cm
-from matplotlib.pyplot import colormaps
 from pyqtgraph.Qt import QtCore
 from utilitys import DeferredActionStackMixin as DASM
 from utilitys import EditorPropsMixin, ParamContainer, PrjParam, RunOpts, fns
@@ -83,6 +81,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
             nest=False,
             ignoreKeys=["hideFocused"],
             container=self.props,
+            labelColormap=dict(limits=fns.listAllPgColormaps() + ["None"]),
         )
         setattr(self, "updateColors", proc)
 
@@ -98,7 +97,6 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
         self.updateColors()
         self.showSelected = True
         self.showFocused = True
-        self.normalFills = None
 
         # 'pointsAt' is an expensive operation if many points are in the scatterplot. Since
         # this will be called anyway when a selection box is made in the main image, disable
@@ -219,9 +217,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
         labelDf[RTF.VERTICES] = self.regionData[RTF.VERTICES]
         # Override id column to avoid an extra parameter
         labelDf[RTF.INST_ID] = self.regionData[PRJ_ENUMS.FIELD_LABEL]
-        return defaultIo.exportLblPng(
-            labelDf, imageShape=imageShape, rescaleOutput=True
-        )
+        return defaultIo.exportLblPng(labelDf, imageShape=imageShape)
 
     def pointsAt(self, pos):
         if not isinstance(pos, QtCore.QPointF):
@@ -266,7 +262,6 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
         )
         return checkerPlot
 
-    @fns.dynamicDocstring(cmapVals=colormaps() + ["None"])
     def updateColors(
         self,
         penWidth=0,
@@ -292,7 +287,6 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
           helpText: "Colormap to use for fill colors by component label. If `None` is selected,
             the fill will be transparent."
           pType: popuplineeditor
-          limits: {cmapVals}
         :param fillAlpha:
           helpText: Transparency of fill color (0 is totally transparent, 1 is totally opaque)
           limits: [0,1]
@@ -303,29 +297,24 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
         if len(regionData) == 0 or len(self.data) == 0:
             return
 
-        def colorsWithAlpha(_numericLbls: np.ndarray):
-            useAlpha = fillAlpha
-            if labelColormap == "None":
-                cmap = lambda _classes: np.zeros((len(_classes), 4))
-                useAlpha = 0.0
-            else:
-                cmap = cm.get_cmap(labelColormap)
-            colors = cmap(_numericLbls)
-            colors[:, -1] = useAlpha
-            return colors
-
         lbls = regionData[PRJ_ENUMS.FIELD_LABEL].to_numpy()
-        fills = colorsWithAlpha(lbls) * 255
-        self.normalFills = fills.copy()
+        fills = np.empty((len(lbls), 4), dtype="float32")
+        fills[:, -1] = fillAlpha
+
+        # On the chance some specified maps have alpha, ignore it with indexing
+        fills[:, :-1] = fns.getAnyPgColormap(labelColormap, forceExist=True).map(
+            lbls, mode="float"
+        )[:, :3]
+
         for clr, typ in zip(
             [selectedFill, focusedFill],
             [PRJ_ENUMS.FIELD_SELECTED, PRJ_ENUMS.FIELD_FOCUSED],
         ):
-            clr = pg.Color(clr)
-            clr.setAlpha(int(fillAlpha * 255))
-            fills[regionData[typ].to_numpy()] = [c * 255 for c in clr.getRgbF()]
+            # Ignore alpha of specified fill/focus colors since there's a separate
+            # alpha controller parameter
+            fills[regionData[typ].to_numpy(), :-1] = pg.Color(clr).getRgbF()[:-1]
 
-        self.setBrush(fills, update=False)
+        self.setBrush(fills * 255, update=False)
         self.setPen(pg.mkPen(color=penColor, width=penWidth))
 
     def drop(self, ids):
