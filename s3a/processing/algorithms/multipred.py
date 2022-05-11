@@ -237,6 +237,7 @@ def make_grid_components(
     df[RTF.VERTICES] = boxes
     return ProcessIO(components=df)
 
+
 def merge_overlapping_components(components: pd.DataFrame):
     """
     Creates new list of components where adjacent regions are merged and everything
@@ -249,7 +250,9 @@ def merge_overlapping_components(components: pd.DataFrame):
     if not len(components):
         return out
     mask, mapping = defaultIo.exportLblPng(components, returnLabelMapping=True)
-    numLbls, labels, stats, centroids = cv.connectedComponentsWithStats(mask.astype("uint8", copy=False))
+    numLbls, labels, stats, centroids = cv.connectedComponentsWithStats(
+        mask.astype("uint8", copy=False)
+    )
     # Use ID from each centroid as the component whose metadata is kept
     keepIds = []
     outVerts = []
@@ -258,16 +261,19 @@ def merge_overlapping_components(components: pd.DataFrame):
         # this component
         offset = stats[lbl, [cv.CC_STAT_TOP, cv.CC_STAT_LEFT]]
         endPixs = offset + stats[lbl, [cv.CC_STAT_HEIGHT, cv.CC_STAT_WIDTH]]
-        maskSubset = labels[offset[0]:endPixs[0], offset[1]:endPixs[1]]
+        maskSubset = labels[offset[0] : endPixs[0], offset[1] : endPixs[1]]
         boolMaskSubset = maskSubset == lbl
         # Keep information from first id composing the shape
         onPixs = boolMaskSubset.nonzero()
         keepIds.append(mask[onPixs[0][0] + offset[0], onPixs[1][0] + offset[1]])
         # Offset is in row-col, removeOffset expects x-y
-        outVerts.append(ComplexXYVertices.fromBinaryMask(boolMaskSubset).removeOffset(-offset[::-1]))
+        outVerts.append(
+            ComplexXYVertices.fromBinaryMask(boolMaskSubset).removeOffset(-offset[::-1])
+        )
     outComps = components[np.isin(components[RTF.INST_ID], mapping[keepIds])].copy()
     outComps[RTF.VERTICES] = outVerts
     return ProcessIO(components=outComps)
+
 
 def simplify_component_vertices(components: pd.DataFrame, epsilon=1):
     """
@@ -277,7 +283,9 @@ def simplify_component_vertices(components: pd.DataFrame, epsilon=1):
         limits: [-1, None]
     """
     outComps = components.copy()
-    outComps[RTF.VERTICES] = [v.simplify(epsilon=epsilon) for v in outComps[RTF.VERTICES]]
+    outComps[RTF.VERTICES] = [
+        v.simplify(epsilon=epsilon) for v in outComps[RTF.VERTICES]
+    ]
     return ProcessIO(components=outComps)
 
 
