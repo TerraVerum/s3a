@@ -193,7 +193,11 @@ class LblPngExporter(AnnotationExporter):
                 mapping.index = mapping.index.astype(int)
         if storeMappings:
             self.mapping = mapping
-            self.inverseMapping = pd.Series(data=list(mapping.index), index=mapping)
+            # Silence pandas warning
+            dtype = None if len(mapping) else object
+            self.inverseMapping = pd.Series(
+                data=list(mapping.index), index=mapping, dtype=dtype
+            )
         if colormap:
             labels_numeric = list(self.inverseMapping[labels])
         return labels_numeric, mapping, backgroundColor
