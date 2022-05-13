@@ -48,7 +48,7 @@ class PrjParamGroup:
         """
         param = str(param).lower()
         for matchParam in group:
-            if matchParam.name.lower() == param:
+            if str(matchParam).lower() == param:
                 return matchParam
         # If we reach here the value didn't match any CNSTomponentTypes values. Throw an error
         if default is None and hasattr(group, "getDefault"):
@@ -61,7 +61,7 @@ class PrjParamGroup:
                 + f'Must be one of {", ".join(list(str(g) for g in group))}.'
             )
         # No exception needed, since the user specified a default type in the derived class
-        warn(baseWarnMsg + f"Defaulting to {default.name}", UserWarning)
+        warn(baseWarnMsg + f"Defaulting to {default}", UserWarning)
         return default
 
     @classmethod
