@@ -159,13 +159,13 @@ def test_export_overlay(app, mgr, tmp_path):
     comps[REQD_TBL_FIELDS.VERTICES] = [ComplexXYVertices([verts])]
     app.compDisplay.regionPlot.showFocused = True
     app.addAndFocusComps(comps)
-    app.compDisplay.regionPlot.updateColors(labelColormap="Reds", fillAlpha=1.0)
+    app.compDisplay.regionPlot.updateColors(labelColormap="CET-D1A", fillAlpha=1.0)
     exportLoc = str(tmp_path / "export.png")
     app.compDisplay.exportCompOverlay(file=exportLoc)
     app.compDisplay.regionPlot.showFocused = False
     img = cvImreadRgb(exportLoc)
     checkPix = img[20, 20, :]
-    # Red channel should be largest for overlay export and red colormap
+    # Red channel should be largest for overlay export and red focus fill
     assert np.array_equal(checkPix, [255, 0, 0])
 
 
