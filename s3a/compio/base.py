@@ -400,7 +400,13 @@ class AnnotationImporter(AnnotationIOBase):
 
             parsedDf[extraCols] = bulkParsedDf[extraCols]
             parsedDf = parsedDf[newOrder]
+
         if addMissingFields:
+            # False positive SettingWithCopyWarning occurs if missing fields were added
+            # and the df was reordered, but copy() is not a performance bottleneck
+            # and at least grants the new `parsedDf` explicit ownership of its data
+            parsedDf = parsedDf.copy()
+
             # Desintation fields that never showed up should be appended
             for field in self.destTableMapping.allFields:
                 # Special case: instance id is handled below
