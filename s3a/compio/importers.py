@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import ast
+import errno
 import inspect
 import itertools
 import json
 import typing as t
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -37,8 +39,13 @@ class SerialImporter(AnnotationImporter):
     ioType = "s3a"
 
     @classmethod
-    def readFile(cls, file: FilePath, **kwargs):
-        fType = Path(file).suffix.lower().replace(".", "")
+    def readFile(cls, file: FilePath, fallbackFormat="csv", **kwargs):
+        file = Path(file)
+        if not file.exists():
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(file))
+        fType = file.suffix.lower().replace(".", "")
+        if not fType and fallbackFormat:
+            fType = fallbackFormat
         importFn = getattr(pd, f"read_{fType}", None)
         if importFn is None:
             raise ValueError(
@@ -60,11 +67,8 @@ class SerialImporter(AnnotationImporter):
 
     @staticmethod
     def _getPdImporters():
-        members = inspect.getmembers(
-            pd.DataFrame,
-            lambda meth: inspect.isfunction(meth) and meth.__name__.startswith("read_"),
-        )
-        return [mem[0].replace("read_", "") for mem in members]
+        members = [v for v in vars(pd) if v.startswith("read_")]
+        return [mem.replace("read_", "") for mem in members]
 
 
 class CsvImporter(SerialImporter):
