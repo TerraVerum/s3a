@@ -249,7 +249,14 @@ def merge_overlapping_components(components: pd.DataFrame):
     out = ProcessIO(components=components)
     if not len(components):
         return out
-    mask, mapping = defaultIo.exportLblPng(components, returnLabelMapping=True)
+    # Guarantee each component is labeled uniquely, something that is not true when
+    # components are new (i.e. many have id -1)
+    components = components.copy()
+    dummyLabel = PrjParam("__lbl_merge_overlap__", 0)
+    components[dummyLabel] = np.arange(len(components))
+    mask, mapping = defaultIo.exportLblPng(
+        components, returnLabelMapping=True, labelField=dummyLabel
+    )
     numLbls, labels, stats, centroids = cv.connectedComponentsWithStats(
         mask.astype("uint8", copy=False)
     )
@@ -270,8 +277,12 @@ def merge_overlapping_components(components: pd.DataFrame):
         outVerts.append(
             ComplexXYVertices.fromBinaryMask(boolMaskSubset).removeOffset(-offset[::-1])
         )
-    outComps = components[np.isin(components[RTF.INST_ID], mapping[keepIds])].copy()
+    oldName = components.index.name
+    components["__old_index__"] = components.index
+    indexable = components.set_index(dummyLabel)
+    outComps = indexable.loc[mapping[keepIds]].set_index("__old_index__")
     outComps[RTF.VERTICES] = outVerts
+    outComps.index.name = oldName
     return ProcessIO(components=outComps)
 
 
