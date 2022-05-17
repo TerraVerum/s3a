@@ -64,7 +64,7 @@ Thus, while the GUI entry point should be consistently useful, be aware of these
 
 ## License
 
-This tool is free for personal and commercial use (except the limits imposed by the PyQt5 library). If you publish something based on results obtained through this app, please cite the following papers:
+This tool is free for personal and commercial use (except the limits imposed by the selected Qt binding). If you publish something based on results obtained through this app, please cite the following papers:
 
 Jessurun, N., Paradis, O., Roberts, A., & Asadizanjani, N. (2020). Component Detection and Evaluation Framework (CDEF): A Semantic Annotation Tool. Microscopy and Microanalysis, 1-5. doi:10.1017/S1431927620018243
 

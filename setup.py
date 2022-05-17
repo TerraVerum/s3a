@@ -51,7 +51,9 @@ if __name__ == "__main__":
             ]
         },
         install_requires=INSTALL_REQUIRES,
-        extras_require={"full": ["opencv-python-headless>=4.1.2.30", "PyQt5>=5.13.0"]},
+        extras_require={
+            "full": ["opencv-python-headless>=4.1.2.30", "PySide2>=5.13.0"]
+        },
         include_package_data=True,
         url="https://gitlab.com/ficsresearch/s3a",
         download_url="https://gitlab.com/ficsresearch/s3a",
