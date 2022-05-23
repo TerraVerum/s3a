@@ -155,7 +155,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     def _runFromDrawAct(self, verts: XYVertices, param: PrjParam):
         # noinspection PyTypeChecker
         verts: XYVertices = verts.astype(int)
-        activeEdits = any(len(v) for v in self.region.regionData["Vertices"])
+        activeEdits = len(self.region.regionData["Vertices"]) > 0
         if not activeEdits and self.win.compDisplay.selectionIntersectsRegion(verts):
             # Warning already handled by main image
             return

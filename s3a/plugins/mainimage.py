@@ -37,9 +37,7 @@ class MainImagePlugin(ParamEditorPlugin):
         disp = win.compDisplay
 
         def actHandler(verts, param):
-            activeEdits = any(
-                len(v) for v in self.win.verticesPlugin.region.regionData["Vertices"]
-            )
+            activeEdits = len(self.win.verticesPlugin.region.regionData["Vertices"]) > 0
             if (
                 param in [CNST.DRAW_ACT_REM, CNST.DRAW_ACT_ADD]
                 and not activeEdits
