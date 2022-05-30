@@ -227,7 +227,7 @@ class ComponentMgr(CompTableModel):
         # Make sure all required data is present for new rows
         missingCols = np.setdiff1d(self.compDf.columns, compsToAdd.columns)
         if missingCols.size > 0 and len(compsToAdd) > 0:
-            embedInfo = self.tableData.makeCompDf(len(newCompsDf)).set_index(
+            embedInfo = self.tableData.makeCompDf(len(compsToAdd)).set_index(
                 compsToAdd.index
             )
             compsToAdd[missingCols] = embedInfo[missingCols]
