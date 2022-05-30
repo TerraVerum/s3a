@@ -423,7 +423,6 @@ class CompImgsDfExporter(AnnotationExporter):
         if labelMask is None:
             labelMask = self.labelMaskDir.get(imageName)
         # Label mask can still be none if there is no source directory hit
-        upToDate = False
         if labelMask is None:
             return self.exportLblPng(compDf, **lblPngKwargs)
         # Else, Need to ensure lblPng mappings are up to date for numeric label retrieval
