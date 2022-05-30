@@ -121,14 +121,9 @@ def format_vertices(
         if not bgVerts.empty:
             bgVerts = cornersToFullBoundary(bgVerts)
 
-    if fgVerts.empty and bgVerts.empty:
-        # Give whole image as input, trim from edges
-        fgVerts = imgCornerVertices(image)
-        fgVerts = cornersToFullBoundary(fgVerts)
-        _historyMask[fgVerts.rows, fgVerts.cols] = FGND
     procCache["mask"] = _historyMask
     curHistory = _historyMask.copy()
-    if fgVerts.empty:
+    if fgVerts.empty and not bgVerts.empty:
         # Invert the mask and paint foreground pixels
         asForeground = False
         # Invert the history mask too
@@ -409,7 +404,11 @@ def remove_small_comps(image: NChanImg, minSzThreshold=30):
 
 
 def draw_vertices(image: NChanImg, fgVerts: XYVertices):
-    return ProcessIO(image=ComplexXYVertices([fgVerts]).toMask(image.shape[:2]) > 0)
+    if len(fgVerts):
+        image = ComplexXYVertices([fgVerts]).toMask(image.shape[:2]) > 0
+    else:
+        image = np.zeros(image.shape[:2], dtype=bool)
+    return ProcessIO(image=image)
 
 
 def convert_to_squares(image: NChanImg):
@@ -449,8 +448,13 @@ class CvGrabcut(AtomicProcess):
             mask[prevCompMask == 0] = cv.GC_PR_BGD
             mask[historyMask == FGND] = cv.GC_FGD
             mask[historyMask == BGND] = cv.GC_BGD
-
-        cvRect = np.array([fgVerts.min(0), fgVerts.max(0) - fgVerts.min(0)]).flatten()
+        if len(fgVerts) and np.all(fgVerts.ptp(0) > 1):
+            cvRect = np.array([fgVerts.min(0), fgVerts.ptp(0)]).flatten()
+            mode = None
+        else:
+            # Can't make a rect out of empty / 0-length verts, use dummy values
+            cvRect = None
+            mode = cv.GC_INIT_WITH_MASK
 
         if firstRun or self.result is None or "fgdModel" not in self.result:
             bgdModel = np.zeros((1, 65), np.float64)
@@ -462,9 +466,9 @@ class CvGrabcut(AtomicProcess):
         if not np.any(mask):
             if cvRect[2] == 0 or cvRect[3] == 0:
                 return ProcessIO(image=np.zeros_like(prevCompMask))
-            mode = cv.GC_INIT_WITH_RECT
+            mode = mode or cv.GC_INIT_WITH_RECT
         else:
-            mode = cv.GC_INIT_WITH_MASK
+            mode = mode or cv.GC_INIT_WITH_MASK
         cv.grabCut(img, mask, cvRect, bgdModel, fgdModel, iters, mode=mode)
         outMask = np.where((mask == 2) | (mask == 0), False, True)
         return ProcessIO(labels=outMask, fgdModel=fgdModel, bgdModel=bgdModel)
@@ -560,13 +564,20 @@ def binarize_labels(
     seeds = np.clip(fgVerts[:, ::-1], 0, np.array(labels.shape) - 1)
     if image.ndim < 3:
         image = image[..., None]
-    if touchingRoiOnly:
+    if touchingRoiOnly and len(seeds):
         out = np.zeros_like(labels, dtype=bool)
         for seed in seeds:
             out |= flood(
                 labels,
                 tuple(seed),
             )
+    elif not len(seeds) and historyMask.shape != labels.shape:
+        raise ValueError(
+            "Cannot binarize labels without vertices and with misshapen history Mask"
+        )
+    elif not len(seeds):
+        # Treat 0 as background
+        out = labels > 0
     else:
         keepColors = labels[seeds[:, 0], seeds[:, 1]]
         out = np.isin(labels, keepColors)
@@ -575,7 +586,7 @@ def binarize_labels(
         # Done for stage summary only
         labels = label(labels)
     if historyMask.shape == out.shape:
-        out[historyMask == 1] = False
+        out[historyMask == BGND] = False
     nChans = image.shape[2]
     if useMeanColor:
         summaryImg = np.zeros_like(image)
@@ -589,7 +600,8 @@ def binarize_labels(
         summaryImg = image.copy()
         summaryImg[boundaries, ...] = [255 for _ in range(nChans)]
     color = (255,) + tuple(0 for _ in range(1, nChans))
-    cv.drawContours(summaryImg, [fgVerts], -1, color, lineThickness)
+    if len(fgVerts):
+        cv.drawContours(summaryImg, [fgVerts], -1, color, lineThickness)
     return ProcessIO(image=out, summaryInfo={"image": summaryImg})
 
 

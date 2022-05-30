@@ -28,24 +28,6 @@ def get_component_images(image: np.ndarray, components: pd.DataFrame):
     return ProcessIO(subimages=imgs)
 
 
-def focusedResultConverter(result, component: pd.Series):
-    out = result
-    if not isinstance(result, ProcessIO):
-        out = ProcessIO(image=result)
-    if "components" not in out:
-        mask = out["image"]
-        newComp = component.copy()
-        if mask is not None:
-            offset = newComp[RTF.VERTICES].stack().min(0)
-            newVerts = ComplexXYVertices.fromBinaryMask(mask)
-            for v in newVerts:
-                v += offset
-            newComp[RTF.VERTICES] = newVerts
-        out["components"] = fns.serAsFrame(newComp)
-    out["addType"] = PRJ_ENUMS.COMP_ADD_AS_MERGE
-    return out
-
-
 class ProcessDispatcher(AtomicProcess):
     def __init__(
         self,
@@ -64,9 +46,8 @@ class ProcessDispatcher(AtomicProcess):
         super().__init__(self.dispatcher, **kwargs)
         self.input["components"] = ProcessIO.FROM_PREV_IO
 
-    def dispatcher(self, image: np.ndarray, components: pd.DataFrame, **kwargs):
+    def dispatcher(self, components: pd.DataFrame, **kwargs):
         compList = []
-        kwargs.update(image=image)
         result = ProcessIO()
         for ii, comp in components.iterrows():
             kwargs.update(component=comp)
@@ -76,10 +57,10 @@ class ProcessDispatcher(AtomicProcess):
                 result = self.resultConverter(result, comp)
             compList.append(result.pop("components"))
         if compList:
-            # Concat fails with empty list
             outComps = pd.concat(compList, ignore_index=True)
         else:
-            outComps = components.drop(components.index).copy()
+            # Concat fails with empty list, just make an empty dataframe
+            outComps = components.iloc[0:0].copy()
         out = ProcessIO(**result, components=outComps)
         return out
 
@@ -99,6 +80,7 @@ def pts_to_components(matchPts: np.ndarray, component: pd.Series):
         newVerts = [verts - origOffset + pt for verts in outComps.at[ii, RTF.VERTICES]]
         allNewverts.append(ComplexXYVertices(newVerts))
     outComps[RTF.VERTICES] = allNewverts
+    outComps[RTF.INST_ID] = RTF.INST_ID.value
     return outComps
 
 
@@ -228,9 +210,10 @@ def make_grid_components(
             )
             boxes.append(ComplexXYVertices([verts]))
     boxes = boxes[:maxNumComponents]
-    # Fill in other dummy fields based on passed in component dataframe fields. Assume input df has PrjParam headers
-    # since it should've come from a prediction input
-    df = pd.DataFrame(columns=components.columns)
+    # Fill in other dummy fields based on passed in component dataframe fields
+    df = pd.DataFrame(
+        columns=[c for c in components.columns if isinstance(c, PrjParam)]
+    )
     numOutputs = len(boxes)
     for field in components:  # type: PrjParam
         df[field] = [copy.copy(field.value) for _ in range(numOutputs)]
@@ -261,18 +244,17 @@ def merge_overlapping_components(components: pd.DataFrame):
         mask.astype("uint8", copy=False)
     )
     # Use ID from each centroid as the component whose metadata is kept
-    keepIds = []
+    keepLabels = []
     outVerts = []
     for lbl in range(1, numLbls):
         # Greatly speed up conversion by only checking the image region which contains
         # this component
         offset = stats[lbl, [cv.CC_STAT_TOP, cv.CC_STAT_LEFT]]
         endPixs = offset + stats[lbl, [cv.CC_STAT_HEIGHT, cv.CC_STAT_WIDTH]]
-        maskSubset = labels[offset[0] : endPixs[0], offset[1] : endPixs[1]]
-        boolMaskSubset = maskSubset == lbl
+        boolMaskSubset = labels[offset[0] : endPixs[0], offset[1] : endPixs[1]] == lbl
         # Keep information from first id composing the shape
         onPixs = boolMaskSubset.nonzero()
-        keepIds.append(mask[onPixs[0][0] + offset[0], onPixs[1][0] + offset[1]])
+        keepLabels.append(mask[onPixs[0][0] + offset[0], onPixs[1][0] + offset[1]])
         # Offset is in row-col, removeOffset expects x-y
         outVerts.append(
             ComplexXYVertices.fromBinaryMask(boolMaskSubset).removeOffset(-offset[::-1])
@@ -280,8 +262,30 @@ def merge_overlapping_components(components: pd.DataFrame):
     oldName = components.index.name
     components["__old_index__"] = components.index
     indexable = components.set_index(dummyLabel)
-    outComps = indexable.loc[mapping[keepIds]].set_index("__old_index__")
-    outComps[RTF.VERTICES] = outVerts
+    newComps = indexable.loc[mapping[keepLabels]]
+
+    # It is possible for one old ID to point to multiple new components. To avoid
+    # undefined behavior, give a new id designation to all but the first occurence
+    # in these cases
+    newComps.loc[
+        newComps.index.duplicated(keep="first"), RTF.INST_ID
+    ] = RTF.INST_ID.value
+    newComps[RTF.VERTICES] = outVerts
+
+    # It is also possible for two components to overlap and only one ID is recycled.
+    # This will mean one original component needs to be deleted. Note that components
+    # which are new in the first place (i.e. from a non-refinement operation) don't need
+    # to be deleted since they haven't yet been added in the first place
+    maybeDeleted = components.loc[
+        components[RTF.INST_ID] != RTF.INST_ID.value, newComps.columns
+    ]
+    delIdxs = np.isin(maybeDeleted[RTF.INST_ID], newComps[RTF.INST_ID], invert=True)
+
+    delComponents = maybeDeleted[delIdxs].copy()
+    delComponents[RTF.VERTICES] = [
+        ComplexXYVertices() for _ in range(len(delComponents))
+    ]
+    outComps = pd.concat([newComps, delComponents]).set_index("__old_index__")
     outComps.index.name = oldName
     return ProcessIO(components=outComps)
 
@@ -302,6 +306,17 @@ def simplify_component_vertices(components: pd.DataFrame, epsilon=1):
 
 def get_selected_components(components: pd.DataFrame, selectedIds: np.ndarray):
     return ProcessIO(components=components.loc[selectedIds])
+
+
+def _components_in_bounds(components: pd.DataFrame, bounds: np.ndarray):
+    keepComps = []
+    for idx, comp in components.iterrows():
+        stacked = comp[RTF.VERTICES].stack()
+        if np.all((stacked.min(0) <= bounds[1]) & (stacked.max(0) >= bounds[0])):
+            # At least partially in-bounds
+            keepComps.append(comp)
+    # Explicitly pass columns in the event of empty "keepComps"
+    return pd.DataFrame(keepComps, columns=components.columns)
 
 
 def remove_overlapping_components(
@@ -325,14 +340,18 @@ def remove_overlapping_components(
     if not len(components):
         # Nothing to do...
         return ProcessIO(components=components)
-    if removeOverlapWithExisting:
-        outShape = pd.concat([fullComponents, components], ignore_index=True)[
-            RTF.VERTICES
-        ].s3averts.max()[::-1]
+    # Save computation time by only considering full components that *could* overlap
+    accessor = components[RTF.VERTICES].s3averts
+    newBounds = np.row_stack([accessor.min(), accessor.max()])
+    fullComponents = _components_in_bounds(fullComponents, newBounds)
+    if removeOverlapWithExisting and len(fullComponents):
+        outShape = np.maximum(
+            newBounds[1], fullComponents[RTF.VERTICES].s3averts.max()
+        )[::-1]
         referenceMask = defaultIo.exportLblPng(fullComponents, imageShape=outShape)
         referenceMask[referenceMask > 0] = 1
     else:
-        outShape = components[RTF.VERTICES].s3averts.max()[::-1]
+        outShape = newBounds[1][::-1]
         referenceMask = np.zeros(outShape, "uint8")
     keepComps = []
     for idx, comp in components.iterrows():
@@ -399,9 +418,45 @@ def single_categorical_prediction(
     out[RTF.VERTICES] = ComplexXYVertices.fromBinaryMask(prediction).removeOffset(
         totalOffset
     )
-    return ProcessIO(
-        components=fns.serAsFrame(out), addType=PRJ_ENUMS.COMP_ADD_AS_MERGE
-    )
+    return ProcessIO(components=fns.serAsFrame(out))
+
+
+class RunPlugins(AtomicProcess):
+    def __init__(self, **kwargs):
+        super().__init__(func=self.run_plugins, **kwargs)
+
+    @staticmethod
+    def run_plugins(plugins=None):
+        """
+        Sets flags which trigger runs of various plugins, i.e. "Vertices" will trigger
+        the vertices plugin
+        :param plugins:
+            type: checklist
+            value: []
+            limits: ["Vertices"]
+        """
+        return ProcessIO(plugins=plugins)
+
+    def run(self, io: ProcessIO = None, disable=False, **runKwargs):
+        disable = self.disabled or disable
+        result = super().run(io, disable, **runKwargs)
+        if disable:
+            result = result.copy()
+            result.pop("plugins", None)
+        return result
+
+
+def remove_small_components(components: pd.DataFrame, sizeThreshold=30):
+    outComps = []
+    for idx, comp in components.iterrows():
+        # Preserve empty values since they signify deletion to an outer scope
+        if (
+            comp[RTF.VERTICES].isEmpty()
+            or np.count_nonzero(comp[RTF.VERTICES].removeOffset().toMask())
+            > sizeThreshold
+        ):
+            outComps.append(comp)
+    return ProcessIO(components=pd.DataFrame(outComps, columns=components.columns))
 
 
 categorical_prediction = ProcessDispatcher(

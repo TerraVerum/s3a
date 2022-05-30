@@ -19,7 +19,8 @@ def test_registered_verts_funcs(vertsPlugin, app):
     imsize = np.prod(SAMPLE_SMALL_IMG.shape[:2])
     editor = vertsPlugin.procEditor
     editor.changeActiveProcessor("Basic Shapes")
-    vertsPlugin.run(updateGui=True)
+    fgVerts = XYVertices([[0, 0], [10, 0], [10, 10]])
+    vertsPlugin.run(fgVerts=fgVerts, updateGui=True)
     assert imageproc.procCache["mask"].sum()
 
     vertsPlugin.clearProcessorHistory()

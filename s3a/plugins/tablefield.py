@@ -11,11 +11,12 @@ import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 from utilitys import (
-    PrjParam,
     DeferredActionStackMixin as DASM,
+    fns,
+    ParamContainer,
+    PrjParam,
     ProcessIO,
     RunOpts,
-    ParamContainer,
 )
 
 from .base import TableFieldPlugin
@@ -320,6 +321,51 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         for inner in centeredData[RTF.VERTICES]:
             buffVerts.extend(inner)
         self.regionBuffer.append(buffEntry(newId, buffVerts))
+
+    def runOnComponent(self, component: pd.Series):
+        def makeReturnValue():
+            return ProcessIO(components=fns.serAsFrame(component))
+
+        component = component.copy()
+        img = self.mainImg.image
+        if img is None or component[RTF.VERTICES].isEmpty():
+            # Preserve empty values since they signify deletion to an outer scope
+            return makeReturnValue()
+        verts = component[RTF.VERTICES]
+        compGrayscale = verts.toMask(img.shape[:2])
+        compMask = compGrayscale > 0
+        # TODO: When multiple classes can be represented within focused image, this is where
+        #  change will have to occur
+        stacked = verts.stack()
+        offset = stacked.min(axis=0)
+        if len(stacked) > 1:
+            span = np.ptp(stacked, axis=0).flatten()
+        else:
+            span = np.array([0, 0], dtype=int)
+        viewbox = span * np.array([[0, 0], [0, 1], [1, 1], [1, 0]]) + offset
+        oldProcCache = imageproc.procCache.copy()
+        # Broad range of things that can go wrong
+        # noinspection PyBroadException
+        try:
+            result = self.curProcessor.run(
+                image=img,
+                prevCompMask=compMask,
+                firstRun=True,
+                viewbox=XYVertices(viewbox),
+                prevCompVerts=verts,
+                # Warnings render dialogs on the GUI thread but not otherwise
+            )
+        except Exception:
+            # If anything goes wrong, safe default is to preserve initial vertices
+            return makeReturnValue()
+        finally:
+            imageproc.procCache = oldProcCache
+        newGrayscale = result
+        if isinstance(newGrayscale, dict):
+            newGrayscale = newGrayscale["image"]
+        component[RTF.VERTICES] = ComplexXYVertices.fromBinaryMask(newGrayscale)
+
+        return makeReturnValue()
 
     @staticmethod
     def applyOffset(complexVerts: t.Sequence[ComplexXYVertices], offset: XYVertices):

@@ -44,6 +44,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     """
 
     sigRegionAccepted = QtCore.Signal()
+    sigPluginAdded = QtCore.Signal(object)  # Plugin object
     __groupingName__ = "S3A Window"
 
     scope = ExitStack()
@@ -86,8 +87,9 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
 
         self.clsToPluginMapping: Dict[Type[ParamEditorPlugin], ParamEditorPlugin] = {}
         """
-    Maintains a record of all plugins added to this window. Only up to one instance of each plugin class is expected.
-    """
+        Maintains a record of all plugins added to this window. Only up to one instance
+        of each plugin class is expected.
+        """
 
         self.docks: List[QtWidgets.QDockWidget] = []
         """List of docks from added plugins"""
@@ -334,6 +336,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             plugin.attachWinRef(self)
         if plugin.dock:
             plugin.dock.setParent(self)
+        self.sigPluginAdded.emit(plugin)
         return plugin
 
     @DASM.undoable("Change Main Image")
@@ -484,6 +487,9 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         )
         # TODO: Maybe the current file will match the current file indicator. What happens then?
         exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.IMG_FILE] = srcImgFname
+        # Ensure ids are sequential
+        seqIds = np.arange(len(exportDf))
+        exportDf.index = exportDf[REQD_TBL_FIELDS.INST_ID] = seqIds
         return exportDf
 
     def openAnnotations(self, inFname: str, loadType=PRJ_ENUMS.COMP_ADD_AS_NEW):

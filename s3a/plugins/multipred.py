@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from utilitys import ProcessIO
+from utilitys import ProcessIO, fns
 
 from .base import ProcessorPlugin
-from ..constants import PRJ_CONSTS as CNST, PRJ_ENUMS
+from ..constants import PRJ_CONSTS as CNST, PRJ_ENUMS, REQD_TBL_FIELDS as RTF
 from ..models.tablemodel import ComponentMgr
 from ..shared import SharedAppSettings
+from ..structures import XYVertices, ComplexXYVertices
+from ..processing.algorithms import imageproc, multipred
 
 
 class MultiPredictionsPlugin(ProcessorPlugin):
@@ -21,6 +23,9 @@ class MultiPredictionsPlugin(ProcessorPlugin):
             type(self), self.name + " Processor"
         )
         self.dock.addEditors([self.procEditor])
+        self.pluginRunnerProc = shared.multiPredClctn.parseProcName(
+            "Run Plugins", topFirst=False
+        )
 
     def __init__(self):
         super().__init__()
@@ -35,6 +40,17 @@ class MultiPredictionsPlugin(ProcessorPlugin):
             btnOpts=CNST.TOOL_MULT_PRED,
             ignoreKeys=["comps"],
         )
+        self.updateRunnerLimits()
+        win.sigPluginAdded.connect(self.updateRunnerLimits)
+
+    def updateRunnerLimits(self):
+        self.pluginRunnerProc.input.params["plugins"].setLimits(
+            [
+                p.name
+                for p in self.win.clsToPluginMapping.values()
+                if hasattr(p, "runOnComponent")
+            ]
+        )
 
     def makePrediction(self, comps: pd.DataFrame = None, **runKwargs):
         if self.win.mainImg.image is None:
@@ -48,7 +64,7 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         )
         vbRange = np.array(self.mainImg.getViewBox().viewRange()).T
         image = self.win.mainImg.image
-        newComps = self.curProcessor.run(
+        result = self.curProcessor.run(
             components=comps,
             fullComponents=comps,
             fullImage=image,
@@ -57,15 +73,40 @@ class MultiPredictionsPlugin(ProcessorPlugin):
             selectedIds=selectedIds,
             **runKwargs,
         )
-        if not isinstance(newComps, ProcessIO):
-            newComps = ProcessIO(components=newComps)
-        compsToAdd = newComps["components"]
+        if not isinstance(result, ProcessIO):
+            result = ProcessIO(components=result)
+        compsToAdd = result["components"]
         if not len(compsToAdd):
             return
-        addType = runKwargs.get("addType") or newComps.get(
-            "addType", PRJ_ENUMS.COMP_ADD_AS_NEW
+        if "plugins" in result:
+            compsToAdd = self.applyPluginRunners(compsToAdd, result["plugins"])
+
+        addType = runKwargs.get("addType") or result.get(
+            "addType", PRJ_ENUMS.COMP_ADD_AS_MERGE
         )
         return self.mgr.addComps(compsToAdd, addType)
+
+    def applyPluginRunners(self, components: pd.DataFrame, plugins: list[str]):
+        if not plugins:
+            return components
+        # Don't run on empty components, since these only exist to indicate deletion
+        # But keep them recorded to handle them later on
+        emptyComps = []
+        for pluginName in plugins:
+            for plugin in self.win.clsToPluginMapping.values():
+                if plugin.name == pluginName:
+                    dispatched = multipred.ProcessDispatcher(plugin.runOnComponent)
+                    emptyIdxs = (
+                        components[RTF.VERTICES]
+                        .apply(ComplexXYVertices.isEmpty)
+                        .to_numpy(bool)
+                    )
+                    emptyComps.append(components[emptyIdxs])
+                    components = dispatched(components=components[~emptyIdxs])[
+                        "components"
+                    ]
+                    continue
+        return pd.concat([components, *emptyComps])
 
     def lastRunAnalytics(self):
         raise NotImplementedError

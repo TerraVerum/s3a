@@ -7,4 +7,4 @@ scikit-image
 pyqtgraph>=0.12.3
 Pillow
 qdarkstyle
-utilitys>=0.5.1
+utilitys>=0.5.2

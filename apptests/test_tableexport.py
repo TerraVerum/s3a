@@ -59,7 +59,7 @@ def test_filter_export(tmp_path, monkeypatch, app):
         exportDf = app.exportableDf
     np.testing.assert_array_equal(
         exportDf.index,
-        sampleComps.index,
+        np.arange(len(sampleComps)),
         "Export DF should not use only filtered IDs"
         " when not exporting only visible, but"
         " ID lists don't match.",
@@ -80,7 +80,7 @@ def test_filter_export(tmp_path, monkeypatch, app):
         exportDf = app.exportableDf
     np.testing.assert_array_equal(
         exportDf.index,
-        filterIds,
+        np.arange(len(filterIds)),
         "Export DF should use only filtered IDs when exporting only "
         "visible, but ID lists don't match.",
     )
