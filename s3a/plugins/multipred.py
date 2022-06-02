@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from utilitys import ProcessIO, fns
+from utilitys import ProcessIO
 
 from .base import ProcessorPlugin
 from ..constants import PRJ_CONSTS as CNST, PRJ_ENUMS, REQD_TBL_FIELDS as RTF
 from ..models.tablemodel import ComponentMgr
+from ..processing.algorithms import multipred
 from ..shared import SharedAppSettings
-from ..structures import XYVertices, ComplexXYVertices
-from ..processing.algorithms import imageproc, multipred
+from ..structures import ComplexXYVertices
 
 
 class MultiPredictionsPlugin(ProcessorPlugin):

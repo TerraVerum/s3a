@@ -15,7 +15,6 @@ from ...constants import PRJ_ENUMS
 from ...generalutils import (
     cornersToFullBoundary,
     getCroppedImg,
-    imgCornerVertices,
     showMaskDiff,
     tryCvResize,
     getObjsDefinedInSelfModule,
@@ -190,7 +189,6 @@ def crop_to_local_area(
         if useMinSpan:
             center = viewbox.mean(0)
             spans = center - viewbox[0]
-            adjustments = (spans - min(spans)).astype(viewbox.dtype)
             adjustments = (spans - min(spans)).astype(viewbox.dtype)
             # maxs need to be subtracted toward center, mins need to be extended toward center
             dim = np.argmax(adjustments)
