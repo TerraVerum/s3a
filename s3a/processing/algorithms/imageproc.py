@@ -132,7 +132,7 @@ def format_vertices(
         bgVerts = XYVertices()
 
     if asForeground:
-        foregroundAdjustedCompMask = prevCompMask.copy()
+        foregroundAdjustedCompMask = prevCompMask
     else:
         foregroundAdjustedCompMask = ~prevCompMask
 
@@ -200,7 +200,7 @@ def crop_to_local_area(
         allVerts = np.vstack([viewbox, roiVerts])
     # Lots of points, use their bounded area
     try:
-        vertArea_rowCol = (allVerts.max(0) - allVerts.min(0))[::-1]
+        vertArea_rowCol = (allVerts.ptp(0))[::-1]
     except ValueError:
         # 0-sized
         vertArea_rowCol = 0
@@ -215,7 +215,7 @@ def crop_to_local_area(
     useVerts = [fgVerts, bgVerts]
     for ii in range(2):
         # Add additional offset
-        tmp = (((useVerts[ii] - vertOffset) * ratio)).astype(int)
+        tmp = ((useVerts[ii] - vertOffset) * ratio).astype(int)
         useVerts[ii] = np.clip(
             tmp,
             a_min=[0, 0],
@@ -230,30 +230,18 @@ def crop_to_local_area(
     curHistory = historyMask[boundSlices]
 
     rectThickness = int(max(1, *image.shape) * 0.005)
-    toPlot = image.copy()
-    borderMask = (
-        cv.rectangle(
-            np.zeros(image.shape[:2], dtype="uint8"),
-            tuple(bounds[0, :]),
-            tuple(bounds[1, :]),
-            255,
-            rectThickness,
-        )
-        > 0
-    )
-    if image.ndim < 3:
-        borderClr = 255
-        borderSlice = (borderMask,)
+    # Much faster not to do any rescaling if the image is already the right type
+    if image.dtype == np.uint8:
+        toPlot = image.copy()
     else:
-        borderClr = [255] + [0 for _ in range(image.shape[2] - 1)]
-        borderSlice = borderMask, slice(None, None)
-    borderClr = np.clip(
-        np.array(borderClr, dtype=image.dtype),
-        image.min(),
-        image.max(),
-        dtype=image.dtype,
+        image = image.astype("float")
+        toPlot = (((image - image.min()) / image.ptp()) * 255).astype("uint8")
+    borderColor = 255
+    if image.ndim > 2:
+        borderColor = (255, *[0 for _ in range(image.shape[2] - 1)])
+    cv.rectangle(
+        toPlot, tuple(bounds[0, :]), tuple(bounds[1, :]), borderColor, rectThickness
     )
-    toPlot[borderSlice] = borderClr
     info = {"name": "Selected Area", "image": toPlot}
     out = ProcessIO(
         image=cropped,
@@ -309,14 +297,14 @@ def apply_process_result(
     else:
         change = change > subset.mean()
     outMask[boundSlices] = change
-    foregroundPixs = np.c_[np.nonzero(outMask)]
+    xywhRect = cv.boundingRect(outMask.astype("uint8", copy=False))
     # Keep algorithm from failing when no foreground pixels exist
-    if len(foregroundPixs) == 0:
+    if not any(xywhRect[2:]):
         mins = [0, 0]
         maxs = [1, 1]
     else:
-        mins = foregroundPixs.min(0)
-        maxs = foregroundPixs.max(0)
+        mins = xywhRect[:2][::-1]
+        maxs = xywhRect[1] + xywhRect[3], xywhRect[0] + xywhRect[2]
 
     # Add 1 to max slice so stopping value is last foreground pixel
     newSlices = (slice(mins[0], maxs[0] + 1), slice(mins[1], maxs[1] + 1))
@@ -416,10 +404,6 @@ def convert_to_squares(image: NChanImg):
     return ProcessIO(image=outMask)
 
 
-def _grabcutResultToMask(gcResult):
-    return np.where((gcResult == 2) | (gcResult == 0), False, True)
-
-
 class CvGrabcut(AtomicProcess):
     def __init__(self, **kwargs):
         super().__init__(self.grabcut, "Cv Grabcut", **kwargs)
@@ -438,8 +422,7 @@ class CvGrabcut(AtomicProcess):
         img = cv.cvtColor(image, cv.COLOR_RGB2BGR)
         historyMask = historyMask.copy()
         if historyMask.size:
-            historyMask[fgVerts.rows, fgVerts.cols] = 2
-
+            historyMask[fgVerts.rows, fgVerts.cols] = FGND
         mask = np.zeros(prevCompMask.shape, dtype="uint8")
         if historyMask.shape == mask.shape:
             mask[prevCompMask == 1] = cv.GC_PR_FGD
@@ -468,7 +451,7 @@ class CvGrabcut(AtomicProcess):
         else:
             mode = mode or cv.GC_INIT_WITH_MASK
         cv.grabCut(img, mask, cvRect, bgdModel, fgdModel, iters, mode=mode)
-        outMask = np.where((mask == 2) | (mask == 0), False, True)
+        outMask = np.where((mask == cv.GC_BGD) | (mask == cv.GC_PR_BGD), False, True)
         return ProcessIO(labels=outMask, fgdModel=fgdModel, bgdModel=bgdModel)
 
 

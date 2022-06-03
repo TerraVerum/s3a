@@ -204,44 +204,35 @@ def tryCvResize(
     return image
 
 
-def cornersToFullBoundary(
-    cornerVerts: Union[XYVertices, ComplexXYVertices],
-    sizeLimit: float = np.inf,
-    fillShape: Tuple[int] = None,
-    stackResult=True,
-) -> Union[XYVertices, ComplexXYVertices]:
+def cornersToFullBoundary(cornerVerts: XYVertices, sizeLimit=0) -> XYVertices:
     """
-    From a list of corner vertices, returns a list with one vertex for every border pixel.
-    Example:
-    >>> cornerVerts = XYVertices([[0,0], [100,0], [100,100],[0,100]])
-    >>> cornersToFullBoundary(cornerVerts)
-    # [[0,0], [1,0], ..., [100,0], [100,1], ..., [100,100], ..., ..., [0,100]]
+    From a list of corner vertices, returns an array with one vertex for every border pixel.
+
     :param cornerVerts: Corners of the represented polygon
-    :param sizeLimit: The largest number of pixels from the enclosed area allowed before the full boundary is no
-    longer returned. For instance:
-      >>> cornerVerts = XYVertices([[0,0], [1000,0], [1000,1000],[0,1000]])
-      >>> cornersToFullBoundary(cornerVerts, 10e5)
-      will *NOT* return all boundary vertices, since the enclosed area (10e6) is larger than sizeLimit.
-    :param fillShape: Size of mask to create. Useful if verts may extend beyond image dimensions
-      and should be truncated. If None, no truncation will occur except for negative verts.
-    :param stackResult: Whether the result should be ComplexXYVertices (if stackResult is False)
-      or a stacked list of exterior verts (if stackResult is True)
-    :return: List with one vertex for every border pixel, unless *sizeLimit* is violated.
+    :param sizeLimit: If > 0, every nth pixel from the border will be used such that
+        ``sizeLimit``total points are returned
+    :return: List with one vertex for every border pixel, unless ``sizeLimit`` is violated.
     """
-    if isinstance(cornerVerts, XYVertices):
-        cornerVerts = ComplexXYVertices([cornerVerts])
-    if fillShape is not None:
-        fillShape = tuple(fillShape)
-    filledMask = cornerVerts.toMask(fillShape, warnIfTooSmall=False)
-    cornerVerts = ComplexXYVertices.fromBinaryMask(filledMask, approximation=None)
-    if not stackResult:
-        return cornerVerts
-    cornerVerts = cornerVerts.filledVerts().stack()
-    numCornerVerts = len(cornerVerts)
-    if numCornerVerts > sizeLimit:
-        spacingPerSamp = int(numCornerVerts / sizeLimit)
-        cornerVerts = cornerVerts[::spacingPerSamp]
-    return cornerVerts
+    # Credit: https://stackoverflow.com/a/70664846/9463643
+    # Cumulative Euclidean distance between successive polygon points.
+    # This will be the "x" for interpolation
+    # Ensure shape is connected
+    vertices = np.r_[cornerVerts, cornerVerts[[0]]]
+    d = np.cumsum(np.r_[0, np.sqrt((np.diff(vertices, axis=0) ** 2).sum(axis=1))])
+
+    # get linearly spaced points along the cumulative Euclidean distance
+    if sizeLimit > 0:
+        distSampled = np.linspace(0, d.max(), int(sizeLimit))
+    else:
+        distSampled = np.arange(0, d.max())
+
+    # interpolate x and y coordinates
+    vertsInterped = np.c_[
+        np.interp(distSampled, d, vertices[:, 0]),
+        np.interp(distSampled, d, vertices[:, 1]),
+    ]
+
+    return XYVertices(vertsInterped)
 
 
 def getCroppedImg(
