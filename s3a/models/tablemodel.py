@@ -156,6 +156,9 @@ class ComponentMgr(CompTableModel):
             # Nothing to undo
             return toEmit
 
+        # Only allow updates from columns that exist
+        newCompsDf = newCompsDf[[c for c in newCompsDf if c in self.compDf]]
+
         # Delete entries with no vertices, since they make work within the app difficult.
         # It is allowed to merge without vertices present
         if RTF.VERTICES in newCompsDf:
