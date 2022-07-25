@@ -1,0 +1,8 @@
+fields:
+  class:
+    value: 0
+    aliases: [Class, Label]
+  center_x: -1
+  center_y: -1
+  width: -1
+  height: -1

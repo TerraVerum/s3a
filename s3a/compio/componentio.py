@@ -105,6 +105,7 @@ class ComponentIO:
         self.importLblPng = LblPngImporter(td)
         self.importPkl = PklImporter(td)
         self.importCompImgsDf = CompImgsDfImporter(td)
+        self.importYoloV5 = YoloV5Importer(td)
 
         self.importSuperannotateJson = SuperannotateJsonImporter(td)
         self.importGeojson = GeojsonImporter(td)
@@ -116,6 +117,7 @@ class ComponentIO:
         self.exportCompImgsDf = CompImgsDfExporter()
         self.exportPkl = PklExporter()
         self.exportSerialized = SerialExporter()
+        self.exportYoloV5 = YoloV5Exporter()
 
     def updateOpts(self, importOrExport: _litLst, **opts):
         # Propagate custom defaults to each desired function

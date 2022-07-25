@@ -32,6 +32,7 @@ __all__ = [
     "PklImporter",
     "CompImgsDfImporter",
     "VGGImageAnnotatorImporter",
+    "YoloV5Importer",
 ]
 
 
@@ -377,4 +378,48 @@ class CompImgsDfImporter(AnnotationImporter):
     def bulkImport(self, importObj, labelField=None, **kwargs):
         out = importObj[["instanceId", "label"]].copy()
         out.columns = [RTF.INST_ID, labelField]
+        return out
+
+
+class YoloV5Importer(CsvImporter):
+    def readFile(self, file: FilePath, **kwargs):
+        return pd.read_csv(
+            file,
+            sep=r"\s+",
+            header=None,
+            names=["class", "center_x", "center_y", "width", "height"],
+        )
+
+    def populateMetadata(self, imageShape=None, labelMapping=None, **kwargs):
+        if imageShape is None:
+            raise ValueError("Must specify ``imageShape`` when importing yolov5 data")
+        return self._forwardMetadata(locals())
+
+    def bulkImport(self, importObj, imageShape=None, labelMapping=None, **kwargs):
+        imageShapeXy = np.array(imageShape[::-1])
+        # Add 3rd dimension so all computations can be simultaneous
+        # (N, 1, 2) wh * (1, 4, 2) bbox = (N,4,2) bboxes for N components
+        # Thus, each row of ``bboxes`` is (4,2) bbox array
+        centerXy = (
+            importObj[["center_x", "center_y"]].to_numpy("float32")[:, None, :]
+            * imageShapeXy
+        )
+        widthHeight = (
+            importObj[["width", "height"]].to_numpy("float32")[:, None, :]
+            * imageShapeXy
+        )
+        bboxes = (
+            np.array([[0, 0], [0, 1], [1, 1], [1, 0]], dtype="float32")[None, ...]
+            * widthHeight
+        )
+        mins = centerXy - (widthHeight / 2)
+        bboxes += mins
+        # reshape to (N,) ComplexXyVertices
+        verts = [ComplexXYVertices([XYVertices(box)]) for box in bboxes]
+        out = pd.DataFrame()
+        out[RTF.VERTICES] = verts
+        classVals = importObj["class"].astype(int)
+        if labelMapping is not None:
+            classVals = labelMapping[classVals]
+        out["class"] = classVals
         return out

@@ -144,6 +144,7 @@ def doAndAssertExport(
             fpath,
             imageShape=app.mainImg.image.shape[:2],
             srcDir=SAMPLE_IMG_FNAME.parent,
+            labelField="Instance ID",
         )
     except ValueError as ve:
         if "Full I/O" not in str(ve):
