@@ -49,9 +49,10 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
 
     scope = ExitStack()
     """
-  Allows each instance of s3a to act like a "scope" for all objecats instantiated within. Keeps multiple instances
-  of separate S3A pieces from e.g. sharing the same undo buffer. This is managed by __new__.
-  """
+    Allows each instance of s3a to act like a "scope" for all objecats instantiated 
+    within. Keeps multiple instances of separate S3A pieces from e.g. sharing the same 
+    undo buffer. This is managed by __new__.
+    """
 
     sharedAttrs: SharedAppSettings
     """App-level properties that many moving pieces use"""

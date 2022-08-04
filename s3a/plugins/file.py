@@ -588,10 +588,10 @@ class ProjectData(QtCore.QObject):
     """List[Path] of removed images"""
     sigImagesMoved = QtCore.Signal(object)
     """
-  List[(oldPath, NewPath)]
-  Used mainly when images from outside the project are annotated. In that case, images are copied to inside the project,
-  and this signal will be emitted.  
-  """
+    List[(oldPath, NewPath)] Used mainly when images from outside the project are 
+    annotated. In that case, images are copied to inside the project, and this signal 
+    will be emitted.
+    """
 
     sigAnnotationsAdded = QtCore.Signal(object)
     """List[Path]"""

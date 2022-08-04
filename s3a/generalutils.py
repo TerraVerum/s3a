@@ -369,7 +369,8 @@ def symbolFromVerts(verts: Union[ComplexXYVertices, XYVertices, np.ndarray]):
 def bboxIou(boxA, boxB):
     """
     determine the (x, y)-coordinates of the intersection rectangle. Both boxes are formatted
-     [[xmin, ymin], [xmax, ymax]]"""
+    [[xmin, ymin], [xmax, ymax]]
+    """
     boxA = boxA.ravel()
     boxB = boxB.ravel()
     xA = max(boxA[0], boxB[0])
@@ -599,7 +600,8 @@ def subImageFromVerts(
     :param allowTranspose: If *True*, the image can be rotated 90 degrees if it results in less padding to reach
       the desired shape
     :param rotationDeg: Clockwise rotation to apply to the extracted image
-    :param kwargs: Passed to `cv.warpAffine`"""
+    :param kwargs: Passed to `cv.warpAffine`
+    """
     if shape is not None:
         shape = np.asarray(shape[:2])
 

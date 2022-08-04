@@ -136,16 +136,16 @@ class AnnotationExporter(AnnotationIOBase):
 
     bulkExport: _GenericExportProtocol | None = None
     """
-  Can be defined if bulk-exporting (whole dataframe at once) is possible. Must have the signature
-  def bulkExport(self, compDf: pd.DataFrame, exportObj, **kwargs) -> exportObj, error dataframe
-  """
+    Can be defined if bulk-exporting (whole dataframe at once) is possible. Must have the signature
+    def bulkExport(self, compDf: pd.DataFrame, exportObj, **kwargs) -> exportObj, error dataframe
+    """
 
     updateExportObj: _UpdateExportObjProtocol | None = None
     """
-  Can be defined if individual importing (row-by-row) is possible. This is fed the current dataframe row as a dict
-  of cell values and is expected to output the updated export object:
-  def updateExportObj(self, inst: dict, exportObj, **kwargs) -> exportObj
-  """
+    Can be defined if individual importing (row-by-row) is possible. This is fed the current dataframe row as a dict
+    of cell values and is expected to output the updated export object:
+    def updateExportObj(self, inst: dict, exportObj, **kwargs) -> exportObj
+    """
 
     class ERROR_COL:
         pass
@@ -217,18 +217,18 @@ class AnnotationImporter(AnnotationIOBase):
 
     formatSingleInstance = None
     """
-  Can be defined to cause row-by-row instance parsing. If defined, must have the signature:
-  ``def formatSingleInstance(self, inst, **kwargs) -> dict``
-  """
+    Can be defined to cause row-by-row instance parsing. If defined, must have the signature:
+    ``def formatSingleInstance(self, inst, **kwargs) -> dict``
+    """
 
     bulkImport = None
     """
-  Can be defined to parse multiple traits from the imported object into a component dataframe all at once. Must have
-  the signature:
-  ``def bulkImport(self, importObj, **kwargs) -> pd.DataFrame``
-  Note that in some cases, a direct conversion of instances to a dataframe is convenient, so ``defaultBulkImport``
-  is provided for these cases. Simply set bulkImport = ``AnnotationImporter.defaultBulkImport`` if you wish.
-  """
+    Can be defined to parse multiple traits from the imported object into a component dataframe all at once. Must have
+    the signature:
+    ``def bulkImport(self, importObj, **kwargs) -> pd.DataFrame``
+    Note that in some cases, a direct conversion of instances to a dataframe is convenient, so ``defaultBulkImport``
+    is provided for these cases. Simply set bulkImport = ``AnnotationImporter.defaultBulkImport`` if you wish.
+    """
 
     def __init__(
         self,

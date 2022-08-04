@@ -16,9 +16,9 @@ class RandomToolsPlugin(ParamEditorPlugin):
 
     _deferredRegisters: dict[Callable, dict] = {}
     """
-  Keeps track of requested functions to register (the key) and the arguments to pass during registration
-  (kwargs are the value)
-  """
+    Keeps track of requested functions to register (the key) and the arguments to pass 
+    during registration (kwargs are the value)
+    """
 
     def attachWinRef(self, win):
         super().attachWinRef(win)

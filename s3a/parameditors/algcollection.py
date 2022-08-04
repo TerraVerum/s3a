@@ -38,8 +38,9 @@ def _fmt(name: str):
 
 
 algoNameFormatter = fns.NameFormatter(_fmt)
-"""Strips spaces and underscores from the provided name, and turns everything to 
-lowercase"""
+"""
+Strips spaces and underscores from the provided name, and turns everything to lowercase
+"""
 
 
 class AlgParamEditor(ParamEditor):

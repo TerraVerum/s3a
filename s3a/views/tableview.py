@@ -219,8 +219,8 @@ class PopupTableDialog(QtWidgets.QDialog):
 class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
     __groupingName__ = "Component Table"
     """
-  Table for displaying :class:`ComponentMgr` data.
-  """
+    Table for displaying :class:`ComponentMgr` data.
+    """
     sigSelectionChanged = Signal(object)
 
     def __initEditorParams__(self, shared: SharedAppSettings):

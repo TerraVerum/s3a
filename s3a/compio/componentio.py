@@ -89,12 +89,14 @@ class ComponentIO:
     """Table to use for import/export cross checks. This is how class and table field information is derived."""
     importOpts = {}
     """
-  Propagated to every importByFileType call to provide user-specified defaults as desired
-  """
+    Propagated to every importByFileType call to provide user-specified defaults as 
+    desired
+    """
     exportOpts = {}
     """
-  Propagated to every exportByFileType call to provide user-specified defaults as desired
-  """
+    Propagated to every exportByFileType call to provide user-specified defaults as 
+    desired
+    """
 
     def __init__(self, tableData: TableData = None):
         if tableData is not None:

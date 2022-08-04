@@ -36,10 +36,10 @@ DrawActFn = Union[Callable[[XYVertices, PrjParam], Any], Callable[[XYVertices], 
 class MainImage(DASM, EditorPropsMixin, ImageViewer):
     sigShapeFinished = Signal(object, object)
     """
-  (XYVertices, PrjParam) emitted when a shape is finished
-  - XYVerts from roi, re-thrown from self.shapeCollection
-  - Current draw action
-  """
+    (XYVertices, PrjParam) emitted when a shape is finished
+    - XYVerts from roi, re-thrown from self.shapeCollection
+    - Current draw action
+    """
 
     sigUpdatedFocusedComp = Signal(object)
     """pd.Series, newly focused component"""
@@ -78,8 +78,9 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
         # -----
         self._focusedTools: List[ParamEditor] = []
         """
-    List of all toolsEditor that allow actions to be performed on the currently focused components
-    """
+        List of all toolsEditor that allow actions to be performed on the currently 
+        focused components
+        """
         # -----
         # DRAWING OPTIONS
         # -----

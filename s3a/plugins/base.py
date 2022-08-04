@@ -12,10 +12,10 @@ from ..parameditors import algcollection
 class ProcessorPlugin(ParamEditorPlugin):
     procEditor: algcollection.AlgParamEditor = None
     """
-  Most table field plugins will use some sort of processor to infer field data.
-  This property holds spawned collections. See :class:`XYVerticesPlugin` for
-  an example.
-  """
+    Most table field plugins will use some sort of processor to infer field data.
+    This property holds spawned collections. See :class:`XYVerticesPlugin` for
+    an example.
+    """
 
     @property
     def curProcessor(self):
@@ -29,10 +29,10 @@ class ProcessorPlugin(ParamEditorPlugin):
 class TableFieldPlugin(ProcessorPlugin):
     mainImg = None
     """
-  Holds a reference to the focused image and set when the s3a reference is set. This
-  is useful for most table field plugins, since mainImg will hold a reference to the
-  component series that is modified by the plugins.
-  """
+    Holds a reference to the focused image and set when the s3a reference is set. 
+    This is useful for most table field plugins, since mainImg will hold a reference to 
+    the component series that is modified by the plugins.
+    """
 
     _active = False
 
