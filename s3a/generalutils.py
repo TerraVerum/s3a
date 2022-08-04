@@ -220,6 +220,11 @@ def cornersToFullBoundary(cornerVerts: XYVertices, sizeLimit=0) -> XYVertices:
     vertices = np.r_[cornerVerts, cornerVerts[[0]]]
     d = np.cumsum(np.r_[0, np.sqrt((np.diff(vertices, axis=0) ** 2).sum(axis=1))])
 
+    # Edge case: vertices don't enclose any usable area, return without changes
+    # otherwise all vertices will disappear
+    if np.max(d) == 0:
+        return cornerVerts
+
     # get linearly spaced points along the cumulative Euclidean distance
     if sizeLimit > 0:
         distSampled = np.linspace(0, d.max(), int(sizeLimit))
