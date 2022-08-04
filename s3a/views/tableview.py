@@ -431,8 +431,9 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         See the project wiki for a detailed description
         """
         selection = self.idsRowsColsFromSelection()
-        overwriteData = self.mgr.compDf.loc[selection[0, 0]]
-        self.setSelectedCellsAs(selection, overwriteData)
+        if len(selection):
+            overwriteData = self.mgr.compDf.loc[selection[0, 0]]
+            self.setSelectedCellsAs(selection, overwriteData)
 
     def setSelectedCellsAsGui(self, selectionIdxs: TwoDArr = None):
         """
