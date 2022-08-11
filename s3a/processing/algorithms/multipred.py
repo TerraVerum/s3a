@@ -357,8 +357,11 @@ def remove_overlapping_components(
     for idx, comp in components.iterrows():
         # Check the indexable area with a component footprint
         verts: ComplexXYVertices = comp[RTF.VERTICES]
+        stacked = verts.stack()
+        if not len(stacked):
+            continue
         checkArea, coords = gutils.getCroppedImg(
-            referenceMask, verts.stack(), coordsAsSlices=True
+            referenceMask, stacked, coordsAsSlices=True
         )
         # Prediction is entirely outside the image
         if checkArea.size <= 0:
@@ -384,8 +387,8 @@ def single_categorical_prediction(
     """
     :param component: Component on which categorical mask prediction should be run
     :param image: Image data to index
-    :param model: Model which will run prediction. If ``expectedImageShape`` is not specified, ``model.input_shape[1:3]``
-      will be used
+    :param model: Model which will run prediction. If ``expectedImageShape`` is
+    not specified, ``model.input_shape[1:3]`` will be used
     :param inputShape: Specifies the image shape the model requires to run a prediction
       type: str
     """
@@ -412,6 +415,8 @@ def single_categorical_prediction(
     prediction = gutils.inverseSubImage(
         prediction.astype("uint8"), stats, gutils.coordsToBbox(verts)
     )
+    if not np.any(prediction):
+        return ProcessIO(components=pd.DataFrame(columns=component.index))
     out = component.copy()
     paddingOffset = verts.min(0) - stats["subImageBbox"][0]
     totalOffset = -(coords[0] + paddingOffset).astype(int)
