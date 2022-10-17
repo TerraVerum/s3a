@@ -15,27 +15,29 @@ from testingconsts import RND, SAMPLE_IMG, SAMPLE_IMG_FNAME
 def test_change_img(app):
     im2 = RND.integers(0, 255, SAMPLE_IMG.shape, "uint8")
     name = Path("./testfile.png").absolute()
-    app.setMainImg(name, im2)
+    app.setMainImage(name, im2)
     assert (
-        name == app.srcImgFname
+        name == app.sourceImagePath
     ), "Annotation source not set after loading image on start"
 
     np.testing.assert_array_equal(
-        app.mainImg.image, im2, "Main image doesn't match sample image"
+        app.mainImage.image, im2, "Main image doesn't match sample image"
     )
 
 
 def test_change_img_none(app):
-    app.setMainImg()
-    assert app.mainImg.image is None
-    assert app.srcImgFname is None
+    app.setMainImage()
+    assert app.mainImage.image is None
+    assert app.sourceImagePath is None
 
 
 @pytest.mark.withcomps
 def test_clear_bounds(app, vertsPlugin):
-    assert len(app.compMgr.compDf) > 0
+    assert len(app.componentManager.compDf) > 0
     app.clearBoundaries()
-    assert len(app.compMgr.compDf) == 0, "Comps not cleared after clearing boundaries"
+    assert (
+        len(app.componentManager.compDf) == 0
+    ), "Comps not cleared after clearing boundaries"
 
 
 @pytest.mark.withcomps
@@ -48,7 +50,7 @@ def test_export_all_comps(tmp_path, app):
 def test_load_comps_merge(tmp_path, app, sampleComps):
     compFile = tmp_path / "tmp.csv"
 
-    app.compMgr.addComps(sampleComps)
+    app.componentManager.addComponents(sampleComps)
     app.exportCurAnnotation(str(compFile))
     app.clearBoundaries()
 
@@ -56,7 +58,10 @@ def test_load_comps_merge(tmp_path, app, sampleComps):
     equalCols = np.setdiff1d(
         dfTester.compDf.columns, [REQD_TBL_FIELDS.INST_ID, REQD_TBL_FIELDS.IMG_FILE]
     )
-    dfCmp = app.compMgr.compDf[equalCols].values == dfTester.compDf[equalCols].values
+    dfCmp = (
+        app.componentManager.compDf[equalCols].values
+        == dfTester.compDf[equalCols].values
+    )
     assert np.all(dfCmp), "Loaded dataframe doesn't match daved dataframe"
 
 
@@ -66,22 +71,22 @@ def test_import_large_verts(sampleComps, tmp_path, app):
     sampleComps.at[0, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices(
         [XYVertices([[50e3, 50e3]])]
     )
-    io = app.compIo
+    io = app.componentIo
     io.exportCsv(sampleComps, tmp_path / "Bad Verts.csv")
     with pytest.warns(UserWarning):
-        io.importCsv(tmp_path / "Bad Verts.csv", imageShape=app.mainImg.image.shape)
+        io.importCsv(tmp_path / "Bad Verts.csv", imageShape=app.mainImage.image.shape)
 
 
 def test_change_comp(app, mgr):
     stack = app.actionStack
-    mImg = app.mainImg
-    mgr.addComps(dfTester.compDf.copy())
+    mImg = app.mainImage
+    mgr.addComponents(dfTester.compDf.copy())
     comp = mgr.compDf.loc[[RND.integers(NUM_COMPS)]]
     app.changeFocusedComp(comp.index)
-    assert app.mainImg.compSer.equals(comp.squeeze())
+    assert app.mainImage.focusedComponent.equals(comp.squeeze())
     assert mImg.image is not None
     stack.undo()
-    assert app.mainImg.compSer[REQD_TBL_FIELDS.INST_ID] == -1
+    assert app.mainImage.focusedComponent[REQD_TBL_FIELDS.INST_ID] == -1
 
 
 def test_save_layout(app):
@@ -99,17 +104,17 @@ def test_autosave(tmp_path, app, filePlugin):
     # Wrap in path otherwise some path ops don't work as expected
     filePlugin.startAutosave(interval, tmp_path, "autosave")
     testComps1 = dfTester.compDf.copy()
-    app.compMgr.addComps(testComps1)
+    app.componentManager.addComponents(testComps1)
     filePlugin.autosaveTimer.timeout.emit()
     appInst.processEvents()
     dfTester.fillRandomVerts()
     testComps2 = pd.concat([testComps1, dfTester.compDf.copy()])
-    app.compMgr.addComps(testComps2)
+    app.componentManager.addComponents(testComps2)
     filePlugin.autosaveTimer.timeout.emit()
     appInst.processEvents()
 
     testComps3 = pd.concat([testComps2, dfTester.compDf.copy()])
-    app.compMgr.addComps(testComps3)
+    app.componentManager.addComponents(testComps3)
     filePlugin.autosaveTimer.timeout.emit()
     filePlugin.stopAutosave()
     savedFiles = list(tmp_path.glob("autosave*.csv"))
@@ -118,23 +123,23 @@ def test_autosave(tmp_path, app, filePlugin):
 
 @pytest.mark.withcomps
 def test_stage_plotting(monkeypatch, app, vertsPlugin):
-    mainImg = app.mainImg
+    mainImg = app.mainImage
     mainImg.drawActGrp.callFuncByParam(CNST.DRAW_ACT_CREATE)
     vertsPlugin.procEditor.changeActiveProcessor("Basic Shapes")
     mainImgProps = app.clsToPluginMapping[MainImagePlugin].props
     oldSz = mainImgProps[CNST.PROP_MIN_COMP_SZ]
     mainImgProps[CNST.PROP_MIN_COMP_SZ] = 0
     mainImg.shapeCollection.sigShapeFinished.emit(XYVertices([[0, 0], [5, 5]]))
-    assert len(app.compMgr.compDf) > 0
-    app.changeFocusedComp(app.compMgr.compDf.index[0])
-    assert app.mainImg.compSer.loc[REQD_TBL_FIELDS.INST_ID] >= 0
+    assert len(app.componentManager.compDf) > 0
+    app.changeFocusedComp(app.componentManager.compDf.index[0])
+    assert app.mainImage.focusedComponent.loc[REQD_TBL_FIELDS.INST_ID] >= 0
     mainImgProps[CNST.PROP_MIN_COMP_SZ] = oldSz
 
     vertsPlugin.procEditor.changeActiveProcessor("Basic Shapes")
     mainImg.drawActGrp.callFuncByParam(CNST.DRAW_ACT_ADD)
 
     mainImg.shapeCollection.sigShapeFinished.emit(XYVertices([[0, 0], [10, 10]]))
-    proc = vertsPlugin.curProcessor.processor
+    proc = vertsPlugin.currentProcessor.processor
     oldMakeWidget = proc._stageSummaryWidget
 
     def patchedWidget():
@@ -148,7 +153,7 @@ def test_stage_plotting(monkeypatch, app, vertsPlugin):
 
 
 def test_unsaved_changes(sampleComps, tmp_path, app):
-    app.compMgr.addComps(sampleComps)
+    app.componentManager.addComponents(sampleComps)
     assert app.hasUnsavedChanges
     app.saveCurAnnotation()
     assert not app.hasUnsavedChanges
@@ -158,9 +163,9 @@ def test_set_colorinfo(app):
     # various number of channels in image
     for clr in [[5], [5, 5, 5], [4, 4, 4, 4]]:
         clr = np.array(clr)
-        app.mainImg.updateCursorInfo((100, 100), clr)
-        assert "100, 100" in app.mouseCoordsLbl.text()
-        assert f"{clr}" in app.pxColorLbl.text()
+        app.mainImage.updateCursorInfo((100, 100), clr)
+        assert "100, 100" in app.mousePosLabel.text()
+        assert f"{clr}" in app.pixelColorLabel.text()
 
 
 @pytest.mark.withcomps
@@ -185,13 +190,13 @@ def test_quickload_profile(tmp_path, app):
 def test_load_last_settings(tmp_path, sampleComps, app):
     oldSaveDir = app.appStateEditor.saveDir
     app.appStateEditor.saveDir = tmp_path
-    app.setMainImg(SAMPLE_IMG_FNAME, SAMPLE_IMG)
-    app.addAndFocusComps(sampleComps)
+    app.setMainImage(SAMPLE_IMG_FNAME, SAMPLE_IMG)
+    app.addAndFocusComponents(sampleComps)
     app.appStateEditor.saveParamValues()
     app.forceClose()
     app.appStateEditor.loadParamValues()
     app.appStateEditor.saveDir = oldSaveDir
-    assert np.array_equal(app.mainImg.image, SAMPLE_IMG)
+    assert np.array_equal(app.mainImage.image, SAMPLE_IMG)
     sampleComps[REQD_TBL_FIELDS.IMG_FILE] = SAMPLE_IMG_FNAME.name
     sampleComps[REQD_TBL_FIELDS.INST_ID] = sampleComps.index
     assert np.array_equal(sampleComps, app.exportableDf)

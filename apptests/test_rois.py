@@ -76,15 +76,15 @@ def test_simple_click():
     pt = (0, 0)
     editableImg.drawAction = PRJ_CONSTS.DRAW_ACT_SELECT
     for curShape in shapes:
-        clctn.curShapeParam = curShape
+        clctn.shapeParameter = curShape
         leftClick(pt)
-        assert np.all(pt in clctn.curShape.vertices)
+        assert np.all(pt in clctn.currentShape.vertices)
 
 
 def test_drag_pt(mouseDragFactory):
     editableImg.drawAction = PRJ_CONSTS.DRAW_ACT_SELECT
     for curShape in shapes:
-        clctn.curShapeParam = curShape
+        clctn.shapeParameter = curShape
         mouseDragFactory(editableImg, (10, 10), (100, 100))
         # Shapes need real mouse events to properly form, so all this can really do is
         # ensure nothing breaks
@@ -96,8 +96,8 @@ def test_drag_pt(mouseDragFactory):
 )
 def test_poly_undo(mouseDragFactory, polyparam, initial, expectedAfterUndo):
     editableImg.drawAction = PRJ_CONSTS.DRAW_ACT_SELECT
-    editableImg.shapeCollection.curShapeParam = polyparam
-    poly = editableImg.shapeCollection.curShape
+    editableImg.shapeCollection.shapeParameter = polyparam
+    poly = editableImg.shapeCollection.currentShape
     poly.lastEvType = QtCore.QEvent.MouseButtonPress
     poly.setRoiPoints()
     poly.addRoiPoints(XYVertices([[0, 0], [10, 0]]))

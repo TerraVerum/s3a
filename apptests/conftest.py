@@ -35,8 +35,8 @@ def sampleComps():
 def app(tmpdir_factory):
     constants.APP_STATE_DIR = tmpdir_factory.mktemp("settings")
     app_ = S3A(Image=SAMPLE_IMG_FNAME, log=PRJ_ENUMS.LOG_TERM, loadLastState=False)
-    app_.filePlugin.projData.create(
-        name=str(tmpdir_factory.mktemp("proj")), parent=app_.filePlugin.projData
+    app_.filePlugin.projectData.create(
+        name=str(tmpdir_factory.mktemp("proj")), parent=app_.filePlugin.projectData
     )
     return app_
 
@@ -49,7 +49,7 @@ def filePlugin(app):
 
 @pytest.fixture(scope="session")
 def mgr(app):
-    return app.compMgr
+    return app.componentManager
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -72,20 +72,20 @@ def vertsPlugin(app) -> VerticesPlugin:
 # After each test, all components are removed from the app
 @pytest.fixture(autouse=True)
 def resetAppAndTester(request, app, filePlugin, mgr):
-    for img in filePlugin.projData.images:
+    for img in filePlugin.projectData.images:
         try:
-            if img != app.srcImgFname:
-                filePlugin.projData.removeImage(img)
+            if img != app.sourceImagePath:
+                filePlugin.projectData.removeImage(img)
         except (FileNotFoundError,):
             pass
-    app.mainImg.shapeCollection.forceUnlock()
+    app.mainImage.shapeCollection.forceUnlock()
     if "smallimage" in request.keywords:
-        app.setMainImg(SAMPLE_SMALL_IMG_FNAME, SAMPLE_SMALL_IMG)
+        app.setMainImage(SAMPLE_SMALL_IMG_FNAME, SAMPLE_SMALL_IMG)
     else:
-        app.setMainImg(SAMPLE_IMG_FNAME, SAMPLE_IMG)
+        app.setMainImage(SAMPLE_IMG_FNAME, SAMPLE_IMG)
     if "withcomps" in request.keywords:
-        dfTester.fillRandomVerts(app.mainImg.image.shape)
-        mgr.addComps(dfTester.compDf.copy())
+        dfTester.fillRandomVerts(app.mainImage.image.shape)
+        mgr.addComponents(dfTester.compDf.copy())
     yield
     app.sharedAttrs.actionStack.clear()
     app.clearBoundaries()

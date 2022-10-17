@@ -16,13 +16,13 @@ class CompTablePlugin(ParamEditorPlugin):
 
     def attachWinRef(self, win: S3ABase):
 
-        tbl = win.compTbl
+        tbl = win.componentTable
         for func, param in zip(
             [
                 lambda: tbl.setSelectedCellsAsGui(),
                 tbl.removeSelectedRowsGui,
                 tbl.setSelectedCellsAsFirst,
-                lambda: win.compDisplay.scaleViewboxToSelectedIds(),
+                lambda: win.componentController.scaleViewboxToSelectedIds(),
             ],
             [
                 CNST.TOOL_TBL_SET_AS,
@@ -31,7 +31,7 @@ class CompTablePlugin(ParamEditorPlugin):
                 CNST.TOOL_TBL_ZOOM_TO_COMPS,
             ],
         ):
-            param.opts["ownerObj"] = win.compTbl
+            param.opts["ownerObj"] = win.componentTable
             self.registerFunc(func, name=param.name, btnOpts=param)
         tbl.menu = self.toolsEditor.actionsMenuFromProcs(parent=tbl, nest=True)
         super().attachWinRef(win)

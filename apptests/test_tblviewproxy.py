@@ -13,16 +13,16 @@ from s3a.views.tableview import CompTableView, PopupTableDialog
 @pytest.mark.withcomps
 def test_merge_selected_comps(app, mgr):
     oldLen = len(mgr.compDf)
-    app.compTbl.selectAll()
+    app.componentTable.selectAll()
     mkQApp().processEvents()
-    assert len(app.compDisplay.selectedIds) > 0
-    app.compDisplay.mergeSelectedComps()
+    assert len(app.componentController.selectedIds) > 0
+    app.componentController.mergeSelectedComps()
     assert len(mgr.compDf) == 1
     mgr.actionStack.undo()
     assert len(mgr.compDf) == oldLen
-    app.compTbl.clearSelection()
+    app.componentTable.clearSelection()
     # Nothing should happen
-    app.compDisplay.mergeSelectedComps()
+    app.componentController.mergeSelectedComps()
 
 
 def test_split_selected_comps(app, mgr):
@@ -35,45 +35,47 @@ def test_split_selected_comps(app, mgr):
     comp = mgr.tableData.makeCompDf()
     comp.at[comp.index[0], REQD_TBL_FIELDS.VERTICES] = verts
     app.clearBoundaries()
-    app.addAndFocusComps(comp)
+    app.addAndFocusComponents(comp)
 
-    app.compTbl.selectAll()
-    app.compDisplay.splitSelectedComps()
+    app.componentTable.selectAll()
+    app.componentController.splitSelectedComps()
     assert len(mgr.compDf) == 4
     mgr.actionStack.undo()
     assert len(mgr.compDf) == 1
     # Nothing should happen
-    app.compDisplay.selectedIds = mgr.compDf.index
-    app.compDisplay.splitSelectedComps()
+    app.componentController.selectedIds = mgr.compDf.index
+    app.componentController.splitSelectedComps()
 
 
 def test_rm_overlap(app):
     verts = [imgCornerVertices(np.zeros(shape)) for shape in ([100, 100], [200, 200])]
     comps = app.sharedAttrs.tableData.makeCompDf(2)
     comps[REQD_TBL_FIELDS.VERTICES] = [ComplexXYVertices([v]) for v in verts]
-    cd = app.compDisplay
-    changeDict = app.addAndFocusComps(comps)
+    cd = app.componentController
+    changeDict = app.addAndFocusComponents(comps)
     comps[REQD_TBL_FIELDS.INST_ID] = changeDict["ids"]
     old = comps.copy()
     cd.selectedIds = changeDict["ids"]
     cd.removeSelectedCompOverlap()
-    assert len(app.compMgr.compDf) == 1
+    assert len(app.componentManager.compDf) == 1
 
     app.clearBoundaries()
-    changeDict = app.addAndFocusComps(old)
+    changeDict = app.addAndFocusComponents(old)
     cd.selectedIds = changeDict["ids"][::-1]
     cd.removeSelectedCompOverlap()
-    assert len(app.compMgr.compDf) == 2
-    checkVerts = app.compMgr.compDf.loc[changeDict["ids"][-1], REQD_TBL_FIELDS.VERTICES]
+    assert len(app.componentManager.compDf) == 2
+    checkVerts = app.componentManager.compDf.loc[
+        changeDict["ids"][-1], REQD_TBL_FIELDS.VERTICES
+    ]
     assert len(checkVerts[0]) > 4
 
 
 @pytest.mark.withcomps
 def test_set_cells_as(app, mgr):
-    oldSrcFile = app.srcImgFname
+    oldSrcFile = app.sourceImagePath
     # Even amount of comps for easy comparison
     if (len(mgr.compDf) % 2) == 1:
-        mgr.rmComps(mgr.compDf.index[-1])
+        mgr.removeComponents(mgr.compDf.index[-1])
     mgr.compDf[REQD_TBL_FIELDS.IMG_FILE] = oldSrcFile
     # Ensure the overwrite data will be different from what it's overwriting
     newFile = "TestFile.png"
@@ -90,7 +92,7 @@ def test_set_cells_as(app, mgr):
     # Sometimes Qt doesn't process selections programmatically. Not sure what to do about that
     if len(selection) == 0:
         return
-    app.compTbl.setSelectedCellsAs(selection, newDf)
+    app.componentTable.setSelectedCellsAs(selection, newDf)
     matchList = np.tile([newFile, oldSrcFile], len(mgr.compDf) // 2)
     # Irritating that sometimes windows path comparisons fail despite having the same str
     # representations
@@ -103,10 +105,10 @@ def test_set_cells_as(app, mgr):
 def test_set_as_gui(sampleComps):
     # Monkeypatch gui for testing
     view = CompTableView()
-    mgr = view.mgr
-    mgr.addComps(sampleComps)
+    mgr = view.manager
+    mgr.addComponents(sampleComps)
     view.popup.exec = lambda: True
-    allCols = np.arange(len(view.mgr.colTitles))
+    allCols = np.arange(len(view.manager.columnTitles))
     editCols = np.setdiff1d(allCols, mgr.noEditColIdxs)
 
     numEditCols = len(editCols)
@@ -114,7 +116,7 @@ def test_set_as_gui(sampleComps):
     selectionIdxs[:, 2] = np.tile(editCols, len(mgr.compDf))
     overwriteData = mgr.compDf.iloc[[0]]
     view.setSelectedCellsAs(selectionIdxs, overwriteData)
-    editableDf = view.mgr.compDf.iloc[:, editCols]
+    editableDf = view.manager.compDf.iloc[:, editCols]
     cmpDf = pd.concat([mgr.compDf.iloc[[0], editCols]] * len(mgr.compDf))
     assert np.array_equal(editableDf.values, cmpDf.values)
 
@@ -123,15 +125,17 @@ def test_set_as_gui(sampleComps):
 def test_move_comps(app, mgr, copyHelper):
     copyHelper(copyMode=False)
     oldComps = mgr.compDf.copy()
-    app.compDisplay.finishRegionCopier(True)
-    compareCopiedCompDfs(oldComps, mgr.compDf, app.compDisplay.regionMover.dataMin)
+    app.componentController.finishRegionCopier(True)
+    compareCopiedCompDfs(
+        oldComps, mgr.compDf, app.componentController.regionMover.dataMin
+    )
 
 
 @pytest.mark.withcomps
 def test_copy_comps(app, mgr, copyHelper):
     copyHelper(copyMode=True)
     oldComps = mgr.compDf.copy()
-    app.compDisplay.finishRegionCopier(True)
+    app.componentController.finishRegionCopier(True)
     assert len(mgr.compDf) == 2 * len(oldComps)
     compareCopiedCompDfs(
         oldComps,
@@ -145,24 +149,26 @@ def test_scale_viewbox(app, mgr):
     verts = ComplexXYVertices([XYVertices([[0, 0], [35, 35]])])
     comps = mgr.tableData.makeCompDf(1)
     comps[REQD_TBL_FIELDS.VERTICES] = [verts]
-    changeDict = mgr.addComps(comps)
+    changeDict = mgr.addComponents(comps)
 
-    app.compDisplay.scaleViewboxToSelectedIds(changeDict["ids"], paddingPct=0)
-    bounds = np.array(app.mainImg.getViewBox().targetRange())
+    app.componentController.scaleViewboxToSelectedIds(changeDict["ids"], paddingPct=0)
+    bounds = np.array(app.mainImage.getViewBox().targetRange())
     assert np.array_equal(bounds, [[0, 35], [0, 35]])
 
 
 @pytest.mark.smallimage
 def test_export_overlay(app, mgr, tmp_path):
-    verts = imgCornerVertices(app.mainImg.image)
+    verts = imgCornerVertices(app.mainImage.image)
     comps = mgr.tableData.makeCompDf(1)
     comps[REQD_TBL_FIELDS.VERTICES] = [ComplexXYVertices([verts])]
-    app.compDisplay.regionPlot.showFocused = True
-    app.addAndFocusComps(comps)
-    app.compDisplay.regionPlot.updateColors(labelColormap="CET-D1A", fillAlpha=1.0)
+    app.componentController.regionPlot.showFocused = True
+    app.addAndFocusComponents(comps)
+    app.componentController.regionPlot.updateColors(
+        labelColormap="CET-D1A", fillAlpha=1.0
+    )
     exportLoc = str(tmp_path / "export.png")
-    app.compDisplay.exportCompOverlay(file=exportLoc)
-    app.compDisplay.regionPlot.showFocused = False
+    app.componentController.exportCompOverlay(file=exportLoc)
+    app.componentController.regionPlot.showFocused = False
     img = cvImreadRgb(exportLoc)
     checkPix = img[20, 20, :]
     # Red channel should be largest for overlay export and red focus fill
@@ -195,7 +201,7 @@ def compareCopiedCompDfs(
 @pytest.fixture
 def copyHelper(app, mgr):
     def copyHelper(copyMode=True):
-        copier = app.mainImg.regionMover
+        copier = app.mainImage.regionMover
         copier.resetBaseData(mgr.compDf.copy())
         copier.inCopyMode = copyMode
 

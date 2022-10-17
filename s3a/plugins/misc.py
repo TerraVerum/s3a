@@ -26,11 +26,11 @@ class RandomToolsPlugin(ParamEditorPlugin):
         self.registerFunc(self.showDevConsoleGui, name="Show Dev Console")
         self.registerFunc(win.clearBoundaries, btnOpts=CNST.TOOL_CLEAR_BOUNDARIES)
         self.registerFunc(
-            win.compDisplay.exportCompOverlay,
+            win.componentController.exportCompOverlay,
             name="Export Component Overlay",
             toClipboard=True,
         )
-        self.registerFunc(lambda: win.setMainImg(None), name="Clear Current Image")
+        self.registerFunc(lambda: win.setMainImage(None), name="Clear Current Image")
 
         self._hookupFieldDisplay(win)
 
@@ -38,7 +38,7 @@ class RandomToolsPlugin(ParamEditorPlugin):
             self.registerFunc(deferred, **kwargs)
 
     def _hookupFieldDisplay(self, win):
-        display = win.compDisplay
+        display = win.componentController
         # This option shouldn't show in the menu dropdown, so register directly to the tools
         _, param = self.toolsEditor.registerFunc(
             display.fieldInfoProc,
@@ -52,7 +52,7 @@ class RandomToolsPlugin(ParamEditorPlugin):
             if display.fieldDisplay.inUseDelegates:
                 display.fieldDisplay.callDelegateFunc("clear")
             else:
-                display.fieldInfoProc(ids=win.compMgr.compDf.index, force=True)
+                display.fieldInfoProc(ids=win.componentManager.compDf.index, force=True)
 
         self.registerFunc(toggleAll, name="Toggle All Field Info")
 
@@ -68,7 +68,7 @@ class RandomToolsPlugin(ParamEditorPlugin):
             )
             fieldsParam.setValue(fieldsParam.opts["limits"])
 
-        win.sharedAttrs.tableData.sigCfgUpdated.connect(updateLims)
+        win.sharedAttrs.tableData.sigConfigUpdated.connect(updateLims)
         updateLims()
 
     def showDevConsoleGui(self):

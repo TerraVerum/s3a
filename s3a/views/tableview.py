@@ -9,7 +9,7 @@ from pyqtgraph.parametertree.Parameter import PARAM_TYPES
 
 from ..compio.helpers import serialize, deserialize
 from ..constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
-from ..models.tablemodel import ComponentMgr
+from ..models.tablemodel import ComponentManager
 from ..shared import SharedAppSettings
 from ..structures import TwoDArr
 
@@ -82,10 +82,10 @@ class SerDesDelegate(QtWidgets.QStyledItemDelegate):
         editor.setGeometry(option.rect)
 
 
-class MinimalTableModel(ComponentMgr):
+class MinimalTableModel(ComponentManager):
     """
     The CheckState flag is only possible on a minimal popup table, but Qt makes it
-    challenging to override just this portion of the ComponentMgr class. So, this simple
+    challenging to override just this portion of the ComponentManager class. So, this simple
     subclass maintains a checkstate and checkable columns on top of the traditional
     component manager.
     """
@@ -145,15 +145,15 @@ class PopupTableDialog(QtWidgets.QDialog):
         # -----------
         # Widget buttons
         # -----------
-        self.applyBtn = QtWidgets.QPushButton("Apply")
-        self.closeBtn = QtWidgets.QPushButton("Close")
+        self.applyButton = QtWidgets.QPushButton("Apply")
+        self.closeButton = QtWidgets.QPushButton("Close")
 
         # -----------
         # Widget layout
         # -----------
         btnLayout = QtWidgets.QHBoxLayout()
-        btnLayout.addWidget(self.applyBtn)
-        btnLayout.addWidget(self.closeBtn)
+        btnLayout.addWidget(self.applyButton)
+        btnLayout.addWidget(self.closeButton)
 
         centralLayout = QtWidgets.QVBoxLayout()
         centralLayout.addWidget(self.warnLbl)
@@ -165,8 +165,8 @@ class PopupTableDialog(QtWidgets.QDialog):
         # -----------
         # UI Element Signals
         # -----------
-        self.closeBtn.clicked.connect(self.close)
-        self.applyBtn.clicked.connect(self.accept)
+        self.closeButton.clicked.connect(self.close)
+        self.applyButton.clicked.connect(self.accept)
 
     def reflectDelegateChange(self):
         # TODO: Find if there's a better way to see if changes happen in a table
@@ -185,7 +185,7 @@ class PopupTableDialog(QtWidgets.QDialog):
 
     @property
     def data(self):
-        return self.tbl.mgr.compDf.iloc[[0], :]
+        return self.tbl.manager.compDf.iloc[[0], :]
 
     def setData(
         self,
@@ -206,8 +206,8 @@ class PopupTableDialog(QtWidgets.QDialog):
                 self.tbl.hideColumn(ii)
             else:
                 self.tbl.showColumn(ii)
-        self.tbl.mgr.rmComps()
-        self.tbl.mgr.addComps(compDf, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)
+        self.tbl.manager.removeComponents()
+        self.tbl.manager.addComponents(compDf, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)
 
     def reject(self):
         # On dialog close be sure to unhide all columns / reset dirty cols
@@ -219,7 +219,7 @@ class PopupTableDialog(QtWidgets.QDialog):
 class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
     __groupingName__ = "Component Table"
     """
-    Table for displaying :class:`ComponentMgr` data.
+    Table for displaying :class:`ComponentManager` data.
     """
     sigSelectionChanged = Signal(object)
 
@@ -242,7 +242,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
             visibleColumns=[],
         )
         props["visibleColumns"] = params.child("visibleColumns")
-        shared.tableData.sigCfgUpdated.connect(self._onTableChange)
+        shared.tableData.sigConfigUpdated.connect(self._onTableChange)
 
     def __init__(self, *args, minimal=False):
         """
@@ -257,12 +257,12 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         self.setStyleSheet(
             "QTableView { selection-color: white; selection-background-color: #0078d7; }"
         )
-        self._prevSelRows = np.array([])
+        self._previouslySelectedRows = np.array([])
         self.setSortingEnabled(True)
 
-        self.mgr = ComponentMgr()
+        self.manager = ComponentManager()
         self.minimal = minimal
-        self.setModel(self.mgr)
+        self.setModel(self.manager)
         self.setColDelegates()
 
         if not minimal:
@@ -274,7 +274,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
                 lambda: self.menu.exec_(cursor.pos())
             )
 
-        self.instIdColIdx = self.tableData.allFields.index(REQD_TBL_FIELDS.INST_ID)
+        self.instanceIdIndex = self.tableData.allFields.index(REQD_TBL_FIELDS.INST_ID)
         self._onTableChange()
 
     def _onTableChange(self, *_args):
@@ -295,7 +295,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
           pType: checklist
           expanded: False
         """
-        for ii, col in enumerate(self.mgr.colTitles):
+        for ii, col in enumerate(self.manager.columnTitles):
             self.setColumnHidden(ii, col not in visibleColumns)
 
     def setColDelegates(self):
@@ -329,14 +329,14 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
 
         self.horizontalHeader().setSectionsMovable(True)
 
-    # When the model is changed, get a reference to the ComponentMgr
+    # When the model is changed, get a reference to the ComponentManager
     def setModel(self, modelOrProxy: QtCore.QAbstractTableModel):
         super().setModel(modelOrProxy)
         try:
             # If successful we were given a proxy model
-            self.mgr = modelOrProxy.sourceModel()
+            self.manager = modelOrProxy.sourceModel()
         except AttributeError:
-            self.mgr = modelOrProxy
+            self.manager = modelOrProxy
 
     def selectionChanged(
         self, curSel: QtCore.QItemSelection, prevSel: QtCore.QItemSelection
@@ -350,14 +350,14 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         selection = self.selectionModel().selectedIndexes()
         for item in selection:
             selectedIds.append(
-                item.sibling(item.row(), self.instIdColIdx).data(
+                item.sibling(item.row(), self.instanceIdIndex).data(
                     QtCore.Qt.ItemDataRole.EditRole
                 )
             )
         newRows = pd.unique(selectedIds)
-        if np.array_equal(newRows, self._prevSelRows):
+        if np.array_equal(newRows, self._previouslySelectedRows):
             return
-        self._prevSelRows = newRows
+        self._previouslySelectedRows = newRows
         self.sigSelectionChanged.emit(newRows)
 
     def removeSelectedRowsGui(self):
@@ -365,7 +365,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
             return
 
         idList = [
-            idx.siblingAtColumn(self.instIdColIdx).data(QtCore.Qt.ItemDataRole.EditRole)
+            idx.siblingAtColumn(self.instanceIdIndex).data(QtCore.Qt.ItemDataRole.EditRole)
             for idx in self.selectedIndexes()
         ]
         if len(idList) == 0:
@@ -383,7 +383,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         if confirm == dlg.Yes:
             # Proceed with operation
             # Since each selection represents a row, remove duplicate row indices
-            self.mgr.rmComps(idList)
+            self.manager.removeComponents(idList)
             self.clearSelection()
 
     def idsRowsColsFromSelection(
@@ -410,7 +410,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
             row = idx.row()
             # 0th row contains instance ID
             # TODO: If the user is allowed to reorder columns this needs to be revisited
-            idAtIdx = idx.siblingAtColumn(self.instIdColIdx).data(
+            idAtIdx = idx.siblingAtColumn(self.instanceIdIndex).data(
                 QtCore.Qt.ItemDataRole.EditRole
             )
             retLists.append([idAtIdx, row, idx.column()])
@@ -418,7 +418,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         if excludeNoEditCols and len(retLists) > 0:
             # Set diff will eliminate any repeats, so use a slower op that at least preserves
             # duplicates
-            retLists = retLists[~np.isin(retLists[:, 2], self.mgr.noEditColIdxs)]
+            retLists = retLists[~np.isin(retLists[:, 2], self.manager.noEditColIdxs)]
         if len(retLists) == 0:
             retLists.shape = (-1, 3)
         if warnNoneSelection and len(retLists) == 0:
@@ -432,7 +432,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         """
         selection = self.idsRowsColsFromSelection()
         if len(selection):
-            overwriteData = self.mgr.compDf.loc[selection[0, 0]]
+            overwriteData = self.manager.compDf.loc[selection[0, 0]]
             self.setSelectedCellsAs(selection, overwriteData)
 
     def setSelectedCellsAsGui(self, selectionIdxs: TwoDArr = None):
@@ -444,7 +444,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
             selectionIdxs = self.idsRowsColsFromSelection()
         if len(selectionIdxs) == 0:
             return
-        overwriteData = self.mgr.compDf.loc[[selectionIdxs[0, 0]]].copy()
+        overwriteData = self.manager.compDf.loc[[selectionIdxs[0, 0]]].copy()
         with self.actionStack.ignoreActions():
             self.popup.setData(
                 overwriteData,
@@ -474,9 +474,9 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         dupCols = []
         # First, find out all rows for each column to select, then test data at those rows
         for col in np.unique(selectionIdxs[:, 2]):
-            name = self.mgr.compDf.columns[col]
+            name = self.manager.compDf.columns[col]
             ids = selectionIdxs[selectionIdxs[:, 2] == col, 0]
-            data = self.mgr.compDf.loc[ids, name]
+            data = self.manager.compDf.loc[ids, name]
             try:
                 numDups = len(pd.unique(data))
             except TypeError:
@@ -502,9 +502,9 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
             return
         overwriteData = overwriteData.squeeze()
         uniqueIds = pd.unique(selectionIdxs[:, 0])
-        newDataDf = self.mgr.compDf.loc[uniqueIds].copy()
+        newDataDf = self.manager.compDf.loc[uniqueIds].copy()
         # New data ilocs will no longer match, fix this using loc + indexed columns
-        colsForLoc = self.mgr.compDf.columns[selectionIdxs[:, 2]]
+        colsForLoc = self.manager.compDf.columns[selectionIdxs[:, 2]]
         for idxTriplet, colForLoc in zip(selectionIdxs, colsForLoc):
             newDataDf.at[idxTriplet[0], colForLoc] = overwriteData.iat[idxTriplet[2]]
-        self.mgr.addComps(newDataDf, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)
+        self.manager.addComponents(newDataDf, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)

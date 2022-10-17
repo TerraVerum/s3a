@@ -1,6 +1,6 @@
 from utilitys import ActionStack
 from .constants import IMG_PROC_DIR, MULT_PRED_DIR, CFG_DIR
-from .parameditors.algcollection import AlgCollection
+from .parameditors.algcollection import AlgorithmCollection
 from .parameditors.table import TableData
 from .plugins.settings import SettingsPlugin
 from .plugins.shortucts import ShortcutsPlugin
@@ -14,13 +14,13 @@ class SharedAppSettings:
         self.tableData = TableData(makeFilter=True)
         self.filter = self.tableData.filter
 
-        self.imgProcClctn = AlgCollection(
+        self.imageProcessCollection = AlgorithmCollection(
             ImgProcWrapper,
             ImageProcess,
             saveDir=IMG_PROC_DIR,
             template=CFG_DIR / "imageproc.yml",
         )
-        self.multiPredClctn = AlgCollection(
+        self.multiPredictionCollection = AlgorithmCollection(
             saveDir=MULT_PRED_DIR, template=CFG_DIR / "multipred.yml"
         )
 

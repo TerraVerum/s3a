@@ -28,20 +28,20 @@ class MainImagePlugin(ParamEditorPlugin):
         self._hookupDrawActions(win)
         self._hookupSelectionTools(win)
 
-        win.mainImg.addTools(self.toolsEditor)
+        win.mainImage.addTools(self.toolsEditor)
         # No need for a dropdown menu
         self.dock = None
         super().attachWinRef(win)
 
     def _hookupDrawActions(self, win):
-        disp = win.compDisplay
+        disp = win.componentController
 
         def actHandler(verts, param):
             activeEdits = len(self.win.verticesPlugin.region.regionData["Vertices"]) > 0
             if (
                 param in [CNST.DRAW_ACT_REM, CNST.DRAW_ACT_ADD]
                 and not activeEdits
-                and self.win.compDisplay.selectionIntersectsRegion(verts)
+                and self.win.componentController.selectionIntersectsRegion(verts)
             ):
                 warnings.warn(
                     "Made a selection on top of an existing component. It is ambiguous"
@@ -56,7 +56,10 @@ class MainImagePlugin(ParamEditorPlugin):
                 # Don't make selection if edits are already in progress
                 return
             # Special case: Selection with point shape should be a point
-            if self.win.mainImg.shapeCollection.curShapeParam == CNST.DRAW_SHAPE_POINT:
+            if (
+                self.win.mainImage.shapeCollection.shapeParameter
+                == CNST.DRAW_SHAPE_POINT
+            ):
                 verts = verts.mean(0, keepdims=True)
             disp.reflectSelectionBoundsMade(verts)
 
@@ -66,14 +69,14 @@ class MainImagePlugin(ParamEditorPlugin):
             CNST.DRAW_ACT_SELECT,
             CNST.DRAW_ACT_PAN,
         ]
-        win.mainImg.registerDrawAction(acts, actHandler)
+        win.mainImage.registerDrawAction(acts, actHandler)
         # Create checks an edge case for selection, so no need to add to above acts
-        win.mainImg.registerDrawAction(CNST.DRAW_ACT_CREATE, self.createComponent)
+        win.mainImage.registerDrawAction(CNST.DRAW_ACT_CREATE, self.createComponent)
 
     def _hookupCopier(self, win):
-        mainImg = win.mainImg
+        mainImage = win.mainImage
 
-        copier = mainImg.regionMover
+        copier = mainImage.regionMover
 
         def startCopy():
             """
@@ -94,10 +97,10 @@ class MainImagePlugin(ParamEditorPlugin):
 
         self.registerFunc(startMove, btnOpts=CNST.TOOL_MOVE_REGIONS)
         self.registerFunc(startCopy, btnOpts=CNST.TOOL_COPY_REGIONS)
-        copier.sigMoveStopped.connect(win.mainImg.updateFocusedComp)
+        copier.sigMoveStopped.connect(win.mainImage.updateFocusedComponent)
 
     def _hookupSelectionTools(self, win):
-        disp = win.compDisplay
+        disp = win.componentController
         self.registerFunc(
             disp.mergeSelectedComps,
             btnOpts=CNST.TOOL_MERGE_COMPS,
@@ -108,14 +111,14 @@ class MainImagePlugin(ParamEditorPlugin):
 
     @property
     def image(self):
-        return self.win.mainImg.image
+        return self.win.mainImage.image
 
     def createComponent(self, roiVerts: XYVertices):
         verts = np.clip(roiVerts.astype(int), 0, self.image.shape[:2][::-1])
 
         if cv.contourArea(verts) < self.props[CNST.PROP_MIN_COMP_SZ]:
             # Use as selection instead of creation
-            self.win.compDisplay.reflectSelectionBoundsMade(roiVerts[[0]])
+            self.win.componentController.reflectSelectionBoundsMade(roiVerts[[0]])
             return
 
         verts = ComplexXYVertices([verts]).simplify(
@@ -123,4 +126,4 @@ class MainImagePlugin(ParamEditorPlugin):
         )
         newComps = self.tableData.makeCompDf()
         newComps[RTF.VERTICES] = [verts]
-        self.win.addAndFocusComps(newComps)
+        self.win.addAndFocusComponents(newComps)

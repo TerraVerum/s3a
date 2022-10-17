@@ -11,7 +11,7 @@ from ..shared import SharedAppSettings
 from ..logger import getAppLogger
 from ..structures import ComplexXYVertices, OneDArr
 
-__all__ = ["ComponentMgr", "CompTableModel"]
+__all__ = ["ComponentManager", "ComponentTableModel"]
 
 from utilitys import EditorPropsMixin
 
@@ -20,10 +20,11 @@ from utilitys.misc import DeferredActionStackMixin as DASM
 Signal = QtCore.Signal
 
 
-class CompTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
-    # Emits 4-element dict: Deleted comp ids, changed comp ids, added comp ids, renamed indexes.
-    # Renaming is useful when the new id for an added component should be propagated. "-1" new index indicates
-    # that component was deleted (or never added in the first place, in the case of ADD_TYPE_NEW)
+class ComponentTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
+    # Emits 4-element dict: Deleted comp ids, changed comp ids, added comp ids,
+    # renamed indexes. Renaming is useful when the new id for an added component should
+    # be propagated. "-1" new index indicates that component was deleted (or never
+    # added in the first place, in the case of ADD_TYPE_NEW)
     defaultEmitDict = {
         "deleted": np.array([], int),
         "changed": np.array([], int),
@@ -46,7 +47,7 @@ class CompTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
     # Functions required to implement table model
     # ------
     def columnCount(self, *args, **kwargs):
-        return len(self.colTitles)
+        return len(self.columnTitles)
 
     def rowCount(self, *args, **kwargs):
         return len(self.compDf)
@@ -56,7 +57,7 @@ class CompTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
             orientation == QtCore.Qt.Orientation.Horizontal
             and role == QtCore.Qt.ItemDataRole.DisplayRole
         ):
-            return self.colTitles[section]
+            return self.columnTitles[section]
 
     # noinspection PyMethodOverriding
     def data(self, index: QtCore.QModelIndex, role: int) -> Any:
@@ -118,7 +119,7 @@ class CompTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
 
     # noinspection PyAttributeOutsideInit
     def resetFields(self):
-        self.colTitles = [f.name for f in self.tableData.allFields]
+        self.columnTitles = [f.name for f in self.tableData.allFields]
 
         self.compDf = self.tableData.makeCompDf(0)
 
@@ -126,23 +127,23 @@ class CompTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
             f for f in self.tableData.allFields if f.opts.get("readonly", False)
         ]
 
-        self.noEditColIdxs = [self.colTitles.index(col.name) for col in noEditParams]
+        self.noEditColIdxs = [self.columnTitles.index(col.name) for col in noEditParams]
         self.editColIdxs = np.setdiff1d(
-            np.arange(len(self.colTitles)), self.noEditColIdxs
+            np.arange(len(self.columnTitles)), self.noEditColIdxs
         )
         self.sigFieldsChanged.emit()
 
 
-class ComponentMgr(CompTableModel):
-    _nextCompId = 0
+class ComponentManager(ComponentTableModel):
+    _nextComponentId = 0
     compDf: pd.DataFrame
 
     def resetFields(self):
         super().resetFields()
-        self._nextCompId = 0
+        self._nextComponentId = 0
 
     @DASM.undoable("Add/Modify Components")
-    def addComps(
+    def addComponents(
         self,
         newCompsDf: pd.DataFrame,
         addtype: PRJ_ENUMS = PRJ_ENUMS.COMP_ADD_AS_NEW,
@@ -190,7 +191,7 @@ class ComponentMgr(CompTableModel):
         if addtype == PRJ_ENUMS.COMP_ADD_AS_NEW:
             # Treat all comps as new -> set their IDs to guaranteed new values
             newIds = np.arange(
-                self._nextCompId, self._nextCompId + len(newCompsDf), dtype=int
+                self._nextComponentId, self._nextComponentId + len(newCompsDf), dtype=int
             )
             newCompsDf[RTF.INST_ID] = newIds
             dropIds = np.array([], dtype=int)
@@ -198,7 +199,7 @@ class ComponentMgr(CompTableModel):
             # Merge may have been performed with new comps (id -1) mixed in
             needsUpdatedId = newCompsDf.index == RTF.INST_ID.value
             newIds = np.arange(
-                self._nextCompId, self._nextCompId + np.sum(needsUpdatedId), dtype=int
+                self._nextComponentId, self._nextComponentId + np.sum(needsUpdatedId), dtype=int
             )
             newCompsDf.loc[needsUpdatedId, RTF.INST_ID] = newIds
 
@@ -210,7 +211,7 @@ class ComponentMgr(CompTableModel):
         alteredDataDf = self.compDf.loc[np.intersect1d(self.compDf.index, alteredIdxs)]
 
         # Delete entries that were updated to have no vertices
-        toEmit.update(self.rmComps(dropIds, emitChange=False))
+        toEmit.update(self.removeComponents(dropIds, emitChange=False))
         # Now, merge existing IDs and add new ones
         newIds = newCompsDf.index
         newChangedIdxs = np.isin(newIds, existingIds, assume_unique=True)
@@ -241,7 +242,7 @@ class ComponentMgr(CompTableModel):
         toEmit["added"] = newIds[~newChangedIdxs]
         self.layoutChanged.emit()
 
-        self._nextCompId = np.max(self.compDf.index.to_numpy(), initial=-1) + 1
+        self._nextComponentId = np.max(self.compDf.index.to_numpy(), initial=-1) + 1
 
         if emitChange:
             self.sigCompsChanged.emit(toEmit)
@@ -249,13 +250,13 @@ class ComponentMgr(CompTableModel):
         yield toEmit
 
         # Undo add by deleting new components and un-updating existing ones
-        self.addComps(alteredDataDf, PRJ_ENUMS.COMP_ADD_AS_MERGE)
+        self.addComponents(alteredDataDf, PRJ_ENUMS.COMP_ADD_AS_MERGE)
         addedCompIdxs = toEmit["added"]
         if len(addedCompIdxs) > 0:
-            self.rmComps(toEmit["added"])
+            self.removeComponents(toEmit["added"])
 
     @DASM.undoable("Remove Components")
-    def rmComps(
+    def removeComponents(
         self,
         idsToRemove: Union[np.ndarray, type(PRJ_ENUMS)] = PRJ_ENUMS.COMP_RM_ALL,
         emitChange=True,
@@ -292,9 +293,9 @@ class ComponentMgr(CompTableModel):
         coerceDfTypes(self.compDf)
 
         # Determine next ID for new components
-        self._nextCompId = 0
+        self._nextComponentId = 0
         if np.any(tfKeepIdx):
-            self._nextCompId = np.max(existingCompIds[tfKeepIdx].to_numpy()) + 1
+            self._nextComponentId = np.max(existingCompIds[tfKeepIdx].to_numpy()) + 1
 
         # Reflect these changes to the component list
         toEmit["deleted"] = idsToRemove
@@ -307,7 +308,7 @@ class ComponentMgr(CompTableModel):
             return toEmit
 
         # Undo code
-        self.addComps(removedData, PRJ_ENUMS.COMP_ADD_AS_MERGE)
+        self.addComponents(removedData, PRJ_ENUMS.COMP_ADD_AS_MERGE)
 
     @DASM.undoable("Merge Components")
     def mergeCompVertsById(self, mergeIds: OneDArr = None, keepId: int = None):
@@ -333,15 +334,15 @@ class ComponentMgr(CompTableModel):
         keepInfo = mergeComps.loc[keepId].copy()
         keepInfo[RTF.VERTICES] = mergeComps[RTF.VERTICES].s3averts.merge()
 
-        deleted = self.rmComps(mergeComps.index, emitChange=False)["deleted"]
-        toEmit = self.addComps(
+        deleted = self.removeComponents(mergeComps.index, emitChange=False)["deleted"]
+        toEmit = self.addComponents(
             keepInfo.to_frame().T, PRJ_ENUMS.COMP_ADD_AS_MERGE, emitChange=False
         )
         toEmit["deleted"] = np.concatenate([toEmit["deleted"], deleted])
         self.sigCompsChanged.emit(toEmit)
 
         yield
-        self.addComps(mergeComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
+        self.addComponents(mergeComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
 
     @DASM.undoable("Split Components")
     def splitCompVertsById(self, splitIds: OneDArr):
@@ -359,11 +360,11 @@ class ComponentMgr(CompTableModel):
         newComps = splitComps.loc[splitVerts.index].copy()
         newComps[RTF.VERTICES] = splitVerts
         # Keep track of which comps were removed and added by this op
-        outDict = self.rmComps(splitComps.index)
-        outDict.update(self.addComps(newComps))
+        outDict = self.removeComponents(splitComps.index)
+        outDict.update(self.addComponents(newComps))
         yield outDict
-        undoDict = self.rmComps(outDict["ids"])
-        undoDict.update(self.addComps(splitComps, PRJ_ENUMS.COMP_ADD_AS_MERGE))
+        undoDict = self.removeComponents(outDict["ids"])
+        undoDict.update(self.addComponents(splitComps, PRJ_ENUMS.COMP_ADD_AS_MERGE))
         return undoDict
 
     def removeOverlapById(self, overlapIds: OneDArr):
@@ -375,4 +376,4 @@ class ComponentMgr(CompTableModel):
         """
         overlapComps = self.compDf.loc[overlapIds].copy()
         overlapComps[RTF.VERTICES] = overlapComps[RTF.VERTICES].s3averts.removeOverlap()
-        self.addComps(overlapComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
+        self.addComponents(overlapComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)

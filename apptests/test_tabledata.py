@@ -29,41 +29,43 @@ def td():
 
 
 @pytest.fixture
-def newCfg(app):
+def newConfig(app):
     @contextlib.contextmanager
     def newCfg(name: Union[str, Path], cfg: dict):
         td = app.sharedAttrs.tableData
-        oldCfg = td.cfg
-        oldFname = td.cfgFname
-        td.loadCfg(name, cfg)
+        oldCfg = td.config
+        oldFname = td.configPath
+        td.loadConfig(name, cfg)
         yield
-        td.loadCfg(oldFname, oldCfg)
+        td.loadConfig(oldFname, oldCfg)
 
     return newCfg
 
 
 @pytest.mark.withcomps
-def test_no_opt_fields(app, newCfg):
-    app.sharedAttrs.tableData.loadCfg("testcfg", cfgDict, force=True)
-    with newCfg("none", {}):
-        assert len(app.compMgr.compDf) == 0
-        assert app.compMgr.colTitles == list(map(str, REQD_TBL_FIELDS))
+def test_no_opt_fields(app, newConfig):
+    app.sharedAttrs.tableData.loadConfig("testcfg", cfgDict, force=True)
+    with newConfig("none", {}):
+        assert len(app.componentManager.compDf) == 0
+        assert app.componentManager.columnTitles == list(map(str, REQD_TBL_FIELDS))
         newComps = app.sharedAttrs.tableData.makeCompDf(3).reset_index(drop=True)
         dfTester.fillRandomVerts(compDf=newComps)
         # Just make sure no errors are thrown on adding comps
-        app.addAndFocusComps(newComps)
-        assert len(app.compMgr.compDf) == 3
+        app.addAndFocusComponents(newComps)
+        assert len(app.componentManager.compDf) == 3
 
 
-def test_params_for_class(newCfg, app):
-    with newCfg("testcfg", cfgDict):
+def test_params_for_class(newConfig, app):
+    with newConfig("testcfg", cfgDict):
         assert "Class" in [f.name for f in app.sharedAttrs.tableData.allFields]
 
 
 @pytest.mark.withcomps
-def test_no_change(app, newCfg):
-    with newCfg(app.sharedAttrs.tableData.cfgFname, app.sharedAttrs.tableData.cfg):
-        assert len(app.compMgr.compDf) > 0
+def test_no_change(app, newConfig):
+    with newConfig(
+        app.sharedAttrs.tableData.configPath, app.sharedAttrs.tableData.config
+    ):
+        assert len(app.componentManager.compDf) > 0
 
 
 def test_filter():
@@ -87,10 +89,10 @@ def test_filter():
     file = StringIO(mockCfg)
     parsed = fns.yamlLoad(file)
     with pytest.warns(UserWarning):
-        td.loadCfg("testfilter", parsed, force=True)
+        td.loadConfig("testfilter", parsed, force=True)
 
     del parsed["fields"]["Bad"]
-    td.loadCfg(td.cfgFname, parsed, force=True)
+    td.loadConfig(td.configPath, parsed, force=True)
     for name in parsed["fields"]:
         assert name in td.filter.params.names
         assert td.fieldFromName(name)

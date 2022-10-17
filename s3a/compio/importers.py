@@ -259,12 +259,12 @@ registerIoHandler("viaregion", deserialize=VGGImageAnnotatorImporter.parseRegion
 class LblPngImporter(AnnotationImporter):
     ioType = "s3a"
 
-    imgInfo = {}
+    imageInfo = {}
 
     def readFile(self, file: FilePath, labelMapping=None, offset=0, **kwargs):
         try:
             image: Image.Image = Image.open(file)
-            self.imgInfo = image.info
+            self.imageInfo = image.info
             # False positive
             # noinspection PyTypeChecker
             image = np.asarray(image)
@@ -301,7 +301,7 @@ class LblPngImporter(AnnotationImporter):
         # Rename for clarity
         labelImage = self.importObj
         # "Offset" present for numeric data, "mapping" present for textual data
-        info = self.imgInfo
+        info = self.imageInfo
         if labelMapping is None and "labelMapping" in info:
             labelMapping = pd.Series(
                 json.loads(info["labelMapping"]), name=info.get("labelField", None)

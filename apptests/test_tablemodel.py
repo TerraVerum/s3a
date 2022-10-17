@@ -19,13 +19,13 @@ def sampleComps(app):
 
 
 def test_normal_add(sampleComps, mgr):
-    mgr.rmComps()
-    changeList = mgr.addComps(sampleComps)
+    mgr.removeComponents()
+    changeList = mgr.addComponents(sampleComps)
     cmpChangeList(changeList, oldIds)
 
 
 def test_undo_add(sampleComps, mgr):
-    mgr.addComps(sampleComps)
+    mgr.addComponents(sampleComps)
     mgr.actionStack.undo()
     assert len(mgr.compDf) == 0
     mgr.actionStack.redo()
@@ -33,7 +33,7 @@ def test_undo_add(sampleComps, mgr):
 
 
 def test_empty_add(mgr):
-    changeList = mgr.addComps(mgr.tableData.makeCompDf(0))
+    changeList = mgr.addComponents(mgr.tableData.makeCompDf(0))
     cmpChangeList(changeList)
 
 
@@ -42,33 +42,33 @@ def test_rm_by_empty_vert_add(sampleComps, mgr):
     perm = RND.permutation(NUM_COMPS)
     deleteIdxs = np.sort(perm[:numDeletions])
     changeIdxs = np.sort(perm[numDeletions:])
-    changes = mgr.addComps(sampleComps)
+    changes = mgr.addComponents(sampleComps)
     sampleComps[REQD_TBL_FIELDS.INST_ID] = changes["ids"]
 
     # List assignment behaves poorly for list-inherited objs (like frcomplexverts) so
     # use individual assignment
     for idx in deleteIdxs:
         sampleComps.at[idx, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices()
-    changeList = mgr.addComps(sampleComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
+    changeList = mgr.addComponents(sampleComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
     cmpChangeList(changeList, deleted=deleteIdxs, changed=changeIdxs)
 
 
 def test_double_add(sampleComps, mgr):
-    changeList = mgr.addComps(sampleComps, PRJ_ENUMS.COMP_ADD_AS_NEW)
+    changeList = mgr.addComponents(sampleComps, PRJ_ENUMS.COMP_ADD_AS_NEW)
     cmpChangeList(changeList, added=oldIds)
 
     # Should be new IDs during 'add as new'
-    changeList = mgr.addComps(sampleComps, PRJ_ENUMS.COMP_ADD_AS_NEW)
+    changeList = mgr.addComponents(sampleComps, PRJ_ENUMS.COMP_ADD_AS_NEW)
     cmpChangeList(changeList, added=oldIds + NUM_COMPS)
 
 
 def test_change_comps(sampleComps, mgr):
-    changeList = mgr.addComps(sampleComps, PRJ_ENUMS.COMP_ADD_AS_NEW)
+    changeList = mgr.addComponents(sampleComps, PRJ_ENUMS.COMP_ADD_AS_NEW)
     cmpChangeList(changeList, added=oldIds)
     sampleComps[REQD_TBL_FIELDS.INST_ID] = changeList["ids"]
 
     newVerts = dfTester.fillRandomVerts(compDf=sampleComps)
-    changeList = mgr.addComps(sampleComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
+    changeList = mgr.addComponents(sampleComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
     cmpChangeList(changeList, changed=oldIds)
     assert (
         newVerts == mgr.compDf[REQD_TBL_FIELDS.VERTICES].to_list()
@@ -79,38 +79,38 @@ def test_rm_comps(sampleComps, mgr):
     ids = np.arange(NUM_COMPS, dtype=int)
 
     # Standard remove
-    mgr.addComps(sampleComps)
-    changeList = mgr.rmComps(ids)
+    mgr.addComponents(sampleComps)
+    changeList = mgr.removeComponents(ids)
     cmpChangeList(changeList, deleted=ids)
 
     # Remove when ids don't exist
-    changeList = mgr.rmComps(ids)
+    changeList = mgr.removeComponents(ids)
     cmpChangeList(changeList)
 
     # Remove all
     for _ in range(10):
-        mgr.addComps(sampleComps)
+        mgr.addComponents(sampleComps)
     prevIds = mgr.compDf[REQD_TBL_FIELDS.INST_ID].values
-    changeList = mgr.rmComps()
+    changeList = mgr.removeComponents()
     cmpChangeList(changeList, deleted=prevIds)
 
     # Remove single
-    mgr.addComps(sampleComps)
-    mgr.rmComps(sampleComps.index[0])
+    mgr.addComponents(sampleComps)
+    mgr.removeComponents(sampleComps.index[0])
 
 
 def test_rm_undo(sampleComps, mgr):
     ids = np.arange(NUM_COMPS, dtype=int)
 
     # Standard remove
-    mgr.addComps(sampleComps)
-    mgr.rmComps(ids)
+    mgr.addComponents(sampleComps)
+    mgr.removeComponents(ids)
     mgr.actionStack.undo()
     assert np.setdiff1d(ids, mgr.compDf.index).size == 0
 
 
 def test_merge_comps(sampleComps, mgr):
-    mgr.addComps(sampleComps)
+    mgr.addComponents(sampleComps)
     mgr.mergeCompVertsById(sampleComps.index)
     assert len(mgr.compDf) == 1
     mgr.actionStack.undo()
@@ -118,7 +118,7 @@ def test_merge_comps(sampleComps, mgr):
 
 
 def test_bad_merge(sampleComps, mgr):
-    mgr.addComps(sampleComps)
+    mgr.addComponents(sampleComps)
     with pytest.warns(UserWarning):
         mgr.mergeCompVertsById([0])
     with pytest.warns(UserWarning):
@@ -126,7 +126,7 @@ def test_bad_merge(sampleComps, mgr):
 
 
 def test_table_setdata(sampleComps, app, mgr):
-    mgr.addComps(sampleComps)
+    mgr.addComponents(sampleComps)
 
     _ = REQD_TBL_FIELDS
     colVals = {
@@ -137,7 +137,7 @@ def test_table_setdata(sampleComps, app, mgr):
 
     for col, newVal in intColMapping.items():
         row = RND.integers(NUM_COMPS)
-        idx = app.compTbl.model().index(row, col)
+        idx = app.componentTable.model().index(row, col)
         oldVal = mgr.data(idx, QtCore.Qt.ItemDataRole.EditRole)
         mgr.setData(idx, newVal)
         # Test with no change
@@ -148,7 +148,7 @@ def test_table_setdata(sampleComps, app, mgr):
 
 
 def test_table_getdata(sampleComps, mgr):
-    mgr.addComps(sampleComps)
+    mgr.addComponents(sampleComps)
     idx = mgr.index(0, list(REQD_TBL_FIELDS).index(REQD_TBL_FIELDS.IMG_FILE))
     dataVal = sampleComps.iat[0, idx.column()]
     assert mgr.data(idx, QtCore.Qt.ItemDataRole.EditRole) == dataVal

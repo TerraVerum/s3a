@@ -253,7 +253,7 @@ class AnnotationImporter(AnnotationIOBase):
         """
 
         # Make a copy to allow for internal changes such as adding extra required fields, aliasing, etc.
-        # 'and' avoids asking for 'cfg' of 'none' table
+        # 'and' avoids asking for 'config' of 'none' table
         super().__init__(ioType=ioType)
         if tableData is None:
             tableData = TableData()
@@ -273,14 +273,14 @@ class AnnotationImporter(AnnotationIOBase):
             # Make sure not to incorporate fields that only exist to provide logistics for the other table setup
             optionalFields = {
                 key: val
-                for key, val in tableData.cfg["fields"].items()
+                for key, val in tableData.config["fields"].items()
                 if key not in tableData.template["fields"]
             }
             optionalCfg = {"fields": optionalFields}
         else:
             optionalCfg = None
         self.tableData.template = requiredCfg
-        self.tableData.loadCfg(cfgDict=optionalCfg)
+        self.tableData.loadConfig(configDict=optionalCfg)
 
     def readFile(self, file: FilePath, **kwargs):
         raise NotImplementedError

@@ -16,8 +16,8 @@ _yamlReps = [
 
 
 class YamlParser:
-    def __init__(self, cfg: dict):
-        self.cfg = cfg
+    def __init__(self, config: dict):
+        self.config = config
 
     @lru_cache(maxsize=None)
     def __getitem__(self, paramName: NestedIndexer):
@@ -82,7 +82,7 @@ class YamlParser:
     def getNestedCfgName(self, namePath: NestedIndexer):
         if isinstance(namePath, str):
             namePath = (namePath,)
-        out = self.cfg
+        out = self.config
         while len(namePath) > 0:
             out = out[namePath[0]]
             namePath = namePath[1:]

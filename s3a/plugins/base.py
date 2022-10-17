@@ -18,19 +18,19 @@ class ProcessorPlugin(ParamEditorPlugin):
     """
 
     @property
-    def curProcessor(self):
-        return self.procEditor.curProcessor
+    def currentProcessor(self):
+        return self.procEditor.currentProcessor
 
-    @curProcessor.setter
-    def curProcessor(self, newProcessor: Union[str, NestedProcWrapper]):
+    @currentProcessor.setter
+    def currentProcessor(self, newProcessor: Union[str, NestedProcWrapper]):
         self.procEditor.changeActiveProcessor(newProcessor)
 
 
 class TableFieldPlugin(ProcessorPlugin):
-    mainImg = None
+    mainImage = None
     """
     Holds a reference to the focused image and set when the s3a reference is set. 
-    This is useful for most table field plugins, since mainImg will hold a reference to 
+    This is useful for most table field plugins, since mainImage will hold a reference to 
     the component series that is modified by the plugins.
     """
 
@@ -40,20 +40,20 @@ class TableFieldPlugin(ProcessorPlugin):
 
     # @property
     # def parentMenu(self):
-    #   return self.win.tblFieldToolbar
+    #   return self.win.tableFieldToolbar
 
     def attachWinRef(self, win):
         super().attachWinRef(win)
-        self.mainImg = mainImg = win.mainImg
+        self.mainImage = mainImage = win.mainImage
         win.sigRegionAccepted.connect(self.acceptChanges)
-        mainImg.sigUpdatedFocusedComp.connect(self.updateFocusedComp)
+        mainImage.sigUpdatedFocusedComponent.connect(self.updateFocusedComponent)
         self.active = True
         self.registerFunc(
             self.processorAnalytics, btnOpts=PRJ_CONSTS.TOOL_PROC_ANALYTICS
         )
 
     def processorAnalytics(self):
-        proc = self.curProcessor
+        proc = self.currentProcessor
         try:
             proc.processor.stageSummaryGui()
         except NotImplementedError:
@@ -61,10 +61,10 @@ class TableFieldPlugin(ProcessorPlugin):
                 f"Processor type {type(proc)} does not implement summary analytics."
             )
 
-    def updateFocusedComp(self, newComp: pd.Series = None):
+    def updateFocusedComponent(self, newComp: pd.Series = None):
         """
         This function is called when a new component is created or the focused image is updated
-        from the main view. See :meth:`MainImage.updateFocusedComp` for parameters.
+        from the main view. See :meth:`MainImage.updateFocusedComponent` for parameters.
         """
         pass
 

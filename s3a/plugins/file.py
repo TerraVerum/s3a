@@ -54,7 +54,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
 
     def __init__(self, startupName: FilePath = None, startupCfg: dict = None):
         super().__init__()
-        self.projData = self.exposes(ProjectData(startupName, startupCfg))
+        self.projectData = self.exposes(ProjectData(startupName, startupCfg))
         self.autosaveTimer = QtCore.QTimer()
 
         self.registerFunc(self.save, btnOpts=CNST.TOOL_PROJ_SAVE)
@@ -71,7 +71,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         )
 
         self.registerFunc(
-            lambda: self.win.setMainImgGui(), btnOpts=CNST.TOOL_PROJ_ADD_IMG
+            lambda: self.win.setMainImageGui(), btnOpts=CNST.TOOL_PROJ_ADD_IMG
         )
         self.registerFunc(
             lambda: self.win.openAnnotationGui(), btnOpts=CNST.TOOL_PROJ_ADD_ANN
@@ -81,47 +81,47 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
             [self.startAutosave, self.stopAutosave], btnOpts=CNST.TOOL_AUTOSAVE
         )
 
-        self._projImgMgr = ProjectImageManager()
-        self._projImgMgr.sigImageSelected.connect(
-            lambda imgFname: self.win.setMainImg(imgFname)
+        self._projectImagePane = ProjectImagePane()
+        self._projectImagePane.sigImageSelected.connect(
+            lambda imgFname: self.win.setMainImage(imgFname)
         )
-        self.projData.sigCfgLoaded.connect(
-            lambda: self._projImgMgr.setRootDir(str(self.projData.imagesDir))
+        self.projectData.sigConfigLoaded.connect(
+            lambda: self._projectImagePane.setRootDirectory(
+                str(self.projectData.imagesPath)
+            )
         )
 
         def onCfgLoad():
-            self._updateProjLbl()
+            self._updateProjectLabel()
             if self.win:
                 # Other arguments are consumed by app state editor
                 state = self.win.appStateEditor
                 if state.loading:
-                    hierarchicalUpdate(state.startupSettings, self.projData.startup)
+                    hierarchicalUpdate(state.startupSettings, self.projectData.startup)
                 else:
                     # Opening a project after s3a is already loaded
-                    state.loadParamValues(stateDict={}, **self.projData.startup)
+                    state.loadParamValues(stateDict={}, **self.projectData.startup)
 
-        self.projData.sigCfgLoaded.connect(onCfgLoad)
+        self.projectData.sigConfigLoaded.connect(onCfgLoad)
 
         self.projNameLbl = QtWidgets.QLabel()
 
         useDefault = startupName is None and startupCfg is None
         self._createDefaultProj(useDefault)
 
-    def _updateProjLbl(self):
-        self.projNameLbl.setText(f"Project: {self.projData.cfgFname.name}")
-        self.projNameLbl.setToolTip(str(self.projData.cfgFname))
+    def _updateProjectLabel(self):
+        self.projNameLbl.setText(f"Project: {self.projectData.configPath.name}")
+        self.projNameLbl.setToolTip(str(self.projectData.configPath))
 
     def _buildIoOpts(self):
-        """
-        Builds export option parameters for user interaction. Assumes export popout funcs have already been created
-        """
-        compIo = self.projData.compIo
+        """Builds export option parameters for user interaction. Assumes export popout funcs have already been created"""
+        componentIo = self.projectData.componentIo
         exportOptsParam = fns.getParamChild(
             self.toolsEditor.params, CNST.TOOL_PROJ_EXPORT.name, "Export Options"
         )
         # Use a wrapper to easily get hyperparams created
         for name, fn in inspect.getmembers(
-            compIo, lambda el: isinstance(el, AnnotationExporter)
+            componentIo, lambda el: isinstance(el, AnnotationExporter)
         ):
             metadata = fn.optsMetadata()
             for child in metadata.values():
@@ -137,18 +137,18 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
 
     def attachWinRef(self, win):
         super().attachWinRef(win)
-        self.projData.compIo.tableData = win.sharedAttrs.tableData
-        win.statBar.addPermanentWidget(self.projNameLbl)
+        self.projectData.componentIo.tableData = win.sharedAttrs.tableData
+        win.statusBar().addPermanentWidget(self.projNameLbl)
 
         def handleExport(_dir):
-            saveImg = win.srcImgFname
-            ret = str(self.projData.cfgFname)
+            saveImg = win.sourceImagePath
+            ret = str(self.projectData.configPath)
             if not saveImg:
-                self.projData.startup.pop("image", None)
+                self.projectData.startup.pop("image", None)
                 return ret
-            if saveImg and saveImg.parent == self.projData.imagesDir:
+            if saveImg and saveImg.parent == self.projectData.imagesPath:
                 saveImg = saveImg.name
-            self.projData.startup["image"] = str(saveImg)
+            self.projectData.startup["image"] = str(saveImg)
             self.save()
             return ret
 
@@ -190,11 +190,11 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         def startImg(imgName: str):
             imgName = Path(imgName)
             if not imgName.is_absolute():
-                imgName = self.projData.imagesDir / imgName
+                imgName = self.projectData.imagesPath / imgName
             if not imgName.exists():
                 return
-            addedName = self.projData.addImage(imgName)
-            self.win.setMainImg(addedName or imgName)
+            addedName = self.projectData.addImage(imgName)
+            self.win.setMainImage(addedName or imgName)
 
         win.appStateEditor.addImportExportOpts("image", startImg, lambda *args: None, 1)
 
@@ -221,18 +221,18 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
             docFunc=win.exportCurAnnotation,
         )
         doctoredAll = AtomicProcess(
-            exportWrapper(self.projData.exportAnnotations),
-            docFunc=self.projData.exportAnnotations,
+            exportWrapper(self.projectData.exportAnnotations),
+            docFunc=self.projectData.exportAnnotations,
         )
         self.registerPopoutFuncs(
-            [self.projData.exportProj, doctoredAll, doctoredCur],
+            [self.projectData.exportProject, doctoredAll, doctoredCur],
             ["Project", "All Annotations", "Current Annotation"],
             btnOpts=CNST.TOOL_PROJ_EXPORT,
         )
-        self._projImgMgr.hide()
-        self._updateProjLbl()
+        self._projectImagePane.hide()
+        self._updateProjectLabel()
         win.addTabbedDock(
-            QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self._projImgMgr
+            QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self._projectImagePane
         )
         self.exportOptsParam = self._buildIoOpts()
 
@@ -242,22 +242,22 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         if not setAsCur:
             for prj in defaultName.glob(f"*.{PROJ_FILE_TYPE}"):
                 prj.unlink()
-        parent = self.projData if setAsCur else None
+        parent = self.projectData if setAsCur else None
         if setAsCur or not defaultName.exists():
             # Otherwise, no action needed
-            self.projData.create(name=defaultName, parent=parent)
+            self.projectData.create(name=defaultName, parent=parent)
 
-    def open(self, cfgFname: FilePath = None, cfgDict: dict = None):
-        if cfgFname is None and cfgDict is None:
+    def open(self, configPath: FilePath = None, cfgDict: dict = None):
+        if configPath is None and cfgDict is None:
             # Do nothing, happens when e.g. intentionally not loading a project
             return
-        _, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
-        if cfgFname is not None and (
-            absolutePath(cfgFname) != self.projData.cfgFname
-            or not pg.eq(cfgDict, self.projData.cfg)
+        _, cfgDict = fns.resolveYamlDict(configPath, cfgDict)
+        if configPath is not None and (
+            absolutePath(configPath) != self.projectData.configPath
+            or not pg.eq(cfgDict, self.projectData.config)
         ):
-            self.win.setMainImg(None)
-            self.projData.loadCfg(cfgFname, cfgDict, force=True)
+            self.win.setMainImage(None)
+            self.projectData.loadConfig(configPath, cfgDict, force=True)
 
     def openGui(self):
         fname = fns.popupFilePicker(
@@ -268,7 +268,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
 
     def save(self):
         self.win.saveCurAnnotation()
-        self.projData.saveCfg()
+        self.projectData.saveConfig()
         getAppLogger(__name__).attention("Saved project")
 
     @fns.dynamicDocstring(ioTypes=["<Unchanged>"] + list(defaultIo.roundTripTypes))
@@ -288,13 +288,13 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         """
         if tableConfig is not None:
             tableConfig = Path(tableConfig)
-            self.projData.tableData.loadCfg(tableConfig)
+            self.projectData.tableData.loadConfig(tableConfig)
         if (
             annotationFormat is not None
-            and annotationFormat in self.projData.compIo.importTypes
-            and annotationFormat in self.projData.compIo.exportTypes
+            and annotationFormat in self.projectData.componentIo.importTypes
+            and annotationFormat in self.projectData.componentIo.exportTypes
         ):
-            self.projData.cfg["annotation-format"] = annotationFormat
+            self.projectData.config["annotation-format"] = annotationFormat
 
     @fns.dynamicDocstring(ioTypes=list(defaultIo.exportTypes))
     def startAutosave(
@@ -369,15 +369,15 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         getAppLogger(__name__).attention(f"Stopped autosaving")
 
     def showProjImgsGui(self):
-        if len(self.projData.images) == 0:
+        if len(self.projectData.images) == 0:
             getAppLogger(__name__).warning(
                 "This project does not have any images yet. You can add them either in\n"
                 "`Project Settings... > Add Image Files` or\n"
                 "`File > Add New Image`."
             )
             return
-        self._projImgMgr.show()
-        self._projImgMgr.raise_()
+        self._projectImagePane.show()
+        self._projectImagePane.raise_()
 
     def addImagesGui(self):
         wiz = QtWidgets.QWizard()
@@ -385,7 +385,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         wiz.addPage(page)
         if wiz.exec_():
             for file in page.fileList.files:
-                self.projData.addImageByPath(file)
+                self.projectData.addImageByPath(file)
 
     def addAnnotationsGui(self):
         wiz = QtWidgets.QWizard()
@@ -395,7 +395,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
             # Make sure if a file is added on top of the current image, recent changes don't get lost
             self.win.saveCurAnnotation()
             for file in page.fileList.files:
-                self.projData.addAnnotationByPath(file)
+                self.projectData.addAnnotationByPath(file)
 
     def createGui(self):
         wiz = NewProjectWizard(self)
@@ -415,7 +415,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         else:
             baseCfg = {}
         projPath = Path(wiz.projSettings["Location"]) / projName
-        outPrj = self.projData.create(name=projPath, cfg=baseCfg)
+        outPrj = self.projectData.create(name=projPath, cfg=baseCfg)
         if prevTemplate:
             prevTemplateLoc = Path(prevTemplate).parent
             if settings["Keep Existing Images"]:
@@ -427,7 +427,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         for ann in annotations:
             outPrj.addAnnotation(ann)
 
-        self.open(outPrj.cfgFname)
+        self.open(outPrj.configPath)
 
 
 class NewProjectWizard(QtWidgets.QWizard):
@@ -528,7 +528,7 @@ def getFileListGui(wizard, _flist: DropList, _title: str, _selectFolder=False):
     _flist.addItems(files)
 
 
-class ProjectImageManager(QtWidgets.QDockWidget):
+class ProjectImagePane(QtWidgets.QDockWidget):
     sigImageSelected = QtCore.Signal(str)  # Selected image name
     sigDeleteRequested = QtCore.Signal(str)  # Image name to delete
 
@@ -569,7 +569,7 @@ class ProjectImageManager(QtWidgets.QDockWidget):
     def _filterFiles(self, text):
         self.fileModel.setNameFilters([f"*{text}*"])
 
-    def setRootDir(self, rootDir: FilePath):
+    def setRootDirectory(self, rootDir: FilePath):
         self.rootDir = Path(rootDir).absolute()
         rootDir = str(self.rootDir)
         rootIdx = self.fileModel.index(rootDir)
@@ -580,7 +580,7 @@ class ProjectImageManager(QtWidgets.QDockWidget):
 
 
 class ProjectData(QtCore.QObject):
-    sigCfgLoaded = QtCore.Signal()
+    sigConfigLoaded = QtCore.Signal()
 
     sigImagesAdded = QtCore.Signal(object)
     """List[Path] of added images"""
@@ -598,29 +598,29 @@ class ProjectData(QtCore.QObject):
     sigAnnotationsRemoved = QtCore.Signal(object)
     """List[Path]"""
 
-    def __init__(self, cfgFname: FilePath = None, cfgDict: dict = None):
+    def __init__(self, configPath: FilePath = None, cfgDict: dict = None):
         super().__init__()
-        self.compIo = ComponentIO()
+        self.componentIo = ComponentIO()
         self.templateName = PROJ_BASE_TEMPLATE
-        self.cfg = fns.attemptFileLoad(self.templateName)
-        self.cfgFname: Optional[Path] = None
+        self.config = fns.attemptFileLoad(self.templateName)
+        self.configPath: Optional[Path] = None
         self.images: List[Path] = []
-        self.baseImgDirs: Set[Path] = set()
-        self.imgToAnnMapping: Dict[Path, Path] = {}
+        self.imageDirectories: Set[Path] = set()
+        self.imageAnnotationMap: Dict[Path, Path] = {}
         """Records annotations belonging to each image"""
         self.spawnedPlugins: List[ParamEditorPlugin] = []
-        """Plugin instances stored separately from plugin-cfg to maintain serializability of self.cfg"""
+        """Plugin instances stored separately from plugin-cfg to maintain serializability of self.config"""
 
         self._suppressSignals = False
         """If this is *True*, no signals will be emitted """
         self.watcher = QtCore.QFileSystemWatcher()
         self.watcher.directoryChanged.connect(self._handleDirChange)
 
-        if cfgFname is not None or cfgDict is not None:
-            self.loadCfg(cfgFname, cfgDict)
+        if configPath is not None or cfgDict is not None:
+            self.loadConfig(configPath, cfgDict)
 
     def _handleDirChange(self):
-        imgs = list(self.imagesDir.glob("*.*"))
+        imgs = list(self.imagesPath.glob("*.*"))
         # Images already in the project will be ignored on add
         newImgs = []
         for img in imgs:
@@ -633,75 +633,84 @@ class ProjectData(QtCore.QObject):
         delImgs = []
         delIdxs = []
         for ii, img in enumerate(self.images):
-            if img.parent == self.imagesDir and img not in imgs:
+            if img.parent == self.imagesPath and img not in imgs:
                 delIdxs.append(ii)
                 delImgs.append(img)
         for idx in delIdxs:
             del self.images[idx]
         self.sigImagesRemoved.emit(delImgs)
 
-        anns = list(self.annotationsDir.glob(f'*.{self.cfg["annotation-format"]}'))
+        anns = list(self.annotationsPath.glob(f'*.{self.config["annotation-format"]}'))
         # Images already in the project will be ignored on add
         # Assume new annotations here are already formatted properly
         for ann in anns:
-            if ann not in self.imgToAnnMapping.values():
+            if ann not in self.imageAnnotationMap.values():
                 self.addFormattedAnnotation(ann)
         # Convert to list to avoid "dictionary changed size on iteration" error
-        for ann in list(self.imgToAnnMapping.values()):
+        for ann in list(self.imageAnnotationMap.values()):
             if ann not in anns:
                 self.removeAnnotation(ann)
 
     @property
     def location(self):
-        return self.cfgFname.parent if self.cfgFname else None
+        return self.configPath.parent if self.configPath else None
 
     @property
-    def imagesDir(self):
+    def imagesPath(self):
         return self.location / "images"
 
     @property
-    def annotationsDir(self):
+    def annotationsPath(self):
         return self.location / "annotations"
 
     @property
     def startup(self):
-        return self.cfg["startup"]
+        return self.config["startup"]
 
     @property
-    def pluginCfg(self) -> Dict[str, str]:
-        return self.cfg["plugin-cfg"]
+    def pluginConfig(self) -> Dict[str, str]:
+        return self.config["plugin-cfg"]
 
     @property
     def tableData(self):
-        return self.compIo.tableData
+        return self.componentIo.tableData
 
-    def clearImgsAndAnns(self):
+    def clearImagesAndAnnotations(self):
         oldImgs = self.images.copy()
-        for lst in self.images, self.imgToAnnMapping, self.baseImgDirs:
+        for lst in self.images, self.imageAnnotationMap, self.imageDirectories:
             lst.clear()
         self._maybeEmit(self.sigImagesRemoved, oldImgs)
 
-    def loadCfg(self, cfgFname: FilePath, cfgDict: dict = None, force=False):
+    def loadConfig(self, configPath: FilePath, configDict: dict = None, force=False):
         """
-        Loads the specified project configuration by name (if a file) or dict (if programmatically created)
-        :param cfgFname: Name of file to open. If `cfgDict` is provided instead, it will be saved here.
-        :param cfgDict: If provided, this config is used and saved to `cfgFname` instead of using the file.
-        :param force: If *True*, the new config will be loaded even if it is the same name as the
-          current config
+        Parameters
+        ----------
+        Loads the specified project configuration by name (if a file) or dict (if
+        programmatically created)
+
+        configPath
+            Name of file to open. If `configDict` is provided instead, it will be
+            saved here.
+        configDict
+            If provided, this config is used and saved to `configPath` instead of
+            using the file.
+        force
+            If *True*, the new config will be loaded even if it is the same name
+            as the current config
         """
         _, baseCfgDict = fns.resolveYamlDict(self.templateName)
-        cfgFname, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
-        cfgFname = absolutePath(cfgFname)
-        if not force and self.cfgFname == cfgFname:
+        configPath, configDict = fns.resolveYamlDict(configPath, configDict)
+        configPath = absolutePath(configPath)
+        if not force and self.configPath == configPath:
             return None
 
-        hierarchicalUpdate(baseCfgDict, cfgDict, uniqueListElements=True)
+        hierarchicalUpdate(baseCfgDict, configDict, uniqueListElements=True)
 
         loadPrjPlugins = baseCfgDict.get("plugin-cfg", {})
         newPlugins = {
-            k: v for (k, v) in loadPrjPlugins.items() if k not in self.pluginCfg
+            k: v for (k, v) in loadPrjPlugins.items() if k not in self.pluginConfig
         }
-        removedPlugins = set(self.pluginCfg).difference(loadPrjPlugins)
+        removedPlugins = set(self.pluginConfig).difference(loadPrjPlugins)
         if removedPlugins:
             raise ValueError(
                 f"The previous project loaded custom plugins, which cannot easily"
@@ -726,12 +735,12 @@ class ProjectData(QtCore.QObject):
                 UserWarning,
             )
 
-        self.cfgFname = cfgFname
-        cfg = self.cfg = baseCfgDict
+        self.configPath = configPath
+        cfg = self.config = baseCfgDict
 
-        self.clearImgsAndAnns()
+        self.clearImagesAndAnnotations()
 
-        tableInfo = cfg.get("table-cfg", None)
+        tableInfo = cfg.get("table-config", None)
         if isinstance(tableInfo, str):
             tableDict = None
             tableName = tableInfo
@@ -739,49 +748,53 @@ class ProjectData(QtCore.QObject):
             if tableInfo is None:
                 tableInfo = {}
             tableDict = tableInfo
-            tableName = cfgFname
+            tableName = configPath
         tableName = Path(tableName)
-        if not tableName.is_absolute() and cfgFname:
+        if not tableName.is_absolute() and configPath:
             tableName = self.location / tableName
-        self.tableData.loadCfg(tableName, tableDict, force=True)
+        self.tableData.loadConfig(tableName, tableDict, force=True)
 
-        if cfgFname:
-            self._hookupProjDirInfo()
+        if configPath:
+            self._hookupProjectDirectoryInfo()
 
-        self.sigCfgLoaded.emit()
-        return self.cfgFname
+        self.sigConfigLoaded.emit()
+        return self.configPath
 
-    def _hookupProjDirInfo(self):
+    def _hookupProjectDirectoryInfo(self):
         """
         For projects that have backing files (i.e. the config is a file instead of a dict in memory), this function
         handles creating images/annotations dirs, adding project images/annotations, and adding file watchers
         """
-        self.annotationsDir.mkdir(exist_ok=True)
-        self.imagesDir.mkdir(exist_ok=True)
+        self.annotationsPath.mkdir(exist_ok=True)
+        self.imagesPath.mkdir(exist_ok=True)
 
         allAddedImages = []
         with self.suppressSignals():
             allAddedImages.extend(
-                self.addImageFolder(self.imagesDir, copyToProject=False)
+                self.addImageFolder(self.imagesPath, copyToProject=False)
             )
             # Leave out for now due to the large number of problems with lacking idempotence
             # allAddedImages.extend(self._addConfigImages())
         self._maybeEmit(self.sigImagesAdded, allAddedImages)
 
         with self.suppressSignals():
-            for file in self.annotationsDir.glob(f'*.{self.cfg["annotation-format"]}'):
+            for file in self.annotationsPath.glob(
+                f'*.{self.config["annotation-format"]}'
+            ):
                 self.addFormattedAnnotation(file)
             # Leave out for now due to the large number of problems with lacking idempotence
             # self._addConfigAnnotations()
 
-        self._maybeEmit(self.sigAnnotationsAdded, list(self.imgToAnnMapping.values()))
+        self._maybeEmit(
+            self.sigAnnotationsAdded, list(self.imageAnnotationMap.values())
+        )
 
         dirs = self.watcher.directories()
         if dirs:
             self.watcher.removePaths(dirs)
-        self.watcher.addPaths([str(self.imagesDir), str(self.annotationsDir)])
+        self.watcher.addPaths([str(self.imagesPath), str(self.annotationsPath)])
         for ioType in PRJ_ENUMS.IO_EXPORT, PRJ_ENUMS.IO_IMPORT:
-            self.compIo.updateOpts(ioType, srcDir=self.imagesDir)
+            self.componentIo.updateOpts(ioType, srcDir=self.imagesPath)
 
     @classmethod
     def create(
@@ -808,12 +821,12 @@ class ProjectData(QtCore.QObject):
 
         if not name.exists() and cfg is None:
             cfg = {}
-        parent.loadCfg(name, cfg)
+        parent.loadConfig(name, cfg)
 
-        parent.saveCfg()
+        parent.saveConfig()
         return parent
 
-    def saveCfg(self, copyMissingItems=False):
+    def saveConfig(self, copyMissingItems=False):
         """
         Saves the config file, optionally copying missing items to the project location as well. "Missing items" are
         images and annotations in base folders / existing in the project config but not in the actual project directory
@@ -824,31 +837,31 @@ class ProjectData(QtCore.QObject):
             for annotation in self._findMissingAnnotations():
                 self.addAnnotationByPath(annotation)
 
-        tblName = Path(self.tableData.cfgFname).absolute()
-        if tblName != self.cfgFname:
+        tblName = Path(self.tableData.configPath).absolute()
+        if tblName != self.configPath:
             if tblName.parent == self.location:
                 tblName = tblName.name
-            self.cfg["table-cfg"] = str(tblName)
-        fns.saveToFile(self.cfg, self.cfgFname)
+            self.config["table-config"] = str(tblName)
+        fns.saveToFile(self.config, self.configPath)
 
     def _findMissingAnnotations(self):
-        annDir = self.annotationsDir
+        annDir = self.annotationsPath
         missingAnns = []
-        for img, ann in self.imgToAnnMapping.items():
+        for img, ann in self.imageAnnotationMap.items():
             if ann.parent != annDir:
                 missingAnns.append(str(ann))
         return missingAnns
 
     def _findMissingImages(self):
         location = self.location
-        imgDir = self.imagesDir
+        imgDir = self.imagesPath
         strImgNames = []
-        for folder in self.baseImgDirs:
+        for folder in self.imageDirectories:
             if location in folder.parents:
                 folder = folder.relative_to(location)
             strImgNames.append(str(folder))
         for img in self.images:
-            if img.parent == imgDir or img.parent in self.baseImgDirs:
+            if img.parent == imgDir or img.parent in self.imageDirectories:
                 # This image is already accounted for in the base directories
                 continue
             strImgNames.append(str(absolutePath(img)))
@@ -856,7 +869,7 @@ class ProjectData(QtCore.QObject):
 
     def _addConfigImages(self):
         addedImages = []
-        for image in self.cfg.get("images", []):
+        for image in self.config.get("images", []):
             if isinstance(image, dict):
                 image.setdefault("copyToProject", True)
                 renamed = self.addImage(**image)
@@ -867,7 +880,9 @@ class ProjectData(QtCore.QObject):
         return addedImages
 
     def _addConfigAnnotations(self):
-        for annotation in set(self.cfg.get("annotations", [])) - {self.annotationsDir}:
+        for annotation in set(self.config.get("annotations", [])) - {
+            self.annotationsPath
+        }:
             if isinstance(annotation, dict):
                 self.addAnnotation(**annotation)
             else:
@@ -905,9 +920,9 @@ class ProjectData(QtCore.QObject):
         """Returns None if an image with the same name already exists in the project, else the new full filepath"""
         fullName = Path(name)
         if not fullName.is_absolute():
-            fullName = self.imagesDir / fullName
+            fullName = self.imagesPath / fullName
         if copyToProject or data is not None:
-            fullName = self._copyImgToProj(fullName, data, allowOverwrite)
+            fullName = self._copyImageToProject(fullName, data, allowOverwrite)
         if fullName.name in [i.name for i in self.images]:
             # Indicate the image was already present to calling scope
             return None
@@ -918,7 +933,7 @@ class ProjectData(QtCore.QObject):
         # yield name
         # self.removeImage(name)
 
-    def changeImgPath(self, oldName: Path, newName: Path = None):
+    def changeImagePath(self, oldName: Path, newName: Path = None):
         """
         Changes the filepath associated with a project image. Note that this doesn't do anything to the path
         of either oldName or newName (i.e. the actual image isn't moved/copied/etc.), it just changes the association
@@ -940,7 +955,7 @@ class ProjectData(QtCore.QObject):
 
     def addImageFolder(self, folder: FilePath, copyToProject=True):
         folder = absolutePath(folder)
-        if folder in self.baseImgDirs:
+        if folder in self.imageDirectories:
             return []
         # Need to keep track of actually added images instead of using all globbed images. If an added image already
         # existed in the project, it won't be added. Also, if the images are copied into the project, the paths
@@ -989,14 +1004,14 @@ class ProjectData(QtCore.QObject):
             return
         self.images.remove(imgName)
         # Remove copied annotations for this image
-        for ann in self.annotationsDir.glob(f"{imgName.stem}.*"):
+        for ann in self.annotationsPath.glob(f"{imgName.stem}.*"):
             ann.unlink()
-        self.imgToAnnMapping.pop(imgName, None)
+        self.imageAnnotationMap.pop(imgName, None)
         self._maybeEmit(self.sigImagesRemoved, [imgName])
-        if imgName.parent == self.imagesDir:
+        if imgName.parent == self.imagesPath:
             imgName.unlink()
         # yield
-        # if imgName.parent == self.imagesDir:
+        # if imgName.parent == self.imagesPath:
         #   # TODO: Cache removed images in a temp dir, then move them to that temp dir instead of unlinking
         #   #  on delete. This will make 'remove' undoable
         #   raise IOError('Can only undo undo image removal when the image was outside the project.'
@@ -1008,9 +1023,9 @@ class ProjectData(QtCore.QObject):
     def removeAnnotation(self, annName: FilePath):
         annName = absolutePath(annName)
         # Since no mapping exists of all annotations, loop the long way until the file is found
-        for key, ann in list(self.imgToAnnMapping.items()):
+        for key, ann in list(self.imageAnnotationMap.items()):
             if annName == ann:
-                del self.imgToAnnMapping[key]
+                del self.imageAnnotationMap[key]
                 ann.unlink(missing_ok=True)
                 self._maybeEmit(self.sigAnnotationsRemoved, [ann])
                 break
@@ -1025,11 +1040,11 @@ class ProjectData(QtCore.QObject):
         # Housekeeping for default arguments
         if name is None and data is None:
             raise IOError("`name` and `data` cannot both be `None`")
-        elif name in self.imgToAnnMapping.values() and not overwriteOld:
+        elif name in self.imageAnnotationMap.values() and not overwriteOld:
             # Already present, shouldn't be added
             return
         if data is None:
-            data = self.compIo.importByFileType(name)
+            data = self.componentIo.importByFileType(name)
         if image is None:
             # If no explicit matching to an image is provided, try to determine based on annotation name
             xpondingImgs = np.unique(data[REQD_TBL_FIELDS.IMG_FILE].to_numpy())
@@ -1045,24 +1060,24 @@ class ProjectData(QtCore.QObject):
         data.loc[:, REQD_TBL_FIELDS.IMG_FILE] = image.name
         # Since only one annotation file can exist per image, concatenate this with any existing files for the same image
         # if needed
-        if image.parent != self.imagesDir:
+        if image.parent != self.imagesPath:
             # None result means already exists in project prior to copying, which is OK in this context
-            image = self.addImage(image) or self.imagesDir / image.name
-        annForImg = self.imgToAnnMapping.get(image, None)
+            image = self.addImage(image) or self.imagesPath / image.name
+        annForImg = self.imageAnnotationMap.get(image, None)
         oldAnns = []
         if annForImg is not None and not overwriteOld:
-            oldAnns.append(self.compIo.importByFileType(annForImg))
+            oldAnns.append(self.componentIo.importByFileType(annForImg))
         combinedAnns = oldAnns + [data]
         outAnn = pd.concat(combinedAnns, ignore_index=True)
         outAnn[REQD_TBL_FIELDS.INST_ID] = outAnn.index
-        outFmt = f".{self.cfg['annotation-format']}"
-        outName = self.annotationsDir / f"{image.name}{outFmt}"
+        outFmt = f".{self.config['annotation-format']}"
+        outName = self.annotationsPath / f"{image.name}{outFmt}"
         # If no annotations exist, this is the same as deleting the old annotations since there's nothing to save
         if len(outAnn):
-            self.compIo.exportByFileType(
+            self.componentIo.exportByFileType(
                 outAnn, outName, verifyIntegrity=False, readonly=False
             )
-            self.imgToAnnMapping[image] = outName
+            self.imageAnnotationMap[image] = outName
             self._maybeEmit(self.sigAnnotationsAdded, [outName])
         elif outName.exists():
             self.removeAnnotation(outName)
@@ -1075,19 +1090,19 @@ class ProjectData(QtCore.QObject):
           * The annotations correspond to exactly one image
         """
         image = self.getFullImgName(file.stem, thorough=False)
-        if file.parent != self.annotationsDir:
-            if not overwriteOld and (self.annotationsDir / file.name).exists():
+        if file.parent != self.annotationsPath:
+            if not overwriteOld and (self.annotationsPath / file.name).exists():
                 raise IOError(
                     f"Cannot add annotation {file} since a corresponding annotation with that name already"
                     f" exists and `overwriteOld` was False"
                 )
-            newName = self.annotationsDir / file.name
+            newName = self.annotationsPath / file.name
             shutil.copy2(file, newName)
             file = newName
-        self.imgToAnnMapping[image] = file
+        self.imageAnnotationMap[image] = file
 
-    def _copyImgToProj(self, name: Path, data: NChanImg = None, overwrite=False):
-        newName = self.imagesDir / name.name
+    def _copyImageToProject(self, name: Path, data: NChanImg = None, overwrite=False):
+        newName = self.imagesPath / name.name
         if newName.exists() and (not overwrite or newName == name):
             # Already in the project, no need to copy
             return newName
@@ -1103,7 +1118,7 @@ class ProjectData(QtCore.QObject):
                 f" image information was provided."
             )
         if name in self.images:
-            self.changeImgPath(name, newName)
+            self.changeImagePath(name, newName)
             self._maybeEmit(self.sigImagesMoved, [(name, newName)])
         return newName
 
@@ -1141,7 +1156,7 @@ class ProjectData(QtCore.QObject):
                     return img
                 candidates.add(img)
 
-        for parent in self.baseImgDirs:
+        for parent in self.imageDirectories:
             curName = parent / name
             if curName.exists():
                 if not thorough:
@@ -1161,7 +1176,7 @@ class ProjectData(QtCore.QObject):
             raise IOError(msg)
         return candidates.pop()
 
-    def exportProj(self, outputFolder: FilePath = "s3a-export"):
+    def exportProject(self, outputFolder: FilePath = "s3a-export"):
         """
         Exports the entire project, making a copy of it at the destination directory
         :param outputFolder:
@@ -1198,7 +1213,7 @@ class ProjectData(QtCore.QObject):
           folder
         :param exportOpts: Additional options passed to the exporting function
         """
-        self.saveCfg()
+        self.saveConfig()
         outputFolder = Path(outputFolder)
 
         if outputFolder.resolve() == self.location and not combine:
@@ -1208,26 +1223,29 @@ class ProjectData(QtCore.QObject):
         if includeImages:
             outImgDir = outputFolder / "images"
             outImgDir.mkdir(exist_ok=True)
-            for img in self.imagesDir.glob("*.*"):
-                if self.imgToAnnMapping.get(img, None) is not None:
+            for img in self.imagesPath.glob("*.*"):
+                if self.imageAnnotationMap.get(img, None) is not None:
                     shutil.copy(img, outImgDir)
 
-        existingAnnFiles = [f for f in self.imgToAnnMapping.values() if f is not None]
+        existingAnnFiles = [
+            f for f in self.imageAnnotationMap.values() if f is not None
+        ]
         if combine:
             outAnnsPath = outputFolder / f"annotations.{annotationFormat}"
             outAnn = pd.concat(
-                map(self.compIo.importByFileType, existingAnnFiles), ignore_index=True
+                map(self.componentIo.importByFileType, existingAnnFiles),
+                ignore_index=True,
             )
             outAnn[REQD_TBL_FIELDS.INST_ID] = outAnn.index
-            self.compIo.exportByFileType(outAnn, outAnnsPath, **exportOpts)
+            self.componentIo.exportByFileType(outAnn, outAnnsPath, **exportOpts)
         else:
             outAnnsPath = outputFolder / "annotations"
             outAnnsPath.mkdir(exist_ok=True)
-            if self.cfg["annotation-format"] == annotationFormat:
-                shutil.copytree(self.annotationsDir, outAnnsPath, dirs_exist_ok=True)
+            if self.config["annotation-format"] == annotationFormat:
+                shutil.copytree(self.annotationsPath, outAnnsPath, dirs_exist_ok=True)
             else:
                 for annFile in existingAnnFiles:
-                    self.compIo.convert(
+                    self.componentIo.convert(
                         annFile,
                         outAnnsPath / f"{annFile.stem}.{annotationFormat}",
                         importArgs=exportOpts,
@@ -1251,4 +1269,4 @@ class ProjectData(QtCore.QObject):
         self._suppressSignals = oldSuppress
 
     def __reduce__(self):
-        return ProjectData, (self.cfgFname, self.cfg)
+        return ProjectData, (self.configPath, self.config)

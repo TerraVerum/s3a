@@ -40,30 +40,30 @@ def test_create_project(app, sampleComps, tmpProj):
     dummyAnnFile = SAMPLE_SMALL_IMG_FNAME.with_suffix(
         f"{SAMPLE_SMALL_IMG_FNAME.suffix}.pkl"
     )
-    tmpProj.loadCfg(tmpProj.cfgFname, {"annotation-format": "pkl"}, force=True)
+    tmpProj.loadConfig(tmpProj.configPath, {"annotation-format": "pkl"}, force=True)
     tmpProj.addAnnotation(dummyAnnFile, dfTester.compDf, image=SAMPLE_SMALL_IMG_FNAME)
 
-    assert tmpProj.cfgFname.exists()
-    assert tmpProj.annotationsDir.exists()
-    assert tmpProj.imagesDir.exists()
+    assert tmpProj.configPath.exists()
+    assert tmpProj.annotationsPath.exists()
+    assert tmpProj.imagesPath.exists()
     tmpProj.addAnnotation(data=sampleComps, image=SAMPLE_SMALL_IMG_FNAME)
-    assert len(list(tmpProj.imagesDir.glob(SAMPLE_SMALL_IMG_FNAME.name))) == 1
-    assert len(list(tmpProj.annotationsDir.glob(dummyAnnFile.name))) == 1
+    assert len(list(tmpProj.imagesPath.glob(SAMPLE_SMALL_IMG_FNAME.name))) == 1
+    assert len(list(tmpProj.annotationsPath.glob(dummyAnnFile.name))) == 1
 
 
 def test_update_props(filePlugin):
-    annFmt = lambda: filePlugin.projData.cfg["annotation-format"]
+    annFmt = lambda: filePlugin.projectData.config["annotation-format"]
     oldFmt = annFmt()
     filePlugin.updateProjectProperties(annotationFormat="pkl")
     assert annFmt() == "pkl"
     filePlugin.updateProjectProperties(annotationFormat=oldFmt)
-    loc = filePlugin.projData.location / "newcfg.tblcfg"
+    loc = filePlugin.projectData.location / "newcfg.tblcfg"
     newCfg = {"fields": {"Class": ""}}
     fns.hierarchicalUpdate(newCfg, IOTemplateManager.getTableCfg("s3a"))
     fns.saveToFile(newCfg, loc)
-    oldName = filePlugin.projData.tableData.cfgFname
+    oldName = filePlugin.projectData.tableData.configPath
     filePlugin.updateProjectProperties(tableConfig=loc)
-    assert newCfg == filePlugin.projData.tableData.cfg
+    assert newCfg == filePlugin.projectData.tableData.config
     filePlugin.updateProjectProperties(tableConfig=oldName)
 
 
@@ -72,7 +72,7 @@ def test_export(prjWithSavedStuff, tmp_path):
     prj = prjWithSavedStuff
 
     out = tmp_path / "my-project"
-    prj.exportProj(out)
+    prj.exportProject(out)
     assert out.exists()
     for fileA, fileB in zip(out.rglob("*.*"), prj.location.rglob("*.*")):
         assert fileA.name == fileB.name
@@ -92,7 +92,7 @@ def test_export_anns(prjWithSavedStuff, tmp_path):
         prj.exportAnnotations(outpath, annotationFormat=typ)
         assert (outpath / "annotations").exists()
         assert sorted(f.stem for f in (outpath / "annotations").iterdir()) == sorted(
-            f.stem for f in prj.annotationsDir.iterdir()
+            f.stem for f in prj.annotationsPath.iterdir()
         )
 
     # Make sure self export doesn't break anything
@@ -101,17 +101,18 @@ def test_export_anns(prjWithSavedStuff, tmp_path):
 
 def test_load_startup_img(tmp_path, app, filePlugin):
     prjcfg = {"startup": {"image": str(SAMPLE_SMALL_IMG_FNAME)}}
-    oldCfg = filePlugin.projData.cfgFname, filePlugin.projData.cfg
+    oldCfg = filePlugin.projectData.configPath, filePlugin.projectData.config
     filePlugin.open(tmp_path / "test-startup.s3aprj", prjcfg)
     assert (
-        app.srcImgFname == filePlugin.projData.imagesDir / SAMPLE_SMALL_IMG_FNAME.name
+        app.sourceImagePath
+        == filePlugin.projectData.imagesPath / SAMPLE_SMALL_IMG_FNAME.name
     )
-    for img in None, filePlugin.projData.imagesDir / "my-image.jpg":
-        app.srcImgFname = img
+    for img in None, filePlugin.projectData.imagesPath / "my-image.jpg":
+        app.sourceImagePath = img
         app.appStateEditor.stateFuncsDf.at["project", "exportFunc"](
             tmp_path / "another"
         )
-        assert bool(img) == ("image" in filePlugin.projData.startup)
+        assert bool(img) == ("image" in filePlugin.projectData.startup)
 
     filePlugin.open(*oldCfg)
 
@@ -127,8 +128,8 @@ def test_load_with_plg(monkeypatch, tmp_path):
         cfg = {"plugin-cfg": {"Test": "files.sample_plg.SamplePlugin"}}
         filePlugin.open(tmp_path / "plgprj.s3aprj", cfg)
         assert SamplePlugin in app.clsToPluginMapping
-        assert len(filePlugin.projData.spawnedPlugins) == 1
-        assert filePlugin.projData.spawnedPlugins[0].win
+        assert len(filePlugin.projectData.spawnedPlugins) == 1
+        assert filePlugin.projectData.spawnedPlugins[0].win
 
     # Remove existing plugin
     cfg = {"plugin-cfg": {"New Name": "nonsense.Plugin"}}
@@ -145,15 +146,15 @@ def test_unique_tblcfg(tmp_path, tmpProj):
     tblName = tmp_path / "tbl.yml"
     fns.saveToFile(tblCfg, tblName)
 
-    cfg = {"table-cfg": str(tblName)}
-    tmpProj.loadCfg(tmp_path / "myprj.s3aprj", cfg)
+    cfg = {"table-config": str(tblName)}
+    tmpProj.loadConfig(tmp_path / "myprj.s3aprj", cfg)
     assert tmpProj.tableData.fieldFromName("Test")
 
 
 def test_img_ops(tmpProj, tmp_path):
     img = {"data": SAMPLE_SMALL_IMG, "name": "my image.png"}
     cfg = {"images": [img]}
-    tmpProj.loadCfg(tmp_path / "test.s3aprj", cfg)
+    tmpProj.loadConfig(tmp_path / "test.s3aprj", cfg)
     tmpProj._addConfigImages()
     assert len(tmpProj.images) == 1
     assert tmpProj.images[0].name == "my image.png"
@@ -163,9 +164,9 @@ def test_img_ops(tmpProj, tmp_path):
 
 
 def test_ann_opts(prjWithSavedStuff, sampleComps):
-    img, toRemove = next(iter(prjWithSavedStuff.imgToAnnMapping.items()))
+    img, toRemove = next(iter(prjWithSavedStuff.imageAnnotationMap.items()))
     prjWithSavedStuff.removeAnnotation(toRemove)
-    assert img not in prjWithSavedStuff.imgToAnnMapping
+    assert img not in prjWithSavedStuff.imageAnnotationMap
 
     with pytest.raises(IOError):
         prjWithSavedStuff.addAnnotation(data=sampleComps, image="garbage.png")
@@ -173,14 +174,14 @@ def test_ann_opts(prjWithSavedStuff, sampleComps):
 
 def test_filter_proj_imgs(filePlugin, prjWithSavedStuff):
     for img in prjWithSavedStuff.images:
-        filePlugin.projData.addImage(img)
-    fMgr = filePlugin._projImgMgr
+        filePlugin.projectData.addImage(img)
+    fMgr = filePlugin._projectImagePane
     fMgr.completer.setText("hubble")
     assert "*hubble*" in fMgr.fileModel.nameFilters()
 
 
 def test_load_self_cfg(prjWithSavedStuff):
-    assert prjWithSavedStuff.loadCfg(prjWithSavedStuff.cfgFname) is None
+    assert prjWithSavedStuff.loadConfig(prjWithSavedStuff.configPath) is None
 
 
 def test_load_independent_tbl_cfg(prjWithSavedStuff, tmpdir):
@@ -188,28 +189,28 @@ def test_load_independent_tbl_cfg(prjWithSavedStuff, tmpdir):
     outName = "separate_tbl_cfg.tblcfg"
     file = tmpdir / outName
     fns.saveToFile(tblCfg, file)
-    prjCfg = {"table-cfg": str(file)}
-    prjWithSavedStuff.loadCfg(tmpdir / "new_loaded_cfg.s3aprj", prjCfg)
+    prjCfg = {"table-config": str(file)}
+    prjWithSavedStuff.loadConfig(tmpdir / "new_loaded_cfg.s3aprj", prjCfg)
 
     relativeName = prjWithSavedStuff.location / outName
-    assert prjWithSavedStuff.tableData.cfgFname == relativeName
+    assert prjWithSavedStuff.tableData.configPath == relativeName
 
 
 def test_none_tblinfo(tmpdir):
     cfg = {}
     prj = ProjectData(tmpdir / "none-table.s3aprj", cfg)
-    assert prj.tableData.cfgFname == prj.cfgFname
-    assert prj.tableData.cfg == IOTemplateManager.getTableCfg("s3a")
+    assert prj.tableData.configPath == prj.configPath
+    assert prj.tableData.config == IOTemplateManager.getTableCfg("s3a")
 
 
 def test_change_image_path(tmpProj):
     tmpProj.addImage(SAMPLE_SMALL_IMG_FNAME, copyToProject=False)
     newPath = Path("./ridiculous/but/different") / SAMPLE_SMALL_IMG_FNAME.name
-    tmpProj.changeImgPath(SAMPLE_SMALL_IMG_FNAME, newPath)
+    tmpProj.changeImagePath(SAMPLE_SMALL_IMG_FNAME, newPath)
     assert newPath.absolute() in tmpProj.images
     assert SAMPLE_SMALL_IMG_FNAME not in tmpProj.images
 
-    tmpProj.changeImgPath(newPath, None)
+    tmpProj.changeImagePath(newPath, None)
     assert newPath not in tmpProj.images
 
 
@@ -223,7 +224,7 @@ def test_add_image_folder(tmpProj, tmpdir):
 def test_base_dir_logic(tmpProj: ProjectData, tmpdir):
     tmpdir = Path(tmpdir)
     shutil.copy(SAMPLE_SMALL_IMG_FNAME, tmpdir / SAMPLE_SMALL_IMG_FNAME.name)
-    tmpProj.baseImgDirs.add(tmpdir)
+    tmpProj.imageDirectories.add(tmpdir)
 
     assert (
         tmpProj.getFullImgName(SAMPLE_SMALL_IMG_FNAME.name)
@@ -234,7 +235,7 @@ def test_base_dir_logic(tmpProj: ProjectData, tmpdir):
     tmp2.mkdir()
     shutil.copy(SAMPLE_SMALL_IMG_FNAME, tmp2)
 
-    tmpProj.baseImgDirs.add(tmp2)
+    tmpProj.imageDirectories.add(tmp2)
     with pytest.raises(IOError):
         tmpProj.getFullImgName(SAMPLE_SMALL_IMG_FNAME.name)
 
@@ -244,11 +245,11 @@ def test_base_dir_logic(tmpProj: ProjectData, tmpdir):
 
 def test_remove_image(prjWithSavedStuff):
     imName = prjWithSavedStuff.getFullImgName(SAMPLE_IMG_FNAME.name)
-    assert imName in prjWithSavedStuff.imgToAnnMapping
+    assert imName in prjWithSavedStuff.imageAnnotationMap
     assert imName.exists()
 
     prjWithSavedStuff.removeImage(imName)
-    assert imName not in prjWithSavedStuff.imgToAnnMapping
+    assert imName not in prjWithSavedStuff.imageAnnotationMap
     assert not imName.exists()
 
     nonexistImg = "garbage.png"
@@ -261,7 +262,7 @@ def test_pkl(prjWithSavedStuff):
     # Test that the pickle is valid
     loaded = pkl.loads(pklBytes)
 
-    assert loaded.cfg == prjWithSavedStuff.cfg
+    assert loaded.config == prjWithSavedStuff.config
 
 
 def test_add_fmt_annotation(
@@ -269,14 +270,14 @@ def test_add_fmt_annotation(
 ):
     imname = SAMPLE_SMALL_IMG_FNAME.name
     fpath = Path(tmpdir / imname + ".csv")
-    prjWithSavedStuff.compIo.exportCsv(sampleComps, fpath)
+    prjWithSavedStuff.componentIo.exportCsv(sampleComps, fpath)
     with pytest.raises(IOError):
         prjWithSavedStuff.addFormattedAnnotation(fpath)
 
     prjWithSavedStuff.addFormattedAnnotation(fpath, True)
     fullImgName = prjWithSavedStuff.getFullImgName(imname)
-    annName = prjWithSavedStuff.imgToAnnMapping[fullImgName]
-    cmpData = prjWithSavedStuff.compIo.importByFileType(annName)
+    annName = prjWithSavedStuff.imageAnnotationMap[fullImgName]
+    cmpData = prjWithSavedStuff.componentIo.importByFileType(annName)
     assert np.array_equal(cmpData.values, sampleComps.values)
 
 

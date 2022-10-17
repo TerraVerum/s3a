@@ -10,7 +10,7 @@ from utilitys import EditorPropsMixin, RunOpts, ParamContainer
 from utilitys.processing import AtomicProcess, ProcessIO
 
 from ..constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
-from ..models.tablemodel import ComponentMgr
+from ..models.tablemodel import ComponentManager
 from ..shared import SharedAppSettings
 from ..structures import OneDArr
 from ..structures import XYVertices, ComplexXYVertices
@@ -19,7 +19,7 @@ from ..views.imageareas import MainImage
 from ..views.regions import MultiRegionPlot
 from ..views.tableview import CompTableView
 
-__all__ = ["CompSortFilter", "CompDisplayFilter"]
+__all__ = ["CompSortFilter", "ComponentController"]
 
 Signal = QtCore.Signal
 QISM = QtCore.QItemSelectionModel
@@ -35,11 +35,11 @@ class CompSortFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
             PRJ_CONSTS.PROP_VERT_SORT_BHV, container=self.props
         )
 
-    def __init__(self, compMgr: ComponentMgr, parent=None):
+    def __init__(self, componentManager: ComponentManager, parent=None):
         super().__init__(parent)
-        self.setSourceModel(compMgr)
+        self.setSourceModel(componentManager)
         # TODO: Move code for filtering into the proxy too. It will be more efficient and
-        #  easier to generalize than the current solution in CompDisplayFilter.
+        #  easier to generalize than the current solution in ComponentController.
 
     @property
     def vertSortCol(self):
@@ -96,7 +96,7 @@ class CompSortFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
         )
 
 
-class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
+class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
     sigCompsSelected = Signal(object)
 
     __groupingName__ = "Main Image"
@@ -116,21 +116,21 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
 
     def __init__(
         self,
-        compMgr: ComponentMgr,
-        mainImg: MainImage,
-        compTbl: CompTableView,
+        componentManager: ComponentManager,
+        mainImage: MainImage,
+        componentTable: CompTableView,
         parent=None,
     ):
         super().__init__(parent)
         filterEditor = self.sharedAttrs.filter
-        self._mainImgArea = mainImg
+        self._mainImageArea = mainImage
         self._filter = filterEditor
-        self._compTbl = compTbl
-        self._compMgr = compMgr
+        self._componentTable = componentTable
+        self._componentManager = componentManager
         self.regionPlot = MultiRegionPlot(disableMouseClick=True)
         self.displayedIds = np.array([], dtype=int)
         self.selectedIds = np.array([], dtype=int)
-        self.labelCol = REQD_TBL_FIELDS.INST_ID
+        self.labelColumn = REQD_TBL_FIELDS.INST_ID
         self.updateLabelCol()
 
         self._regionIntersectionCache: Tuple[
@@ -143,7 +143,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         solution is to simply preserve the cache across at most one "selection" value
         """
 
-        mainImg.sigUpdatedFocusedComp.connect(self._onFocusedCompChange)
+        mainImage.sigUpdatedFocusedComponent.connect(self._onFocusedCompChange)
 
         attrs = self.sharedAttrs
 
@@ -160,7 +160,9 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
             Since an updated filter can also result from refreshed table fields, make sure not to update in that case
             (otherwise errors may occur from missing classes, etc.)
             """
-            if np.array_equal(attrs.tableData.allFields, self._compMgr.compDf.columns):
+            if np.array_equal(
+                attrs.tableData.allFields, self._componentManager.compDf.columns
+            ):
                 self.redrawComps()
 
         self._filter.sigChangesApplied.connect(_maybeRedraw)
@@ -170,16 +172,16 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         )
         self.regionMover.sigMoveStopped.connect(lambda *args: self.finishRegionCopier())
 
-        compMgr.sigCompsChanged.connect(self.redrawComps)
-        compMgr.sigFieldsChanged.connect(self._reflectFieldsChanged)
-        compTbl.sigSelectionChanged.connect(self._reflectTableSelectionChange)
+        componentManager.sigCompsChanged.connect(self.redrawComps)
+        componentManager.sigFieldsChanged.connect(self._reflectFieldsChanged)
+        componentTable.sigSelectionChanged.connect(self._reflectTableSelectionChange)
 
-        mainImg.addItem(self.regionPlot)
-        mainImg.addItem(self.regionMover.manipRoi)
-        self.vb = mainImg.getViewBox()
+        mainImage.addItem(self.regionPlot)
+        mainImage.addItem(self.regionMover.manipRoi)
+        self.vb = mainImage.getViewBox()
         self.vb.sigRangeChanged.connect(self.recomputePenWidth)
 
-        self.fieldDisplay = FieldDisplay(mainImg)
+        self.fieldDisplay = FieldDisplay(mainImage)
         self.fieldsShowing = False
         self.fieldInfoProc = self._createFieldDisplayProc()
         self.fieldDisplay.callDelegateFunc("hide")
@@ -214,18 +216,18 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
             newWidth = 0
         self.regionPlot.props["penWidth"] = newWidth
 
-    def updateLabelCol(self, labelCol=REQD_TBL_FIELDS.INST_ID.name):
+    def updateLabelCol(self, labelColumn=REQD_TBL_FIELDS.INST_ID.name):
         """
         Changes the data column used to label (color) the region plot data
-        :param labelCol:
+        :param labelColumn:
           helpText: New column to use
-          title: Labeling Column
           pType: list
           limits: ['Instance ID'] # Will be updated programmatically
         """
-        self.labelCol = self.sharedAttrs.tableData.fieldFromName(labelCol)
-        newLblData = self.labelCol.toNumeric(
-            self._compMgr.compDf.loc[self.displayedIds, self.labelCol], rescale=True
+        self.labelColumn = self.sharedAttrs.tableData.fieldFromName(labelColumn)
+        newLblData = self.labelColumn.toNumeric(
+            self._componentManager.compDf.loc[self.displayedIds, self.labelColumn],
+            rescale=True,
         )
 
         self.regionPlot.regionData[PRJ_ENUMS.FIELD_LABEL] = newLblData
@@ -238,7 +240,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         # Plots: DRAWN, UNDRAWN
         # Note that hiding the ID is chosen instead of deleting, since that is a costly graphics
         # operation
-        compDf = self._compMgr.compDf
+        compDf = self._componentManager.compDf
 
         # Invalidate selection cache
         self._regionIntersectionCache = (None, None)
@@ -253,7 +255,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         # Update filter list: hide/unhide ids and verts as needed.
         self._updateDisplayedIds()
         self.regionPlot.resetRegionList(
-            compDf.loc[self.displayedIds], labelField=self.labelCol
+            compDf.loc[self.displayedIds], labelField=self.labelColumn
         )
         # noinspection PyTypeChecker
         # self._reflectTableSelectionChange(np.intersect1d(self.displayedIds, self.selectedIds))
@@ -261,15 +263,19 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         tblIdsToShow = np.isin(compDf.index, self.displayedIds).nonzero()[0]
         # Don't go through the effort of showing an already visible row
         tblIdsToShow = np.setdiff1d(tblIdsToShow, previouslyVisible)
-        model = self._compTbl.model()
+        model = self._componentTable.model()
         for rowId in tblIdsToShow:
-            xpondingIdx = model.mapFromSource(self._compMgr.index(rowId, 0)).row()
-            self._compTbl.showRow(xpondingIdx)
+            xpondingIdx = model.mapFromSource(
+                self._componentManager.index(rowId, 0)
+            ).row()
+            self._componentTable.showRow(xpondingIdx)
 
         # Hide no longer visible components
         for rowId in np.setdiff1d(previouslyVisible, self.displayedIds):
-            xpondingIdx = model.mapFromSource(self._compMgr.index(rowId, 0)).row()
-            self._compTbl.hideRow(xpondingIdx)
+            xpondingIdx = model.mapFromSource(
+                self._componentManager.index(rowId, 0)
+            ).row()
+            self._componentTable.hideRow(xpondingIdx)
 
     @DASM.undoable("Split Components", asGroup=True)
     def splitSelectedComps(self):
@@ -278,7 +284,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
 
         if len(selection) == 0:
             return
-        changes = self._compMgr.splitCompVertsById(selection)
+        changes = self._componentManager.splitCompVertsById(selection)
         self.selectRowsById(changes["added"], QISM.ClearAndSelect)
 
     @DASM.undoable("Merge Components", asGroup=True)
@@ -296,7 +302,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         if keepId < 0:
             keepId = selection[0]
 
-        self._compMgr.mergeCompVertsById(selection, keepId)
+        self._componentManager.mergeCompVertsById(selection, keepId)
         self.selectRowsById(np.array([keepId]), QISM.ClearAndSelect)
 
     def removeSelectedCompOverlap(self):
@@ -307,7 +313,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         """
         if self.selectedIds.size == 0:
             return
-        self._compMgr.removeOverlapById(self.selectedIds)
+        self._componentManager.removeOverlapById(self.selectedIds)
 
     def _reflectFieldsChanged(self):
         fields = self.sharedAttrs.tableData.allFields
@@ -315,7 +321,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         lblParams = self.sharedAttrs.colorScheme.procToParamsMapping[
             self.updateLabelProc
         ]
-        lblParams.child("labelCol").setLimits([f.name for f in fields])
+        lblParams.child("labelColumn").setLimits([f.name for f in fields])
 
         self.redrawComps()
 
@@ -325,7 +331,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         self.regionPlot.updateSelectedAndFocused(
             selectedIds=selectedIds, updatePlot=False
         )
-        selectedComps = self._compMgr.compDf.loc[selectedIds]
+        selectedComps = self._componentManager.compDf.loc[selectedIds]
         self.sigCompsSelected.emit(selectedComps)
         if self.props[PRJ_CONSTS.PROP_FIELD_INFO_ON_SEL]:
             self.fieldInfoProc(ids=selectedIds, force=True)
@@ -345,11 +351,13 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         if len(selectedIds) == 0:
             return
         # Calculate how big the viewbox needs to be
-        selectedVerts = self._compMgr.compDf.loc[selectedIds, REQD_TBL_FIELDS.VERTICES]
+        selectedVerts = self._componentManager.compDf.loc[
+            selectedIds, REQD_TBL_FIELDS.VERTICES
+        ]
         allVerts = np.vstack([v.stack() for v in selectedVerts])
         mins = allVerts.min(0)
         maxs = allVerts.max(0)
-        vb: pg.ViewBox = self._mainImgArea.getViewBox()
+        vb: pg.ViewBox = self._mainImageArea.getViewBox()
         viewRect = QtCore.QRectF(*mins, *(maxs - mins))
         vb.setRange(viewRect, padding=paddingPct)
 
@@ -359,24 +367,26 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         selectionMode=QISM.Rows | QISM.ClearAndSelect,
         onlyEditableRetList=True,
     ):
-        selectionModel = self._compTbl.selectionModel()
-        sortModel = self._compTbl.model()
+        selectionModel = self._componentTable.selectionModel()
+        sortModel = self._componentTable.model()
         isFirst = True
         shouldScroll = len(ids) > 0
         selectionList = QtCore.QItemSelection()
         retLists = []  # See tableview ids_rows_colsFromSelection
         if onlyEditableRetList:
-            selectedCols = self._compMgr.editColIdxs
+            selectedCols = self._componentManager.editColIdxs
         else:
-            selectedCols = np.arange(len(self._compMgr.colTitles))
-        ids = np.intersect1d(ids, self._compMgr.compDf.index)
+            selectedCols = np.arange(len(self._componentManager.columnTitles))
+        ids = np.intersect1d(ids, self._componentManager.compDf.index)
         for curId in ids:
-            idRow = np.nonzero(self._compMgr.compDf.index == curId)[0][0]
+            idRow = np.nonzero(self._componentManager.compDf.index == curId)[0][0]
             # Map this ID to its sorted position in the list
-            idxForId = sortModel.mapFromSource(self._compMgr.index(idRow, 0))
+            idxForId = sortModel.mapFromSource(self._componentManager.index(idRow, 0))
             selectionList.select(idxForId, idxForId)
             if isFirst and shouldScroll:
-                self._compTbl.scrollTo(idxForId, self._compTbl.PositionAtCenter)
+                self._componentTable.scrollTo(
+                    idxForId, self._componentTable.PositionAtCenter
+                )
                 isFirst = False
             tblRow = idxForId.row()
             retLists.extend([[curId, tblRow, col] for col in selectedCols])
@@ -404,12 +414,12 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         if not fields:
             self.fieldDisplay.callDelegateFunc("clear")
             # Sometimes artifacts are left on the scene at this point
-            self._mainImgArea.scene().update()
+            self._mainImageArea.scene().update()
             return
 
         if ids is None:
             ids = self.selectedIds
-        comps = self._compMgr.compDf.loc[ids]
+        comps = self._componentManager.compDf.loc[ids]
         self.fieldDisplay.showFieldData(comps, fields, **kwargs)
         self.fieldsShowing = True
 
@@ -475,7 +485,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         return result
 
     def _updateDisplayedIds(self):
-        curComps = self._filter.filterCompDf(self._compMgr.compDf.copy())
+        curComps = self._filter.filterCompDf(self._componentManager.compDf.copy())
         # Give self the id list of surviving comps
         self.displayedIds = curComps[REQD_TBL_FIELDS.INST_ID]
         return self.displayedIds
@@ -485,7 +495,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
             selectedIds = self.selectedIds
         if len(selectedIds) == 0:
             return
-        comps = self._compMgr.compDf.loc[selectedIds].copy()
+        comps = self._componentManager.compDf.loc[selectedIds].copy()
         self.regionMover.resetBaseData(comps)
         self.regionMover.active = True
 
@@ -496,7 +506,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         # TODO: Truncate vertices that lie outside image boundaries
         # Invalid if any verts are outside image bounds
         # truncatedCompIds = []
-        # imShape_xy = self._mainImgArea.image.shape[:2][::-1]
+        # imShape_xy = self._mainImageArea.image.shape[:2][::-1]
         for idx in newComps.index:
             verts = newComps.at[idx, REQD_TBL_FIELDS.VERTICES].removeOffset(
                 self.regionMover.dataMin
@@ -506,11 +516,11 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
             ] = self.regionMover.transformedData(verts)
         # truncatedCompIds = np.unique(truncatedCompIds)
         if self.regionMover.inCopyMode:
-            change = self._compMgr.addComps(newComps)
+            change = self._componentManager.addComponents(newComps)
             self.activateRegionCopier(change["added"])
         else:  # Move mode
             self.regionMover.erase()
-            self._compMgr.addComps(newComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
+            self._componentManager.addComponents(newComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
         # if len(truncatedCompIds) > 0:
         #   warn(f'Some regions extended beyond image dimensions. Boundaries for the following'
         #        f' components were altered: {truncatedCompIds}', UserWarning)
@@ -524,7 +534,7 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
         oldShowFocused = self.regionPlot.showFocused
         oldShowSelected = self.regionPlot.showSelected
 
-        pm = self._mainImgArea.imgItem.getPixmap()
+        pm = self._mainImageArea.imgItem.getPixmap()
         painter = QtGui.QPainter(pm)
         try:
             self.regionPlot.showFocused = True
@@ -549,4 +559,4 @@ class CompDisplayFilter(DASM, EditorPropsMixin, QtCore.QObject):
 
     @property
     def regionMover(self):
-        return self._mainImgArea.regionMover
+        return self._mainImageArea.regionMover

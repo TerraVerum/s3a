@@ -14,16 +14,16 @@ def test_metrics_image(app):
         dict(
             action=CNST.DRAW_ACT_ADD,
             mouse_pos=pos,
-            pixel_size=app.mainImg.imgItem.pixelWidth(),
+            pixel_size=app.mainImage.imgItem.pixelWidth(),
         )
         for pos in [(50, 50), (40, 40)]
     ]
     for info in toEmit:
-        metrics.mainImgMouseFilter.sigMouseMoved.emit(info)
+        metrics.mainImageMouseFilter.sigMouseMoved.emit(info)
         # last proxy is mouse, first proxy is viewbox
         metrics.collectorProxies[-1].flush()
     # TODO: Check correctness, for now just enough to ensure no crashing
-    vb: pg.ViewBox = app.mainImg.getViewBox()
+    vb: pg.ViewBox = app.mainImage.getViewBox()
     vb.sigRangeChanged.emit(vb, [[0, 1], [0, 1]], [True, True])
     metrics.collectorProxies[0].flush()
 

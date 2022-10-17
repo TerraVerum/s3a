@@ -30,7 +30,7 @@ USE_MULTICHANNEL_KWARG = parse_version(_skimage_version) < parse_version("0.19.0
 
 
 def stackedVertsPlusConnections(
-    vertList: ComplexXYVertices,
+    vertices: ComplexXYVertices,
 ) -> Tuple[XYVertices, np.ndarray]:
     """
     Utility for concatenating all vertices within a list while recording where separations
@@ -39,7 +39,7 @@ def stackedVertsPlusConnections(
     allVerts = [np.zeros((0, 2))]
     separationIdxs = []
     idxOffset = 0
-    for curVerts in vertList:
+    for curVerts in vertices:
         allVerts.append(curVerts)
         vertsLen = len(curVerts)
         if vertsLen == 0:
@@ -103,8 +103,8 @@ def largestList(verts: List[XYVertices]) -> XYVertices:
     for vertList in verts:
         if len(vertList) > len(maxLenList):
             maxLenList = vertList
-    # for vertList in newVerts:
-    # vertList += cropOffset[0:2]
+    # for vertices in newVerts:
+    # vertices += cropOffset[0:2]
     return XYVertices(maxLenList)
 
 

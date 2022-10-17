@@ -6,7 +6,7 @@ from utilitys import ProcessIO
 
 from .base import ProcessorPlugin
 from ..constants import PRJ_CONSTS as CNST, PRJ_ENUMS, REQD_TBL_FIELDS as RTF
-from ..models.tablemodel import ComponentMgr
+from ..models.tablemodel import ComponentManager
 from ..processing.algorithms import multipred
 from ..shared import SharedAppSettings
 from ..structures import ComplexXYVertices
@@ -15,15 +15,15 @@ from ..structures import ComplexXYVertices
 class MultiPredictionsPlugin(ProcessorPlugin):
     name = "Multi-Predictions"
 
-    mgr: ComponentMgr
+    manager: ComponentManager
 
     def __initEditorParams__(self, shared: SharedAppSettings):
         super().__initEditorParams__()
-        self.procEditor = shared.multiPredClctn.createProcessorEditor(
+        self.procEditor = shared.multiPredictionCollection.createProcessorEditor(
             type(self), self.name + " Processor"
         )
         self.dock.addEditors([self.procEditor])
-        self.pluginRunnerProc = shared.multiPredClctn.parseProcName(
+        self.pluginRunnerProc = shared.multiPredictionCollection.parseProcName(
             "Run Plugins", topFirst=False
         )
 
@@ -33,9 +33,9 @@ class MultiPredictionsPlugin(ProcessorPlugin):
 
     def attachWinRef(self, win):
         super().attachWinRef(win)
-        self.mgr = win.compMgr
-        self.mainImg = win.mainImg
-        win.mainImg.toolsEditor.registerFunc(
+        self.manager = win.componentManager
+        self.mainImage = win.mainImage
+        win.mainImage.toolsEditor.registerFunc(
             self.makePrediction,
             btnOpts=CNST.TOOL_MULT_PRED,
             ignoreKeys=["comps"],
@@ -53,18 +53,19 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         )
 
     def makePrediction(self, comps: pd.DataFrame = None, **runKwargs):
-        if self.win.mainImg.image is None:
+        if self.win.mainImage.image is None:
             return
         if comps is None:
             comps = self.win.exportableDf
         # It is possible for a previously selected id to be deleted before a redraw occurs, in which case the
         # selected id won't correspond to a valid index. Resolve using intersection with all components
         selectedIds = np.intersect1d(
-            self.win.compDisplay.selectedIds, self.win.compMgr.compDf.index
+            self.win.componentController.selectedIds,
+            self.win.componentManager.compDf.index,
         )
-        vbRange = np.array(self.mainImg.getViewBox().viewRange()).T
-        image = self.win.mainImg.image
-        result = self.curProcessor.run(
+        vbRange = np.array(self.mainImage.getViewBox().viewRange()).T
+        image = self.win.mainImage.image
+        result = self.currentProcessor.run(
             components=comps,
             fullComponents=comps,
             fullImage=image,
@@ -84,7 +85,7 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         addType = runKwargs.get("addType") or result.get(
             "addType", PRJ_ENUMS.COMP_ADD_AS_MERGE
         )
-        return self.mgr.addComps(compsToAdd, addType)
+        return self.manager.addComponents(compsToAdd, addType)
 
     def applyPluginRunners(self, components: pd.DataFrame, plugins: list[str]):
         if not plugins:

@@ -68,7 +68,7 @@ class S3A(S3ABase):
         self.setWindowTitle(self.APP_TITLE)
         self.setWindowIconText(self.APP_TITLE)
 
-        self.curCompIdLbl = QtWidgets.QLabel(self.CUR_COMP_LBL)
+        self.currentComponentLabel = QtWidgets.QLabel(self.CUR_COMP_LBL)
 
         # -----
         # LAOYUT MANAGER
@@ -118,18 +118,18 @@ class S3A(S3ABase):
         layout = QtWidgets.QVBoxLayout(centralWidget)
 
         self.toolbarWidgets: Dict[PrjParam, List[QtGui.QAction]] = defaultdict(list)
-        layout.addWidget(self.mainImg)
+        layout.addWidget(self.mainImage)
 
-        self.tblFieldToolbar.setObjectName("Table Field Plugins")
-        # self.addToolBar(self.tblFieldToolbar)
-        self.tblFieldToolbar.hide()
+        self.tableFieldToolbar.setObjectName("Table Field Plugins")
+        # self.addToolBar(self.tableFieldToolbar)
+        self.tableFieldToolbar.hide()
         self.generalToolbar.setObjectName("General")
         self.addToolBar(self.generalToolbar)
 
         _plugins = [
             self.clsToPluginMapping[c] for c in [MainImagePlugin, CompTablePlugin]
         ]
-        parents = [self.mainImg, self.compTbl]
+        parents = [self.mainImage, self.componentTable]
         for plugin, parent in zip(_plugins, reversed(parents)):
             plugin.toolsEditor.actionsMenuFromProcs(
                 plugin.name, nest=True, parent=parent, outerMenu=parent.menu
@@ -143,27 +143,27 @@ class S3A(S3ABase):
         tableDock.setObjectName("Component Table Dock")
         tableContents = QtWidgets.QWidget(tableDock)
         tableLayout = QtWidgets.QVBoxLayout(tableContents)
-        tableLayout.addWidget(self.compTbl)
+        tableLayout.addWidget(self.componentTable)
         tableDock.setWidget(tableContents)
 
         self.addDockWidget(QtCore.Qt.DockWidgetArea.BottomDockWidgetArea, tableDock)
 
         # STATUS BAR
-        self.setStatusBar(self.statBar)
+        statusBar = self.statusBar()
 
-        self.mouseCoordsLbl = QtWidgets.QLabel()
-        self.pxColorLbl = QtWidgets.QLabel()
+        self.mousePosLabel = QtWidgets.QLabel()
+        self.pixelColorLabel = QtWidgets.QLabel()
 
-        self.imageLbl = QtWidgets.QLabel(f"Image: None")
+        self.imageLabel = QtWidgets.QLabel(f"Image: None")
 
-        self.statBar.show()
-        self.statBar.addPermanentWidget(self.imageLbl)
+        statusBar.show()
+        statusBar.addPermanentWidget(self.imageLabel)
 
-        self.statBar.addPermanentWidget(self.mouseCoordsLbl)
-        self.mainImg.mouseCoordsLbl = self.mouseCoordsLbl
+        statusBar.addPermanentWidget(self.mousePosLabel)
+        self.mainImage.mouseCoordsLbl = self.mousePosLabel
 
-        self.statBar.addPermanentWidget(self.pxColorLbl)
-        self.mainImg.pxColorLbl = self.pxColorLbl
+        statusBar.addPermanentWidget(self.pixelColorLabel)
+        self.mainImage.pxColorLbl = self.pixelColorLabel
 
     def saveLayout(
         self, layoutName: Union[str, Path] = None, allowOverwriteDefault=False
@@ -181,8 +181,8 @@ class S3A(S3ABase):
 
     def changeFocusedComp(self, compIds: Union[int, Sequence[int]] = None):
         ret = super().changeFocusedComp(compIds)
-        self.curCompIdLbl.setText(
-            f"Component ID: {self.mainImg.compSer[REQD_TBL_FIELDS.INST_ID]}"
+        self.currentComponentLabel.setText(
+            f"Component ID: {self.mainImage.focusedComponent[REQD_TBL_FIELDS.INST_ID]}"
         )
         return ret
 
@@ -191,7 +191,7 @@ class S3A(S3ABase):
             None, "Select Table Config File", "All Files (*.*);; Config Files (*.yml)"
         )
         if outFname is not None:
-            self.sharedAttrs.tableData.loadCfg(outFname)
+            self.sharedAttrs.tableData.loadConfig(outFname)
 
     def _addPluginObj(self, plugin: ParamEditorPlugin, **kwargs):
         plugin = super()._addPluginObj(plugin, **kwargs)
@@ -212,31 +212,31 @@ class S3A(S3ABase):
             plugin.addToWindow(self, parentToolbarOrMenu=parentTb)
         return plugin
 
-    def setMainImg(
+    def setMainImage(
         self, file: FilePath = None, imgData: NChanImg = None, clearExistingComps=True
     ):
-        gen = super().setMainImg(file, imgData, clearExistingComps)
+        gen = super().setMainImage(file, imgData, clearExistingComps)
         ret = fns.gracefulNext(gen)
-        img = self.srcImgFname
+        img = self.sourceImagePath
         if img is not None:
             img = img.name
-        self.imageLbl.setText(f"Image: {img}")
+        self.imageLabel.setText(f"Image: {img}")
 
         yield ret
         yield fns.gracefulNext(gen)
 
-    def setMainImgGui(self):
+    def setMainImageGui(self):
         fileFilter = (
             "Image Files (*.png *.tif *.jpg *.jpeg *.bmp *.jfif);;All files(*.*)"
         )
         fname = fns.popupFilePicker(None, "Select Main Image", fileFilter)
         if fname is not None:
             with pg.BusyCursor():
-                self.setMainImg(fname)
+                self.setMainImage(fname)
 
     def exportAnnotationsGui(self):
         """Saves the component table to a file"""
-        fileFilters = self.compIo.ioFileFilter(**{"*": "All Files"})
+        fileFilters = self.componentIo.ioFileFilter(**{"*": "All Files"})
         outFname = fns.popupFilePicker(
             None, "Select Save File", fileFilters, existing=False
         )
@@ -245,7 +245,7 @@ class S3A(S3ABase):
 
     def openAnnotationGui(self):
         # TODO: See note about exporting comps. Delegate the filepicker activity to importer
-        fileFilter = self.compIo.ioFileFilter(which=PRJ_ENUMS.IO_IMPORT)
+        fileFilter = self.componentIo.ioFileFilter(which=PRJ_ENUMS.IO_IMPORT)
         fname = fns.popupFilePicker(None, "Select Load File", fileFilter)
         if fname is None:
             return
@@ -303,21 +303,21 @@ class S3A(S3ABase):
             style = qdarkstyle.load_stylesheet()
         self.setStyleSheet(style)
 
-    def addAndFocusComps(
+    def addAndFocusComponents(
         self, newComps: pd.DataFrame, addType=PRJ_ENUMS.COMP_ADD_AS_NEW
     ):
-        gen = super().addAndFocusComps(newComps, addType=addType)
+        gen = super().addAndFocusComponents(newComps, addType=addType)
         changeDict = fns.gracefulNext(gen)
         keepIds = changeDict["ids"]
         keepIds = keepIds[keepIds >= 0]
-        selection = self.compDisplay.selectRowsById(keepIds)
+        selection = self.componentController.selectRowsById(keepIds)
         if (
             self.isVisible()
-            and self.compTbl.props[PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE]
+            and self.componentTable.props[PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE]
         ):
             # For some reason sometimes the actual table selection doesn't propagate in time, so
             # directly forward the selection here
-            self.compTbl.setSelectedCellsAsGui(selection)
+            self.componentTable.setSelectedCellsAsGui(selection)
         yield changeDict
         yield fns.gracefulNext(gen)
 

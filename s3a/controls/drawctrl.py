@@ -31,8 +31,8 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
             allowableShapes = set()
         self.shapeVerts = XYVertices()
         # Make a new graphics item for each roi type
-        self.roiForShape: Dict[PrjParam, PlotDataROI] = {}
-        self._curShape = (
+        self.parameterRoiMap: Dict[PrjParam, PlotDataROI] = {}
+        self._shapeParameter = (
             next(iter(allowableShapes)) if len(allowableShapes) > 0 else None
         )
 
@@ -43,7 +43,7 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
         for shape in allowableShapes:
             newRoi = SHAPE_ROI_MAPPING[shape]()
             newRoi.setZValue(1000)
-            self.roiForShape[shape] = newRoi
+            self.parameterRoiMap[shape] = newRoi
             newRoi.setRoiPoints()
             newRoi.hide()
         self.addRoisToView(parent)
@@ -51,12 +51,12 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
     def addRoisToView(self, view: pg.GraphicsView):
         self._parent = view
         if view is not None:
-            for roi in self.roiForShape.values():
+            for roi in self.parameterRoiMap.values():
                 roi.hide()
                 view.addItem(roi)
 
     def clearAllRois(self):
-        for roi in self.roiForShape.values():  # type: PlotDataROI
+        for roi in self.parameterRoiMap.values():  # type: PlotDataROI
             roi.setRoiPoints()
             roi.hide()
             self.addLock(self)
@@ -87,18 +87,24 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
     def locked(self):
         return len(self._locks) > 0
 
-    def buildRoi(self, ev: QtGui.QMouseEvent, imgItem: pg.ImageItem = None):
+    def buildRoi(self, ev: QtGui.QMouseEvent, imageItem: pg.ImageItem = None):
         """
-        Construct the current shape ROI depending on mouse movement and current shape parameters
-        :param imgItem: Image the ROI is drawn upon, used for mapping event coordinates
-          from a scene to pixel coordinates. If *None*, event coordinates are assumed
-          to already be relative to pixel coordinates.
-        :param ev: Mouse event
+        Construct the current shape ROI depending on mouse movement and current shape
+        parameters
+
+        Parameters
+        ----------
+        imageItem
+            Image the ROI is drawn upon, used for mapping event coordinates from a
+            scene to pixel coordinates. If *None*, event coordinates are assumed to
+            already be relative to pixel coordinates.
+        ev:
+            Mouse event
         """
         # Unblock on mouse press
         # None imgitem is only the case during programmatic calls so allow this case
         if (
-            (imgItem is None or imgItem.image is not None)
+            (imageItem is None or imageItem.image is not None)
             and ev.type() == QtCore.QEvent.Type.MouseButtonPress
             and ev.button() == QtCore.Qt.MouseButton.LeftButton
         ):
@@ -106,15 +112,15 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
         if self.locked:
             return False
         eventPos = ev.position() if hasattr(ev, "position") else ev.localPos()
-        if imgItem is not None:
-            posRelToImg = imgItem.mapFromScene(eventPos)
+        if imageItem is not None:
+            posRelToImg = imageItem.mapFromScene(eventPos)
         else:
             posRelToImg = eventPos
         # Form of rate-limiting -- only simulate click if the next pixel is at least one away
         # from the previous pixel location
         xyCoord = XYVertices([[posRelToImg.x(), posRelToImg.y()]], dtype=float)
-        curRoi = self.curShape
-        constructingRoi, self.shapeVerts = self.curShape.updateShape(ev, xyCoord)
+        curRoi = self.currentShape
+        constructingRoi, self.shapeVerts = self.currentShape.updateShape(ev, xyCoord)
         if self.shapeVerts is not None:
             self.sigShapeFinished.emit(self.shapeVerts)
 
@@ -128,21 +134,21 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
         return constructingRoi
 
     @property
-    def curShapeParam(self):
-        return self._curShape
+    def shapeParameter(self):
+        return self._shapeParameter
 
-    @curShapeParam.setter
-    def curShapeParam(self, newShape: PrjParam):
+    @shapeParameter.setter
+    def shapeParameter(self, newShape: PrjParam):
         """
         When the shape is changed, be sure to reset the underlying ROIs
         :param newShape: New shape
         :return: None
         """
         # Reset the underlying ROIs for a different shape than we currently are using
-        if newShape != self._curShape:
+        if newShape != self._shapeParameter:
             self.clearAllRois()
-        self._curShape = newShape
+        self._shapeParameter = newShape
 
     @property
-    def curShape(self):
-        return self.roiForShape[self._curShape]
+    def currentShape(self):
+        return self.parameterRoiMap[self._shapeParameter]

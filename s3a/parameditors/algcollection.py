@@ -47,17 +47,17 @@ class AlgParamEditor(ParamEditor):
     sigProcessorChanged = QtCore.Signal(str)
     """Name of newly selected process"""
 
-    def __init__(self, clctn: "AlgCollection" = None, **kwargs):
+    def __init__(self, clctn: "AlgorithmCollection" = None, **kwargs):
         super().__init__(**kwargs)
         if clctn is None:
-            clctn = AlgCollection()
-        self.clctn = clctn
+            clctn = AlgorithmCollection()
+        self.collection = clctn
         self.treeBtnsWidget.hide()
 
-        procName = next(iter(self.clctn.topProcs))
+        procName = next(iter(self.collection.topProcesses))
         proc = clctn.parseProcName(procName)
         # Set to None first to force switch, init states
-        self.curProcessor = self.clctn.procWrapType(proc, self.params)
+        self.currentProcessor = self.collection.processWrapType(proc, self.params)
         _, self.changeProcParam = self.registerFunc(
             self.changeActiveProcessor,
             runOpts=RunOpts.ON_CHANGED,
@@ -67,10 +67,10 @@ class AlgParamEditor(ParamEditor):
         )
         fns.setParamsExpanded(self._metaTree)
         procSelector = self.changeProcParam.child("proc")
-        self.clctn.sigChangesApplied.connect(
-            lambda: procSelector.setLimits(list(self.clctn.topProcs))
+        self.collection.sigChangesApplied.connect(
+            lambda: procSelector.setLimits(list(self.collection.topProcesses))
         )
-        self.clctn.sigChangesApplied.emit({})
+        self.collection.sigChangesApplied.emit({})
 
         def onChange(name):
             with fns.makeDummySignal(procSelector, "sigValueChanged"):
@@ -98,7 +98,7 @@ class AlgParamEditor(ParamEditor):
         kwargs.update(includeMeta=True, disabled=False, allowDisable=True)
         first = _state is None
         if first:
-            _state = {"modules": self.clctn.includeModules, "primitive": {}, "top": {}}
+            _state = {"modules": self.collection.includeModules, "primitive": {}, "top": {}}
         stageVals = []
         for stage in proc:
             if isinstance(stage, NestedProcess):
@@ -122,16 +122,16 @@ class AlgParamEditor(ParamEditor):
         The algorithm editor also needs to store information about the selected process, so lump
         this in with the other parameter information before calling default save.
         """
-        proc = self.curProcessor.processor
+        proc = self.currentProcessor.processor
         # Make sure any newly added stages are accounted for
         if paramState is None:
             # Since inner nested processes are already recorded, flatten here to just save updated parameter values for the
             # outermost stage
             paramState = self._unnestedProcState(proc, includeMeta=True)
-            paramState["modules"] = self.clctn.includeModules
-        self.clctn.loadParamValues(self.clctn.stateName, paramState)
-        clctnState = self.clctn.saveParamValues(saveName, blockWrite=True)
-        paramState = {"active": self.curProcessor.algName, **clctnState}
+            paramState["modules"] = self.collection.includeModules
+        self.collection.loadParamValues(self.collection.stateName, paramState)
+        clctnState = self.collection.saveParamValues(saveName, blockWrite=True)
+        paramState = {"active": self.currentProcessor.algName, **clctnState}
         return super().saveParamValues(
             saveName, paramState, includeDefaults=includeDefaults, **kwargs
         )
@@ -156,9 +156,9 @@ class AlgParamEditor(ParamEditor):
             )
             stateDict = stateDict["Parameters"]
         if not procName:
-            procName = next(iter(self.clctn.topProcs))
+            procName = next(iter(self.collection.topProcesses))
 
-        self.clctn.loadParamValues(stateName, stateDict, **kwargs)
+        self.collection.loadParamValues(stateName, stateDict, **kwargs)
         self.changeActiveProcessor(procName, saveBeforeChange=False)
         return super().loadParamValues(stateName, {}, candidateParams=[], **kwargs)
 
@@ -179,22 +179,22 @@ class AlgParamEditor(ParamEditor):
         if saveBeforeChange:
             self.saveParamValues(
                 self.stateName,
-                self._unnestedProcState(self.curProcessor.processor, includeMeta=True),
+                self._unnestedProcState(self.currentProcessor.processor, includeMeta=True),
                 blockWrite=True,
             )
         proc = self._resolveProccessor(proc)
         if proc is None:
             return
-        self.curProcessor.clear()
+        self.currentProcessor.clear()
         self.params.clearChildren()
-        self.curProcessor = self.clctn.procWrapType(proc, self.params)
+        self.currentProcessor = self.collection.processWrapType(proc, self.params)
         fns.setParamsExpanded(self.tree)
         self.sigProcessorChanged.emit(proc.name)
 
     def _resolveProccessor(self, proc):
         if isinstance(proc, str):
-            proc = self.clctn.parseProcName(proc)
-        if proc == self.curProcessor.processor:
+            proc = self.collection.parseProcName(proc)
+        if proc == self.currentProcessor.processor:
             return None
         return proc
 
@@ -202,7 +202,7 @@ class AlgParamEditor(ParamEditor):
         webbrowser.open(self.formatFileName(self.stateName))
 
 
-class AlgCollection(ParamEditor):
+class AlgorithmCollection(ParamEditor):
     def __init__(
         self,
         procWrapType=NestedProcWrapper,
@@ -214,19 +214,19 @@ class AlgCollection(ParamEditor):
         **kwargs,
     ):
         super().__init__(parent, fileType=fileType, **kwargs)
-        self.procWrapType = procWrapType
-        self.procType = procType
-        self.procEditorType = procEditorType
-        self.primitiveProcs: t.Dict[str, t.Union[ProcessStage, t.List[str]]] = {}
-        self.topProcs: _procDict = {}
+        self.processWrapType = procWrapType
+        self.processType = procType
+        self.processEditorType = procEditorType
+        self.primitiveProcesses: t.Dict[str, t.Union[ProcessStage, t.List[str]]] = {}
+        self.topProcesses: _procDict = {}
         self.includeModules: t.List[str] = []
 
         if template is not None:
             self.loadParamValues(template)
 
-        if not self.topProcs:
+        if not self.topProcesses:
             # Ensure at least one top-level processor exists
-            self.addProcess(self.procType("None"), top=True)
+            self.addProcess(self.processType("None"), top=True)
 
         # Make sure fallthroughs are possible, i.e. for really simple image processes
         self.addProcess(
@@ -249,7 +249,7 @@ class AlgCollection(ParamEditor):
             saveDir = MENU_OPTS_DIR / formattedClsName.lower()
         elif saveDir is not None:
             saveDir = Path(saveDir)
-        return self.procEditorType(
+        return self.processEditorType(
             self,
             saveDir=saveDir,
             fileType=self.fileType,
@@ -257,7 +257,7 @@ class AlgCollection(ParamEditor):
         )
 
     def addProcess(self, proc: ProcessStage, top=False, force=False):
-        addDict = self.topProcs if top else self.primitiveProcs
+        addDict = self.topProcesses if top else self.primitiveProcesses
         saveObj = (
             {proc.name: proc}
             if isinstance(proc, AtomicProcess)
@@ -290,14 +290,14 @@ class AlgCollection(ParamEditor):
         :param allowOverwrite: If `add` is *True*, this determines whether the new process can overwite an already existing
           proess. If `add` is *False*, this value is ignored.
         """
-        out = self.procType(name)
+        out = self.processType(name)
         for stageName in stages:
             if isinstance(stageName, dict):
                 stage = self.parseProcDict(stageName)
             else:
                 stage = self.parseProcName(stageName, topFirst=False)
             out.addProcess(stage)
-        exists = out.name in self.topProcs
+        exists = out.name in self.topProcesses
         if add is not PRJ_ENUMS.PROC_NO_ADD and (not exists or allowOverwrite):
             self.addProcess(
                 out, top=add == PRJ_ENUMS.PROC_ADD_TOP, force=allowOverwrite
@@ -379,7 +379,7 @@ class AlgCollection(ParamEditor):
         specified name. If 'topFirst' is chosen, the search locations are parsed in reverse order.
         """
         if searchDicts is None:
-            searchDicts = [self.primitiveProcs, self.topProcs]
+            searchDicts = [self.primitiveProcesses, self.topProcesses]
         if topFirst:
             searchDicts = searchDicts[::-1]
 
@@ -518,8 +518,8 @@ class AlgCollection(ParamEditor):
 
         if paramState is None:
             paramState = {
-                "top": procFilter(self.topProcs),
-                "primitive": procFilter(self.primitiveProcs),
+                "top": procFilter(self.topProcesses),
+                "primitive": procFilter(self.primitiveProcesses),
                 "modules": self.includeModules,
             }
         return super().saveParamValues(saveName, paramState, **kwargs)
@@ -534,7 +534,7 @@ class AlgCollection(ParamEditor):
         top, primitive = stateDict.get("top", {}), stateDict.get("primitive", {})
         modules = stateDict.get("modules", [])
         self.includeModules = modules
-        self.topProcs.update(top)
-        self.primitiveProcs.update(primitive)
+        self.topProcesses.update(top)
+        self.primitiveProcesses.update(primitive)
 
         return super().loadParamValues(stateName, stateDict, candidateParams=[])

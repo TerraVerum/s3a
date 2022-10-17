@@ -20,7 +20,7 @@ def td():
             "complex": {"pType": "complexxyvertices", "value": ComplexXYVertices()},
         }
     }
-    td = TableData("temp", cfgDict=cfg)
+    td = TableData("temp", configDict=cfg)
     return td
 
 

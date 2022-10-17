@@ -42,7 +42,7 @@ if __name__ == "__main__":
         packages=find_packages(),
         data_files=[
             ("s3a/s3a/icons", _mltGlob("s3a/icons", "*.svg", "*.png")),
-            ("s3a/s3a", _mltGlob("s3a/cfg", "*.yml")),
+            ("s3a/s3a", _mltGlob("s3a/config", "*.yml")),
             ("s3a/s3a/compio/templates", _mltGlob("s3a/compio/templates", "*.tblcfg")),
         ],
         entry_points={

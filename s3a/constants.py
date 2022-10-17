@@ -32,7 +32,7 @@ __all__ = [
 CODE_DIR = Path(__file__).parent
 BASE_DIR = Path.home() / ".s3a"
 
-CFG_DIR = CODE_DIR / "cfg"
+CFG_DIR = CODE_DIR / "config"
 ICON_DIR = CODE_DIR / "icons"
 MENU_OPTS_DIR = BASE_DIR / "menuopts"
 IO_TEMPLATES_DIR = CODE_DIR / "compio/templates"

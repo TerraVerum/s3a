@@ -23,8 +23,8 @@ class IOTemplateManager:
     def getTableCfg(cls, ioType: str):
         if ioType is None:
             return None
-        cfgFname = ioType.lower() + ".tblcfg"
-        cfg = cls.templates.get(cfgFname)
+        configPath = ioType.lower() + ".tblcfg"
+        cfg = cls.templates.get(configPath)
         if cfg is None:
             return None
         return copy.deepcopy(cfg)

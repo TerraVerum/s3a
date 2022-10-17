@@ -31,7 +31,7 @@ class MetricsEventFilter(QtCore.QObject):
         self.metrics = metrics
 
     def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent):
-        mImg = self.metrics.win.mainImg
+        mImg = self.metrics.win.mainImage
         if not (
             QtWidgets.QApplication.mouseButtons() == QtCore.Qt.MouseButton.LeftButton
             and event.type() in [event.Type.MetaCall]
@@ -60,7 +60,7 @@ class UserMetricsPlugin(ParamEditorPlugin):
         self.collectedMetrics = pd.DataFrame(
             columns=["time", "viewbox_range", "mouse_pos", "action", "pixel_size"]
         ).set_index(["time"])
-        self.mainImgMouseFilter = MetricsEventFilter(metrics=self)
+        self.mainImageMouseFilter = MetricsEventFilter(metrics=self)
         self._metricsImage = None
         self._metricsViewer = self._metricsViewerContainer = None
         self.collectorProxies: t.List[SignalProxy] = []
@@ -91,10 +91,10 @@ class UserMetricsPlugin(ParamEditorPlugin):
         else:
             self.menu.menuAction().setVisible(False)
 
-        win.mainImg.imgItem.sigImageChanged.connect(self.resetMetrics)
+        win.mainImage.imgItem.sigImageChanged.connect(self.resetMetrics)
 
     def activateMetricCollection(self):
-        mImg: MainImage = self.win.mainImg
+        mImg: MainImage = self.win.mainImage
 
         def collectViewboxMetrics(args):
             vb, vbRange, axes = args
@@ -111,17 +111,17 @@ class UserMetricsPlugin(ParamEditorPlugin):
                 rateLimit=int(1 / METRIC_TICK_INTERVAL_S),
             ),
             SignalProxy(
-                self.mainImgMouseFilter.sigMouseMoved,
+                self.mainImageMouseFilter.sigMouseMoved,
                 slot=collectMouseMetrics,
                 rateLimit=int(1 / METRIC_TICK_INTERVAL_S),
             ),
         ]
 
-        mImg.scene().installEventFilter(self.mainImgMouseFilter)
+        mImg.scene().installEventFilter(self.mainImageMouseFilter)
 
     def deactivateMetricCollection(self):
-        mImg: MainImage = self.win.mainImg
-        mImg.scene().removeEventFilter(self.mainImgMouseFilter)
+        mImg: MainImage = self.win.mainImage
+        mImg.scene().removeEventFilter(self.mainImageMouseFilter)
         for proxy in self.collectorProxies:
             proxy.disconnect()
         self.collectorProxies.clear()
@@ -160,7 +160,7 @@ class UserMetricsPlugin(ParamEditorPlugin):
         else:
             image = self._metricsImage
         if image is None:
-            image = np.zeros((*self.win.mainImg.image.shape[:2], len(actions)))
+            image = np.zeros((*self.win.mainImage.image.shape[:2], len(actions)))
 
         vbRanges = metricsToUse.loc[
             metricsToUse["viewbox_range"].notnull(), "viewbox_range"

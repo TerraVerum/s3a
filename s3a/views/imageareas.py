@@ -41,14 +41,14 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
     - Current draw action
     """
 
-    sigUpdatedFocusedComp = Signal(object)
+    sigUpdatedFocusedComponent = Signal(object)
     """pd.Series, newly focused component"""
 
     sigDrawActionChanged = Signal(object)
     """New draw action (PrjParam)"""
 
     def __initEditorParams__(self, shared: SharedAppSettings):
-        self.compSer: pd.Series = shared.tableData.makeCompSer()
+        self.focusedComponent: pd.Series = shared.tableData.makeComponentSeries()
         shared.colorScheme.registerFunc(
             self.updateGridScheme, runOpts=RunOpts.ON_CHANGED
         )
@@ -108,13 +108,13 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
 
         # Initialize draw shape/action buttons
         self.drawActGrp.callFuncByParam(self.drawAction)
-        self.drawShapeGrp.callFuncByParam(self.shapeCollection.curShapeParam)
+        self.drawShapeGrp.callFuncByParam(self.shapeCollection.shapeParameter)
 
-        self.toolsGrp = None
+        self.toolsGroup = None
         if toolbar is not None:
             toolbar.addWidget(self.drawShapeGrp)
             toolbar.addWidget(self.drawActGrp)
-            self.toolsGrp = self.addTools(self.toolsEditor)
+            self.toolsGroup = self.addTools(self.toolsEditor)
 
     def resetZoom(self):
         """
@@ -128,11 +128,11 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
         vb.setRange(xRange=(0, imShape[1]), yRange=(0, imShape[0]))
 
     @property
-    def compSerAsFrame(self):
-        return coerceDfTypes(fns.serAsFrame(self.compSer))
+    def focusedComponentAsFrame(self):
+        return coerceDfTypes(fns.serAsFrame(self.focusedComponent))
 
     def shapeAssignment(self, newShapeParam: PrjParam):
-        self.shapeCollection.curShapeParam = newShapeParam
+        self.shapeCollection.shapeParameter = newShapeParam
         if self.regionMover.active:
             self.regionMover.erase()
 
@@ -294,9 +294,12 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
                 **registerOpts
             )
 
-    def focusedCompImage(self, margin: int = 0):
+    def focusedComponentImage(self, margin: int = 0):
         return getCroppedImg(
-            self.image, self.compSer[RTF.VERTICES].stack(), margin, returnCoords=False
+            self.image,
+            self.focusedComponent[RTF.VERTICES].stack(),
+            margin,
+            returnCoords=False,
         )
 
     def viewboxCoords(self, margin=0):
@@ -312,8 +315,8 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
         if toolsEditor in self._focusedTools:
             return
         toolsEditor.actionsMenuFromProcs(outerMenu=self.menu, parent=self, nest=True)
-        # self.toolsGrp.clear()
-        # self.toolsGrp.fromToolsEditors(self._focusedTools, checkable=False, ownerClctn=self.toolsGrp)
+        # self.toolsGroup.clear()
+        # self.toolsGroup.fromToolsEditors(self._focusedTools, checkable=False, ownerClctn=self.toolsGroup)
         retClctn = None
         # Define some helper functions for listening to toolsEditor changes
         def visit(param, child=None):
@@ -335,24 +338,25 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
         self.getViewBox().menu = self.menu
         return retClctn
 
-    def updateFocusedComp(self, newComp: pd.Series = None):
+    def updateFocusedComponent(self, component: pd.Series = None):
         """
-        Updates focused image and component from provided information. Useful for creating
-        a 'zoomed-in' view that allows much faster processing than applying image processing
-        algorithms to the entire image each iteration.
-        :param newComp: New component to edit using various plugins (See :class:`TableFieldPlugin`)
+        Updates focused image and component from provided information. Useful for
+        creating a 'zoomed-in' view that allows much faster processing than applying
+        image processing algorithms to the entire image each iteration.
+
+        :param component: New component to edit using various plugins (See :class:`TableFieldPlugin`)
         """
-        mainImg = self.image
-        if newComp is None or mainImg is None:
-            newComp = self.tableData.makeCompSer()
+        mainImage = self.image
+        if component is None or mainImage is None:
+            component = self.tableData.makeComponentSeries()
         else:
             # Since values INSIDE the dataframe are reset instead of modified, there is no
             # need to go through the trouble of deep copying
-            newComp = newComp.copy(deep=False)
+            component = component.copy(deep=False)
 
-        if mainImg is None:
+        if mainImage is None:
             self.imgItem.clear()
             self.shapeCollection.clearAllRois()
-        self.compSer = newComp
+        self.focusedComponent = component
 
-        self.sigUpdatedFocusedComp.emit(newComp)
+        self.sigUpdatedFocusedComponent.emit(component)

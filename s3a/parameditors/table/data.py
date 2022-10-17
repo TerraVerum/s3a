@@ -38,13 +38,13 @@ def aliasesToRequired(field: PrjParam):
 
 
 class TableData(QtCore.QObject):
-    sigCfgUpdated = QtCore.Signal(object)
-    """dict (self.cfg) during update"""
+    sigConfigUpdated = QtCore.Signal(object)
+    """dict (self.config) during update"""
 
     def __init__(
         self,
-        cfgFname: FilePath = None,
-        cfgDict: dict = None,
+        configPath: FilePath = None,
+        configDict: dict = None,
         template: Union[FilePath, dict] = None,
         makeFilter=False,
     ):
@@ -59,16 +59,16 @@ class TableData(QtCore.QObject):
             self.filter = TableFilterEditor()
         else:
             self.filter = None
-        self.paramParser: Optional[YamlParser] = None
+        self.parameterParser: Optional[YamlParser] = None
 
-        self.cfgFname: Optional[Path] = None
-        self.cfg: Optional[dict] = {}
+        self.configPath: Optional[Path] = None
+        self.config: Optional[dict] = {}
 
         self.allFields: List[PrjParam] = []
         self.resetLists()
 
-        cfgFname = cfgFname or None
-        self.loadCfg(cfgFname, cfgDict, force=True)
+        configPath = configPath or None
+        self.loadConfig(configPath, configDict, force=True)
 
     def makeCompDf(self, numRows=1, sequentialIds=False) -> pd.DataFrame:
         """
@@ -127,55 +127,57 @@ class TableData(QtCore.QObject):
             return False
         field.group = self.allFields
         self.allFields.append(field)
-        if field.name not in self.cfg["fields"]:
-            # Added programmatically outside cfg, ensure file representation is not lost
-            self.cfg["fields"][field.name] = newFieldCfg = dict(field)
+        if field.name not in self.config["fields"]:
+            # Added programmatically outside config, ensure file representation is not lost
+            self.config["fields"][field.name] = newFieldCfg = dict(field)
             # Remove redundant `name` field
             newFieldCfg.pop("name")
         return True
 
-    def makeCompSer(self):
+    def makeComponentSeries(self):
         return self.makeCompDf().squeeze()
 
-    def loadCfg(self, cfgFname: FilePath = None, cfgDict: dict = None, force=False):
+    def loadConfig(
+        self, configPath: FilePath = None, configDict: dict = None, force=False
+    ):
         """
         Lodas the specified table configuration file for S3A. Alternatively, a name
         and dict pair can be supplied instead.
-        :param cfgFname: If *cfgDict* is *None*, this is treated as the file containaing
+        :param configPath: If *configDict* is *None*, this is treated as the file containaing
           a YAML-compatible table configuration dictionary. Otherwise, this is the
           configuration name assiciated with the given dictionary.
-        :param cfgDict: If not *None*, this is the config data used instad of
-          reading *cfgFname* as a file.
+        :param configDict: If not *None*, this is the config data used instad of
+          reading *configFile* as a file.
         :param force: If *True*, the new config will be loaded even if it is the same name as the
         current config
         """
-        baseCfgDict = copy.deepcopy(self.template)
-        if cfgFname is not None:
-            cfgFname, cfgDict = fns.resolveYamlDict(cfgFname, cfgDict)
-            cfgFname = cfgFname.resolve()
+        baseConfigDict = copy.deepcopy(self.template)
+        if configPath is not None:
+            configPath, configDict = fns.resolveYamlDict(configPath, configDict)
+            configPath = configPath.resolve()
         # Often, a table config can be wrapped in a project config; look for this case first
-        if cfgDict is not None and "table-cfg" in cfgDict:
-            cfgDict = cfgDict["table-cfg"]
+        if configDict is not None and "table-config" in configDict:
+            configDict = configDict["table-config"]
 
-        hierarchicalUpdate(baseCfgDict, cfgDict, uniqueListElements=True)
-        cfg = baseCfgDict
-        if not force and self.cfgFname == cfgFname and pg.eq(cfg, self.cfg):
+        hierarchicalUpdate(baseConfigDict, configDict, uniqueListElements=True)
+        cfg = baseConfigDict
+        if not force and self.configPath == configPath and pg.eq(cfg, self.config):
             return None
 
-        self.cfgFname = cfgFname or self.cfgFname
-        self.cfg = cfg
-        self.paramParser = YamlParser(cfg)
+        self.configPath = configPath or self.configPath
+        self.config = cfg
+        self.parameterParser = YamlParser(cfg)
         self.resetLists()
         for field in cfg.get("fields", {}):
-            param = self.paramParser["fields", field]
+            param = self.parameterParser["fields", field]
             self.addField(param)
 
         if self.filter:
             self.filter.updateParamList(self.allFields)
-        self.sigCfgUpdated.emit(self.cfg)
+        self.sigConfigUpdated.emit(self.config)
 
     def clear(self):
-        self.loadCfg(cfgDict={})
+        self.loadConfig(configDict={})
 
     def resetLists(self):
         self.allFields.clear()
@@ -234,8 +236,8 @@ class TableData(QtCore.QObject):
 
     def __reduce__(self):
         return TableData, (
-            self.cfgFname,
-            self.cfg,
+            self.configPath,
+            self.config,
             self.template,
             self.filter is not None,
         )

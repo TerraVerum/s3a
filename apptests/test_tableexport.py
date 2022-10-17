@@ -27,13 +27,13 @@ from s3a.parameditors.table import TableData
 @pytest.fixture
 def _simpleTbl(tmp_path):
     td = TableData()
-    td.loadCfg(tmp_path / "test.cfg", {"fields": {"List": list("abcdefg")}})
+    td.loadConfig(tmp_path / "test.config", {"fields": {"List": list("abcdefg")}})
     return td
 
 
 @pytest.mark.withcomps
 def test_normal_export(sampleComps, tmp_path, app):
-    io = app.compIo
+    io = app.componentIo
     app.props[CNST.EXP_ONLY_VISIBLE] = False
     for ftype in io.exportTypes:
         curPath = tmp_path / f"normalExport - All IDs.{ftype}"
@@ -48,14 +48,14 @@ def test_normal_export(sampleComps, tmp_path, app):
 
 @pytest.mark.withcomps
 def test_filter_export(tmp_path, monkeypatch, app):
-    io = app.compIo
+    io = app.componentIo
 
     curPath = tmp_path / "normalExport - Filtered IDs export all.csv"
     filterIds = np.array([0, 3, 2])
-    sampleComps = app.compMgr.compDf
+    sampleComps = app.componentManager.compDf
     with monkeypatch.context() as m:
         m.setitem(app.props, CNST.EXP_ONLY_VISIBLE, False)
-        m.setattr(app.compDisplay, "displayedIds", filterIds)
+        m.setattr(app.componentController, "displayedIds", filterIds)
         exportDf = app.exportableDf
     np.testing.assert_array_equal(
         exportDf.index,
@@ -76,7 +76,7 @@ def test_filter_export(tmp_path, monkeypatch, app):
     curPath = tmp_path / "normalExport - Filtered IDs export filtered.csv"
     with monkeypatch.context() as m:
         m.setitem(app.props, CNST.EXP_ONLY_VISIBLE, True)
-        m.setattr(app.compDisplay, "displayedIds", filterIds)
+        m.setattr(app.componentController, "displayedIds", filterIds)
         exportDf = app.exportableDf
     np.testing.assert_array_equal(
         exportDf.index,
@@ -91,7 +91,7 @@ def test_filter_export(tmp_path, monkeypatch, app):
 
 
 def test_bad_import(tmp_path, app):
-    io = app.compIo
+    io = app.componentIo
     for ext in io.importTypes:
         ofile = open(tmp_path / f"junkfile.{ext}", "w")
         ofile.write("Vertices\nabsolute junk")
@@ -102,7 +102,7 @@ def test_bad_import(tmp_path, app):
 
 @pytest.mark.withcomps
 def test_bad_integrity(tmp_path, app, monkeypatch, qtbot):
-    oldBuild = app.compIo.importByFileType
+    oldBuild = app.componentIo.importByFileType
 
     def badBuilder(*args, **kwargs):
         df = oldBuild(*args, **kwargs)
@@ -110,17 +110,19 @@ def test_bad_integrity(tmp_path, app, monkeypatch, qtbot):
         return df
 
     with monkeypatch.context() as m:
-        m.setattr(app.compIo, "importByFileType", badBuilder)
+        m.setattr(app.componentIo, "importByFileType", badBuilder)
         with pytest.warns(UserWarning):
             app.exportCurAnnotation(tmp_path / "test.csv", verifyIntegrity=True)
 
 
 def test_serial_export(tmp_path, sampleComps, app):
     with pytest.raises(ValueError):
-        app.compIo.exportSerialized(sampleComps, tmp_path / "test.nopandastypehere")
+        app.componentIo.exportSerialized(
+            sampleComps, tmp_path / "test.nopandastypehere"
+        )
 
     # No export without a file path
-    app.compIo.exportSerialized(sampleComps)
+    app.componentIo.exportSerialized(sampleComps)
     assert len(list(tmp_path.glob("*.*"))) == 0
 
     sampleComps = sampleComps.copy()
@@ -131,7 +133,7 @@ def test_serial_export(tmp_path, sampleComps, app):
 
     sampleComps[REQD_TBL_FIELDS.INST_ID] = BadRep()
     with pytest.raises(Exception):
-        app.compIo.exportSerialized(sampleComps, tmp_path / "test.csv")
+        app.componentIo.exportSerialized(sampleComps, tmp_path / "test.csv")
 
 
 def doAndAssertExport(
@@ -142,7 +144,7 @@ def doAndAssertExport(
         io.exportByFileType(
             compDf,
             fpath,
-            imageShape=app.mainImg.image.shape[:2],
+            imageShape=app.mainImage.image.shape[:2],
             srcDir=SAMPLE_IMG_FNAME.parent,
             labelField="Instance ID",
         )
@@ -155,14 +157,14 @@ def doAndAssertExport(
     else:
         assert fpath.exists(), "File doesn't exist despite export"
         try:
-            inDf = io.importByFileType(fpath, app.mainImg.image.shape[:2])
+            inDf = io.importByFileType(fpath, app.mainImage.image.shape[:2])
             assert len(inDf) > 0
         except (ValueError, IOError):
             pass
 
 
 def test_impossible_io(tmp_path, sampleComps, app):
-    io = app.compIo
+    io = app.componentIo
     with pytest.raises(IOError):
         io.exportByFileType(sampleComps, "./nopossible.exporttype$")
     with pytest.raises(IOError):
@@ -171,10 +173,10 @@ def test_impossible_io(tmp_path, sampleComps, app):
 
 @pytest.mark.withcomps
 def test_opts_insertion(app, sampleComps, tmp_path):
-    app.compIo.updateOpts(PRJ_ENUMS.IO_IMPORT, reindex=True)
+    app.componentIo.updateOpts(PRJ_ENUMS.IO_IMPORT, reindex=True)
     sampleComps.index = np.linspace(0, 10000, len(sampleComps), dtype=int)
-    app.compIo.exportSerialized(sampleComps, tmp_path / "test.csv")
-    imported = app.compIo.importSerialized(tmp_path / "test.csv")
+    app.componentIo.exportSerialized(sampleComps, tmp_path / "test.csv")
+    imported = app.componentIo.importSerialized(tmp_path / "test.csv")
     assert not (imported.index == sampleComps.index).all()
 
 
@@ -238,7 +240,7 @@ def test_convert(app, tmp_path):
     sampleComps = app.exportableDf
     io = ComponentIO()
     td = app.sharedAttrs.tableData
-    io.tableData.loadCfg(td.cfgFname, td.cfg)
+    io.tableData.loadConfig(td.configPath, td.config)
     pklFile = tmp_path / "pklexport.pkl"
     csvFile = tmp_path / "csvexport.csv"
     io.exportPkl(sampleComps, pklFile)
@@ -302,7 +304,7 @@ def test_superannotate_import():
 
 def test_vgg_annotator_import():
     cfg = {"fields": {"name": "", "type": ""}}
-    io = ComponentIO(tableData=TableData(cfgDict=cfg))
+    io = ComponentIO(tableData=TableData(configDict=cfg))
     file = TEST_FILE_DIR / "sample.vgg.csv"
     df = io.importViaCsv(file)
     assert np.any(np.isin(df["type"], ["human"]))

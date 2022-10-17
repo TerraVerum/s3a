@@ -45,7 +45,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
     def __initEditorParams__(self, shared: SharedAppSettings):
         super().__initEditorParams__()
-        self.procEditor = shared.imgProcClctn.createProcessorEditor(
+        self.procEditor = shared.imageProcessCollection.createProcessorEditor(
             type(self), self.name + " Processor"
         )
 
@@ -65,11 +65,11 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         self.stageInfoImage = pg.ImageItem()
         self.stageInfoImage.hide()
         self._displayedStage = ""
-        self.statusBtn: QtWidgets.QPushButton | None = None
-        self.taskMgr = AbortableThreadContainer()
-        self.taskMgr.sigThreadsUpdated.connect(self.updateTaskLbl)
+        self.statusButton: QtWidgets.QPushButton | None = None
+        self.taskManager = AbortableThreadContainer()
+        self.taskManager.sigThreadsUpdated.connect(self.updateTaskLbl)
 
-        self.oldProcCache = None
+        self.oldResultCache = None
         """Holds the last result from a region run so undoables reset the proc cache"""
 
         _, self._overlayParam = self.procEditor.registerFunc(
@@ -80,8 +80,8 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         )
 
     def attachWinRef(self, win):
-        win.mainImg.addItem(self.region)
-        win.mainImg.addItem(self.stageInfoImage)
+        win.mainImage.addItem(self.region)
+        win.mainImage.addItem(self.stageInfoImage)
 
         def resetRegBuff(_, newSize):
             newBuff = deque(maxlen=newSize)
@@ -113,26 +113,26 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             self.clearFocusedRegion()
             self.stageInfoImage.hide()
 
-        win.mainImg.imgItem.sigImageChanged.connect(onChange)
+        win.mainImage.imgItem.sigImageChanged.connect(onChange)
 
-        win.mainImg.registerDrawAction(
+        win.mainImage.registerDrawAction(
             [CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self._runFromDrawAct
         )
-        win.mainImg.addTools(self.toolsEditor)
-        self.vb: pg.ViewBox = win.mainImg.getViewBox()
+        win.mainImage.addTools(self.toolsEditor)
+        self.vb: pg.ViewBox = win.mainImage.getViewBox()
 
-        self.statusBtn = QtWidgets.QPushButton("No pending actions")
-        self.statusBtn.setToolTip("Click to abort all active/pending actions")
-        self.statusBtn.clicked.connect(self.endQueuedActionsGui)
-        win.statBar.addPermanentWidget(self.statusBtn)
+        self.statusButton = QtWidgets.QPushButton("No pending actions")
+        self.statusButton.setToolTip("Click to abort all active/pending actions")
+        self.statusButton.clicked.connect(self.endQueuedActionsGui)
+        win.statusBar().addPermanentWidget(self.statusButton)
 
         super().attachWinRef(win)
 
     def fillRegionMask(self):
         """Completely fill the focused region mask"""
-        if self.mainImg.compSer is None:
+        if self.mainImage.focusedComponent is None:
             return
-        filledImg = np.ones(self.mainImg.image.shape[:2], dtype="uint16")
+        filledImg = np.ones(self.mainImage.image.shape[:2], dtype="uint16")
         self.updateRegionFromMask(filledImg)
 
     @classmethod
@@ -144,12 +144,12 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         """
         imageproc.procCache["mask"] = np.zeros_like(imageproc.procCache["mask"])
 
-    def updateFocusedComp(self, newComp: pd.Series = None):
-        if self.mainImg.compSer[RTF.INST_ID] == -1:
+    def updateFocusedComponent(self, newComp: pd.Series = None):
+        if self.mainImage.focusedComponent[RTF.INST_ID] == -1:
             self.updateRegionFromDf(None)
             return
-        oldId = self.mainImg.compSer[RTF.INST_ID]
-        self.updateRegionFromDf(self.mainImg.compSerAsFrame)
+        oldId = self.mainImage.focusedComponent[RTF.INST_ID]
+        self.updateRegionFromDf(self.mainImage.focusedComponentAsFrame)
         if newComp is None or oldId != newComp[RTF.INST_ID]:
             self.firstRun = True
 
@@ -157,7 +157,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         # noinspection PyTypeChecker
         verts: XYVertices = verts.astype(int)
         activeEdits = len(self.region.regionData["Vertices"]) > 0
-        if not activeEdits and self.win.compDisplay.selectionIntersectsRegion(verts):
+        if not activeEdits and self.win.componentController.selectionIntersectsRegion(
+            verts
+        ):
             # Warning already handled by main image
             return
 
@@ -167,7 +169,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             vertsKey = "bgVerts"
         kwargs = {vertsKey: verts}
         if self.queueActions:
-            thread = self.taskMgr.addThread(self.run, **kwargs, name="Vertices Update")
+            thread = self.taskManager.addThread(self.run, **kwargs, name="Vertices Update")
             thread.sigResultReady.connect(self._onThreadFinished)
             thread.sigFailed.connect(self._onThreadFinished)
         else:
@@ -176,21 +178,21 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             self.updateGuiFromProcessor(result)
 
     def updateTaskLbl(self):
-        if not self.statusBtn:
+        if not self.statusButton:
             return
-        active = sum([th.isRunning() for th in self.taskMgr.threads])
-        pending = len(self.taskMgr.threads) - active
+        active = sum([th.isRunning() for th in self.taskManager.threads])
+        pending = len(self.taskManager.threads) - active
         if active or pending:
-            self.statusBtn.setText(f"{active} active, {pending} pending action(s)")
+            self.statusButton.setText(f"{active} active, {pending} pending action(s)")
         else:
-            self.statusBtn.setText("No pending actions")
+            self.statusButton.setText("No pending actions")
 
     def endQueuedActions(self, endRunning=False):
         # Reversing kills unstarted tasks first
-        self.taskMgr.endThreads(reversed(self.taskMgr.threads), endRunning=endRunning)
+        self.taskManager.endThreads(reversed(self.taskManager.threads), endRunning=endRunning)
 
     def endQueuedActionsGui(self):
-        statuses = [t.isRunning() for t in self.taskMgr.threads]
+        statuses = [t.isRunning() for t in self.taskManager.threads]
         if len(statuses) and all(statuses):
             # Only running threads are left, ensure the user really wants to violently kill them
             confirm = QtWidgets.QMessageBox.question(
@@ -212,7 +214,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             warnings.warn(str(ex), UserWarning)
 
     def updateGuiFromProcessor(self, procResult: dict | np.ndarray):
-        img = self.mainImg.image
+        img = self.mainImage.image
         if img is None:
             compGrayscale = None
         else:
@@ -226,7 +228,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             return
         newGrayscale = newGrayscale.astype("uint8")
 
-        matchNames = incrStageNames(self.curProcessor.stagesFlattened)
+        matchNames = incrStageNames(self.currentProcessor.stagesFlattened)
         type(self).displayableInfos.fget.cache_clear()
         if self._displayedStage in matchNames:
             self.overlayStageInfo(self._displayedStage, self.stageInfoImage.opacity())
@@ -248,7 +250,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             vertsDict["fgVerts"] = fgVerts
         if bgVerts is not None:
             vertsDict["bgVerts"] = bgVerts
-        img = self.mainImg.image
+        img = self.mainImage.image
         if img is None:
             compMask = None
         else:
@@ -256,9 +258,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             compMask = compGrayscale > 0
         # TODO: When multiple classes can be represented within focused image, this is where
         #  change will have to occur
-        viewbox = self.mainImg.viewboxCoords()
-        self.oldProcCache = imageproc.procCache.copy()
-        result = self.curProcessor.run(
+        viewbox = self.mainImage.viewboxCoords()
+        self.oldResultCache = imageproc.procCache.copy()
+        result = self.currentProcessor.run(
             image=img,
             prevCompMask=compMask,
             **vertsDict,
@@ -284,10 +286,10 @@ class VerticesPlugin(DASM, TableFieldPlugin):
           see `makeMultiRegionDf`
         :param offset: Offset of newVerts relative to main image coordinates
         """
-        fImg = self.mainImg
+        fImg = self.mainImage
         # Since some calls to this function make an undo entry and others don't, be sure to save state for the undoable ones
         # revertId is only used when changedComp is true and an undo is valid
-        newId = fImg.compSer[RTF.INST_ID]
+        newId = fImg.focusedComponent[RTF.INST_ID]
         if newData is None:
             newData = makeMultiRegionDf(0)
 
@@ -313,7 +315,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         if oldData.equals(centeredData):
             return
 
-        lblCol = self.win.compDisplay.labelCol
+        lblCol = self.win.componentController.labelColumn
         self.region.resetRegionList(newRegionDf=centeredData, labelField=lblCol)
         self.region.focusById(centeredData.index.values)
 
@@ -327,7 +329,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             return ProcessIO(components=fns.serAsFrame(component))
 
         component = component.copy()
-        img = self.mainImg.image
+        img = self.mainImage.image
         if img is None or component[RTF.VERTICES].isEmpty():
             # Preserve empty values since they signify deletion to an outer scope
             return makeReturnValue()
@@ -347,7 +349,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         # Broad range of things that can go wrong
         # noinspection PyBroadException
         try:
-            result = self.curProcessor.run(
+            result = self.currentProcessor.run(
                 image=img,
                 prevCompMask=compMask,
                 firstRun=True,
@@ -379,10 +381,10 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
     def _maybeChangeFocusedComp(self, newIds: t.Sequence[int]):
         regionId = newIds[0] if len(newIds) else -1
-        focusedId = self.mainImg.compSer[RTF.INST_ID]
+        focusedId = self.mainImage.focusedComponent[RTF.INST_ID]
         updated = regionId != focusedId
         if updated:
-            if regionId in self.win.compMgr.compDf.index:
+            if regionId in self.win.componentManager.compDf.index:
                 self.win.changeFocusedComp([regionId])
             else:
                 self.win.changeFocusedComp()
@@ -398,7 +400,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             self.props[CNST.PROP_REG_APPROX_EPS]
         )
         df = makeMultiRegionDf(vertices=[newVerts], idList=[compId])
-        self.updateRegionUndoable(df, offset=offset, oldProcCache=self.oldProcCache)
+        self.updateRegionUndoable(df, offset=offset, oldProcCache=self.oldResultCache)
 
     def invertRegion(self):
         """
@@ -434,9 +436,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     def acceptChanges(self, overrideVerts: ComplexXYVertices = None):
         # Add in offset from main image to VertexRegion vertices
         newVerts = overrideVerts or self.collapseRegionVerts()
-        ser = self.mainImg.compSer
+        ser = self.mainImage.focusedComponent
         ser[RTF.VERTICES] = newVerts
-        self.updateFocusedComp()
+        self.updateFocusedComponent()
 
     def collapseRegionVerts(self, simplify=True):
         """
@@ -470,23 +472,23 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     def clearFocusedRegion(self):
         # Reset drawn comp vertices to nothing
         # Only perform action if image currently exists
-        if self.mainImg.compSer is None:
+        if self.mainImage.focusedComponent is None:
             return
         self.updateRegionFromMask(np.zeros((1, 1), bool))
 
     def resetFocusedRegion(self):
         """Reset the focused image by restoring the region mask to the last saved state"""
-        if self.mainImg.compSer is None:
+        if self.mainImage.focusedComponent is None:
             return
-        self.updateRegionUndoable(self.mainImg.compSerAsFrame)
+        self.updateRegionUndoable(self.mainImage.focusedComponentAsFrame)
 
     def _onActivate(self):
         self.region.show()
-        self.win.compDisplay.regionPlot.showFocused = False
+        self.win.componentController.regionPlot.showFocused = False
 
     def _onDeactivate(self):
         self.region.hide()
-        self.win.compDisplay.regionPlot.showFocused = True
+        self.win.componentController.regionPlot.showFocused = True
 
     def getRegionHistory(self):
         outImgs = []
@@ -503,7 +505,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         # First find offset and img size so we don't
         # have to keep copying a full image sized output every time
         allVerts = np.vstack([v.stack() for v in bufferRegions])
-        initialImg, slices = getCroppedImg(self.mainImg.image, allVerts)
+        initialImg, slices = getCroppedImg(self.mainImage.image, allVerts)
         imShape = initialImg.shape[:2]
         offset = slices[0]
         img = np.zeros(imShape, bool)
@@ -552,7 +554,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     @lru_cache()
     def displayableInfos(self):
         outInfos = {}
-        stages = self.curProcessor.processor.stagesFlattened
+        stages = self.currentProcessor.processor.stagesFlattened
         matchNames = incrStageNames(stages)
         boundSlices = None
 
@@ -560,7 +562,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             if stage.result is None:
                 # Not run yet
                 continue
-            info = self.curProcessor.processor.singleStageInfo(stage)
+            info = self.currentProcessor.processor.singleStageInfo(stage)
             if info:
                 # TODO: Figure out which 'info' to use
                 info = info[0]
