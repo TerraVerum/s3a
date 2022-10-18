@@ -85,8 +85,8 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
             stateDict = self._parseStateDictIncludeRequired(stateName, stateDict)
             paramDict = stateDict.pop("Parameters", {}) or {}
 
-            # It's possible for some functions (e.g. project load) to add or remove startup args,
-            # so chack for this
+            # It's possible for some functions (e.g. project load) to add or remove
+            # startup args, so chack for this
             hierarchicalUpdate(self.startupSettings, kwargs)
 
             def nextKey():
@@ -108,8 +108,8 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
                 key = nextKey()
             if errs:
                 warnings.warn(
-                    "The following settings could not be loaded (shown as [setting]: [exception])\n"
-                    + "\n\n".join(errs.values()),
+                    "The following settings could not be loaded (shown as [setting]: "
+                    "[exception])\n" + "\n\n".join(errs.values()),
                     UserWarning,
                 )
             if stateDict:
@@ -158,19 +158,28 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
         Main interface to the app state editor. By providing import and export functions,
         various aspects of the program state can be loaded and saved on demand.
 
-        :param optName: What should this save option be called? E.g. when providing a
-          load and save for annotation data, this is 'annotations'.
-        :param importFunc: Function called when importing saved data. Takes in a
-          full file path
-        :param exportFunc: Function to save the app data. Input is a full folder path. Expects
-          the output to be a full file path of the saved file. This file is then passed to
-          'importFunc' on loading a param state. If *None* is returned, the value is not stored.
-        :param index: Where to place this function. In most cases, this won't matter. However, some imports must be
-          performed first / last otherwise app behavior may be undefined. In these cases, passing a value for index ensures
-          correct placement of the import/export pair. By default, the function is added to the end of the import/export list.
-        :param required: If *True*, this parameter is required every time param values are loaded.
-          In the case it is missing from a load, the param editor first attempts to fetch this option
-          from the most recent saved state.
+        Parameters
+        ----------
+        optName
+            What should this save option be called? E.g. when providing a load and save
+            for annotation data, this is 'annotations'.
+        importFunc
+            Function called when importing saved data. Takes in a full file path
+        exportFunc
+            Function to save the app data. Input is a full folder path. Expects the
+            output to be a full file path of the saved file. This file is then passed
+            to 'importFunc' on loading a param state. If *None* is returned, the value
+            is not stored.
+        index
+            Where to place this function. In most cases, this won't matter. However,
+            some imports must be performed first / last otherwise app behavior may be
+            undefined. In these cases, passing a value for index ensures correct
+            placement of the import/export pair. By default, the function is added to
+            the end of the import/export list.
+        required
+            If *True*, this parameter is required every time param values are loaded.
+            In the case it is missing from a load, the param editor first attempts to
+            fetch this option from the most recent saved state.
         """
         newRow = pd.Series(
             [importFunc, exportFunc, required],

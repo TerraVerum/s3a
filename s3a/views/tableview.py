@@ -31,11 +31,18 @@ Signal = QtCore.Signal
 class SerDesDelegate(QtWidgets.QStyledItemDelegate):
     def __init__(self, param: PrjParam, asLineEdit=False, parent=None):
         """
-        Creates a string-editable item delegate which uses ComponentIO's serialize and deserialize methods to convert to
-        actual values.
-        :param param: PrjParam which dictates the serialization/deserialization of this value
-        :param asLineEdit: Whether to give this delegate a line editor text edit to set the serialized form of value
-        :parent: Parent widget
+        Creates a string-editable item delegate which uses ComponentIO's serialize and
+        deserialize methods to convert to actual values.
+
+        Parameters
+        ----------
+        param
+            PrjParam which dictates the serialization/deserialization of this value
+        asLineEdit
+            Whether to give this delegate a line editor text edit to set the serialized
+            form of value
+        parent
+            Parent widget
         """
         super().__init__(parent)
         self.asLineEdit = asLineEdit
@@ -85,9 +92,9 @@ class SerDesDelegate(QtWidgets.QStyledItemDelegate):
 class MinimalTableModel(ComponentManager):
     """
     The CheckState flag is only possible on a minimal popup table, but Qt makes it
-    challenging to override just this portion of the ComponentManager class. So, this simple
-    subclass maintains a checkstate and checkable columns on top of the traditional
-    component manager.
+    challenging to override just this portion of the ComponentManager class. So,
+    this simple subclass maintains a checkstate and checkable columns on top of the
+    traditional component manager.
     """
 
     def __init__(self):
@@ -248,9 +255,11 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         """
         Creates the table.
 
-        :param minimal: Whether to make a table with minimal features.
-           If false, creates extensible table with context menu options.
-           Otherwise, only contains minimal features.
+        Parameters
+        ----------
+        minimal
+            Whether to make a table with minimal features. If false, creates extensible
+            table with context menu options. Otherwise, only contains minimal features.
         """
         super().__init__(*args)
 
@@ -291,9 +300,12 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
     def setVisibleColumns(self, visibleColumns: Sequence[str]):
         """
         Determines which columns to show. All unspecified columns will be hidden.
-        :param visibleColumns:
-          pType: checklist
-          expanded: False
+
+        Parameters
+        ----------
+        visibleColumns
+            pType: checklist
+            expanded: False
         """
         for ii, col in enumerate(self.manager.columnTitles):
             self.setColumnHidden(ii, col not in visibleColumns)
@@ -310,8 +322,8 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
                 paramDict["type"] = "list"
                 paramDict.update(values=list(curval.group))
             elif curType == "bool":
-                # TODO: Get checkbox to stay in table after editing for a smoother appearance.
-                #   For now, the easiest solution is to just use dropdown
+                # TODO: Get checkbox to stay in table after editing for a smoother
+                #  appearance. For now, the easiest solution is to just use dropdown
                 paramDict["type"] = "list"
                 paramDict.update(values={"True": True, "False": False})
             try:
@@ -342,8 +354,8 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         self, curSel: QtCore.QItemSelection, prevSel: QtCore.QItemSelection
     ):
         """
-        When the selected rows in the table change, this retrieves the corresponding previously
-        and newly selected IDs. They are then emitted in sigSelectionChanged.
+        When the selected rows in the table change, this retrieves the corresponding
+        previously and newly selected IDs. They are then emitted in sigSelectionChanged.
         """
         super().selectionChanged(curSel, prevSel)
         selectedIds = []
@@ -393,15 +405,21 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         selectedIdxs: Sequence[QtCore.QModelIndex] = None,
     ):
         """
-        Returns Nx3 np array of (ids, rows, cols) from current table selection. Ids refer to
-        the 'Instance ID' column, while rows refer to the placement in the visible table.
-        Thus, sorting the table will not affect `id` values, but will affect `row` values.
+        Returns Nx3 np array of (ids, rows, cols) from current table selection. Ids
+        refer to the 'Instance ID' column, while rows refer to the placement in the
+        visible table. Thus, sorting the table will not affect `id` values, but will
+        affect `row` values.
 
-        :param excludeNoEditCols: Whether to consider columns that do not allow editing, like
-          Instance ID and Vertices
-        :param warnNoneSelection: Whether to raise a warning if no values are selected
-        :param selectedIdxs: Selection to get ids, rows, and cols from. If *None*, defaults to
-          the current table selection (self.selectedIndexes())
+        Parameters
+        ----------
+        excludeNoEditCols
+            Whether to consider columns that do not allow editing, like Instance ID and
+            Vertices
+        warnNoneSelection
+            Whether to raise a warning if no values are selected
+        selectedIdxs
+            Selection to get ids, rows, and cols from. If *None*, defaults to the
+            current table selection (self.selectedIndexes())
         """
         if selectedIdxs is None:
             selectedIdxs = self.selectedIndexes()
@@ -416,8 +434,8 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
             retLists.append([idAtIdx, row, idx.column()])
         retLists = np.array(retLists, dtype=int)
         if excludeNoEditCols and len(retLists) > 0:
-            # Set diff will eliminate any repeats, so use a slower op that at least preserves
-            # duplicates
+            # Set diff will eliminate any repeats, so use a slower op that at least
+            # preserves duplicates
             retLists = retLists[~np.isin(retLists[:, 2], self.manager.noEditColIdxs)]
         if len(retLists) == 0:
             retLists.shape = (-1, 3)
@@ -460,16 +478,23 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         selectionIdxs = selectionIdxs[np.isin(selectionIdxs[:, 2], dirtyCols)]
         self.setSelectedCellsAs(selectionIdxs, self.popup.data)
 
-    def _getDupDataCols(self, selectionIdxs: np.ndarray):
+    def _getDupDataCols(self, selectionIdxs: np.ndarray) -> list[int]:
         """
-        From a selection of components, returns the column names which have the same data in
-        every row. This is useful for determining which columns should be propagated by
-        default when performing a "set cells" operation
+        From a selection of components, returns the column names which have the same
+        data in every row. This is useful for determining which columns should be
+        propagated by default when performing a "set cells" operation
 
-        :param selectionIdxs: Selection list of dataframe cells to consider. See
-          `ids_rows_colsFormSelection` for a description of this array
-        :return: List of column idxs which have only duplicate data selected, i.e. all
-        entries in every row of that column are the same
+        Parameters
+        ----------
+        selectionIdxs
+            Selection list of dataframe cells to consider. See
+            ``ids_rows_colsFormSelection`` for a description of this array
+
+        Returns
+        -------
+        list[int]
+            List of column idxs which have only duplicate data selected, i.e. all
+            entries in every row of that column are the same
         """
         dupCols = []
         # First, find out all rows for each column to select, then test data at those rows
@@ -488,12 +513,16 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
 
     def setSelectedCellsAs(self, selectionIdxs: TwoDArr, overwriteData: pd.DataFrame):
         """
-        Overwrites the data from rows and cols with the information in *overwriteData*.
+        Overwrites the data from rows and cols with the information in ``overwriteData``.
         Each (id, row, col) index is treated as a single index
-        :param selectionIdxs: Selection idxs to overwrite. If *None*, defaults to
-          current selection.
-        :param overwriteData: What to fill in the overwrite locations. If *None*, a popup table
-          is displayed and its data is used.
+
+        Parameters
+        ----------
+        selectionIdxs
+            Selection idxs to overwrite. If *None*, defaults to current selection.
+        overwriteData
+            What to fill in the overwrite locations. If *None*, a popup table is
+            displayed and its data is used.
         """
         if self.minimal:
             return

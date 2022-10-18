@@ -33,8 +33,8 @@ def stackedVertsPlusConnections(
     vertices: ComplexXYVertices,
 ) -> Tuple[XYVertices, np.ndarray]:
     """
-    Utility for concatenating all vertices within a list while recording where separations
-    occurred
+    Utility for concatenating all vertices within a list while recording where
+    separations occurred
     """
     allVerts = [np.zeros((0, 2))]
     separationIdxs = []
@@ -64,15 +64,14 @@ def getClippedBbox(arrShape: tuple, bbox: TwoDArr, margin: int):
 
     Parameters
     ----------
-    arrShape :    2-element tuple
-       Refrence array dimensions
-
-    bbox     :    2x2 array
-       [minX minY; maxX maxY] bounding box coordinates
-
-    margin   :    int
-       Offset from bounding box coords. This will not fully be added to the bounding box
-       if the new margin causes coordinates to fall off either end of the reference array shape.
+    arrShape : 2-element tuple
+        Refrence array dimensions
+    bbox : 2x2 array
+        [minX minY; maxX maxY] bounding box coordinates
+    margin : int
+        Offset from bounding box coords. This will not fully be added to the bounding
+        box if the new margin causes coordinates to fall off either end of the
+        reference array shape.
     """
     bbox = bbox.astype(int)
     bbox[0] -= margin
@@ -84,8 +83,9 @@ def getClippedBbox(arrShape: tuple, bbox: TwoDArr, margin: int):
 
 def coerceDfTypes(dataframe: pd.DataFrame, constParams: Collection[PrjParam] = None):
     """
-    Pandas currently has a bug where datatypes are not preserved after update operations.
-    Current workaround is to coerce all types to their original values after each operation
+    Pandas currently has a bug where datatypes are not preserved after update
+    operations. Current workaround is to coerce all types to their original values
+    after each operation
     """
     if constParams is None:
         constParams = dataframe.columns
@@ -174,12 +174,19 @@ def tryCvResize(
     image: NChanImg, newSize: Union[tuple, float], asRatio=True, interp=cv.INTER_CUBIC
 ):
     """
-    Uses cv.resize where posisble, but if dtypes prevent this, it falls back to skimage.transform.rescale/resize
+    Uses ``cv.resize`` where posisble, but if dtypes prevent this, it falls back to
+    skimage.transform.rescale/resize
 
-    :param image: Image to resize
-    :param newSize: Either ratio to scale each axis or new image size (x, y -- not row, col)
-    :param asRatio: Whether to interpret `newSize` as a ratio or new image dimensions
-    :param interp: Interpolation to use, if cv.resize is available for the given dtype
+    Parameters
+    ----------
+    image
+        Image to resize
+    newSize
+        Either ratio to scale each axis or new image size (x, y -- not row, col)
+    asRatio
+        Whether to interpret `newSize` as a ratio or new image dimensions
+    interp
+        Interpolation to use, if cv.resize is available for the given dtype
     """
     if asRatio:
         if not isinstance(newSize, tuple):
@@ -206,12 +213,21 @@ def tryCvResize(
 
 def cornersToFullBoundary(cornerVerts: XYVertices, sizeLimit=0) -> XYVertices:
     """
-    From a list of corner vertices, returns an array with one vertex for every border pixel.
+    From a list of corner vertices, returns an array with one vertex for every border
+    pixel.
 
-    :param cornerVerts: Corners of the represented polygon
-    :param sizeLimit: If > 0, every nth pixel from the border will be used such that
-        ``sizeLimit``total points are returned
-    :return: List with one vertex for every border pixel, unless ``sizeLimit`` is violated.
+    Parameters
+    ----------
+    cornerVerts
+        Corners of the represented polygon
+    sizeLimit
+        If > 0, every nth pixel from the border will be used such that ``sizeLimit``
+        total points are returned
+
+    Returns
+    -------
+    XYVertices
+        List with one vertex for every border pixel, unless ``sizeLimit`` is violated.
     """
     # Credit: https://stackoverflow.com/a/70664846/9463643
     # Cumulative Euclidean distance between successive polygon points.
@@ -248,10 +264,10 @@ def getCroppedImg(
     returnCoords=True,
 ) -> tuple[np.ndarray, _coordType] | np.ndarray:
     """
-    Crops an image according to the specified vertices such that the returned image does not extend
-    past vertices plus margin (including other bboxes if specified). All bboxes and output coords
-    are of the form [[xmin, ymin], [xmax, ymax]]. Slices are (row slices, col slices) if `coordsAsSlices`
-    is specified.
+    Crops an image according to the specified vertices such that the returned image
+    does not extend past vertices plus margin (including other bboxes if specified).
+    All bboxes and output coords are of the form [[xmin, ymin], [xmax, ymax]]. Slices
+    are (row slices, col slices) if ``coordsAsSlices`` is specified.
     """
     verts = np.vstack(verts)
     img_np = image
@@ -304,8 +320,8 @@ class MaxSizeDict(dict):  # lgtm [py/missing-equals]
     """
     Poor man's LRU dict, since I don't yet feel like including another pypi dependency
     Rather than evicting the least recently used, it evicts the oldest set value.
-    Allows simpler implementation since no logic is needed to track last accesses.
-    Use something more effective than this if true LRU behavior is required.
+    Allows simpler implementation since no logic is needed to track last accesses. Use
+    something more effective than this if true LRU behavior is required.
     """
 
     def __init__(self, *args, maxsize: int = np.inf, **kwargs):
@@ -328,9 +344,9 @@ def _getPtAngles(pts):
 
 def orderContourPts(pts: XYVertices, ccw=True):
     """
-    Only guaranteed to work for convex hulls, i.e. shapes not intersecting themselves. Orderes
-    an arbitrary list of coordinates into one that works well line plotting, i.e. doesn't show
-    excessive self-crossing when plotting
+    Only guaranteed to work for convex hulls, i.e. shapes not intersecting themselves.
+    Orderes an arbitrary list of coordinates into one that works well line plotting,
+    i.e. doesn't show excessive self-crossing when plotting
     """
     if len(pts) < 3:
         return pts
@@ -364,17 +380,18 @@ def symbolFromVerts(verts: Union[ComplexXYVertices, XYVertices, np.ndarray]):
     else:
         boundLoc = np.nanmin(concatRegion, 0, keepdims=True)
     useVerts = concatRegion - boundLoc + 0.5
-    # pyqtgraph 0.12.2 errs on an empty symbol https://github.com/pyqtgraph/pyqtgraph/issues/1888
+    # pyqtgraph 0.12.2 errs on an empty symbol
+    # https://github.com/pyqtgraph/pyqtgraph/issues/1888
     if not len(isfinite):
         isfinite = "all"
     return pg.arrayToQPath(*useVerts.T, connect=isfinite), boundLoc
 
 
-# Credit: https://www.pyimagesearch.com/2016/11/07/intersection-over-union-iou-for-object-detection/
+# Credit: https://www.pyimagesearch.com/2016/11/07/intersection-over-union-iou-for-object-detection/  # noqa
 def bboxIou(boxA, boxB):
     """
-    determine the (x, y)-coordinates of the intersection rectangle. Both boxes are formatted
-    [[xmin, ymin], [xmax, ymax]]
+    determine the (x, y)-coordinates of the intersection rectangle. Both boxes are
+    formatted [[xmin, ymin], [xmax, ymax]]
     """
     boxA = boxA.ravel()
     boxB = boxB.ravel()
@@ -429,8 +446,9 @@ def imgPathtoHtml(imgPath: FilePath, width=None):
 
 def incrStageNames(stages: Sequence[ProcessStage]):
     """
-    Returns a list of names numerically incrementing where they would otherwise be duplicated. E.g. if the stage
-    list was [Open, Open], this is converted to [Open, Open#2]
+    Returns a list of names numerically incrementing where they would otherwise be
+    duplicated. E.g. if the stage list was [Open, Open], this is converted to
+    [Open, Open#2]
     """
     preExisting = defaultdict(int)
     names = []
@@ -445,11 +463,12 @@ def incrStageNames(stages: Sequence[ProcessStage]):
 
 class DirectoryDict(MaxSizeDict):
     """
-    Used to shim the API between file-system and programmatically generated content. If a directory is passed, files are
-    read and cached when a name is passed. Otherwise, treat as a normal dict of things. For instance, a directory of
-    png images can be accessed through this data structure as ddict['x.png'] which will load the image. Next time 'x.png'
-    is accessed, it will be instantaneous due to caching. Similarly, `ddict` could be given an initial dict if contents
-    are not directory-backed
+    Used to shim the API between file-system and programmatically generated content. If
+    a directory is passed, files are read and cached when a name is passed. Otherwise,
+    treat as a normal dict of things. For instance, a directory of png images can be
+    accessed through this data structure as ddict['x.png'] which will load the image.
+    Next time 'x.png' is accessed, it will be instantaneous due to caching. Similarly,
+    `ddict` could be given an initial dict if contents are not directory-backed
     """
 
     _UNSET = object()
@@ -466,13 +485,19 @@ class DirectoryDict(MaxSizeDict):
         **kwargs,
     ):
         """
-        :param initData: Either startup dict or backing directory path. If a DirectoryDict is passed, its attribute will
-          be used instead of the value passed for allowAbsolute. Its readFunc will be used if the passed
-          readFunc is *None*
-        :param readFunc: Function used to read files from the directory, i.e. `io.imread`, `attemptFileLoad`, etc.
-          Must accept the name of the file to read
-        :param allowAbsolute: Whether to allow reading absolute paths
-        :param kwargs: Passed to super constructor
+        Parameters
+        ----------
+        initData
+            Either startup dict or backing directory path. If a DirectoryDict is
+            passed, its attribute will be used instead of the value passed for
+            allowAbsolute. Its readFunc will be used if the passed readFunc is *None*
+        readFunc
+            Function used to read files from the directory, i.e. ``io.imread``,
+            ``attemptFileLoad``, etc. Must accept the name of the file to read
+        allowAbsolute
+            Whether to allow reading absolute paths
+        **kwargs
+            Passed to super constructor
         """
         self.fileDir = None
         if isinstance(initData, FilePath.__args__):
@@ -508,7 +533,8 @@ class DirectoryDict(MaxSizeDict):
         if len(candidates) != 1:
             grammar = ": " if len(candidates) else ""
             raise KeyError(
-                f'"{key}" corresponds to {len(candidates)} files{grammar}{", ".join(c.name for c in candidates)}'
+                f'"{key}" corresponds to {len(candidates)} files{grammar}'
+                f'{", ".join(c.name for c in candidates)} '
             )
         else:
             file = candidates[0]
@@ -558,7 +584,10 @@ def deprecateKwargs(warningType=DeprecationWarning, **oldToNewNameMapping):
                     for k in usedDeprecated
                     if oldToNewNameMapping[k] is not None
                 }
-                msg = f'{", ".join(usedDeprecated)} {grammar} deprecated and will be removed in a future release.'
+                msg = (
+                    f'{", ".join(usedDeprecated)} {grammar} deprecated and will be '
+                    f'removed in a future release. '
+                )
                 if replacements:
                     for orig, replace in replacements.items():
                         kwargs[replace] = kwargs[orig]
@@ -573,7 +602,10 @@ def deprecateKwargs(warningType=DeprecationWarning, **oldToNewNameMapping):
 
 
 def _indexUsingPad(image, tblrPadding):
-    """Extracts an inner portion of an image accounting for top/bottom/left/right padding tuple"""
+    """
+    Extracts an inner portion of an image accounting for top/bottom/left/right padding
+    tuple
+    """
     imshape = image.shape[:2]
     rows = slice(tblrPadding[0], imshape[0] - tblrPadding[1])
     cols = slice(tblrPadding[2], imshape[1] - tblrPadding[3])
@@ -590,22 +622,38 @@ def subImageFromVerts(
     allowTranspose=False,
     rotationDeg=0,
     **kwargs,
-):
+) -> np.ndarray | tuple[np.ndarray, dict]:
     """
-    extracts a region from an image cropped to the area of `verts`. Unlike `getCroppedImage`, this allows a constant-sized
-    output shape, rotation, and other features.
-    :param image: Full-sized image from which to extract a subregion
-    :param verts: Nx2 array of x-y vertices that determine the extracted region
-    :param margin: Margin in pixels to add to the [x, y] shapes of vertices. Can be a scalar or [x,y].
-      If float values are specified, the margin is interpreted as a percentage (1.0 = 100% margin) of the [x,y] sizes.
-    :param shape: (rows, cols) output shape
-    :param returnCoords: Whether to return a bounding box array of [[minx, miny], [maxx, maxy]] coordinates where this
-      subimage fits. With no scaling, rotation, padding, etc. this is the same region as the vertices bounding box
-    :param returnStats: Whether to return a dict of reshaping stats that can be passed to `inverseSubImage`
-    :param allowTranspose: If *True*, the image can be rotated 90 degrees if it results in less padding to reach
-      the desired shape
-    :param rotationDeg: Clockwise rotation to apply to the extracted image
-    :param kwargs: Passed to `cv.warpAffine`
+    Extracts a region from an image cropped to the area of `verts`. Unlike
+    `getCroppedImage`, this allows a constant-sized output shape, rotation, and other
+    features.
+
+    Parameters
+    ----------
+    image
+        Full-sized image from which to extract a subregion
+    verts
+        Nx2 array of x-y vertices that determine the extracted region
+    margin
+        Margin in pixels to add to the [x, y] shapes of vertices. Can be a scalar or
+        [x,y]. If float values are specified, the margin is interpreted as a percentage
+        (1.0 = 100% margin) of the [x,y] sizes.
+    shape
+        (rows, cols) output shape
+    returnCoords
+        Whether to return a bounding box array of [[minx, miny], [maxx, maxy]]
+        coordinates where this subimage fits. With no scaling, rotation, padding,
+        etc. this is the same region as the vertices bounding box
+    returnStats
+        Whether to return a dict of reshaping stats that can be passed to
+        ``inverseSubImage``
+    allowTranspose
+        If ``True``, the image can be rotated 90 degrees if it results in less padding
+        to reach the desired shape
+    rotationDeg
+        Clockwise rotation to apply to the extracted image
+    **kwargs
+        Passed to ``cv.warpAffine``
     """
     if shape is not None:
         shape = np.asarray(shape[:2])
@@ -646,8 +694,8 @@ def subImageFromVerts(
     transformedBbox[0, padAx] -= leftPad
     transformedBbox[1, padAx] += rightPad
 
-    # In order for rotation not to clip any image pixels, make sure to capture a bounding box big enough to
-    # prevent border-filling where possible
+    # In order for rotation not to clip any image pixels, make sure to capture a
+    # bounding box big enough to prevent border-filling where possible
     if not np.isclose(rotationDeg, 0):
         rotatedPoints = cv.boxPoints(
             (transformedBbox.mean(0), transformedBbox.ptp(0), -rotationDeg)
@@ -715,8 +763,9 @@ def _getRotationStats(
 
 def _shapeTransposeNeeded(inputShape, outputShape):
     """
-    Determines whether the input shape would better fit to the output shope if it was transposed. This is evaluated
-    based on whether it results in a maintained aspect ratio during resizing
+    Determines whether the input shape would better fit to the output shope if it was
+    transposed. This is evaluated based on whether it results in a maintained aspect
+    ratio during resizing
     """
     ratios = outputShape / inputShape
     # Choose whichever orientation leads to the closest ratio to the original size
@@ -736,8 +785,8 @@ def _getAffineSubregion(
     **affineKwargs,
 ):
     totalBbox = coordsToBbox(totalBbox, addOneToMax=False)
-    # It's common for rotation angles to cut off fractions of a pixel during warping. This is
-    # easily resolved by adding just a few more pixels to the total box
+    # It's common for rotation angles to cut off fractions of a pixel during warping.
+    # This is easily resolved by adding just a few more pixels to the total box
     totalBbox[0] -= 1
     totalBbox[1] += 1
     hasRotation = not np.isclose(rotationDeg, 0)
@@ -796,11 +845,17 @@ def _getAffineSubregion(
 
 def inverseSubImage(subImage, stats, finalBbox: np.ndarray = None):
     """
-    From a subImage after a call from `subImageFromVerts`, turns it back into a regularly size, de-rotated version
+    From a subImage after a call from `subImageFromVerts`, turns it back into a
+    regularly size, de-rotated version
 
-    :param subImage: Image to resize and re-rotate
-    :param stats: dict of stats coming from the `subImageFromVerts` call
-    :param finalBbox: If provided, this is the region from within the inverted subImage to extract
+    Parameters
+    ----------
+    subImage
+        Image to resize and re-rotate
+    stats
+        dict of stats coming from the `subImageFromVerts` call
+    finalBbox
+        If provided, this is the region from within the inverted subImage to extract
     """
     subBbox = stats["subImageBbox"]
     transBbox = stats["normedTransformedBbox"]
@@ -808,7 +863,8 @@ def inverseSubImage(subImage, stats, finalBbox: np.ndarray = None):
     unresized = cv.resize(
         subImage, preResizedShape, interpolation=stats.get("interpolation")
     )
-    # De-rotate around the same center as the rotation occurred, accounting for an offset from subindexing (transBbox[0])
+    # De-rotate around the same center as the rotation occurred, accounting for an
+    # offset from subindexing (transBbox[0])
     unrotated = trans.rotate(
         unresized, -stats["rotation"], resize=True, preserve_range=True
     ).astype(subImage.dtype)
@@ -835,8 +891,8 @@ def coordsToBbox(coords: np.ndarray, addOneToMax=True):
 
 def toDictGen(df: pd.DataFrame, index=False):
     """
-    pandas to_dict() keeps all rows in memory at once. This method is similar, but is a generator version only yielding
-    one row at a time.
+    pandas to_dict() keeps all rows in memory at once. This method is similar, but is a
+    generator version only yielding one row at a time.
     """
     cols = df.columns.to_list()
     # Define out here to avoid if-statement in every evaluation
@@ -853,9 +909,10 @@ def toHtmlWithStyle(
     df: pd.DataFrame, file: FilePath = None, style: str = None, **exportArgs
 ):
     """
-    `to_html` doesn't allow any injection of style attributes, etc. This is an intermediate step which collects the
-    exported dataframe data, prepends <style> tags with the inserted style string, and completes the export.
-    If no style is provided, `to_html` is called normally.
+    `to_html` doesn't allow any injection of style attributes, etc. This is an
+    intermediate step which collects the exported dataframe data, prepends <style> tags
+    with the inserted style string, and completes the export. If no style is provided,
+    `to_html` is called normally.
     """
     if not style:
         return df.to_html(file, **exportArgs)

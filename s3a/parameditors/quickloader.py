@@ -158,8 +158,8 @@ class QuickLoaderEditor(ParamEditor):
                 errSettings.append(f"{editor.name}: {ex}")
         if len(errSettings) > 0:
             warnings.warn(
-                "The following settings could not be loaded (shown as [setting]: [exception])\n"
-                + "\n\n".join(errSettings),
+                "The following settings could not be loaded (shown as [setting]: "
+                "[exception])\n" + "\n\n".join(errSettings),
                 UserWarning,
             )
         return startupSrc
@@ -187,8 +187,8 @@ class QuickLoaderEditor(ParamEditor):
                 ]
                 if len(matches) != 1:
                     raise ValueError(
-                        f'Exactly one editor name must match "{editorName}" but {len(matches)}'
-                        f" were found"
+                        f'Exactly one editor name must match "{editorName}" but '
+                        f'{len(matches)} were found'
                     )
                 editor = matches[0]
                 for state, shcValue in shcOpts.items():
@@ -225,9 +225,9 @@ class QuickLoaderEditor(ParamEditor):
         self, editor: ParamEditor, paramState: str, shortcut: str = None
     ):
         """
-        Ensures the specified editor shortcut will exist in the quickloader parameter tree. The
-        action can either be None (if no shortcut should be defaulted) or the starting shortcut
-        value.
+        Ensures the specified editor shortcut will exist in the quickloader parameter
+        tree. The action can either be None (if no shortcut should be defaulted) or the
+        starting shortcut value.
         """
         act = None
         if editor.name not in self.params.names:

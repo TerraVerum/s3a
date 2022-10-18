@@ -44,12 +44,18 @@ class FieldDisplayDelegate(ABC):
         """
         Called with all data that matches this delegate.
 
-        :param comps: DataFrame of all components that match this delegate
-        :param field: Field to which this delegate belongs. In some cases, data *outside* this
-          field is required for proper display (i.e. text labels need Vertices for their position).
-          So, while the whole dataframe is passed, only the data that is relevant to this delegate
-          should be consumed. No matter what, `comps` should *not* be modified.
-        :param kwargs: ways to customise the display. `setData` will be registered as a function in
+        Parameters
+        ----------
+        comps
+            DataFrame of all components that match this delegate
+        field
+            Field to which this delegate belongs. In some cases, data *outside* this
+            field is required for proper display (i.e. text labels need Vertices for
+            their position). So, while the whole dataframe is passed, only the data
+            that is relevant to this delegate should be consumed. No matter what,
+            `comps` should *not* be modified.
+        **kwargs
+            ways to customise the display. `setData` will be registered as a function in
           a ParamEditor, so these will be user-customizable.
         """
         raise NotImplementedError
@@ -57,9 +63,9 @@ class FieldDisplayDelegate(ABC):
 
 class SceneItemContainer(FieldDisplayDelegate):
     """
-    This base class handles all cases where all visual representations are scene items, which already support
-    show, hide, removeItem, addItem. So, classes which inherit this must indicate a list of `item`s
-    on which these operations should be called
+    This base class handles all cases where all visual representations are scene items,
+    which already support show, hide, removeItem, addItem. So, classes which inherit
+    this must indicate a list of `item`s on which these operations should be called
     """
 
     items: List[pg.GraphicsObject] = None
@@ -83,7 +89,8 @@ class SceneItemContainer(FieldDisplayDelegate):
             plotItem.addItem(item)
         self.plotItem = plotItem
 
-    # Many items support 'clear', so provide a default implementation when this is the case
+    # Many items support 'clear', so provide a default implementation when this is the
+    # case
     def clear(self):
         for item in self.items:
             item.clear()
@@ -102,8 +109,10 @@ class TextFieldDelegate(SceneItemContainer):
         self, comps: pd.DataFrame, field: PrjParam, fontSize=10, textColor="w", **kwargs
     ):
         """
-        :param textColor:
-          pType: color
+        Parameters
+        ----------
+        textColor
+            pType: color
         """
         positions = np.row_stack(
             comps[RTF.VERTICES].apply(lambda el: minVertsCoord(el.stack()))
@@ -193,12 +202,14 @@ class XYVerticesDelegate(SceneItemContainer):
         calloutWidth=1,
         **kwargs,
     ):
-        # Single coordinates and disconnected vertices are points, while connected verts are shaded
-        # polygons.
         """
-        :param spotColor:
-          pType: color
+        Parameters
+        ----------
+        spotColor
+            pType: color
         """
+        # Single coordinates and disconnected vertices are points, while connected
+        # verts are shaded polygons.
         polyVerts, pointVerts, callouts = [], [], []
         for idx, verts in comps[field].iteritems():
             # Ignore empty vertices
@@ -247,7 +258,9 @@ class XYVerticesDelegate(SceneItemContainer):
 
     @staticmethod
     def _calloutLine(compVerts, point):
-        """Creates a callout line from the point to the comp vertex closest to the origin"""
+        """
+        Creates a callout line from the point to the comp vertex closest to the origin
+        """
         return np.row_stack([minVertsCoord(compVerts), point])
 
 
@@ -294,9 +307,10 @@ class FieldDisplay(EditorPropsMixin):
         self, pType, delegate: Type[FieldDisplayDelegate], override=False
     ):
         """
-        Assigns a delegate for displaying a type of data. I.e. a MultiRegionPlot is the delegate for vertices-like data.
-        `pType` corresponds to the same field as PrjParam.pType, which is a registered form of field data. It may be a
-        single string or tuple of strings, each denoting a type (i.e. 'int', 'list', etc.).
+        Assigns a delegate for displaying a type of data. I.e. a MultiRegionPlot is the
+        delegate for vertices-like data. `pType` corresponds to the same field as
+        PrjParam.pType, which is a registered form of field data. It may be a single
+        string or tuple of strings, each denoting a type (i.e. 'int', 'list', etc.).
         """
         if not isinstance(pType, tuple):
             pType = (pType,)
@@ -342,7 +356,10 @@ class FieldDisplay(EditorPropsMixin):
 
     @classmethod
     def _replaceDefaultData(cls, comps: pd.DataFrame, fields):
-        """Concats all data into text for display with the default delagate, and drops the original fields"""
+        """
+        Concats all data into text for display with the default delagate, and drops the
+        original fields
+        """
         converter = lambda comp: "\n".join(
             f"{index}: {data}" for index, data in comp.iteritems() if len(str(data))
         )

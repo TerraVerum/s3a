@@ -69,24 +69,27 @@ _defaultResizeOpts = dict(
 
 class ComponentIO:
     """
-    Exporter responsible for saving Component information to a file or object.
-    Once created, users can extract different representations of components by
-    calling exporter.exportCsv, exportPkl, etc. for those objects / files respectively.
+    Exporter responsible for saving Component information to a file or object. Once
+    created, users can extract different representations of components by calling
+    exporter.exportCsv, exportPkl, etc. for those objects / files respectively.
     """
 
     @property
     def roundTripTypes(self):
         """
-        Not all IO types can export->import and remain the exact same dataframe afterwards.
-        For instance, exporting a labeled image will discard all additional fields.
-        This property holds export types which can give back the original dataframe after
-        a round trip export->import.
+        Not all IO types can export->import and remain the exact same dataframe
+        afterwards. For instance, exporting a labeled image will discard all additional
+        fields. This property holds export types which can give back the original
+        dataframe after a round trip export->import.
         """
         # Since both import and export should have these keys, can use either dict
         return {k: self.importTypes[k] for k in ["csv", "pkl"]}
 
     tableData = TableData()
-    """Table to use for import/export cross checks. This is how class and table field information is derived."""
+    """
+    Table to use for import/export cross checks. This is how class and table field 
+    information is derived.
+    """
     importOpts = {}
     """
     Propagated to every importByFileType call to provide user-specified defaults as 
@@ -159,14 +162,20 @@ class ComponentIO:
         **extraOpts,
     ):
         """
-        Helper for creating a file filter out of the handled IO types. The returned list of
-        strings is suitable for inserting into a QFileDialog.
+        Helper for creating a file filter out of the handled IO types. The returned
+        list of strings is suitable for inserting into a QFileDialog.
 
-        :param which: Whether to generate filters for build types, export types, or round trip
-        :param typeFilter: type filter for handled io types. For instanece, if typ='png', then
-          a file filter list with only 'id.png' and 'class.png' will appear.
-        :param allFilesOpt: Whether to add an "All Files (*.*) option to the dropdown menu
-        :param extraOpts; Extra file types to include in the filter
+        Parameters
+        ----------
+        which
+            Whether to generate filters for build types, export types, or round trip
+        typeFilter
+            Type filter for handled io types. For instanece, if typ='png', then
+            a file filter list with only 'id.png' and 'class.png' will appear.
+        allFilesOpt
+            Whether to add an "All Files (*.*) option to the dropdown menu
+        **extraOpts
+            Extra file types to include in the filter
         """
         ioDict = {
             PRJ_ENUMS.IO_ROUND_TRIP: self.roundTripTypes,

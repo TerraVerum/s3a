@@ -43,14 +43,15 @@ class PrjParamGroup:
         default: PrjParam = None,
     ):
         """
-        Allows user to create a :class:`PrjParam` object from its string value (or a parameter that
-        can equal one of the parameters in this list)
+        Allows user to create a :class:`PrjParam` object from its string value (or a
+        parameter that can equal one of the parameters in this list)
         """
         param = str(param).lower()
         for matchParam in group:
             if str(matchParam).lower() == param:
                 return matchParam
-        # If we reach here the value didn't match any CNSTomponentTypes values. Throw an error
+        # If we reach here the value didn't match any CNSTomponentTypes values. Throw
+        # an error
         if default is None and hasattr(group, "getDefault"):
             default = group.getDefault()
         baseWarnMsg = f'String representation "{param}" was not recognized.\n'
@@ -60,14 +61,16 @@ class PrjParamGroup:
                 baseWarnMsg
                 + f'Must be one of {", ".join(list(str(g) for g in group))}.'
             )
-        # No exception needed, since the user specified a default type in the derived class
+        # No exception needed, since the user specified a default type in the derived
+        # class
         warn(baseWarnMsg + f"Defaulting to {default}", UserWarning)
         return default
 
     @classmethod
     def getDefault(cls) -> Optional[PrjParam]:
         """
-        Returns the default Param from the group. This can be overloaded in derived classes to yield a safe
-        fallback class if the :func:`fieldFromParam` method fails.
+        Returns the default Param from the group. This can be overloaded in derived
+        classes to yield a safe fallback class if the :func:`fieldFromParam` method
+        fails.
         """
         return None

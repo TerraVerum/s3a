@@ -57,8 +57,9 @@ class MultiPredictionsPlugin(ProcessorPlugin):
             return
         if comps is None:
             comps = self.win.exportableDf
-        # It is possible for a previously selected id to be deleted before a redraw occurs, in which case the
-        # selected id won't correspond to a valid index. Resolve using intersection with all components
+        # It is possible for a previously selected id to be deleted before a redraw
+        # occurs, in which case the selected id won't correspond to a valid index.
+        # Resolve using intersection with all components
         selectedIds = np.intersect1d(
             self.win.componentController.selectedIds,
             self.win.componentManager.compDf.index,

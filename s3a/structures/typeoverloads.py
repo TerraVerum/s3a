@@ -24,10 +24,12 @@ __all__ = [
 ]
 
 """
-Functions that just return a `np.ndarray` are often hard to interpret. Is the output a simple array, image, 
-etc.? If it _is_ an image, what is the output shape? Developers and users will have to comb through the function body
-or rely on detailed documentation for an answer. This is a simple answer to the problem. By redefining np.ndarray in 
-several ways, users and devs can more clearly interpret the intenionality behind various np.ndarray (and other) types.
+Functions that just return a `np.ndarray` are often hard to interpret. Is the output a 
+simple array, image, etc.? If it _is_ an image, what is the output shape? Developers 
+and users will have to comb through the function body or rely on detailed documentation 
+for an answer. This is a simple answer to the problem. By redefining np.ndarray in 
+several ways, users and devs can more clearly interpret the intenionality behind 
+various np.ndarray (and other) types. 
 """
 
 BlackWhiteImg = ndarray
@@ -62,7 +64,10 @@ class AnnParseError(ValueError):
         invalidInsts = self.instances[self.invalidIndexes]
         if isinstance(invalidInsts, pd.DataFrame):
             invalidInsts = invalidInsts.to_string()
-        return f"{self.fileName}: Encountered problems on annotation import:\n{invalidInsts}"
+        return (
+            f"{self.fileName}: Encountered problems on annotation import:\n"
+            f"{invalidInsts}"
+        )
 
 
 class AnnInstanceError(ValueError):

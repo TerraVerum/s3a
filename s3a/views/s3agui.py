@@ -59,8 +59,8 @@ class S3A(S3ABase):
             logger.addHandler(
                 widgets.StatusBarHandler(logging.INFO, self, maxLevel=logging.INFO)
             )
-            # This logger isn't supposed to propagate, since everything is handled in the terminal on accepted events
-            # unless 'terminal' is also specified
+            # This logger isn't supposed to propagate, since everything is handled in
+            # the terminal on accepted events unless 'terminal' is also specified
             if PRJ_ENUMS.LOG_TERM not in log:
                 logger.propagate = False
         self.APP_TITLE = "Semi-Supervised Semantic Annotator"
@@ -244,7 +244,8 @@ class S3A(S3ABase):
             super().exportCurAnnotation(outFname)
 
     def openAnnotationGui(self):
-        # TODO: See note about exporting comps. Delegate the filepicker activity to importer
+        # TODO: See note about exporting comps. Delegate the filepicker activity to
+        #  importer
         fileFilter = self.componentIo.ioFileFilter(which=PRJ_ENUMS.IO_IMPORT)
         fname = fns.popupFilePicker(None, "Select Load File", fileFilter)
         if fname is None:
@@ -270,7 +271,8 @@ class S3A(S3ABase):
             msg = QtWidgets.QMessageBox()
             msg.setWindowTitle("Confirm Exit")
             msg.setText(
-                "Component table has unsaved changes.\nYou can choose to save and exit or discard changes"
+                "Component table has unsaved changes.\nYou can choose to save and exit "
+                "or discard changes "
             )
             msg.setDefaultButton(msg.Save)
             msg.setStandardButtons(msg.Discard | msg.Cancel | msg.Save)
@@ -315,8 +317,8 @@ class S3A(S3ABase):
             self.isVisible()
             and self.componentTable.props[PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE]
         ):
-            # For some reason sometimes the actual table selection doesn't propagate in time, so
-            # directly forward the selection here
+            # For some reason sometimes the actual table selection doesn't propagate in
+            # time, so directly forward the selection here
             self.componentTable.setSelectedCellsAsGui(selection)
         yield changeDict
         yield fns.gracefulNext(gen)

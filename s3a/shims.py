@@ -1,5 +1,6 @@
 """
-All API discrepancies between different systems, python versions, etc. should be resolved here if remotely possible
+All API discrepancies between different systems, python versions, etc. should be
+resolved here if remotely possible
 """
 import sys
 

@@ -16,8 +16,8 @@ __all__ = ["BoundScatterPlot", "RightPanViewBox"]
 class BoundScatterPlot(pg.ScatterPlotItem):
     def __init__(self, *args, boundaryOnly=False, **kwargs):
         super().__init__(*args, **kwargs)
-        # TODO: Find out where the mouse is and make sure it's above a point before changing
-        # the mouse cursor
+        # TODO: Find out where the mouse is and make sure it's above a point before
+        #  changing the mouse cursor
 
         self.hoverCursor = QtCore.Qt.CursorShape.PointingHandCursor
         self.boundaryOnly = boundaryOnly
@@ -50,18 +50,19 @@ class BoundScatterPlot(pg.ScatterPlotItem):
         #   & (pointLocs[1] >= bbox[1]) \
         #   & (pointLocs[1] <= bbox[3])
         tfIsInSelection = points_in_poly(pointLocs, selection)
-        # tfIsInSelection = np.array([selectionPoly.containsPoint(QtCore.QPointF(*row), QtCore.Qt.WindingFill)
-        #                             for row in pointLocs], dtype=bool)
         return np.array([point.data() for point in self.points()[tfIsInSelection]])
 
     def _maskAt(self, pos: QtCore.QPointF | QtCore.QRectF):
         """
-        The default implementation only checks a square around each spot. However, this is not
-        precise enough for my needs. The overloaded pointsAt checks any polygonal area as defined
-        by the spot boundary. It also triggers when clicking *inside* the spot boundary,
-        which I don't want.
+        The default implementation only checks a square around each spot. However,
+        this is not precise enough for my needs. The overloaded pointsAt checks any
+        polygonal area as defined by the spot boundary. It also triggers when clicking
+        *inside* the spot boundary, which I don't want.
 
-        :param pos: Where to search for points
+        Parameters
+        ----------
+        pos
+            Where to search for points
         """
         if not isinstance(pos, QtCore.QPointF):
             return super()._maskAt(pos)

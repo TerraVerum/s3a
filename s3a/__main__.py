@@ -12,9 +12,13 @@ def main(loadLastState=True, **load):
     """
     Calling code for the S3A application.
 
-    :param loadLastState: When the app is closed, all settings are saved. If this is *True*,
-      these settings are restored on startup. If *False*, they aren't.
-    :param load: States to load, see the help output for possible values
+    Parameters
+    ----------
+    loadLastState
+        When the app is closed, all settings are saved. If this is *True*,
+        these settings are restored on startup. If *False*, they aren't.
+    load
+        States to load, see the help output for possible values
     """
     appInst = mkQApp()
     win = S3A(log=PRJ_ENUMS.LOG_GUI, loadLastState=loadLastState, **load)

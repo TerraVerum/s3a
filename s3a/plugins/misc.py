@@ -39,15 +39,16 @@ class RandomToolsPlugin(ParamEditorPlugin):
 
     def _hookupFieldDisplay(self, win):
         display = win.componentController
-        # This option shouldn't show in the menu dropdown, so register directly to the tools
+        # This option shouldn't show in the menu dropdown, so register directly to the
+        # tools
         _, param = self.toolsEditor.registerFunc(
             display.fieldInfoProc,
             name="Show Field Info",
             returnParam=True,
         )
 
-        # There should also be an option that *does* show in the menu, which displays field info
-        # for every component
+        # There should also be an option that *does* show in the menu, which displays
+        # field info for every component
         def toggleAll():
             if display.fieldDisplay.inUseDelegates:
                 display.fieldDisplay.callDelegateFunc("clear")
@@ -73,21 +74,22 @@ class RandomToolsPlugin(ParamEditorPlugin):
 
     def showDevConsoleGui(self):
         """
-        Opens a console that allows dynamic interaction with current variables. If IPython
-        is on your system, a qt console will be loaded. Otherwise, a (less capable) standard
-        pyqtgraph console will be used.
+        Opens a console that allows dynamic interaction with current variables. If
+        IPython is on your system, a qt console will be loaded. Otherwise, a (less
+        capable) standard pyqtgraph console will be used.
         """
         namespace = dict(app=self.win, rtf=RTF)
-        # "dict" default is to use repr instead of string for internal elements, so expanding
-        # into string here ensures repr is not used
+        # "dict" default is to use repr instead of string for internal elements,
+        # so expanding into string here ensures repr is not used
         nsPrintout = [f"{k}: {v}" for k, v in namespace.items()]
         text = f"Starting console with variables:\n" f"{nsPrintout}"
-        # Broad exception is fine, fallback is good enough. Too many edge cases to properly diagnose when Pycharm's event
-        # loop is sync-able with the Jupyter dev console
-        # noinspection PyBroadException
+        # Broad exception is fine, fallback is good enough. Too many edge cases to
+        # properly diagnose when Pycharm's event loop is sync-able with the Jupyter dev
+        # console noinspection PyBroadException
         try:
-            # See https://intellij-support.jetbrains.com/hc/en-us/community/posts/205819799/comments/206004059
-            # for detecting whether this is run in debug mode. PyCharm among other IDEs crash trying to spawn a jupyter console
+            # See https://intellij-support.jetbrains.com/hc/en-us/community/posts/205819799/comments/206004059  # noqa
+            # for detecting whether this is run in debug
+            # mode. PyCharm among other IDEs crash trying to spawn a jupyter console
             # without a stack trace, so attempt to catch this situation early
             if sys.gettrace() is None:
                 console = uw.ConsoleWidget(
@@ -99,7 +101,8 @@ class RandomToolsPlugin(ParamEditorPlugin):
                     "Cannot spawn Jupyter console in a debug environment"
                 )
         except Exception:
-            # Ipy kernel can have issues for many different reasons. Always be ready to fall back to traditional console
+            # Ipy kernel can have issues for many reasons. Always be ready to fall back
+            # to traditional console
             console = pg_console.ConsoleWidget(
                 parent=self.win, namespace=namespace, text=text
             )

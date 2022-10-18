@@ -23,14 +23,20 @@ class HelpPlugin(ParamEditorPlugin):
         self.registerFunc(self.iconAttributionsGui, name="Icon Attributions")
 
     def iconAttributionsGui(self):
-        htmlStr = """
-    <div>Icons made by <a href="https://www.freepik.com" title="Freepik">Freepik</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a></div>
+        flaticonUrl = "<a href='https://www.flaticon.com/'>flaticon</a>"
 
-    <div>Icons made by <a href="https://www.flaticon.com/authors/those-icons" title="Those Icons">Those Icons</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a></div>
+        htmlStr = f"""
+            <div>Icons made by <a href="https://www.freepik.com">Freepik</a> 
+            from {flaticonUrl}</div>
+            
+            <div>Icons made by <a href="https://www.flaticon.com/authors/those-icons">
+            Those Icons</a> from {flaticonUrl}</div>
 
-    <div>Icons made by <a href="https://www.flaticon.com/authors/pixel-perfect" title="Pixel perfect">Pixel perfect</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a></div>
+            <div>Icons made by <a href="https://www.flaticon.com/authors/pixel-perfect">
+            Pixel perfect</a> from {flaticonUrl}</div>
     
-    <div>Icons made by <a href="https://www.flaticon.com/authors/google" title="Google">Google</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a></div>
-    """
+            <div>Icons made by <a href="https://www.flaticon.com/authors/google"> 
+            Google</a> from {flaticonUrl}</div> 
+        """
 
         QtWidgets.QMessageBox.information(self.win, "Icon Attributions", htmlStr)

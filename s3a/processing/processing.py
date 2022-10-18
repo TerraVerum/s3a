@@ -110,7 +110,10 @@ class RunnableFuncWrapperSignals(QtCore.QObject):
     resultReady = QtCore.Signal(object)
     """ThreadedFuncWrapper instance, emmitted on successful function run"""
     failed = QtCore.Signal(object, object)
-    """ThreadedFuncWrapper instance, exception instance, emmitted on any exception during function run"""
+    """
+    ThreadedFuncWrapper instance, exception instance, emmitted on any exception during 
+    function run 
+    """
 
 
 class RunnableFuncWrapper(QtCore.QRunnable):
@@ -127,8 +130,8 @@ class RunnableFuncWrapper(QtCore.QRunnable):
         self.inProgress = True
         try:
             self.proc.run()
-            # This could go in a "finally" block to avoid duplication below, but now "inProgress" will be false before
-            # the signal is emitted
+            # This could go in a "finally" block to avoid duplication below, but now
+            # "inProgress" will be false before the signal is emitted
             self.inProgress = False
             self.signals.resultReady.emit(self)
         except Exception as ex:
@@ -152,7 +155,10 @@ class ThreadedFuncWrapper(QtCore.QThread):
     sigResultReady = QtCore.Signal(object)
     """ThreadedFuncWrapper instance, emmitted on successful function run"""
     sigFailed = QtCore.Signal(object, object)
-    """ThreadedFuncWrapper instance, exception instance, emmitted on any exception during function run"""
+    """
+    ThreadedFuncWrapper instance, exception instance, emmitted on any exception 
+    during function run
+    """
 
     def __init__(self, func, **kwargs):
         super().__init__()
@@ -186,8 +192,8 @@ class RunnableThreadContainer(QtCore.QObject):
         super().__init__()
 
     def discardUnfinishedRunners(self):
-        # Reverse to avoid race condition where first runner is supposed to happen before second, first is deleted,
-        # and second runs regardless
+        # Reverse to avoid race condition where first runner is supposed to happen
+        # before second, first is deleted, and second runs regardless
         update = False
         for runner in reversed(self.unfinishedRunners):  # type: RunnableFuncWrapper
             if runner in self.unfinishedRunners and self.pool.tryTake(runner):
@@ -228,7 +234,10 @@ class AbortableThreadContainer(QtCore.QObject):
         return thread
 
     def _threadFinishedWrapper(self, thread):
-        """QThread.finished doesn't have an argument for the thread, so wrap a no-arg slot to accomodate"""
+        """
+        QThread.finished doesn't have an argument for the thread, so wrap a no-arg
+        slot to accomodate
+        """
 
         def slot():
             self.endThreads(thread)
@@ -240,7 +249,8 @@ class AbortableThreadContainer(QtCore.QObject):
     def updateThreads(self):
         for thread in self.threads[: self.maxConcurrentThreads]:
             if thread.isRunning() or thread.isFinished():
-                # Either the max number of threads are already active or recycling is falling behind
+                # Either the max number of threads are already active or recycling is
+                # falling behind
                 continue
             thread.finished.connect(self._threadFinishedWrapper(thread))
             thread.start()
@@ -250,10 +260,15 @@ class AbortableThreadContainer(QtCore.QObject):
         self,
         threads: ThreadedFuncWrapper | t.Iterable[ThreadedFuncWrapper],
         endRunning=False,
-    ):
+    ) -> bool | list[bool]:
         """
-        Abort a thread or thread at an index. Optionally does nothing if the requested thread is in progress.
-        :return: Boolean indicating whether the thread was terminated
+        Abort a thread or thread at an index. Optionally does nothing if the requested
+        thread is in progress.
+
+        Returns
+        -------
+        bool or list[bool]
+            indicates whether the thread was terminated
         """
         returnScalar = False
         if isinstance(threads, ThreadedFuncWrapper):
@@ -275,7 +290,8 @@ class AbortableThreadContainer(QtCore.QObject):
         return returns
 
     def _removeThread(self, thread: ThreadedFuncWrapper, endFunc="quit"):
-        # Already-connected threads need to be disconnected to avoid infinite waiting for termination
+        # Already-connected threads need to be disconnected to avoid infinite waiting
+        # for termination
         if "terminationSlot" in thread.__dict__:
             thread.finished.disconnect(thread.__dict__["terminationSlot"])
         if endFunc == "quit":

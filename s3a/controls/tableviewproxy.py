@@ -43,7 +43,9 @@ class CompSortFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
 
     @property
     def vertSortCol(self):
-        """Returns the column index to sort by based on whether the user wants x first or y"""
+        """
+        Returns the column index to sort by based on whether the user wants x first or y
+        """
         if self.props[PRJ_CONSTS.PROP_VERT_SORT_BHV] == "X First":
             return 0
         return 1
@@ -65,7 +67,8 @@ class CompSortFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
 
     def lessThan(self, left: QtCore.QModelIndex, right: QtCore.QModelIndex) -> bool:
         # First, attempt to compare the object data
-        # For some reason, data doesn't preserve the true type so get from the source model
+        # For some reason, data doesn't preserve the true type so get from the source
+        # model
         model = self.sourceModel()
         leftObj = model.data(left, QtCore.Qt.ItemDataRole.EditRole)
         rightObj = model.data(right, QtCore.Qt.ItemDataRole.EditRole)
@@ -157,8 +160,9 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         # Attach to UI signals
         def _maybeRedraw():
             """
-            Since an updated filter can also result from refreshed table fields, make sure not to update in that case
-            (otherwise errors may occur from missing classes, etc.)
+            Since an updated filter can also result from refreshed table fields,
+            make sure not to update in that case (otherwise errors may occur from
+            missing classes, etc.)
             """
             if np.array_equal(
                 attrs.tableData.allFields, self._componentManager.compDf.columns
@@ -219,10 +223,13 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
     def updateLabelCol(self, labelColumn=REQD_TBL_FIELDS.INST_ID.name):
         """
         Changes the data column used to label (color) the region plot data
-        :param labelColumn:
-          helpText: New column to use
-          pType: list
-          limits: ['Instance ID'] # Will be updated programmatically
+
+        Parameters
+        ----------
+        labelColumn:
+            New column to use
+            pType: list
+            limits: ['Instance ID'] # Will be updated programmatically
         """
         self.labelColumn = self.sharedAttrs.tableData.fieldFromName(labelColumn)
         newLblData = self.labelColumn.toNumeric(
@@ -238,8 +245,8 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         # Components: DELETED, UNCHANGED, CHANGED, NEW
         # New is different from changed since id plot already exists (unhide vs. create)
         # Plots: DRAWN, UNDRAWN
-        # Note that hiding the ID is chosen instead of deleting, since that is a costly graphics
-        # operation
+        # Note that hiding the ID is chosen instead of deleting, since that is a costly
+        # graphics operation
         compDf = self._componentManager.compDf
 
         # Invalidate selection cache
@@ -249,7 +256,8 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         # TODO: Find out why this isn't working. For now, just reset the whole comp list
         #  each time components are changed, since the overhead isn't too terrible.
 
-        # Note that components that were visible but then deleted shouldn't trigger false positives
+        # Note that components that were visible but then deleted shouldn't trigger
+        # false positives
         previouslyVisible = np.intersect1d(self.displayedIds, compDf.index)
 
         # Update filter list: hide/unhide ids and verts as needed.
@@ -257,8 +265,6 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         self.regionPlot.resetRegionList(
             compDf.loc[self.displayedIds], labelField=self.labelColumn
         )
-        # noinspection PyTypeChecker
-        # self._reflectTableSelectionChange(np.intersect1d(self.displayedIds, self.selectedIds))
 
         tblIdsToShow = np.isin(compDf.index, self.displayedIds).nonzero()[0]
         # Don't go through the effort of showing an already visible row
@@ -279,7 +285,10 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
 
     @DASM.undoable("Split Components", asGroup=True)
     def splitSelectedComps(self):
-        """Makes a separate component for each distinct boundary of all selected components"""
+        """
+        Makes a separate component for each distinct boundary of all selected
+        components
+        """
         selection = self.selectedIds
 
         if len(selection) == 0:
@@ -290,9 +299,15 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
     @DASM.undoable("Merge Components", asGroup=True)
     def mergeSelectedComps(self, keepId=-1):
         """
-        Merges the selected components into one, keeping all properties of the first in the selection
-        :param keepId: If specified and >0, this is the ID whose peripheral data will be retained
-          during the merge. Otherwise, the first selected component is used as the keep ID.
+        Merges the selected components into one, keeping all properties of the first in
+        the selection
+
+        Parameters
+        ----------
+        keepId
+            If specified and >0, this is the ID whose peripheral data will be retained
+            during the merge. Otherwise, the first selected component is used as the
+            keep ID.
         """
         selection = self.selectedIds
 
@@ -342,9 +357,13 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         """
         Rescales the main image viewbox to encompass the selection
 
-        :param selectedIds: Ids to scale to. If *None*, this is the current selection
-        :param paddingPct: Padding around the selection. If *None*, defaults to
-          pyqtgraph padding behavior
+        Parameters
+        ----------
+        selectedIds
+            Ids to scale to. If *None*, this is the current selection
+        paddingPct
+            Padding around the selection. If *None*, defaults to pyqtgraph padding
+            behavior
         """
         if selectedIds is None:
             selectedIds = self.selectedIds
@@ -400,14 +419,16 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
 
     def showFieldInfoById(self, ids=None, fields=None, force=False, **kwargs):
         """
-        :param ids:
-          ignore: True
-        :param fields:
-          pType: checklist
-          limits: []
-          expanded: False
-        :param force:
-          ignore: True
+        Parameters
+        ----------
+        ids
+            ignore: True
+        fields
+            pType: checklist
+            limits: []
+            expanded: False
+        force
+            ignore: True
         """
         if not self.fieldsShowing and not force:
             return
@@ -438,9 +459,15 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         clearExisting=True,
     ):
         """
-        :param selection: bounding box of user selection: [xmin ymin; xmax ymax]
-        :param clearExisting: If *True*, already selected points are cleared before
-             this selection is incorporated
+        Called when user makes a selection in the main image area
+
+        Parameters
+        ----------
+        selection
+            bounding box of user selection: [xmin ymin; xmax ymax]
+        clearExisting
+            If ``True``, already selected points are cleared before this selection is
+            incorporated
         """
         # If min and max are the same, just check for points at mouse position
         if selection.size == 0:
@@ -521,15 +548,17 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         else:  # Move mode
             self.regionMover.erase()
             self._componentManager.addComponents(newComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
-        # if len(truncatedCompIds) > 0:
-        #   warn(f'Some regions extended beyond image dimensions. Boundaries for the following'
-        #        f' components were altered: {truncatedCompIds}', UserWarning)
 
     def exportCompOverlay(self, file="", toClipboard=False):
         """
-        :param file:
-          pType: filepicker
-          existing: False
+        Exports the current component overlay to a file or clipboard
+
+        Parameters
+        ----------
+        file : str | Path
+            File to save to. If empty, no file is saved
+            pType: filepicker
+            existing: False
         """
         oldShowFocused = self.regionPlot.showFocused
         oldShowSelected = self.regionPlot.showSelected

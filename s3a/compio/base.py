@@ -20,7 +20,9 @@ from ..structures import AnnInstanceError, AnnParseError
 
 
 class TableContainer:
-    """Dummy component io in case a raw tableData is directly given to an importer/exporter"""
+    """
+    Dummy component io in case a raw tableData is directly given to an importer/exporter
+    """
 
     def __init__(self, tableData=None):
         self.tableData = tableData
@@ -54,23 +56,30 @@ class AnnotationIOBase:
 
     __name__: t.Optional[str] = None
     ioType: t.Optional[str] = None
-    """Type indicating what required fields from the IOTemplateManager should be applied"""
+    """
+    Type indicating what required fields from the IOTemplateManager should be applied
+    """
 
     def __init__(self, ioType=UNSET_IO_TYPE, options=None):
         """
         Provides access to a modularized version of the common import structure:
-
           * read a file
           * parse bulk columns, where applicable (one to one column mapping)
-          * parse individual instances, where applicable (one to many or many to one column mapping)
+          * parse individual instances, where applicable (one to many or many to
+            one column mapping)
           * apply formatting
 
-        This is all viewable under the `__call__` function.
+        This is all viewable under the ``__call__`` function.
 
-        :param ioType: Determines which config template's required fields are necessary for this input. That way,
-          required fields don't have to be explicitly enumerated in a project's table configuration
-        :param options: Dict-like metadata for this importer/exporter. If *None*, defaults to empty option set.
-          This will be updated with kwargs from being called.
+        Parameters
+        ----------
+        ioType
+            Determines which config template's required fields are necessary for this
+            input. That way, required fields don't have to be explicitly enumerated in
+            a project's table configuration
+        options
+            Dict-like metadata for this importer/exporter. If *None*, defaults to empty
+            option set. This will be updated with kwargs from being called.
         """
         # Compatibility with function analysis done in ComponentIO
         clsName = type(self).__name__
@@ -92,7 +101,9 @@ class AnnotationIOBase:
 
     @classmethod
     def optsMetadata(cls):
-        """Get all metadata descriptions from self and any base class `populateMetadata`."""
+        """
+        Get all metadata descriptions from self and any base class ``populateMetadata``.
+        """
         metadata = {}
         classes = [
             curcls
@@ -118,8 +129,8 @@ class AnnotationIOBase:
 
     def _forwardMetadata(self, locals_=None, **kwargs):
         """
-        Convenience function to update __call__ kwargs from some locals and extra keywords, since this is a common
-        paradigm in `populateMetadata`
+        Convenience function to update __call__ kwargs from some locals and extra
+        keywords, since this is a common paradigm in `populateMetadata`
         """
         if locals_ is None:
             locals_ = {}
@@ -136,15 +147,18 @@ class AnnotationExporter(AnnotationIOBase):
 
     bulkExport: _GenericExportProtocol | None = None
     """
-    Can be defined if bulk-exporting (whole dataframe at once) is possible. Must have the signature
-    def bulkExport(self, compDf: pd.DataFrame, exportObj, **kwargs) -> exportObj, error dataframe
+    Can be defined if bulk-exporting (whole dataframe at once) is possible. Must
+    accept inputs (component dataframe, export object, **kwargs) and output
+    tuple[export object, error dataframe]. If no errors, error dataframe should
+    be present but empty.
     """
 
     updateExportObj: _UpdateExportObjProtocol | None = None
     """
-    Can be defined if individual importing (row-by-row) is possible. This is fed the current dataframe row as a dict
-    of cell values and is expected to output the updated export object:
-    def updateExportObj(self, inst: dict, exportObj, **kwargs) -> exportObj
+    Can be defined if individual importing (row-by-row) is possible. This is fed
+    the current dataframe row as a dict of cell values and is expected to output the 
+    updated export object (which will be passed to writeFile). Must accept inputs
+    (instance dict, export object, **kwargs) and output the export object.
     """
 
     class ERROR_COL:
@@ -159,9 +173,13 @@ class AnnotationExporter(AnnotationIOBase):
         raise NotImplementedError
 
     def individualExport(self, compDf: pd.DataFrame, exportObj, **kwargs):
-        """Returns an export object + dataframe of row + errors, if any occurred for some rows"""
+        """
+        Returns an export object + dataframe of row + errors, if any occurred for some
+        rows
+        """
         if self.updateExportObj is None:
-            # Can't do anything, don't modify the object and save time not iterating over rows
+            # Can't do anything, don't modify the object and save time not iterating
+            # over rows
             return exportObj, NO_ERRORS.copy()
         errs = []
         for row in toDictGen(compDf):
@@ -217,17 +235,18 @@ class AnnotationImporter(AnnotationIOBase):
 
     formatSingleInstance = None
     """
-    Can be defined to cause row-by-row instance parsing. If defined, must have the signature:
-    ``def formatSingleInstance(self, inst, **kwargs) -> dict``
+    Can be defined to cause row-by-row instance parsing. If defined, must accept
+    inputs (instance dict, **kwargs) and output a dict of instance values.
     """
 
     bulkImport = None
     """
-    Can be defined to parse multiple traits from the imported object into a component dataframe all at once. Must have
-    the signature:
-    ``def bulkImport(self, importObj, **kwargs) -> pd.DataFrame``
-    Note that in some cases, a direct conversion of instances to a dataframe is convenient, so ``defaultBulkImport``
-    is provided for these cases. Simply set bulkImport = ``AnnotationImporter.defaultBulkImport`` if you wish.
+    Can be defined to parse multiple traits from the imported object into a component 
+    dataframe all at once. Must accept inputs (import object, **kwargs) and output a
+    dataframe of instance values. Note that in some cases, a direct conversion of 
+    instances to a dataframe is convenient, so ``defaultBulkImport`` is provided for 
+    these cases. Simply set bulkImport = ``AnnotationImporter.defaultBulkImport`` if 
+    you wish.
     """
 
     def __init__(
@@ -240,20 +259,28 @@ class AnnotationImporter(AnnotationIOBase):
 
           * read a file
           * parse bulk columns, where applicable (one to one column mapping)
-          * parse individual instances, where applicable (one to many or many to one column mapping)
+          * parse individual instances, where applicable (one to many or many to one
+            column mapping)
           * apply formatting
 
         This is all viewable under the `__call__` function.
 
-        :param tableData: Table configuration for fields in the input file. If a container, ``container.tableData`` leads to
-          the table data. This allows references to be reassigned in e.g. an outer ComponentIO without losing connection
-          to this importer
-        :param ioType: Determines which config template's required fields are necessary for this input. That way,
-          required fields don't have to be explicitly enumerated in a project's table configuration
+        Parameters
+        ----------
+        tableData
+            Table configuration for fields in the input file. If a container,
+            ``container.tableData`` leads to the table data. This allows references to
+            be reassigned in e.g. an outer ComponentIO without losing connection to
+            this importer
+
+        ioType
+            Determines which config template's required fields are necessary for this
+            input. That way, required fields don't have to be explicitly enumerated in
+            a project's table configuration
         """
 
-        # Make a copy to allow for internal changes such as adding extra required fields, aliasing, etc.
-        # 'and' avoids asking for 'config' of 'none' table
+        # Make a copy to allow for internal changes such as adding extra required
+        # fields, aliasing, etc. 'and' avoids asking for 'config' of 'none' table
         super().__init__(ioType=ioType)
         if tableData is None:
             tableData = TableData()
@@ -270,7 +297,8 @@ class AnnotationImporter(AnnotationIOBase):
         self.destTableMapping = tableData = self.container.tableData
         requiredCfg = IOTemplateManager.getTableCfg(self.ioType)
         if tableData is not None:
-            # Make sure not to incorporate fields that only exist to provide logistics for the other table setup
+            # Make sure not to incorporate fields that only exist to provide logistics
+            # for the other table setup
             optionalFields = {
                 key: val
                 for key, val in tableData.config["fields"].items()
@@ -291,20 +319,23 @@ class AnnotationImporter(AnnotationIOBase):
     @staticmethod
     def _findSrcFieldForDest(destField, allSourceFields):
         """
-        Helper function during ``finalizeImport`` to find a match between a yet-to-serialize dataframe and
-        destination tableData. Basically, a more primitive version of ``resolveFieldAliases``
-        Returns *None* if no sensible mapping could be found, and errs if multiple sources alias to the same destination
+        Helper function during ``finalizeImport`` to find a match between a
+        yet-to-serialize dataframe and destination tableData. Basically,
+        a more primitive version of ``resolveFieldAliases`` Returns *None* if no
+        sensible mapping could be found, and errs if multiple sources alias to the same
+        destination
         """
-        # Check for destination aliases primitively (one-way mappings). A full (two-way) check will occur
-        # later (see __call__ -> resolveFieldAliases)
+        # Check for destination aliases primitively (one-way mappings). A full (
+        # two-way) check will occur later (see __call__ -> resolveFieldAliases)
         match = tuple(getFieldAliases(destField) & allSourceFields)
         if not match:
             return
         if len(match) == 1:
             srcField = match[0]
         else:
-            # Make sure there aren't multiple aliases, since this is not easily resolvable
-            # The only exception is that direct matches trump alias matches, so check for this directly
+            # Make sure there aren't multiple aliases, since this is not easily
+            # resolvable The only exception is that direct matches trump alias matches,
+            # so check for this directly
             if destField.name in match:
                 srcField = destField.name
             else:
@@ -317,14 +348,15 @@ class AnnotationImporter(AnnotationIOBase):
     def finalizeImport(self, compDf, **kwargs):
         """Deserializes any columns that are still strings"""
 
-        # Objects in the original frame may be represented as strings, so try to convert these
-        # as needed
+        # Objects in the original frame may be represented as strings, so try to
+        # convert these as needed
         outDf = pd.DataFrame()
         # Preserve / transcribe fields that are already PrjParams
         for destField in [f for f in compDf.columns if isinstance(f, PrjParam)]:
             outDf[destField] = compDf[destField]
 
-        # Need to serialize / convert string names since they indicate yet-to-serialize columns
+        # Need to serialize / convert string names since they indicate yet-to-serialize
+        # columns
         toConvert = set(compDf.columns)
         for destField in self.tableData.allFields:
             srcField = self._findSrcFieldForDest(destField, toConvert)
@@ -336,12 +368,14 @@ class AnnotationImporter(AnnotationIOBase):
             # So, assume the exting types can first convert themselves to strings
             serializedDfVals, errs = serialize(destField, dfVals)
             parsedDfVals, parsedErrs = deserialize(destField, serializedDfVals)
-            # Turn problematic cells into instance errors for detecting problems in the outer scope
+            # Turn problematic cells into instance errors for detecting problems in the
+            # outer scope
             errs = errs.apply(AnnInstanceError)
             parsedErrs = parsedErrs.apply(AnnInstanceError)
             parsedDfVals = pd.concat([parsedDfVals, errs, parsedErrs])
             outDf[destField] = parsedDfVals
-        # All recognized output fields should now be deserialied; make sure required fields exist
+        # All recognized output fields should now be deserialied; make sure required
+        # fields exist
         return outDf
 
     @deprecateKwargs(keepExtraColumns="keepExtraFields", warningType=FutureWarning)
@@ -380,7 +414,8 @@ class AnnotationImporter(AnnotationIOBase):
         indivParsedDf, bulkParsedDf = parsedDfs
         # Overwrite bulk-parsed information with individual if needed, or add to it
         bulkParsedDf[indivParsedDf.columns] = indivParsedDf
-        # Some cols could be deserialized, others could be serialized still. Handle the still serialized cases
+        # Some cols could be deserialized, others could be serialized still. Handle the
+        # still serialized cases
         parsedDf = self.finalizeImport(bulkParsedDf, **kwargs)
 
         # Determine any destination mappings
@@ -391,7 +426,8 @@ class AnnotationImporter(AnnotationIOBase):
             )
 
         if keepExtraFields:
-            # Columns not specified in the table data should be kept in their unmodified state
+            # Columns not specified in the table data should be kept in their
+            # unmodified state
             extraCols = bulkParsedDf.columns.difference(importedCols)
             alreadyParsed = np.isin(bulkParsedDf.columns, importedCols)
             # Make sure column ordering matches original

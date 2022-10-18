@@ -25,7 +25,8 @@ class EditPlugin(ParamEditorPlugin):
         stack.stackChangedCallbacks.append(updateUndoRedoTxts)
 
         def showStatus(action):
-            # Since this was the *already performed* action, what it reports is the opposite of what happens
+            # Since this was the *already performed* action, what it reports is the
+            # opposite of what happens
             if action is None:
                 return
             if action.treatAsUndo:

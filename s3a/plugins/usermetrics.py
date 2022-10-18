@@ -140,8 +140,8 @@ class UserMetricsPlugin(ParamEditorPlugin):
 
     def incrementUserMetricsImage(self, n=1):
         """
-        Updates the current metrics image instead of recreating it by applying the last n rows
-        of collected metrisc
+        Updates the current metrics image instead of recreating it by applying the last
+        n rows of collected metrisc
         """
         if not len(self.collectedMetrics):
             useMetrics = None
@@ -183,15 +183,20 @@ class UserMetricsPlugin(ParamEditorPlugin):
     def _populateViewboxVotes(votes: pd.Series, image: np.ndarray):
         """
         Records viewbox range votes from collected metrics into the image
-        :param votes: Viewbox ranges from metrics
-        :param image: Image to record votes into
+
+        Parameters
+        ----------
+        votes
+            Viewbox ranges from metrics
+        image
+            Image to record votes into
         """
         for vb in votes:
             # Viewbox has float values, convert to int for indexing
             vb = np.asarray(vb)
-            # Negative values index by wrapping around the image, but these should be clipped to 0 instead
-            # No need to clip high values, since these won't be considered during the indexing anyway
-            # if they're too large
+            # Negative values index by wrapping around the image, but these should be
+            # clipped to 0 instead No need to clip high values, since these won't be
+            # considered during the indexing anyway if they're too large
             vb = np.clip(vb, 0, np.inf).astype(int)
             (x1, x2), (y1, y2) = vb
             image[y1:y2, x1:x2, ...] += 1
@@ -203,14 +208,19 @@ class UserMetricsPlugin(ParamEditorPlugin):
         """
         Records votes from mouse movement into image. Slower movement is considered a
         higher vote
-        :param votes: Mouse positions from metrics and pixel sizes
-        :param image: Image to record votes into
+
+        Parameters
+        ----------
+        votes
+            Mouse positions from metrics and pixel sizes
+        image
+            Image to record votes into
         """
         xyCoords = np.row_stack(votes["mouse_pos"])
         diffs = np.abs(np.diff(xyCoords, axis=0))
         dists = diffs[:, 0] + diffs[:, 1]
-        # Since slower movement is a smaller distance number, and we want the opposite to be true,
-        # find the inverse but protect against a divide by zero
+        # Since slower movement is a smaller distance number, and we want the opposite
+        # to be true, find the inverse but protect against a divide by zero
         dists[dists == 0] = 0.01
         distWgt = 1 - distToPxSizeRatio
         wgts = np.clip(dists.max() / dists, 0, maxVoteWeight) * distWgt
@@ -218,7 +228,8 @@ class UserMetricsPlugin(ParamEditorPlugin):
         xyCoords = xyCoords[1:].astype(int)
         pxSizes = votes["pixel_size"].to_numpy(float).round()[1:].astype(int)
         # Dilate each coordinate by the pixel size to account for potential variances
-        # The smaller the device pixel size, the stronger the confidence/weight should be too
+        # The smaller the device pixel size, the stronger the confidence/weight should
+        # be too
         for coord, pxSize, wgt in zip(xyCoords, pxSizes, wgts):
             (x, y) = coord
             pxSize = max(1, pxSize)

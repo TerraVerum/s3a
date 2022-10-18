@@ -86,19 +86,33 @@ class AlgParamEditor(ParamEditor):
         self, proc: NestedProcess, _state=None, **kwargs
     ) -> _AlgClctnDict:
         """
-        Updates processes without hierarchy so separate stages are unnested. The outermost process is considered a
-        'top' process, while all subprocesses are considered 'primitive'.
+        Updates processes without hierarchy so separate stages are unnested. The
+        outermost process is considered a 'top' process, while all subprocesses are
+        considered 'primitive'.
 
-        :param proc: Process to record the unnested state
-        :param _state: Internally used, do not provide in the function call. It will be returned at the end with 'top' and
-          'primitive' keys
-        :return: Mock Collection state from just the provided nested process. The passed process will be the only 'top'
-          value, while all substages are entries (and unnested substages, etc.) are entries in the 'primitive' key
+        Parameters
+        ----------
+        proc
+            Process to record the unnested state
+        _state
+            Internally used; do not provide in the function call. It will be returned
+            at the end with 'top' and 'primitive' keys
+
+        Returns
+        -------
+        _AlgClctnDict
+            Mock Collection state from just the provided nested process. The passed
+            process will be the only 'top' value, while all substages are entries (and
+            unnested substages, etc.) are entries in the 'primitive' key
         """
         kwargs.update(includeMeta=True, disabled=False, allowDisable=True)
         first = _state is None
         if first:
-            _state = {"modules": self.collection.includeModules, "primitive": {}, "top": {}}
+            _state = {
+                "modules": self.collection.includeModules,
+                "primitive": {},
+                "top": {},
+            }
         stageVals = []
         for stage in proc:
             if isinstance(stage, NestedProcess):
@@ -119,14 +133,15 @@ class AlgParamEditor(ParamEditor):
         **kwargs,
     ):
         """
-        The algorithm editor also needs to store information about the selected process, so lump
-        this in with the other parameter information before calling default save.
+        The algorithm editor also needs to store information about the selected
+        process, so lump this in with the other parameter information before calling
+        default save.
         """
         proc = self.currentProcessor.processor
         # Make sure any newly added stages are accounted for
         if paramState is None:
-            # Since inner nested processes are already recorded, flatten here to just save updated parameter values for the
-            # outermost stage
+            # Since inner nested processes are already recorded, flatten here to just
+            # save updated parameter values for the outermost stage
             paramState = self._unnestedProcState(proc, includeMeta=True)
             paramState["modules"] = self.collection.includeModules
         self.collection.loadParamValues(self.collection.stateName, paramState)
@@ -150,8 +165,9 @@ class AlgParamEditor(ParamEditor):
         procName = stateDict.pop("active", None)
         if "Parameters" in stateDict:
             warnings.warn(
-                '"Parameters" is deprecated for a loaded state. In the future, set "top", "primitive", etc. at the'
-                ' top dictionary level along with "active"',
+                '"Parameters" is deprecated for a loaded state. In the future, '
+                'set "top", "primitive", etc. at the top dictionary level along with '
+                '"active"',
                 DeprecationWarning,
             )
             stateDict = stateDict["Parameters"]
@@ -168,18 +184,25 @@ class AlgParamEditor(ParamEditor):
         """
         Changes which processor is active.
 
-        :param proc:
-          helpText: Processor to load
-          pType: popuplineeditor
-          limits: []
-          title: Algorithm
-        :param saveBeforeChange: Whether to propagate current algorithm settings to the processor collection before changing
+        Parameters
+        ----------
+        proc
+            Processor to load
+            pType: popuplineeditor
+            limits: []
+            title: Algorithm
+        saveBeforeChange
+            Whether to propagate current algorithm settings to the processor collection
+            before changing
         """
-        # TODO: Maybe there's a better way of doing this? Ensures proc label is updated for programmatic calls
+        # TODO: Maybe there's a better way of doing this? Ensures proc label is updated
+        #  for programmatic calls
         if saveBeforeChange:
             self.saveParamValues(
                 self.stateName,
-                self._unnestedProcState(self.currentProcessor.processor, includeMeta=True),
+                self._unnestedProcState(
+                    self.currentProcessor.processor, includeMeta=True
+                ),
                 blockWrite=True,
             )
         proc = self._resolveProccessor(proc)
@@ -237,11 +260,17 @@ class AlgorithmCollection(ParamEditor):
         self, saveDir: t.Union[str, t.Type], editorName="Processor"
     ) -> AlgParamEditor:
         """
-        Creates a processor editor capable of dynamically loading, saving, and editing collection processes
+        Creates a processor editor capable of dynamically loading, saving, and editing
+        collection processes
 
-        :param saveDir: Directory for saved states. If a class type is provided, the __name__ of this class is used.
-          Note: Either way, the resulting name is lowercased before being applied.
-        :param editorName: The name of the spawned editor
+        Parameters
+        ----------
+        saveDir
+            Directory for saved states. If a class type is provided, the __name__ of
+            this class is used. Note: Either way, the resulting name is lowercased
+            before being applied.
+        editorName
+            The name of the spawned editor
         """
         if inspect.isclass(saveDir):
             saveDir = saveDir.__name__
@@ -271,7 +300,10 @@ class AlgorithmCollection(ParamEditor):
         return proc.name
 
     def addFunction(self, func: t.Callable, top=False, **kwargs):
-        """Helper function to wrap a function in an atomic process and add it as a stage"""
+        """
+        Helper function to wrap a function in an atomic process and add it as a
+        stage
+        """
         return self.addProcess(AtomicProcess(func, **kwargs), top)
 
     def parseProcStages(
@@ -283,12 +315,19 @@ class AlgorithmCollection(ParamEditor):
     ):
         """
         Creates a nested process from a sequence of process stages and optional name
-        :param stages: Stages to parse
-        :param name: Name of the nested process
-        :param add: Whether to add this new process to the current collection's top or primitive process blocks, or
-          to not add at all (if NO_ADD)
-        :param allowOverwrite: If `add` is *True*, this determines whether the new process can overwite an already existing
-          proess. If `add` is *False*, this value is ignored.
+
+        Parameters
+        ----------
+        stages
+            Stages to parse
+        name
+            Name of the nested process
+        add
+            Whether to add this new process to the current collection's top or
+            primitive process blocks, or to not add at all (if NO_ADD)
+        allowOverwrite
+            If `add` is *True*, this determines whether the new process can overwite an
+            already existing proess. If `add` is *False*, this value is ignored.
         """
         out = self.processType(name)
         for stageName in stages:
@@ -307,15 +346,17 @@ class AlgorithmCollection(ParamEditor):
     @classmethod
     def _deepCopyProcShallowCopyIo(cls, proc) -> ProcessStage:
         """
-        Inputs/outputs get regenerated each run cycle, and can be potentially large. No need to deep copy them
-        every run. Instead, deep copy the internal state of a process and add a shallow copy of the inputs
+        Inputs/outputs get regenerated each run cycle, and can be potentially large. No
+        need to deep copy them every run. Instead, deep copy the internal state of a
+        process and add a shallow copy of the inputs
         """
         if isinstance(proc, NestedProcess):
             stages = [cls._deepCopyProcShallowCopyIo(stage) for stage in proc.stages]
             originalStages = proc.stages
             try:
                 proc.stages = []
-                # Deepcopy doesn't know to shallow copy inputs, so remove stages before this
+                # Deepcopy doesn't know to shallow copy inputs, so remove stages before
+                # this
                 out = copy.deepcopy(proc)
             finally:
                 proc.stages = originalStages
@@ -375,8 +416,9 @@ class AlgorithmCollection(ParamEditor):
         **kwargs,
     ):
         """
-        From a list of search locations (ranging from most primitive to topmost), find the first processor matching the
-        specified name. If 'topFirst' is chosen, the search locations are parsed in reverse order.
+        From a list of search locations (ranging from most primitive to topmost),
+        find the first processor matching the specified name. If 'topFirst' is chosen,
+        the search locations are parsed in reverse order.
         """
         if searchDicts is None:
             searchDicts = [self.primitiveProcesses, self.topProcesses]
@@ -410,15 +452,17 @@ class AlgorithmCollection(ParamEditor):
         return proc
 
     def parseProcDict(self, procDict: dict, topFirst=False):
-        # 1. First key is always the process name, values are new inputs for any matching process
+        # 1. First key is always the process name, values are new inputs for any
+        # matching process
         # 2. Second key is whether the process is disabled
         procDict = procDict.copy()
         procName, updateArgs = next(iter(procDict.items()))
         procDict.pop(procName)
         proc = self.parseProcName(procName, topFirst=topFirst)
         if isinstance(updateArgs, list):
-            # TODO: Determine policy for loading nested procs, outer should already know about inner so it shouldn't
-            #   _need_ to occur, given outer would've been saved previously
+            # TODO: Determine policy for loading nested procs, outer should already
+            #  know about inner so it shouldn't _need_ to occur, given outer would've
+            #  been saved previously
             raise ValueError("Parsing deep nested processes is currently undefined")
         elif updateArgs:
             proc.updateInput(**updateArgs)
@@ -430,21 +474,28 @@ class AlgorithmCollection(ParamEditor):
             if hasattr(proc, kk):
                 setattr(proc, kk, vv)
         return proc
-        # TODO: Add recursion, if it's something that will be done. For now, assume only 1-depth nesting. Otherwise,
-        #   it's hard to distinguish between actual input optiosn and a nested process
+        # TODO: Add recursion, if it's something that will be done. For now, assume
+        #  only 1-depth nesting. Otherwise, it's hard to distinguish between actual
+        #  input optiosn and a nested process
 
     def _addFromModuleName(self, fullModuleName: str, primitive=True):
         """
-        Adds all processes defined in a module to this collection. From a full module name (import.path.module). Rules:
-          - All functions defined in that file *not* beginning with an underscore (_) will be added, except for
-            the rule(s) below
-          - All functions ending with 'factory' will be assumed ProcessStage factories, where their return value is exactly
-            one ProcessStage. These are expected to take no arguments. Note that if `primitive` is *False* and an
-            AtomicProcess is returned, errors will occur. So, it is implicitly forced to be a primitive process if this
-            occurs
+        Adds all processes defined in a module to this collection from a full module
+        name (import.path.module). Rules:
+          - All functions defined in that file *not* beginning with an underscore (_) will
+            be added, except for the rule(s) below
+          - All functions ending with 'factory' will be assumed ProcessStage factories,
+            where their return value is exactly one ProcessStage. These are expected to
+            take no arguments. Note that if `primitive` is *False* and an AtomicProcess
+            is returned, errors will occur. So, it is implicitly forced to be a
+            primitive process if this occurs
 
-        :param fullModuleName: Module name to parse. Should be in a format expected by pydoc
-        :param primitive: Whether the returned values should be considered top or primitive processes
+        Parameters
+        ----------
+        fullModuleName
+            Module name to parse. Should be in a format expected by pydoc
+        primitive
+            Whether the returned values should be considered top or primitive processes
         """
         if fullModuleName in self.includeModules:
             return
@@ -499,7 +550,8 @@ class AlgorithmCollection(ParamEditor):
                     if not isinstance(attr, ProcessStage):
                         continue
                 except Exception:
-                    # Don't plan on handling non-process stage factory objects / badly constructed objects
+                    # Don't plan on handling non-process stage factory objects / badly
+                    # constructed objects
                     continue
             if isinstance(attr, ProcessStage):
                 name = formatter(attr.name)

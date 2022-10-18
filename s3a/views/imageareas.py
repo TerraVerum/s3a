@@ -206,7 +206,8 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
                     pos.x(),
                     pos.y(),
                 )
-                # Simulate a click-wide boundary selection so points can be registered in pan mode
+                # Simulate a click-wide boundary selection so points can be registered
+                # in pan mode
                 pt = XYVertices([[xx, yy]], dtype=float)
                 self.shapeCollection.sigShapeFinished.emit(pt)
         super().mouseReleaseEvent(ev)
@@ -240,10 +241,18 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
 
     def updateGridScheme(self, showGrid=False, gridWidth=1, gridColor="#fff"):
         """
-        :param showGrid:
-        :param gridWidth:
-        :param gridColor:
-          pType: color
+        Update the grid scheme for the image plot to either show a grid with
+        specified width and color, or to hide the grid
+
+        Parameters
+        ----------
+        showGrid
+            Whether to show the grid
+        gridWidth
+            Width of the grid lines
+        gridColor
+            Color of the grid lines
+            pType: color
         """
         pi: pg.PlotItem = self.plotItem
         pi.showGrid(showGrid, showGrid)
@@ -259,16 +268,22 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
         **registerOpts
     ):
         """
-        Adds specified action(s) to the list of allowable roi actions if any do not already
-        exist. `func` is only triggered if a shape was finished and the current action matches
-        any of the specified `actParams`
+        Adds specified action(s) to the list of allowable roi actions if any do not
+        already exist. ``func`` is only triggered if a shape was finished and the current
+        action matches any of the specified ``actParams``
 
-        :param actParams: Single :py:class:`~s3a.structures.PrjParam` or multiple PrjParams that are allowed
-          to trigger this funciton. If empty, triggers on every parameter
-        :param func: Function to trigger when a shape is completed during the requested actions.
-          If only one parameter is registered to this function, it is expected to only take
-          roiVerts. If multiple or none are provided, it is expected to take roiVerts and the current draw action
-        :param registerOpts: Extra arguments for button registration
+        Parameters
+        ----------
+        actParams
+            Single or multiple ``PrjParam``s that are allowed to trigger this funciton.
+            If empty, triggers on every parameter
+        func
+            Function to trigger when a shape is completed during the requested actions.
+            If only one parameter is registered to this function, it is expected to
+            only take roiVerts. If multiple or none are provided, it is expected to
+            take roiVerts and the current draw action
+        registerOpts
+            Extra arguments for button registration
         """
         if isinstance(actParams, PrjParam):
             actParams = [actParams]
@@ -315,8 +330,6 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
         if toolsEditor in self._focusedTools:
             return
         toolsEditor.actionsMenuFromProcs(outerMenu=self.menu, parent=self, nest=True)
-        # self.toolsGroup.clear()
-        # self.toolsGroup.fromToolsEditors(self._focusedTools, checkable=False, ownerClctn=self.toolsGroup)
         retClctn = None
         # Define some helper functions for listening to toolsEditor changes
         def visit(param, child=None):
@@ -344,7 +357,10 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
         creating a 'zoomed-in' view that allows much faster processing than applying
         image processing algorithms to the entire image each iteration.
 
-        :param component: New component to edit using various plugins (See :class:`TableFieldPlugin`)
+        Parameters
+        ----------
+        component
+            New component to edit using various plugins (See :class:`TableFieldPlugin`)
         """
         mainImage = self.image
         if component is None or mainImage is None:

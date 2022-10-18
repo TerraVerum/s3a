@@ -32,7 +32,8 @@ def registerIoHandler(pType: str, force=False, **kwargs):
 
 
 def _runFunc(param: PrjParam, values, which: str, default: t.Callable, returnErrs=True):
-    # Using a dictionary instead of list of (value, key) pairs would clash on duplicate keys
+    # Using a dictionary instead of list of (value, key) pairs would clash on duplicate
+    # keys
     out = []
     errs = []
     parseType = param.opts.get("parser", param.pType)
@@ -82,9 +83,9 @@ def serialize(param: PrjParam, values: t.Sequence[t.Any], returnErrs=True):
 def deserialize(param: PrjParam, values: t.Sequence[str], returnErrs=True):
     # Calling 'deserialize' on a stringified data is a no-op
     # TODO: heterogeneous arrays?
-    # Unlike serialize, dtype could be different depending on 'param', so leave empty creation to the handler
-    # Series objects will use loc-based indexing, so use an iterator to guarantee first access regardless of sequence
-    # type
+    # Unlike serialize, dtype could be different depending on 'param', so leave empty
+    # creation to the handler Series objects will use loc-based indexing, so use an
+    # iterator to guarantee first access regardless of sequence type
     if len(values) and not isinstance(next(iter(values)), str):
         return pd.Series(values, name=param)
     paramType = type(param.value)
@@ -95,13 +96,17 @@ def deserialize(param: PrjParam, values: t.Sequence[str], returnErrs=True):
 
 def checkVertBounds(vertSer: pd.Series, imageShape: tuple):
     """
-    Checks whether any vertices in the imported dataframe extend past image dimensions. This is an indicator
-    they came from the wrong import file.
+    Checks whether any vertices in the imported dataframe extend past image dimensions.
+    This is an indicator they came from the wrong import file. Warns if offending
+    vertices are present, since this is an indication the component file was from a
+    different image
 
-    :param vertSer: Vertices from incoming component dataframe
-    :param imageShape: Shape of the main image these vertices are drawn on
-    :return: Raises error if offending vertices are present, since this is an indication the component file
-      was from a different image
+    Parameters
+    ----------
+    vertSer
+            Vertices from incoming component dataframe
+    imageShape
+            Shape of the main image these vertices are drawn on
     """
     if imageShape is None or len(vertSer) == 0:
         # Nothing we can do if no shape is given
@@ -123,10 +128,11 @@ def checkVertBounds(vertSer: pd.Series, imageShape: tuple):
 
 def compareDataframes(compDf, loadedDf):
     matchingCols = np.setdiff1d(compDf.columns, [RTF.INST_ID, RTF.IMG_FILE])
-    # For some reason, there are cases in which all values truly are equal but np.array_equal,
-    # x.equals(y), x.eq(y), etc. all fail. Something to do with block ordering?
-    # https://github.com/pandas-dev/pandas/issues/9330 indicates it should be fixed, but the error still occasionally
-    # happens for me. array_equivalent is not affected by this, in testing so far
+    # For some reason, there are cases in which all values truly are equal but
+    # np.array_equal, x.equals(y), x.eq(y), etc. all fail. Something to do with block
+    # ordering? https://github.com/pandas-dev/pandas/issues/9330 indicates it should be
+    # fixed, but the error still occasionally happens for me. array_equivalent is not
+    # affected by this, in testing so far
     dfCmp = array_equivalent(loadedDf[matchingCols].values, compDf[matchingCols].values)
     problemCells = defaultdict(list)
 
@@ -139,7 +145,8 @@ def compareDataframes(compDf, loadedDf):
                     problemCells[compDf.at[dfB.index[ii], RTF.INST_ID]].append(
                         str(matchingCols[jj])
                     )
-        # The only way to prevent "truth value of array is ambiguous" is cell-by-cell iteration
+        # The only way to prevent "truth value of array is ambiguous" is cell-by-cell
+        # iteration
         problemMsg = [f"{idx}: {cols}" for idx, cols in problemCells.items()]
         problemMsg = "\n".join(problemMsg)
         # Try to fix the problem with an iloc write

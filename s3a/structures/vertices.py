@@ -25,8 +25,8 @@ class XYVertices(np.ndarray):
         dtype=int,
         **kwargs,
     ):
-        # Default to integer type if not specified, since this is how pixel coordinates will be represented anyway
-        # See numpy docs on subclassing ndarray
+        # Default to integer type if not specified, since this is how pixel coordinates
+        # will be represented anyway See numpy docs on subclassing ndarray
         if inputArr is None:
             inputArr = np.zeros((0, 2))
         arr = np.asarray(inputArr, dtype=dtype, **kwargs).view(cls)
@@ -110,9 +110,10 @@ class XYVertices(np.ndarray):
 
 class ComplexXYVertices(list):
     """
-    Allows holes in the component shape. Subclassing ndarray instead of list allows primitive algebraic ops on the list
-    contents (e.g. subtracting/adding offset). Since normal usage doesn't typically require a mutable structure, the
-    loss is minimal.
+    Allows holes in the component shape. Subclassing ndarray instead of list allows
+    primitive algebraic ops on the list contents (e.g. subtracting/adding offset).
+    Since normal usage doesn't typically require a mutable structure, the loss is
+    minimal.
     """
 
     hierarchy = np.ones((0, 4), dtype=int)
@@ -182,8 +183,9 @@ class ComplexXYVertices(list):
 
     def removeOffset(self, offset=None, inplace=False, returnOffset=False):
         """
-        Subtracts a constant offset from all contained vertices. If offset is None, it will be set to the min value across
-        all contained vertices such that this polygon's coordinates are all relative to (0,0).
+        Subtracts a constant offset from all contained vertices. If offset is None,
+        it will be set to the min value across all contained vertices such that this
+        polygon's coordinates are all relative to (0,0).
         """
         if offset is None:
             offset = self.stack().min(0)
@@ -272,30 +274,22 @@ class ComplexXYVertices(list):
         return out
 
     @staticmethod
-    def fromBwMask(
-        bwMask: BlackWhiteImg, simplifyVerts=True, externOnly=False
-    ) -> ComplexXYVertices:
-        warn(
-            '"ComplexXYVertices.fromBwMask" is deprecated in favor of "ComplexXYVertices.fromBinaryMask".',
-            DeprecationWarning,
-        )
-        out = ComplexXYVertices.fromBinaryMask(bwMask, externOnly)
-        if simplifyVerts:
-            return out.simplify()
-        return out
-
-    @staticmethod
     def fromBinaryMask(
         bwMask: BlackWhiteImg, approximation=cv.CHAIN_APPROX_SIMPLE, externalOnly=False
     ) -> ComplexXYVertices:
         """
         Creates ComplexXYVertices from a numpy binary image
-        :param bwMask: Mask to locate connected components. Nonzero pixels are considered
-            part of the component.
-        :param approximation: One of "CHAIN_APPROX_*" from opencv constants. ``None``
-            is an alias for CHAIN_APPROX_NONE.
-        :param externalOnly: If *True*, finds contours using RETR_EXTERNAL, otherwise
-            uses RETR_CCOMP.
+
+        Parameters
+        ----------
+        bwMask
+            Mask to locate connected components. Nonzero pixels are considered part
+            of the component.
+        approximation
+            One of "CHAIN_APPROX_*" from opencv constants. ``None`` is an alias for
+            CHAIN_APPROX_NONE.
+        externalOnly
+            If *True*, finds contours using RETR_EXTERNAL, otherwise uses RETR_CCOMP.
         """
         if approximation is None:
             approximation = cv.CHAIN_APPROX_NONE
@@ -329,8 +323,13 @@ class ComplexXYVertices(list):
         right-angles. The resulting call to "fillPoly" produces an equivalent result,
         and "approxPolyDP" maintains rectangular shapes.
 
-        :param poly: Nx2 XYVertices to check (works with regular ndarray too)
-        :return: Copy of ``poly`` with a single right-angle for every pair found as
+        poly
+            Nx2 XYVertices to check (works with regular ndarray too)
+
+        Returns
+        -------
+        Any
+            Copy of ``poly`` with a single right-angle for every pair found as
             described in the documentation above.
         """
         polyDiff = np.diff(poly, axis=0, append=poly[[0]])
@@ -366,9 +365,10 @@ class ComplexXYVertices(list):
 
         keepInds = np.where(keepFirstPt, replaceInds, replaceInds + 1)
         deleteInds = np.where(keepFirstPt, replaceInds + 1, replaceInds)
-        # To replace a diagonal with a corner, substitute either the leading or following
-        # point's coordinates depending on whether the diagonal curves inward or outward
-        # "argmax" will point to either x or y coordinate depending on which is *not* shared
+        # To replace a diagonal with a corner, substitute either the leading or
+        # following point's coordinates depending on whether the diagonal curves inward
+        # or outward "argmax" will point to either x or y coordinate depending on which
+        # is *not* shared
         replaceDims = sharesPrevCoord[~falsePositives].argmin(axis=1)
         # If the following instead of leading edge is preferred, keep the opposite
         # coordinate since the rules for the point are swapped
@@ -381,13 +381,21 @@ class ComplexXYVertices(list):
         returnPoly = np.delete(returnPoly, deleteInds, axis=0)
         return returnPoly
 
-    def simplify(self, epsilon=1.0):
+    def simplify(self, epsilon=1.0) -> ComplexXYVertices:
         """
         Uses ``cv.approxPolyDP`` to reduce the number of vertices in each subregion.
-        :param epsilon: Passed to ``cv.approxPolyDP``. Two special cases: if 0,
-            diagonal pairs of vertices in each polygon are converted into corners.
-            < 0 is considered a no-op.
-        :return: Simplified version of ComplexXYVertices
+
+        Parameters
+        ----------
+        epsilon
+            Passed to ``cv.approxPolyDP``. Two special cases: if 0, diagonal pairs of
+            vertices in each polygon are converted into corners. < 0 is considered a
+            no-op.
+
+        Returns
+        -------
+        ComplexXYVertices
+            Simplified version of ComplexXYVertices
         """
         # Special case: No simplification performed
         if epsilon < 0:
@@ -403,8 +411,13 @@ class ComplexXYVertices(list):
 
     def __str__(self) -> str:
         """
-        Improve the readability of vertex list in table by just displaying stats of larger arrays
-        :return: Human readable string representation
+        Improve the readability of vertex list in table by just displaying stats of
+        larger arrays
+
+        Returns
+        -------
+        str
+            Human-readable string representation
         """
         concatVerts = self.stack()
         if len(concatVerts) <= 4:
@@ -439,9 +452,10 @@ class ComplexXYVertices(list):
 
     @staticmethod
     def deserialize(strObj: str) -> ComplexXYVertices:
-        # TODO: Infer appropriate hierarchy from the serialized string. It is possible by finding whether vertices are given
-        #  in CW or CCW order. This doesn't affect how they are drawn, but it does effect the return values of "holeVerts()"
-        #  and "filledVerts()"
+        # TODO: Infer appropriate hierarchy from the serialized string. It is possible
+        #  by finding whether vertices are given in CW or CCW order. This doesn't
+        #  affect how they are drawn, but it does effect the return values of
+        #  "holeVerts()" and "filledVerts()"
         outerLst = literal_eval(strObj)
         return ComplexXYVertices([XYVertices(lst) for lst in outerLst])
 
@@ -465,9 +479,9 @@ class S3AVertsAccessor:
 
     def split(self):
         """
-        Makes a separate component for each distinct boundary in all selected components.
-        For instance, if two components are selected, and each has two separate circles as
-        vertices, then 4 total rows will exist after this operation.
+        Makes a separate component for each distinct boundary in all selected
+        components. For instance, if two components are selected, and each has two
+        separate circles as vertices, then 4 total rows will exist after this operation.
         """
         newVerts = []
         newIds = []
@@ -481,9 +495,10 @@ class S3AVertsAccessor:
 
     def merge(self):
         """
-        Forms one single ComplexXYVertices object from a series of ComplexXYVertices regions. Overlapping is allowed.
-        The output is determined by placing all vertices in a binary image and calling ``ComplexXYVertices.fromBinaryMask``
-        on the final mask.
+        Forms one single ComplexXYVertices object from a series of ComplexXYVertices
+        regions. Overlapping is allowed. The output is determined by placing all
+        vertices in a binary image and calling ``ComplexXYVertices.fromBinaryMask`` on
+        the final mask.
         """
         # x-y -> row-col
         offset = self.min()

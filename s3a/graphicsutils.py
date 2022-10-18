@@ -100,7 +100,8 @@ def autosaveOptsDialog(parent):
     return dlg
 
 
-# Taken directly from https://stackoverflow.com/questions/60663793/drop-one-or-more-files-into-listwidget-or-lineedit
+# Taken directly from
+# https://stackoverflow.com/questions/60663793/drop-one-or-more-files-into-listwidget-or-lineedit  # noqa
 class DropList(QtWidgets.QListWidget):
     def __init__(self, parent=None):
         super(DropList, self).__init__(parent)
@@ -174,8 +175,10 @@ class RegionHistoryViewer(QtWidgets.QMainWindow):
 
     def autoPlay(self, timestep=500):
         """
-        :param timestep:
-          title: Timestep (ms)
+        Parameters
+        ----------
+        timestep
+            title: Timestep (ms)
         """
         self.histTimer.start(timestep)
 
@@ -191,10 +194,11 @@ class RegionHistoryViewer(QtWidgets.QMainWindow):
 
     def updateImg(self, curSlice=0):
         """
-        :param curSlice:
-          pType: slider
-          limits: [0, 10]
-        :return:
+        Parameters
+        ----------
+        curSlice
+            pType: slider
+            limits: [0, 10]
         """
         self.diffImg.setImage(self.diffs[curSlice])
 

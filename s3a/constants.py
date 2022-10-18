@@ -213,9 +213,9 @@ class PRJ_CONSTS:
         "Entire Component",
         "list",
         limits=["Boundary Only", "Entire Component"],
-        helpText="When `Boundary Only`, components are selected when clicking on their boundaries.\n"
-        "When `Entire Component`, clicking anywhere within the component"
-        " will select it",
+        helpText="When `Boundary Only`, components are selected when clicking on "
+                 "their boundaries.\nWhen `Entire Component`, clicking anywhere within "
+                 "the component will select it",
     )
     PROP_FIELD_INFO_ON_SEL = PrjParam(
         "Show field info after selection",
@@ -332,18 +332,19 @@ class PRJ_CONSTS:
     EXP_ONLY_VISIBLE = PrjParam(
         "Only Export Visible Components",
         False,
-        helpText="If *True*, only components showing on the main image will be included in"
-        " file exports.",
+        helpText="If *True*, only components showing on the main image will be included "
+                 "in file exports.",
     )
     INCLUDE_FNAME_PATH = PrjParam(
         "Include full image path on export",
         False,
         None,
-        "If *False*, only the image name is included in export information, e.g. <img>.png."
-        ' Otherwise, the full filepath is included, e.g. "C:/Users/.../<img>.png',
+        "If *False*, only the image name is included in export information, e.g. "
+        "``<img>.png``. Otherwise, the full filepath is included, e.g. "
+        "``C:/Users/.../<img>.png``",
     )
 
-    # --------------------------
+    # -------------------
     # DRAWING
     # -------------------
     # Modes
@@ -407,21 +408,23 @@ class PRJ_CONSTS:
         f"{SHORTCUT_BASE}+D, B",
         "registeredaction",
         icon=str(ICON_DIR / "background.svg"),
-        helpText="When an ROI is created, the image processor will attempt to take the enclosed"
-        " area away from the current component shape. Right-click and drag to pan.",
+        helpText="When an ROI is created, the image processor will attempt to take the "
+                 "enclosedarea away from the current component shape. Right-click and "
+                 "drag to pan.",
     )
     DRAW_ACT_SELECT = PrjParam(
         'Activate "Select" draw action',
         f"{SHORTCUT_BASE}+D, S",
         "registeredaction",
         icon=str(ICON_DIR / "select.svg"),
-        helpText="When component boundaries are enclosed by this ROI, they will be selected"
-        " in the component table. Right-click and drag to pan.",
+        helpText="When component boundaries are enclosed by this ROI, they will be "
+                 "selected in the component table. Right-click and drag to pan.",
     )
     DRAW_ACT_PAN = PrjParam(
         'Activate "Pan" draw action',
         f"{SHORTCUT_BASE}+D,P",
         "registeredaction",
         icon=str(ICON_DIR / "pan.svg"),
-        helpText="No ROI will be drawn in this mode. Right- or left-click and drag to pan.",
+        helpText="No ROI will be drawn in this mode. Right- or left-click and drag "
+                 "to pan.",
     )

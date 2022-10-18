@@ -36,12 +36,13 @@ BGND = PRJ_ENUMS.HISTORY_BACKGROUND
 # TODO: Establish better mechanism than global buffer
 procCache: Dict[str, Any] = {"mask": np.array([[]], "uint8")}
 """
-While a global structure is not ideal, it allows algorithms to use previous results across multiple calls.
-Only results that need to be accessed across several different functions should be stored here. If one function
-needs to maintain its state across multiple calls, it should be promoted to an AtomicProcess and use its own
-`result` structure.
-keys are:
-  mask: Mask of previous results, where 0 = unspecified, 1 = background, 2 = foreground
+While a global structure is not ideal, it allows algorithms to use previous results 
+across multiple calls. Only results that need to be accessed across several different 
+functions should be stored here. If one function needs to maintain its state across 
+multiple calls, it should be promoted to an AtomicProcess and use its own `result` 
+structure. keys are: 
+  - mask: Mask of previous results, where 0 = unspecified, 1 = background,
+    2 = foreground
 """
 
 
@@ -59,27 +60,6 @@ def growSeedpoint(img: NChanImg, seeds: XYVertices, thresh: float) -> BlackWhite
             curBwMask = flood(img[..., chan], tuple(seed), tolerance=thresh)
             bwOut |= curBwMask
     return bwOut
-
-
-# def _growSeedpointCvFastButErratic(img: NChanImg, seeds: XYVertices, thresh: float):
-#   if len(seeds) == 0:
-#     return np.zeros(img.shape[:2], bool)
-#   nChans = img.shape[2] if img.ndim > 2 else 1
-#   thresh = int(np.clip(thresh, 0, 255))
-#   imRCShape = np.array(img.shape[:2])
-#   bwOut = np.zeros(imRCShape+2, 'uint8')
-#   # Throw away seeds outside image boundaries
-#   seeds = seeds[np.all(seeds < imRCShape, axis=1)]
-#   seeds = np.fliplr(seeds)
-#   mask = np.zeros(imRCShape+2, 'uint8')
-#   for seed in seeds:
-#     mask.fill(0)
-#     flooded = img.copy()
-#     seed = tuple(seed.flatten())
-#     _, _, curOut, _ = cv.floodFill(flooded, mask, seed, 255, (thresh,)*nChans, (thresh,)*nChans,8)
-#     bwOut |= curOut
-#   bwOut = bwOut[1:-1,1:-1]
-#   return bwOut.astype(bool)
 
 
 def _cvConnComps(image: np.ndarray, returnLabels=True, areaOnly=True, removeBg=True):
@@ -166,15 +146,20 @@ def crop_to_local_area(
     useMinSpan=False,
 ):
     """
-    :param reference:
+    Parameters
+    ----------
+    reference
       pType: list
       limits: ['image', 'component', 'viewbox', 'roi']
-    :param maxSize: Maximum side length for a local portion of the image. If the local area exceeds this, it will be
-      rescaled to match this size. It can be beneficial for algorithms that take a long time to run, and quality of
-      segmentation can be retained. Set to <= 0 to have no maximum size
-    :param useMinSpan: When `viewbox` is the reference, this determines whether to crop to the area defined by the
-      shortest side of the viewbox. So, for aspect ratios far from 1 (i.e. heavily rectangular), this prevents a large
-      area from being used every time
+    maxSize
+        Maximum side length for a local portion of the image. If the local area exceeds
+        this, it will be rescaled to match this size. It can be beneficial for
+        algorithms that take a long time to run, and quality of segmentation can be
+        retained. Set to <= 0 to have no maximum size
+    useMinSpan
+        When ``viewbox`` is the reference, this determines whether to crop to the area
+        defined by the shortest side of the viewbox. So, for aspect ratios far from 1
+        (i.e. heavily rectangular), this prevents a large area from being used every time
     """
     roiVerts = np.vstack([fgVerts, bgVerts])
     compVerts = np.vstack([prevCompVerts.stack(), roiVerts])
@@ -190,7 +175,8 @@ def crop_to_local_area(
             center = viewbox.mean(0)
             spans = center - viewbox[0]
             adjustments = (spans - min(spans)).astype(viewbox.dtype)
-            # maxs need to be subtracted toward center, mins need to be extended toward center
+            # maxs need to be subtracted toward center, mins need to be extended toward
+            # center
             dim = np.argmax(adjustments)
             adjust = adjustments[dim]
             maxs = viewbox[:, dim] == viewbox[:, dim].max()
@@ -273,8 +259,9 @@ def apply_process_result(
         # Add to background
         bitOperation = lambda curRegion, other: ~(curRegion | other)
     # The other basic operations need the rest of the component mask to work properly,
-    # so expand the current area of interest only as much as needed. Returning to full size
-    # now would incur unnecessary addtional processing times for the full-sized image
+    # so expand the current area of interest only as much as needed. Returning to full
+    # size now would incur unnecessary addtional processing times for the full-sized
+    # image
     outMask = origCompMask.copy()
     change = bitOperation(prevCompMask, image)
     if resizeRatio < 1:
@@ -282,8 +269,8 @@ def apply_process_result(
             boundSlices[0].stop - boundSlices[0].start,
             boundSlices[1].stop - boundSlices[1].start,
         )
-        # Without first converting to float, interpolation will be cliped to True/False. This causes
-        # 'jagged' edges in the output
+        # Without first converting to float, interpolation will be cliped to
+        # True/False. This causes 'jagged' edges in the output
         change = cv_resize(
             change.astype(float),
             origSize[::-1],
@@ -344,15 +331,20 @@ def disallow_paint_tool(_image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertic
 @fns.dynamicDocstring(morphOps=[d for d in dir(cv) if d.startswith("MORPH_")])
 def morph_op(image: NChanImg, radius=1, op: str = "", shape="rectangle"):
     """
-    :param radius: Radius of the structuring element. Note that the total side length
-      of the structuring element will be (2*radius)+1.
-    :param shape:
-      helpText: Structuring element shape
-      pType: list
-      limits: ['rectangle', 'disk', 'diamond']
-    :param op:
-      pType: list
-      limits: {morphOps}
+    Perform a morphological operation on the input image.
+
+    Parameters
+    ----------
+    radius
+        Radius of the structuring element. Note that the total side length of the
+        structuring element will be (2*radius)+1.
+    shape
+        Structuring element shape
+        pType: list
+        limits: ['rectangle', 'disk', 'diamond']
+    op
+        pType: list
+        limits: {morphOps}
     """
     opType = getattr(cv, op)
     if image.ndim > 2:
@@ -476,7 +468,7 @@ def quickshift_segmentation(
     return ProcessIO(labels=segImg)
 
 
-# Taken from example page: https://scikit-image.org/docs/dev/auto_examples/segmentation/plot_morphsnakes.html
+# Taken from example page: https://scikit-image.org/docs/dev/auto_examples/segmentation/plot_morphsnakes.html  # noqa
 def morph_acwe(image: NChanImg, initialCheckerSize=6, iters=35, smoothing=3):
     image = img_as_float(image)
     if image.ndim > 2:
@@ -489,7 +481,8 @@ def morph_acwe(image: NChanImg, initialCheckerSize=6, iters=35, smoothing=3):
 
 
 def k_means_segmentation(image: NChanImg, kVal=5, attempts=10):
-    # Logic taken from https://docs.opencv.org/master/d1/d5c/tutorial_py_kmeans_opencv.html
+    # Logic taken from
+    # https://docs.opencv.org/master/d1/d5c/tutorial_py_kmeans_opencv.html
     numChannels = 1 if image.ndim < 3 else image.shape[2]
     clrs = image.reshape(-1, numChannels)
     clrs = clrs.astype("float32")
@@ -527,16 +520,19 @@ def binarize_labels(
     lineThickness=2,
 ):
     """
-    For a given binary image input, only keeps connected components that are directly in
-    contact with at least one of the specified vertices. In essence, this function can make
-    a wide variety of operations behave similarly to region growing.
+    For a given binary image input, only keeps connected components that are directly
+    in contact with at least one of the specified vertices. In essence, this function
+    can make a wide variety of operations behave similarly to region growing.
 
-    :param touchingRoiOnly: Whether to only keep labeled regions that are in contact
-      with the current ROI
-    :param useMeanColor: Whether to color the summary info image with mean values or
-      (if *False*) just draw the boundaries around each label.
-    :param lineThickness:
-      helpText: How thick to draw label boundary and ROI vertices lines
+    Parameters
+    ----------
+    touchingRoiOnly
+        Whether to only keep labeled regions that are in contact with the current ROI
+    useMeanColor
+        Whether to color the summary info image with mean values or (if *False*) just
+        draw the boundaries around each label.
+    lineThickness
+        How thick to draw label boundary and ROI vertices lines
     """
     if labels.ndim > 2:
         raise ValueError(
@@ -633,15 +629,20 @@ def cv_resize(
     interpolation="INTER_CUBIC",
 ):
     """
-    :param image: Image to resize
-    :param interpolation:
-      pType: list
-      limits: {inters}
-    :param newSize:
-      pType: float
-      step: 0.1
-    :param asRatio:
-      readonly: True
+    Like skimage.transform.resize, but uses cv2.resize instead for speed where posible
+
+    Parameters
+    ----------
+    image
+        Image to resize
+    interpolation
+        pType: list
+        limits: {inters}
+    newSize
+        pType: float
+        step: 0.1
+    asRatio
+        readonly: True
     """
     if isinstance(interpolation, str):
         interpolation = getattr(cv, interpolation)

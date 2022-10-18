@@ -80,9 +80,9 @@ class MainImagePlugin(ParamEditorPlugin):
 
         def startCopy():
             """
-            Copies the selected components. They can be pasted by <b>double-clicking</b>
-            on the destination location. When done copying, Click the *Clear ROI* tool change
-            the current draw action.
+            Copies the selected components. They can be pasted by
+            <b>double-clicking</b> on the destination location. When done copying,
+            Click the *Clear ROI* tool change the current draw action.
             """
             copier.inCopyMode = True
             copier.sigMoveStarted.emit()

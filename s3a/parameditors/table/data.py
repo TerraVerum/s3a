@@ -72,14 +72,14 @@ class TableData(QtCore.QObject):
 
     def makeCompDf(self, numRows=1, sequentialIds=False) -> pd.DataFrame:
         """
-        Creates a dataframe for the requested number of components.
-        This is the recommended method for component instantiation prior to table insertion.
+        Creates a dataframe for the requested number of components. This is the
+        recommended method for component instantiation prior to table insertion.
         """
         df_list = []
         dropRow = False
         if numRows <= 0:
-            # Create one row and drop it, which ensures data types are correct in the empty
-            # dataframe
+            # Create one row and drop it, which ensures data types are correct in the
+            # empty dataframe
             numRows = 1
             dropRow = True
         populators = []
@@ -105,30 +105,38 @@ class TableData(QtCore.QObject):
 
     def addFieldFactory(self, fieldLbl: PrjParam, factory: Callable[[], Any]):
         """
-        For fields that are simple functions (i.e. don't require input from the user), a
-        factory can be used to create default values when instantiating new table rows.
+        For fields that are simple functions (i.e. don't require input from the user),
+        a factory can be used to create default values when instantiating new table rows.
 
-        :param fieldLbl: WHich field this factory is used for instead of just the default value
-        :param factory: Callable to use instead of field value. This is called with no parameters.
+        Parameters
+        ----------
+        fieldLbl
+            WHich field this factory is used for instead of just the default value
+        factory
+            Callable to use instead of field value. This is called with no parameters.
         """
         self.factories[fieldLbl] = factory
 
     def addField(self, field: PrjParam):
         """
-        Adds a new field to the table. If the field already exists in the current table, no action is performed.
-        Returns *True* if a field really was added, *False* if this field is already in the table list or aliases to
-        an existing field
+        Adds a new field to the table. If the field already exists in the current
+        table, no action is performed. Returns *True* if a field really was added,
+        *False* if this field is already in the table list or aliases to an existing
+        field
         """
 
-        # Problems occur when fields alias to already existing ones. When this is the case, ignore the extra fields.
-        # Not only does this solve the many-to-one alias issue, but also allows table datas with different required
-        # fields to seamlessly share and swap fields with eachother while avoiding vestigial table columns
+        # Problems occur when fields alias to already existing ones. When this is the
+        # case, ignore the extra fields. Not only does this solve the many-to-one alias
+        # issue, but also allows table datas with different required fields to
+        # seamlessly share and swap fields with eachother while avoiding vestigial
+        # table columns
         if field in self.allFields or self._findMatchingField(field) is not field:
             return False
         field.group = self.allFields
         self.allFields.append(field)
         if field.name not in self.config["fields"]:
-            # Added programmatically outside config, ensure file representation is not lost
+            # Added programmatically outside config, ensure file representation is not
+            # lost
             self.config["fields"][field.name] = newFieldCfg = dict(field)
             # Remove redundant `name` field
             newFieldCfg.pop("name")
@@ -143,19 +151,26 @@ class TableData(QtCore.QObject):
         """
         Lodas the specified table configuration file for S3A. Alternatively, a name
         and dict pair can be supplied instead.
-        :param configPath: If *configDict* is *None*, this is treated as the file containaing
-          a YAML-compatible table configuration dictionary. Otherwise, this is the
-          configuration name assiciated with the given dictionary.
-        :param configDict: If not *None*, this is the config data used instad of
-          reading *configFile* as a file.
-        :param force: If *True*, the new config will be loaded even if it is the same name as the
-        current config
+
+        Parameters
+        ----------
+        configPath
+            If *configDict* is *None*, this is treated as the file containaing a
+            YAML-compatible table configuration dictionary. Otherwise, this is the
+            configuration name assiciated with the given dictionary.
+        configDict
+            If not *None*, this is the config data used instad of reading ``configFile``
+            as a file.
+        force
+            If *True*, the new config will be loaded even if it is the same name as the
+            current config
         """
         baseConfigDict = copy.deepcopy(self.template)
         if configPath is not None:
             configPath, configDict = fns.resolveYamlDict(configPath, configDict)
             configPath = configPath.resolve()
-        # Often, a table config can be wrapped in a project config; look for this case first
+        # Often, a table config can be wrapped in a project config; look for this case
+        # first
         if configDict is not None and "table-config" in configDict:
             configDict = configDict["table-config"]
 
@@ -184,20 +199,26 @@ class TableData(QtCore.QObject):
 
     def fieldFromName(self, name: Union[str, PrjParam], default=None):
         """
-        Helper function to retrieve the PrjParam corresponding to the field with this name
+        Helper function to retrieve the PrjParam corresponding to the field with this
+        name
         """
         return PrjParamGroup.fieldFromParam(self.allFields, name, default)
 
     def resolveFieldAliases(self, fields: Sequence[PrjParam], mapping: dict = None):
         """
-        Several forms of imports / exports handle data that may not be compatible with the current table data.
-        In these cases, it is beneficial to determine a mapping between names to allow greater compatibility between
-        I/O formats. Mapping is also extended in both directions by parameter name aliases (param.opts['aliases']),
-        which are a list of strings of common mappings for that parameter (e.g. [Class, Label] are often used
-        interchangeably)
+        Several forms of imports / exports handle data that may not be compatible with
+        the current table data. In these cases, it is beneficial to determine a mapping
+        between names to allow greater compatibility between I/O formats. Mapping is
+        also extended in both directions by parameter name aliases (param.opts[
+        'aliases']), which are a list of strings of common mappings for that parameter
+        (e.g. [Class, Label] are often used interchangeably)
 
-        :param fields: Dataframe with maybe foreign fields
-        :param mapping: Foreign to local field name mapping
+        Parameters
+        ----------
+        fields
+            Dataframe with maybe foreign fields
+        mapping
+            Foreign to local field name mapping
         """
 
         outFields = []
@@ -222,14 +243,16 @@ class TableData(QtCore.QObject):
         elif srcField in self.allFields:
             return srcField
         else:
-            # Not in mapping, no exact match. TODO: what if multiple dest cols have a matching alias?
-            # Otherwise, a 'break' can be added
+            # Not in mapping, no exact match.
+            # TODO: what if multiple dest cols have a matching alias?
+            #   Otherwise, a 'break' can be added
             curOutName = srcField
             for destField in self.allFields:
                 if potentialSrcNames & getFieldAliases(destField):
-                    # Match between source field's aliases and dest field aliases
-                    # Make sure it didn't match multiple names that weren't itself with the assert statement
-                    # In other words, if multiple dest fields have the same alias, this assertion will fail
+                    # Match between source field's aliases and dest field aliases Make
+                    # sure it didn't match multiple names that weren't itself with the
+                    # assert statement In other words, if multiple dest fields have the
+                    # same alias, this assertion will fail
                     assert curOutName == srcField
                     curOutName = destField
         return curOutName

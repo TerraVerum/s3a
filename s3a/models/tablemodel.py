@@ -84,11 +84,12 @@ class ComponentTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
             # logic
             pass
         self.compDf.iat[row, col] = value
-        # !!! Serious issue! Using iat sometimes doesn't work and I have no idea why since it is
-        # not easy to replicate. See https://github.com/pandas-dev/pandas/issues/22740
-        # Also, pandas iloc unnecessarily coerces to 2D ndarray when setting, so iloc will fail
-        # when assigning an array to a single location. Not sure how to prevent this...
-        # For now, checking this on export
+        # !!! Serious issue! Using iat sometimes doesn't work and I have no idea why
+        # since it is not easy to replicate. See
+        # https://github.com/pandas-dev/pandas/issues/22740 Also, pandas iloc
+        # unnecessarily coerces to 2D ndarray when setting, so iloc will fail when
+        # assigning an array to a single location. Not sure how to prevent this... For
+        # now, checking this on export
         cmp = (
             self.compDf.iloc[row, [col, col - 1]].values[0] != self.compDf.iat[row, col]
         )
@@ -315,11 +316,14 @@ class ComponentManager(ComponentTableModel):
         """
         Merges the selected components
 
-        :param mergeIds: Ids of components to merge. If *None*, defaults to current user
-          selection.
-        :param keepId: If provided, the selected component with this ID is used as
-          the merged component columns (except for the vertices, of course). Else,
-          this will default to the first component in the selection.
+        Parameters
+        ----------
+        mergeIds
+            Ids of components to merge. If *None*, defaults to current user selection.
+        keepId
+            If provided, the selected component with this ID is used as the merged
+            component columns (except for the vertices, of course). Else, this will
+            default to the first component in the selection.
         """
         if mergeIds is None or len(mergeIds) < 2:
             warn(
@@ -347,13 +351,15 @@ class ComponentManager(ComponentTableModel):
     @DASM.undoable("Split Components")
     def splitCompVertsById(self, splitIds: OneDArr):
         """
-        Makes a separate component for each distinct boundary in all selected components.
-        For instance, if two components are selected, and each has two separate circles as
-        vertices, then 4 total components will exist after this operation.
+        Makes a separate component for each distinct boundary in all selected
+        components. For instance, if two components are selected, and each has two
+        separate circles as vertices, then 4 total components will exist after this
+        operation. Each new component will have the table fields of its parent
 
-        Each new component will have the table fields of its parent
-
-        :param splitIds: Ids of components to split up
+        Parameters
+        ----------
+        splitIds
+            Ids of components to split up
         """
         splitComps = self.compDf.loc[splitIds]
         splitVerts = splitComps[RTF.VERTICES].s3averts.split()
@@ -369,10 +375,10 @@ class ComponentManager(ComponentTableModel):
 
     def removeOverlapById(self, overlapIds: OneDArr):
         """
-        Makes sure all specified components have no overlap. Preference is given
-        in order of the given IDs, i.e. the last ID in the list is guaranteed to
-        keep its full shape. If an area selection is made, priority is given to larger
-        IDs, i.e. the largest ID is guaranteed to keep its full original shape.
+        Makes sure all specified components have no overlap. Preference is given in
+        order of the given IDs, i.e. the last ID in the list is guaranteed to keep its
+        full shape. If an area selection is made, priority is given to larger IDs,
+        i.e. the largest ID is guaranteed to keep its full original shape.
         """
         overlapComps = self.compDf.loc[overlapIds].copy()
         overlapComps[RTF.VERTICES] = overlapComps[RTF.VERTICES].s3averts.removeOverlap()

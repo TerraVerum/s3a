@@ -95,7 +95,8 @@ class PlotDataROI(DASM, BoundScatterPlot):
             self.addRoiPoints(xyEvCoords)
             constructingRoi = True
         elif evType == self.endEvType:
-            # Done drawing the ROI, complete shape, get vertices, remove old undo stack entries
+            # Done drawing the ROI, complete shape, get vertices, remove old undo stack
+            # entries
             verts = self.vertices
             constructingRoi = False
             self.flushBuildActions()
@@ -219,9 +220,9 @@ class EllipseROI(PlotDataROI):
 
 class ROIManipulator(pg.RectROI):
     """
-    Pyqtgraph roi assigned to a PlotDataROI to allow various manipulations such as scaling,
-    rotating, translating, etc. After the manipulation is complete, the wrapped PlotDataROI is
-    transformed accordingly.
+    Pyqtgraph roi assigned to a PlotDataROI to allow various manipulations such as
+    scaling, rotating, translating, etc. After the manipulation is complete,
+    the wrapped PlotDataROI is transformed accordingly.
     """
 
     roiVerts: Optional[np.ndarray] = None
@@ -258,9 +259,9 @@ class ROIManipulator(pg.RectROI):
 
     def setBaseData(self, data: XYVertices, connectivity: np.ndarray, show=True):
         """
-        Entry point for transformations to a plot data roi. When meth:`RoiManpulator.finish` is
-        called, whatever translations, scaling, and rotating done to this ROI will be applied
-        to `dataRoi`.
+        Entry point for transformations to a plot data roi. When
+        meth:`RoiManpulator.finish` is called, whatever translations, scaling,
+        and rotating done to this ROI will be applied to `dataRoi`.
         """
         self.roiVerts = data.view(np.ndarray)
         self.roiVerts = self.roiVerts - data.min(0)
@@ -320,10 +321,10 @@ class FreehandRoi(PlotDataROI):
             and not stack.lockedByUser
             and stack.undoDescr == _ROI_PT_DESCR
         ):
-            # Moving the mouse should merge with the last undoable operation
-            # rather than adding a new entry to the stack
-            # This merge shouldn't happen on a redo, since the argument was already modified on the first forward
-            # pass. Hence, the checking against "undoDescr"
+            # Moving the mouse should merge with the last undoable operation rather
+            # than adding a new entry to the stack This merge shouldn't happen on a
+            # redo, since the argument was already modified on the first forward pass.
+            # Hence, the checking against "undoDescr"
             act = stack.actions[-1]
             # Add this point to the redo operation of the last action
             act.args = (np.r_[act.args[0], pts],)

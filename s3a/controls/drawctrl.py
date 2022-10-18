@@ -60,8 +60,9 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
             roi.setRoiPoints()
             roi.hide()
             self.addLock(self)
-            # If all ROIs share the same action stack, calling "flush" on one should take care of everything
-            # But this is a failsafe against separate undo buffers for each shape
+            # If all ROIs share the same action stack, calling "flush" on one should
+            # take care of everything But this is a failsafe against separate undo
+            # buffers for each shape
             roi.flushBuildActions()
 
     def addLock(self, lock):
@@ -69,8 +70,11 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
         Allows this shape collection to be `locked`, preventing shapes from being drawn.
         Multiple locks can be applied; ROIs can only be drawn when all locks are removed.
 
-        :param lock: Anything used as a lock. This will have to be manually removed later
-          using `RoiCollection.removeLock`
+        Parameters
+        ----------
+        lock
+            Anything used as a lock. This will have to be manually removed later using
+            ``RoiCollection.removeLock``
         """
         self._locks.add(lock)
 
@@ -98,7 +102,7 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
             Image the ROI is drawn upon, used for mapping event coordinates from a
             scene to pixel coordinates. If *None*, event coordinates are assumed to
             already be relative to pixel coordinates.
-        ev:
+        ev
             Mouse event
         """
         # Unblock on mouse press
@@ -116,8 +120,8 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
             posRelToImg = imageItem.mapFromScene(eventPos)
         else:
             posRelToImg = eventPos
-        # Form of rate-limiting -- only simulate click if the next pixel is at least one away
-        # from the previous pixel location
+        # Form of rate-limiting -- only simulate click if the next pixel is at least
+        # one away from the previous pixel location
         xyCoord = XYVertices([[posRelToImg.x(), posRelToImg.y()]], dtype=float)
         curRoi = self.currentShape
         constructingRoi, self.shapeVerts = self.currentShape.updateShape(ev, xyCoord)
@@ -125,7 +129,8 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
             self.sigShapeFinished.emit(self.shapeVerts)
 
         if not constructingRoi:
-            # Vertices from the completed shape are already stored, so clean up the shapes.
+            # Vertices from the completed shape are already stored, so clean up the
+            # shapes.
             curRoi.setRoiPoints()
             curRoi.hide()
         else:
@@ -141,8 +146,6 @@ class RoiCollection(EditorPropsMixin, QtCore.QObject):
     def shapeParameter(self, newShape: PrjParam):
         """
         When the shape is changed, be sure to reset the underlying ROIs
-        :param newShape: New shape
-        :return: None
         """
         # Reset the underlying ROIs for a different shape than we currently are using
         if newShape != self._shapeParameter:

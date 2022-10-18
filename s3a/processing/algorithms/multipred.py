@@ -51,7 +51,8 @@ class ProcessDispatcher(AtomicProcess):
         result = ProcessIO()
         for ii, comp in components.iterrows():
             kwargs.update(component=comp)
-            # TODO: Determine appropriate behavior. For now, just remember last result metadata other than comps
+            # TODO: Determine appropriate behavior. For now, just remember last result
+            #  metadata other than comps
             result = self.singleRunner(**kwargs)
             if self.resultConverter is not None:
                 result = self.resultConverter(result, comp)
@@ -95,20 +96,25 @@ def cv_template_match_single(
 ):
     """
     Performs template matching using default opencv functions
-    :param component: Template component
-    :param image: Main image
-    :param threshold:
-      helpText: Cutoff point to consider a matched template
-      limits: [0, 1]
-      step: 0.1
-    :param metric:
-      helpText: Template maching metric
-      pType: list
-      limits: {metricTypes}
-    :param area:
-      helpText: Where to apply the new components
-      pType: list
-      limits: ['image', 'viewbox']
+
+    Parameters
+    ----------
+    component
+        Template component
+    image
+        Main image
+    threshold
+        Cutoff point to consider a matched template
+        limits: [0, 1]
+        step: 0.1
+    metric
+        Template maching metric
+        pType: list
+        limits: {metricTypes}
+    area
+        Where to apply the new components
+        pType: list
+        limits: ['image', 'viewbox']
     """
     template, templateBbox = gutils.getCroppedImg(
         image, component[RTF.VERTICES].stack()
@@ -163,21 +169,34 @@ def make_grid_components(
     maxNumComponents=1000,
 ):
     """
-    :param image: Main image
-    :param components: Reference components, needed to determine proper output columns
-    :param viewbox: zoomed-in bbox coordinates relative to the main image
-    :param area: Area to apply gridding
-    type: list
-    limits: ['image', 'viewbox']
-    :param windowParam: Number used during the calculation of window size. Its meaning changes depending on ``winType``
-    :param winType: If "Row/Col Divisions", the image area is divided into ``windowParam`` rows or columns,
-      selcting the number resulting in a greater number of divisions. For instance, if ``windowParam`` is 5 and
-      image shape is (500, 300, 3), winSize will be 60x60 since min(500/5, 300/5) is 60. If "Raw Size",
-      the window size is directly set to ``windowParam``.
-      type: list
-      limits: ['Row/Col Divisions', 'Raw Size']
-    :param maxNumComponents: To prevent instances where the window parameters create too many regions, the number
-      of outputs will be clipped to ``maxNumComponents``
+    Creates a grid of components based on the bounding boxes of the input components
+
+    Parameters
+    ----------
+    image
+        Main image
+    components
+        Reference components, needed to determine proper output columns
+    viewbox
+        zoomed-in bbox coordinates relative to the main image
+    area
+        Area to apply gridding
+        type: list
+        limits: ['image', 'viewbox']
+    windowParam
+        Number used during the calculation of window size. Its meaning changes
+        depending on ``winType``
+    winType
+        If "Row/Col Divisions", the image area is divided into ``windowParam`` rows or
+        columns, selcting the number resulting in a greater number of divisions. For
+        instance, if ``windowParam`` is 5 and image shape is (500, 300, 3), winSize
+        will be 60x60 since min(500/5, 300/5) is 60. If "Raw Size", the window size is
+        directly set to ``windowParam``.
+        type: list
+        limits: ['Row/Col Divisions', 'Raw Size']
+    maxNumComponents
+        To prevent instances where the window parameters create too many regions,
+        the number of outputs will be clipped to ``maxNumComponents``
     """
     offset = np.array([[0, 0]])
     if area == "viewbox":
@@ -227,7 +246,11 @@ def merge_overlapping_components(components: pd.DataFrame):
     is split apart after. This means every component will have at most one region
     (i.e. components that previously contained two separate regions will turn into
     two distinct components with the same metadata)
-    :param components: Dataframe of components to merge -> split
+
+    Parameters
+    ----------
+    components
+        Dataframe of components to merge -> split
     """
     out = ProcessIO(components=components)
     if not len(components):
@@ -293,8 +316,13 @@ def merge_overlapping_components(components: pd.DataFrame):
 def simplify_component_vertices(components: pd.DataFrame, epsilon=1):
     """
     Runs ``ComplexXYVertices.simplify`` on each component vertices
-    :param components: Dataframe of components to simplify
-    :param epsilon: Passed to ``ComplexXYVertices.simplify``
+
+    Parameters
+    ----------
+    components
+        Dataframe of components to simplify
+    epsilon
+        Passed to ``ComplexXYVertices.simplify``
         limits: [-1, None]
     """
     outComps = components.copy()
@@ -327,15 +355,24 @@ def remove_overlapping_components(
     removeOverlapWithNew=True,
 ):
     """
-    Discards overlapping components. Can either check against existing components, other new components, or both
-    :param fullComponents: Complete list of original components
-    :param components: Working list of (newly created) components
-    :param overlapThreshold: Percentage overlap between any new component and existing component over which the new
-      component will be discarded
-      limits: [0,1]
-      step: 0.1
-    :param removeOverlapWithExisting: If *True*, new components overlapping with pre-existing components will be removed
-    :param removeOverlapWithNew: If *True*, new components overlapping with other new components will be removed
+    Discards overlapping components. Can either check against existing components,
+    other new components, or both
+
+    Parameters
+    ----------
+    fullComponents
+        Complete list of original components
+    components
+        Working list of (newly created) components
+    overlapThreshold
+        Percentage overlap between any new component and existing component over which
+        the new component will be discarded
+        limits: [0,1]
+        step: 0.1
+    removeOverlapWithExisting
+        If *True*, new components overlapping with pre-existing components will be removed
+    removeOverlapWithNew
+        If *True*, new components overlapping with other new components will be removed
     """
     if not len(components):
         # Nothing to do...
@@ -385,16 +422,25 @@ def single_categorical_prediction(
     component: pd.Series, image: np.ndarray, model, inputShape=None
 ):
     """
-    :param component: Component on which categorical mask prediction should be run
-    :param image: Image data to index
-    :param model: Model which will run prediction. If ``expectedImageShape`` is
-    not specified, ``model.input_shape[1:3]`` will be used
-    :param inputShape: Specifies the image shape the model requires to run a prediction
-      type: str
+    Runs a single component through a model
+
+    Parameters
+    ----------
+    component
+        Component on which categorical mask prediction should be run
+    image
+        Image data to index
+    model
+        Model which will run prediction. If ``expectedImageShape`` is
+        not specified, ``model.input_shape[1:3]`` will be used
+    inputShape
+        Specifies the image shape the model requires to run a prediction
+        type: str
     """
     if inputShape is None:
         raise ValueError(
-            '"inputShape" must be specified either as a (h, w) tuple or string eval with namespace "model=model"'
+            '"inputShape" must be specified either as a (h, w) tuple or string eval '
+            'with namespace "model=model"'
         )
     elif isinstance(inputShape, str):
         inputShape = eval(inputShape, dict(model=model))
@@ -435,7 +481,10 @@ class RunPlugins(AtomicProcess):
         """
         Sets flags which trigger runs of various plugins, i.e. "Vertices" will trigger
         the vertices plugin
-        :param plugins:
+
+        Parameters
+        ----------
+        plugins
             type: checklist
             value: []
             limits: ["Vertices"]

@@ -51,7 +51,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
     """
     Allows each instance of s3a to act like a "scope" for all objecats instantiated 
     within. Keeps multiple instances of separate S3A pieces from e.g. sharing the same 
-    undo buffer. This is managed by __new__.
+    undo buffer. This is managed by __new__. 
     """
 
     sharedAttrs: SharedAppSettings
@@ -124,8 +124,8 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         )
 
         self.componentManager = ComponentManager()
-        # Warning! If default IO table is not associated here, object refs throughout the application will point to the
-        # wrong table
+        # Warning! If default IO table is not associated here, object refs throughout
+        # the application will point to the wrong table
         ComponentIO.tableData = attrs.tableData
 
         self.componentTable = CompTableView()
@@ -217,8 +217,8 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         When table fields change, the displayed columns must change and the view
         must be made aware. Ensure this occurs here
         """
-        # Even if the field names are the same, e.g. classes may added or default values could
-        # be changed. So, reset the cell editor delegates no matter what
+        # Even if the field names are the same, e.g. classes may added or default
+        # values could be changed. So, reset the cell editor delegates no matter what
         # Start by adding any potentially new plugins
         for plg in self.filePlugin.projectData.spawnedPlugins:
             self._addPluginObj(plg)
@@ -229,8 +229,9 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             if mgr.columnTitles == list(
                 [f.name for f in self.sharedAttrs.tableData.allFields]
             ):
-                # Fields haven't changed since last reset. Types could be different, but nothing
-                # will break. So, the table doesn't have to be completely reset
+                # Fields haven't changed since last reset. Types could be different,
+                # but nothing will break. So, the table doesn't have to be completely
+                # reset
                 return
 
             mgr.beginResetModel()
@@ -248,7 +249,10 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
 
     @DASM.undoable("Accept Focused Region")
     def acceptFocusedRegion(self):
-        """Applies the focused image vertices to the corresponding component in the table"""
+        """
+        Applies the focused image vertices to the corresponding component in the
+        table
+        """
         # If the component was deleted
         mgr = self.componentManager
         focusedId = self.mainImage.focusedComponent[REQD_TBL_FIELDS.INST_ID]
@@ -263,7 +267,8 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         ser = self.mainImage.focusedComponent
         if ser[REQD_TBL_FIELDS.VERTICES].isEmpty():
             # Component should be erased. Since new components will not match existing
-            # IDs the same function will work regardless of whether this was new or existing
+            # IDs the same function will work regardless of whether this was new or
+            # existing
             self.componentManager.removeComponents([ser[REQD_TBL_FIELDS.INST_ID]])
             return
 
@@ -310,13 +315,18 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
 
     def addPlugin(self, pluginCls: Type[ParamEditorPlugin], *args, **kwargs):
         """
-        From a class inheriting the *PrjParamEditorPlugin*, creates a plugin object
+        From a class inheriting the ``PrjParamEditorPlugin``, creates a plugin object
         that will appear in the S3A toolbar. An entry is created with dropdown options
-        for each editor in *pluginCls*'s *editors* attribute.
+        for each editor in ``pluginCls``'s ``editors`` attribute.
 
-        :param pluginCls: Class containing plugin actions
-        :param args: Passed to class constructor
-        :param kwargs: Passed to class constructor
+        Parameters
+        ----------
+        pluginCls
+            Class containing plugin actions
+        args
+            Passed to class constructor
+        kwargs
+            Passed to class constructor
         """
         if pluginCls in self.clsToPluginMapping:
             getAppLogger(__name__).info(
@@ -328,8 +338,9 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
 
     def _addPluginObj(self, plugin: ParamEditorPlugin, overwriteExisting=False):
         """
-        Adds already intsantiated plugin. Discourage public use of this API since most plugin use should be class-based
-        until window registration. This mainly provides for adding spawned plugins from prject data
+        Adds already intsantiated plugin. Discourage public use of this API since most
+        plugin use should be class-based until window registration. This mainly
+        provides for adding spawned plugins from prject data
         """
         pluginCls = type(plugin)
         if not overwriteExisting and pluginCls in self.clsToPluginMapping:
@@ -356,10 +367,15 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         * If both file and imgData are provided, then imgData is used to populate the
         image, and file is assumed to be the file associated with that data.
 
-        :param file: Filename either to load or that corresponds to imgData
-        :param imgData: N-Channel numpy image
-        :param clearExistingComps: If True, erases all existing components on image load.
-          Else, they are retained.
+        Parameters
+        ----------
+        file
+            Filename either to load or that corresponds to imgData
+        imgData
+            N-Channel numpy image
+        clearExistingComps
+            If True, erases all existing components on image load. Else, they are
+            retained.
         """
         oldFile = self.sourceImagePath
         oldData = self.mainImage.image
@@ -395,7 +411,8 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             return
         srcImg_proj = self.filePlugin.imagesPath / sourceImagePath.name
         if not srcImg_proj.exists() or srcImg_proj != sourceImagePath:
-            # Either the image didn't exist (i.e. was programmatically generated) or doesn't yet belong to the project
+            # Either the image didn't exist (i.e. was programmatically generated) or
+            # doesn't yet belong to the project
             self.filePlugin.addImage(
                 sourceImagePath,
                 data=self.mainImage.image,
@@ -431,14 +448,15 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
                 ),
                 addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE,
             )
-            # 'hasUnsavedChanges' will be true after this, even though the changes are saved.
+            # 'hasUnsavedChanges' will be true after this, even though the changes are
+            # saved.
             self.hasUnsavedChanges = False
 
     def _maybeLoadActiveAnnotation(self, addedAnnotations: List[Path]):
         """
-        When annotations are added to a project while an image is active, that image will not receive the new annotations.
-        This function looks through recently added annotations, checks if any match the current image, and loads them
-        in if so
+        When annotations are added to a project while an image is active, that image
+        will not receive the new annotations. This function looks through recently
+        added annotations, checks if any match the current image, and loads them in if so
         """
         # No worries if no main image is loaded
         if self.sourceImagePath is None:
@@ -447,23 +465,26 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         for annName in addedAnnotations:
             if annName.stem == srcImgName:
                 self.loadNewAnnotations(self.sourceImagePath)
-                # Not possible for multiple added annotations to have the same name, otherwise they would overwrite
-                # so it's safe to break here
+                # Not possible for multiple added annotations to have the same name,
+                # otherwise they would overwrite, so it's safe to break here
                 break
 
     @fns.dynamicDocstring(filters=defaultIo.ioFileFilter(PRJ_ENUMS.IO_EXPORT))
     def exportCurAnnotation(self, outFname: Union[str, Path], **kwargs):
         """
-        Exports current image annotations to a file. This may be more convenient than exporting
-        an entire project if just the current current annotations are needed
+        Exports current image annotations to a file. This may be more convenient than
+        exporting an entire project if just the current annotations are needed
 
-        :param outFname:
-          title: Output File
-          helpText: Where to export. The file extension determines the save type
-          pType: filepicker
-          existing: False
-          fileFilter: {filters}
-        :param kwargs: Passed to the exporter
+        Parameters
+        ----------
+        outFname
+            Where to export. The file extension determines the save type
+            title: Output File
+            pType: filepicker
+            existing: False
+            fileFilter: {filters}
+        **kwargs
+            Passed to the exporter
         """
         outFname = Path(outFname)
         self.componentIo.exportByFileType(
@@ -494,7 +515,8 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         overwriteIdxs = (
             exportDf[REQD_TBL_FIELDS.IMG_FILE] == REQD_TBL_FIELDS.IMG_FILE.value
         )
-        # TODO: Maybe the current file will match the current file indicator. What happens then?
+        # TODO: Maybe the current file will match the current file indicator. What
+        #  happens then?
         exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.IMG_FILE] = srcImgFname
         # Ensure ids are sequential
         seqIds = np.arange(len(exportDf))
@@ -569,7 +591,10 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             self.addDockWidget(area, dockwidget)
 
     def makeHelpOpts(self, parser: argparse.ArgumentParser = None):
-        """Adds quick loader and app state options to a parser, or creates a new parser if one is not passed"""
+        """
+        Adds quick loader and app state options to a parser, or creates a new parser if
+        one is not passed
+        """
         if parser is None:
             parser = argparse.ArgumentParser("S3A")
         ql = self.appStateEditor.quickLoader

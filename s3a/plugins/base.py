@@ -63,16 +63,17 @@ class TableFieldPlugin(ProcessorPlugin):
 
     def updateFocusedComponent(self, newComp: pd.Series = None):
         """
-        This function is called when a new component is created or the focused image is updated
-        from the main view. See :meth:`MainImage.updateFocusedComponent` for parameters.
+        This function is called when a new component is created or the focused image is
+        updated from the main view. See :meth:`MainImage.updateFocusedComponent` for
+        parameters.
         """
         pass
 
     def acceptChanges(self):
         """
-        This must be overloaded by each plugin so the set component data is properly stored
-        in the focused component. Essentially, any changes made by this plugin are saved
-        after a call to this method.
+        This must be overloaded by each plugin so the set component data is properly
+        stored in the focused component. Essentially, any changes made by this plugin
+        are saved after a call to this method.
         """
         raise NotImplementedError
 
@@ -95,4 +96,7 @@ class TableFieldPlugin(ProcessorPlugin):
         """Overloaded by plugin classes to set up the plugin for use"""
 
     def _onDeactivate(self):
-        """Overloaded by plugin classes to tear down when the plugin is no longer in use"""
+        """
+        Overloaded by plugin classes to tear down when the plugin is no longer in
+        use
+        """

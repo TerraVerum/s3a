@@ -40,9 +40,9 @@ def makeMultiRegionDf(
 ):
     """
     Helper for creating new dataframe holding information determining color data.
-    `selected` and `focused` must be boolean arrays indicating whether or not each component
-    is selected or focused, respectively.
-    If `labelField` is given, it is used as a value to color the components
+    `selected` and `focused` must be boolean arrays indicating whether each component
+    is selected or focused, respectively. If `labelField` is given, it is used as a
+    value to color the components
     """
     outDict = {}
     if selected is None:
@@ -87,8 +87,8 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
 
     def __init__(self, parent=None, disableMouseClick=False):
         super().__init__(size=1, pxMode=False)
-        # Wrapping in atomic process means when users make changes to properties, these are maintained when calling the
-        # function internally with no parameters
+        # Wrapping in atomic process means when users make changes to properties,
+        # these are maintained when calling the function internally with no parameters
         self.setParent(parent)
         self.setZValue(50)
         self.regionData = makeMultiRegionDf(0)
@@ -98,14 +98,14 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
         self.showSelected = True
         self.showFocused = True
 
-        # 'pointsAt' is an expensive operation if many points are in the scatterplot. Since
-        # this will be called anyway when a selection box is made in the main image, disable
-        # mouse click listener to avoid doing all that work for nothing.
+        # 'pointsAt' is an expensive operation if many points are in the scatterplot.
+        # Since this will be called anyway when a selection box is made in the main
+        # image, disable mouse click listener to avoid doing all that work for nothing.
         # self.centroidPlts.mouseClickEvent = lambda ev: None
         if disableMouseClick:
             self.mouseClickEvent = lambda ev: None
-            # Also disable sigClicked. This way, users who try connecting to this signal won't get
-            # code that runs but never triggers
+            # Also disable sigClicked. This way, users who try connecting to this
+            # signal won't get code that runs but never triggers
             # self.centroidPlts.sigClicked = None
             self.sigClicked = None
 
@@ -132,8 +132,8 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
 
     def selectById(self, selectedIds: OneDArr):
         """
-        Marks 'selectedIds' as currently selected by changing their scheme to user-specified
-        selection values.
+        Marks 'selectedIds' as currently selected by changing their scheme to
+        user-specified selection values.
         """
         self.updateSelectedAndFocused(selectedIds=selectedIds)
 
@@ -150,9 +150,14 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
         updatePlot=True,
     ):
         """
-        :param selectedIds: All currently selected Ids
-        :param focusedIds: All currently focused Ids
-        :param updatePlot: Whether to also update the graphics plot (may be time consuming)
+        Parameters
+        ----------
+        selectedIds
+            All currently selected Ids
+        focusedIds
+            All currently focused Ids
+        updatePlot
+            Whether to also update the graphics plot (may be time consuming)
         """
         if len(self.regionData) == 0:
             return
@@ -273,24 +278,28 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     ):
         """
         Assigns colors from the specified colormap to each unique class
-        :param penWidth: Width of the pen in pixels
-        :param penColor:
-          helpText: Color of the border of each non-selected boundary
-          pType: color
-        :param selectedFill:
-          helpText: Fill color for components selected in the component table
-          pType: color
-        :param focusedFill:
-          helpText: Fill color for the component currently in the focused image
-          pType: color
-        :param labelColormap:
-          helpText: "Colormap to use for fill colors by component label. If `None` is selected,
-            the fill will be transparent."
-          pType: popuplineeditor
-        :param fillAlpha:
-          helpText: Transparency of fill color (0 is totally transparent, 1 is totally opaque)
-          limits: [0,1]
-          step: 0.1
+
+        Parameters
+        ----------
+        penWidth
+            Width of the pen in pixels
+        penColor
+            Color of the border of each non-selected boundary
+            pType: color
+        selectedFill
+            Fill color for components selected in the component table
+            pType: color
+        focusedFill:
+            Fill color for the component currently in the focused image
+            pType: color
+        labelColormap
+            Colormap to use for fill colors by component label. If `None` is selected,
+            the fill will be transparent.
+            pType: popuplineeditor
+        fillAlpha
+            Transparency of fill color (0 is totally transparent, 1 is totally opaque)
+            limits: [0,1]
+            step: 0.1
         """
         # Account for maybe hidden spots
         regionData = self.regionData.loc[self.data["data"]]
@@ -380,7 +389,8 @@ class VertexDefinedImg(DASM, EditorPropsMixin, pg.ImageItem):
         self.updateFromVertices(oldVerts, oldImg)
 
     def updateFromMask(self, newMask: BlackWhiteImg):
-        # It is expensive to color the vertices, so only find contours if specified by the user
+        # It is expensive to color the vertices, so only find contours if specified by
+        # the user
         oldImg = self.image
 
         newMask = newMask.astype("uint8")

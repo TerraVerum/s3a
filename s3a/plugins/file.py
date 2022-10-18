@@ -41,8 +41,8 @@ from ..structures import FilePath, NChanImg
 
 def absolutePath(p: Optional[Path]):
     """
-    Bug in Path.resolve means it doesn't actually return an absolute path on Windows for a non-existent path
-    While we're here, return None nicely without raising error
+    Bug in ``Path.resolve`` means it doesn't actually return an absolute path on Windows
+    for a non-existent path While we're here, return None nicely without raising error
     """
     if p is None:
         return None
@@ -114,7 +114,10 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         self.projNameLbl.setToolTip(str(self.projectData.configPath))
 
     def _buildIoOpts(self):
-        """Builds export option parameters for user interaction. Assumes export popout funcs have already been created"""
+        """
+        Builds export option parameters for user interaction. Assumes export popout
+        funcs have already been created
+        """
         componentIo = self.projectData.componentIo
         exportOptsParam = fns.getParamChild(
             self.toolsEditor.params, CNST.TOOL_PROJ_EXPORT.name, "Export Options"
@@ -169,7 +172,10 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
             self.startAutosave(**cfg)
 
         def exportAutosave(savePath: Path):
-            """Stores current autosave configuration at the specified location, if autosave is running"""
+            """
+            Stores current autosave configuration at the specified location,
+            if autosave is running
+            """
             if not self.autosaveTimer.isActive():
                 return None
 
@@ -278,13 +284,15 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         """
         Updates the specified project properties, for each one that is provided
 
-        :param tableConfig:
-          pType: filepicker
-        :param annotationFormat:
-          helpText: "How to save annotations internally. Note that altering
-          this value may alter the speed of saving and loading annotations."
-          pType: list
-          limits: {ioTypes}
+        Parameters
+        ----------
+        tableConfig
+            pType: filepicker
+        annotationFormat
+            How to save annotations internally. Note that altering this value may
+            alter the speed of saving and loading annotations.
+            pType: list
+            limits: {ioTypes}
         """
         if tableConfig is not None:
             tableConfig = Path(tableConfig)
@@ -303,27 +311,31 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         """
         Saves the current annotation set evert *interval* minutes
 
-        :param interval:
-          helpText: Interval in minutes between saves
-          limits: [1, 1e9]
-        :param backupFolder:
-          helpText: "If provided, annotations are saved here sequentially afte reach *interval* minutes.
-          Each output is named `[Parent Folder]/[base name]_[counter].[export type]`, where `counter`
-          is the current save file number.'"
-          pType: filepicker
-          asFolder: True
-        :param baseName: What to name the saved annotation file
-        :param annotationFormat:
-          helpText: File format for backups
-          pType: list
-          limits: {ioTypes}
+        Parameters
+        ----------
+        interval
+            Interval in minutes between saves
+            limits: [1, None]
+        backupFolder
+            If provided, annotations are saved here sequentially afte reach *interval*
+            minutes. Each output is named `[Parent Folder]/[base name]_[counter].[
+            export type]`, where `counter` is the current save file number.
+            pType: filepicker
+            asFolder: True
+        baseName
+            What to name the saved annotation file
+        annotationFormat
+            File format for backups
+            pType: list
+            limits: {ioTypes}
         """
         self.autosaveTimer.stop()
         self.autosaveTimer = QtCore.QTimer()
         saveToBackup = len(str(backupFolder)) > 0
         if not saveToBackup:
             getAppLogger(__name__).attention(
-                f"No backup folder selected. Will save to project without saving to backup directory."
+                "No backup folder selected. Will save to project without saving to "
+                "backup directory."
             )
         backupFolder = Path(backupFolder)
         backupFolder.mkdir(exist_ok=True, parents=True)
@@ -392,7 +404,8 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         page = NewProjectWizard.createFilePage("Annotations", wiz)
         wiz.addPage(page)
         if wiz.exec_():
-            # Make sure if a file is added on top of the current image, recent changes don't get lost
+            # Make sure if a file is added on top of the current image, recent changes
+            # don't get lost
             self.win.saveCurAnnotation()
             for file in page.fileList.files:
                 self.projectData.addAnnotationByPath(file)
@@ -448,8 +461,8 @@ class NewProjectWizard(QtWidgets.QWizard):
                 name="Template Project",
                 type="filepicker",
                 value=None,
-                tip="Path to existing project config file. This will serve as a template for"
-                " the newly created project, except for overridden settings",
+                tip="Path to existing project config file. This will serve as a template "
+                    "for the newly created project, except for overridden settings",
             ),
             dict(
                 name="Keep Existing Images",
@@ -463,10 +476,6 @@ class NewProjectWizard(QtWidgets.QWizard):
                 value=True,
                 tip="Whether to keep annotations specified in the existing config",
             ),
-            # dict(name='Annotation Storage Format', value='pkl',
-            #      tip="Project's internal representation of annotation files. Pickle (pkl) is the"
-            #          " fastest for interaction, but is not as human readable. Alternatives (e.g. csv)"
-            #          " are more human readable, but much slower when switching from image to image")
         ]
         # Use ParamEditor for speedy tree building
         editor = ParamEditor(paramList=settings, saveDir=None)
@@ -609,7 +618,10 @@ class ProjectData(QtCore.QObject):
         self.imageAnnotationMap: Dict[Path, Path] = {}
         """Records annotations belonging to each image"""
         self.spawnedPlugins: List[ParamEditorPlugin] = []
-        """Plugin instances stored separately from plugin-cfg to maintain serializability of self.config"""
+        """
+        Plugin instances stored separately from plugin-cfg to maintain serializability 
+        of ``self.config`` 
+        """
 
         self._suppressSignals = False
         """If this is *True*, no signals will be emitted """
@@ -712,11 +724,13 @@ class ProjectData(QtCore.QObject):
         }
         removedPlugins = set(self.pluginConfig).difference(loadPrjPlugins)
         if removedPlugins:
+            removedPluginsStr = ", ".join(removedPlugins)
             raise ValueError(
-                f"The previous project loaded custom plugins, which cannot easily"
-                f' be removed. To load a new project without plugin(s) {", ".join(removedPlugins)}, close and'
-                f" re-open S3A with the new project instance instead. Alternatively, add these missing plugins"
-                f" to the project you wish to add."
+                f'The previous project loaded custom plugins, which cannot easily be '
+                f'removed. To load a new project without plugin(s) {removedPluginsStr}, '
+                f'close and re-open S3A with the new project instance instead. '
+                f'Alternatively, add these missing plugins to the project you wish to '
+                f'add. '
             )
         warnPlgs = []
         for plgName, plgPath in newPlugins.items():
@@ -762,8 +776,9 @@ class ProjectData(QtCore.QObject):
 
     def _hookupProjectDirectoryInfo(self):
         """
-        For projects that have backing files (i.e. the config is a file instead of a dict in memory), this function
-        handles creating images/annotations dirs, adding project images/annotations, and adding file watchers
+        For projects that have backing files (i.e. the config is a file instead of a
+        dict in memory), this function handles creating images/annotations dirs,
+        adding project images/annotations, and adding file watchers
         """
         self.annotationsPath.mkdir(exist_ok=True)
         self.imagesPath.mkdir(exist_ok=True)
@@ -773,8 +788,8 @@ class ProjectData(QtCore.QObject):
             allAddedImages.extend(
                 self.addImageFolder(self.imagesPath, copyToProject=False)
             )
-            # Leave out for now due to the large number of problems with lacking idempotence
-            # allAddedImages.extend(self._addConfigImages())
+            # Leave out for now due to the large number of problems with lacking
+            # idempotence allAddedImages.extend(self._addConfigImages())
         self._maybeEmit(self.sigImagesAdded, allAddedImages)
 
         with self.suppressSignals():
@@ -782,8 +797,8 @@ class ProjectData(QtCore.QObject):
                 f'*.{self.config["annotation-format"]}'
             ):
                 self.addFormattedAnnotation(file)
-            # Leave out for now due to the large number of problems with lacking idempotence
-            # self._addConfigAnnotations()
+            # Leave out for now due to the large number of problems with lacking
+            # idempotence self._addConfigAnnotations()
 
         self._maybeEmit(
             self.sigAnnotationsAdded, list(self.imageAnnotationMap.values())
@@ -801,16 +816,22 @@ class ProjectData(QtCore.QObject):
         cls,
         *,
         name: FilePath = f"./{PROJ_FILE_TYPE}",
-        cfg: dict = None,
+        config: dict = None,
         parent: ProjectData = None,
     ):
         """
         Creates a new project with the specified settings in the specified directory.
-        :param name:
-          helpText: Project Name. The parent directory of this name indicates the directory in which to create the project
-          pType: filepicker
-        :param cfg: see `ProjectData.loadCfg` for information
-        :param parent: Associated ProjectData instance for a non-classmethod version of this function
+
+        Parameters
+        ----------
+        name
+            Project Name. The parent directory of this name indicates the directory
+            in which to create the project
+            pType: filepicker
+        config
+            see ``ProjectData.loadConfig`` for information
+        parent
+            Associated ProjectData instance for a non-classmethod version of this function
         """
         name = Path(name)
         name = name / f"{name.name}.{PROJ_FILE_TYPE}"
@@ -819,17 +840,18 @@ class ProjectData(QtCore.QObject):
         if parent is None:
             parent = cls()
 
-        if not name.exists() and cfg is None:
-            cfg = {}
-        parent.loadConfig(name, cfg)
+        if not name.exists() and config is None:
+            config = {}
+        parent.loadConfig(name, config)
 
         parent.saveConfig()
         return parent
 
     def saveConfig(self, copyMissingItems=False):
         """
-        Saves the config file, optionally copying missing items to the project location as well. "Missing items" are
-        images and annotations in base folders / existing in the project config but not in the actual project directory
+        Saves the config file, optionally copying missing items to the project location
+        as well. "Missing items" are images and annotations in base folders / existing
+        in the project config but not in the actual project directory
         """
         if copyMissingItems:
             for image in self._findMissingImages():
@@ -890,10 +912,11 @@ class ProjectData(QtCore.QObject):
 
     def addImageByPath(self, name: FilePath, copyToProject=True):
         """
-        Determines whether to add as a folder or file based on filepath type. Since adding a folder returns a list of
-        images and adding a single image returns a name or None, this function unifies the return signature by always
-        returning a list. If the path is a single image and not a folder, and the return value is *None*, this function
-        will return an empty list instead.
+        Determines whether to add as a folder or file based on filepath type. Since
+        adding a folder returns a list of images and adding a single image returns a
+        name or None, this function unifies the return signature by always returning a
+        list. If the path is a single image and not a folder, and the return value is
+        *None*, this function will return an empty list instead.
         """
         image = Path(name)
         if not image.is_absolute():
@@ -917,7 +940,10 @@ class ProjectData(QtCore.QObject):
         copyToProject=True,
         allowOverwrite=False,
     ) -> Optional[FilePath]:
-        """Returns None if an image with the same name already exists in the project, else the new full filepath"""
+        """
+        Returns None if an image with the same name already exists in the project,
+        else the new full filepath
+        """
         fullName = Path(name)
         if not fullName.is_absolute():
             fullName = self.imagesPath / fullName
@@ -935,12 +961,15 @@ class ProjectData(QtCore.QObject):
 
     def changeImagePath(self, oldName: Path, newName: Path = None):
         """
-        Changes the filepath associated with a project image. Note that this doesn't do anything to the path
-        of either oldName or newName (i.e. the actual image isn't moved/copied/etc.), it just changes the association
-        within the project from the old image to the new image.
-          * If newName is None, the association is deleted. Don't do this for images inside the project directory.
-          * if newName already exists in the current project (i.e. matches an image already added to the project),
-            oldName is deleted from the project associations
+        Changes the filepath associated with a project image. Note that this doesn't do
+        anything to the path of either oldName or newName (i.e. the actual image isn't
+        moved/copied/etc.), it just changes the association within the project from the
+        old image to the new image.
+          * If newName is None, the association is deleted. Don't do this for images
+            inside the project directory.
+          * if newName already exists in the current project (i.e. matches an image
+            already added to the project), oldName is deleted from the project
+            associations
           * Otherwise, oldName is re-associated to newName.
         """
         oldName = absolutePath(oldName)
@@ -957,9 +986,9 @@ class ProjectData(QtCore.QObject):
         folder = absolutePath(folder)
         if folder in self.imageDirectories:
             return []
-        # Need to keep track of actually added images instead of using all globbed images. If an added image already
-        # existed in the project, it won't be added. Also, if the images are copied into the project, the paths
-        # will change.
+        # Need to keep track of actually added images instead of using all globbed
+        # images. If an added image already existed in the project, it won't be added.
+        # Also, if the images are copied into the project, the paths will change.
         addedImgs = []
         with self.suppressSignals():
             for img in folder.glob("*.*"):
@@ -1012,17 +1041,21 @@ class ProjectData(QtCore.QObject):
             imgName.unlink()
         # yield
         # if imgName.parent == self.imagesPath:
-        #   # TODO: Cache removed images in a temp dir, then move them to that temp dir instead of unlinking
-        #   #  on delete. This will make 'remove' undoable
-        #   raise IOError('Can only undo undo image removal when the image was outside the project.'
-        #                    f' Image {imgName.name} was either annotated or directly placed in the project images'
-        #                    f' directory, and was deleted during removal. To re-add, do so from the original image'
-        #                    f' location outside the project directory.')
+        #     # TODO: Cache removed images in a temp dir, then move them to that temp dir
+        #     #  instead of unlinking on delete. This will make 'remove' undoable
+        #     raise IOError(
+        #         "Can only undo undo image removal when the image was outside the "
+        #         f"project. Image `{imgName.name}` was either annotated or directly "
+        #         "placed in the project images directory, and was deleted during "
+        #         "removal. To re-add, do so from the original image location outside "
+        #         " the project directory."
+        #     )
         # self.addImage(imgName)
 
     def removeAnnotation(self, annName: FilePath):
         annName = absolutePath(annName)
-        # Since no mapping exists of all annotations, loop the long way until the file is found
+        # Since no mapping exists of all annotations, loop the long way until the file
+        # is found
         for key, ann in list(self.imageAnnotationMap.items()):
             if annName == ann:
                 del self.imageAnnotationMap[key]
@@ -1046,7 +1079,8 @@ class ProjectData(QtCore.QObject):
         if data is None:
             data = self.componentIo.importByFileType(name)
         if image is None:
-            # If no explicit matching to an image is provided, try to determine based on annotation name
+            # If no explicit matching to an image is provided, try to determine based
+            # on annotation name
             xpondingImgs = np.unique(data[REQD_TBL_FIELDS.IMG_FILE].to_numpy())
             # Break into annotaitons by iamge
             for img in xpondingImgs:
@@ -1058,10 +1092,11 @@ class ProjectData(QtCore.QObject):
         image = self.getFullImgName(Path(image))
         # Force provided annotations to now belong to this image
         data.loc[:, REQD_TBL_FIELDS.IMG_FILE] = image.name
-        # Since only one annotation file can exist per image, concatenate this with any existing files for the same image
-        # if needed
+        # Since only one annotation file can exist per image, concatenate this with any
+        # existing files for the same image if needed
         if image.parent != self.imagesPath:
-            # None result means already exists in project prior to copying, which is OK in this context
+            # None result means already exists in project prior to copying, which is OK
+            # in this context
             image = self.addImage(image) or self.imagesPath / image.name
         annForImg = self.imageAnnotationMap.get(image, None)
         oldAnns = []
@@ -1072,7 +1107,8 @@ class ProjectData(QtCore.QObject):
         outAnn[REQD_TBL_FIELDS.INST_ID] = outAnn.index
         outFmt = f".{self.config['annotation-format']}"
         outName = self.annotationsPath / f"{image.name}{outFmt}"
-        # If no annotations exist, this is the same as deleting the old annotations since there's nothing to save
+        # If no annotations exist, this is the same as deleting the old annotations
+        # since there's nothing to save
         if len(outAnn):
             self.componentIo.exportByFileType(
                 outAnn, outName, verifyIntegrity=False, readonly=False
@@ -1085,16 +1121,18 @@ class ProjectData(QtCore.QObject):
     def addFormattedAnnotation(self, file: FilePath, overwriteOld=False):
         """
         Adds an annotation file that is already formatted in the following ways:
-          * The right source image file column (i.e. REQD_TBL_FIELDS.IMG_FILE set to the image name
-          * The file stem already matches a project image (not remote, i.e. an image in the `images` directory)
+          * The right source image file column (i.e. REQD_TBL_FIELDS.IMG_FILE set
+            to the image name
+          * The file stem already matches a project image (not remote, i.e. an image
+            in the `images` directory)
           * The annotations correspond to exactly one image
         """
         image = self.getFullImgName(file.stem, thorough=False)
         if file.parent != self.annotationsPath:
             if not overwriteOld and (self.annotationsPath / file.name).exists():
                 raise IOError(
-                    f"Cannot add annotation {file} since a corresponding annotation with that name already"
-                    f" exists and `overwriteOld` was False"
+                    f"Cannot add annotation {file} since a corresponding annotation "
+                    "with that name already exists and `overwriteOld` was False"
                 )
             newName = self.annotationsPath / file.name
             shutil.copy2(file, newName)
@@ -1114,8 +1152,8 @@ class ProjectData(QtCore.QObject):
             cvImsaveRgb(newName, data)
         else:
             raise IOError(
-                f"No image data associated with {name.name}. Either the file does not exist or no"
-                f" image information was provided."
+                f"No image data associated with {name.name}. Either the file does "
+                f"not exist or no image information was provided."
             )
         if name in self.images:
             self.changeImagePath(name, newName)
@@ -1124,16 +1162,23 @@ class ProjectData(QtCore.QObject):
 
     def getFullImgName(self, name: FilePath, thorough=True):
         """
-        From an absolute or relative image name, attempts to find the absolute path it corresponds
-        to based on current project images. A match is located in the following order:
-          - If the image path is already absolute, it is resolved, checked for existence, and returned
-          - Solitary project images are searched to see if they end with the specified relative path
+        From an absolute or relative image name, attempts to find the absolute path it
+        corresponds to based on current project images. A match is located in the
+        following order:
+          - If the image path is already absolute, it is resolved, checked for existence,
+            and returned
+          - Solitary project images are searched to see if they end with the specified
+            relative path
           - All base image directories are checked to see if they contain this subpath
 
-        :param name: Image name
-        :param thorough: If `False`, as soon as a match is found the function returns. Otherwise,
-          all solitary paths and images will be checked to ensure there is exactly one matching
-          image for the name provided.
+        Parameters
+        ----------
+        name
+            Image name
+        thorough
+            If `False`, as soon as a match is found the function returns. Otherwise,
+            all solitary paths and images will be checked to ensure there is exactly
+            one matching image for the name provided.
         """
         name = Path(name)
         if name.is_absolute():
@@ -1166,8 +1211,9 @@ class ProjectData(QtCore.QObject):
         numCandidates = len(candidates)
         if numCandidates != 1:
             msg = (
-                f"Exactly one corresponding image file must exist for a given annotation. However,"
-                f" {numCandidates} candidate images were found for image {name.name}"
+                f"Exactly one corresponding image file must exist for a given "
+                f"annotation. However, {numCandidates} candidate images were found "
+                f"for image {name.name}"
             )
             if numCandidates == 0:
                 msg += "."
@@ -1179,10 +1225,13 @@ class ProjectData(QtCore.QObject):
     def exportProject(self, outputFolder: FilePath = "s3a-export"):
         """
         Exports the entire project, making a copy of it at the destination directory
-        :param outputFolder:
-          helpText: Where to place the exported project
-          pType: filepicker
-          asFolder: True
+
+        Parameters
+        ----------
+        outputFolder
+            Where to place the exported project
+            pType: filepicker
+            asFolder: True
         """
         shutil.copytree(self.location, outputFolder)
         getAppLogger(__name__).info("Exported project")
@@ -1198,20 +1247,26 @@ class ProjectData(QtCore.QObject):
     ):
         """
         Exports project annotations, optionally including their source images
-        :param outputFolder:
-          helpText: Folder for exported annotations
-          pType: filepicker
-          asFolder: True
-        :param annotationFormat:
-          helpText: "Annotation file type. E.g. if 'csv', annotations will be saved as csv files. Available
-          file types are:
-          {fileTypes}"
-          pType: list
-          limits: {fileTypes}
-        :param combine: If `True`, all annotation files will be combined into one exported file with name `annotations.<format>`
-        :param includeImages: If `True`, the corresponding image for each annotation will also be exported into an `images`
-          folder
-        :param exportOpts: Additional options passed to the exporting function
+
+        Parameters
+        ----------
+        outputFolder
+            Folder for exported annotations
+            pType: filepicker
+            asFolder: True
+        annotationFormat
+            Annotation file type. E.g. if 'csv', annotations will be saved as csv files.
+            Available file types are: {fileTypes}
+            pType: list
+            limits: {fileTypes}
+        combine
+            If `True`, all annotation files will be combined into one exported file
+            with name `annotations.<format>`
+        includeImages
+            If `True`, the corresponding image for each annotation will also be exported
+            into an `images` folder
+        exportOpts
+            Additional options passed to the exporting function
         """
         self.saveConfig()
         outputFolder = Path(outputFolder)
@@ -1252,7 +1307,8 @@ class ProjectData(QtCore.QObject):
                         exportArgs=exportOpts,
                     )
         getAppLogger(__name__).attention(
-            f"Exported project annotations to {os.path.join(outAnnsPath.parent.name, outAnnsPath.name)}"
+            f"Exported project annotations to "
+            f"{os.path.join(outAnnsPath.parent.name, outAnnsPath.name)}"
         )
 
     def _maybeEmit(

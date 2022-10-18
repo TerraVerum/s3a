@@ -169,7 +169,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             vertsKey = "bgVerts"
         kwargs = {vertsKey: verts}
         if self.queueActions:
-            thread = self.taskManager.addThread(self.run, **kwargs, name="Vertices Update")
+            thread = self.taskManager.addThread(
+                self.run, **kwargs, name="Vertices Update"
+            )
             thread.sigResultReady.connect(self._onThreadFinished)
             thread.sigFailed.connect(self._onThreadFinished)
         else:
@@ -189,17 +191,20 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
     def endQueuedActions(self, endRunning=False):
         # Reversing kills unstarted tasks first
-        self.taskManager.endThreads(reversed(self.taskManager.threads), endRunning=endRunning)
+        self.taskManager.endThreads(
+            reversed(self.taskManager.threads), endRunning=endRunning
+        )
 
     def endQueuedActionsGui(self):
         statuses = [t.isRunning() for t in self.taskManager.threads]
         if len(statuses) and all(statuses):
-            # Only running threads are left, ensure the user really wants to violently kill them
+            # Only running threads are left, ensure the user really wants to violently
+            # kill them
             confirm = QtWidgets.QMessageBox.question(
                 self.win,
                 "Kill Running Actions?",
-                "Killing in-progress actions may cause memory leaks or unintended side effects. Are you sure you want to"
-                " continue?",
+                "Killing in-progress actions may cause memory leaks or unintended "
+                "side effects. Are you sure you want to continue?",
             )
             if confirm == QtWidgets.QMessageBox.StandardButton.Yes:
                 self.endQueuedActions(endRunning=True)
@@ -234,7 +239,8 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             self.overlayStageInfo(self._displayedStage, self.stageInfoImage.opacity())
         else:
             self.stageInfoImage.hide()
-        # Can't set limits to actual infos since equality comparison fails in pyqtgraph setLimits
+        # Can't set limits to actual infos since equality comparison fails in pyqtgraph
+        # setLimits
         limits = [""] + list(self.displayableInfos)
         self._overlayParam.child("info").setLimits(limits)
 
@@ -256,8 +262,8 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         else:
             compGrayscale = self.region.toGrayImg(img.shape[:2])
             compMask = compGrayscale > 0
-        # TODO: When multiple classes can be represented within focused image, this is where
-        #  change will have to occur
+        # TODO: When multiple classes can be represented within focused image, this is
+        #  where change will have to occur
         viewbox = self.mainImage.viewboxCoords()
         self.oldResultCache = imageproc.procCache.copy()
         result = self.currentProcessor.run(
@@ -281,14 +287,20 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     ):
         """
         Updates the current focused region using the new provided vertices
-        :param newData: Dataframe to use.If *None*, the image will be totally reset and the component
-          will be removed. Otherwise, the provided value will be used. For column information,
-          see `makeMultiRegionDf`
-        :param offset: Offset of newVerts relative to main image coordinates
+
+        Parameters
+        ----------
+        newData
+            Dataframe to use.If *None*, the image will be totally reset and the
+            component will be removed. Otherwise, the provided value will be used. For
+            column information, see ``makeMultiRegionDf``
+        offset
+            Offset of newVerts relative to main image coordinates
         """
         fImg = self.mainImage
-        # Since some calls to this function make an undo entry and others don't, be sure to save state for the undoable ones
-        # revertId is only used when changedComp is true and an undo is valid
+        # Since some calls to this function make an undo entry and others don't,
+        # be sure to save state for the undoable ones revertId is only used when
+        # changedComp is true and an undo is valid
         newId = fImg.focusedComponent[RTF.INST_ID]
         if newData is None:
             newData = makeMultiRegionDf(0)
@@ -336,8 +348,8 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         verts = component[RTF.VERTICES]
         compGrayscale = verts.toMask(img.shape[:2])
         compMask = compGrayscale > 0
-        # TODO: When multiple classes can be represented within focused image, this is where
-        #  change will have to occur
+        # TODO: When multiple classes can be represented within focused image, this is
+        #  where change will have to occur
         stacked = verts.stack()
         offset = stacked.min(axis=0)
         if len(stacked) > 1:
@@ -424,8 +436,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     def updateRegionUndoable(
         self, newData: pd.DataFrame = None, offset: XYVertices = None, oldProcCache=None
     ):
-        # Preserve cache state in argument list so it can be restored on undo. Otherwise, a separate undo buffer must
-        # be maintained just to keep the cache up to date
+        # Preserve cache state in argument list, so it can be restored on undo.
+        # Otherwise, a separate undo buffer must be maintained just to keep the cache
+        # up to date
         oldData = self.region.regionData.copy()
         self.updateRegionFromDf(newData, offset=offset)
         yield
@@ -442,13 +455,16 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
     def collapseRegionVerts(self, simplify=True):
         """
-        Region can consist of multiple separate complex vertices. However, the focused series
-        can only contain one list of complex vertices. This function collapses all data in self.region
-        into one list of complex vertices.
+        Region can consist of multiple separate complex vertices. However, the focused
+        series can only contain one list of complex vertices. This function collapses
+        all data in self.region into one list of complex vertice.
 
-        :param simplify: Overlapping regions can be simplified by converting to and back from
-          an image. This can be computationally intensive at times, in which case `simplify` can
-          be set to *False*
+        Parameters
+        ----------
+        simplify
+            Overlapping regions can be simplified by converting to and back from an
+            image. This can be computationally intensive at times, in which case
+            ``simplify`` can be set to *False*
         """
         try:
             hierarchy = np.row_stack(
@@ -477,7 +493,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         self.updateRegionFromMask(np.zeros((1, 1), bool))
 
     def resetFocusedRegion(self):
-        """Reset the focused image by restoring the region mask to the last saved state"""
+        """
+        Reset the focused image by restoring the region mask to the last saved state
+        """
         if self.mainImage.focusedComponent is None:
             return
         self.updateRegionUndoable(self.mainImage.focusedComponentAsFrame)
@@ -519,17 +537,19 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
     def overlayStageInfo(self, info: t.Union[str, dict] = "", alpha=1.0):
         """
-        :param info:
-          pType: list
-          helpText: "If a name is given, this stage's info result will be shown on top of the image. Note that
-            if multiple stages exist with the same name and a string is passed, include the 1-based numeric index in the
-            name, i.e. if two 'Open' stages exist, to select the second stage pass 'Open#2'.
-          "
-          limits: ['']
-        :param alpha:
-          helpText: Opacity of this overlay
-          limits: [0, 1]
-          step: 0.1
+        Parameters
+        ----------
+        info
+            If a name is given, this stage's info result will be shown on top of the
+            image. Note that if multiple stages exist with the same name and a string
+            is passed, include the 1-based numeric index in the name, i.e. if two
+            'Open' stages exist, to select the second stage pass 'Open#2'.
+            pType: list
+            limits: ['']
+        alpha
+            Opacity of this overlay
+            limits: [0, 1]
+            step: 0.1
         """
         if not isinstance(info, dict):
             self._displayedStage = info
@@ -569,7 +589,8 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             if info is None or "image" not in info:
                 continue
             useImg = info["image"]
-            # This image was likely from a cropped area, make sure to put it in the right place
+            # This image was likely from a cropped area, make sure to put it in the
+            # right place
             imPos = (0, 0)
             span = useImg.shape[:2]
             if boundSlices is not None:
