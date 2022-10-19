@@ -49,7 +49,7 @@ class IOTemplateManager:
             if not force:
                 raise KeyError(
                     f'I/O type "{ioType}" already has associated data and `force` '
-                    f'is false:\n{ret}'
+                    f"is false:\n{ret}"
                 )
 
         if isinstance(cfg, FilePath.__args__):

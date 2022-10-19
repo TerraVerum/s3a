@@ -188,7 +188,7 @@ class QuickLoaderEditor(ParamEditor):
                 if len(matches) != 1:
                     raise ValueError(
                         f'Exactly one editor name must match "{editorName}" but '
-                        f'{len(matches)} were found'
+                        f"{len(matches)} were found"
                     )
                 editor = matches[0]
                 for state, shcValue in shcOpts.items():

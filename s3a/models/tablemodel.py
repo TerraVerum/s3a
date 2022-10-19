@@ -192,7 +192,9 @@ class ComponentManager(ComponentTableModel):
         if addtype == PRJ_ENUMS.COMP_ADD_AS_NEW:
             # Treat all comps as new -> set their IDs to guaranteed new values
             newIds = np.arange(
-                self._nextComponentId, self._nextComponentId + len(newCompsDf), dtype=int
+                self._nextComponentId,
+                self._nextComponentId + len(newCompsDf),
+                dtype=int,
             )
             newCompsDf[RTF.INST_ID] = newIds
             dropIds = np.array([], dtype=int)
@@ -200,7 +202,9 @@ class ComponentManager(ComponentTableModel):
             # Merge may have been performed with new comps (id -1) mixed in
             needsUpdatedId = newCompsDf.index == RTF.INST_ID.value
             newIds = np.arange(
-                self._nextComponentId, self._nextComponentId + np.sum(needsUpdatedId), dtype=int
+                self._nextComponentId,
+                self._nextComponentId + np.sum(needsUpdatedId),
+                dtype=int,
             )
             newCompsDf.loc[needsUpdatedId, RTF.INST_ID] = newIds
 

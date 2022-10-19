@@ -34,9 +34,9 @@ try:
 
 except (ImportError, AssertionError):
     raise ImportError(
-        'S3A requires OpenCV (cv2) >= 4.1.2.30. This can come from '
-        '`opencv-python-headless` (preferred), `opencv-python`, `opencv-contrib-python`, '
-        'etc.'
+        "S3A requires OpenCV (cv2) >= 4.1.2.30. This can come from "
+        "`opencv-python-headless` (preferred), `opencv-python`, `opencv-contrib-python`, "
+        "etc."
     )
 
 from .__version__ import __version__

@@ -377,7 +377,9 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
             return
 
         idList = [
-            idx.siblingAtColumn(self.instanceIdIndex).data(QtCore.Qt.ItemDataRole.EditRole)
+            idx.siblingAtColumn(self.instanceIdIndex).data(
+                QtCore.Qt.ItemDataRole.EditRole
+            )
             for idx in self.selectedIndexes()
         ]
         if len(idList) == 0:

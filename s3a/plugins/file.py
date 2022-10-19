@@ -462,7 +462,7 @@ class NewProjectWizard(QtWidgets.QWizard):
                 type="filepicker",
                 value=None,
                 tip="Path to existing project config file. This will serve as a template "
-                    "for the newly created project, except for overridden settings",
+                "for the newly created project, except for overridden settings",
             ),
             dict(
                 name="Keep Existing Images",
@@ -726,11 +726,11 @@ class ProjectData(QtCore.QObject):
         if removedPlugins:
             removedPluginsStr = ", ".join(removedPlugins)
             raise ValueError(
-                f'The previous project loaded custom plugins, which cannot easily be '
-                f'removed. To load a new project without plugin(s) {removedPluginsStr}, '
-                f'close and re-open S3A with the new project instance instead. '
-                f'Alternatively, add these missing plugins to the project you wish to '
-                f'add. '
+                f"The previous project loaded custom plugins, which cannot easily be "
+                f"removed. To load a new project without plugin(s) {removedPluginsStr}, "
+                f"close and re-open S3A with the new project instance instead. "
+                f"Alternatively, add these missing plugins to the project you wish to "
+                f"add."
             )
         warnPlgs = []
         for plgName, plgPath in newPlugins.items():

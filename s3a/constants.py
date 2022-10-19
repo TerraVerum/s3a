@@ -214,8 +214,8 @@ class PRJ_CONSTS:
         "list",
         limits=["Boundary Only", "Entire Component"],
         helpText="When `Boundary Only`, components are selected when clicking on "
-                 "their boundaries.\nWhen `Entire Component`, clicking anywhere within "
-                 "the component will select it",
+        "their boundaries.\nWhen `Entire Component`, clicking anywhere within "
+        "the component will select it",
     )
     PROP_FIELD_INFO_ON_SEL = PrjParam(
         "Show field info after selection",
@@ -333,7 +333,7 @@ class PRJ_CONSTS:
         "Only Export Visible Components",
         False,
         helpText="If *True*, only components showing on the main image will be included "
-                 "in file exports.",
+        "in file exports.",
     )
     INCLUDE_FNAME_PATH = PrjParam(
         "Include full image path on export",
@@ -409,8 +409,8 @@ class PRJ_CONSTS:
         "registeredaction",
         icon=str(ICON_DIR / "background.svg"),
         helpText="When an ROI is created, the image processor will attempt to take the "
-                 "enclosedarea away from the current component shape. Right-click and "
-                 "drag to pan.",
+        "enclosedarea away from the current component shape. Right-click and "
+        "drag to pan.",
     )
     DRAW_ACT_SELECT = PrjParam(
         'Activate "Select" draw action',
@@ -418,7 +418,7 @@ class PRJ_CONSTS:
         "registeredaction",
         icon=str(ICON_DIR / "select.svg"),
         helpText="When component boundaries are enclosed by this ROI, they will be "
-                 "selected in the component table. Right-click and drag to pan.",
+        "selected in the component table. Right-click and drag to pan.",
     )
     DRAW_ACT_PAN = PrjParam(
         'Activate "Pan" draw action',
@@ -426,5 +426,5 @@ class PRJ_CONSTS:
         "registeredaction",
         icon=str(ICON_DIR / "pan.svg"),
         helpText="No ROI will be drawn in this mode. Right- or left-click and drag "
-                 "to pan.",
+        "to pan.",
     )

@@ -586,7 +586,7 @@ def deprecateKwargs(warningType=DeprecationWarning, **oldToNewNameMapping):
                 }
                 msg = (
                     f'{", ".join(usedDeprecated)} {grammar} deprecated and will be '
-                    f'removed in a future release. '
+                    f"removed in a future release."
                 )
                 if replacements:
                     for orig, replace in replacements.items():
