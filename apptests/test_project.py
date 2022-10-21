@@ -19,7 +19,7 @@ from s3a import S3A
 from s3a.parameditors.table import IOTemplateManager
 from s3a.plugins.file import ProjectData, absolutePath
 
-_autosaveFile = "autosave.param"
+_autosaveFile = "autosave.parameter"
 
 
 @pytest.fixture
@@ -59,7 +59,7 @@ def test_update_props(filePlugin):
     filePlugin.updateProjectProperties(annotationFormat=oldFmt)
     loc = filePlugin.projectData.location / "newcfg.tblcfg"
     newCfg = {"fields": {"Class": ""}}
-    fns.hierarchicalUpdate(newCfg, IOTemplateManager.getTableCfg("s3a"))
+    fns.hierarchicalUpdate(newCfg, IOTemplateManager.getTableConfig("s3a"))
     fns.saveToFile(newCfg, loc)
     oldName = filePlugin.projectData.tableData.configPath
     filePlugin.updateProjectProperties(tableConfig=loc)
@@ -109,7 +109,7 @@ def test_load_startup_img(tmp_path, app, filePlugin):
     )
     for img in None, filePlugin.projectData.imagesPath / "my-image.jpg":
         app.sourceImagePath = img
-        app.appStateEditor.stateFuncsDf.at["project", "exportFunc"](
+        app.appStateEditor.stateFuncsDf.at["project", "exportFunction"](
             tmp_path / "another"
         )
         assert bool(img) == ("image" in filePlugin.projectData.startup)
@@ -127,7 +127,7 @@ def test_load_with_plg(monkeypatch, tmp_path):
 
         cfg = {"plugin-cfg": {"Test": "files.sample_plg.SamplePlugin"}}
         filePlugin.open(tmp_path / "plgprj.s3aprj", cfg)
-        assert SamplePlugin in app.clsToPluginMapping
+        assert SamplePlugin in app.classPluginMap
         assert len(filePlugin.projectData.spawnedPlugins) == 1
         assert filePlugin.projectData.spawnedPlugins[0].win
 
@@ -200,7 +200,7 @@ def test_none_tblinfo(tmpdir):
     cfg = {}
     prj = ProjectData(tmpdir / "none-table.s3aprj", cfg)
     assert prj.tableData.configPath == prj.configPath
-    assert prj.tableData.config == IOTemplateManager.getTableCfg("s3a")
+    assert prj.tableData.config == IOTemplateManager.getTableConfig("s3a")
 
 
 def test_change_image_path(tmpProj):
@@ -224,7 +224,7 @@ def test_add_image_folder(tmpProj, tmpdir):
 def test_base_dir_logic(tmpProj: ProjectData, tmpdir):
     tmpdir = Path(tmpdir)
     shutil.copy(SAMPLE_SMALL_IMG_FNAME, tmpdir / SAMPLE_SMALL_IMG_FNAME.name)
-    tmpProj.imageDirectories.add(tmpdir)
+    tmpProj.imageFolders.add(tmpdir)
 
     assert (
         tmpProj.getFullImgName(SAMPLE_SMALL_IMG_FNAME.name)
@@ -235,7 +235,7 @@ def test_base_dir_logic(tmpProj: ProjectData, tmpdir):
     tmp2.mkdir()
     shutil.copy(SAMPLE_SMALL_IMG_FNAME, tmp2)
 
-    tmpProj.imageDirectories.add(tmp2)
+    tmpProj.imageFolders.add(tmp2)
     with pytest.raises(IOError):
         tmpProj.getFullImgName(SAMPLE_SMALL_IMG_FNAME.name)
 
@@ -290,7 +290,7 @@ def test_load_autosave(app, filePlugin, tmp_path):
 
     fns.saveToFile({"interval": 10}, tmp_path / _autosaveFile)
 
-    importer = state.stateFuncsDf.at["autosave", "importFunc"]
+    importer = state.stateFuncsDf.at["autosave", "importFunction"]
     importer(True)
     assert filePlugin.autosaveTimer.isActive()
 
@@ -306,7 +306,7 @@ def test_export_autosave(app, filePlugin, tmp_path):
 
     fns.saveToFile({"interval": 10}, tmp_path / _autosaveFile)
 
-    exporter = state.stateFuncsDf.at["autosave", "exportFunc"]
+    exporter = state.stateFuncsDf.at["autosave", "exportFunction"]
     for proc, params in filePlugin.toolsEditor.procToParamsMapping.items():
         if proc.name == "Start Autosave":
             break

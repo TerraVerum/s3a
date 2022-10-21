@@ -17,7 +17,7 @@ class CompDfTester(CompositionMixin):
         if tableData is None:
             tableData = TableData()
         self.tableData = tableData
-        self.compDf = self.exposes(tableData.makeCompDf(numComps))
+        self.compDf = self.exposes(tableData.makeComponentDf(numComps))
         self.compDf.set_index(np.arange(numComps, dtype=int), inplace=True)
         self.numComps = numComps
         if fillInfo:

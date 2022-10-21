@@ -53,7 +53,9 @@ class S3A(S3ABase):
             logger.registerWarnings()
             logger.addHandler(
                 widgets.FadeNotifyHandler(
-                    PRJ_ENUMS.LOG_LVL_ATTN, self, maxLevel=PRJ_ENUMS.LOG_LVL_ATTN
+                    PRJ_ENUMS.LOG_LEVEL_ATTENTION,
+                    self,
+                    maxLevel=PRJ_ENUMS.LOG_LEVEL_ATTENTION,
                 )
             )
             logger.addHandler(
@@ -91,7 +93,9 @@ class S3A(S3ABase):
 
         self.layoutEditor.loadParamValues = loadLayout
         self.layoutEditor.saveParamValues = saveRecentLayout
-        self.appStateEditor.addImportExportOpts("layout", loadLayout, saveRecentLayout)
+        self.appStateEditor.addImportExportOptions(
+            "layout", loadLayout, saveRecentLayout
+        )
 
         self._buildGui()
         self._buildMenu()
@@ -126,9 +130,7 @@ class S3A(S3ABase):
         self.generalToolbar.setObjectName("General")
         self.addToolBar(self.generalToolbar)
 
-        _plugins = [
-            self.clsToPluginMapping[c] for c in [MainImagePlugin, CompTablePlugin]
-        ]
+        _plugins = [self.classPluginMap[c] for c in [MainImagePlugin, CompTablePlugin]]
         parents = [self.mainImage, self.componentTable]
         for plugin, parent in zip(_plugins, reversed(parents)):
             plugin.toolsEditor.actionsMenuFromProcs(
@@ -179,22 +181,22 @@ class S3A(S3ABase):
         )
         self.sigLayoutSaved.emit()
 
-    def changeFocusedComp(self, compIds: Union[int, Sequence[int]] = None):
-        ret = super().changeFocusedComp(compIds)
+    def changeFocusedComponent(self, ids: Union[int, Sequence[int]] = None):
+        ret = super().changeFocusedComponent(ids)
         self.currentComponentLabel.setText(
-            f"Component ID: {self.mainImage.focusedComponent[REQD_TBL_FIELDS.INST_ID]}"
+            f"Component ID: {self.mainImage.focusedComponent[REQD_TBL_FIELDS.ID]}"
         )
         return ret
 
-    def resetTblFieldsGui(self):
+    def resetTableFieldsGui(self):
         outFname = fns.popupFilePicker(
             None, "Select Table Config File", "All Files (*.*);; Config Files (*.yml)"
         )
         if outFname is not None:
             self.sharedAttrs.tableData.loadConfig(outFname)
 
-    def _addPluginObj(self, plugin: ParamEditorPlugin, **kwargs):
-        plugin = super()._addPluginObj(plugin, **kwargs)
+    def _addPluginObject(self, plugin: ParamEditorPlugin, **kwargs):
+        plugin = super()._addPluginObject(plugin, **kwargs)
         if not plugin:
             return
         dock = plugin.dock
@@ -213,9 +215,12 @@ class S3A(S3ABase):
         return plugin
 
     def setMainImage(
-        self, file: FilePath = None, imgData: NChanImg = None, clearExistingComps=True
+        self,
+        file: FilePath = None,
+        imageData: NChanImg = None,
+        clearExistingComponents=True,
     ):
-        gen = super().setMainImage(file, imgData, clearExistingComps)
+        gen = super().setMainImage(file, imageData, clearExistingComponents)
         ret = fns.gracefulNext(gen)
         img = self.sourceImagePath
         if img is not None:
@@ -241,10 +246,10 @@ class S3A(S3ABase):
             None, "Select Save File", fileFilters, existing=False
         )
         if outFname is not None:
-            super().exportCurAnnotation(outFname)
+            super().exportCurrentAnnotation(outFname)
 
     def openAnnotationGui(self):
-        # TODO: See note about exporting comps. Delegate the filepicker activity to
+        # TODO: See note about exporting components. Delegate the filepicker activity to
         #  importer
         fileFilter = self.componentIo.ioFileFilter(which=PRJ_ENUMS.IO_IMPORT)
         fname = fns.popupFilePicker(None, "Select Load File", fileFilter)
@@ -306,9 +311,9 @@ class S3A(S3ABase):
         self.setStyleSheet(style)
 
     def addAndFocusComponents(
-        self, newComps: pd.DataFrame, addType=PRJ_ENUMS.COMP_ADD_AS_NEW
+        self, components: pd.DataFrame, addType=PRJ_ENUMS.COMPONENT_ADD_AS_NEW
     ):
-        gen = super().addAndFocusComponents(newComps, addType=addType)
+        gen = super().addAndFocusComponents(components, addType=addType)
         changeDict = fns.gracefulNext(gen)
         keepIds = changeDict["ids"]
         keepIds = keepIds[keepIds >= 0]

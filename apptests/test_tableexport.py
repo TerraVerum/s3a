@@ -41,7 +41,7 @@ def test_normal_export(sampleComps, tmp_path, app):
             app,
             curPath,
             io,
-            app.exportableDf,
+            app.componentDf,
             "Normal export with all IDs not successful: " + ftype,
         )
 
@@ -56,7 +56,7 @@ def test_filter_export(tmp_path, monkeypatch, app):
     with monkeypatch.context() as m:
         m.setitem(app.props, CNST.EXP_ONLY_VISIBLE, False)
         m.setattr(app.componentController, "displayedIds", filterIds)
-        exportDf = app.exportableDf
+        exportDf = app.componentDf
     np.testing.assert_array_equal(
         exportDf.index,
         np.arange(len(sampleComps)),
@@ -77,7 +77,7 @@ def test_filter_export(tmp_path, monkeypatch, app):
     with monkeypatch.context() as m:
         m.setitem(app.props, CNST.EXP_ONLY_VISIBLE, True)
         m.setattr(app.componentController, "displayedIds", filterIds)
-        exportDf = app.exportableDf
+        exportDf = app.componentDf
     np.testing.assert_array_equal(
         exportDf.index,
         np.arange(len(filterIds)),
@@ -112,7 +112,7 @@ def test_bad_integrity(tmp_path, app, monkeypatch, qtbot):
     with monkeypatch.context() as m:
         m.setattr(app.componentIo, "importByFileType", badBuilder)
         with pytest.warns(UserWarning):
-            app.exportCurAnnotation(tmp_path / "test.csv", verifyIntegrity=True)
+            app.exportCurrentAnnotation(tmp_path / "test.csv", verifyIntegrity=True)
 
 
 def test_serial_export(tmp_path, sampleComps, app):
@@ -131,7 +131,7 @@ def test_serial_export(tmp_path, sampleComps, app):
         def __str__(self):
             raise AttributeError
 
-    sampleComps[REQD_TBL_FIELDS.INST_ID] = BadRep()
+    sampleComps[REQD_TBL_FIELDS.ID] = BadRep()
     with pytest.raises(Exception):
         app.componentIo.exportSerialized(sampleComps, tmp_path / "test.csv")
 
@@ -145,7 +145,7 @@ def doAndAssertExport(
             compDf,
             fpath,
             imageShape=app.mainImage.image.shape[:2],
-            srcDir=SAMPLE_IMG_FNAME.parent,
+            source=SAMPLE_IMG_FNAME.parent,
             labelField="Instance ID",
         )
     except ValueError as ve:
@@ -173,7 +173,7 @@ def test_impossible_io(tmp_path, sampleComps, app):
 
 @pytest.mark.withcomps
 def test_opts_insertion(app, sampleComps, tmp_path):
-    app.componentIo.updateOpts(PRJ_ENUMS.IO_IMPORT, reindex=True)
+    app.componentIo.updateOptions(PRJ_ENUMS.IO_IMPORT, reindex=True)
     sampleComps.index = np.linspace(0, 10000, len(sampleComps), dtype=int)
     app.componentIo.exportSerialized(sampleComps, tmp_path / "test.csv")
     imported = app.componentIo.importSerialized(tmp_path / "test.csv")
@@ -185,22 +185,22 @@ def test_compimgs_export(tmp_path, _simpleTbl):
     io = ComponentIO(_simpleTbl)
     tester = CompDfTester(100, tableData=_simpleTbl)
     tester.fillRandomVerts(SAMPLE_SMALL_IMG.shape[:2])
-    tester.compDf.loc[:50, REQD_TBL_FIELDS.IMG_FILE] = SAMPLE_SMALL_IMG_FNAME
-    tester.compDf.loc[50:, REQD_TBL_FIELDS.IMG_FILE] = SAMPLE_IMG_FNAME
-    tester.compDf.loc[50:, REQD_TBL_FIELDS.INST_ID] = tester.compDf.index[:50]
+    tester.compDf.loc[:50, REQD_TBL_FIELDS.IMAGE_FILE] = SAMPLE_SMALL_IMG_FNAME
+    tester.compDf.loc[50:, REQD_TBL_FIELDS.IMAGE_FILE] = SAMPLE_IMG_FNAME
+    tester.compDf.loc[50:, REQD_TBL_FIELDS.ID] = tester.compDf.index[:50]
     tester.compDf.index = np.concatenate(
         [tester.compDf.index[:50], tester.compDf.index[:50]]
     )
-    tester.compDf[REQD_TBL_FIELDS.INST_ID] = tester.index
+    tester.compDf[REQD_TBL_FIELDS.ID] = tester.index
 
     # Do df export just to test the output file capability and various options
     io.exportCompImgsDf(tester.compDf, tmp_path / "test.pkl", labelField="List")
     assert (tmp_path / "test.pkl").exists()
     df, mappings = io.exportCompImgsDf(
-        tester.compDf, prioritizeById=False, returnLabelMapping=True
+        tester.compDf, prioritizeById=False, returnLabelMap=True
     )
     df["image_name"] = (
-        tester.compDf[REQD_TBL_FIELDS.IMG_FILE].apply(lambda p: p.name).values
+        tester.compDf[REQD_TBL_FIELDS.IMAGE_FILE].apply(lambda p: p.name).values
     )
     revMaps = {k: pd.Series(v.index, v.to_numpy()) for k, v in mappings.items()}
 
@@ -208,7 +208,7 @@ def test_compimgs_export(tmp_path, _simpleTbl):
         revMap = revMaps[row["image_name"]]
         assert np.count_nonzero(row["labelMask"] == revMap[row["label"]]) > 0
 
-    df = io.exportCompImgsDf(tester.compDf, resizeOpts=dict(shape=(150, 150)))
+    df = io.exportCompImgsDf(tester.compDf, resizeOptions=dict(shape=(150, 150)))
     for mask in df.labelMask:
         assert mask.shape == (150, 150)
 
@@ -225,7 +225,7 @@ def test_compimgs_export(tmp_path, _simpleTbl):
             with Image.open(outPath / "labels" / file.name) as lblImg:
                 assert dataImg.size == lblImg.size
 
-    io.exportCompImgsZip(tester.compDf, outPath, resizeOpts=dict(shape=(300, 300)))
+    io.exportCompImgsZip(tester.compDf, outPath, resizeOptions=dict(shape=(300, 300)))
     for file in (outPath / "data").iterdir():
         with Image.open(file) as dataImg:
             with Image.open(outPath / "labels" / file.name) as lblImg:
@@ -237,7 +237,7 @@ def test_compimgs_export(tmp_path, _simpleTbl):
 
 @pytest.mark.withcomps
 def test_convert(app, tmp_path):
-    sampleComps = app.exportableDf
+    sampleComps = app.componentDf
     io = ComponentIO()
     td = app.sharedAttrs.tableData
     io.tableData.loadConfig(td.configPath, td.config)
@@ -260,20 +260,20 @@ def test_lblpng_export(_simpleTbl):
     with pytest.raises(ValueError):
         io.exportLblPng(sampleComps, backgroundColor=-1)
 
-    export, mapping = io.exportLblPng(sampleComps, returnLabelMapping=True)
+    export, mapping = io.exportLblPng(sampleComps, returnLabelMap=True)
     assert np.all(np.isin(mapping.index, export))
-    assert np.max(mapping.index) > np.max(sampleComps[REQD_TBL_FIELDS.INST_ID])
+    assert np.max(mapping.index) > np.max(sampleComps[REQD_TBL_FIELDS.ID])
 
     field = _simpleTbl.fieldFromName("List")
     export, mapping = io.exportLblPng(
-        sampleComps, returnLabelMapping=True, labelField=field
+        sampleComps, returnLabelMap=True, labelField=field
     )
     assert (mapping.to_numpy() == field.opts["limits"]).all()
 
     sampleComps[field] = "a"
     # Make sure full mapping is made even when not all values exist
     export, mapping = io.exportLblPng(
-        sampleComps, returnLabelMapping=True, labelField=field
+        sampleComps, returnLabelMap=True, labelField=field
     )
     assert (mapping.to_numpy() == field.opts["limits"]).all()
 

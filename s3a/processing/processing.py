@@ -13,9 +13,9 @@ __all__ = [
     "NestedProcess",
     "ImageProcess",
     "AtomicProcess",
-    "ThreadedFuncWrapper",
+    "ThreadedFunctionWrapper",
     "AbortableThreadContainer",
-    "RunnableFuncWrapper",
+    "RunnableFunctionWrapper",
     "RunnableThreadContainer",
 ]
 
@@ -106,20 +106,20 @@ class ImageProcess(NestedProcess):
 _winRefs = {}
 
 
-class RunnableFuncWrapperSignals(QtCore.QObject):
+class RunnableFunctionWrapperSignals(QtCore.QObject):
     resultReady = QtCore.Signal(object)
-    """ThreadedFuncWrapper instance, emmitted on successful function run"""
+    """ThreadedFunctionWrapper instance, emmitted on successful function run"""
     failed = QtCore.Signal(object, object)
     """
-    ThreadedFuncWrapper instance, exception instance, emmitted on any exception during 
+    ThreadedFunctionWrapper instance, exception instance, emmitted on any exception during 
     function run 
     """
 
 
-class RunnableFuncWrapper(QtCore.QRunnable):
+class RunnableFunctionWrapper(QtCore.QRunnable):
     def __init__(self, func, **kwargs):
         super().__init__()
-        self.signals = RunnableFuncWrapperSignals()
+        self.signals = RunnableFunctionWrapperSignals()
         if not isinstance(func, AtomicProcess):
             kwargs.update(interactive=False)
             func = AtomicProcess(func, **kwargs)
@@ -151,12 +151,12 @@ class RunnableFuncWrapper(QtCore.QRunnable):
         return self.signals.failed
 
 
-class ThreadedFuncWrapper(QtCore.QThread):
+class ThreadedFunctionWrapper(QtCore.QThread):
     sigResultReady = QtCore.Signal(object)
-    """ThreadedFuncWrapper instance, emmitted on successful function run"""
+    """ThreadedFunctionWrapper instance, emmitted on successful function run"""
     sigFailed = QtCore.Signal(object, object)
     """
-    ThreadedFuncWrapper instance, exception instance, emmitted on any exception 
+    ThreadedFunctionWrapper instance, exception instance, emmitted on any exception 
     during function run
     """
 
@@ -195,16 +195,16 @@ class RunnableThreadContainer(QtCore.QObject):
         # Reverse to avoid race condition where first runner is supposed to happen
         # before second, first is deleted, and second runs regardless
         update = False
-        for runner in reversed(self.unfinishedRunners):  # type: RunnableFuncWrapper
+        for runner in reversed(self.unfinishedRunners):  # type: RunnableFunctionWrapper
             if runner in self.unfinishedRunners and self.pool.tryTake(runner):
                 self.unfinishedRunners.remove(runner)
                 update = True
         if update:
             self.sigTasksUpdated.emit()
 
-    def addRunner(self, runner: t.Callable | RunnableFuncWrapper, **kwargs):
-        if not isinstance(runner, RunnableFuncWrapper):
-            runner = RunnableFuncWrapper(runner, **kwargs)
+    def addRunner(self, runner: t.Callable | RunnableFunctionWrapper, **kwargs):
+        if not isinstance(runner, RunnableFunctionWrapper):
+            runner = RunnableFunctionWrapper(runner, **kwargs)
         self.unfinishedRunners.append(runner)
 
         def onFinish(*_):
@@ -222,13 +222,15 @@ class AbortableThreadContainer(QtCore.QObject):
     sigThreadsUpdated = QtCore.Signal()
 
     def __init__(self, maxConcurrentThreads=1):
-        self.threads: list[ThreadedFuncWrapper] = []
+        self.threads: list[ThreadedFunctionWrapper] = []
         self.maxConcurrentThreads = maxConcurrentThreads
         super().__init__()
 
-    def addThread(self, thread: ThreadedFuncWrapper | t.Callable = None, **addedKwargs):
-        if not isinstance(thread, ThreadedFuncWrapper):
-            thread = ThreadedFuncWrapper(thread, **addedKwargs)
+    def addThread(
+        self, thread: ThreadedFunctionWrapper | t.Callable = None, **addedKwargs
+    ):
+        if not isinstance(thread, ThreadedFunctionWrapper):
+            thread = ThreadedFunctionWrapper(thread, **addedKwargs)
         self.threads.append(thread)
         self.updateThreads()
         return thread
@@ -258,7 +260,7 @@ class AbortableThreadContainer(QtCore.QObject):
 
     def endThreads(
         self,
-        threads: ThreadedFuncWrapper | t.Iterable[ThreadedFuncWrapper],
+        threads: ThreadedFunctionWrapper | t.Iterable[ThreadedFunctionWrapper],
         endRunning=False,
     ) -> bool | list[bool]:
         """
@@ -271,7 +273,7 @@ class AbortableThreadContainer(QtCore.QObject):
             indicates whether the thread was terminated
         """
         returnScalar = False
-        if isinstance(threads, ThreadedFuncWrapper):
+        if isinstance(threads, ThreadedFunctionWrapper):
             threads = [threads]
             returnScalar = True
         returns = []
@@ -280,7 +282,7 @@ class AbortableThreadContainer(QtCore.QObject):
                 returns.append(False)
             else:
                 self._removeThread(
-                    thread, endFunc="terminate" if thread.isRunning() else "quit"
+                    thread, endFunction="terminate" if thread.isRunning() else "quit"
                 )
                 returns.append(True)
         if any(returns):
@@ -289,12 +291,12 @@ class AbortableThreadContainer(QtCore.QObject):
             return returns[0]
         return returns
 
-    def _removeThread(self, thread: ThreadedFuncWrapper, endFunc="quit"):
+    def _removeThread(self, thread: ThreadedFunctionWrapper, endFunction="quit"):
         # Already-connected threads need to be disconnected to avoid infinite waiting
         # for termination
         if "terminationSlot" in thread.__dict__:
             thread.finished.disconnect(thread.__dict__["terminationSlot"])
-        if endFunc == "quit":
+        if endFunction == "quit":
             thread.quit()
         else:
             thread.terminate()

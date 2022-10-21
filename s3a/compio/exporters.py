@@ -25,13 +25,13 @@ from .base import AnnotationExporter, NO_ERRORS
 from .helpers import serialize
 from ..constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
 from ..generalutils import (
-    subImageFromVerts,
-    getCroppedImg,
+    subImageFromVertices,
+    getCroppedImage,
     DirectoryDict,
     cvImreadRgb,
     toDictGen,
     cvImsaveRgb,
-    imgPathtoHtml,
+    imagePathToHtml,
     toHtmlWithStyle,
 )
 from ..structures import ComplexXYVertices, PrjParamGroup
@@ -51,7 +51,7 @@ class LblPngExporter(AnnotationExporter):
     mapping: pd.Series = None
     inverseMapping: pd.Series = None
 
-    def createExportObj(
+    def createExportObject(
         self, imageShape=None, backgroundColor=None, colormap=None, **_kwargs
     ):
         shape = imageShape[:2]
@@ -72,7 +72,7 @@ class LblPngExporter(AnnotationExporter):
         backgroundColor=0,
         offset: np.ndarray = None,
         colormap: str = None,
-        returnLabelMapping=False,
+        returnLabelMap=False,
         writeMeta=True,
         **kwargs,
     ):
@@ -104,7 +104,7 @@ class LblPngExporter(AnnotationExporter):
           prevents the export from being re-imported later by a LblPngImporter.
           type: str
           value: ''
-        returnLabelMapping
+        returnLabelMap
             Whether to return a pd.Series matching original index values to their
             numeric counterparts. Note: this is important in cases where an offset must
             be applied to the underlying data. If the background color is 0 and a valid
@@ -119,70 +119,72 @@ class LblPngExporter(AnnotationExporter):
             Additional keyword arguments to pass to
             :meth:`AnnotationExporter.populateMetadata`
         """
-        labelField = PrjParamGroup.fieldFromParam(list(self.compDf.columns), labelField)
+        labelField = PrjParamGroup.fieldFromParam(
+            list(self.componentDf.columns), labelField
+        )
         if backgroundColor < 0 and not colormap:
             raise ValueError(f"Background color must be >= 0, was {backgroundColor}")
 
         if imageShape is None:
             # Without any components the image is non-existant
-            if len(self.compDf) == 0:
+            if len(self.componentDf) == 0:
                 raise ValueError(
                     "imageShape cannot be *None* if no components are present"
                 )
-            vertMax = self.compDf[RTF.VERTICES].s3averts.max()
+            vertMax = self.componentDf[RTF.VERTICES].s3averts.max()
             imageShape = tuple(vertMax[::-1] + 1)
 
         return self._forwardMetadata(locals())
 
-    def formatReturnObj(self, exportObj, returnLabelMapping=None, **kwargs):
-        if returnLabelMapping:
-            return exportObj, self.mapping
-        return exportObj
+    def formatReturnObject(self, exportObject, returnLabelMap=None, **kwargs):
+        if returnLabelMap:
+            return exportObject, self.mapping
+        return exportObject
 
     def writeFile(
         self,
         file: FilePath,
-        exportObj,
+        exportObject,
         writeMeta=None,
         offset=None,
         **kwargs,
     ):
         mapping = self.mapping
         if writeMeta:
-            outImg = Image.fromarray(exportObj)
+            outImg = Image.fromarray(exportObject)
             info = PngInfo()
             if mapping is not None:
-                info.add_text("labelMapping", json.dumps(mapping.to_dict()))
+                info.add_text("labelMap", json.dumps(mapping.to_dict()))
                 info.add_text("labelField", str(mapping.name))
             if offset is not None:
                 info.add_text("offset", str(offset))
             outImg.save(file, pnginfo=info)
         else:
-            cvImsaveRgb(file, exportObj)
+            cvImsaveRgb(file, exportObject)
 
-    def updateExportObj(self, inst: dict, exportObj, **kwargs):
-        verts: ComplexXYVertices = inst[RTF.VERTICES]
+    def updateExportObject(self, instance: dict, exportObject, **kwargs):
+        verts: ComplexXYVertices = instance[RTF.VERTICES]
         verts.toMask(
-            exportObj,
-            inst[PRJ_ENUMS.FIELD_LABEL],
+            exportObject,
+            instance[PRJ_ENUMS.FIELD_LABEL],
             checkForDisconnectedVerts=False,
         )
-        return exportObj
+        return exportObject
 
     def individualExport(
         self,
-        compDf: pd.DataFrame,
-        exportObj,
+        componentDf: pd.DataFrame,
+        exportObject,
         labelField=None,
         **kwargs,
     ):
         labels, mapping, backgroundColor = self.resolveMappings(
-            compDf[labelField], labelField, **kwargs
+            componentDf[labelField], labelField, **kwargs
         )
-        exportObj[:] = backgroundColor
-        compDf = compDf.copy()
-        compDf[PRJ_ENUMS.FIELD_LABEL] = labels
-        return super().individualExport(compDf, exportObj, **kwargs)
+        exportObject[:] = backgroundColor
+        componentDf = componentDf.copy()
+        componentDf[PRJ_ENUMS.FIELD_LABEL] = labels
+        return super().individualExport(componentDf, exportObject, **kwargs)
 
     def resolveMappings(
         self,
@@ -195,7 +197,7 @@ class LblPngExporter(AnnotationExporter):
     ):
         labels_numeric, mapping = labelField.toNumeric(labels, returnMapping=True)
         if colormap:
-            mapping, backgroundColor = self.labelsToLutSer(
+            mapping, backgroundColor = self.labelsToLutSeries(
                 mapping.to_numpy(), colormap, backgroundColor
             )
         else:
@@ -222,7 +224,7 @@ class LblPngExporter(AnnotationExporter):
         return labels_numeric, mapping, backgroundColor
 
     @staticmethod
-    def labelsToLutSer(uniqueLabels, colormap, backgroundIndex=0):
+    def labelsToLutSeries(uniqueLabels, colormap, backgroundIndex=0):
         """
         Creates a LUT from mapping values and associates each numeric label with a
         LUT entry. Useful for e.g. painting an RGB output rather than making a
@@ -269,10 +271,10 @@ class LblPngExporter(AnnotationExporter):
 
 
 class CompImgsDfExporter(AnnotationExporter):
-    cropperFunc: t.Callable
+    cropperFunction: t.Callable
     mappings: t.Union[pd.Series, t.Dict[str, pd.Series]]
-    srcDir: DirectoryDict
-    labelMaskDir: dict
+    source: DirectoryDict
+    labelMaskSource: dict
 
     allOutputColumns = (
         "instanceId",
@@ -290,14 +292,14 @@ class CompImgsDfExporter(AnnotationExporter):
     @fns.dynamicDocstring(cols=list(allOutputColumns))
     def populateMetadata(
         self,
-        srcDir: FilePath | dict | DirectoryDict = None,
+        source: FilePath | dict | DirectoryDict = None,
         labelField="Instance ID",
-        labelMaskDir: FilePath | dict | DirectoryDict = None,
-        includeCols=allOutputColumns,
+        labelMaskSource: FilePath | dict | DirectoryDict = None,
+        includeFields=allOutputColumns,
         prioritizeById=False,
-        returnLabelMapping=False,
+        returnLabelMap=False,
         missingOk=False,
-        resizeOpts=None,
+        resizeOptions=None,
         **kwargs,
     ):
         """
@@ -306,11 +308,11 @@ class CompImgsDfExporter(AnnotationExporter):
 
         Parameters
         ----------
-        srcDir
+        source
             Where images corresponding to this dataframe are kept. Source image
             filenames are interpreted relative to this directory if they are not
             absolute. Alternatively, can be a dict of name to np.ndarray image mappings
-        includeCols
+        includeFields
             Which columns to include in the export list
             pType: checklist
             limits: {cols}
@@ -319,8 +321,8 @@ class CompImgsDfExporter(AnnotationExporter):
         labelField
             See ``ComponentIO.exportLblPng``. This label is provided in the output
             dataframe as well, if specified.
-        labelMaskDir
-            Similar to ``srcDir``, this is where label masks can be found. If not
+        labelMaskSource
+            Similar to ``source``, this is where label masks can be found. If not
             specified, a new label mask is generated for each image based on its
             components in the exported component table
         prioritizeById
@@ -337,7 +339,7 @@ class CompImgsDfExporter(AnnotationExporter):
         missingOk
             Whether a missing image is acceptable. When no source image is found for an
             annotation, this will simpy the 'image' output property
-        resizeOpts
+        resizeOptions
             Options for reshaping the output to a uniform size if desired. The
             following keys may be supplied:
               - ``shape`` : Required. It is the shape that all images will be resized
@@ -357,7 +359,7 @@ class CompImgsDfExporter(AnnotationExporter):
                 rotated 90 degrees if this reduces the amount of manipulation required
                 to get the output to be the proper shape
               - ``interpolation``: Any interpolation value accepted by ``cv.resize``
-        returnLabelMapping
+        returnLabelMap
             Whether to return the mapping of label numeric values to table field values
 
         Returns
@@ -372,44 +374,44 @@ class CompImgsDfExporter(AnnotationExporter):
                 `labelField`
               - offset: Image (x,y) coordinate of the min component vertex.
         """
-        if srcDir is None:
-            srcDir = Path()
+        if source is None:
+            source = Path()
         imageReaderFunc = lambda file: cvImreadRgb(file, cv.IMREAD_UNCHANGED)
-        srcDir = DirectoryDict(
-            srcDir,
+        source = DirectoryDict(
+            source,
             allowAbsolute=True,
             readFunc=imageReaderFunc,
             cacheOnRead=False,
         )
-        self.srcDir = srcDir
+        self.source = source
         # Label masks are programmatically generated so no need for a backing directory
-        self.labelMaskDir = DirectoryDict(
-            labelMaskDir,
+        self.labelMaskSource = DirectoryDict(
+            labelMaskSource,
             allowAbsolute=True,
             readFunc=imageReaderFunc,
             cacheOnRead=False,
         )
-        if resizeOpts is not None:
-            cropperFunc = subImageFromVerts
+        if resizeOptions is not None:
+            cropperFunc = subImageFromVertices
         else:
-            resizeOpts = {}
-            cropperFunc = getCroppedImg
-        self.cropperFunc = cropperFunc
-        labelField = PrjParamGroup.fieldFromParam(self.compDf, labelField)
+            resizeOptions = {}
+            cropperFunc = getCroppedImage
+        self.cropperFunction = cropperFunc
+        labelField = PrjParamGroup.fieldFromParam(self.componentDf, labelField)
         return self._forwardMetadata(locals())
 
-    def writeFile(self, file: FilePath, exportObj, **kwargs):
-        return exportObj.to_pickle(file)
+    def writeFile(self, file: FilePath, exportObject, **kwargs):
+        return exportObject.to_pickle(file)
 
-    def formatReturnObj(self, exportObj, returnLabelMapping=False, **_kwargs):
-        if returnLabelMapping:
-            return exportObj, self.mappings
-        return exportObj
+    def formatReturnObject(self, exportObject, returnLabelMap=False, **_kwargs):
+        if returnLabelMap:
+            return exportObject, self.mappings
+        return exportObject
 
-    def createExportObj(self, **kwargs):
+    def createExportObject(self, **kwargs):
         return []
 
-    def bulkExport(self, compDf, exportObj, **kwargs):
+    def bulkExport(self, componentDf, exportObject, **kwargs):
         # imageShape is automatically inferred by the exporter
         kwargs.pop("imageShape", None)
         # File is taken care of in outer scope
@@ -417,83 +419,85 @@ class CompImgsDfExporter(AnnotationExporter):
         mappings = {}
 
         exportIndexes = []
-        for fullImgName, miniDf in compDf.groupby(
-            RTF.IMG_FILE
+        for fullImgName, miniDf in componentDf.groupby(
+            RTF.IMAGE_FILE
         ):  # type: str, pd.DataFrame
             exportedComps, mapping = self._formatSingleImage(
                 miniDf, fullImgName, **kwargs
             )
             mappings[Path(fullImgName).name] = mapping
-            exportObj.extend(exportedComps)
+            exportObject.extend(exportedComps)
             exportIndexes.extend(miniDf.index)
 
-        exportObj = pd.DataFrame(exportObj, index=exportIndexes)
+        exportObject = pd.DataFrame(exportObject, index=exportIndexes)
         if len(mappings) == 1:
             # Common case where annotations for just one image were converted
             mappings = next(iter(mappings.values()))
-        exportObj.attrs["mapping"] = mappings
+        exportObject.attrs["mapping"] = mappings
         self.mappings = mappings
-        return exportObj, NO_ERRORS.copy()
+        return exportObject, NO_ERRORS.copy()
 
     def _formatSingleImage(
         self,
-        compDf: pd.DataFrame,
+        componentDf: pd.DataFrame,
         imageName,
         labelMask=None,
-        labelMapping=None,
+        labelMap=None,
         missingOk=False,
         **kwargs,
     ):
-        exportObj = []
-        img = self.srcDir.get(imageName)
+        exportObject = []
+        img = self.source.get(imageName)
         if img is None and not missingOk:
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), imageName)
         shape = img if img is None else img.shape[:2]
         # Make sure no options are duplicated
         kwargs.update(imageShape=shape)
-        labelMask, labelMapping = self._resolveLabelMaskAndMapping(
-            labelMask, labelMapping, compDf, imageName, **kwargs
+        labelMask, labelMap = self._resolveLabelMaskAndMapping(
+            labelMask, labelMap, componentDf, imageName, **kwargs
         )
         if img is None:
             img = np.zeros_like(labelMask)
-        labelValues = self.exportLblPng.inverseMapping[compDf[kwargs["labelField"]]]
-        for row, labelValue in zip(toDictGen(compDf), labelValues):
-            exportObj.append(
-                self._formatSingleComp(
+        labelValues = self.exportLblPng.inverseMapping[
+            componentDf[kwargs["labelField"]]
+        ]
+        for row, labelValue in zip(toDictGen(componentDf), labelValues):
+            exportObject.append(
+                self._formatSingleComponent(
                     row, image=img, labelMask=labelMask, labelValue=labelValue, **kwargs
                 )
             )
-        return exportObj, labelMapping
+        return exportObject, labelMap
 
     def _resolveLabelMaskAndMapping(
-        self, labelMask, labelMapping, compDf, imageName, **lblPngKwargs
+        self, labelMask, labelMap, componentDf, imageName, **lblPngKwargs
     ):
         """
         Allows for any combination of missing mask, label mask, or both. Requires many
         edge cases, since masks can come from user, directory object, or be generated
         programmatically.
         """
-        lblPngKwargs.update(returnLabelMapping=True)
+        lblPngKwargs.update(returnLabelMap=True)
         if labelMask is None:
-            labelMask = self.labelMaskDir.get(imageName)
+            labelMask = self.labelMaskSource.get(imageName)
         # Label mask can still be none if there is no source directory hit
         if labelMask is None:
-            return self.exportLblPng(compDf, **lblPngKwargs)
+            return self.exportLblPng(componentDf, **lblPngKwargs)
         # Else, Need to ensure lblPng mappings are up to date for numeric label retrieval
-        if labelMapping is not None and "colormap" not in lblPngKwargs:
-            self.exportLblPng.mapping = labelMapping
+        if labelMap is not None and "colormap" not in lblPngKwargs:
+            self.exportLblPng.mapping = labelMap
             self.exportLblPng.inverseMapping = pd.Series(
-                data=labelMapping.index, index=labelMapping.to_numpy()
+                data=labelMap.index, index=labelMap.to_numpy()
             )
         else:
             labelField = lblPngKwargs["labelField"]
-            _, labelMapping, _ = self.exportLblPng.resolveMappings(
-                compDf[labelField], labelField, **lblPngKwargs
+            _, labelMap, _ = self.exportLblPng.resolveMappings(
+                componentDf[labelField], labelField, **lblPngKwargs
             )
 
-        return labelMask, labelMapping
+        return labelMask, labelMap
 
-    def _formatSingleComp(
+    def _formatSingleComponent(
         self,
         inst: t.Any,
         *,
@@ -501,38 +505,38 @@ class CompImgsDfExporter(AnnotationExporter):
         labelMask=None,
         labelField=None,
         labelValue=None,
-        includeCols=None,
+        includeFields=None,
         prioritizeById=None,
-        resizeOpts=None,
+        resizeOptions=None,
         returnStats=None,
         **_kwargs,
     ):
         out = {}
         allVerts = inst[RTF.VERTICES].stack()
-        imageName = inst[RTF.IMG_FILE]
+        imageName = inst[RTF.IMAGE_FILE]
         if image is None:
-            image = self.srcDir.get(imageName)
+            image = self.source.get(imageName)
         if labelMask is None:
-            labelMask = self.labelMaskDir.get(imageName)
-        resizeOpts = resizeOpts.copy()
-        returnStats = returnStats or resizeOpts.pop("returnStats", None)
+            labelMask = self.labelMaskSource.get(imageName)
+        resizeOptions = resizeOptions.copy()
+        returnStats = returnStats or resizeOptions.pop("returnStats", None)
         if returnStats:
-            compImg, bounds, stats = self.cropperFunc(
+            compImg, bounds, stats = self.cropperFunction(
                 image,
                 allVerts,
-                returnCoords=True,
+                returnBoundingBox=True,
                 returnStats=returnStats,
-                **resizeOpts,
+                **resizeOptions,
             )
         else:
-            compImg, bounds = self.cropperFunc(
-                image, allVerts, returnCoords=True, **resizeOpts
+            compImg, bounds = self.cropperFunction(
+                image, allVerts, returnBoundingBox=True, **resizeOptions
             )
             stats = None
-        useKeys = includeCols
+        useKeys = includeFields
 
         if "instanceId" in useKeys:
-            out["instanceId"] = inst[RTF.INST_ID]
+            out["instanceId"] = inst[RTF.ID]
 
         if "offset" in useKeys:
             out["offset"] = bounds[0, :]
@@ -557,7 +561,9 @@ class CompImgsDfExporter(AnnotationExporter):
             else:
                 # The current component should always be drawn on top
                 useImg = inst[RTF.VERTICES].toMask(labelMask.copy(), labelValue)
-            mask = self.cropperFunc(useImg, allVerts, returnCoords=False, **resizeOpts)
+            mask = self.cropperFunction(
+                useImg, allVerts, returnBoundingBox=False, **resizeOptions
+            )
 
             out["labelMask"] = mask
 
@@ -588,7 +594,7 @@ class CompImgsZipExporter(CompImgsDfExporter):
     def writeFile(
         self,
         file: FilePath,
-        exportObj,
+        exportObject,
         archive=None,
         makeSummary=None,
         summaryImageWidth=None,
@@ -607,7 +613,7 @@ class CompImgsZipExporter(CompImgsDfExporter):
 
             summaryName = useDir / "summary.html"
 
-            for idx, row in exportObj.iterrows():
+            for idx, row in exportObject.iterrows():
                 saveName = f'{row["instanceId"]}.png'
                 if "image" in row.index:
                     cvImsaveRgb(dataDir / saveName, row["image"])
@@ -616,7 +622,7 @@ class CompImgsZipExporter(CompImgsDfExporter):
 
             if makeSummary:
                 self._createSummary(
-                    exportObj,
+                    exportObject,
                     useDir,
                     dataDir,
                     labelsDir,
@@ -630,12 +636,12 @@ class CompImgsZipExporter(CompImgsDfExporter):
                 self._createArchive(outDir, dataDir, labelsDir, summaryName)
 
     @staticmethod
-    def _createArchive(parentDir, dataDir, labelsDir, summaryName):
+    def _createArchive(parentPath, dataPath, labelsPath, summaryName):
         makeSummary = summaryName is not None
-        if parentDir.suffix != ".zip":
-            parentDir = parentDir.with_suffix(parentDir.suffix + ".zip")
-        with ZipFile(parentDir, "w") as ozip:
-            for dir_ in labelsDir, dataDir:
+        if parentPath.suffix != ".zip":
+            parentPath = parentPath.with_suffix(parentPath.suffix + ".zip")
+        with ZipFile(parentPath, "w") as ozip:
+            for dir_ in labelsPath, dataPath:
                 if not dir_.exists():
                     continue
                 for file in dir_.iterdir():
@@ -645,32 +651,32 @@ class CompImgsZipExporter(CompImgsDfExporter):
 
     def _createSummary(
         self,
-        exportObj,
-        parentDir,
-        dataDir,
-        labelsDir,
+        exportObject,
+        parentPath,
+        dataPath,
+        labelsPath,
         summaryName,
         imageWidth,
     ):
-        extractedImgs = exportObj.rename({"instanceId": RTF.INST_ID.name}, axis=1)
+        extractedImgs = exportObject.rename({"instanceId": RTF.ID.name}, axis=1)
         # Prevent merge error by renaming index
-        # INST_ID.name has to be used instead of raw INST_ID due to strange pandas issue
+        # ID.name has to be used instead of raw ID due to strange pandas issue
         # throwing a TypeError: keywords must be a string
-        outDf: pd.DataFrame = self.compDf.drop([RTF.VERTICES], axis=1).rename(
+        outDf: pd.DataFrame = self.componentDf.drop([RTF.VERTICES], axis=1).rename(
             str, axis=1
         )
         # Unset index name in case it clashes with Instance ID column
         outDf.index.name = None
-        outDf = outDf.merge(extractedImgs, on=RTF.INST_ID.name)
+        outDf = outDf.merge(extractedImgs, on=RTF.ID.name)
 
         def imgFormatter(el):
-            return imgPathtoHtml((relDir / str(el)).with_suffix(".png").as_posix())
+            return imagePathToHtml((relDir / str(el)).with_suffix(".png").as_posix())
 
-        for colName, imgDir in zip(["labelMask", "image"], [labelsDir, dataDir]):
+        for colName, imgDir in zip(["labelMask", "image"], [labelsPath, dataPath]):
             if colName not in extractedImgs:
                 continue
-            relDir = imgDir.relative_to(parentDir)
-            outDf[colName] = outDf[RTF.INST_ID.name].apply(imgFormatter)
+            relDir = imgDir.relative_to(parentPath)
+            outDf[colName] = outDf[RTF.ID.name].apply(imgFormatter)
         outDf.columns = list(map(str, outDf.columns))
         style = None
         if imageWidth is not None:
@@ -695,8 +701,8 @@ class SerialExporter(AnnotationExporter):
     `the documentation`https://pandas.pydata.org/pandas-docs/stable /user_guide/io.html`.
     """
 
-    def createExportObj(self, **kwargs):
-        return self.compDf.copy()
+    def createExportObject(self, **kwargs):
+        return self.componentDf.copy()
 
     def populateMetadata(self, readonly=False, **kwargs):
         """
@@ -708,7 +714,7 @@ class SerialExporter(AnnotationExporter):
         return self._forwardMetadata(locals())
 
     @classmethod
-    def writeFile(cls, file: FilePath, exportObj, readonly=None, **kwargs):
+    def writeFile(cls, file: FilePath, exportObject, readonly=None, **kwargs):
         defaultExportParams = {
             "na_rep": "NaN",
             "float_format": "{:0.10n}",
@@ -718,7 +724,7 @@ class SerialExporter(AnnotationExporter):
         exporter = outPath.suffix.lower().replace(".", "")
 
         defaultExportParams.update(kwargs)
-        exportFn = getattr(exportObj, f"to_{exporter}", None)
+        exportFn = getattr(exportObject, f"to_{exporter}", None)
         if exportFn is None:
             raise ValueError(
                 f'Exporter "{exporter}" not recognized. Acceptable options:\n'
@@ -738,26 +744,26 @@ class SerialExporter(AnnotationExporter):
         )
         return [mem[0].replace("to_", "") for mem in members]
 
-    def bulkExport(self, compDf, exportObj, readonly=None, **kwargs):
+    def bulkExport(self, componentDf, exportObject, readonly=None, **kwargs):
         allErrs = []
         # TODO: Currently the additional options are causing errors. Find out why and fix
         #  them, since this may be useful if it can be modified
         # Format special columns appropriately
         # Since CSV export significantly modifies the df, make a copy before doing all
         # these operations
-        for col in exportObj:
+        for col in exportObject:
             if not isinstance(col, PrjParam):
-                exportObj[col] = exportObj[col].apply(str)
+                exportObject[col] = exportObject[col].apply(str)
             elif not isinstance(col.value, str):
-                serial, errs = serialize(col, exportObj[col])
-                exportObj[col] = serial.to_numpy()
+                serial, errs = serialize(col, exportObject[col])
+                exportObject[col] = serial.to_numpy()
                 allErrs.append(errs)
         # Pandas raises error concatenating empty list
         if len(allErrs):
             allErrs = pd.concat(allErrs, axis=1)
         else:
             allErrs = NO_ERRORS.copy()
-        return exportObj, allErrs
+        return exportObject, allErrs
 
 
 class CsvExporter(SerialExporter):
@@ -765,65 +771,65 @@ class CsvExporter(SerialExporter):
 
 
 class PklExporter(AnnotationExporter):
-    def writeFile(self, file: FilePath, exportObj, **kwargs):
-        exportObj.to_pickle(file)
+    def writeFile(self, file: FilePath, exportObject, **kwargs):
+        exportObject.to_pickle(file)
 
-    def createExportObj(self, **kwargs):
-        return self.compDf.copy()
+    def createExportObject(self, **kwargs):
+        return self.componentDf.copy()
 
 
 class YoloV5Exporter(CsvExporter):
     ioType = "yolov5"
     mapping: pd.Series
 
-    def writeFile(self, file: FilePath, exportObj: pd.DataFrame, **kwargs):
+    def writeFile(self, file: FilePath, exportObject: pd.DataFrame, **kwargs):
         kwargs.setdefault("float_format", "%.6f")
 
-        classLen = exportObj["class"].astype(str).str.len().max()
+        classLen = exportObject["class"].astype(str).str.len().max()
         kwargs.setdefault("formatters", {"class": f"{{:<{classLen}}}".format})
 
-        exportObj.to_string(file, index=False, header=False)
+        exportObject.to_string(file, index=False, header=False)
 
     def populateMetadata(
         self,
         labelField=None,
         imageShape=None,
-        returnLabelMapping=False,
+        returnLabelMap=False,
         **kwargs,
     ):
         if imageShape is None:
             raise ValueError("Cannot export yolov5 without specifying `imageShape`")
         if labelField is None:
             raise ValueError("Cannot export yolov5 without specifying `labelField`")
-        labelField = PrjParamGroup.fieldFromParam(self.compDf, labelField)
+        labelField = PrjParamGroup.fieldFromParam(self.componentDf, labelField)
         return self._forwardMetadata(locals())
 
     def bulkExport(
         self,
-        compDf,
-        exportObj,
+        componentDf,
+        exportObject,
         readonly=None,
         imageShape=None,
         labelField=None,
         **kwargs,
     ):
         numericVals, mapping = labelField.toNumeric(
-            exportObj[labelField], returnMapping=True
+            exportObject[labelField], returnMapping=True
         )
         self.mapping = mapping
         if not np.issubdtype(numericVals.dtype, np.integer):
             raise ValueError("Yolo export only supports integer class values")
-        stacked = exportObj[RTF.VERTICES].apply(ComplexXYVertices.stack)
+        stacked = exportObject[RTF.VERTICES].apply(ComplexXYVertices.stack)
         mins = np.vstack(stacked.apply(lambda el: el.min(0)))
         ptps = np.vstack(stacked.apply(lambda el: el.ptp(0)))
         imageShapeXy = np.array(imageShape[::-1])[None, :]
-        exportObj = pd.DataFrame()
-        exportObj["class"] = numericVals
-        exportObj[["center_x", "center_y"]] = (mins + (ptps / 2)) / imageShapeXy
-        exportObj[["width", "height"]] = ptps / imageShapeXy
-        return super().bulkExport(compDf, exportObj, readonly, **kwargs)
+        exportObject = pd.DataFrame()
+        exportObject["class"] = numericVals
+        exportObject[["center_x", "center_y"]] = (mins + (ptps / 2)) / imageShapeXy
+        exportObject[["width", "height"]] = ptps / imageShapeXy
+        return super().bulkExport(componentDf, exportObject, readonly, **kwargs)
 
-    def formatReturnObj(self, exportObj, returnLabelMapping=None, **kwargs):
-        if returnLabelMapping:
-            return exportObj, self.mapping
-        return exportObj
+    def formatReturnObject(self, exportObject, returnLabelMap=None, **kwargs):
+        if returnLabelMap:
+            return exportObject, self.mapping
+        return exportObject

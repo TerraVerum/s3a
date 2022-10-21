@@ -8,7 +8,7 @@ from s3a.constants import REQD_TBL_FIELDS, CODE_DIR
 NUM_COMPS = 15
 TESTS_DIR = CODE_DIR.parent / "apptests"
 TEST_FILE_DIR = TESTS_DIR / "files"
-FIMG_SER_COLS = [REQD_TBL_FIELDS.INST_ID, REQD_TBL_FIELDS.VERTICES]
+FIMG_SER_COLS = [REQD_TBL_FIELDS.ID, REQD_TBL_FIELDS.VERTICES]
 RND = np.random.default_rng(seed=42)
 
 SAMPLE_IMG = data.hubble_deep_field()

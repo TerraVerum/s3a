@@ -43,7 +43,7 @@ def test_clear_bounds(app, vertsPlugin):
 @pytest.mark.withcomps
 def test_export_all_comps(tmp_path, app):
     compFile = tmp_path / "tmp.csv"
-    app.exportCurAnnotation(str(compFile))
+    app.exportCurrentAnnotation(str(compFile))
     assert compFile.exists(), "All-comp export didn't produce a component list"
 
 
@@ -51,12 +51,12 @@ def test_load_comps_merge(tmp_path, app, sampleComps):
     compFile = tmp_path / "tmp.csv"
 
     app.componentManager.addComponents(sampleComps)
-    app.exportCurAnnotation(str(compFile))
+    app.exportCurrentAnnotation(str(compFile))
     app.clearBoundaries()
 
     app.openAnnotations(str(compFile))
     equalCols = np.setdiff1d(
-        dfTester.compDf.columns, [REQD_TBL_FIELDS.INST_ID, REQD_TBL_FIELDS.IMG_FILE]
+        dfTester.compDf.columns, [REQD_TBL_FIELDS.ID, REQD_TBL_FIELDS.IMAGE_FILE]
     )
     dfCmp = (
         app.componentManager.compDf[equalCols].values
@@ -67,7 +67,7 @@ def test_load_comps_merge(tmp_path, app, sampleComps):
 
 def test_import_large_verts(sampleComps, tmp_path, app):
     sampleComps = sampleComps.copy()
-    sampleComps[REQD_TBL_FIELDS.INST_ID] = np.arange(len(sampleComps))
+    sampleComps[REQD_TBL_FIELDS.ID] = np.arange(len(sampleComps))
     sampleComps.at[0, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices(
         [XYVertices([[50e3, 50e3]])]
     )
@@ -82,11 +82,11 @@ def test_change_comp(app, mgr):
     mImg = app.mainImage
     mgr.addComponents(dfTester.compDf.copy())
     comp = mgr.compDf.loc[[RND.integers(NUM_COMPS)]]
-    app.changeFocusedComp(comp.index)
+    app.changeFocusedComponent(comp.index)
     assert app.mainImage.focusedComponent.equals(comp.squeeze())
     assert mImg.image is not None
     stack.undo()
-    assert app.mainImage.focusedComponent[REQD_TBL_FIELDS.INST_ID] == -1
+    assert app.mainImage.focusedComponent[REQD_TBL_FIELDS.ID] == -1
 
 
 def test_save_layout(app):
@@ -124,19 +124,19 @@ def test_autosave(tmp_path, app, filePlugin):
 @pytest.mark.withcomps
 def test_stage_plotting(monkeypatch, app, vertsPlugin):
     mainImg = app.mainImage
-    mainImg.drawActGrp.callFuncByParam(CNST.DRAW_ACT_CREATE)
+    mainImg.drawActionGroup.callFuncByParam(CNST.DRAW_ACT_CREATE)
     vertsPlugin.procEditor.changeActiveProcessor("Basic Shapes")
-    mainImgProps = app.clsToPluginMapping[MainImagePlugin].props
+    mainImgProps = app.classPluginMap[MainImagePlugin].props
     oldSz = mainImgProps[CNST.PROP_MIN_COMP_SZ]
     mainImgProps[CNST.PROP_MIN_COMP_SZ] = 0
     mainImg.shapeCollection.sigShapeFinished.emit(XYVertices([[0, 0], [5, 5]]))
     assert len(app.componentManager.compDf) > 0
-    app.changeFocusedComp(app.componentManager.compDf.index[0])
-    assert app.mainImage.focusedComponent.loc[REQD_TBL_FIELDS.INST_ID] >= 0
+    app.changeFocusedComponent(app.componentManager.compDf.index[0])
+    assert app.mainImage.focusedComponent.loc[REQD_TBL_FIELDS.ID] >= 0
     mainImgProps[CNST.PROP_MIN_COMP_SZ] = oldSz
 
     vertsPlugin.procEditor.changeActiveProcessor("Basic Shapes")
-    mainImg.drawActGrp.callFuncByParam(CNST.DRAW_ACT_ADD)
+    mainImg.drawActionGroup.callFuncByParam(CNST.DRAW_ACT_ADD)
 
     mainImg.shapeCollection.sigShapeFinished.emit(XYVertices([[0, 0], [10, 10]]))
     proc = vertsPlugin.currentProcessor.processor
@@ -155,7 +155,7 @@ def test_stage_plotting(monkeypatch, app, vertsPlugin):
 def test_unsaved_changes(sampleComps, tmp_path, app):
     app.componentManager.addComponents(sampleComps)
     assert app.hasUnsavedChanges
-    app.saveCurAnnotation()
+    app.saveCurrentAnnotation()
     assert not app.hasUnsavedChanges
 
 
@@ -171,7 +171,7 @@ def test_set_colorinfo(app):
 @pytest.mark.withcomps
 def test_quickload_profile(tmp_path, app):
     outfile = tmp_path / "tmp.csv"
-    app.exportCurAnnotation(outfile)
+    app.exportCurrentAnnotation(outfile)
     app.appStateEditor.loadParamValues(
         stateDict=dict(
             annotations=str(outfile),
@@ -197,6 +197,6 @@ def test_load_last_settings(tmp_path, sampleComps, app):
     app.appStateEditor.loadParamValues()
     app.appStateEditor.saveDir = oldSaveDir
     assert np.array_equal(app.mainImage.image, SAMPLE_IMG)
-    sampleComps[REQD_TBL_FIELDS.IMG_FILE] = SAMPLE_IMG_FNAME.name
-    sampleComps[REQD_TBL_FIELDS.INST_ID] = sampleComps.index
-    assert np.array_equal(sampleComps, app.exportableDf)
+    sampleComps[REQD_TBL_FIELDS.IMAGE_FILE] = SAMPLE_IMG_FNAME.name
+    sampleComps[REQD_TBL_FIELDS.ID] = sampleComps.index
+    assert np.array_equal(sampleComps, app.componentDf)

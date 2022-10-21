@@ -1,5 +1,5 @@
 from utilitys import ActionStack
-from .constants import IMG_PROC_DIR, MULT_PRED_DIR, CFG_DIR
+from .constants import IMAGE_PROCESSORS_DIR, MULTI_PREDICTIONS_DIR, CONFIG_DIR
 from .parameditors.algcollection import AlgorithmCollection
 from .parameditors.table import TableData
 from .plugins.settings import SettingsPlugin
@@ -17,16 +17,16 @@ class SharedAppSettings:
         self.imageProcessCollection = AlgorithmCollection(
             ImgProcWrapper,
             ImageProcess,
-            saveDir=IMG_PROC_DIR,
-            template=CFG_DIR / "imageproc.yml",
+            saveDir=IMAGE_PROCESSORS_DIR,
+            template=CONFIG_DIR / "imageproc.yml",
         )
         self.multiPredictionCollection = AlgorithmCollection(
-            saveDir=MULT_PRED_DIR, template=CFG_DIR / "multipred.yml"
+            saveDir=MULTI_PREDICTIONS_DIR, template=CONFIG_DIR / "multipred.yml"
         )
 
         self.settingsPlugin = SettingsPlugin()
         self.colorScheme = self.settingsPlugin.colorScheme
-        self.generalProps = self.settingsPlugin.generalProps
+        self.generalProperties = self.settingsPlugin.generalProps
 
         self.shortcutsPlugin = ShortcutsPlugin()
         self.shortcuts = self.shortcutsPlugin.shortcuts

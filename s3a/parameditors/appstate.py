@@ -8,7 +8,7 @@ from utilitys import ParamEditor, EditorPropsMixin
 from utilitys.fns import serAsFrame, attemptFileLoad
 
 from ..constants import APP_STATE_DIR
-from ..generalutils import safeCallFuncList, hierarchicalUpdate, safeCallFunc
+from ..generalutils import safeCallFunctionList, hierarchicalUpdate, safeCallFunction
 from ..logger import getAppLogger
 from ..shared import SharedAppSettings
 from ..structures import FilePath
@@ -23,14 +23,14 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
         parent=None,
         paramList: List[Dict] = None,
         saveDir: FilePath = APP_STATE_DIR,
-        fileType="param",
+        fileType="parameter",
         name=None,
         topTreeChild: Parameter = None,
     ):
         # TODO: Add params to choose which features are saved, etc.
         super().__init__(parent, paramList, saveDir, fileType, name, topTreeChild)
         self.stateFuncsDf = pd.DataFrame(
-            columns=["importFunc", "exportFunc", "required"]
+            columns=["importFunction", "exportFunction", "required"]
         )
         self.loading = False
 
@@ -42,10 +42,10 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
         if paramState is None:
             # TODO: May be good in the future to be able to choose which should be saved
             legitKeys = self.stateFuncsDf.index
-            exportFuncs = self.stateFuncsDf.exportFunc
+            exportFuncs = self.stateFuncsDf.exportFunction
             saveOnExitDir = self.saveDir / "saved_on_exit"
             saveOnExitDir.mkdir(exist_ok=True)
-            rets, errs = safeCallFuncList(
+            rets, errs = safeCallFunctionList(
                 legitKeys, exportFuncs, [[saveOnExitDir]] * len(legitKeys)
             )
             updateDict = {k: ret for k, ret in zip(legitKeys, rets) if ret is not None}
@@ -62,7 +62,7 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
             errs = []
 
         ret = super().saveParamValues(saveName, paramState, **kwargs)
-        self.raiseErrMsgIfNeeded(errs)
+        self.raiseErrorMessageIfNeeded(errs)
         return ret
 
     def loadParamValues(
@@ -99,9 +99,9 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
             key = nextKey()
             rets, errs = [], {}
             while key:
-                importFunc = self.stateFuncsDf.loc[key, "importFunc"]
+                importFunc = self.stateFuncsDf.loc[key, "importFunction"]
                 arg = stateDict.pop(key, None)
-                curRet, curErr = safeCallFunc(key, importFunc, arg)
+                curRet, curErr = safeCallFunction(key, importFunc, arg)
                 rets.append(curRet)
                 if curErr:
                     errs[key] = curErr
@@ -113,7 +113,7 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
                     UserWarning,
                 )
             if stateDict:
-                self.quickLoader.buildFromStartupParams(stateDict)
+                self.quickLoader.buildFromStartupParameters(stateDict)
             ret = super().loadParamValues(stateName, paramDict)
         finally:
             self.loading = False
@@ -138,19 +138,19 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
         return out
 
     @staticmethod
-    def raiseErrMsgIfNeeded(errMsgs: List[str]):
-        if len(errMsgs) > 0:
+    def raiseErrorMessageIfNeeded(errorMessages: List[str]):
+        if len(errorMessages) > 0:
             err = IOError(
                 "Errors were encountered for the following parameters"
-                " (shown as [parameter]: [exception])\n" + "\n\n".join(errMsgs)
+                " (shown as [parameter]: [exception])\n" + "\n\n".join(errorMessages)
             )
             getAppLogger(__name__).critical(err)
 
-    def addImportExportOpts(
+    def addImportExportOptions(
         self,
-        optName: str,
-        importFunc: Callable[[str], Any],
-        exportFunc: Callable[[Path], str],
+        optionName: str,
+        importFunction: Callable[[str], Any],
+        exportFunction: Callable[[Path], str],
         index: int = None,
         required=False,
     ):
@@ -160,15 +160,15 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
 
         Parameters
         ----------
-        optName
+        optionName
             What should this save option be called? E.g. when providing a load and save
             for annotation data, this is 'annotations'.
-        importFunc
+        importFunction
             Function called when importing saved data. Takes in a full file path
-        exportFunc
+        exportFunction
             Function to save the app data. Input is a full folder path. Expects the
             output to be a full file path of the saved file. This file is then passed
-            to 'importFunc' on loading a param state. If *None* is returned, the value
+            to 'importFunction' on loading a parameter state. If *None* is returned, the value
             is not stored.
         index
             Where to place this function. In most cases, this won't matter. However,
@@ -177,13 +177,13 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
             placement of the import/export pair. By default, the function is added to
             the end of the import/export list.
         required
-            If *True*, this parameter is required every time param values are loaded.
-            In the case it is missing from a load, the param editor first attempts to
+            If *True*, this parameter is required every time parameter values are loaded.
+            In the case it is missing from a load, the parameter editor first attempts to
             fetch this option from the most recent saved state.
         """
         newRow = pd.Series(
-            [importFunc, exportFunc, required],
-            name=optName,
+            [importFunction, exportFunction, required],
+            name=optionName,
             index=self.stateFuncsDf.columns,
         )
         if index is not None:
@@ -194,7 +194,7 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
             )
         else:
             self.stateFuncsDf: pd.DataFrame
-            self.stateFuncsDf.loc[optName] = newRow
+            self.stateFuncsDf.loc[optionName] = newRow
 
     @property
     def RECENT_STATE_FNAME(self):

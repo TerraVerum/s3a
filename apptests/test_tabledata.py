@@ -48,9 +48,9 @@ def test_no_opt_fields(app, newConfig):
     with newConfig("none", {}):
         assert len(app.componentManager.compDf) == 0
         assert app.componentManager.columnTitles == list(map(str, REQD_TBL_FIELDS))
-        newComps = app.sharedAttrs.tableData.makeCompDf(3).reset_index(drop=True)
+        newComps = app.sharedAttrs.tableData.makeComponentDf(3).reset_index(drop=True)
         dfTester.fillRandomVerts(compDf=newComps)
-        # Just make sure no errors are thrown on adding comps
+        # Just make sure no errors are thrown on adding components
         app.addAndFocusComponents(newComps)
         assert len(app.componentManager.compDf) == 3
 
@@ -130,8 +130,8 @@ def apply_assertFilter(tableData, status: dict, resultLen: int, setVals: Sequenc
     fieldName = next(iter(status))
     param = tableData.fieldFromName(fieldName)
     tableData.filter.loadParamValues(tableData.filter.stateName, status)
-    df = tableData.makeCompDf(len(setVals))
+    df = tableData.makeComponentDf(len(setVals))
     df[param] = setVals
-    filteredDf = tableData.filter.filterCompDf(df)
+    filteredDf = tableData.filter.filterComponentDf(df)
     assert len(filteredDf) == resultLen
     return filteredDf[param]

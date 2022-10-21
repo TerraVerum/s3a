@@ -61,7 +61,7 @@ class TableFieldPlugin(ProcessorPlugin):
                 f"Processor type {type(proc)} does not implement summary analytics."
             )
 
-    def updateFocusedComponent(self, newComp: pd.Series = None):
+    def updateFocusedComponent(self, component: pd.Series = None):
         """
         This function is called when a new component is created or the focused image is
         updated from the main view. See :meth:`MainImage.updateFocusedComponent` for

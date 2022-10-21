@@ -7,11 +7,11 @@ from utilitys import PrjParam
 
 from s3a import generalutils as gu, ComplexXYVertices, PRJ_ENUMS
 from s3a.generalutils import deprecateKwargs, DirectoryDict
-from s3a.plugins.misc import miscFuncsPluginFactory
+from s3a.plugins.misc import miscFunctionsPluginFactory
 from s3a.plugins.multipred import MultiPredictionsPlugin
 from s3a.compio.helpers import deserialize
 
-_rots = list(np.linspace(-180, 180, 5)) + [PRJ_ENUMS.ROT_OPTIMAL]
+_rots = list(np.linspace(-180, 180, 5)) + [PRJ_ENUMS.ROTATION_OPTIMAL]
 
 
 @pytest.mark.parametrize("rot", _rots)
@@ -21,17 +21,17 @@ _rots = list(np.linspace(-180, 180, 5)) + [PRJ_ENUMS.ROT_OPTIMAL]
 def test_sub_image_correctness(rot, transpose, shape, margin):
     vertsBox = np.array([[96, 77], [96, 179], [356, 179], [356, 77]])
     im = data.chelsea()
-    sub, stats = gu.subImageFromVerts(
+    sub, stats = gu.subImageFromVertices(
         im,
         vertsBox,
-        rotationDeg=rot,
+        rotationDegrees=rot,
         returnStats=True,
         allowTranspose=transpose,
         shape=shape,
         margin=margin,
     )
     inv = gu.inverseSubImage(sub, stats)
-    orig = gu.getCroppedImg(im, vertsBox, returnCoords=False)
+    orig = gu.getCroppedImage(im, vertsBox, returnBoundingBox=False)
     if orig.shape == inv.shape:
         inv = gu.inverseSubImage(sub, stats)
         diff = np.abs(orig.astype(float) - inv.astype(float))
@@ -49,7 +49,7 @@ def test_plg_factory(app):
         nonlocal count
         count += 1
 
-    mp = miscFuncsPluginFactory("test", [add])()
+    mp = miscFunctionsPluginFactory("test", [add])()
     mp.attachWinRef(app)
     assert mp.toolsEditor.procToParamsMapping
     assert mp.name == "test"
@@ -58,9 +58,9 @@ def test_plg_factory(app):
 
 
 def test_pred(app):
-    predPlg: MultiPredictionsPlugin = app.clsToPluginMapping[MultiPredictionsPlugin]
+    predPlg: MultiPredictionsPlugin = app.classPluginMap[MultiPredictionsPlugin]
     # Correctness of algo already tested elsewhere, run to assert no errors
-    predPlg.makePrediction(app.exportableDf)
+    predPlg.makePrediction(app.componentDf)
 
 
 def test_vertices_offset():

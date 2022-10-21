@@ -41,7 +41,7 @@ except (ImportError, AssertionError):
 
 from .__version__ import __version__
 from . import graphicsutils as gutils
-from .constants import REQD_TBL_FIELDS, PRJ_CONSTS, CFG_DIR, PRJ_ENUMS
+from .constants import REQD_TBL_FIELDS, PRJ_CONSTS, CONFIG_DIR, PRJ_ENUMS
 from .structures import ComplexXYVertices, XYVertices
 from .compio import ComponentIO, defaultIo
 from .views.s3agui import S3A

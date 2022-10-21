@@ -83,7 +83,7 @@ def serialize(param: PrjParam, values: t.Sequence[t.Any], returnErrs=True):
 def deserialize(param: PrjParam, values: t.Sequence[str], returnErrs=True):
     # Calling 'deserialize' on a stringified data is a no-op
     # TODO: heterogeneous arrays?
-    # Unlike serialize, dtype could be different depending on 'param', so leave empty
+    # Unlike serialize, dtype could be different depending on 'parameter', so leave empty
     # creation to the handler Series objects will use loc-based indexing, so use an
     # iterator to guarantee first access regardless of sequence type
     if len(values) and not isinstance(next(iter(values)), str):
@@ -94,7 +94,7 @@ def deserialize(param: PrjParam, values: t.Sequence[str], returnErrs=True):
     return _runFunc(param, values, "deserialize", default, returnErrs)
 
 
-def checkVertBounds(vertSer: pd.Series, imageShape: tuple):
+def checkVerticesBounds(verticesSeries: pd.Series, imageShape: tuple):
     """
     Checks whether any vertices in the imported dataframe extend past image dimensions.
     This is an indicator they came from the wrong import file. Warns if offending
@@ -103,18 +103,18 @@ def checkVertBounds(vertSer: pd.Series, imageShape: tuple):
 
     Parameters
     ----------
-    vertSer
+    verticesSeries: pd.Series of ComplexXYVertices
             Vertices from incoming component dataframe
     imageShape
             Shape of the main image these vertices are drawn on
     """
-    if imageShape is None or len(vertSer) == 0:
+    if imageShape is None or len(verticesSeries) == 0:
         # Nothing we can do if no shape is given
         return
     # Image shape from row-col -> x-y
     imageShape = np.array(imageShape[1::-1])[None, :]
     # Remove components whose vertices go over any image edges
-    vertMaxs = [verts.stack().max(0) for verts in vertSer if len(verts) > 0]
+    vertMaxs = [verts.stack().max(0) for verts in verticesSeries if len(verts) > 0]
     vertMaxs = np.vstack(vertMaxs)
     offendingIds = np.nonzero(np.any(vertMaxs > imageShape, axis=1))[0]
     if len(offendingIds) > 0:
@@ -126,23 +126,25 @@ def checkVertBounds(vertSer: pd.Series, imageShape: tuple):
         )
 
 
-def compareDataframes(compDf, loadedDf):
-    matchingCols = np.setdiff1d(compDf.columns, [RTF.INST_ID, RTF.IMG_FILE])
+def compareDataframes(componentDf, loadedDf):
+    matchingCols = np.setdiff1d(componentDf.columns, [RTF.ID, RTF.IMAGE_FILE])
     # For some reason, there are cases in which all values truly are equal but
     # np.array_equal, x.equals(y), x.eq(y), etc. all fail. Something to do with block
     # ordering? https://github.com/pandas-dev/pandas/issues/9330 indicates it should be
     # fixed, but the error still occasionally happens for me. array_equivalent is not
     # affected by this, in testing so far
-    dfCmp = array_equivalent(loadedDf[matchingCols].values, compDf[matchingCols].values)
+    dfCmp = array_equivalent(
+        loadedDf[matchingCols].values, componentDf[matchingCols].values
+    )
     problemCells = defaultdict(list)
 
     if not dfCmp:
         dfA = loadedDf[matchingCols]
-        dfB = compDf[matchingCols]
+        dfB = componentDf[matchingCols]
         for ii in range(len(dfA)):
             for jj in range(len(dfA.columns)):
                 if not np.array_equal(dfA.iat[ii, jj], dfB.iat[ii, jj]):
-                    problemCells[compDf.at[dfB.index[ii], RTF.INST_ID]].append(
+                    problemCells[componentDf.at[dfB.index[ii], RTF.ID]].append(
                         str(matchingCols[jj])
                     )
         # The only way to prevent "truth value of array is ambiguous" is cell-by-cell

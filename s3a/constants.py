@@ -13,26 +13,26 @@ __all__ = [
     "SCHEMES_DIR",
     "LAYOUTS_DIR",
     "TABLE_DIR",
-    "GEN_PROPS_DIR",
+    "GENERAL_PROPERTIES_DIR",
     "SHORTCUTS_DIR",
     "SHORTCUT_BASE",
-    "MAIN_IMG_DIR",
+    "MAIN_IMAGE_DIR",
     "APP_STATE_DIR",
-    "CFG_DIR",
-    "IMG_PROC_DIR",
-    "MULT_PRED_DIR",
+    "CONFIG_DIR",
+    "IMAGE_PROCESSORS_DIR",
+    "MULTI_PREDICTIONS_DIR",
     "REQD_TBL_FIELDS",
     "PRJ_CONSTS",
     "PRJ_ENUMS",
-    "PROJ_FILE_TYPE",
+    "PROJECT_FILE_TYPE",
     "IO_TEMPLATES_DIR",
-    "PROJ_BASE_TEMPLATE",
+    "PROJECT_BASE_TEMPLATE",
 ]
 
 CODE_DIR = Path(__file__).parent
 BASE_DIR = Path.home() / ".s3a"
 
-CFG_DIR = CODE_DIR / "config"
+CONFIG_DIR = CODE_DIR / "config"
 ICON_DIR = CODE_DIR / "icons"
 MENU_OPTS_DIR = BASE_DIR / "menuopts"
 IO_TEMPLATES_DIR = CODE_DIR / "compio/templates"
@@ -43,17 +43,17 @@ IO_TEMPLATES_DIR = CODE_DIR / "compio/templates"
 LAYOUTS_DIR = MENU_OPTS_DIR / "layouts"
 QUICK_LOAD_DIR = MENU_OPTS_DIR / "quickloader"
 SCHEMES_DIR = MENU_OPTS_DIR / "schemes"
-GEN_PROPS_DIR = MENU_OPTS_DIR / "genprops"
+GENERAL_PROPERTIES_DIR = MENU_OPTS_DIR / "genprops"
 SHORTCUTS_DIR = MENU_OPTS_DIR / "shortcuts"
-MAIN_IMG_DIR = MENU_OPTS_DIR / "mainimg"
-IMG_PROC_DIR = MENU_OPTS_DIR / "imageproc"
-MULT_PRED_DIR = MENU_OPTS_DIR / "multiproc"
+MAIN_IMAGE_DIR = MENU_OPTS_DIR / "mainimg"
+IMAGE_PROCESSORS_DIR = MENU_OPTS_DIR / "imageproc"
+MULTI_PREDICTIONS_DIR = MENU_OPTS_DIR / "multiproc"
 TABLE_DIR = MENU_OPTS_DIR / "table"
 APP_STATE_DIR = BASE_DIR
 
 
-PROJ_BASE_TEMPLATE = CFG_DIR / "projectcfg.yml"
-PROJ_FILE_TYPE = "s3aprj"
+PROJECT_BASE_TEMPLATE = CONFIG_DIR / "projectcfg.yml"
+PROJECT_FILE_TYPE = "s3aprj"
 
 # Ensure menuopts and layouts directories exist
 LAYOUTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -66,9 +66,9 @@ class PRJ_ENUMS:
     # --------------------------
     # COMPONENTS
     # --------------------------
-    COMP_ADD_AS_MERGE = "merge"
-    COMP_ADD_AS_NEW = "new"
-    COMP_RM_ALL = None
+    COMPONENT_ADD_AS_MERGE = "merge"
+    COMPONENT_ADD_AS_NEW = "new"
+    COMPONENT_REMOVE_ALL = None
 
     # --------------------------
     # REGION CREATION
@@ -79,7 +79,7 @@ class PRJ_ENUMS:
     # --------------------------
     # VERTICES
     # --------------------------
-    HIER_ALL_FILLED = "All Filled"
+    HIERARCHY_ALL_FILLED = "All Filled"
 
     # --------------------------
     # COMMON DATAFRAME FIELDS
@@ -104,20 +104,20 @@ class PRJ_ENUMS:
     LOG_TERM = "term"
     LOG_NONE = "none"
     LOG_FILE = "file"
-    LOG_LVL_ATTN = utilitys.constants.PrjEnums.LOG_LVL_ATTN
+    LOG_LEVEL_ATTENTION = utilitys.constants.PrjEnums.LOG_LVL_ATTN
 
     # --------------------------
     # PROCESSING
     # --------------------------
-    PROC_ADD_TOP = "top"
-    PROC_ADD_PRIM = "primitive"
-    PROC_NO_ADD = None
+    PROCESS_ADD_TOP = "top"
+    PROCESS_ADD_PRIMITIVE = "primitive"
+    PROCESS_NO_ADD = None
 
     HISTORY_UNSPECIFIED = 0
     HISTORY_BACKGROUND = 1
     HISTORY_FOREGROUND = 2
 
-    ROT_OPTIMAL = None
+    ROTATION_OPTIMAL = None
 
 
 class _ReqdTableFields:
@@ -139,8 +139,8 @@ class _ReqdTableFields:
             self._iterFields.append(ret)
             return ret
 
-        self.INST_ID = constructNext()
-        self.IMG_FILE = constructNext()
+        self.ID = constructNext()
+        self.IMAGE_FILE = constructNext()
         self.VERTICES = constructNext()
         # Special case: Vertices is non-primitive type
         self.VERTICES.value = ComplexXYVertices()
@@ -197,7 +197,7 @@ class PRJ_CONSTS:
     SCHEME_GRID_CLR = PrjParam("Grid Line Color", "#fff", "color")
     SCHEME_SHOW_GRID = PrjParam("Show Grid", False)
     SCHEME_LBL_COL = PrjParam(
-        "Labeling Column", REQD_TBL_FIELDS.INST_ID.name, pType="list", limits=[]
+        "Labeling Column", REQD_TBL_FIELDS.ID.name, pType="list", limits=[]
     )
 
     # --------------------------

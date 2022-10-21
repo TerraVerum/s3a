@@ -15,8 +15,8 @@ primitive:
     - Fill Holes
     - Opening
     - Closing
-    - Keep Largest Comp
-    - Remove Small Comps
+    - Keep Largest Component
+    - Remove Small Components
 
 top:
   Primitive Grab Cut:

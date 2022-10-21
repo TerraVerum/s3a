@@ -50,7 +50,7 @@ class TableData(QtCore.QObject):
     ):
         super().__init__()
         if template is None:
-            template = IOTemplateManager.getTableCfg("s3a")
+            template = IOTemplateManager.getTableConfig("s3a")
         self.template = template
 
         self.factories: Dict[PrjParam, Callable[[], Any]] = {}
@@ -70,17 +70,17 @@ class TableData(QtCore.QObject):
         configPath = configPath or None
         self.loadConfig(configPath, configDict, force=True)
 
-    def makeCompDf(self, numRows=1, sequentialIds=False) -> pd.DataFrame:
+    def makeComponentDf(self, rows=1, sequentialIds=False) -> pd.DataFrame:
         """
         Creates a dataframe for the requested number of components. This is the
         recommended method for component instantiation prior to table insertion.
         """
         df_list = []
         dropRow = False
-        if numRows <= 0:
+        if rows <= 0:
             # Create one row and drop it, which ensures data types are correct in the
             # empty dataframe
-            numRows = 1
+            rows = 1
             dropRow = True
         populators = []
         for f in self.allFields:
@@ -90,32 +90,32 @@ class TableData(QtCore.QObject):
                 val = f.value
             populators.append(val)
 
-        for _ in range(numRows):
+        for _ in range(rows):
             # Make sure to construct a separate component instance for
             # each row no objects have the same reference
             df_list.append(copy.copy(populators))
         outDf = pd.DataFrame(df_list, columns=self.allFields)
-        if RTF.INST_ID in self.allFields:
+        if RTF.ID in self.allFields:
             if sequentialIds:
-                outDf[RTF.INST_ID] = np.arange(len(outDf), dtype=int)
-            outDf = outDf.set_index(RTF.INST_ID, drop=False)
+                outDf[RTF.ID] = np.arange(len(outDf), dtype=int)
+            outDf = outDf.set_index(RTF.ID, drop=False)
         if dropRow:
             outDf = outDf.iloc[0:0]
         return outDf
 
-    def addFieldFactory(self, fieldLbl: PrjParam, factory: Callable[[], Any]):
+    def addFieldFactory(self, fieldLabel: PrjParam, factory: Callable[[], Any]):
         """
         For fields that are simple functions (i.e. don't require input from the user),
         a factory can be used to create default values when instantiating new table rows.
 
         Parameters
         ----------
-        fieldLbl
+        fieldLabel
             WHich field this factory is used for instead of just the default value
         factory
             Callable to use instead of field value. This is called with no parameters.
         """
-        self.factories[fieldLbl] = factory
+        self.factories[fieldLabel] = factory
 
     def addField(self, field: PrjParam):
         """
@@ -143,7 +143,7 @@ class TableData(QtCore.QObject):
         return True
 
     def makeComponentSeries(self):
-        return self.makeCompDf().squeeze()
+        return self.makeComponentDf().squeeze()
 
     def loadConfig(
         self, configPath: FilePath = None, configDict: dict = None, force=False
@@ -188,7 +188,7 @@ class TableData(QtCore.QObject):
             self.addField(param)
 
         if self.filter:
-            self.filter.updateParamList(self.allFields)
+            self.filter.updateParameterList(self.allFields)
         self.sigConfigUpdated.emit(self.config)
 
     def clear(self):
@@ -209,7 +209,7 @@ class TableData(QtCore.QObject):
         Several forms of imports / exports handle data that may not be compatible with
         the current table data. In these cases, it is beneficial to determine a mapping
         between names to allow greater compatibility between I/O formats. Mapping is
-        also extended in both directions by parameter name aliases (param.opts[
+        also extended in both directions by parameter name aliases (parameter.opts[
         'aliases']), which are a list of strings of common mappings for that parameter
         (e.g. [Class, Label] are often used interchangeably)
 

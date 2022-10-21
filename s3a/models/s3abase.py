@@ -23,7 +23,7 @@ from utilitys import (
 
 from .. import ComponentIO, defaultIo
 from ..constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
-from ..controls.tableviewproxy import ComponentController, CompSortFilter
+from ..controls.tableviewproxy import ComponentController, ComponentSorterFilter
 from ..logger import getAppLogger
 from ..models.tablemodel import ComponentManager
 from ..parameditors.appstate import AppStateEditor
@@ -59,7 +59,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
 
     def __new__(cls, *args, **kwargs):
         cls.scope.close()
-        cls.scope, newAttrs = cls.createScope(cls.scope, returnAttrs=True)
+        cls.scope, newAttrs = cls.createScope(cls.scope, returnAttributes=True)
         newAttrs: SharedAppSettings
         obj = super().__new__(cls, *args, **kwargs)
         obj.sharedAttrs = newAttrs
@@ -67,26 +67,26 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
 
     def __initEditorParams__(self, shared: SharedAppSettings):
         self.props = ParamContainer()
-        shared.generalProps.registerProps(
+        shared.generalProperties.registerProps(
             [PRJ_CONSTS.EXP_ONLY_VISIBLE, PRJ_CONSTS.INCLUDE_FNAME_PATH],
             container=self.props,
         )
 
     @staticmethod
-    def createScope(scope: ExitStack = None, returnAttrs=False):
+    def createScope(scope: ExitStack = None, returnAttributes=False):
         if scope is None:
             scope = ExitStack()
         newAttrs = SharedAppSettings()
         scope.enter_context(EditorPropsMixin.setEditorPropertyOpts(shared=newAttrs))
         scope.enter_context(DASM.setStack(newAttrs.actionStack))
-        if returnAttrs:
+        if returnAttributes:
             return scope, newAttrs
         return scope
 
     def __init__(self, parent=None, **startupSettings):
         super().__init__(parent)
 
-        self.clsToPluginMapping: Dict[Type[ParamEditorPlugin], ParamEditorPlugin] = {}
+        self.classPluginMap: Dict[Type[ParamEditorPlugin], ParamEditorPlugin] = {}
         """
         Maintains a record of all plugins added to this window. Only up to one instance
         of each plugin class is expected.
@@ -104,7 +104,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         self.mainImage.toolsEditor.registerFunc(
             self.acceptFocusedRegion, btnOpts=PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION
         )
-        _, param = attrs.generalProps.registerFunc(
+        _, param = attrs.generalProperties.registerFunc(
             attrs.actionStack.resizeStack,
             runOpts=RunOpts.ON_CHANGED,
             maxLength={
@@ -115,11 +115,10 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             nest=False,
             container=self.props,
         )
-        self.menuBar_ = self.menuBar()
 
         attrs.shortcuts.registerShortcut(
             PRJ_CONSTS.TOOL_CLEAR_ROI,
-            self.mainImage.clearCurRoi,
+            self.mainImage.clearCurrentRoi,
             overrideOwnerObj=self.mainImage,
         )
 
@@ -136,7 +135,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         self.componentTable.setSortingEnabled(True)
         self.componentTable.setAlternatingRowColors(True)
         # Allow filtering/sorting
-        self.sortFilterProxy = CompSortFilter(self.componentManager)
+        self.sortFilterProxy = ComponentSorterFilter(self.componentManager)
         self.componentTable.setModel(self.sortFilterProxy)
 
         self.hasUnsavedChanges = False
@@ -158,19 +157,19 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             if inspect.isclass(plg):
                 self.addPlugin(plg)
             else:
-                self._addPluginObj(plg)
+                self._addPluginObject(plg)
 
         # Create links for commonly used plugins
         # noinspection PyTypeChecker
-        self.filePlugin: FilePlugin = self.clsToPluginMapping[FilePlugin]
-        attrs.tableData.sigConfigUpdated.connect(lambda: self.resetTblFields())
+        self.filePlugin: FilePlugin = self.classPluginMap[FilePlugin]
+        attrs.tableData.sigConfigUpdated.connect(lambda: self.resetTableFields())
 
         # noinspection PyTypeChecker
-        self.verticesPlugin: tablefield.VerticesPlugin = self.clsToPluginMapping[
+        self.verticesPlugin: tablefield.VerticesPlugin = self.classPluginMap[
             tablefield.VerticesPlugin
         ]
         # noinspection PyTypeChecker
-        self.miscPlugin: RandomToolsPlugin = self.clsToPluginMapping[RandomToolsPlugin]
+        self.miscPlugin: RandomToolsPlugin = self.classPluginMap[RandomToolsPlugin]
         self.componentIo = self.filePlugin.projectData.componentIo
 
         # Connect signals
@@ -180,21 +179,21 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         def handleUpdate(*_args):
             self.hasUnsavedChanges = True
 
-        self.componentManager.sigCompsChanged.connect(handleUpdate)
+        self.componentManager.sigComponentsChanged.connect(handleUpdate)
 
         # -----
         # MAIN IMAGE
         # -----
-        def handleCompsChanged(changedDict: dict):
+        def handleComponentsChanged(changedDict: dict):
             ser = self.mainImage.focusedComponent
-            focusedId = ser[REQD_TBL_FIELDS.INST_ID]
+            focusedId = ser[REQD_TBL_FIELDS.ID]
             if focusedId in changedDict["deleted"]:
                 self.componentController.selectRowsById([])
-                self.changeFocusedComp()
+                self.changeFocusedComponent()
             elif focusedId in changedDict["changed"]:
-                self.changeFocusedComp(self.componentManager.compDf.loc[focusedId])
+                self.changeFocusedComponent(self.componentManager.compDf.loc[focusedId])
 
-        self.componentManager.sigCompsChanged.connect(handleCompsChanged)
+        self.componentManager.sigComponentsChanged.connect(handleComponentsChanged)
 
         self.filePlugin.projectData.sigAnnotationsAdded.connect(
             self._maybeLoadActiveAnnotation
@@ -203,8 +202,8 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         # -----
         # COMPONENT TABLE
         # -----
-        self.componentController.sigCompsSelected.connect(
-            lambda newComps: self.changeFocusedComp(newComps.index)
+        self.componentController.sigComponentsSelected.connect(
+            lambda newComps: self.changeFocusedComponent(newComps.index)
         )
 
         # -----
@@ -212,7 +211,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         # -----
         self.saveAllEditorDefaults()
 
-    def resetTblFields(self):
+    def resetTableFields(self):
         """
         When table fields change, the displayed columns must change and the view
         must be made aware. Ensure this occurs here
@@ -221,7 +220,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         # values could be changed. So, reset the cell editor delegates no matter what
         # Start by adding any potentially new plugins
         for plg in self.filePlugin.projectData.spawnedPlugins:
-            self._addPluginObj(plg)
+            self._addPluginObject(plg)
         self.componentTable.setColDelegates()
         self.componentTable.popup.reflectDelegateChange()
         # Make sure this is necessary, first
@@ -255,9 +254,9 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         """
         # If the component was deleted
         mgr = self.componentManager
-        focusedId = self.mainImage.focusedComponent[REQD_TBL_FIELDS.INST_ID]
+        focusedId = self.mainImage.focusedComponent[REQD_TBL_FIELDS.ID]
         exists = focusedId in mgr.compDf.index
-        if not exists and focusedId != REQD_TBL_FIELDS.INST_ID.value:
+        if not exists and focusedId != REQD_TBL_FIELDS.ID.value:
             # Could be a brand new component, allow in that case
             warn("Cannot accept region as this component was deleted.", UserWarning)
             return
@@ -269,7 +268,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             # Component should be erased. Since new components will not match existing
             # IDs the same function will work regardless of whether this was new or
             # existing
-            self.componentManager.removeComponents([ser[REQD_TBL_FIELDS.INST_ID]])
+            self.componentManager.removeComponents([ser[REQD_TBL_FIELDS.ID]])
             return
 
         if exists:
@@ -284,8 +283,8 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         # New, make a brand new table entry
         compAsDf = fns.serAsFrame(focusedComponent)
         newIds = self.componentManager.addComponents(compAsDf)["added"]
-        compAsDf[REQD_TBL_FIELDS.INST_ID] = newIds
-        compAsDf = compAsDf.set_index(REQD_TBL_FIELDS.INST_ID, drop=False)
+        compAsDf[REQD_TBL_FIELDS.ID] = newIds
+        compAsDf = compAsDf.set_index(REQD_TBL_FIELDS.ID, drop=False)
 
         def undo():
             self.componentManager.removeComponents(newIds)
@@ -296,15 +295,17 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
 
     def _acceptFocusedExisting(self, focusedComponent: pd.Series):
         oldComp = self.componentManager.compDf.loc[
-            [focusedComponent[REQD_TBL_FIELDS.INST_ID]]
+            [focusedComponent[REQD_TBL_FIELDS.ID]]
         ].copy()
         modifiedDf = fns.serAsFrame(focusedComponent)
         self.componentManager.addComponents(
-            modifiedDf, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE
+            modifiedDf, addType=PRJ_ENUMS.COMPONENT_ADD_AS_MERGE
         )
 
         def undo():
-            self.addAndFocusComponents(oldComp, addType=PRJ_ENUMS.COMP_ADD_AS_MERGE)
+            self.addAndFocusComponents(
+                oldComp, addType=PRJ_ENUMS.COMPONENT_ADD_AS_MERGE
+            )
             self.mainImage.updateFocusedComponent(focusedComponent)
 
         return undo
@@ -328,24 +329,24 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         kwargs
             Passed to class constructor
         """
-        if pluginCls in self.clsToPluginMapping:
+        if pluginCls in self.classPluginMap:
             getAppLogger(__name__).info(
                 f"Ignoring {pluginCls} since it was previously added", UserWarning
             )
 
         plugin: ParamEditorPlugin = pluginCls(*args, **kwargs)
-        return self._addPluginObj(plugin)
+        return self._addPluginObject(plugin)
 
-    def _addPluginObj(self, plugin: ParamEditorPlugin, overwriteExisting=False):
+    def _addPluginObject(self, plugin: ParamEditorPlugin, overwriteExisting=False):
         """
         Adds already intsantiated plugin. Discourage public use of this API since most
         plugin use should be class-based until window registration. This mainly
         provides for adding spawned plugins from prject data
         """
         pluginCls = type(plugin)
-        if not overwriteExisting and pluginCls in self.clsToPluginMapping:
+        if not overwriteExisting and pluginCls in self.classPluginMap:
             return None
-        self.clsToPluginMapping[pluginCls] = plugin
+        self.classPluginMap[pluginCls] = plugin
         if plugin.dock is not None and plugin.dock not in self.docks:
             self.docks.append(plugin.dock)
         # Many plugins register functions when attaching win
@@ -364,13 +365,13 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         * If file is None, the main and focused images are blacked out.
         * If only file is provided, it is assumed to be an image. The image data
         will be populated by reading in that file.
-        * If both file and imgData are provided, then imgData is used to populate the
+        * If both file and imageData are provided, then imageData is used to populate the
         image, and file is assumed to be the file associated with that data.
 
         Parameters
         ----------
         file
-            Filename either to load or that corresponds to imgData
+            Filename either to load or that corresponds to imageData
         imgData
             N-Channel numpy image
         clearExistingComps
@@ -384,7 +385,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         if file == self.sourceImagePath:
             return
 
-        self.saveCurAnnotation()
+        self.saveCurrentAnnotation()
 
         if imgData is not None:
             self.mainImage.setImage(imgData)
@@ -405,7 +406,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         yield
         self.setMainImage(oldFile, oldData, clearExistingComps)
 
-    def saveCurAnnotation(self):
+    def saveCurrentAnnotation(self):
         sourceImagePath = self.sourceImagePath
         if sourceImagePath is None:
             return
@@ -423,30 +424,32 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         # Suppress to avoid double-loading due to `sigAnnotationsAdded`
         with self.filePlugin.projectData.suppressSignals():
             self.filePlugin.addAnnotation(
-                data=self.exportableDf, image=srcImg_proj, overwriteOld=True
+                data=self.componentDf, image=srcImg_proj, overwriteOld=True
             )
         # Now all added components should be forced to belong to this image
         names = self.componentManager.compDf[
-            [REQD_TBL_FIELDS.IMG_FILE, REQD_TBL_FIELDS.INST_ID]
+            [REQD_TBL_FIELDS.IMAGE_FILE, REQD_TBL_FIELDS.ID]
         ].copy()
-        names.loc[:, REQD_TBL_FIELDS.IMG_FILE] = self.sourceImagePath.name
-        self.componentManager.addComponents(names, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)
+        names.loc[:, REQD_TBL_FIELDS.IMAGE_FILE] = self.sourceImagePath.name
+        self.componentManager.addComponents(
+            names, addType=PRJ_ENUMS.COMPONENT_ADD_AS_MERGE
+        )
         self.sourceImagePath = srcImg_proj
         self.hasUnsavedChanges = False
         getAppLogger(__name__).info("Saved current annotation")
 
-    def loadNewAnnotations(self, imgFname: FilePath = None):
-        if imgFname is None:
-            imgFname = self.sourceImagePath
-        if imgFname is None:
+    def loadNewAnnotations(self, imagePath: FilePath = None):
+        if imagePath is None:
+            imagePath = self.sourceImagePath
+        if imagePath is None:
             return
-        imgAnns = self.filePlugin.imageAnnotationMap.get(imgFname, None)
+        imgAnns = self.filePlugin.imageAnnotationMap.get(imagePath, None)
         if imgAnns is not None:
             self.componentManager.addComponents(
                 self.componentIo.importByFileType(
                     imgAnns, imageShape=self.mainImage.image.shape
                 ),
-                addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE,
+                addType=PRJ_ENUMS.COMPONENT_ADD_AS_MERGE,
             )
             # 'hasUnsavedChanges' will be true after this, even though the changes are
             # saved.
@@ -470,14 +473,14 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
                 break
 
     @fns.dynamicDocstring(filters=defaultIo.ioFileFilter(PRJ_ENUMS.IO_EXPORT))
-    def exportCurAnnotation(self, outFname: Union[str, Path], **kwargs):
+    def exportCurrentAnnotation(self, outputPath: Union[str, Path], **kwargs):
         """
         Exports current image annotations to a file. This may be more convenient than
         exporting an entire project if just the current annotations are needed
 
         Parameters
         ----------
-        outFname
+        outputPath
             Where to export. The file extension determines the save type
             title: Output File
             pType: filepicker
@@ -486,15 +489,18 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         **kwargs
             Passed to the exporter
         """
-        outFname = Path(outFname)
+        outputPath = Path(outputPath)
         self.componentIo.exportByFileType(
-            self.exportableDf, outFname, imageShape=self.mainImage.image.shape, **kwargs
+            self.componentDf,
+            outputPath,
+            imageShape=self.mainImage.image.shape,
+            **kwargs,
         )
-        msgPath = os.path.join(outFname.parent.name, outFname.name)
+        msgPath = os.path.join(outputPath.parent.name, outputPath.name)
         getAppLogger(__name__).attention(f"Exported current annotation to {msgPath}")
 
     @property
-    def exportableDf(self):
+    def componentDf(self):
         """
         Dataframe from manager with populated information for main image name and
         potentially filtered to only visible components (if requested by the user)
@@ -513,18 +519,18 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             srcImgFname = str(srcImgFname)
         # Assign correct export name for only new components
         overwriteIdxs = (
-            exportDf[REQD_TBL_FIELDS.IMG_FILE] == REQD_TBL_FIELDS.IMG_FILE.value
+            exportDf[REQD_TBL_FIELDS.IMAGE_FILE] == REQD_TBL_FIELDS.IMAGE_FILE.value
         )
         # TODO: Maybe the current file will match the current file indicator. What
         #  happens then?
-        exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.IMG_FILE] = srcImgFname
+        exportDf.loc[overwriteIdxs, REQD_TBL_FIELDS.IMAGE_FILE] = srcImgFname
         # Ensure ids are sequential
         seqIds = np.arange(len(exportDf))
-        exportDf.index = exportDf[REQD_TBL_FIELDS.INST_ID] = seqIds
+        exportDf.index = exportDf[REQD_TBL_FIELDS.ID] = seqIds
         return exportDf
 
-    def openAnnotations(self, inFname: str, loadType=PRJ_ENUMS.COMP_ADD_AS_NEW):
-        pathFname = Path(inFname)
+    def openAnnotations(self, fileName: str, loadType=PRJ_ENUMS.COMPONENT_ADD_AS_NEW):
+        pathFname = Path(fileName)
         if self.mainImage.image is None:
             raise IOError("Cannot load components when no main image is set.")
         fType = pathFname.suffix[1:]
@@ -534,44 +540,44 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
                 + self.componentIo.ioFileFilter()
             )
         newComps = self.componentIo.importByFileType(
-            inFname, self.mainImage.image.shape
+            fileName, self.mainImage.image.shape
         )
         self.componentManager.addComponents(newComps, loadType)
 
     @DASM.undoable("Create New Component")
     def addAndFocusComponents(
-        self, newComps: pd.DataFrame, addType=PRJ_ENUMS.COMP_ADD_AS_NEW
+        self, components: pd.DataFrame, addType=PRJ_ENUMS.COMPONENT_ADD_AS_NEW
     ):
         # Capture undo action here since current stack might be disabled
         dummyStack = ActionStack()
         undoableAddComps = dummyStack.undoable()(ComponentManager.addComponents)
-        changeDict = undoableAddComps(self.componentManager, newComps, addType)
+        changeDict = undoableAddComps(self.componentManager, components, addType)
         # Focus is performed by comp table
         # Arbitrarily choose the last possible component
         changeList = np.concatenate([changeDict["added"], changeDict["changed"]])
-        oldFocused = self.mainImage.focusedComponent[REQD_TBL_FIELDS.INST_ID]
+        oldFocused = self.mainImage.focusedComponent[REQD_TBL_FIELDS.ID]
         # Nothing to undo if there were no changes
         if len(changeList) > 0:
             self.componentController.selectRowsById([changeList[-1]])
         yield changeDict
-        # Explicitly call the captured "undo" from adding comps if needed
+        # Explicitly call the captured "undo" from adding components if needed
         if len(dummyStack.actions):
             dummyStack.undo()
         self.componentController.selectRowsById([oldFocused])
 
-    def changeFocusedComp(self, compIds: Union[int, Sequence[int]] = None):
-        # TODO: More robust scenario if multiple comps are in the dataframe
+    def changeFocusedComponent(self, ids: Union[int, Sequence[int]] = None):
+        # TODO: More robust scenario if multiple components are in the dataframe
         #   For now, treat ambiguity by not focusing anything
-        if np.isscalar(compIds):
-            compIds = [compIds]
+        if np.isscalar(ids):
+            ids = [ids]
         if (
-            compIds is None
-            or len(compIds) != 1
-            or compIds[0] not in self.componentManager.compDf.index
+            ids is None
+            or len(ids) != 1
+            or ids[0] not in self.componentManager.compDf.index
         ):
             self.mainImage.updateFocusedComponent()
         else:
-            newComp: pd.Series = self.componentManager.compDf.loc[compIds[0]]
+            newComp: pd.Series = self.componentManager.compDf.loc[ids[0]]
             self.mainImage.updateFocusedComponent(newComp)
 
     # Stolen and adapted for python from https://stackoverflow.com/a/42910109/9463643
@@ -590,7 +596,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             # First dock in area
             self.addDockWidget(area, dockwidget)
 
-    def makeHelpOpts(self, parser: argparse.ArgumentParser = None):
+    def updateCliOptions(self, parser: argparse.ArgumentParser = None):
         """
         Adds quick loader and app state options to a parser, or creates a new parser if
         one is not passed

@@ -45,10 +45,10 @@ class BoundScatterPlot(pg.ScatterPlotItem):
             return np.array([spot.data() for spot in selectedSpots])
 
         pointLocs = np.column_stack(self.getData())
-        # tfIsInSelection = (pointLocs[0] >= bbox[0]) \
-        #   & (pointLocs[0] <= bbox[2]) \
-        #   & (pointLocs[1] >= bbox[1]) \
-        #   & (pointLocs[1] <= bbox[3])
+        # tfIsInSelection = (pointLocs[0] >= boundingBox[0]) \
+        #   & (pointLocs[0] <= boundingBox[2]) \
+        #   & (pointLocs[1] >= boundingBox[1]) \
+        #   & (pointLocs[1] <= boundingBox[3])
         tfIsInSelection = points_in_poly(pointLocs, selection)
         return np.array([point.data() for point in self.points()[tfIsInSelection]])
 

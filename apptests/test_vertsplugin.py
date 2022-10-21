@@ -5,7 +5,7 @@ from skimage import draw
 
 from apptests.testingconsts import SAMPLE_SMALL_IMG
 from s3a import XYVertices, REQD_TBL_FIELDS, PRJ_CONSTS
-from s3a.generalutils import imgCornerVertices
+from s3a.generalutils import imageCornerVertices
 from s3a.plugins.file import NewProjectWizard
 from s3a.processing.algorithms import imageproc
 
@@ -15,12 +15,12 @@ from s3a.processing.algorithms import imageproc
 def test_registered_verts_funcs(vertsPlugin, app):
     # Disable region simplification for accurate testing
     vertsPlugin.props[PRJ_CONSTS.PROP_REG_APPROX_EPS] = -1
-    togray = lambda: vertsPlugin.region.toGrayImg(SAMPLE_SMALL_IMG.shape)
+    togray = lambda: vertsPlugin.region.toGrayImage(SAMPLE_SMALL_IMG.shape)
     imsize = np.prod(SAMPLE_SMALL_IMG.shape[:2])
     editor = vertsPlugin.procEditor
     editor.changeActiveProcessor("Basic Shapes")
-    fgVerts = XYVertices([[0, 0], [10, 0], [10, 10]])
-    vertsPlugin.run(fgVerts=fgVerts, updateGui=True)
+    foregroundVertices = XYVertices([[0, 0], [10, 0], [10, 10]])
+    vertsPlugin.run(foregroundVertices=foregroundVertices, updateGui=True)
     assert imageproc.procCache["mask"].sum()
 
     vertsPlugin.clearProcessorHistory()
@@ -36,7 +36,7 @@ def test_registered_verts_funcs(vertsPlugin, app):
     vertsPlugin.actionStack.undo()
     assert (img > 0).sum() == imsize
 
-    app.changeFocusedComp(app.componentManager.compDf.index[0])
+    app.changeFocusedComponent(app.componentManager.compDf.index[0])
     img = togray()
     vertsPlugin.clearFocusedRegion()
     vertsPlugin.resetFocusedRegion()
@@ -67,14 +67,14 @@ def test_region_offset(vertsPlugin, sampleComps):
 @pytest.mark.withcomps
 def test_accept_region(app, vertsPlugin):
     comp = app.componentManager.compDf.iloc[[0]]
-    app.changeFocusedComp(comp.index)
+    app.changeFocusedComponent(comp.index)
     vertsPlugin.clearFocusedRegion()
 
     app.acceptFocusedRegion()
     assert comp.index[0] not in app.componentManager.compDf.index
 
     comp = app.componentManager.compDf.iloc[[0]]
-    app.changeFocusedComp(comp.index)
+    app.changeFocusedComponent(comp.index)
     vertsPlugin.fillRegionMask()
     verts = vertsPlugin.region.regionData[REQD_TBL_FIELDS.VERTICES]
     app.acceptFocusedRegion()
@@ -87,23 +87,25 @@ def test_accept_region(app, vertsPlugin):
 @pytest.mark.withcomps
 def test_region_history(vertsPlugin, app, monkeypatch):
     comp = app.componentManager.compDf.iloc[[0]]
-    app.changeFocusedComp(comp.index)
+    app.changeFocusedComponent(comp.index)
 
-    vertsPlugin.run(bgVerts=imgCornerVertices(SAMPLE_SMALL_IMG), updateGui=True)
+    vertsPlugin.run(
+        backgroundVertices=imageCornerVertices(SAMPLE_SMALL_IMG), updateGui=True
+    )
     vertsPlugin.run(updateGui=True)
 
     initial, history = vertsPlugin.getRegionHistory()
     assert np.array_equal(initial, SAMPLE_SMALL_IMG)
     assert len(history)
     assert np.array_equal(
-        history[-1], vertsPlugin.region.toGrayImg(SAMPLE_SMALL_IMG.shape) > 0
+        history[-1], vertsPlugin.region.toGrayImage(SAMPLE_SMALL_IMG.shape) > 0
     )
 
     with monkeypatch.context() as m:
         m.setattr(vertsPlugin.playbackWindow, "show", lambda *args: None)
         m.setattr(vertsPlugin.playbackWindow, "raise_", lambda *args: None)
         vertsPlugin.playbackRegionHistory()
-        winImg = vertsPlugin.playbackWindow.displayPlt.imgItem.image
+        winImg = vertsPlugin.playbackWindow.displayPlot.imgItem.image
         assert np.array_equal(winImg, initial)
 
 

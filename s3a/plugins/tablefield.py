@@ -21,12 +21,17 @@ from utilitys import (
 
 from .base import TableFieldPlugin
 from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
-from ..generalutils import getCroppedImg, showMaskDiff, tryCvResize, incrStageNames
+from ..generalutils import (
+    getCroppedImage,
+    showMaskDifference,
+    tryCvResize,
+    maybeIncrementStageNames,
+)
 from ..graphicsutils import RegionHistoryViewer
 from ..processing.algorithms import imageproc
 from ..processing.processing import (
     AbortableThreadContainer,
-    ThreadedFuncWrapper,
+    ThreadedFunctionWrapper,
 )
 from ..shared import SharedAppSettings
 from ..structures import BlackWhiteImg, XYVertices, ComplexXYVertices
@@ -52,7 +57,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         self.dock.addEditors([self.procEditor])
 
         self.props = ParamContainer()
-        shared.generalProps.registerProp(CNST.PROP_REG_APPROX_EPS, container=self.props)
+        shared.generalProperties.registerProp(
+            CNST.PROP_REG_APPROX_EPS, container=self.props
+        )
 
     def __init__(self):
         super().__init__()
@@ -67,7 +74,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         self._displayedStage = ""
         self.statusButton: QtWidgets.QPushButton | None = None
         self.taskManager = AbortableThreadContainer()
-        self.taskManager.sigThreadsUpdated.connect(self.updateTaskLbl)
+        self.taskManager.sigThreadsUpdated.connect(self.updateTaskLabel)
 
         self.oldResultCache = None
         """Holds the last result from a region run so undoables reset the proc cache"""
@@ -144,13 +151,13 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         """
         imageproc.procCache["mask"] = np.zeros_like(imageproc.procCache["mask"])
 
-    def updateFocusedComponent(self, newComp: pd.Series = None):
-        if self.mainImage.focusedComponent[RTF.INST_ID] == -1:
+    def updateFocusedComponent(self, component: pd.Series = None):
+        if self.mainImage.focusedComponent[RTF.ID] == -1:
             self.updateRegionFromDf(None)
             return
-        oldId = self.mainImage.focusedComponent[RTF.INST_ID]
+        oldId = self.mainImage.focusedComponent[RTF.ID]
         self.updateRegionFromDf(self.mainImage.focusedComponentAsFrame)
-        if newComp is None or oldId != newComp[RTF.INST_ID]:
+        if component is None or oldId != component[RTF.ID]:
             self.firstRun = True
 
     def _runFromDrawAct(self, verts: XYVertices, param: PrjParam):
@@ -164,9 +171,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             return
 
         if param == CNST.DRAW_ACT_ADD:
-            vertsKey = "fgVerts"
+            vertsKey = "foregroundVertices"
         else:
-            vertsKey = "bgVerts"
+            vertsKey = "backgroundVertices"
         kwargs = {vertsKey: verts}
         if self.queueActions:
             thread = self.taskManager.addThread(
@@ -179,7 +186,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             result = self.run(**kwargs)
             self.updateGuiFromProcessor(result)
 
-    def updateTaskLbl(self):
+    def updateTaskLabel(self):
         if not self.statusButton:
             return
         active = sum([th.isRunning() for th in self.taskManager.threads])
@@ -212,7 +219,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             # By default, only end not-yet-started actions
             self.endQueuedActions()
 
-    def _onThreadFinished(self, thread: ThreadedFuncWrapper, ex=None):
+    def _onThreadFinished(self, thread: ThreadedFunctionWrapper, ex=None):
         if not ex:
             self.updateGuiFromProcessor(thread.result)
         else:
@@ -223,7 +230,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         if img is None:
             compGrayscale = None
         else:
-            compGrayscale = self.region.toGrayImg(img.shape[:2])
+            compGrayscale = self.region.toGrayImage(img.shape[:2])
 
         newGrayscale = procResult
         if isinstance(newGrayscale, dict):
@@ -233,7 +240,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             return
         newGrayscale = newGrayscale.astype("uint8")
 
-        matchNames = incrStageNames(self.currentProcessor.stagesFlattened)
+        matchNames = maybeIncrementStageNames(self.currentProcessor.stagesFlattened)
         type(self).displayableInfos.fget.cache_clear()
         if self._displayedStage in matchNames:
             self.overlayStageInfo(self._displayedStage, self.stageInfoImage.opacity())
@@ -249,18 +256,21 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             self.updateRegionFromMask(newGrayscale)
 
     def run(
-        self, fgVerts: XYVertices = None, bgVerts: XYVertices = None, updateGui=False
+        self,
+        foregroundVertices: XYVertices = None,
+        backgroundVertices: XYVertices = None,
+        updateGui=False,
     ):
         vertsDict = {}
-        if fgVerts is not None:
-            vertsDict["fgVerts"] = fgVerts
-        if bgVerts is not None:
-            vertsDict["bgVerts"] = bgVerts
+        if foregroundVertices is not None:
+            vertsDict["foregroundVertices"] = foregroundVertices
+        if backgroundVertices is not None:
+            vertsDict["backgroundVertices"] = backgroundVertices
         img = self.mainImage.image
         if img is None:
             compMask = None
         else:
-            compGrayscale = self.region.toGrayImg(img.shape[:2])
+            compGrayscale = self.region.toGrayImage(img.shape[:2])
             compMask = compGrayscale > 0
         # TODO: When multiple classes can be represented within focused image, this is
         #  where change will have to occur
@@ -268,7 +278,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         self.oldResultCache = imageproc.procCache.copy()
         result = self.currentProcessor.run(
             image=img,
-            prevCompMask=compMask,
+            oldComponentMask=compMask,
             **vertsDict,
             firstRun=self.firstRun,
             viewbox=XYVertices(viewbox),
@@ -295,17 +305,17 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             component will be removed. Otherwise, the provided value will be used. For
             column information, see ``makeMultiRegionDf``
         offset
-            Offset of newVerts relative to main image coordinates
+            Offset of newVertices relative to main image coordinates
         """
         fImg = self.mainImage
         # Since some calls to this function make an undo entry and others don't,
         # be sure to save state for the undoable ones revertId is only used when
         # changedComp is true and an undo is valid
-        newId = fImg.focusedComponent[RTF.INST_ID]
+        newId = fImg.focusedComponent[RTF.ID]
         if newData is None:
             newData = makeMultiRegionDf(0)
 
-        self._maybeChangeFocusedComp(newData.index)
+        self._maybeChangeFocusedComponent(newData.index)
 
         if fImg.image is None:
             self.region.clear()
@@ -319,7 +329,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         # 0-center new vertices relative to FocusedImage image
         centeredData = newData
         if np.any(offset != 0):
-            # Make a deep copy of verts (since they change) to preserve redos
+            # Make a deep copy of vertices (since they change) to preserve redos
             centeredData = centeredData.copy()
             centeredData[RTF.VERTICES] = self.applyOffset(
                 [copy.deepcopy(v) for v in newData[RTF.VERTICES]], offset
@@ -363,7 +373,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         try:
             result = self.currentProcessor.run(
                 image=img,
-                prevCompMask=compMask,
+                oldComponentMask=compMask,
                 firstRun=True,
                 viewbox=XYVertices(viewbox),
                 prevCompVerts=verts,
@@ -382,36 +392,36 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         return makeReturnValue()
 
     @staticmethod
-    def applyOffset(complexVerts: t.Sequence[ComplexXYVertices], offset: XYVertices):
+    def applyOffset(verticesList: t.Sequence[ComplexXYVertices], offset: XYVertices):
         centeredVerts = []
-        for complexVerts in complexVerts:
+        for verticesList in verticesList:
             newVertList = ComplexXYVertices()
-            for vertList in complexVerts:
+            for vertList in verticesList:
                 newVertList.append(vertList + offset)
             centeredVerts.append(newVertList)
         return centeredVerts
 
-    def _maybeChangeFocusedComp(self, newIds: t.Sequence[int]):
+    def _maybeChangeFocusedComponent(self, newIds: t.Sequence[int]):
         regionId = newIds[0] if len(newIds) else -1
-        focusedId = self.mainImage.focusedComponent[RTF.INST_ID]
+        focusedId = self.mainImage.focusedComponent[RTF.ID]
         updated = regionId != focusedId
         if updated:
             if regionId in self.win.componentManager.compDf.index:
-                self.win.changeFocusedComp([regionId])
+                self.win.changeFocusedComponent([regionId])
             else:
-                self.win.changeFocusedComp()
+                self.win.changeFocusedComponent()
         return updated
 
-    def updateRegionFromMask(self, mask: BlackWhiteImg, offset=None, compId=None):
+    def updateRegionFromMask(self, mask: BlackWhiteImg, offset=None, componentId=None):
         if offset is None:
             offset = XYVertices([0, 0])
         data = self.region.regionData.copy()
-        if compId is None:
-            compId = data.index[0] if len(data) else -1
+        if componentId is None:
+            componentId = data.index[0] if len(data) else -1
         newVerts = ComplexXYVertices.fromBinaryMask(mask).simplify(
             self.props[CNST.PROP_REG_APPROX_EPS]
         )
-        df = makeMultiRegionDf(vertices=[newVerts], idList=[compId])
+        df = makeMultiRegionDf(vertices=[newVerts], idList=[componentId])
         self.updateRegionUndoable(df, offset=offset, oldProcCache=self.oldResultCache)
 
     def invertRegion(self):
@@ -446,9 +456,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             imageproc.procCache = oldProcCache
         self.updateRegionFromDf(oldData)
 
-    def acceptChanges(self, overrideVerts: ComplexXYVertices = None):
+    def acceptChanges(self, overrideVertices: ComplexXYVertices = None):
         # Add in offset from main image to VertexRegion vertices
-        newVerts = overrideVerts or self.collapseRegionVerts()
+        newVerts = overrideVertices or self.collapseRegionVerts()
         ser = self.mainImage.focusedComponent
         ser[RTF.VERTICES] = newVerts
         self.updateFocusedComponent()
@@ -471,7 +481,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
                 [v.hierarchy for v in self.region.regionData[RTF.VERTICES]]
             )
         except ValueError:
-            # Numpy error when all verts are empty or no verts present
+            # Numpy error when all vertices are empty or no vertices present
             hierarchy = np.empty((0, 4), dtype=int)
         outVerts = ComplexXYVertices(
             [
@@ -523,7 +533,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         # First find offset and img size so we don't
         # have to keep copying a full image sized output every time
         allVerts = np.vstack([v.stack() for v in bufferRegions])
-        initialImg, slices = getCroppedImg(self.mainImage.image, allVerts)
+        initialImg, slices = getCroppedImage(self.mainImage.image, allVerts)
         imShape = initialImg.shape[:2]
         offset = slices[0]
         img = np.zeros(imShape, bool)
@@ -575,7 +585,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     def displayableInfos(self):
         outInfos = {}
         stages = self.currentProcessor.processor.stagesFlattened
-        matchNames = incrStageNames(stages)
+        matchNames = maybeIncrementStageNames(stages)
         boundSlices = None
 
         for name, stage in zip(matchNames, stages):
@@ -622,8 +632,8 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             return
         # Add current state as final result
         history += [history[-1]]
-        diffs = [showMaskDiff(o, n) for (o, n) in zip(history, history[1:])]
-        self.playbackWindow.setDiffs(diffs)
-        self.playbackWindow.displayPlt.setImage(initialImg)
+        diffs = [showMaskDifference(o, n) for (o, n) in zip(history, history[1:])]
+        self.playbackWindow.setDifferenceImages(diffs)
+        self.playbackWindow.displayPlot.setImage(initialImg)
         self.playbackWindow.show()
         self.playbackWindow.raise_()

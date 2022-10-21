@@ -20,7 +20,7 @@ from utilitys.typeoverloads import FilePath
 from .base import AnnotationImporter
 from .helpers import registerIoHandler
 from ..constants import REQD_TBL_FIELDS as RTF
-from ..generalutils import DirectoryDict, orderContourPts, cvImreadRgb, toDictGen
+from ..generalutils import DirectoryDict, orderContourPoints, cvImreadRgb, toDictGen
 from ..structures import ComplexXYVertices, XYVertices, AnnInstanceError, LabelFieldType
 
 __all__ = [
@@ -51,7 +51,7 @@ class SerialImporter(AnnotationImporter):
         if importFn is None:
             raise ValueError(
                 f"File type {fType} cannot be handled by the serial importer."
-                f' Must be one of {",".join(cls._getPdImporters())}'
+                f' Must be one of {",".join(cls._getPandasImporters())}'
             )
         # Special case: csv imports need to avoid interpreting nan results
         kwargs.update(na_filter=False, dtype=str)
@@ -67,7 +67,7 @@ class SerialImporter(AnnotationImporter):
         return toDictGen(importObj)
 
     @staticmethod
-    def _getPdImporters():
+    def _getPandasImporters():
         members = [v for v in vars(pd) if v.startswith("read_")]
         return [mem.replace("read_", "") for mem in members]
 
@@ -112,16 +112,16 @@ class SuperannotateJsonImporter(AnnotationImporter):
     def populateMetadata(
         self,
         file: Path = None,
-        srcDir: t.Union[FilePath, dict] = None,
+        source: t.Union[FilePath, dict] = None,
         imageShape: tuple[int, int] = None,
         **kwargs,
     ):
-        if srcDir is None:
-            srcDir = file.parent
-        srcDir = DirectoryDict(srcDir, readFunc=self.readFile, allowAbsolute=True)
-        classes = srcDir.get("classes.json")
+        if source is None:
+            source = file.parent
+        source = DirectoryDict(source, readFunc=self.readFile, allowAbsolute=True)
+        classes = source.get("classes.json")
         if classes is None and file is not None:
-            classes = srcDir.get(file.parent / "classes" / "classes.json")
+            classes = source.get(file.parent / "classes" / "classes.json")
         if classes is not None:
             self.tableData.fieldFromName("className").opts["limits"] = [
                 c["name"] for c in classes
@@ -134,12 +134,12 @@ class SuperannotateJsonImporter(AnnotationImporter):
     def getInstances(self, importObj, **kwargs):
         return importObj["instances"]
 
-    def bulkImport(self, importObj, srcDir=None, **kwargs) -> pd.DataFrame:
-        df = super().defaultBulkImport(importObj, **kwargs, srcDir=srcDir)
-        df[RTF.IMG_FILE] = importObj["metadata"]["name"]
+    def bulkImport(self, importObj, source=None, **kwargs) -> pd.DataFrame:
+        df = super().defaultBulkImport(importObj, **kwargs, source=source)
+        df[RTF.IMAGE_FILE] = importObj["metadata"]["name"]
         return df
 
-    def formatSingleInstance(self, inst, name=None, srcDir=None, **kwargs):
+    def formatSingleInstance(self, inst, name=None, source=None, **kwargs):
         out = {}
         verts = self.parseRegion(inst)
         if not isinstance(verts, AnnInstanceError):
@@ -172,7 +172,7 @@ class SuperannotateJsonImporter(AnnotationImporter):
             vals = inst["cy"], inst["cx"], inst["ry"], inst["rx"], inst["angle"]
             pts = draw.ellipse_perimeter(*(int(v) for v in vals))
             pts = np.column_stack(pts[::-1])
-            pts = orderContourPts(pts)
+            pts = orderContourPoints(pts)
         else:
             pts = AnnInstanceError(f'Unrecognized type "{typ}"')
         if not isinstance(pts, AnnInstanceError):
@@ -233,7 +233,7 @@ class VGGImageAnnotatorImporter(CsvImporter):
             )
             pts = draw.ellipse_perimeter(*(int(v) for v in vals[:-1]), vals[-1])
             pts = np.column_stack(pts[::-1])
-            pts = orderContourPts(pts)
+            pts = orderContourPoints(pts)
         elif name == "rect":
             x, y = region["x"], region["y"]
             width, height = region["width"], region["height"]
@@ -244,7 +244,7 @@ class VGGImageAnnotatorImporter(CsvImporter):
             cx, cy, r = region["cx"], region["cy"], region["r"]
             pts = draw.circle_perimeter(int(cy), int(cx), int(r))
             pts = np.column_stack(pts[::-1])
-            pts = orderContourPts(pts)
+            pts = orderContourPoints(pts)
         elif name == "point":
             cx, cy = region["cx"], region["cy"]
             pts = XYVertices([[cx, cy]])
@@ -261,7 +261,7 @@ class LblPngImporter(AnnotationImporter):
 
     imageInfo = {}
 
-    def readFile(self, file: FilePath, labelMapping=None, offset=0, **kwargs):
+    def readFile(self, file: FilePath, labelMap=None, offset=0, **kwargs):
         try:
             image: Image.Image = Image.open(file)
             self.imageInfo = image.info
@@ -276,7 +276,7 @@ class LblPngImporter(AnnotationImporter):
     def populateMetadata(
         self,
         labelField: LabelFieldType = "Instance ID",
-        labelMapping: pd.Series = None,
+        labelMap: pd.Series = None,
         distinctRegions=True,
         offset=0,
         **kwargs,
@@ -287,21 +287,21 @@ class LblPngImporter(AnnotationImporter):
         labelField
             label field to associate with this image. Pixel values within the image
             correspond to values from this field in the table data. If *None*, this is
-            inferred by the mapping read from the image file (see `labelMapping`
+            inferred by the mapping read from the image file (see `labelMap`
             description)
-        labelMapping
+        labelMap
             For parameters that aren't numeric and don't have limits (e.g. arbitrary
             string values), this mapping determines how numeric values should be turned
             into field values. See ``PrjParam.toNumeric`` for details, since this is the
             mapping expected. If not provided, first the image metadata tags are
-            searched for a 'labelMapping' text attribute (this is often added to label
+            searched for a 'labelMap' text attribute (this is often added to label
             images saved by S3A). Note that metadata can only be read from the file if
             a file path is provided, of course. If this check fails, it is inferred
             based on the allowed options of `labelField` (`labelField.opts['limits']`).
             Finally, if this is not present, it is assumed the raw image values can be
             used directly as field values.
         offset
-            When ``labelMapping`` is not provided and field values are directly inferred
+            When ``labelMap`` is not provided and field values are directly inferred
             from label values, this determines whether (and how much if not *None*) to
             offset numeric labels during import. I.e. if the png label is 1, but offset
             is 1, the corresponding *field* value will be 0 (1 - offset = 0).
@@ -313,37 +313,35 @@ class LblPngImporter(AnnotationImporter):
         labelImage = self.importObj
         # "Offset" present for numeric data, "mapping" present for textual data
         info = self.imageInfo
-        if labelMapping is None and "labelMapping" in info:
-            labelMapping = pd.Series(
-                json.loads(info["labelMapping"]), name=info.get("labelField", None)
+        if labelMap is None and "labelMap" in info:
+            labelMap = pd.Series(
+                json.loads(info["labelMap"]), name=info.get("labelField", None)
             )
-            labelMapping.index = labelMapping.index.astype(int)
+            labelMap.index = labelMap.index.astype(int)
 
         if offset is None and "offset" in info:
             offset = int(info["offset"])
 
-        labelField = self.tableData.fieldFromName(labelField or labelMapping.name)
-        if labelMapping is None:
+        labelField = self.tableData.fieldFromName(labelField or labelMap.name)
+        if labelMap is None:
             vals = labelField.opts.get("limits", None) or np.unique(labelImage)
-            _, labelMapping = labelField.toNumeric(vals, returnMapping=True)
-            labelMapping.index += offset
+            _, labelMap = labelField.toNumeric(vals, returnMapping=True)
+            labelMap.index += offset
 
         return self._forwardMetadata(locals())
 
-    def getInstances(
-        self, importObj, labelMapping=None, distinctRegions=None, **kwargs
-    ):
+    def getInstances(self, importObj, labelMap=None, distinctRegions=None, **kwargs):
         labelMask = importObj
-        for numericLbl, origVal in labelMapping.items():  # type: int, t.Any
+        for numericLbl, origVal in labelMap.items():  # type: int, t.Any
             verts = ComplexXYVertices.fromBinaryMask(labelMask == numericLbl)
             if distinctRegions:
                 for vv in verts:
                     yield {
-                        RTF.INST_ID: numericLbl,
+                        RTF.ID: numericLbl,
                         RTF.VERTICES: ComplexXYVertices([vv]),
                     }
             else:
-                yield {RTF.INST_ID: numericLbl, RTF.VERTICES: verts}
+                yield {RTF.ID: numericLbl, RTF.VERTICES: verts}
 
     bulkImport = AnnotationImporter.defaultBulkImport
 
@@ -388,7 +386,7 @@ class CompImgsDfImporter(AnnotationImporter):
 
     def bulkImport(self, importObj, labelField=None, **kwargs):
         out = importObj[["instanceId", "label"]].copy()
-        out.columns = [RTF.INST_ID, labelField]
+        out.columns = [RTF.ID, labelField]
         return out
 
 
@@ -401,16 +399,16 @@ class YoloV5Importer(CsvImporter):
             names=["class", "center_x", "center_y", "width", "height"],
         )
 
-    def populateMetadata(self, imageShape=None, labelMapping=None, **kwargs):
+    def populateMetadata(self, imageShape=None, labelMap=None, **kwargs):
         if imageShape is None:
             raise ValueError("Must specify ``imageShape`` when importing yolov5 data")
         return self._forwardMetadata(locals())
 
-    def bulkImport(self, importObj, imageShape=None, labelMapping=None, **kwargs):
+    def bulkImport(self, importObj, imageShape=None, labelMap=None, **kwargs):
         imageShapeXy = np.array(imageShape[::-1])
         # Add 3rd dimension so all computations can be simultaneous
-        # (N, 1, 2) wh * (1, 4, 2) bbox = (N,4,2) bboxes for N components
-        # Thus, each row of ``bboxes`` is (4,2) bbox array
+        # (N, 1, 2) wh * (1, 4, 2) boundingBox = (N,4,2) bboxes for N components
+        # Thus, each row of ``bboxes`` is (4,2) boundingBox array
         centerXy = (
             importObj[["center_x", "center_y"]].to_numpy("float32")[:, None, :]
             * imageShapeXy
@@ -430,7 +428,7 @@ class YoloV5Importer(CsvImporter):
         out = pd.DataFrame()
         out[RTF.VERTICES] = verts
         classVals = importObj["class"].astype(int)
-        if labelMapping is not None:
-            classVals = labelMapping[classVals]
+        if labelMap is not None:
+            classVals = labelMap[classVals]
         out["class"] = classVals
         return out

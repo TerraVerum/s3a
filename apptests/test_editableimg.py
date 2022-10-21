@@ -49,10 +49,10 @@ def test_update(app, mgr, vertsPlugin, sampleComps):
     masks = RND.random((3, 500, 500)) > 0.5
 
     def regionCmp(mask):
-        assert np.array_equal(mask > 0, vertsPlugin.region.toGrayImg(mask.shape) > 0)
+        assert np.array_equal(mask > 0, vertsPlugin.region.toGrayImage(mask.shape) > 0)
 
     changeDict = app.addAndFocusComponents(newCompSer.to_frame().T)
-    newCompSer[REQD_TBL_FIELDS.INST_ID] = changeDict["added"][0]
+    newCompSer[REQD_TBL_FIELDS.ID] = changeDict["added"][0]
     assert mImg.focusedComponent.equals(newCompSer)
     # Add two updates so one is undoable and still comparable
     for ii in range(2):
@@ -61,8 +61,8 @@ def test_update(app, mgr, vertsPlugin, sampleComps):
 
     newerSer = sampleComps.iloc[0].copy()
     changeDict = app.addAndFocusComponents(newerSer.to_frame().T)
-    newerSer[REQD_TBL_FIELDS.INST_ID] = changeDict["added"][0]
-    oldMask = vertsPlugin.region.toGrayImg()
+    newerSer[REQD_TBL_FIELDS.ID] = changeDict["added"][0]
+    oldMask = vertsPlugin.region.toGrayImage()
     vertsPlugin.updateRegionFromMask(masks[2])
     regionCmp(masks[2])
 
@@ -72,19 +72,13 @@ def test_update(app, mgr, vertsPlugin, sampleComps):
     assert mImg.focusedComponent.equals(newerSer)
 
     vertsPlugin.actionStack.undo()
-    assert (
-        mImg.focusedComponent[REQD_TBL_FIELDS.INST_ID]
-        == newCompSer[REQD_TBL_FIELDS.INST_ID]
-    )
+    assert mImg.focusedComponent[REQD_TBL_FIELDS.ID] == newCompSer[REQD_TBL_FIELDS.ID]
     # Undo create new comp, nothing is selected
 
     app.sharedAttrs.actionStack.undo()
     # Undo earlier region edit, region should now equal the second-to-last edit
     regionCmp(masks[0])
-    assert (
-        mImg.focusedComponent[REQD_TBL_FIELDS.INST_ID]
-        == newCompSer[REQD_TBL_FIELDS.INST_ID]
-    )
+    assert mImg.focusedComponent[REQD_TBL_FIELDS.ID] == newCompSer[REQD_TBL_FIELDS.ID]
 
     app.sharedAttrs.actionStack.redo()
     regionCmp(masks[1])
@@ -106,7 +100,7 @@ def test_region_modify(sampleComps, app, mgr, vertsPlugin):
     oldData = vertsPlugin.region.regionData.copy()
     mImg.shapeCollection.shapeParameter = PRJ_CONSTS.DRAW_SHAPE_POLY
     mImg.drawAction = PRJ_CONSTS.DRAW_ACT_CREATE
-    imsum = lambda: vertsPlugin.region.toGrayImg(shapeBnds).sum()
+    imsum = lambda: vertsPlugin.region.toGrayImage(shapeBnds).sum()
 
     # 1st action
     app.mainImage.updateFocusedComponent(None)
@@ -117,7 +111,7 @@ def test_region_modify(sampleComps, app, mgr, vertsPlugin):
     # 2nd action
     app.mainImage.updateFocusedComponent(sampleComps.iloc[-1])
     mImg.shapeCollection.sigShapeFinished.emit(newVerts)
-    checkpointMask = vertsPlugin.region.toGrayImg(shapeBnds)
+    checkpointMask = vertsPlugin.region.toGrayImage(shapeBnds)
     assert np.any(checkpointMask)
 
     mImg.drawAction = PRJ_CONSTS.DRAW_ACT_ADD
@@ -152,7 +146,7 @@ def test_selectionbounds_all(app, mgr):
 def test_selectionbounds_none(app):
     app.componentTable.clearSelection()
     app.componentController.selectedIds = np.array([], dtype=int)
-    # Selection in negative area ensures no comps will be selected
+    # Selection in negative area ensures no components will be selected
     app.componentController.reflectSelectionBoundsMade(XYVertices([[-100, -100]]))
     assert len(app.componentController.selectedIds) == 0
 
@@ -167,7 +161,9 @@ def test_proc_err(tmp_path):
     clctn.addProcess(proc, top=True)
 
     algEditor.changeActiveProcessor("Bad")
-    kwargs = dict(image=np.array([[True]], dtype=bool), fgVerts=XYVertices([[0, 0]]))
+    kwargs = dict(
+        image=np.array([[True]], dtype=bool), foregroundVertices=XYVertices([[0, 0]])
+    )
     with pytest.warns(UserWarning):
         algEditor.currentProcessor.run(errorsToWarnings=True, **kwargs)
     with pytest.raises(ZeroDivisionError):

@@ -33,7 +33,7 @@ def test_undo_add(sampleComps, mgr):
 
 
 def test_empty_add(mgr):
-    changeList = mgr.addComponents(mgr.tableData.makeCompDf(0))
+    changeList = mgr.addComponents(mgr.tableData.makeComponentDf(0))
     cmpChangeList(changeList)
 
 
@@ -43,32 +43,32 @@ def test_rm_by_empty_vert_add(sampleComps, mgr):
     deleteIdxs = np.sort(perm[:numDeletions])
     changeIdxs = np.sort(perm[numDeletions:])
     changes = mgr.addComponents(sampleComps)
-    sampleComps[REQD_TBL_FIELDS.INST_ID] = changes["ids"]
+    sampleComps[REQD_TBL_FIELDS.ID] = changes["ids"]
 
     # List assignment behaves poorly for list-inherited objs (like frcomplexverts) so
     # use individual assignment
     for idx in deleteIdxs:
         sampleComps.at[idx, REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices()
-    changeList = mgr.addComponents(sampleComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
+    changeList = mgr.addComponents(sampleComps, PRJ_ENUMS.COMPONENT_ADD_AS_MERGE)
     cmpChangeList(changeList, deleted=deleteIdxs, changed=changeIdxs)
 
 
 def test_double_add(sampleComps, mgr):
-    changeList = mgr.addComponents(sampleComps, PRJ_ENUMS.COMP_ADD_AS_NEW)
+    changeList = mgr.addComponents(sampleComps, PRJ_ENUMS.COMPONENT_ADD_AS_NEW)
     cmpChangeList(changeList, added=oldIds)
 
     # Should be new IDs during 'add as new'
-    changeList = mgr.addComponents(sampleComps, PRJ_ENUMS.COMP_ADD_AS_NEW)
+    changeList = mgr.addComponents(sampleComps, PRJ_ENUMS.COMPONENT_ADD_AS_NEW)
     cmpChangeList(changeList, added=oldIds + NUM_COMPS)
 
 
 def test_change_comps(sampleComps, mgr):
-    changeList = mgr.addComponents(sampleComps, PRJ_ENUMS.COMP_ADD_AS_NEW)
+    changeList = mgr.addComponents(sampleComps, PRJ_ENUMS.COMPONENT_ADD_AS_NEW)
     cmpChangeList(changeList, added=oldIds)
-    sampleComps[REQD_TBL_FIELDS.INST_ID] = changeList["ids"]
+    sampleComps[REQD_TBL_FIELDS.ID] = changeList["ids"]
 
     newVerts = dfTester.fillRandomVerts(compDf=sampleComps)
-    changeList = mgr.addComponents(sampleComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
+    changeList = mgr.addComponents(sampleComps, PRJ_ENUMS.COMPONENT_ADD_AS_MERGE)
     cmpChangeList(changeList, changed=oldIds)
     assert (
         newVerts == mgr.compDf[REQD_TBL_FIELDS.VERTICES].to_list()
@@ -90,7 +90,7 @@ def test_rm_comps(sampleComps, mgr):
     # Remove all
     for _ in range(10):
         mgr.addComponents(sampleComps)
-    prevIds = mgr.compDf[REQD_TBL_FIELDS.INST_ID].values
+    prevIds = mgr.compDf[REQD_TBL_FIELDS.ID].values
     changeList = mgr.removeComponents()
     cmpChangeList(changeList, deleted=prevIds)
 
@@ -111,7 +111,7 @@ def test_rm_undo(sampleComps, mgr):
 
 def test_merge_comps(sampleComps, mgr):
     mgr.addComponents(sampleComps)
-    mgr.mergeCompVertsById(sampleComps.index)
+    mgr.mergeById(sampleComps.index)
     assert len(mgr.compDf) == 1
     mgr.actionStack.undo()
     assert len(mgr.compDf) == len(sampleComps)
@@ -120,9 +120,9 @@ def test_merge_comps(sampleComps, mgr):
 def test_bad_merge(sampleComps, mgr):
     mgr.addComponents(sampleComps)
     with pytest.warns(UserWarning):
-        mgr.mergeCompVertsById([0])
+        mgr.mergeById([0])
     with pytest.warns(UserWarning):
-        mgr.mergeCompVertsById([])
+        mgr.mergeById([])
 
 
 def test_table_setdata(sampleComps, app, mgr):
@@ -131,7 +131,7 @@ def test_table_setdata(sampleComps, app, mgr):
     _ = REQD_TBL_FIELDS
     colVals = {
         _.VERTICES: ComplexXYVertices([XYVertices([[1, 2], [3, 4]])]),
-        _.IMG_FILE: "newfilename",
+        _.IMAGE_FILE: "newfilename",
     }
     intColMapping = {mgr.tableData.allFields.index(k): v for k, v in colVals.items()}
 
@@ -149,7 +149,7 @@ def test_table_setdata(sampleComps, app, mgr):
 
 def test_table_getdata(sampleComps, mgr):
     mgr.addComponents(sampleComps)
-    idx = mgr.index(0, list(REQD_TBL_FIELDS).index(REQD_TBL_FIELDS.IMG_FILE))
+    idx = mgr.index(0, list(REQD_TBL_FIELDS).index(REQD_TBL_FIELDS.IMAGE_FILE))
     dataVal = sampleComps.iat[0, idx.column()]
     assert mgr.data(idx, QtCore.Qt.ItemDataRole.EditRole) == dataVal
     assert mgr.data(idx, QtCore.Qt.ItemDataRole.DisplayRole) == str(dataVal)

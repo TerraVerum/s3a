@@ -22,7 +22,7 @@ def get_component_images(image: np.ndarray, components: pd.DataFrame):
     subregion within the image each component occupies.
     """
     imgs = [
-        gutils.getCroppedImg(image, verts.stack(), 0)
+        gutils.getCroppedImage(image, verts.stack(), 0)
         for verts in components[RTF.VERTICES]
     ]
     return ProcessIO(subimages=imgs)
@@ -52,7 +52,7 @@ class ProcessDispatcher(AtomicProcess):
         for ii, comp in components.iterrows():
             kwargs.update(component=comp)
             # TODO: Determine appropriate behavior. For now, just remember last result
-            #  metadata other than comps
+            #  metadata other than components
             result = self.singleRunner(**kwargs)
             if self.resultConverter is not None:
                 result = self.resultConverter(result, comp)
@@ -66,7 +66,7 @@ class ProcessDispatcher(AtomicProcess):
         return out
 
 
-def pts_to_components(matchPts: np.ndarray, component: pd.Series):
+def points_to_components(matchPts: np.ndarray, component: pd.Series):
     numOutComps = len(matchPts)
     if numOutComps == 0:
         ret = fns.serAsFrame(component).copy()
@@ -81,7 +81,7 @@ def pts_to_components(matchPts: np.ndarray, component: pd.Series):
         newVerts = [verts - origOffset + pt for verts in outComps.at[ii, RTF.VERTICES]]
         allNewverts.append(ComplexXYVertices(newVerts))
     outComps[RTF.VERTICES] = allNewverts
-    outComps[RTF.INST_ID] = RTF.INST_ID.value
+    outComps[RTF.ID] = RTF.ID.value
     return outComps
 
 
@@ -116,11 +116,11 @@ def cv_template_match_single(
         pType: list
         limits: ['image', 'viewbox']
     """
-    template, templateBbox = gutils.getCroppedImg(
+    template, templateBbox = gutils.getCroppedImage(
         image, component[RTF.VERTICES].stack()
     )
     if area == "viewbox":
-        image, coords = gutils.getCroppedImg(image, viewbox)
+        image, coords = gutils.getCroppedImage(image, viewbox)
     else:
         coords = np.array([[0, 0], image.shape[:2][::-1]])
     grayImg = image if image.ndim < 3 else cv.cvtColor(image, cv.COLOR_RGB2GRAY)
@@ -145,12 +145,12 @@ def cv_template_match_single(
     ious = []
     for pt in matchPts:
         ious.append(
-            gutils.bboxIou(templateBbox, np.vstack([pt, pt + templateShp[::-1]]))
+            gutils.boundingBoxIou(templateBbox, np.vstack([pt, pt + templateShp[::-1]]))
         )
     return ProcessIO(
         scores=scores,
         matchImg=maxFilter,
-        components=pts_to_components(matchPts, component),
+        components=points_to_components(matchPts, component),
     )
 
 
@@ -178,7 +178,7 @@ def make_grid_components(
     components
         Reference components, needed to determine proper output columns
     viewbox
-        zoomed-in bbox coordinates relative to the main image
+        zoomed-in boundingBox coordinates relative to the main image
     area
         Area to apply gridding
         type: list
@@ -200,7 +200,7 @@ def make_grid_components(
     """
     offset = np.array([[0, 0]])
     if area == "viewbox":
-        image, coords = gutils.getCroppedImg(image, viewbox)
+        image, coords = gutils.getCroppedImage(image, viewbox)
         offset = coords[[0]]
     imageH, imageW = image.shape[:2]
     if winType == "Row/Col Divisions":
@@ -261,7 +261,7 @@ def merge_overlapping_components(components: pd.DataFrame):
     dummyLabel = PrjParam("__lbl_merge_overlap__", 0)
     components[dummyLabel] = np.arange(len(components))
     mask, mapping = defaultIo.exportLblPng(
-        components, returnLabelMapping=True, labelField=dummyLabel
+        components, returnLabelMap=True, labelField=dummyLabel
     )
     numLbls, labels, stats, centroids = cv.connectedComponentsWithStats(
         mask.astype("uint8", copy=False)
@@ -290,19 +290,15 @@ def merge_overlapping_components(components: pd.DataFrame):
     # It is possible for one old ID to point to multiple new components. To avoid
     # undefined behavior, give a new id designation to all but the first occurence
     # in these cases
-    newComps.loc[
-        newComps.index.duplicated(keep="first"), RTF.INST_ID
-    ] = RTF.INST_ID.value
+    newComps.loc[newComps.index.duplicated(keep="first"), RTF.ID] = RTF.ID.value
     newComps[RTF.VERTICES] = outVerts
 
     # It is also possible for two components to overlap and only one ID is recycled.
     # This will mean one original component needs to be deleted. Note that components
     # which are new in the first place (i.e. from a non-refinement operation) don't need
     # to be deleted since they haven't yet been added in the first place
-    maybeDeleted = components.loc[
-        components[RTF.INST_ID] != RTF.INST_ID.value, newComps.columns
-    ]
-    delIdxs = np.isin(maybeDeleted[RTF.INST_ID], newComps[RTF.INST_ID], invert=True)
+    maybeDeleted = components.loc[components[RTF.ID] != RTF.ID.value, newComps.columns]
+    delIdxs = np.isin(maybeDeleted[RTF.ID], newComps[RTF.ID], invert=True)
 
     delComponents = maybeDeleted[delIdxs].copy()
     delComponents[RTF.VERTICES] = [
@@ -397,8 +393,8 @@ def remove_overlapping_components(
         stacked = verts.stack()
         if not len(stacked):
             continue
-        checkArea, coords = gutils.getCroppedImg(
-            referenceMask, stacked, coordsAsSlices=True
+        checkArea, coords = gutils.getCroppedImage(
+            referenceMask, stacked, returnSlices=True
         )
         # Prediction is entirely outside the image
         if checkArea.size <= 0:
@@ -445,10 +441,10 @@ def single_categorical_prediction(
     elif isinstance(inputShape, str):
         inputShape = eval(inputShape, dict(model=model))
     verts = component[RTF.VERTICES].stack()
-    resized_image, coords, stats = gutils.subImageFromVerts(
+    resized_image, coords, stats = gutils.subImageFromVertices(
         image,
         verts,
-        returnCoords=True,
+        returnBoundingBox=True,
         returnStats=True,
         shape=inputShape[:2],
         interpolation=cv.INTER_NEAREST,
@@ -459,7 +455,7 @@ def single_categorical_prediction(
     prediction = np.argmax(prediction[0], axis=-1)
     prediction[prediction > 0] = 1
     prediction = gutils.inverseSubImage(
-        prediction.astype("uint8"), stats, gutils.coordsToBbox(verts)
+        prediction.astype("uint8"), stats, gutils.coordsToBox(verts)
     )
     if not np.any(prediction):
         return ProcessIO(components=pd.DataFrame(columns=component.index))
@@ -521,4 +517,4 @@ _selfModule = single_categorical_prediction.__module__
 __all__ = [
     "categorical_prediction",
     "cv_template_match",
-] + gutils.getObjsDefinedInSelfModule(vars(), _selfModule)
+] + gutils.getObjectsDefinedInSelfModule(vars(), _selfModule)

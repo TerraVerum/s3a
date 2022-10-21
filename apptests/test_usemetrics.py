@@ -7,7 +7,7 @@ from s3a.plugins.usermetrics import UserMetricsPlugin
 
 @pytest.mark.smallimage
 def test_metrics_image(app):
-    metrics: UserMetricsPlugin = app.clsToPluginMapping[UserMetricsPlugin]
+    metrics: UserMetricsPlugin = app.classPluginMap[UserMetricsPlugin]
     metrics.props[CNST.PROP_COLLECT_USR_METRICS] = True
 
     toEmit = [

@@ -16,7 +16,7 @@ def td():
             "class": "test",
             "another": 2,
             "oncemore": True,
-            "verts": {"pType": "xyvertices", "value": XYVertices()},
+            "xyvertices": {"pType": "xyvertices", "value": XYVertices()},
             "complex": {"pType": "complexxyvertices", "value": ComplexXYVertices()},
         }
     }
@@ -26,7 +26,7 @@ def td():
 
 def test_combined(sampleComps, td):
 
-    comps = td.makeCompDf(len(sampleComps))
+    comps = td.makeComponentDf(len(sampleComps))
     sampleComps = sampleComps.copy()
     comps.index = sampleComps.index
     comps.update(sampleComps)
@@ -39,10 +39,10 @@ def test_combined(sampleComps, td):
     # No vertices, should be hidden
     assert len(disp.inUseDelegates) == 3
     # Make sure no exceptions here
-    disp.callDelegateFunc("show")
-    disp.callDelegateFunc("hide")
+    disp.callDelegateFunction("show")
+    disp.callDelegateFunction("hide")
     assert len(disp.inUseDelegates) == 3
-    disp.callDelegateFunc("clear")
+    disp.callDelegateFunction("clear")
     assert not len(disp.inUseDelegates)
 
     disp.showFieldData(
@@ -55,7 +55,7 @@ def test_xyvertices(td, sampleComps):
     v1 = XYVertices(np.arange(10).reshape(5, 2))
     v2 = XYVertices(np.arange(6).reshape(3, 2), connected=False)
     v3 = XYVertices(np.arange(4).reshape(2, 2))
-    field = td.fieldFromName("verts")
+    field = td.fieldFromName("xyvertices")
     sampleComps = sampleComps.iloc[:3].copy()
     sampleComps.loc[:, field] = [v1, v2, v3]
 

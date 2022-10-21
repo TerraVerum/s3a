@@ -20,7 +20,7 @@ from .regions import RegionMoverPlot
 from .rois import SHAPE_ROI_MAPPING
 from ..constants import REQD_TBL_FIELDS as RTF, PRJ_CONSTS as CNST
 from ..controls.drawctrl import RoiCollection
-from ..generalutils import getCroppedImg, coerceDfTypes
+from ..generalutils import getCroppedImage, coerceDfTypes
 from ..structures import XYVertices
 
 __all__ = ["MainImage"]
@@ -99,7 +99,7 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
             self.shapeAssignment,
             checkable=True,
         )
-        self.drawActGrp = ButtonCollection(self, "Actions")
+        self.drawActionGroup = ButtonCollection(self, "Actions")
 
         # Make sure panning is allowed before creating draw widget
         self.registerDrawAction(
@@ -107,13 +107,13 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
         )
 
         # Initialize draw shape/action buttons
-        self.drawActGrp.callFuncByParam(self.drawAction)
+        self.drawActionGroup.callFuncByParam(self.drawAction)
         self.drawShapeGrp.callFuncByParam(self.shapeCollection.shapeParameter)
 
         self.toolsGroup = None
         if toolbar is not None:
             toolbar.addWidget(self.drawShapeGrp)
-            toolbar.addWidget(self.drawActGrp)
+            toolbar.addWidget(self.drawActionGroup)
             self.toolsGroup = self.addTools(self.toolsEditor)
 
     def resetZoom(self):
@@ -131,16 +131,16 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
     def focusedComponentAsFrame(self):
         return coerceDfTypes(fns.serAsFrame(self.focusedComponent))
 
-    def shapeAssignment(self, newShapeParam: PrjParam):
-        self.shapeCollection.shapeParameter = newShapeParam
+    def shapeAssignment(self, newShapeParameter: PrjParam):
+        self.shapeCollection.shapeParameter = newShapeParameter
         if self.regionMover.active:
             self.regionMover.erase()
 
-    def actionAssignment(self, newActionParam: PrjParam):
-        self.drawAction = newActionParam
+    def actionAssignment(self, newActionParameter: PrjParam):
+        self.drawAction = newActionParameter
         if self.regionMover.active:
             self.regionMover.erase()
-        self.sigDrawActionChanged.emit(newActionParam)
+        self.sigDrawActionChanged.emit(newActionParameter)
 
     def maybeBuildRoi(self, ev: QtGui.QMouseEvent):
         ev.ignore()
@@ -155,10 +155,10 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
             ev.accept()
         return finished
 
-    def switchBtnMode(self, newMode: PrjParam):
+    def switchButtonMode(self, newMode: PrjParam):
         # EAFP
         try:
-            self.drawActGrp.callFuncByParam(newMode)
+            self.drawActionGroup.callFuncByParam(newMode)
         except KeyError:
             self.drawShapeGrp.callFuncByParam(newMode)
 
@@ -213,13 +213,13 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
         super().mouseReleaseEvent(ev)
         self.shapeCollection.removeLock(self)
 
-    def clearCurRoi(self):
+    def clearCurrentRoi(self):
         """Clears the current ROI shape"""
         self.shapeCollection.clearAllRois()
         self.regionMover.erase()
 
     def _widgetContainerChildren(self):
-        return [self.drawActGrp, self.drawShapeGrp, self]
+        return [self.drawActionGroup, self.drawShapeGrp, self]
 
     def _initGrid(self):
         pi: pg.PlotItem = self.plotItem
@@ -263,8 +263,8 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
 
     def registerDrawAction(
         self,
-        actParams: Union[PrjParam, Sequence[PrjParam]],
-        func: DrawActFn,
+        actionParameters: Union[PrjParam, Sequence[PrjParam]],
+        function: DrawActFn,
         **registerOpts
     ):
         """
@@ -274,34 +274,34 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
 
         Parameters
         ----------
-        actParams
+        actionParameters
             Single or multiple ``PrjParam``s that are allowed to trigger this funciton.
             If empty, triggers on every parameter
-        func
+        function
             Function to trigger when a shape is completed during the requested actions.
             If only one parameter is registered to this function, it is expected to
-            only take roiVerts. If multiple or none are provided, it is expected to
-            take roiVerts and the current draw action
+            only take roiPolygon. If multiple or none are provided, it is expected to
+            take roiPolygon and the current draw action
         registerOpts
             Extra arguments for button registration
         """
-        if isinstance(actParams, PrjParam):
-            actParams = [actParams]
+        if isinstance(actionParameters, PrjParam):
+            actionParameters = [actionParameters]
 
-        @wraps(func)
-        def wrapper(roiVerts: XYVertices, param: PrjParam):
-            if param in actParams:
-                if len(actParams) > 1:
-                    func(roiVerts, param)
+        @wraps(function)
+        def wrapper(roiPolygon: XYVertices, param: PrjParam):
+            if param in actionParameters:
+                if len(actionParameters) > 1:
+                    function(roiPolygon, param)
                 else:
-                    func(roiVerts)
+                    function(roiPolygon)
 
-        if len(actParams) == 0:
-            self.sigShapeFinished.connect(func)
+        if len(actionParameters) == 0:
+            self.sigShapeFinished.connect(function)
         else:
             self.sigShapeFinished.connect(wrapper)
-        for actParam in actParams:
-            self.drawActGrp.createAndAddBtn(
+        for actParam in actionParameters:
+            self.drawActionGroup.createAndAddBtn(
                 actParam,
                 self.actionAssignment,
                 checkable=True,
@@ -310,11 +310,11 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
             )
 
     def focusedComponentImage(self, margin: int = 0):
-        return getCroppedImg(
+        return getCroppedImage(
             self.image,
             self.focusedComponent[RTF.VERTICES].stack(),
             margin,
-            returnCoords=False,
+            returnBoundingBox=False,
         )
 
     def viewboxCoords(self, margin=0):

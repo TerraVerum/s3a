@@ -8,7 +8,7 @@ from skimage.draw import draw
 from utilitys import PrjParam, DeferredActionStackMixin as DASM
 
 from ..constants import PRJ_CONSTS
-from ..generalutils import orderContourPts, symbolFromVerts
+from ..generalutils import orderContourPoints, symbolFromVertices
 from ..structures import XYVertices, ComplexXYVertices
 from ..views.clickables import BoundScatterPlot
 
@@ -28,7 +28,7 @@ class PlotDataROI(DASM, BoundScatterPlot):
         self.vertices = XYVertices()
 
         self.endEvType = endEvType
-        self.viableEvTypes = {
+        self.viableEventTypes = {
             qe.MouseButtonPress,
             qe.MouseMove,
             qe.MouseButtonRelease,
@@ -50,7 +50,7 @@ class PlotDataROI(DASM, BoundScatterPlot):
         refactored = self._refactorPoints(vertsToUse)
         verts = self.vertices = XYVertices(refactored)
         connectData = np.vstack([verts, verts[[0]]]).view(XYVertices)
-        symbol, pos = symbolFromVerts(ComplexXYVertices([connectData]))
+        symbol, pos = symbolFromVertices(ComplexXYVertices([connectData]))
         self.setData(*pos.T, symbol=[symbol])
 
     def dataBounds(self, ax, frac=1.0, orthoRange=None):
@@ -61,20 +61,20 @@ class PlotDataROI(DASM, BoundScatterPlot):
         self.bounds[ax] = self.vertices[:, ax].min() - 2, self.vertices[:, ax].max() + 2
         return super().dataBounds(ax, frac, orthoRange)
 
-    def setRoiPoints(self, pts: XYVertices = None):
-        if pts is None:
-            pts = XYVertices()
+    def setRoiPoints(self, points: XYVertices = None):
+        if points is None:
+            points = XYVertices()
         self.setData()
         self.vertices = XYVertices()
-        self.firstPt = pts
-        if pts.size > 0:
+        self.firstPt = points
+        if points.size > 0:
             with self.actionStack.ignoreActions():
-                self.addRoiPoints(pts)
+                self.addRoiPoints(points)
 
     def _refactorPoints(self, vertices: np.ndarray):
         return vertices
 
-    def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: XYVertices):
+    def updateShape(self, ev: QtGui.QMouseEvent, xyEventCoords: XYVertices):
         """
         See function signature for :func:`ExtendedROI.updateShape`
         """
@@ -89,10 +89,10 @@ class PlotDataROI(DASM, BoundScatterPlot):
         evType = ev.type()
         if evType == qe.Type.MouseButtonPress and not constructingRoi:
             # Need to start a new shape
-            self.setRoiPoints(xyEvCoords)
+            self.setRoiPoints(xyEventCoords)
             constructingRoi = True
-        if evType in self.viableEvTypes:
-            self.addRoiPoints(xyEvCoords)
+        if evType in self.viableEventTypes:
+            self.addRoiPoints(xyEventCoords)
             constructingRoi = True
         elif evType == self.endEvType:
             # Done drawing the ROI, complete shape, get vertices, remove old undo stack
@@ -140,18 +140,18 @@ class RectROI(PlotDataROI):
 class PolygonROI(PlotDataROI):
     def __init__(self):
         super().__init__(qe.MouseButtonDblClick, True)
-        # self.viableEvTypes.remove(qe.MouseMove)
-        self.viableEvTypes.remove(qe.MouseButtonRelease)
+        # self.viableEventTypes.remove(qe.MouseMove)
+        self.viableEventTypes.remove(qe.MouseButtonRelease)
         self.lastEvType = None
 
-    def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: XYVertices):
+    def updateShape(self, ev: QtGui.QMouseEvent, xyEventCoords: XYVertices):
         self.lastEvType = ev.type()
-        return super().updateShape(ev, xyEvCoords)
+        return super().updateShape(ev, xyEventCoords)
 
     @DASM.undoable(_ROI_PT_DESCR)
-    def addRoiPoints(self, pts: XYVertices):
+    def addRoiPoints(self, points: XYVertices):
         oldVerts = self.vertices.copy()
-        ret = super().addRoiPoints(pts)
+        ret = super().addRoiPoints(points)
         if self.lastEvType != qe.MouseMove and len(self.vertices) > 1:
             yield
             return super().setRoiPoints(oldVerts)
@@ -176,15 +176,15 @@ class PointROI(PlotDataROI):
         self.setSize(3)
         self.constructTypes = {qe.MouseButtonPress, qe.MouseMove}
 
-    def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: XYVertices):
+    def updateShape(self, ev: QtGui.QMouseEvent, xyEventCoords: XYVertices):
         success = False
         verts = None
         constructingRoi = False
         if ev.type() in self.constructTypes:
             success = True
-            self.setData(*xyEvCoords.T, size=self.roiRadius * 2)
+            self.setData(*xyEventCoords.T, size=self.roiRadius * 2)
             verts = XYVertices(
-                np.column_stack(draw.disk(xyEvCoords[0], self.roiRadius))
+                np.column_stack(draw.disk(xyEventCoords[0], self.roiRadius))
             )
             self.vertices = verts
             constructingRoi = True
@@ -214,7 +214,7 @@ class EllipseROI(PlotDataROI):
             *center.astype(int), int(normedR / sqr2), int(normedC / sqr2)
         )
         # Reorder to ensure no criss-crossing when these vertices are plotted
-        perim = orderContourPts(np.column_stack(perim[::-1]))
+        perim = orderContourPoints(np.column_stack(perim[::-1]))
         return perim.view(XYVertices)
 
 
@@ -306,15 +306,15 @@ class ROIManipulator(pg.RectROI):
 
 
 class FreehandRoi(PlotDataROI):
-    def __init__(self, endEvType=qe.MouseButtonDblClick, addIntermedPts=True):
-        super().__init__(endEvType, addIntermedPts)
-        self.viableEvTypes.remove(qe.MouseButtonRelease)
+    def __init__(self, endEventType=qe.MouseButtonDblClick, addIntermedPoints=True):
+        super().__init__(endEventType, addIntermedPoints)
+        self.viableEventTypes.remove(qe.MouseButtonRelease)
         self.lastEvType = None
 
     @DASM.undoable(_ROI_PT_DESCR)
-    def addRoiPoints(self, /, pts: XYVertices):
+    def addRoiPoints(self, /, points: XYVertices):
         oldVerts = self.vertices.copy()
-        super().addRoiPoints(pts)
+        super().addRoiPoints(points)
         stack = self.actionStack
         if (
             self.lastEvType != qe.MouseButtonPress
@@ -327,25 +327,25 @@ class FreehandRoi(PlotDataROI):
             # Hence, the checking against "undoDescr"
             act = stack.actions[-1]
             # Add this point to the redo operation of the last action
-            act.args = (np.r_[act.args[0], pts],)
+            act.args = (np.r_[act.args[0], points],)
             return
         # else:
         yield
         self.setRoiPoints(oldVerts)
 
-    def removeRoiPoints(self, removePct: float):
+    def removeRoiPoints(self, removePercent: float):
         dists = np.cumsum(
             np.r_[0, np.sqrt((np.diff(self.vertices, axis=0) ** 2).sum(axis=1))]
         )
-        keepAmt = dists[-1] * (1 - removePct)
+        keepAmt = dists[-1] * (1 - removePercent)
         keepAmt = np.clip(keepAmt, 0, np.inf)
         # First distance is 0, so at least one point is guaranteed to be kept
         keepIdx = np.flatnonzero(dists <= keepAmt)[-1]
         self.setRoiPoints(self.vertices[:keepIdx])
 
-    def updateShape(self, ev: QtGui.QMouseEvent, xyEvCoords: XYVertices):
+    def updateShape(self, ev: QtGui.QMouseEvent, xyEventCoords: XYVertices):
         self.lastEvType = ev.type()
-        return super().updateShape(ev, xyEvCoords)
+        return super().updateShape(ev, xyEventCoords)
 
 
 SHAPE_ROI_MAPPING: Dict[PrjParam, Callable[[], PlotDataROI]] = {

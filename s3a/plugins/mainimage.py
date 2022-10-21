@@ -18,7 +18,9 @@ class MainImagePlugin(ParamEditorPlugin):
 
     def __initEditorParams__(self, shared: SharedAppSettings, **kwargs):
         self.props = ParamContainer()
-        shared.generalProps.registerProp(CNST.PROP_MIN_COMP_SZ, container=self.props)
+        shared.generalProperties.registerProp(
+            CNST.PROP_MIN_COMP_SZ, container=self.props
+        )
         self.tableData = shared.tableData
         super().__initEditorParams__(shared=shared, **kwargs)
         self._cachedRegionIntersection = False
@@ -99,31 +101,33 @@ class MainImagePlugin(ParamEditorPlugin):
         self.registerFunc(startCopy, btnOpts=CNST.TOOL_COPY_REGIONS)
         copier.sigMoveStopped.connect(win.mainImage.updateFocusedComponent)
 
-    def _hookupSelectionTools(self, win):
-        disp = win.componentController
+    def _hookupSelectionTools(self, window):
+        disp = window.componentController
         self.registerFunc(
-            disp.mergeSelectedComps,
+            disp.mergeSelectedComponents,
             btnOpts=CNST.TOOL_MERGE_COMPS,
             ignoreKeys=["keepId"],
         )
-        self.registerFunc(disp.splitSelectedComps, btnOpts=CNST.TOOL_SPLIT_COMPS)
-        self.registerFunc(disp.removeSelectedCompOverlap, btnOpts=CNST.TOOL_REM_OVERLAP)
+        self.registerFunc(disp.splitSelectedComponents, btnOpts=CNST.TOOL_SPLIT_COMPS)
+        self.registerFunc(
+            disp.removeSelectedComponentOverlap, btnOpts=CNST.TOOL_REM_OVERLAP
+        )
 
     @property
     def image(self):
         return self.win.mainImage.image
 
-    def createComponent(self, roiVerts: XYVertices):
-        verts = np.clip(roiVerts.astype(int), 0, self.image.shape[:2][::-1])
+    def createComponent(self, roiVertices: XYVertices):
+        verts = np.clip(roiVertices.astype(int), 0, self.image.shape[:2][::-1])
 
         if cv.contourArea(verts) < self.props[CNST.PROP_MIN_COMP_SZ]:
             # Use as selection instead of creation
-            self.win.componentController.reflectSelectionBoundsMade(roiVerts[[0]])
+            self.win.componentController.reflectSelectionBoundsMade(roiVertices[[0]])
             return
 
         verts = ComplexXYVertices([verts]).simplify(
             self.win.verticesPlugin.props[CNST.PROP_REG_APPROX_EPS]
         )
-        newComps = self.tableData.makeCompDf()
+        newComps = self.tableData.makeComponentDf()
         newComps[RTF.VERTICES] = [verts]
         self.win.addAndFocusComponents(newComps)

@@ -14,10 +14,10 @@ from utilitys.processing import *
 from ...constants import PRJ_ENUMS
 from ...generalutils import (
     cornersToFullBoundary,
-    getCroppedImg,
-    showMaskDiff,
+    getCroppedImage,
+    showMaskDifference,
     tryCvResize,
-    getObjsDefinedInSelfModule,
+    getObjectsDefinedInSelfModule,
 )
 from ...structures import (
     BlackWhiteImg,
@@ -62,11 +62,13 @@ def growSeedpoint(img: NChanImg, seeds: XYVertices, thresh: float) -> BlackWhite
     return bwOut
 
 
-def _cvConnComps(image: np.ndarray, returnLabels=True, areaOnly=True, removeBg=True):
+def _cvConnComps(
+    image: np.ndarray, returnLabels=True, areaOnly=True, removeBackground=True
+):
     if image.dtype != "uint8":
         image = image.astype("uint8")
     _, labels, conncomps, _ = cv.connectedComponentsWithStats(image)
-    startIdx = 1 if removeBg else 0
+    startIdx = 1 if removeBackground else 0
     if areaOnly:
         conncomps = conncomps[:, cv.CC_STAT_AREA]
     if returnLabels:
@@ -76,45 +78,47 @@ def _cvConnComps(image: np.ndarray, returnLabels=True, areaOnly=True, removeBg=T
 
 def format_vertices(
     image: NChanImg,
-    fgVerts: XYVertices,
-    bgVerts: XYVertices,
-    prevCompMask: BlackWhiteImg,
+    foregroundVertices: XYVertices,
+    backgroundVertices: XYVertices,
+    oldComponentMask: BlackWhiteImg,
     firstRun: bool,
     useFullBoundary=True,
-    keepVertHistory=True,
+    keepVerticesHistory=True,
 ):
 
-    if firstRun or not keepVertHistory or not np.any(procCache["mask"]):
+    if firstRun or not keepVerticesHistory or not np.any(procCache["mask"]):
         _historyMask = np.zeros(image.shape[:2], "uint8")
     else:
         _historyMask = procCache["mask"].copy()
 
     asForeground = True
-    for fillClr, verts in enumerate([bgVerts, fgVerts], PRJ_ENUMS.HISTORY_BACKGROUND):
+    for fillClr, verts in enumerate(
+        [backgroundVertices, foregroundVertices], PRJ_ENUMS.HISTORY_BACKGROUND
+    ):
         if not verts.empty and verts.connected:
             cv.fillPoly(_historyMask, [verts], fillClr)
 
     if useFullBoundary:
-        if not fgVerts.empty:
-            fgVerts = cornersToFullBoundary(fgVerts)
-        if not bgVerts.empty:
-            bgVerts = cornersToFullBoundary(bgVerts)
+        if not foregroundVertices.empty:
+            foregroundVertices = cornersToFullBoundary(foregroundVertices)
+        if not backgroundVertices.empty:
+            backgroundVertices = cornersToFullBoundary(backgroundVertices)
 
     procCache["mask"] = _historyMask
     curHistory = _historyMask.copy()
-    if fgVerts.empty and not bgVerts.empty:
+    if foregroundVertices.empty and not backgroundVertices.empty:
         # Invert the mask and paint foreground pixels
         asForeground = False
         # Invert the history mask too
         curHistory[_historyMask == FGND] = BGND
         curHistory[_historyMask == BGND] = FGND
-        fgVerts = bgVerts
-        bgVerts = XYVertices()
+        foregroundVertices = backgroundVertices
+        backgroundVertices = XYVertices()
 
     if asForeground:
-        foregroundAdjustedCompMask = prevCompMask
+        foregroundAdjustedCompMask = oldComponentMask
     else:
-        foregroundAdjustedCompMask = ~prevCompMask
+        foregroundAdjustedCompMask = ~oldComponentMask
 
     # Default to bound slices that encompass the whole image
     bounds = np.array([[0, 0], image.shape[:2][::-1]])
@@ -122,26 +126,26 @@ def format_vertices(
     return ProcessIO(
         image=image,
         summaryInfo=None,
-        fgVerts=fgVerts,
-        bgVerts=bgVerts,
+        foregroundVertices=foregroundVertices,
+        backgroundVertices=backgroundVertices,
         asForeground=asForeground,
         historyMask=curHistory,
-        prevCompMask=foregroundAdjustedCompMask,
-        origCompMask=prevCompMask,
+        oldComponentMask=foregroundAdjustedCompMask,
+        unformattedOldComponentMask=oldComponentMask,
         boundSlices=boundSlices,
     )
 
 
 def crop_to_local_area(
     image: NChanImg,
-    fgVerts: XYVertices,
-    bgVerts: XYVertices,
-    prevCompMask: BlackWhiteImg,
+    foregroundVertices: XYVertices,
+    backgroundVertices: XYVertices,
+    oldComponentMask: BlackWhiteImg,
     prevCompVerts: ComplexXYVertices,
     viewbox: XYVertices,
     historyMask: GrayImg,
     reference="viewbox",
-    margin_pct=10,
+    marginPct=10,
     maxSize=0,
     useMinSpan=False,
 ):
@@ -161,7 +165,7 @@ def crop_to_local_area(
         defined by the shortest side of the viewbox. So, for aspect ratios far from 1
         (i.e. heavily rectangular), this prevents a large area from being used every time
     """
-    roiVerts = np.vstack([fgVerts, bgVerts])
+    roiVerts = np.vstack([foregroundVertices, backgroundVertices])
     compVerts = np.vstack([prevCompVerts.stack(), roiVerts])
     if reference == "image":
         allVerts = np.array([[0, 0], image.shape[:2]])
@@ -190,15 +194,15 @@ def crop_to_local_area(
     except ValueError:
         # 0-sized
         vertArea_rowCol = 0
-    margin = int(round(max(vertArea_rowCol) * (margin_pct / 100)))
-    cropped, bounds = getCroppedImg(image, allVerts, margin)
+    margin = int(round(max(vertArea_rowCol) * (marginPct / 100)))
+    cropped, bounds = getCroppedImage(image, allVerts, margin)
     ratio = 1
     curMaxDim = np.max(cropped.shape[:2])
     if 0 < maxSize < curMaxDim:
         ratio = maxSize / curMaxDim
 
     vertOffset = bounds.min(0)
-    useVerts = [fgVerts, bgVerts]
+    useVerts = [foregroundVertices, backgroundVertices]
     for ii in range(2):
         # Add additional offset
         tmp = ((useVerts[ii] - vertOffset) * ratio).astype(int)
@@ -209,10 +213,10 @@ def crop_to_local_area(
             dtype=int,
             casting="unsafe",
         )
-    fgVerts, bgVerts = useVerts
+    foregroundVertices, backgroundVertices = useVerts
 
     boundSlices = slice(*bounds[:, 1]), slice(*bounds[:, 0])
-    croppedCompMask = prevCompMask[boundSlices]
+    croppedCompMask = oldComponentMask[boundSlices]
     curHistory = historyMask[boundSlices]
 
     rectThickness = int(max(1, *image.shape) * 0.005)
@@ -231,16 +235,16 @@ def crop_to_local_area(
     info = {"name": "Selected Area", "image": toPlot}
     out = ProcessIO(
         image=cropped,
-        fgVerts=fgVerts,
-        bgVerts=bgVerts,
-        prevCompMask=croppedCompMask,
+        foregroundVertices=foregroundVertices,
+        backgroundVertices=backgroundVertices,
+        oldComponentMask=croppedCompMask,
         boundSlices=boundSlices,
         historyMask=curHistory,
         resizeRatio=ratio,
         summaryInfo=info,
     )
     if ratio < 1:
-        for kk in "image", "prevCompMask", "historyMask":
+        for kk in "image", "oldComponentMask", "historyMask":
             out[kk] = cv_resize(out[kk], ratio, interpolation="INTER_NEAREST")
     return out
 
@@ -248,8 +252,8 @@ def crop_to_local_area(
 def apply_process_result(
     image: NChanImg,
     asForeground: bool,
-    prevCompMask: BlackWhiteImg,
-    origCompMask: BlackWhiteImg,
+    oldComponentMask: BlackWhiteImg,
+    unformattedOldComponentMask: BlackWhiteImg,
     boundSlices: Tuple[slice, slice],
     resizeRatio: float,
 ):
@@ -262,8 +266,8 @@ def apply_process_result(
     # so expand the current area of interest only as much as needed. Returning to full
     # size now would incur unnecessary addtional processing times for the full-sized
     # image
-    outMask = origCompMask.copy()
-    change = bitOperation(prevCompMask, image)
+    outMask = unformattedOldComponentMask.copy()
+    change = bitOperation(oldComponentMask, image)
     if resizeRatio < 1:
         origSize = (
             boundSlices[0].stop - boundSlices[0].start,
@@ -301,14 +305,16 @@ def apply_process_result(
 
 
 def return_to_full_size(
-    image: NChanImg, origCompMask: BlackWhiteImg, boundSlices: Tuple[slice]
+    image: NChanImg,
+    unformattedOldComponentMask: BlackWhiteImg,
+    boundSlices: Tuple[slice],
 ):
-    out = np.zeros_like(origCompMask)
+    out = np.zeros_like(unformattedOldComponentMask)
     if image.ndim > 2:
         image = image.mean(2).astype(int)
     out[boundSlices] = image
 
-    infoMask = showMaskDiff(origCompMask[boundSlices], image)
+    infoMask = showMaskDifference(unformattedOldComponentMask[boundSlices], image)
 
     return ProcessIO(
         image=out, summaryInfo={"image": infoMask, "name": "Finalize Region"}
@@ -319,8 +325,10 @@ def fill_holes(image: NChanImg):
     return ProcessIO(image=binary_fill_holes(image))
 
 
-def disallow_paint_tool(_image: NChanImg, fgVerts: XYVertices, bgVerts: XYVertices):
-    if len(np.vstack([fgVerts, bgVerts])) < 2:
+def disallow_paint_tool(
+    _image: NChanImg, foregroundVertices: XYVertices, backgroundVertices: XYVertices
+):
+    if len(np.vstack([foregroundVertices, backgroundVertices])) < 2:
         raise ValueError(
             "This algorithm requires an enclosed area to work."
             " Only one vertex was given as an input."
@@ -362,7 +370,7 @@ opening = AtomicProcess(morph_op, "Opening", op="MORPH_OPEN")
 closing = AtomicProcess(morph_op, "Closing", op="MORPH_CLOSE")
 
 
-def keep_largest_comp(image: NChanImg):
+def keep_largest_component(image: NChanImg):
     if not np.any(image):
         return ProcessIO(image=image)
     areas, labels = _cvConnComps(image)
@@ -374,16 +382,16 @@ def keep_largest_comp(image: NChanImg):
     return ProcessIO(image=out)
 
 
-def remove_small_comps(image: NChanImg, minSzThreshold=30):
+def remove_small_components(image: NChanImg, sizeThreshold=30):
     areas, labels = _cvConnComps(image, areaOnly=True)
-    validLabels = np.flatnonzero(areas >= minSzThreshold) + 1
+    validLabels = np.flatnonzero(areas >= sizeThreshold) + 1
     out = np.isin(labels, validLabels)
     return ProcessIO(image=out)
 
 
-def draw_vertices(image: NChanImg, fgVerts: XYVertices):
-    if len(fgVerts):
-        image = ComplexXYVertices([fgVerts]).toMask(image.shape[:2]) > 0
+def draw_vertices(image: NChanImg, foregroundVertices: XYVertices):
+    if len(foregroundVertices):
+        image = ComplexXYVertices([foregroundVertices]).toMask(image.shape[:2]) > 0
     else:
         image = np.zeros(image.shape[:2], dtype=bool)
     return ProcessIO(image=image)
@@ -403,29 +411,31 @@ class CvGrabcut(AtomicProcess):
     def grabcut(
         self,
         image: NChanImg,
-        prevCompMask: BlackWhiteImg,
-        fgVerts: XYVertices,
+        oldComponentMask: BlackWhiteImg,
+        foregroundVertices: XYVertices,
         firstRun: bool,
         historyMask: GrayImg,
         iters=5,
     ):
         if image.size == 0:
-            return ProcessIO(image=np.zeros_like(prevCompMask))
+            return ProcessIO(image=np.zeros_like(oldComponentMask))
         img = cv.cvtColor(image, cv.COLOR_RGB2BGR)
         historyMask = historyMask.copy()
         if historyMask.size:
-            historyMask[fgVerts.rows, fgVerts.cols] = FGND
-        mask = np.zeros(prevCompMask.shape, dtype="uint8")
+            historyMask[foregroundVertices.rows, foregroundVertices.columns] = FGND
+        mask = np.zeros(oldComponentMask.shape, dtype="uint8")
         if historyMask.shape == mask.shape:
-            mask[prevCompMask == 1] = cv.GC_PR_FGD
-            mask[prevCompMask == 0] = cv.GC_PR_BGD
+            mask[oldComponentMask == 1] = cv.GC_PR_FGD
+            mask[oldComponentMask == 0] = cv.GC_PR_BGD
             mask[historyMask == FGND] = cv.GC_FGD
             mask[historyMask == BGND] = cv.GC_BGD
-        if len(fgVerts) and np.all(fgVerts.ptp(0) > 1):
-            cvRect = np.array([fgVerts.min(0), fgVerts.ptp(0)]).flatten()
+        if len(foregroundVertices) and np.all(foregroundVertices.ptp(0) > 1):
+            cvRect = np.array(
+                [foregroundVertices.min(0), foregroundVertices.ptp(0)]
+            ).flatten()
             mode = None
         else:
-            # Can't make a rect out of empty / 0-length verts, use dummy values
+            # Can't make a rect out of empty / 0-length vertices, use dummy values
             cvRect = None
             mode = cv.GC_INIT_WITH_MASK
 
@@ -438,7 +448,7 @@ class CvGrabcut(AtomicProcess):
 
         if not np.any(mask):
             if cvRect[2] == 0 or cvRect[3] == 0:
-                return ProcessIO(image=np.zeros_like(prevCompMask))
+                return ProcessIO(image=np.zeros_like(oldComponentMask))
             mode = mode or cv.GC_INIT_WITH_RECT
         else:
             mode = mode or cv.GC_INIT_WITH_MASK
@@ -480,7 +490,7 @@ def morph_acwe(image: NChanImg, initialCheckerSize=6, iters=35, smoothing=3):
     return ProcessIO(labels=outLevels)
 
 
-def k_means_segmentation(image: NChanImg, kVal=5, attempts=10):
+def k_means_segmentation(image: NChanImg, kValue=5, attempts=10):
     # Logic taken from
     # https://docs.opencv.org/master/d1/d5c/tutorial_py_kmeans_opencv.html
     numChannels = 1 if image.ndim < 3 else image.shape[2]
@@ -488,7 +498,7 @@ def k_means_segmentation(image: NChanImg, kVal=5, attempts=10):
     clrs = clrs.astype("float32")
     criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 10, 1.0)
     ret, lbls, imgMeans = cv.kmeans(
-        clrs, kVal, None, criteria, attempts, cv.KMEANS_RANDOM_CENTERS
+        clrs, kValue, None, criteria, attempts, cv.KMEANS_RANDOM_CENTERS
     )
     # Now convert back into uint8, and make original image
     imgMeans = imgMeans.astype(image.dtype)
@@ -513,7 +523,7 @@ def _labelBoundaries_cv(labels: np.ndarray, thickness: int):
 def binarize_labels(
     image: NChanImg,
     labels: BlackWhiteImg,
-    fgVerts: XYVertices,
+    foregroundVertices: XYVertices,
     historyMask: BlackWhiteImg,
     touchingRoiOnly=True,
     useMeanColor=True,
@@ -538,7 +548,7 @@ def binarize_labels(
         raise ValueError(
             "Cannot handle multichannel labels.\n" f"(labelss.shape={labels.shape})"
         )
-    seeds = np.clip(fgVerts[:, ::-1], 0, np.array(labels.shape) - 1)
+    seeds = np.clip(foregroundVertices[:, ::-1], 0, np.array(labels.shape) - 1)
     if image.ndim < 3:
         image = image[..., None]
     if touchingRoiOnly and len(seeds):
@@ -577,27 +587,29 @@ def binarize_labels(
         summaryImg = image.copy()
         summaryImg[boundaries, ...] = [255 for _ in range(nChans)]
     color = (255,) + tuple(0 for _ in range(1, nChans))
-    if len(fgVerts):
-        cv.drawContours(summaryImg, [fgVerts], -1, color, lineThickness)
+    if len(foregroundVertices):
+        cv.drawContours(summaryImg, [foregroundVertices], -1, color, lineThickness)
     return ProcessIO(image=out, summaryInfo={"image": summaryImg})
 
 
-def region_grow_segmentation(image: NChanImg, fgVerts: XYVertices, seedThresh=10):
+def region_grow_segmentation(
+    image: NChanImg, foregroundVertices: XYVertices, seedThreshold=10
+):
     if image.size == 0:
         return ProcessIO(image=np.zeros(image.shape[:2], bool))
-    if np.all(fgVerts == fgVerts[0, :]):
+    if np.all(foregroundVertices == foregroundVertices[0, :]):
         # Remove unnecessary redundant seedpoints
-        fgVerts = fgVerts[[0], :]
+        foregroundVertices = foregroundVertices[[0], :]
     # outMask = np.zeros(image.shape[0:2], bool)
     # For small enough shapes, get all boundary pixels instead of just shape vertices
-    if fgVerts.connected:
-        fgVerts = cornersToFullBoundary(fgVerts, 50e3)
+    if foregroundVertices.connected:
+        foregroundVertices = cornersToFullBoundary(foregroundVertices, 50e3)
 
     # Don't let region grow outside area of effect
-    # img_aoe, coords = getCroppedImg(image, fgVerts, areaOfEffect, coordsAsSlices=True)
+    # img_aoe, coords = getCroppedImg(image, foregroundVertices, areaOfEffect, returnSlices=True)
     # Offset vertices before filling
-    # seeds = fgVerts - [coords[1].start, coords[0].start]
-    outMask = growSeedpoint(image, fgVerts, seedThresh)
+    # seeds = foregroundVertices - [coords[1].start, coords[0].start]
+    outMask = growSeedpoint(image, foregroundVertices, seedThreshold)
 
     return ProcessIO(image=outMask)
 
@@ -658,4 +670,4 @@ __all__ = [
     "opening",
     "closing",
     "slic_segmentation",
-] + getObjsDefinedInSelfModule(vars(), _selfModule)
+] + getObjectsDefinedInSelfModule(vars(), _selfModule)

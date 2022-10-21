@@ -26,9 +26,9 @@ _litLst = typing_extensions.Literal[PRJ_ENUMS.IO_IMPORT, PRJ_ENUMS.IO_EXPORT]
 _maybeCallable = Optional[Union[Callable, AnnotationIOBase]]
 
 
-def _attrNameFmt(buildOrExport: _litLst, obj):
+def _attributeNameFormat(buildOrExport: _litLst, obj):
     def membership(el):
-        for exclude in ["FileType", "Opts", "Types", "Serialized"]:
+        for exclude in ["FileType", "Options", "Types", "Serialized"]:
             if el.endswith(exclude):
                 return False
         return el.startswith(buildOrExport)
@@ -46,7 +46,7 @@ def _attrNameFmt(buildOrExport: _litLst, obj):
     return out
 
 
-def _writeImgWithMetadata(
+def _writeImageWithMetadata(
     outImg: np.ndarray,
     saveName: FilePath,
     mapping: pd.Series = None,
@@ -62,7 +62,7 @@ def _writeImgWithMetadata(
     outImg.save(saveName, pnginfo=info)
 
 
-_defaultResizeOpts = dict(
+_defaultResizeOptions = dict(
     shape=None, keepAspectRatio=True, padVal=np.nan, allowReorient=True
 )
 
@@ -90,12 +90,12 @@ class ComponentIO:
     Table to use for import/export cross checks. This is how class and table field 
     information is derived.
     """
-    importOpts = {}
+    importOptions = {}
     """
     Propagated to every importByFileType call to provide user-specified defaults as 
     desired
     """
-    exportOpts = {}
+    exportOptions = {}
     """
     Propagated to every exportByFileType call to provide user-specified defaults as 
     desired
@@ -124,18 +124,18 @@ class ComponentIO:
         self.exportSerialized = SerialExporter()
         self.exportYoloV5 = YoloV5Exporter()
 
-    def updateOpts(self, importOrExport: _litLst, **opts):
+    def updateOptions(self, importOrExport: _litLst, **opts):
         # Propagate custom defaults to each desired function
         if importOrExport == PRJ_ENUMS.IO_EXPORT:
             typeDict = self.exportTypes
         else:
             typeDict = self.importTypes
         for fileExt in typeDict:
-            ioFunc = self._ioFnFromFileType(fileExt, importOrExport)
+            ioFunc = self._ioFunctionFromFileType(fileExt, importOrExport)
             try:
-                ioFunc.opts.update(**opts)
+                ioFunc.options.update(**opts)
             except AttributeError:
-                # Can't set opts on a regular function
+                # Can't set options on a regular function
                 continue
 
     @property
@@ -144,7 +144,7 @@ class ComponentIO:
         File types this class can export. {file type: description} useful for adding to
         file picker dialog
         """
-        return _attrNameFmt(PRJ_ENUMS.IO_EXPORT, self)
+        return _attributeNameFormat(PRJ_ENUMS.IO_EXPORT, self)
 
     @property
     def importTypes(self):
@@ -152,7 +152,7 @@ class ComponentIO:
         Types this class can import. {file type: description} useful for adding to
         file picker dialog
         """
-        return _attrNameFmt(PRJ_ENUMS.IO_IMPORT, self)
+        return _attributeNameFormat(PRJ_ENUMS.IO_IMPORT, self)
 
     def ioFileFilter(
         self,
@@ -194,18 +194,18 @@ class ComponentIO:
 
     def exportByFileType(
         self,
-        compDf: pd.DataFrame,
+        componentDf: pd.DataFrame,
         file: Union[str, Path],
         verifyIntegrity=True,
         **exportArgs,
     ):
         file = Path(file)
-        outFn = self._ioFnFromFileType(file, PRJ_ENUMS.IO_EXPORT)
+        outFn = self._ioFunctionFromFileType(file, PRJ_ENUMS.IO_EXPORT)
 
-        ret = outFn(compDf, file, **exportArgs)
+        ret = outFn(componentDf, file, **exportArgs)
         if verifyIntegrity and file.suffix[1:] in self.roundTripTypes:
             loadedDf = self.importByFileType(file)
-            compareDataframes(compDf, loadedDf)
+            compareDataframes(componentDf, loadedDf)
         return ret
 
     def importByFileType(
@@ -215,13 +215,13 @@ class ComponentIO:
         strColumns=False,
         **importArgs,
     ) -> pd.DataFrame:
-        buildFn = self._ioFnFromFileType(inFile, PRJ_ENUMS.IO_IMPORT)
+        buildFn = self._ioFunctionFromFileType(inFile, PRJ_ENUMS.IO_IMPORT)
         outDf = buildFn(inFile, imageShape=imageShape, **importArgs)
         if strColumns:
             outDf.columns = list(map(str, outDf.columns))
         return outDf
 
-    def _ioFnFromFileType(
+    def _ioFunctionFromFileType(
         self,
         fpath: Union[str, Path],
         buildOrExport=_litLst,
@@ -230,7 +230,7 @@ class ComponentIO:
     ) -> _maybeCallable | Tuple[_maybeCallable, str]:
         fpath = Path(fpath)
         fname = fpath.name
-        cmpTypes = np.array(list(_attrNameFmt(buildOrExport, self)))
+        cmpTypes = np.array(list(_attributeNameFormat(buildOrExport, self)))
         typIdx = [fname.endswith(typ) for typ in cmpTypes]
         if not any(typIdx):
             raise IOError(f"Not sure how to handle file {fpath.name}")
@@ -257,7 +257,7 @@ class ComponentIO:
             exportArgs = {}
         if not isinstance(fromData, pd.DataFrame):
             fromData = self.importByFileType(fromData, **importArgs)
-        exportFn = self._ioFnFromFileType(toFile, PRJ_ENUMS.IO_EXPORT)
+        exportFn = self._ioFunctionFromFileType(toFile, PRJ_ENUMS.IO_EXPORT)
         if not doExport:
             toFile = None
         return exportFn(fromData, toFile, **exportArgs)

@@ -31,7 +31,7 @@ class ComponentTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
         "added": np.array([], int),
         "ids": np.array([], int),
     }
-    sigCompsChanged = Signal(dict)
+    sigComponentsChanged = Signal(dict)
     sigFieldsChanged = Signal()
 
     def __initEditorParams__(self, shared: SharedAppSettings):
@@ -106,7 +106,7 @@ class ComponentTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
             )
         toEmit = self.defaultEmitDict.copy()
         toEmit["changed"] = np.array([self.compDf.index[index.row()]])
-        self.sigCompsChanged.emit(toEmit)
+        self.sigComponentsChanged.emit(toEmit)
         yield True
         self.setData(index, oldVal, role)
         return True
@@ -122,7 +122,7 @@ class ComponentTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
     def resetFields(self):
         self.columnTitles = [f.name for f in self.tableData.allFields]
 
-        self.compDf = self.tableData.makeCompDf(0)
+        self.compDf = self.tableData.makeComponentDf(0)
 
         noEditParams = [
             f for f in self.tableData.allFields if f.opts.get("readonly", False)
@@ -146,29 +146,29 @@ class ComponentManager(ComponentTableModel):
     @DASM.undoable("Add/Modify Components")
     def addComponents(
         self,
-        newCompsDf: pd.DataFrame,
-        addtype: PRJ_ENUMS = PRJ_ENUMS.COMP_ADD_AS_NEW,
+        componentsDf: pd.DataFrame,
+        addType: PRJ_ENUMS = PRJ_ENUMS.COMPONENT_ADD_AS_NEW,
         emitChange=True,
     ):
         toEmit = self.defaultEmitDict.copy()
         existingIds = self.compDf.index
-        newIdsForOrigComps = newCompsDf.index.to_numpy(dtype=int, copy=True)
+        newIdsForOrigComps = componentsDf.index.to_numpy(dtype=int, copy=True)
 
-        if len(newCompsDf) == 0:
+        if len(componentsDf) == 0:
             # Nothing to undo
             return toEmit
 
         # Only allow updates from columns that exist
-        newCompsDf = newCompsDf[[c for c in newCompsDf if c in self.compDf]]
+        componentsDf = componentsDf[[c for c in componentsDf if c in self.compDf]]
 
         # Delete entries with no vertices, since they make work within the app difficult.
         # It is allowed to merge without vertices present
-        if RTF.VERTICES in newCompsDf:
-            verts = newCompsDf[RTF.VERTICES]
+        if RTF.VERTICES in componentsDf:
+            verts = componentsDf[RTF.VERTICES]
             dropLocs = verts.map(ComplexXYVertices.isEmpty).to_numpy(bool)
-            dropIds = newCompsDf.index[dropLocs]
-            newCompsDf = newCompsDf.loc[~dropLocs].copy()
-        elif addtype != PRJ_ENUMS.COMP_ADD_AS_MERGE:
+            dropIds = componentsDf.index[dropLocs]
+            componentsDf = componentsDf.loc[~dropLocs].copy()
+        elif addType != PRJ_ENUMS.COMPONENT_ADD_AS_MERGE:
             warn(
                 "Cannot add new components without vertices. Returning.",
                 UserWarning,
@@ -176,67 +176,67 @@ class ComponentManager(ComponentTableModel):
             )
             return
         else:
-            dropLocs = np.zeros(len(newCompsDf), dtype=bool)
+            dropLocs = np.zeros(len(componentsDf), dtype=bool)
             dropIds = np.array([], dtype=int)
-            newCompsDf = newCompsDf.copy()
+            componentsDf = componentsDf.copy()
 
         newIdsForOrigComps[dropLocs] = -1
 
-        if RTF.INST_ID in newCompsDf:
+        if RTF.ID in componentsDf:
             # IDs take precedence over native index if present
             # Pandas 1.4 warns FutureWarning without guaranteed int dtype
             # A copy was already made above, so this is potentially redundant
-            newCompsDf[RTF.INST_ID] = newCompsDf[RTF.INST_ID].astype(int, copy=False)
-            newCompsDf = newCompsDf.set_index(RTF.INST_ID, drop=False)
+            componentsDf[RTF.ID] = componentsDf[RTF.ID].astype(int, copy=False)
+            componentsDf = componentsDf.set_index(RTF.ID, drop=False)
 
-        if addtype == PRJ_ENUMS.COMP_ADD_AS_NEW:
-            # Treat all comps as new -> set their IDs to guaranteed new values
+        if addType == PRJ_ENUMS.COMPONENT_ADD_AS_NEW:
+            # Treat all components as new -> set their IDs to guaranteed new values
             newIds = np.arange(
                 self._nextComponentId,
-                self._nextComponentId + len(newCompsDf),
+                self._nextComponentId + len(componentsDf),
                 dtype=int,
             )
-            newCompsDf[RTF.INST_ID] = newIds
+            componentsDf[RTF.ID] = newIds
             dropIds = np.array([], dtype=int)
         else:
-            # Merge may have been performed with new comps (id -1) mixed in
-            needsUpdatedId = newCompsDf.index == RTF.INST_ID.value
+            # Merge may have been performed with new components (id -1) mixed in
+            needsUpdatedId = componentsDf.index == RTF.ID.value
             newIds = np.arange(
                 self._nextComponentId,
                 self._nextComponentId + np.sum(needsUpdatedId),
                 dtype=int,
             )
-            newCompsDf.loc[needsUpdatedId, RTF.INST_ID] = newIds
+            componentsDf.loc[needsUpdatedId, RTF.ID] = newIds
 
-        newCompsDf = newCompsDf.set_index(RTF.INST_ID, drop=False)
-        newIdsForOrigComps[~dropLocs] = newCompsDf.index.to_numpy(int)
+        componentsDf = componentsDf.set_index(RTF.ID, drop=False)
+        newIdsForOrigComps[~dropLocs] = componentsDf.index.to_numpy(int)
 
         # Track dropped data for undo
-        alteredIdxs = np.concatenate([newCompsDf.index.values, dropIds])
+        alteredIdxs = np.concatenate([componentsDf.index.values, dropIds])
         alteredDataDf = self.compDf.loc[np.intersect1d(self.compDf.index, alteredIdxs)]
 
         # Delete entries that were updated to have no vertices
         toEmit.update(self.removeComponents(dropIds, emitChange=False))
         # Now, merge existing IDs and add new ones
-        newIds = newCompsDf.index
+        newIds = componentsDf.index
         newChangedIdxs = np.isin(newIds, existingIds, assume_unique=True)
         changedIds = newIds[newChangedIdxs]
 
         # Signal to table that rows should change
         self.layoutAboutToBeChanged.emit()
         # Ensure indices overlap with the components these are replacing
-        self.compDf.update(newCompsDf)
+        self.compDf.update(componentsDf)
         toEmit["changed"] = changedIds
 
         # Record mapping for exterior scopes
         toEmit["ids"] = newIdsForOrigComps
 
-        # Finally, add new comps
-        compsToAdd = newCompsDf.iloc[~newChangedIdxs, :]
+        # Finally, add new components
+        compsToAdd = componentsDf.iloc[~newChangedIdxs, :]
         # Make sure all required data is present for new rows
         missingCols = np.setdiff1d(self.compDf.columns, compsToAdd.columns)
         if missingCols.size > 0 and len(compsToAdd) > 0:
-            embedInfo = self.tableData.makeCompDf(len(compsToAdd)).set_index(
+            embedInfo = self.tableData.makeComponentDf(len(compsToAdd)).set_index(
                 compsToAdd.index
             )
             compsToAdd[missingCols] = embedInfo[missingCols]
@@ -250,12 +250,12 @@ class ComponentManager(ComponentTableModel):
         self._nextComponentId = np.max(self.compDf.index.to_numpy(), initial=-1) + 1
 
         if emitChange:
-            self.sigCompsChanged.emit(toEmit)
+            self.sigComponentsChanged.emit(toEmit)
 
         yield toEmit
 
         # Undo add by deleting new components and un-updating existing ones
-        self.addComponents(alteredDataDf, PRJ_ENUMS.COMP_ADD_AS_MERGE)
+        self.addComponents(alteredDataDf, PRJ_ENUMS.COMPONENT_ADD_AS_MERGE)
         addedCompIdxs = toEmit["added"]
         if len(addedCompIdxs) > 0:
             self.removeComponents(toEmit["added"])
@@ -263,31 +263,29 @@ class ComponentManager(ComponentTableModel):
     @DASM.undoable("Remove Components")
     def removeComponents(
         self,
-        idsToRemove: Union[np.ndarray, type(PRJ_ENUMS)] = PRJ_ENUMS.COMP_RM_ALL,
+        removeIds: Union[np.ndarray, type(PRJ_ENUMS)] = PRJ_ENUMS.COMPONENT_REMOVE_ALL,
         emitChange=True,
     ) -> dict:
         toEmit = self.defaultEmitDict.copy()
         # Generate ID list
         existingCompIds = self.compDf.index
-        if idsToRemove is PRJ_ENUMS.COMP_RM_ALL:
-            idsToRemove = existingCompIds
-        elif not hasattr(idsToRemove, "__iter__"):
+        if removeIds is PRJ_ENUMS.COMPONENT_REMOVE_ALL:
+            removeIds = existingCompIds
+        elif not hasattr(removeIds, "__iter__"):
             # single number passed in
-            idsToRemove = [idsToRemove]
-        idsToRemove = np.array(idsToRemove)
+            removeIds = [removeIds]
+        removeIds = np.array(removeIds)
 
         # Do nothing for IDs not actually in the existing list
-        idsActuallyRemoved = np.isin(idsToRemove, existingCompIds, assume_unique=True)
+        idsActuallyRemoved = np.isin(removeIds, existingCompIds, assume_unique=True)
         if len(idsActuallyRemoved) == 0:
             return toEmit
-        idsToRemove = idsToRemove[idsActuallyRemoved]
+        removeIds = removeIds[idsActuallyRemoved]
 
         # Track for undo purposes
-        removedData = self.compDf.loc[idsToRemove]
+        removedData = self.compDf.loc[removeIds]
 
-        tfKeepIdx = np.isin(
-            existingCompIds, idsToRemove, assume_unique=True, invert=True
-        )
+        tfKeepIdx = np.isin(existingCompIds, removeIds, assume_unique=True, invert=True)
 
         # Reset manager's component list
         self.layoutAboutToBeChanged.emit()
@@ -303,22 +301,22 @@ class ComponentManager(ComponentTableModel):
             self._nextComponentId = np.max(existingCompIds[tfKeepIdx].to_numpy()) + 1
 
         # Reflect these changes to the component list
-        toEmit["deleted"] = idsToRemove
+        toEmit["deleted"] = removeIds
         if emitChange:
-            self.sigCompsChanged.emit(toEmit)
-        if len(idsToRemove) > 0:
+            self.sigComponentsChanged.emit(toEmit)
+        if len(removeIds) > 0:
             yield toEmit
         else:
             # Nothing to undo
             return toEmit
 
         # Undo code
-        self.addComponents(removedData, PRJ_ENUMS.COMP_ADD_AS_MERGE)
+        self.addComponents(removedData, PRJ_ENUMS.COMPONENT_ADD_AS_MERGE)
 
     @DASM.undoable("Merge Components")
-    def mergeCompVertsById(self, mergeIds: OneDArr = None, keepId: int = None):
+    def mergeById(self, mergeIds: OneDArr = None, keepId: int = None):
         """
-        Merges the selected components
+        Merges the selected components based on spatial overlap
 
         Parameters
         ----------
@@ -344,16 +342,16 @@ class ComponentManager(ComponentTableModel):
 
         deleted = self.removeComponents(mergeComps.index, emitChange=False)["deleted"]
         toEmit = self.addComponents(
-            keepInfo.to_frame().T, PRJ_ENUMS.COMP_ADD_AS_MERGE, emitChange=False
+            keepInfo.to_frame().T, PRJ_ENUMS.COMPONENT_ADD_AS_MERGE, emitChange=False
         )
         toEmit["deleted"] = np.concatenate([toEmit["deleted"], deleted])
-        self.sigCompsChanged.emit(toEmit)
+        self.sigComponentsChanged.emit(toEmit)
 
         yield
-        self.addComponents(mergeComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
+        self.addComponents(mergeComps, PRJ_ENUMS.COMPONENT_ADD_AS_MERGE)
 
     @DASM.undoable("Split Components")
-    def splitCompVertsById(self, splitIds: OneDArr):
+    def splitById(self, splitIds: OneDArr):
         """
         Makes a separate component for each distinct boundary in all selected
         components. For instance, if two components are selected, and each has two
@@ -369,12 +367,14 @@ class ComponentManager(ComponentTableModel):
         splitVerts = splitComps[RTF.VERTICES].s3averts.split()
         newComps = splitComps.loc[splitVerts.index].copy()
         newComps[RTF.VERTICES] = splitVerts
-        # Keep track of which comps were removed and added by this op
+        # Keep track of which components were removed and added by this op
         outDict = self.removeComponents(splitComps.index)
         outDict.update(self.addComponents(newComps))
         yield outDict
         undoDict = self.removeComponents(outDict["ids"])
-        undoDict.update(self.addComponents(splitComps, PRJ_ENUMS.COMP_ADD_AS_MERGE))
+        undoDict.update(
+            self.addComponents(splitComps, PRJ_ENUMS.COMPONENT_ADD_AS_MERGE)
+        )
         return undoDict
 
     def removeOverlapById(self, overlapIds: OneDArr):
@@ -386,4 +386,4 @@ class ComponentManager(ComponentTableModel):
         """
         overlapComps = self.compDf.loc[overlapIds].copy()
         overlapComps[RTF.VERTICES] = overlapComps[RTF.VERTICES].s3averts.removeOverlap()
-        self.addComponents(overlapComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
+        self.addComponents(overlapComps, PRJ_ENUMS.COMPONENT_ADD_AS_MERGE)

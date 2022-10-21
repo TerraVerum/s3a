@@ -27,12 +27,12 @@ def disableAppDuringFunc(func):
     return disableApp
 
 
-def createAndAddMenuAct(
-    mainWin: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, title: str, asMenu=False
+def createAndAddMenuAction(
+    mainWindow: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, title: str, asMenu=False
 ) -> Union[QtWidgets.QMenu, QtGui.QAction]:
     menu = None
     if asMenu:
-        menu = QtWidgets.QMenu(title, mainWin)
+        menu = QtWidgets.QMenu(title, mainWindow)
         act = menu.menuAction()
     else:
         act = QtGui.QAction(title)
@@ -43,7 +43,7 @@ def createAndAddMenuAct(
         return act
 
 
-def autosaveOptsDialog(parent):
+def autosaveOptionsDialog(parent):
     dlg = QtWidgets.QDialog(parent)
     layout = QtWidgets.QGridLayout(dlg)
     dlg.setLayout(layout)
@@ -139,24 +139,24 @@ class DropList(QtWidgets.QListWidget):
 
 
 class RegionHistoryViewer(QtWidgets.QMainWindow):
-    sigDiffsChanged = QtCore.Signal()
+    sigImageBufferChanged = QtCore.Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.diffs: List[np.ndarray] = []
+        self.differenceImages: List[np.ndarray] = []
         self.histTimer = QtCore.QTimer(self)
 
-        self.diffImg = pg.ImageItem()
-        dp = self.displayPlt = ImageViewer()
-        self.displayPlt.addItem(self.diffImg)
-        self.diffImg.setOpacity(0.5)
+        self.differenceImage = pg.ImageItem()
+        dp = self.displayPlot = ImageViewer()
+        self.displayPlot.addItem(self.differenceImage)
+        self.differenceImage.setOpacity(0.5)
 
         _, param = dp.toolsEditor.registerFunc(
-            self.updateImg, runOpts=RunOpts.ON_CHANGED, returnParam=True
+            self.updateImage, runOpts=RunOpts.ON_CHANGED, returnParam=True
         )
         self.slider = param.child("curSlice")
-        self.sigDiffsChanged.connect(
-            lambda: self.slider.setLimits([0, len(self.diffs) - 1])
+        self.sigImageBufferChanged.connect(
+            lambda: self.slider.setLimits([0, len(self.differenceImages) - 1])
         )
         self.histTimer.timeout.connect(self.incrSlicer)
 
@@ -169,9 +169,9 @@ class RegionHistoryViewer(QtWidgets.QMainWindow):
         EasyWidget.buildMainWin([dp], layout="H", win=self)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dp.toolsEditor)
 
-    def setDiffs(self, diffs: List[np.ndarray]):
-        self.diffs = diffs
-        self.sigDiffsChanged.emit()
+    def setDifferenceImages(self, differenceImages: List[np.ndarray]):
+        self.differenceImages = differenceImages
+        self.sigImageBufferChanged.emit()
 
     def autoPlay(self, timestep=500):
         """
@@ -183,16 +183,16 @@ class RegionHistoryViewer(QtWidgets.QMainWindow):
         self.histTimer.start(timestep)
 
     def incrSlicer(self):
-        if self.slider.value() < len(self.diffs) - 1:
+        if self.slider.value() < len(self.differenceImages) - 1:
             self.slider.setValue(self.slider.value() + 1)
         else:
             self.histTimer.stop()
 
     def show(self):
         super().show()
-        self.displayPlt.toolsEditor.show()
+        self.displayPlot.toolsEditor.show()
 
-    def updateImg(self, curSlice=0):
+    def updateImage(self, curSlice=0):
         """
         Parameters
         ----------
@@ -200,7 +200,7 @@ class RegionHistoryViewer(QtWidgets.QMainWindow):
             pType: slider
             limits: [0, 10]
         """
-        self.diffImg.setImage(self.diffs[curSlice])
+        self.differenceImage.setImage(self.differenceImages[curSlice])
 
     def discardLeftEntries(self):
-        self.setDiffs(self.diffs[self.slider.value() :])
+        self.setDifferenceImages(self.differenceImages[self.slider.value() :])

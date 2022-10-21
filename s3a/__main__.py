@@ -47,7 +47,7 @@ class S3AHelp(Action):
     def __call__(self, parser, *args, **kwargs) -> None:
         mkQApp()
         win = S3A(loadLastState=False, log=PRJ_ENUMS.LOG_NONE)
-        win.makeHelpOpts(parser)
+        win.updateCliOptions(parser)
         # Prevent settings overwrite
         win.appStateEditor.saveParamValues = lambda *args, **kwargs: None
         win.forceClose()

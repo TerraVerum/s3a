@@ -19,8 +19,8 @@ class EditPlugin(ParamEditorPlugin):
         self.registerFunc(stack.redo, name="Redo", btnOpts=CNST.TOOL_REDO)
 
         def updateUndoRedoTxts(_action=None):
-            self.undoAct.setText(f"Undo: {stack.undoDescr}")
-            self.redoAct.setText(f"Redo: {stack.redoDescr}")
+            self.undoAction.setText(f"Undo: {stack.undoDescr}")
+            self.redoAction.setText(f"Redo: {stack.redoDescr}")
 
         stack.stackChangedCallbacks.append(updateUndoRedoTxts)
 
@@ -40,9 +40,9 @@ class EditPlugin(ParamEditorPlugin):
         updateUndoRedoTxts()
 
     @property
-    def undoAct(self):
+    def undoAction(self):
         return [a for a in self.menu.actions() if a.text().startswith("Undo")][0]
 
     @property
-    def redoAct(self):
+    def redoAction(self):
         return [a for a in self.menu.actions() if a.text().startswith("Redo")][0]

@@ -43,7 +43,7 @@ class ImgProcWrapper(NestedProcWrapper):
         self.output = outImg
         return outImg
 
-    def resultAsVerts(self, localEstimate=True):
+    def resultAsVertices(self, localEstimate=True):
         initialList = ComplexXYVertices.fromBinaryMask(self.output)
         if len(initialList) == 0:
             return initialList
@@ -60,12 +60,12 @@ class ImgProcWrapper(NestedProcWrapper):
             raise RuntimeError("Cannot run processor without an image")
 
         runKwargs.setdefault("firstRun", True)
-        for name in "fgVerts", "bgVerts":
+        for name in "foregroundVertices", "backgroundVertices":
             runKwargs.setdefault(name, XYVertices())
 
-        if runKwargs.get("prevCompMask", None) is None:
+        if runKwargs.get("oldComponentMask", None) is None:
             noPrevMask = True
-            runKwargs["prevCompMask"] = np.zeros(image.shape[:2], bool)
+            runKwargs["oldComponentMask"] = np.zeros(image.shape[:2], bool)
         else:
             noPrevMask = False
 

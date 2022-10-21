@@ -11,7 +11,7 @@ from utilitys import EditorPropsMixin, ParamContainer, PrjParam, RunOpts, fns
 
 from .clickables import BoundScatterPlot
 from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS as RTF
-from ..generalutils import stackedVertsPlusConnections, symbolFromVerts
+from ..generalutils import stackedVerticesPlusConnections, symbolFromVertices
 from ..structures import (
     BlackWhiteImg,
     ComplexXYVertices,
@@ -20,7 +20,7 @@ from ..structures import (
     XYVertices,
 )
 
-__all__ = ["MultiRegionPlot", "VertexDefinedImg", "RegionMoverPlot"]
+__all__ = ["MultiRegionPlot", "VertexDefinedImage", "RegionMoverPlot"]
 
 from .rois import ROIManipulator
 
@@ -112,7 +112,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
     def resetRegionList(
         self,
         newRegionDf: Optional[pd.DataFrame] = None,
-        labelField: PrjParam = RTF.INST_ID,
+        labelField: PrjParam = RTF.ID,
     ):
         idList = None
         if newRegionDf is not None and labelField in newRegionDf.columns:
@@ -170,7 +170,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
         if updatePlot:
             self.updatePlot(useCache=True)
 
-    def getShownIdxs(self):
+    def getShownIndexes(self):
         """Returns a boolean mask of rows in regionData which should be shown"""
         usePoints = np.ones(len(self.regionData), dtype=bool)
         if not self.showSelected:
@@ -183,7 +183,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
         # -----------
         # Update data
         # -----------
-        usePoints = self.getShownIdxs()
+        usePoints = self.getShownIndexes()
 
         if self.regionData.empty or not np.any(usePoints):
             self.setData(x=[], y=[], data=[])
@@ -194,7 +194,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
             or self._symbolCache is None
             or len(self._symbolCache) != len(self.regionData)
         ):
-            self._symbolCache = self.createSybolLUT()
+            self._symbolCache = self.createSybolLut()
 
         plotRegions = np.vstack(self._symbolCache.loc[usePoints, "location"])
         self.setData(
@@ -204,24 +204,24 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
         )
         self.updateColors()
 
-    def createSybolLUT(self, regionData: pd.DataFrame = None):
+    def createSybolLut(self, regionData: pd.DataFrame = None):
         if regionData is None:
             regionData = self.regionData
         boundLocs = []
         boundSymbs = []
         for region in regionData[RTF.VERTICES]:
-            boundSymbol, boundLoc = symbolFromVerts(region)
+            boundSymbol, boundLoc = symbolFromVertices(region)
 
             boundLocs.append(boundLoc)
             boundSymbs.append(boundSymbol)
         cache = {"location": boundLocs, "symbol": boundSymbs}
         return pd.DataFrame(cache)
 
-    def toGrayImg(self, imageShape: Sequence[int] = None):
+    def toGrayImage(self, imageShape: Sequence[int] = None):
         labelDf = pd.DataFrame()
         labelDf[RTF.VERTICES] = self.regionData[RTF.VERTICES]
         # Override id column to avoid an extra parameter
-        labelDf[RTF.INST_ID] = self.regionData[PRJ_ENUMS.FIELD_LABEL]
+        labelDf[RTF.ID] = self.regionData[PRJ_ENUMS.FIELD_LABEL]
         return defaultIo.exportLblPng(labelDf, imageShape=imageShape)
 
     def pointsAt(self, pos):
@@ -233,15 +233,15 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
         return self._selectionOnHiddenIds(selection, "boundsWithin")
 
     def _selectionOnHiddenIds(
-        self, selection: XYVertices | QtCore.QPoint, checkFunc: str
+        self, selection: XYVertices | QtCore.QPoint, checkFunction: str
     ):
         """
         Must be overridden since MultiRegionPlot might be hiding focused IDs, in which
         case they won't show up when testing point data.
         Logic is the same for ``pointsAt`` or ``boundsWithin``
         """
-        pts = getattr(super(), checkFunc)(selection)
-        hiddenPts = ~self.getShownIdxs()
+        pts = getattr(super(), checkFunction)(selection)
+        hiddenPts = ~self.getShownIndexes()
         if not hiddenPts.any():
             # Nothing was hidden, so parent impl. checked every point
             return pts
@@ -249,13 +249,13 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
         needsCheck = self.regionData.loc[hiddenPts]
         # TODO: Probably a better way to do this instead of creating a new plot to check
         checkPlt = self._createPlotForHiddenRegions(needsCheck)
-        hiddenAndSelected = getattr(checkPlt, checkFunc)(selection)
+        hiddenAndSelected = getattr(checkPlt, checkFunction)(selection)
         if len(hiddenAndSelected):
             return np.concatenate([pts, hiddenAndSelected])
         return pts
 
     def _createPlotForHiddenRegions(self, hiddenDf):
-        symbLut = self.createSybolLUT(hiddenDf)
+        symbLut = self.createSybolLut(hiddenDf)
         with type(self).setEditorPropertyOpts(shared=None):
             checkerPlot = BoundScatterPlot()
 
@@ -342,7 +342,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
         return list(bounds[:, ax])
 
 
-class VertexDefinedImg(DASM, EditorPropsMixin, pg.ImageItem):
+class VertexDefinedImage(DASM, EditorPropsMixin, pg.ImageItem):
     sigRegionReverted = Signal(object)  # new GrayImg
 
     __groupingName__ = "Focused Image Graphics"
@@ -368,21 +368,23 @@ class VertexDefinedImg(DASM, EditorPropsMixin, pg.ImageItem):
         return outImg
 
     @DASM.undoable("Modify Focused Region")
-    def updateFromVertices(self, newVerts: ComplexXYVertices, srcImg: GrayImg = None):
+    def updateFromVertices(
+        self, newVertices: ComplexXYVertices, sourceImage: GrayImg = None
+    ):
         oldImg = self.image
         oldVerts = self.verts
 
-        self.verts = newVerts.copy()
-        if len(newVerts) == 0:
+        self.verts = newVertices.copy()
+        if len(newVertices) == 0:
             regionData = np.zeros((1, 1), dtype=bool)
         else:
-            if srcImg is None:
-                stackedVerts = newVerts.stack()
-                regionData = newVerts.toMask()
+            if sourceImage is None:
+                stackedVerts = newVertices.stack()
+                regionData = newVertices.toMask()
                 # Make vertices full brightness
-                regionData[stackedVerts.rows, stackedVerts.cols] = 2
+                regionData[stackedVerts.rows, stackedVerts.columns] = 2
             else:
-                regionData = srcImg.copy()
+                regionData = sourceImage.copy()
 
         self.setImage(regionData, levels=[0, 2], lut=self.getLUTFromScheme())
         yield
@@ -399,8 +401,8 @@ class VertexDefinedImg(DASM, EditorPropsMixin, pg.ImageItem):
             return
         verts = ComplexXYVertices.fromBinaryMask(newMask)
         stackedVerts = verts.stack()
-        newMask[stackedVerts.rows, stackedVerts.cols] = 2
-        self.updateFromVertices(verts, srcImg=newMask)
+        newMask[stackedVerts.rows, stackedVerts.columns] = 2
+        self.updateFromVertices(verts, sourceImage=newMask)
         return
 
     def getLUTFromScheme(self):
@@ -426,9 +428,9 @@ class RegionMoverPlot(QtCore.QObject):
 
         self._connectivity = np.ndarray([], bool)
 
-    def transformedData(self, verts: ComplexXYVertices):
-        out = ComplexXYVertices(hierarchy=verts.hierarchy)
-        for sublist in verts:
+    def transformedData(self, vertices: ComplexXYVertices):
+        out = ComplexXYVertices(hierarchy=vertices.hierarchy)
+        for sublist in vertices:
             out.append(self.manipRoi.getTransformedPoints(data=sublist))
         return out
 
@@ -438,7 +440,7 @@ class RegionMoverPlot(QtCore.QObject):
         for verts in baseData[
             RTF.VERTICES
         ]:  # each list element represents one component
-            plotData, connectivity = stackedVertsPlusConnections(verts)
+            plotData, connectivity = stackedVerticesPlusConnections(verts)
             allData.append(plotData)
             allConnctivity.append(connectivity)
             if len(connectivity) > 0:

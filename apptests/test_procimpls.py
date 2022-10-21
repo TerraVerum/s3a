@@ -7,7 +7,7 @@ from skimage import util
 
 from apptests.testingconsts import SAMPLE_IMG
 from s3a import ComplexXYVertices, REQD_TBL_FIELDS
-from s3a.generalutils import imgCornerVertices
+from s3a.generalutils import imageCornerVertices
 from s3a.processing import ImageProcess
 from s3a.processing.algorithms import multipred as mulp, make_grid_components
 from s3a.structures import XYVertices
@@ -23,7 +23,7 @@ def test_algs_working(app, vertsPlugin):
     allAlgs = vertsPlugin.procEditor.collection.topProcesses
 
     # Some exceptions may occur in the processor, this is fine since behavior might be undefined
-    mImg.shapeCollection.sigShapeFinished.emit(imgCornerVertices(app.mainImage.image))
+    mImg.shapeCollection.sigShapeFinished.emit(imageCornerVertices(app.mainImage.image))
     for alg in allAlgs:
         pe.changeActiveProcessor(alg)
         with warnings.catch_warnings():
@@ -36,14 +36,15 @@ def test_disable_top_stages(app, vertsPlugin):
     mImg = app.mainImage
     pe = vertsPlugin.procEditor
     oldProc = pe.currentProcessor.algName
-    mImg.shapeCollection.sigShapeFinished.emit(imgCornerVertices(app.mainImage.image))
+    mImg.shapeCollection.sigShapeFinished.emit(imageCornerVertices(app.mainImage.image))
     for name in pe.collection.topProcesses:
-        proc = pe.collection.parseProcName(name)
+        proc = pe.collection.parseProcessName(name)
         pe.changeActiveProcessor(proc, saveBeforeChange=False)
         for stage in proc.stagesFlattened:
             if stage.allowDisable and isinstance(stage, ImageProcess):
                 pe.currentProcessor.setStageEnabled([stage.name], False)
-        # Some exceptions may occur in the processor, this is fine since behavior might be undefined
+        # Some exceptions may occur in the processor, this is fine since behavior might
+        # be undefined
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
             mImg.shapeCollection.sigShapeFinished.emit(XYVertices())
@@ -52,8 +53,8 @@ def test_disable_top_stages(app, vertsPlugin):
 
 
 # -----
-# Administrative Image processes (e.g. cropping, formatting, etc. stages that must work for every kind of process
-# hierarchy
+# Administrative Image processes (e.g. cropping, formatting, etc. stages that must
+# work for every kind of process hierarchy
 # -----
 def test_crop_image():
     testImg = SAMPLE_SMALL_IMG.copy()
@@ -68,9 +69,9 @@ def test_crop_image():
             # Make sure this works for all image types and downsample sizes
             out = ip.crop_to_local_area(
                 image=converter(testImg),
-                fgVerts=XYVertices(),
-                bgVerts=XYVertices(),
-                prevCompMask=testMask,
+                foregroundVertices=XYVertices(),
+                backgroundVertices=XYVertices(),
+                oldComponentMask=testMask,
                 prevCompVerts=ComplexXYVertices(),
                 viewbox=XYVertices(),
                 historyMask=np.zeros_like(testMask),
@@ -96,7 +97,7 @@ def test_template_dispatch(app):
 
     # Two perfectly matching circles should be detected by template matching
     templateSize = 2 * rad + 1
-    dummyComp = app.componentIo.tableData.makeCompDf(1)
+    dummyComp = app.componentIo.tableData.makeComponentDf(1)
     templateVerts = XYVertices([[0, 0], [templateSize, templateSize]])
     dummyComp.at[dummyComp.index[0], REQD_TBL_FIELDS.VERTICES] = ComplexXYVertices(
         [templateVerts], coerceListElements=True

@@ -11,7 +11,7 @@ from utilitys import EditorPropsMixin, PrjParam
 
 from .regions import MultiRegionPlot
 from ..constants import REQD_TBL_FIELDS as RTF
-from ..generalutils import minVertsCoord, symbolFromVerts
+from ..generalutils import getTopLeftCoordinate, symbolFromVertices
 from ..shared import SharedAppSettings
 
 
@@ -40,20 +40,20 @@ class FieldDisplayDelegate(ABC):
         """Hide data without clearing it"""
         raise NotImplementedError
 
-    def setData(self, comps: pd.DataFrame, field: PrjParam, **kwargs):
+    def setData(self, components: pd.DataFrame, field: PrjParam, **kwargs):
         """
         Called with all data that matches this delegate.
 
         Parameters
         ----------
-        comps
+        components
             DataFrame of all components that match this delegate
         field
             Field to which this delegate belongs. In some cases, data *outside* this
             field is required for proper display (i.e. text labels need Vertices for
             their position). So, while the whole dataframe is passed, only the data
             that is relevant to this delegate should be consumed. No matter what,
-            `comps` should *not* be modified.
+            `components` should *not* be modified.
         **kwargs
             ways to customise the display. `setData` will be registered as a function in
           a ParamEditor, so these will be user-customizable.
@@ -106,7 +106,12 @@ class TextFieldDelegate(SceneItemContainer):
         self.items = [self.scatter, self.bgScatter]
 
     def setData(
-        self, comps: pd.DataFrame, field: PrjParam, fontSize=10, textColor="w", **kwargs
+        self,
+        components: pd.DataFrame,
+        field: PrjParam,
+        fontSize=10,
+        textColor="w",
+        **kwargs,
     ):
         """
         Parameters
@@ -115,10 +120,10 @@ class TextFieldDelegate(SceneItemContainer):
             pType: color
         """
         positions = np.row_stack(
-            comps[RTF.VERTICES].apply(lambda el: minVertsCoord(el.stack()))
+            components[RTF.VERTICES].apply(lambda el: getTopLeftCoordinate(el.stack()))
         )
         symbols_scales = np.row_stack(
-            comps[field].apply(self.makeTextSymbol, returnScale=True)
+            components[field].apply(self.makeTextSymbol, returnScale=True)
         )
         keepLocs = [s is not None for s in symbols_scales[:, 0]]
         positions = positions[keepLocs]
@@ -150,22 +155,22 @@ class TextFieldDelegate(SceneItemContainer):
         return path
 
     @staticmethod
-    def makeTextSymbol(txt: str, fontSize=12, returnScale=False):
-        if not txt:
+    def makeTextSymbol(text: str, fontSize=12, returnScale=False):
+        if not text:
             # No way to draw symbol
             if returnScale:
                 return None, 1
             else:
                 return None
         outSymbol = QtGui.QPainterPath()
-        txtLabel = QtGui.QFont("Sans Serif", fontSize)
-        # txtLabel.setStyleStrategy(QtGui.QFont.StyleStrategy.PreferBitmap)
-        lines = txt.split("\n")
-        outSymbol.addText(0, 0, txtLabel, lines[0])
+        textLabel = QtGui.QFont("Sans Serif", fontSize)
+        # textLabel.setStyleStrategy(QtGui.QFont.StyleStrategy.PreferBitmap)
+        lines = text.split("\n")
+        outSymbol.addText(0, 0, textLabel, lines[0])
         height = outSymbol.boundingRect().height()
         heightWithMargin = height * 1.2
         for ii, line in enumerate(lines[1:]):
-            outSymbol.addText(0, heightWithMargin * (ii + 1), txtLabel, line)
+            outSymbol.addText(0, heightWithMargin * (ii + 1), textLabel, line)
         br = outSymbol.boundingRect()
         scale = 1.0 / max(br.width(), br.height())
         tr = QtGui.QTransform()
@@ -195,7 +200,7 @@ class XYVerticesDelegate(SceneItemContainer):
 
     def setData(
         self,
-        comps: pd.DataFrame,
+        components: pd.DataFrame,
         field: PrjParam,
         spotSize=15,
         spotColor="y",
@@ -209,9 +214,9 @@ class XYVerticesDelegate(SceneItemContainer):
             pType: color
         """
         # Single coordinates and disconnected vertices are points, while connected
-        # verts are shaded polygons.
+        # vertices are shaded polygons.
         polyVerts, pointVerts, callouts = [], [], []
-        for idx, verts in comps[field].items():
+        for idx, verts in components[field].items():
             # Ignore empty vertices
             if not len(verts):
                 continue
@@ -224,13 +229,13 @@ class XYVerticesDelegate(SceneItemContainer):
                 pointVerts.append(verts)
             point = verts[[0]]
             callouts.append(
-                self._calloutLine(comps.at[idx, RTF.VERTICES].stack(), point)
+                self._calloutLine(components.at[idx, RTF.VERTICES].stack(), point)
             )
 
         # Checking length prevents "need at least one array to concatenate" error
         if len(polyVerts):
             polySymbols, polyPositions = zip(
-                *[symbolFromVerts(_verts) for _verts in polyVerts]
+                *[symbolFromVertices(_verts) for _verts in polyVerts]
             )
             polyPositions = np.row_stack(polyPositions)
         else:
@@ -257,11 +262,11 @@ class XYVerticesDelegate(SceneItemContainer):
             self.calloutCurve.setData(*calloutPositions.T, pen=pen, connect="pairs")
 
     @staticmethod
-    def _calloutLine(compVerts, point):
+    def _calloutLine(vertices, point):
         """
         Creates a callout line from the point to the comp vertex closest to the origin
         """
-        return np.row_stack([minVertsCoord(compVerts), point])
+        return np.row_stack([getTopLeftCoordinate(vertices), point])
 
 
 class ComplexXYVerticesDelegate(SceneItemContainer):
@@ -271,10 +276,10 @@ class ComplexXYVerticesDelegate(SceneItemContainer):
         self.region = MultiRegionPlot(disableMouseClick=True)
         self.items = [self.region]
 
-    def setData(self, comps: pd.DataFrame, field: PrjParam, **kwargs):
+    def setData(self, components: pd.DataFrame, field: PrjParam, **kwargs):
         setComps = pd.DataFrame()
-        setComps[RTF.VERTICES] = comps[field]
-        # TODO: Expose label param for coloring, etc.
+        setComps[RTF.VERTICES] = components[field]
+        # TODO: Expose label parameter for coloring, etc.
         self.region.resetRegionList(setComps)
 
 
@@ -301,27 +306,27 @@ class FieldDisplay(EditorPropsMixin):
             "complexxyvertices", ComplexXYVerticesDelegate, override=True
         )
         # Vertices are already displayed, source image is the same for all components
-        self.ignoreCols = [RTF.VERTICES, RTF.IMG_FILE]
+        self.ignoreColumns = [RTF.VERTICES, RTF.IMAGE_FILE]
 
     def registerDelegate(
-        self, pType, delegate: Type[FieldDisplayDelegate], override=False
+        self, fieldType, delegate: Type[FieldDisplayDelegate], override=False
     ):
         """
         Assigns a delegate for displaying a type of data. I.e. a MultiRegionPlot is the
-        delegate for vertices-like data. `pType` corresponds to the same field as
-        PrjParam.pType, which is a registered form of field data. It may be a single
+        delegate for vertices-like data. `fieldType` corresponds to the same field as
+        PrjParam.fieldType, which is a registered form of field data. It may be a single
         string or tuple of strings, each denoting a type (i.e. 'int', 'list', etc.).
         """
-        if not isinstance(pType, tuple):
-            pType = (pType,)
-        for typ in pType:
+        if not isinstance(fieldType, tuple):
+            fieldType = (fieldType,)
+        for typ in fieldType:
             if typ in self.availableDelegates and not override:
                 raise ValueError(f"Delegate for {typ} already registered")
             self.availableDelegates[typ] = delegate
 
-    def showFieldData(self, comps: pd.DataFrame, fields=None, **kwargs):
-        self.callDelegateFunc("clear")
-        if not len(comps):
+    def showFieldData(self, components: pd.DataFrame, fields=None, **kwargs):
+        self.callDelegateFunction("clear")
+        if not len(components):
             return
 
         if fields is None:
@@ -335,27 +340,27 @@ class FieldDisplay(EditorPropsMixin):
             for f in fields
             if self.availableDelegates.get(f.pType, self.defaultDelegate)
             is self.defaultDelegate
-            and f not in self.ignoreCols
+            and f not in self.ignoreColumns
         ]
 
         if defaultFields:
-            comps = self._replaceDefaultData(comps, defaultFields)
+            components = self._replaceDefaultData(components, defaultFields)
             # Ensure defaults don't get thrown out below
             fields.append(self.DEFAULT_FIELD)
 
-        for field in comps:
-            if field in self.ignoreCols or field not in fields:
+        for field in components:
+            if field in self.ignoreColumns or field not in fields:
                 continue
             delegateCls = self.availableDelegates.get(field.pType, None)
             if delegateCls is None:
                 continue
             delegate = delegateCls()
             delegate.addToDisplay(self.plotItem)
-            delegate.setData(comps, field, **kwargs)
+            delegate.setData(components, field, **kwargs)
             self.inUseDelegates.append(delegate)
 
     @classmethod
-    def _replaceDefaultData(cls, comps: pd.DataFrame, fields):
+    def _replaceDefaultData(cls, components: pd.DataFrame, fields):
         """
         Concats all data into text for display with the default delagate, and drops the
         original fields
@@ -363,16 +368,16 @@ class FieldDisplay(EditorPropsMixin):
         converter = lambda comp: "\n".join(
             f"{index}: {data}" for index, data in comp.items() if len(str(data))
         )
-        text = comps[fields].apply(converter, axis=1)
+        text = components[fields].apply(converter, axis=1)
         text.name = cls.DEFAULT_FIELD
-        keepColumns = np.setdiff1d(comps.columns, fields)
-        delegateComps = pd.concat([text, comps[keepColumns]], axis=1)
+        keepColumns = np.setdiff1d(components.columns, fields)
+        delegateComps = pd.concat([text, components[keepColumns]], axis=1)
         return delegateComps
 
-    def callDelegateFunc(self, funcName, *args):
+    def callDelegateFunction(self, functionName, *args):
         for delegate in self.inUseDelegates:
-            getattr(delegate, funcName)(*args)
+            getattr(delegate, functionName)(*args)
         # Special case: clearing means letting go of refs
-        if funcName == "clear":
-            self.callDelegateFunc("removeFromDisplay", self.plotItem)
+        if functionName == "clear":
+            self.callDelegateFunction("removeFromDisplay", self.plotItem)
             self.inUseDelegates.clear()

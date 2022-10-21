@@ -23,7 +23,7 @@ class MultiPredictionsPlugin(ProcessorPlugin):
             type(self), self.name + " Processor"
         )
         self.dock.addEditors([self.procEditor])
-        self.pluginRunnerProc = shared.multiPredictionCollection.parseProcName(
+        self.pluginRunnerProc = shared.multiPredictionCollection.parseProcessName(
             "Run Plugins", topFirst=False
         )
 
@@ -38,7 +38,7 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         win.mainImage.toolsEditor.registerFunc(
             self.makePrediction,
             btnOpts=CNST.TOOL_MULT_PRED,
-            ignoreKeys=["comps"],
+            ignoreKeys=["components"],
         )
         self.updateRunnerLimits()
         win.sigPluginAdded.connect(self.updateRunnerLimits)
@@ -47,16 +47,16 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         self.pluginRunnerProc.input.params["plugins"].setLimits(
             [
                 p.name
-                for p in self.win.clsToPluginMapping.values()
+                for p in self.win.classPluginMap.values()
                 if hasattr(p, "runOnComponent")
             ]
         )
 
-    def makePrediction(self, comps: pd.DataFrame = None, **runKwargs):
+    def makePrediction(self, components: pd.DataFrame = None, **runKwargs):
         if self.win.mainImage.image is None:
             return
-        if comps is None:
-            comps = self.win.exportableDf
+        if components is None:
+            components = self.win.componentDf
         # It is possible for a previously selected id to be deleted before a redraw
         # occurs, in which case the selected id won't correspond to a valid index.
         # Resolve using intersection with all components
@@ -67,8 +67,8 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         vbRange = np.array(self.mainImage.getViewBox().viewRange()).T
         image = self.win.mainImage.image
         result = self.currentProcessor.run(
-            components=comps,
-            fullComponents=comps,
+            components=components,
+            fullComponents=components,
             fullImage=image,
             image=image,
             viewbox=vbRange,
@@ -84,7 +84,7 @@ class MultiPredictionsPlugin(ProcessorPlugin):
             compsToAdd = self.applyPluginRunners(compsToAdd, result["plugins"])
 
         addType = runKwargs.get("addType") or result.get(
-            "addType", PRJ_ENUMS.COMP_ADD_AS_MERGE
+            "addType", PRJ_ENUMS.COMPONENT_ADD_AS_MERGE
         )
         return self.manager.addComponents(compsToAdd, addType)
 
@@ -95,7 +95,7 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         # But keep them recorded to handle them later on
         emptyComps = []
         for pluginName in plugins:
-            for plugin in self.win.clsToPluginMapping.values():
+            for plugin in self.win.classPluginMap.values():
                 if plugin.name == pluginName:
                     dispatched = multipred.ProcessDispatcher(plugin.runOnComponent)
                     emptyIdxs = (

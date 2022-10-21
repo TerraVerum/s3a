@@ -9,7 +9,7 @@ import pandas as pd
 from utilitys import PrjParam, fns, RunOpts
 from utilitys.typeoverloads import FilePath
 
-from .helpers import serialize, deserialize, checkVertBounds
+from .helpers import serialize, deserialize, checkVerticesBounds
 from ..constants import REQD_TBL_FIELDS as RTF
 from ..generalutils import toDictGen, deprecateKwargs
 from ..parameditors.table import TableData
@@ -34,14 +34,14 @@ class TblContainer_T(typing_extensions.Protocol):
 
 class _GenericExportProtocol(typing_extensions.Protocol):
     def __call__(
-        self, compDf: pd.DataFrame, exportObj, **kwargs
+        self, componentDf: pd.DataFrame, exportObject, **kwargs
     ) -> (t.Any, pd.DataFrame):
-        return exportObj, NO_ERRORS.copy()
+        return exportObject, NO_ERRORS.copy()
 
 
-class _UpdateExportObjProtocol(typing_extensions.Protocol):
-    def __call__(self, inst: dict, exportObj, **kwargs) -> t.Any:
-        return exportObj
+class _updateExportObjectProtocol(typing_extensions.Protocol):
+    def __call__(self, inst: dict, exportObject, **kwargs) -> t.Any:
+        return exportObject
 
 
 # Alias just for better readability
@@ -94,13 +94,13 @@ class AnnotationIOBase:
 
         if options is None:
             options = {}
-        self.opts = options
+        self.options = options
 
     def populateMetadata(self, **kwargs):
         return self._forwardMetadata(**kwargs)
 
     @classmethod
-    def optsMetadata(cls):
+    def optionsMetadata(cls):
         """
         Get all metadata descriptions from self and any base class ``populateMetadata``.
         """
@@ -136,14 +136,14 @@ class AnnotationIOBase:
             locals_ = {}
         keySource = {**locals_, **kwargs}
 
-        useKeys = set(kwargs).union(self.optsMetadata())
+        useKeys = set(kwargs).union(self.optionsMetadata())
         # Can only populate requested keys if they exist in the keysource
         return {kk: keySource[kk] for kk in useKeys.intersection(keySource)}
 
 
 class AnnotationExporter(AnnotationIOBase):
-    exportObj: t.Any
-    compDf: t.Optional[pd.DataFrame] = None
+    exportObject: t.Any
+    componentDf: t.Optional[pd.DataFrame] = None
 
     bulkExport: _GenericExportProtocol | None = None
     """
@@ -153,7 +153,7 @@ class AnnotationExporter(AnnotationIOBase):
     be present but empty.
     """
 
-    updateExportObj: _UpdateExportObjProtocol | None = None
+    updateExportObject: _updateExportObjectProtocol | None = None
     """
     Can be defined if individual importing (row-by-row) is possible. This is fed
     the current dataframe row as a dict of cell values and is expected to output the 
@@ -166,67 +166,67 @@ class AnnotationExporter(AnnotationIOBase):
 
     """Sentinel class to add errors to an explanatory message during export"""
 
-    def writeFile(self, file: FilePath, exportObj, **kwargs):
+    def writeFile(self, file: FilePath, exportObject, **kwargs):
         raise NotImplementedError
 
-    def createExportObj(self, **kwargs):
+    def createExportObject(self, **kwargs):
         raise NotImplementedError
 
-    def individualExport(self, compDf: pd.DataFrame, exportObj, **kwargs):
+    def individualExport(self, componentDf: pd.DataFrame, exportObject, **kwargs):
         """
         Returns an export object + dataframe of row + errors, if any occurred for some
         rows
         """
-        if self.updateExportObj is None:
+        if self.updateExportObject is None:
             # Can't do anything, don't modify the object and save time not iterating
             # over rows
-            return exportObj, NO_ERRORS.copy()
+            return exportObject, NO_ERRORS.copy()
         errs = []
-        for row in toDictGen(compDf):
+        for row in toDictGen(componentDf):
             try:
-                exportObj = self.updateExportObj(row, exportObj, **kwargs)
+                exportObject = self.updateExportObject(row, exportObject, **kwargs)
             except Exception as err:
                 row[self.ERROR_COL] = err
                 errs.append(row)
-        return exportObj, pd.DataFrame(errs)
+        return exportObject, pd.DataFrame(errs)
 
-    def formatReturnObj(self, exportObj, **kwargs):
+    def formatReturnObject(self, exportObject, **kwargs):
         # If metadata options change return behavior, that can be resolved here.
-        return exportObj
+        return exportObject
 
     def __call__(
         self,
-        compDf: pd.DataFrame,
+        componentDf: pd.DataFrame,
         file: FilePath = None,
         errorOk=False,
         **kwargs,
     ):
         file = Path(file) if isinstance(file, FilePath.__args__) else None
-        self.compDf = compDf
+        self.componentDf = componentDf
 
         kwargs.update(file=file)
-        activeOpts = {**self.opts, **kwargs}
+        activeOpts = {**self.options, **kwargs}
         meta = self.populateMetadata(**activeOpts)
         kwargs.update(**meta)
 
-        exportObj = self.createExportObj(**kwargs)
+        exportObject = self.createExportObject(**kwargs)
         for func in (
             self.bulkExport,
             self.individualExport,
         ):  # type: _GenericExportProtocol
             if func is None:
                 continue
-            exportObj, errs = func(compDf, exportObj, **kwargs)
+            exportObject, errs = func(componentDf, exportObject, **kwargs)
             if len(errs) and not errorOk:
                 raise ValueError(
                     "Encountered problems exporting the following annotations:\n"
                     + errs.to_string()
                 )
-        self.exportObj = exportObj
+        self.exportObject = exportObject
         if file is not None:
-            self.writeFile(kwargs.pop("file"), exportObj, **kwargs)
-        toReturn = self.formatReturnObj(exportObj, **kwargs)
-        self.compDf = None
+            self.writeFile(kwargs.pop("file"), exportObject, **kwargs)
+        toReturn = self.formatReturnObject(exportObject, **kwargs)
+        self.componentDf = None
         return toReturn
 
 
@@ -290,12 +290,12 @@ class AnnotationImporter(AnnotationIOBase):
             container = tableData
         self.container = container
         self.tableData = TableData()
-        self.destTableMapping = self.container.tableData
+        self.destinationTable = self.container.tableData
         self.refreshTableData()
 
     def refreshTableData(self):
-        self.destTableMapping = tableData = self.container.tableData
-        requiredCfg = IOTemplateManager.getTableCfg(self.ioType)
+        self.destinationTable = tableData = self.container.tableData
+        requiredCfg = IOTemplateManager.getTableConfig(self.ioType)
         if tableData is not None:
             # Make sure not to incorporate fields that only exist to provide logistics
             # for the other table setup
@@ -317,7 +317,7 @@ class AnnotationImporter(AnnotationIOBase):
         raise NotImplementedError
 
     @staticmethod
-    def _findSrcFieldForDest(destField, allSourceFields):
+    def _findSourceFieldForDestination(destField, allSourceFields):
         """
         Helper function during ``finalizeImport`` to find a match between a
         yet-to-serialize dataframe and destination tableData. Basically,
@@ -345,25 +345,25 @@ class AnnotationImporter(AnnotationIOBase):
                 )
         return srcField
 
-    def finalizeImport(self, compDf, **kwargs):
+    def finalizeImport(self, componentDf, **kwargs):
         """Deserializes any columns that are still strings"""
 
         # Objects in the original frame may be represented as strings, so try to
         # convert these as needed
         outDf = pd.DataFrame()
         # Preserve / transcribe fields that are already PrjParams
-        for destField in [f for f in compDf.columns if isinstance(f, PrjParam)]:
-            outDf[destField] = compDf[destField]
+        for destField in [f for f in componentDf.columns if isinstance(f, PrjParam)]:
+            outDf[destField] = componentDf[destField]
 
         # Need to serialize / convert string names since they indicate yet-to-serialize
         # columns
-        toConvert = set(compDf.columns)
+        toConvert = set(componentDf.columns)
         for destField in self.tableData.allFields:
-            srcField = self._findSrcFieldForDest(destField, toConvert)
+            srcField = self._findSourceFieldForDestination(destField, toConvert)
             if not srcField:
                 # No match
                 continue
-            dfVals = compDf[srcField]
+            dfVals = componentDf[srcField]
             # Parsing functions only know how to convert from strings to themselves.
             # So, assume the exting types can first convert themselves to strings
             serializedDfVals, errs = serialize(destField, dfVals)
@@ -381,7 +381,7 @@ class AnnotationImporter(AnnotationIOBase):
     @deprecateKwargs(keepExtraColumns="keepExtraFields", warningType=FutureWarning)
     def __call__(
         self,
-        inFileOrObj: t.Union[FilePath, t.Any],
+        inputFileOrObject: t.Union[FilePath, t.Any],
         *,
         parseErrorOk=False,
         reindex=False,
@@ -391,13 +391,17 @@ class AnnotationImporter(AnnotationIOBase):
     ):
         self.refreshTableData()
 
-        file = Path(inFileOrObj) if isinstance(inFileOrObj, FilePath.__args__) else None
+        file = (
+            Path(inputFileOrObject)
+            if isinstance(inputFileOrObject, FilePath.__args__)
+            else None
+        )
         if file is not None:
-            inFileOrObj = self.readFile(inFileOrObj, **kwargs)
-        self.importObj = inFileOrObj
+            inputFileOrObject = self.readFile(inputFileOrObject, **kwargs)
+        self.importObj = inputFileOrObject
 
         kwargs.update(file=file, reindex=reindex)
-        activeOpts = {**self.opts, **kwargs}
+        activeOpts = {**self.options, **kwargs}
         meta = self.populateMetadata(**activeOpts)
         kwargs.update(meta)
 
@@ -409,7 +413,7 @@ class AnnotationImporter(AnnotationIOBase):
             # Default to empty dataframes for unspecified importers
             if func is None:
                 func = lambda *_args, **_kw: pd.DataFrame()
-            parsedDfs.append(func(inFileOrObj, **kwargs))
+            parsedDfs.append(func(inputFileOrObject, **kwargs))
 
         indivParsedDf, bulkParsedDf = parsedDfs
         # Overwrite bulk-parsed information with individual if needed, or add to it
@@ -420,8 +424,8 @@ class AnnotationImporter(AnnotationIOBase):
 
         # Determine any destination mappings
         importedCols = parsedDf.columns.copy()
-        if self.destTableMapping:
-            parsedDf.columns = self.destTableMapping.resolveFieldAliases(
+        if self.destinationTable:
+            parsedDf.columns = self.destinationTable.resolveFieldAliases(
                 parsedDf.columns, kwargs.get("mapping", {})
             )
 
@@ -444,40 +448,40 @@ class AnnotationImporter(AnnotationIOBase):
             parsedDf = parsedDf.copy()
 
             # Desintation fields that never showed up should be appended
-            for field in self.destTableMapping.allFields:
+            for field in self.destinationTable.allFields:
                 # Special case: instance id is handled below
-                if field not in parsedDf and field != RTF.INST_ID:
+                if field not in parsedDf and field != RTF.ID:
                     parsedDf[field] = field.value
 
         # Make sure IDs are present
-        parsedDf = self._ensureInstIdIndex(parsedDf, reindex=reindex)
+        parsedDf = self._ensureIdsAsIndex(parsedDf, reindex=reindex)
 
         # Now that all column names and settings are resolve, handle any bad imports
         validDf = self.validInstances(parsedDf, parseErrorOk)
         # Ensure reindexing still takes place if requested
         if reindex and len(validDf) != len(parsedDf):
-            validDf[RTF.INST_ID] = validDf.index = np.arange(len(validDf))
+            validDf[RTF.ID] = validDf.index = np.arange(len(validDf))
 
         # Ensure vertices present, optionally check against known image shape
         if "imageShape" in kwargs and RTF.VERTICES in validDf:
-            checkVertBounds(validDf[RTF.VERTICES], kwargs.get("imageShape"))
+            checkVerticesBounds(validDf[RTF.VERTICES], kwargs.get("imageShape"))
         return validDf
 
     @staticmethod
-    def _ensureInstIdIndex(df, reindex=None):
-        alreadyExists = RTF.INST_ID in df
+    def _ensureIdsAsIndex(df, reindex=None):
+        alreadyExists = RTF.ID in df
         if reindex or not alreadyExists:
             sequentialIds = np.arange(len(df), dtype=int)
             if alreadyExists:  # Just reindexing
-                df[RTF.INST_ID] = sequentialIds
+                df[RTF.ID] = sequentialIds
             # Ensure instance ID is the first column if new
             else:
-                df.insert(0, RTF.INST_ID, sequentialIds)
-        elif not pd.api.types.is_integer_dtype(df[RTF.INST_ID]):
+                df.insert(0, RTF.ID, sequentialIds)
+        elif not pd.api.types.is_integer_dtype(df[RTF.ID]):
             # pandas 1.4 introduced FutureWarnings for object-dtype assignments so ensure
             # Instance ID is integer type
-            df[RTF.INST_ID] = df[RTF.INST_ID].astype(int)
-        return df.set_index(RTF.INST_ID, drop=False)
+            df[RTF.ID] = df[RTF.ID].astype(int)
+        return df.set_index(RTF.ID, drop=False)
 
     @classmethod
     def validInstances(cls, parsedDf: pd.DataFrame, parseErrorOk=False):

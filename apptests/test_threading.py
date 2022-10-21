@@ -3,8 +3,8 @@ import time
 
 from pyqtgraph.Qt import QtCore
 from s3a.processing import (
-    RunnableFuncWrapper,
-    ThreadedFuncWrapper,
+    RunnableFunctionWrapper,
+    ThreadedFunctionWrapper,
     AbortableThreadContainer,
     RunnableThreadContainer,
 )
@@ -102,7 +102,9 @@ def test_waiting(qtbot):
     assert doneCounter == 1
 
 
-@pytest.mark.parametrize("threadOrRunnable", [RunnableFuncWrapper, ThreadedFuncWrapper])
+@pytest.mark.parametrize(
+    "threadOrRunnable", [RunnableFunctionWrapper, ThreadedFunctionWrapper]
+)
 def test_wrappers(qtbot, threadOrRunnable):
     def myfunc(id_, err=False):
         if err:

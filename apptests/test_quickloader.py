@@ -12,19 +12,19 @@ def ql(app):
 
 @pytest.fixture()
 def editor(app):
-    return app.sharedAttrs.generalProps
+    return app.sharedAttrs.generalProperties
 
 
 def test_normal_add(ql, editor):
-    ql.addActForEditor(editor, "Default")
+    ql.addActionForEditor(editor, "Default")
     ql.applyChanges()
     assert editor.name in ql.params.names
     ql.params.clearChildren()
 
 
 def test_double_add(ql, editor):
-    ql.addActForEditor(editor, "Default")
-    ql.addActForEditor(editor, "Default")
+    ql.addActionForEditor(editor, "Default")
+    ql.addActionForEditor(editor, "Default")
     assert editor.name in ql.params.names
     param = ql.params.child(editor.name)
     assert len(param.children()) == 1
@@ -36,7 +36,7 @@ def test_invalid_load(caplog, ql, editor):
     # Pytest isn't catching this error correctly for some reason, try wrapping in caller
     # function within qt event loop
     def invalidLoadCaller():
-        ql.addActForEditor(editor, "SaveOptionThatDoesntExist")
+        ql.addActionForEditor(editor, "SaveOptionThatDoesntExist")
         ql.applyChanges()
 
     invalidLoadCaller()
@@ -65,7 +65,7 @@ def test_invalid_line_edit_add(ql):
 def test_bad_user_profile(ql):
     invalidFileDict = {"colorscheme": "doesnt exist"}
     with pytest.warns(UserWarning):
-        ql.buildFromStartupParams(invalidFileDict)
+        ql.buildFromStartupParameters(invalidFileDict)
 
 
 def test_load_state(ql):

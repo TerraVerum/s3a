@@ -38,7 +38,7 @@ registerIoHandler(
 )
 
 
-def listDeser(param, strVal):
+def listDeserializer(param, strVal):
     # Slight adjustment to value interpretation for checklist
     fixedLims = param.opts.get("fixedLimits", False)
     lims = param.opts["limits"]
@@ -59,7 +59,7 @@ def listDeser(param, strVal):
 
 
 for typ in "list", "checklist":
-    registerIoHandler(typ, deserialize=listDeser, takesParam=True)
+    registerIoHandler(typ, deserialize=listDeserializer, takesParam=True)
 
 from .componentio import ComponentIO, defaultIo
 from .exporters import *

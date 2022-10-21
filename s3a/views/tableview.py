@@ -196,7 +196,7 @@ class PopupTableDialog(QtWidgets.QDialog):
 
     def setData(
         self,
-        compDf: pd.DataFrame,
+        componentDf: pd.DataFrame,
         colIdxs: Sequence[int],
         dirtyColIdxs: Sequence[int] = None,
     ):
@@ -214,7 +214,9 @@ class PopupTableDialog(QtWidgets.QDialog):
             else:
                 self.tbl.showColumn(ii)
         self.tbl.manager.removeComponents()
-        self.tbl.manager.addComponents(compDf, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)
+        self.tbl.manager.addComponents(
+            componentDf, addType=PRJ_ENUMS.COMPONENT_ADD_AS_MERGE
+        )
 
     def reject(self):
         # On dialog close be sure to unhide all columns / reset dirty cols
@@ -233,7 +235,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
     def __initEditorParams__(self, shared: SharedAppSettings):
         self.props = props = ParamContainer()
         self.tableData = shared.tableData
-        shared.generalProps.registerProp(
+        shared.generalProperties.registerProp(
             PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE, container=props
         )
 
@@ -241,7 +243,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
             type(self), name="Component Table Tools"
         )
 
-        proc, params = shared.generalProps.registerFunc(
+        proc, params = shared.generalProperties.registerFunc(
             self.setVisibleColumns,
             runOpts=RunOpts.ON_CHANGED,
             nest=False,
@@ -283,7 +285,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
                 lambda: self.menu.exec_(cursor.pos())
             )
 
-        self.instanceIdIndex = self.tableData.allFields.index(REQD_TBL_FIELDS.INST_ID)
+        self.instanceIdIndex = self.tableData.allFields.index(REQD_TBL_FIELDS.ID)
         self._onTableChange()
 
     def _onTableChange(self, *_args):
@@ -400,11 +402,11 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
             self.manager.removeComponents(idList)
             self.clearSelection()
 
-    def idsRowsColsFromSelection(
+    def idsRowsColumnsFromSelection(
         self,
-        excludeNoEditCols=True,
+        excludeNoEditColumns=True,
         warnNoneSelection=True,
-        selectedIdxs: Sequence[QtCore.QModelIndex] = None,
+        selectedIdndexes: Sequence[QtCore.QModelIndex] = None,
     ):
         """
         Returns Nx3 np array of (ids, rows, cols) from current table selection. Ids
@@ -414,19 +416,19 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
 
         Parameters
         ----------
-        excludeNoEditCols
+        excludeNoEditColumns
             Whether to consider columns that do not allow editing, like Instance ID and
             Vertices
         warnNoneSelection
             Whether to raise a warning if no values are selected
-        selectedIdxs
+        selectedIdndexes
             Selection to get ids, rows, and cols from. If *None*, defaults to the
             current table selection (self.selectedIndexes())
         """
-        if selectedIdxs is None:
-            selectedIdxs = self.selectedIndexes()
+        if selectedIdndexes is None:
+            selectedIdndexes = self.selectedIndexes()
         retLists = []  # (Ids, rows, cols)
-        for idx in selectedIdxs:
+        for idx in selectedIdndexes:
             row = idx.row()
             # 0th row contains instance ID
             # TODO: If the user is allowed to reorder columns this needs to be revisited
@@ -435,7 +437,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
             )
             retLists.append([idAtIdx, row, idx.column()])
         retLists = np.array(retLists, dtype=int)
-        if excludeNoEditCols and len(retLists) > 0:
+        if excludeNoEditColumns and len(retLists) > 0:
             # Set diff will eliminate any repeats, so use a slower op that at least
             # preserves duplicates
             retLists = retLists[~np.isin(retLists[:, 2], self.manager.noEditColIdxs)]
@@ -450,26 +452,26 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         Sets all cells in the selection to be the same as the first row in the selection.
         See the project wiki for a detailed description
         """
-        selection = self.idsRowsColsFromSelection()
+        selection = self.idsRowsColumnsFromSelection()
         if len(selection):
             overwriteData = self.manager.compDf.loc[selection[0, 0]]
             self.setSelectedCellsAs(selection, overwriteData)
 
-    def setSelectedCellsAsGui(self, selectionIdxs: TwoDArr = None):
+    def setSelectedCellsAsGui(self, selectionIndexes: TwoDArr = None):
         """
         Sets all cells in the selection to the values specified in the popup table. See
         the project wiki for a detailed description
         """
-        if selectionIdxs is None:
-            selectionIdxs = self.idsRowsColsFromSelection()
-        if len(selectionIdxs) == 0:
+        if selectionIndexes is None:
+            selectionIndexes = self.idsRowsColumnsFromSelection()
+        if len(selectionIndexes) == 0:
             return
-        overwriteData = self.manager.compDf.loc[[selectionIdxs[0, 0]]].copy()
+        overwriteData = self.manager.compDf.loc[[selectionIndexes[0, 0]]].copy()
         with self.actionStack.ignoreActions():
             self.popup.setData(
                 overwriteData,
-                pd.unique(selectionIdxs[:, 2]),
-                self._getDupDataCols(selectionIdxs),
+                pd.unique(selectionIndexes[:, 2]),
+                self._getDuplicateDataColumns(selectionIndexes),
             )
             wasAccepted = self.popup.exec_()
         # Convert to list or isin() check below fails
@@ -477,10 +479,10 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         if not wasAccepted or not dirtyCols:
             return
 
-        selectionIdxs = selectionIdxs[np.isin(selectionIdxs[:, 2], dirtyCols)]
-        self.setSelectedCellsAs(selectionIdxs, self.popup.data)
+        selectionIndexes = selectionIndexes[np.isin(selectionIndexes[:, 2], dirtyCols)]
+        self.setSelectedCellsAs(selectionIndexes, self.popup.data)
 
-    def _getDupDataCols(self, selectionIdxs: np.ndarray) -> list[int]:
+    def _getDuplicateDataColumns(self, selectionIndexes: np.ndarray) -> list[int]:
         """
         From a selection of components, returns the column names which have the same
         data in every row. This is useful for determining which columns should be
@@ -488,7 +490,7 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
 
         Parameters
         ----------
-        selectionIdxs
+        selectionIndexes
             Selection list of dataframe cells to consider. See
             ``ids_rows_colsFormSelection`` for a description of this array
 
@@ -500,9 +502,9 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         """
         dupCols = []
         # First, find out all rows for each column to select, then test data at those rows
-        for col in np.unique(selectionIdxs[:, 2]):
+        for col in np.unique(selectionIndexes[:, 2]):
             name = self.manager.compDf.columns[col]
-            ids = selectionIdxs[selectionIdxs[:, 2] == col, 0]
+            ids = selectionIndexes[selectionIndexes[:, 2] == col, 0]
             data = self.manager.compDf.loc[ids, name]
             try:
                 numDups = len(pd.unique(data))
@@ -513,14 +515,16 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
                 dupCols.append(col)
         return dupCols
 
-    def setSelectedCellsAs(self, selectionIdxs: TwoDArr, overwriteData: pd.DataFrame):
+    def setSelectedCellsAs(
+        self, selectionIndexes: TwoDArr, overwriteData: pd.DataFrame
+    ):
         """
         Overwrites the data from rows and cols with the information in ``overwriteData``.
         Each (id, row, col) index is treated as a single index
 
         Parameters
         ----------
-        selectionIdxs
+        selectionIndexes
             Selection idxs to overwrite. If *None*, defaults to current selection.
         overwriteData
             What to fill in the overwrite locations. If *None*, a popup table is
@@ -529,13 +533,13 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         if self.minimal:
             return
 
-        if len(selectionIdxs) == 0:
+        if len(selectionIndexes) == 0:
             return
         overwriteData = overwriteData.squeeze()
-        uniqueIds = pd.unique(selectionIdxs[:, 0])
+        uniqueIds = pd.unique(selectionIndexes[:, 0])
         newDataDf = self.manager.compDf.loc[uniqueIds].copy()
         # New data ilocs will no longer match, fix this using loc + indexed columns
-        colsForLoc = self.manager.compDf.columns[selectionIdxs[:, 2]]
-        for idxTriplet, colForLoc in zip(selectionIdxs, colsForLoc):
+        colsForLoc = self.manager.compDf.columns[selectionIndexes[:, 2]]
+        for idxTriplet, colForLoc in zip(selectionIndexes, colsForLoc):
             newDataDf.at[idxTriplet[0], colForLoc] = overwriteData.iat[idxTriplet[2]]
-        self.manager.addComponents(newDataDf, addtype=PRJ_ENUMS.COMP_ADD_AS_MERGE)
+        self.manager.addComponents(newDataDf, addType=PRJ_ENUMS.COMPONENT_ADD_AS_MERGE)

@@ -56,8 +56,8 @@ class XYVertices(np.ndarray):
         return str(self.tolist())
 
     @classmethod
-    def deserialize(cls, strVal: str):
-        out = cls(literal_eval(strVal))
+    def deserialize(cls, stringValue: str):
+        out = cls(literal_eval(stringValue))
         if out.size == 0:
             # Make sure size is 0x2
             return cls()
@@ -100,12 +100,12 @@ class XYVertices(np.ndarray):
         self.y = newRows
 
     @property
-    def cols(self):
+    def columns(self):
         return self.x
 
-    @cols.setter
-    def cols(self, newCols):
-        self.x = newCols
+    @columns.setter
+    def columns(self, newColumns):
+        self.x = newColumns
 
 
 class ComplexXYVertices(list):
@@ -121,19 +121,19 @@ class ComplexXYVertices(list):
 
     def __init__(
         self,
-        inputArr: Union[List[XYVertices], np.ndarray, Sequence] = None,
+        verticesArray: Union[List[XYVertices], np.ndarray, Sequence] = None,
         hierarchy: np.ndarray = None,
         coerceListElements=False,
     ):
 
-        if inputArr is None:
-            inputArr = []
-        numInpts = len(inputArr)
+        if verticesArray is None:
+            verticesArray = []
+        numInpts = len(verticesArray)
         if coerceListElements:
-            inputArr = [XYVertices(el) for el in inputArr]
+            verticesArray = [XYVertices(el) for el in verticesArray]
         if hierarchy is None:
             hierarchy = np.ones((numInpts, 4), dtype=int) * -1
-        super().__init__(inputArr)
+        super().__init__(verticesArray)
         # No hierarchy required unless list is longer than length 1
         self.hierarchy = hierarchy
 
@@ -275,14 +275,14 @@ class ComplexXYVertices(list):
 
     @staticmethod
     def fromBinaryMask(
-        bwMask: BlackWhiteImg, approximation=cv.CHAIN_APPROX_SIMPLE, externalOnly=False
+        mask: BlackWhiteImg, approximation=cv.CHAIN_APPROX_SIMPLE, externalOnly=False
     ) -> ComplexXYVertices:
         """
         Creates ComplexXYVertices from a numpy binary image
 
         Parameters
         ----------
-        bwMask
+        mask
             Mask to locate connected components. Nonzero pixels are considered part
             of the component.
         approximation
@@ -299,9 +299,9 @@ class ComplexXYVertices(list):
         # Contours are on the inside of components, so dilate first to make sure they
         # are on the outside
         # bwmask = dilation(bwmask, np.ones((3,3), dtype=bool))
-        if bwMask.dtype != np.uint8:
-            bwMask = bwMask.astype("uint8")
-        contours, hierarchy = cv.findContours(bwMask, retrMethod, approximation)
+        if mask.dtype != np.uint8:
+            mask = mask.astype("uint8")
+        contours, hierarchy = cv.findContours(mask, retrMethod, approximation)
         compVertices = ComplexXYVertices()
         for contour in contours:
             compVertices.append(XYVertices(contour[:, 0, :]))
@@ -313,7 +313,7 @@ class ComplexXYVertices(list):
         return compVertices
 
     @staticmethod
-    def _diagPairsToCorners(poly: T) -> T:
+    def _diagonalPairsToCorners(poly: T) -> T:
         """
         cv2.findContours has a habit of turning right-angles into pairs of 45-degree
         offset contour indices. This becomes a problem when using simplification methods
@@ -334,7 +334,7 @@ class ComplexXYVertices(list):
         """
         polyDiff = np.diff(poly, axis=0, append=poly[[0]])
         # Cutoff corner segments are 45 degrees and sqrt(2) length long
-        # So, find segments whose x and y diffs are both 1 and form 45-degree angles
+        # So, find segments whose x and y differenceImages are both 1 and form 45-degree angles
         # 45 degree angles must also occur in pairs
         sqrt2Segs = np.all(np.abs(polyDiff) == 1, axis=1)
         segmentAngles = np.rad2deg(np.arctan2(polyDiff[:, 1], polyDiff[:, 0]))
@@ -403,7 +403,7 @@ class ComplexXYVertices(list):
         out = type(self)(hierarchy=self.hierarchy)
         for contour in self:  # type: XYVertices
             # See function documentation for justification of this step
-            contour = self._diagPairsToCorners(contour)
+            contour = self._diagonalPairsToCorners(contour)
             if epsilon > 0:
                 contour = cv.approxPolyDP(contour, epsilon, contour.connected)[:, 0, :]
             out.append(XYVertices(contour))
@@ -451,19 +451,19 @@ class ComplexXYVertices(list):
         return str([arr.tolist() for arr in self])
 
     @staticmethod
-    def deserialize(strObj: str) -> ComplexXYVertices:
+    def deserialize(stringObject: str) -> ComplexXYVertices:
         # TODO: Infer appropriate hierarchy from the serialized string. It is possible
         #  by finding whether vertices are given in CW or CCW order. This doesn't
         #  affect how they are drawn, but it does effect the return values of
         #  "holeVerts()" and "filledVerts()"
-        outerLst = literal_eval(strObj)
+        outerLst = literal_eval(stringObject)
         return ComplexXYVertices([XYVertices(lst) for lst in outerLst])
 
 
 @pd.api.extensions.register_series_accessor("s3averts")
 class S3AVertsAccessor:
-    def __init__(self, vertsSer: pd.Series):
-        self.verts = vertsSer
+    def __init__(self, verticesSeries: pd.Series):
+        self.verts = verticesSeries
 
     def max(self):
         """

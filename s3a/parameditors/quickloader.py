@@ -37,11 +37,11 @@ class EditorListModel(QtCore.QAbstractListModel):
                 self.paramStatesLst.append(stateName)
                 self.editorList.append(editor)
             editor.sigParamStateCreated.connect(
-                lambda name, e=editor: self.addOptForEditor(e, name)
+                lambda name, e=editor: self.addOptionForEditor(e, name)
             )
         self.layoutChanged.emit()
 
-    def addOptForEditor(self, editor: ParamEditor, name: str):
+    def addOptionForEditor(self, editor: ParamEditor, name: str):
         if (
             self.displayFormat.format(editor=editor, stateName=name)
             in self.displayedData
@@ -138,15 +138,15 @@ class QuickLoaderEditor(ParamEditor):
             saveName, paramState, **kwargs, includeDefaults=True
         )
 
-    def buildFromStartupParams(self, startupSrc: dict):
+    def buildFromStartupParameters(self, startupSource: dict):
         # If quick loader is given along with other params, use the quick loader as the
         # base and apply other settings on top of it
         errSettings = []
         # Ignore case and spacing on input keys
-        startupSrc = {lowerNoSpaces(kk): vv for kk, vv in startupSrc.items()}
+        startupSource = {lowerNoSpaces(kk): vv for kk, vv in startupSource.items()}
 
         for editor in [self] + self.listModel.uniqueEditors:  # type: ParamEditor
-            paramStateInfo: Union[dict, str] = startupSrc.get(
+            paramStateInfo: Union[dict, str] = startupSource.get(
                 lowerNoSpaces(editor.name), None
             )
             try:
@@ -162,7 +162,7 @@ class QuickLoaderEditor(ParamEditor):
                 "[exception])\n" + "\n\n".join(errSettings),
                 UserWarning,
             )
-        return startupSrc
+        return startupSource
 
     def addDock(self, dock: Union[ParamEditor, ParamEditorDockGrouping]):
         if isinstance(dock, ParamEditorDockGrouping):
@@ -192,7 +192,7 @@ class QuickLoaderEditor(ParamEditor):
                     )
                 editor = matches[0]
                 for state, shcValue in shcOpts.items():
-                    self.addActForEditor(editor, state, shcValue)
+                    self.addActionForEditor(editor, state, shcValue)
         return super().loadParamValues(
             stateName, stateDict, useDefaults=False, candidateParams=[], **kwargs
         )
@@ -218,11 +218,11 @@ class QuickLoaderEditor(ParamEditor):
         # if not selectionIdx.isValid():
         #   selectionIdx = completer.currentIndex()
         paramState, editor = qtSelectionIdx.data(QtCore.Qt.ItemDataRole.EditRole)
-        self.addActForEditor(editor, paramState)
+        self.addActionForEditor(editor, paramState)
         # self.addNewParamState.clear()
 
-    def addActForEditor(
-        self, editor: ParamEditor, paramState: str, shortcut: str = None
+    def addActionForEditor(
+        self, editor: ParamEditor, parameterState: str, shortcut: str = None
     ):
         """
         Ensures the specified editor shortcut will exist in the quickloader parameter
@@ -239,17 +239,21 @@ class QuickLoaderEditor(ParamEditor):
             # It is not made possible through the context menu. Fix this
             curGroup = self.params.names[editor.name]
             _addRmOption(curGroup)
-            if paramState in curGroup.names:
-                act = curGroup.child(paramState)
+            if parameterState in curGroup.names:
+                act = curGroup.child(parameterState)
 
-        if paramState in curGroup.names and act is not None and act.isActivateConnected:
+        if (
+            parameterState in curGroup.names
+            and act is not None
+            and act.isActivateConnected
+        ):
             # Duplicate option, no reason to add, but value might be different
             act.setValue(shortcut)
             return
         curGroup.opts["removable"] = True
         if act is None:
             act = ShcKeySeq(
-                name=paramState,
+                name=parameterState,
                 value=shortcut or "",
                 removable=True,
                 type="shortcutkeyseq",
@@ -259,7 +263,7 @@ class QuickLoaderEditor(ParamEditor):
         act.opts["removable"] = True
         _addRmOption(act)
         act.sigActivated.connect(
-            lambda _act: self._safeLoadParamValues(_act, editor, paramState)
+            lambda _act: self._safeLoadParamValues(_act, editor, parameterState)
         )
         act.isActivateConnected = True
 
@@ -267,7 +271,7 @@ class QuickLoaderEditor(ParamEditor):
         self, action: ShcKeySeq, editor: ParamEditor, paramState: str
     ):
         """
-        It is possible for the quick loader to refer to a param state that no longer
+        It is possible for the quick loader to refer to a parameter state that no longer
         exists. When this happens, failure should be graceful and the action should be
         deleted
         """

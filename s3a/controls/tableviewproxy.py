@@ -19,19 +19,19 @@ from ..views.imageareas import MainImage
 from ..views.regions import MultiRegionPlot
 from ..views.tableview import CompTableView
 
-__all__ = ["CompSortFilter", "ComponentController"]
+__all__ = ["ComponentSorterFilter", "ComponentController"]
 
 Signal = QtCore.Signal
 QISM = QtCore.QItemSelectionModel
 
 
-class CompSortFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
+class ComponentSorterFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
     __groupingName__ = "Component Table"
 
     def __initEditorParams__(self, shared: SharedAppSettings):
         self.tableData = shared.tableData
         self.props = ParamContainer()
-        shared.generalProps.registerProp(
+        shared.generalProperties.registerProp(
             PRJ_CONSTS.PROP_VERT_SORT_BHV, container=self.props
         )
 
@@ -42,7 +42,7 @@ class CompSortFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
         #  easier to generalize than the current solution in ComponentController.
 
     @property
-    def vertSortCol(self):
+    def verticesSortAxis(self):
         """
         Returns the column index to sort by based on whether the user wants x first or y
         """
@@ -91,7 +91,7 @@ class CompSortFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
             rightObj = rightObj.stack()
         leftObj = np.min(leftObj, axis=0, initial=sys.maxsize)
         rightObj = np.min(rightObj, axis=0, initial=sys.maxsize)
-        sortCol = self.vertSortCol
+        sortCol = self.verticesSortAxis
         otherCol = 1 - sortCol
         return leftObj[sortCol] < rightObj[sortCol] or (
             leftObj[sortCol] == rightObj[sortCol]
@@ -100,13 +100,13 @@ class CompSortFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
 
 
 class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
-    sigCompsSelected = Signal(object)
+    sigComponentsSelected = Signal(object)
 
     __groupingName__ = "Main Image"
 
     def __initEditorParams__(self, shared: SharedAppSettings):
         self.props = ParamContainer()
-        boundaryOnly, _ = shared.generalProps.registerProps(
+        boundaryOnly, _ = shared.generalProperties.registerProps(
             [PRJ_CONSTS.PROP_COMP_SEL_BHV, PRJ_CONSTS.PROP_FIELD_INFO_ON_SEL],
             container=self.props,
         )
@@ -133,8 +133,8 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         self.regionPlot = MultiRegionPlot(disableMouseClick=True)
         self.displayedIds = np.array([], dtype=int)
         self.selectedIds = np.array([], dtype=int)
-        self.labelColumn = REQD_TBL_FIELDS.INST_ID
-        self.updateLabelCol()
+        self.labelColumn = REQD_TBL_FIELDS.ID
+        self.updateLabelColumn()
 
         self._regionIntersectionCache: Tuple[
             Optional[np.ndarray], Optional[np.ndarray]
@@ -146,14 +146,14 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         solution is to simply preserve the cache across at most one "selection" value
         """
 
-        mainImage.sigUpdatedFocusedComponent.connect(self._onFocusedCompChange)
+        mainImage.sigUpdatedFocusedComponent.connect(self._onFocusedComponentChange)
 
         attrs = self.sharedAttrs
 
         self.updateLabelProc = attrs.colorScheme.registerFunc(
-            self.updateLabelCol, runOpts=RunOpts.ON_CHANGED, nest=False
+            self.updateLabelColumn, runOpts=RunOpts.ON_CHANGED, nest=False
         )
-        attrs.generalProps.registerProp(
+        attrs.generalProperties.registerProp(
             PRJ_CONSTS.PROP_SCALE_PEN_WIDTH, container=self.props
         )
 
@@ -167,7 +167,7 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
             if np.array_equal(
                 attrs.tableData.allFields, self._componentManager.compDf.columns
             ):
-                self.redrawComps()
+                self.redrawComponents()
 
         self._filter.sigChangesApplied.connect(_maybeRedraw)
 
@@ -176,7 +176,7 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         )
         self.regionMover.sigMoveStopped.connect(lambda *args: self.finishRegionCopier())
 
-        componentManager.sigCompsChanged.connect(self.redrawComps)
+        componentManager.sigComponentsChanged.connect(self.redrawComponents)
         componentManager.sigFieldsChanged.connect(self._reflectFieldsChanged)
         componentTable.sigSelectionChanged.connect(self._reflectTableSelectionChange)
 
@@ -187,15 +187,15 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
 
         self.fieldDisplay = FieldDisplay(mainImage)
         self.fieldsShowing = False
-        self.fieldInfoProc = self._createFieldDisplayProc()
-        self.fieldDisplay.callDelegateFunc("hide")
+        self.fieldInfoProc = self._createFieldDisplayProcess()
+        self.fieldDisplay.callDelegateFunction("hide")
         # Populate initial field options
         self._reflectFieldsChanged()
 
-    def _onFocusedCompChange(self, newComp: pd.Series):
-        self.regionPlot.focusById(np.array([newComp[REQD_TBL_FIELDS.INST_ID]]))
+    def _onFocusedComponentChange(self, newComp: pd.Series):
+        self.regionPlot.focusById(np.array([newComp[REQD_TBL_FIELDS.ID]]))
 
-    def _createFieldDisplayProc(self):
+    def _createFieldDisplayProcess(self):
         io = {}
         for deleg in self.fieldDisplay.availableDelegates.values():
             delegIo = ProcessIO.fromFunction(deleg.setData)
@@ -220,7 +220,7 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
             newWidth = 0
         self.regionPlot.props["penWidth"] = newWidth
 
-    def updateLabelCol(self, labelColumn=REQD_TBL_FIELDS.INST_ID.name):
+    def updateLabelColumn(self, labelColumn=REQD_TBL_FIELDS.ID.name):
         """
         Changes the data column used to label (color) the region plot data
 
@@ -240,7 +240,7 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         self.regionPlot.regionData[PRJ_ENUMS.FIELD_LABEL] = newLblData
         self.regionPlot.updateColors()
 
-    def redrawComps(self, idLists=None):
+    def redrawComponents(self, idLists=None):
         # Following mix of cases are possible:
         # Components: DELETED, UNCHANGED, CHANGED, NEW
         # New is different from changed since id plot already exists (unhide vs. create)
@@ -260,7 +260,7 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         # false positives
         previouslyVisible = np.intersect1d(self.displayedIds, compDf.index)
 
-        # Update filter list: hide/unhide ids and verts as needed.
+        # Update filter list: hide/unhide ids and vertices as needed.
         self._updateDisplayedIds()
         self.regionPlot.resetRegionList(
             compDf.loc[self.displayedIds], labelField=self.labelColumn
@@ -284,7 +284,7 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
             self._componentTable.hideRow(xpondingIdx)
 
     @DASM.undoable("Split Components", asGroup=True)
-    def splitSelectedComps(self):
+    def splitSelectedComponents(self):
         """
         Makes a separate component for each distinct boundary of all selected
         components
@@ -293,11 +293,11 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
 
         if len(selection) == 0:
             return
-        changes = self._componentManager.splitCompVertsById(selection)
+        changes = self._componentManager.splitById(selection)
         self.selectRowsById(changes["added"], QISM.ClearAndSelect)
 
     @DASM.undoable("Merge Components", asGroup=True)
-    def mergeSelectedComps(self, keepId=-1):
+    def mergeSelectedComponents(self, keepId=-1):
         """
         Merges the selected components into one, keeping all properties of the first in
         the selection
@@ -317,10 +317,10 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         if keepId < 0:
             keepId = selection[0]
 
-        self._componentManager.mergeCompVertsById(selection, keepId)
+        self._componentManager.mergeById(selection, keepId)
         self.selectRowsById(np.array([keepId]), QISM.ClearAndSelect)
 
-    def removeSelectedCompOverlap(self):
+    def removeSelectedComponentOverlap(self):
         """
         Makes sure all specified components have no overlap. Preference is given
         in order of the selection, i.e. the last selected component in the list
@@ -338,7 +338,7 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         ]
         lblParams.child("labelColumn").setLimits([f.name for f in fields])
 
-        self.redrawComps()
+        self.redrawComponents()
 
     def _reflectTableSelectionChange(self, selectedIds: OneDArr):
         self.selectedIds = selectedIds
@@ -347,7 +347,7 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
             selectedIds=selectedIds, updatePlot=False
         )
         selectedComps = self._componentManager.compDf.loc[selectedIds]
-        self.sigCompsSelected.emit(selectedComps)
+        self.sigComponentsSelected.emit(selectedComps)
         if self.props[PRJ_CONSTS.PROP_FIELD_INFO_ON_SEL]:
             self.fieldInfoProc(ids=selectedIds, force=True)
 
@@ -433,7 +433,7 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         if not self.fieldsShowing and not force:
             return
         if not fields:
-            self.fieldDisplay.callDelegateFunc("clear")
+            self.fieldDisplay.callDelegateFunction("clear")
             # Sometimes artifacts are left on the scene at this point
             self._mainImageArea.scene().update()
             return
@@ -446,7 +446,7 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
 
     def toggleFieldInfoDisplay(self):
         func = "hide" if self.fieldsShowing else "show"
-        self.fieldDisplay.callDelegateFunc(func)
+        self.fieldDisplay.callDelegateFunction(func)
         self.fieldsShowing = not self.fieldsShowing
         # May need to refresh data
         if func == "show" and not self.fieldDisplay.inUseDelegates:
@@ -512,9 +512,9 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         return result
 
     def _updateDisplayedIds(self):
-        curComps = self._filter.filterCompDf(self._componentManager.compDf.copy())
-        # Give self the id list of surviving comps
-        self.displayedIds = curComps[REQD_TBL_FIELDS.INST_ID]
+        curComps = self._filter.filterComponentDf(self._componentManager.compDf.copy())
+        # Give self the id list of surviving components
+        self.displayedIds = curComps[REQD_TBL_FIELDS.ID]
         return self.displayedIds
 
     def activateRegionCopier(self, selectedIds: OneDArr = None):
@@ -531,7 +531,7 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
             return
         newComps = self.regionMover.baseData
         # TODO: Truncate vertices that lie outside image boundaries
-        # Invalid if any verts are outside image bounds
+        # Invalid if any vertices are outside image bounds
         # truncatedCompIds = []
         # imShape_xy = self._mainImageArea.image.shape[:2][::-1]
         for idx in newComps.index:
@@ -547,9 +547,11 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
             self.activateRegionCopier(change["added"])
         else:  # Move mode
             self.regionMover.erase()
-            self._componentManager.addComponents(newComps, PRJ_ENUMS.COMP_ADD_AS_MERGE)
+            self._componentManager.addComponents(
+                newComps, PRJ_ENUMS.COMPONENT_ADD_AS_MERGE
+            )
 
-    def exportCompOverlay(self, file="", toClipboard=False):
+    def exportComponentOverlay(self, file="", toClipboard=False):
         """
         Exports the current component overlay to a file or clipboard
 

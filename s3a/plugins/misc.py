@@ -26,7 +26,7 @@ class RandomToolsPlugin(ParamEditorPlugin):
         self.registerFunc(self.showDevConsoleGui, name="Show Dev Console")
         self.registerFunc(win.clearBoundaries, btnOpts=CNST.TOOL_CLEAR_BOUNDARIES)
         self.registerFunc(
-            win.componentController.exportCompOverlay,
+            win.componentController.exportComponentOverlay,
             name="Export Component Overlay",
             toClipboard=True,
         )
@@ -37,8 +37,8 @@ class RandomToolsPlugin(ParamEditorPlugin):
         for deferred, kwargs in self._deferredRegisters.items():
             self.registerFunc(deferred, **kwargs)
 
-    def _hookupFieldDisplay(self, win):
-        display = win.componentController
+    def _hookupFieldDisplay(self, window):
+        display = window.componentController
         # This option shouldn't show in the menu dropdown, so register directly to the
         # tools
         _, param = self.toolsEditor.registerFunc(
@@ -51,9 +51,11 @@ class RandomToolsPlugin(ParamEditorPlugin):
         # field info for every component
         def toggleAll():
             if display.fieldDisplay.inUseDelegates:
-                display.fieldDisplay.callDelegateFunc("clear")
+                display.fieldDisplay.callDelegateFunction("clear")
             else:
-                display.fieldInfoProc(ids=win.componentManager.compDf.index, force=True)
+                display.fieldInfoProc(
+                    ids=window.componentManager.compDf.index, force=True
+                )
 
         self.registerFunc(toggleAll, name="Toggle All Field Info")
 
@@ -63,13 +65,13 @@ class RandomToolsPlugin(ParamEditorPlugin):
             fieldsParam.setLimits(
                 [
                     str(f)
-                    for f in win.sharedAttrs.tableData.allFields
-                    if f not in display.fieldDisplay.ignoreCols
+                    for f in window.sharedAttrs.tableData.allFields
+                    if f not in display.fieldDisplay.ignoreColumns
                 ]
             )
             fieldsParam.setValue(fieldsParam.opts["limits"])
 
-        win.sharedAttrs.tableData.sigConfigUpdated.connect(updateLims)
+        window.sharedAttrs.tableData.sigConfigUpdated.connect(updateLims)
         updateLims()
 
     def showDevConsoleGui(self):
@@ -110,29 +112,29 @@ class RandomToolsPlugin(ParamEditorPlugin):
         console.show()
 
     @classmethod
-    def deferredRegisterFunc(cls, func: Callable, **registerKwargs):
+    def deferredRegisterFunction(cls, func: Callable, **registerKwargs):
         cls._deferredRegisters[func] = registerKwargs
 
 
-def miscFuncsPluginFactory(
+def miscFunctionsPluginFactory(
     name_: str = None,
-    regFuncs: Sequence[Callable] = None,
+    functions: Sequence[Callable] = None,
     titles: Sequence[str] = None,
-    showFuncDetails=False,
+    showFunctionDetails=False,
 ):
     class FuncContainerPlugin(ParamEditorPlugin):
         name = name_
-        _showFuncDetails = showFuncDetails
+        _showFuncDetails = showFunctionDetails
 
         def attachWinRef(self, win: s3abase.S3ABase):
             super().attachWinRef(win)
 
-            nonlocal regFuncs, titles
-            if regFuncs is None:
-                regFuncs = []
+            nonlocal functions, titles
+            if functions is None:
+                functions = []
             if titles is None:
-                titles = [None] * len(regFuncs)
-            for func, title in zip(regFuncs, titles):
+                titles = [None] * len(functions)
+            for func, title in zip(functions, titles):
                 self.registerFunc(func, title)
 
     return FuncContainerPlugin

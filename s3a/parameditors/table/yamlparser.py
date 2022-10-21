@@ -20,11 +20,11 @@ class YamlParser:
         self.config = config
 
     @lru_cache(maxsize=None)
-    def __getitem__(self, paramName: NestedIndexer):
-        value = self.getNestedCfgName(paramName)
-        if not isinstance(paramName, tuple):
-            paramName = (paramName,)
-        leafName = paramName[-1]
+    def __getitem__(self, parameterName: NestedIndexer):
+        value = self.getNestedConfigName(parameterName)
+        if not isinstance(parameterName, tuple):
+            parameterName = (parameterName,)
+        leafName = parameterName[-1]
         # Assume leaf until proven otherwise since most mechanics are still applicable
         if isinstance(value, PrjParam):
             # Can happen with programmatically generated cfgs. Make a copy to
@@ -56,8 +56,8 @@ class YamlParser:
                     pass
         return parsedParam
 
-    def parseLeaf(self, paramName: str, value: Any):
-        leafParam = PrjParam(paramName, value)
+    def parseLeaf(self, parameterName: str, value: Any):
+        leafParam = PrjParam(parameterName, value)
         value = leafParam.value
         if isinstance(value, bool):
             pass
@@ -79,7 +79,7 @@ class YamlParser:
             leafParam.value = testVal
         return leafParam
 
-    def getNestedCfgName(self, namePath: NestedIndexer):
+    def getNestedConfigName(self, namePath: NestedIndexer):
         if isinstance(namePath, str):
             namePath = (namePath,)
         out = self.config

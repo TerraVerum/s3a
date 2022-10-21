@@ -21,7 +21,7 @@ class IOTemplateManager:
     templates = DirectoryDict(IO_TEMPLATES_DIR, fns.attemptFileLoad, allowAbsolute=True)
 
     @classmethod
-    def getTableCfg(cls, ioType: str):
+    def getTableConfig(cls, ioType: str):
         if ioType is None:
             return None
         configPath = ioType.lower() + ".tblcfg"
@@ -31,7 +31,9 @@ class IOTemplateManager:
         return copy.deepcopy(cfg)
 
     @classmethod
-    def registerTableCfg(cls, ioType: str, cfg: t.Union[FilePath, dict], force=False):
+    def registerTableConfig(
+        cls, ioType: str, config: t.Union[FilePath, dict], force=False
+    ):
         """
         Associates the given field information as containing required fields for
         ``ioType``. Either an absolute filepath to a configuration or a dictionary of
@@ -52,6 +54,6 @@ class IOTemplateManager:
                     f"is false:\n{ret}"
                 )
 
-        if isinstance(cfg, FilePath.__args__):
-            cfg = fns.attemptFileLoad(cfg)
-        cls.templates[key] = cfg
+        if isinstance(config, FilePath.__args__):
+            config = fns.attemptFileLoad(config)
+        cls.templates[key] = config

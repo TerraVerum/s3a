@@ -13,7 +13,7 @@ __all__ = ["RoiCollection"]
 
 class RoiCollection(EditorPropsMixin, QtCore.QObject):
     # Signal(ExtendedROI)
-    sigShapeFinished = QtCore.Signal(object)  # roiVerts : XYVertices
+    sigShapeFinished = QtCore.Signal(object)  # roiVertices : XYVertices
 
     def __initEditorParams__(self, shared: SharedAppSettings):
         shared.colorScheme.registerFunc(

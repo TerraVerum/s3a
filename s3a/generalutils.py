@@ -29,7 +29,7 @@ _coordType = Union[np.ndarray, Tuple[slice, slice]]
 USE_MULTICHANNEL_KWARG = parse_version(_skimage_version) < parse_version("0.19.0")
 
 
-def stackedVertsPlusConnections(
+def stackedVerticesPlusConnections(
     vertices: ComplexXYVertices,
 ) -> Tuple[XYVertices, np.ndarray]:
     """
@@ -57,28 +57,28 @@ def stackedVertsPlusConnections(
     return XYVertices(allVerts, dtype=float), isfinite
 
 
-def getClippedBbox(arrShape: tuple, bbox: TwoDArr, margin: int):
+def getClippedBoundingBox(shape: tuple, boundingBox: TwoDArr, margin: int):
     """
     Given a bounding box and margin, create a clipped bounding box that does not extend
     past any dimension size from arrShape
 
     Parameters
     ----------
-    arrShape : 2-element tuple
+    shape : 2-element tuple
         Refrence array dimensions
-    bbox : 2x2 array
+    boundingBox : 2x2 array
         [minX minY; maxX maxY] bounding box coordinates
     margin : int
         Offset from bounding box coords. This will not fully be added to the bounding
         box if the new margin causes coordinates to fall off either end of the
         reference array shape.
     """
-    bbox = bbox.astype(int)
-    bbox[0] -= margin
+    boundingBox = boundingBox.astype(int)
+    boundingBox[0] -= margin
     # Add extra 1 since python slicing stops before last index
-    bbox[1] += margin + 1
-    arrShape = arrShape[:2]
-    return np.clip(bbox, 0, arrShape[::-1])
+    boundingBox[1] += margin + 1
+    shape = shape[:2]
+    return np.clip(boundingBox, 0, shape[::-1])
 
 
 def coerceDfTypes(dataframe: pd.DataFrame, constParams: Collection[PrjParam] = None):
@@ -103,7 +103,7 @@ def largestList(verts: List[XYVertices]) -> XYVertices:
     for vertList in verts:
         if len(vertList) > len(maxLenList):
             maxLenList = vertList
-    # for vertices in newVerts:
+    # for vertices in newVertices:
     # vertices += cropOffset[0:2]
     return XYVertices(maxLenList)
 
@@ -117,7 +117,7 @@ def lowerNoSpaces(name: str):
     return name.replace(" ", "").lower()
 
 
-def safeCallFuncList(
+def safeCallFunctionList(
     fnNames: Collection[str], funcLst: List[Callable], fnArgs: List[Sequence] = None
 ):
     errs = []
@@ -125,14 +125,14 @@ def safeCallFuncList(
     if fnArgs is None:
         fnArgs = [()] * len(fnNames)
     for key, fn, args in zip(fnNames, funcLst, fnArgs):
-        curRet, curErr = safeCallFunc(key, fn, *args)
+        curRet, curErr = safeCallFunction(key, fn, *args)
         rets.append(curRet)
         if curErr:
             errs.append(curErr)
     return rets, errs
 
 
-def safeCallFunc(fnName: str, func: Callable, *fnArgs):
+def safeCallFunction(fnName: str, func: Callable, *fnArgs):
     ret = err = None
     try:
         ret = func(*fnArgs)
@@ -256,7 +256,7 @@ def cornersToFullBoundary(cornerVerts: XYVertices, sizeLimit=0) -> XYVertices:
     return XYVertices(vertsInterped)
 
 
-def getCroppedImg(
+def getCroppedImage(
     image: NChanImg,
     vertices: np.ndarray,
     margin=0,
@@ -285,8 +285,8 @@ def getCroppedImg(
     """
     vertices = np.vstack(vertices)
     img_np = image
-    compCoords = getClippedBbox(img_np.shape, compCoords, margin)
     compCoords = np.vstack([vertices.min(0), vertices.max(0)])
+    compCoords = getClippedBoundingBox(img_np.shape, compCoords, margin)
     coordSlices = (
         slice(compCoords[0, 1], compCoords[1, 1]),
         slice(compCoords[0, 0], compCoords[1, 0]),
@@ -303,11 +303,11 @@ def getCroppedImg(
     return tuple(toReturn) if len(toReturn) > 1 else toReturn[0]
 
 
-def imgCornerVertices(img: NChanImg = None) -> XYVertices:
+def imageCornerVertices(image: NChanImg = None) -> XYVertices:
     """Returns [x,y] vertices for each corner of the input image"""
-    if img is None:
+    if image is None:
         return XYVertices()
-    fullImShape_xy = img.shape[:2][::-1]
+    fullImShape_xy = image.shape[:2][::-1]
     return XYVertices(
         [
             [0, 0],
@@ -318,7 +318,7 @@ def imgCornerVertices(img: NChanImg = None) -> XYVertices:
     )
 
 
-def showMaskDiff(oldMask: BlackWhiteImg, newMask: BlackWhiteImg):
+def showMaskDifference(oldMask: BlackWhiteImg, newMask: BlackWhiteImg):
     infoMask = np.tile(oldMask[..., None].astype("uint8") * 255, (1, 1, 3))
     # Was there, now it's not -- color red
     infoMask[oldMask & ~newMask, :] = [255, 0, 0]
@@ -349,13 +349,13 @@ class MaxSizeDict(dict):  # lgtm [py/missing-equals]
             self.pop(next(iter(self.keys())))
 
 
-def _getPtAngles(pts):
+def _getPointAngles(pts):
     midpt = np.mean(pts, 0)
     relPosPts = (pts - midpt).view(np.ndarray)
     return np.arctan2(*relPosPts.T[::-1])
 
 
-def orderContourPts(pts: XYVertices, ccw=True):
+def orderContourPoints(pts: XYVertices, ccw=True):
     """
     Only guaranteed to work for convex hulls, i.e. shapes not intersecting themselves.
     Orderes an arbitrary list of coordinates into one that works well line plotting,
@@ -363,29 +363,18 @@ def orderContourPts(pts: XYVertices, ccw=True):
     """
     if len(pts) < 3:
         return pts
-    angles = _getPtAngles(pts)
+    angles = _getPointAngles(pts)
     ptOrder = np.argsort(angles)
     if not ccw:
         ptOrder = ptOrder[::-1]
     return pts[ptOrder]
 
 
-# def movePtsTowardCenter(pts: XYVertices, dist=1):
-#   if not pts.size:
-#     return pts
-#   angles = _getPtAngles(pts)
-#   adjusts = np.column_stack([np.cos(angles), np.sin(angles)])
-#   adjusts[np.abs(adjusts) < 0.01] = 0
-#   # Adjust by whole steps
-#   adjusts = np.sign(adjusts)*dist
-#   return pts - adjusts
-
-
-def symbolFromVerts(verts: Union[ComplexXYVertices, XYVertices, np.ndarray]):
-    if isinstance(verts, ComplexXYVertices):
-        concatRegion, isfinite = stackedVertsPlusConnections(verts)
+def symbolFromVertices(vertices: Union[ComplexXYVertices, XYVertices, np.ndarray]):
+    if isinstance(vertices, ComplexXYVertices):
+        concatRegion, isfinite = stackedVerticesPlusConnections(vertices)
     else:
-        concatRegion, isfinite = verts, np.all(np.isfinite(verts), axis=1)
+        concatRegion, isfinite = vertices, np.all(np.isfinite(vertices), axis=1)
         # Qt doesn't like subclassed ndarrays
         concatRegion = concatRegion.view(np.ndarray)
     if not len(concatRegion):
@@ -401,7 +390,7 @@ def symbolFromVerts(verts: Union[ComplexXYVertices, XYVertices, np.ndarray]):
 
 
 # Credit: https://www.pyimagesearch.com/2016/11/07/intersection-over-union-iou-for-object-detection/  # noqa
-def bboxIou(boxA, boxB):
+def boundingBoxIou(boxA, boxB):
     """
     determine the (x, y)-coordinates of the intersection rectangle. Both boxes are
     formatted [[xmin, ymin], [xmax, ymax]]
@@ -426,10 +415,10 @@ def bboxIou(boxA, boxB):
     return iou
 
 
-def minVertsCoord(verts: XYVertices):
+def getTopLeftCoordinate(verts: XYVertices):
     """
-    Finds the coordinate in the vertices list that is closest to the origin. `verts` must
-    have length > 0.
+    Finds the coordinate in the vertices list that is closest to the origin. `vertices`
+    must have length > 0.
     """
     # Early exit condition
     if verts.ndim < 2:
@@ -440,16 +429,7 @@ def minVertsCoord(verts: XYVertices):
     return verts[closestPtIdx]
 
 
-# Credit: https://stackoverflow.com/a/13624858/9463643
-class classproperty:
-    def __init__(self, fget):
-        self.fget = fget
-
-    def __get__(self, owner_self, owner_cls):
-        return self.fget(owner_cls)
-
-
-def imgPathtoHtml(imgPath: FilePath, width=None):
+def imagePathToHtml(imgPath: FilePath, width=None):
     outStr = f'<img src="{imgPath}"'
     if width is not None:
         outStr += f' width="{width}px"'
@@ -457,7 +437,7 @@ def imgPathtoHtml(imgPath: FilePath, width=None):
     return outStr
 
 
-def incrStageNames(stages: Sequence[ProcessStage]):
+def maybeIncrementStageNames(stages: Sequence[ProcessStage]):
     """
     Returns a list of names numerically incrementing where they would otherwise be
     duplicated. E.g. if the stage list was [Open, Open], this is converted to
@@ -625,19 +605,19 @@ def _indexUsingPad(image, tblrPadding):
     return image[rows, cols, ...]
 
 
-def subImageFromVerts(
+def subImageFromVertices(
     image,
-    verts: ComplexXYVertices | np.ndarray,
+    vertices: ComplexXYVertices | np.ndarray,
     margin=0,
     shape=None,
-    returnCoords=False,
+    returnBoundingBox=False,
     returnStats=False,
     allowTranspose=False,
-    rotationDeg=0,
+    rotationDegrees=0,
     **kwargs,
 ) -> np.ndarray | tuple[np.ndarray, dict]:
     """
-    Extracts a region from an image cropped to the area of `verts`. Unlike
+    Extracts a region from an image cropped to the area of `vertices`. Unlike
     `getCroppedImage`, this allows a constant-sized output shape, rotation, and other
     features.
 
@@ -645,7 +625,7 @@ def subImageFromVerts(
     ----------
     image
         Full-sized image from which to extract a subregion
-    verts
+    vertices
         Nx2 array of x-y vertices that determine the extracted region
     margin
         Margin in pixels to add to the [x, y] shapes of vertices. Can be a scalar or
@@ -653,7 +633,7 @@ def subImageFromVerts(
         (1.0 = 100% margin) of the [x,y] sizes.
     shape
         (rows, cols) output shape
-    returnCoords
+    returnBoundingBox
         Whether to return a bounding box array of [[minx, miny], [maxx, maxy]]
         coordinates where this subimage fits. With no scaling, rotation, padding,
         etc. this is the same region as the vertices bounding box
@@ -663,7 +643,7 @@ def subImageFromVerts(
     allowTranspose
         If ``True``, the image can be rotated 90 degrees if it results in less padding
         to reach the desired shape
-    rotationDeg
+    rotationDegrees
         Clockwise rotation to apply to the extracted image
     **kwargs
         Passed to ``cv.warpAffine``
@@ -671,27 +651,27 @@ def subImageFromVerts(
     if shape is not None:
         shape = np.asarray(shape[:2])
 
-    if isinstance(verts, ComplexXYVertices):
-        verts = verts.stack()
+    if isinstance(vertices, ComplexXYVertices):
+        vertices = vertices.stack()
     else:
-        verts = verts.copy()
+        vertices = vertices.copy()
     if np.isscalar(margin):
         margin = [margin, margin]
     margin = np.asarray(margin)
     if np.issubdtype(margin.dtype, np.float_):
-        margin = (margin * verts.ptp(0)).astype(int)
+        margin = (margin * vertices.ptp(0)).astype(int)
 
     for ax in 0, 1:
-        verts[verts[:, ax].argmin()] -= margin
-        verts[verts[:, ax].argmax()] += margin
+        vertices[vertices[:, ax].argmin()] -= margin
+        vertices[vertices[:, ax].argmax()] += margin
 
-    initialBbox = coordsToBbox(verts)
-    transformedPts, rotationDeg = _getRotationStats(
-        verts, rotationDeg, shape, allowTranspose
+    initialBbox = coordsToBox(vertices)
+    transformedPts, rotationDegrees = _getRotationStats(
+        vertices, rotationDegrees, shape, allowTranspose
     )
     if shape is None:
         shape = (transformedPts.ptp(0)[::-1] + 1).astype(int)
-    transformedBbox = coordsToBbox(transformedPts)
+    transformedBbox = coordsToBox(transformedPts)
     # Handle half-coordinates by preserving both ends of the spectrum
     newXYShape = transformedBbox.ptp(0).astype(int)
     transformedBbox[0] = np.floor(transformedBbox[0])
@@ -709,9 +689,9 @@ def subImageFromVerts(
 
     # In order for rotation not to clip any image pixels, make sure to capture a
     # bounding box big enough to prevent border-filling where possible
-    if not np.isclose(rotationDeg, 0):
+    if not np.isclose(rotationDegrees, 0):
         rotatedPoints = cv.boxPoints(
-            (transformedBbox.mean(0), transformedBbox.ptp(0), -rotationDeg)
+            (transformedBbox.mean(0), transformedBbox.ptp(0), -rotationDegrees)
         )
         # rotatedPoints = initialBbox
         totalBbox = np.r_[initialBbox, rotatedPoints, transformedBbox]
@@ -719,12 +699,12 @@ def subImageFromVerts(
         totalBbox = np.r_[initialBbox, transformedBbox]
 
     subImage, stats = _getAffineSubregion(
-        image, transformedBbox, totalBbox, shape, rotationDeg, **kwargs
+        image, transformedBbox, totalBbox, shape, rotationDegrees, **kwargs
     )
     stats["initialBbox"] = initialBbox
 
     ret = [subImage]
-    if returnCoords:
+    if returnBoundingBox:
         ret.append(transformedBbox)
     if returnStats:
         ret.append(stats)
@@ -750,7 +730,7 @@ def _getRotationStats(
         trueRotationDeg -= 90
         width_height = width_height[::-1]
 
-    if rotationDeg is PRJ_ENUMS.ROT_OPTIMAL:
+    if rotationDeg is PRJ_ENUMS.ROTATION_OPTIMAL:
         # Use the rotation that most squarely aligns the component
         rotationDeg = trueRotationDeg
         allowTranspose = True
@@ -797,7 +777,7 @@ def _getAffineSubregion(
     padBorderOpts: dict = None,
     **affineKwargs,
 ):
-    totalBbox = coordsToBbox(totalBbox, addOneToMax=False)
+    totalBbox = coordsToBox(totalBbox, addOneToMax=False)
     # It's common for rotation angles to cut off fractions of a pixel during warping.
     # This is easily resolved by adding just a few more pixels to the total box
     totalBbox[0] -= 1
@@ -895,7 +875,7 @@ def inverseSubImage(subImage, stats, finalBbox: np.ndarray = None):
     return out
 
 
-def coordsToBbox(coords: np.ndarray, addOneToMax=True):
+def coordsToBox(coords: np.ndarray, addOneToMax=True):
     ret = np.r_[coords.min(0, keepdims=True), coords.max(0, keepdims=True)]
     if addOneToMax:
         ret[1] += 1
@@ -945,7 +925,7 @@ def toHtmlWithStyle(
         return htmlDf
 
 
-def _cvtImage(file, ext="png", replace=True):
+def _convertImage(file, ext="png", replace=True):
     if file.suffix[1:] == ext:
         return
     try:
@@ -963,13 +943,15 @@ def convertImages(
         folder = Path()
     folder = Path(folder)
     files = list(folder.glob(globstr))
-    ret = fns.mprocApply(_cvtImage, files, "Converting Files", extraArgs=(ext, replace))
+    ret = fns.mprocApply(
+        _convertImage, files, "Converting Files", extraArgs=(ext, replace)
+    )
     errs = [f"{r[0].name}: {r[1]}" for r in ret if r is not None]
     if errs:
         print(f"Conversion errors occurred in the following files:\n" + "\n".join(errs))
 
 
-def getObjsDefinedInSelfModule(moduleVars, moduleName, ignorePrefix="_"):
+def getObjectsDefinedInSelfModule(moduleVars, moduleName, ignorePrefix="_"):
     # Prepopulate to avoid "dictionary changed on iteration"
     _iterVars = list(moduleVars.items())
     out = []

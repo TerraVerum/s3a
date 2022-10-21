@@ -47,15 +47,15 @@ class AlgParamEditor(ParamEditor):
     sigProcessorChanged = QtCore.Signal(str)
     """Name of newly selected process"""
 
-    def __init__(self, clctn: "AlgorithmCollection" = None, **kwargs):
+    def __init__(self, collection: "AlgorithmCollection" = None, **kwargs):
         super().__init__(**kwargs)
-        if clctn is None:
-            clctn = AlgorithmCollection()
-        self.collection = clctn
+        if collection is None:
+            collection = AlgorithmCollection()
+        self.collection = collection
         self.treeBtnsWidget.hide()
 
-        procName = next(iter(self.collection.topProcesses))
-        proc = clctn.parseProcName(procName)
+        processName = next(iter(self.collection.topProcesses))
+        proc = collection.parseProcessName(processName)
         # Set to None first to force switch, init states
         self.currentProcessor = self.collection.processWrapType(proc, self.params)
         _, self.changeProcParam = self.registerFunc(
@@ -63,7 +63,7 @@ class AlgParamEditor(ParamEditor):
             runOpts=RunOpts.ON_CHANGED,
             returnParam=True,
             parentParam=self._metaParamGrp,
-            proc=procName,
+            proc=processName,
         )
         fns.setParamsExpanded(self._metaTree)
         procSelector = self.changeProcParam.child("proc")
@@ -80,9 +80,9 @@ class AlgParamEditor(ParamEditor):
                     item.valueChanged(procSelector, name)
 
         self.sigProcessorChanged.connect(onChange)
-        self.changeActiveProcessor(procName)
+        self.changeActiveProcessor(processName)
 
-    def _unnestedProcState(
+    def _unnestedProcessState(
         self, proc: NestedProcess, _state=None, **kwargs
     ) -> _AlgClctnDict:
         """
@@ -116,7 +116,7 @@ class AlgParamEditor(ParamEditor):
         stageVals = []
         for stage in proc:
             if isinstance(stage, NestedProcess):
-                self._unnestedProcState(stage, _state, **kwargs)
+                self._unnestedProcessState(stage, _state, **kwargs)
                 stageVals.append(stage.addMetaProps(stage.name, **kwargs))
             else:
                 stageVals.append(stage.saveState(**kwargs))
@@ -142,7 +142,7 @@ class AlgParamEditor(ParamEditor):
         if paramState is None:
             # Since inner nested processes are already recorded, flatten here to just
             # save updated parameter values for the outermost stage
-            paramState = self._unnestedProcState(proc, includeMeta=True)
+            paramState = self._unnestedProcessState(proc, includeMeta=True)
             paramState["modules"] = self.collection.includeModules
         self.collection.loadParamValues(self.collection.stateName, paramState)
         clctnState = self.collection.saveParamValues(saveName, blockWrite=True)
@@ -162,7 +162,7 @@ class AlgParamEditor(ParamEditor):
                 DeprecationWarning,
             )
             stateDict["active"] = stateDict.pop("Selected Algorithm")
-        procName = stateDict.pop("active", None)
+        processName = stateDict.pop("active", None)
         if "Parameters" in stateDict:
             warnings.warn(
                 '"Parameters" is deprecated for a loaded state. In the future, '
@@ -171,11 +171,11 @@ class AlgParamEditor(ParamEditor):
                 DeprecationWarning,
             )
             stateDict = stateDict["Parameters"]
-        if not procName:
-            procName = next(iter(self.collection.topProcesses))
+        if not processName:
+            processName = next(iter(self.collection.topProcesses))
 
         self.collection.loadParamValues(stateName, stateDict, **kwargs)
-        self.changeActiveProcessor(procName, saveBeforeChange=False)
+        self.changeActiveProcessor(processName, saveBeforeChange=False)
         return super().loadParamValues(stateName, {}, candidateParams=[], **kwargs)
 
     def changeActiveProcessor(
@@ -200,7 +200,7 @@ class AlgParamEditor(ParamEditor):
         if saveBeforeChange:
             self.saveParamValues(
                 self.stateName,
-                self._unnestedProcState(
+                self._unnestedProcessState(
                     self.currentProcessor.processor, includeMeta=True
                 ),
                 blockWrite=True,
@@ -214,32 +214,32 @@ class AlgParamEditor(ParamEditor):
         fns.setParamsExpanded(self.tree)
         self.sigProcessorChanged.emit(proc.name)
 
-    def _resolveProccessor(self, proc):
-        if isinstance(proc, str):
-            proc = self.collection.parseProcName(proc)
-        if proc == self.currentProcessor.processor:
+    def _resolveProccessor(self, processor):
+        if isinstance(processor, str):
+            processor = self.collection.parseProcessName(processor)
+        if processor == self.currentProcessor.processor:
             return None
-        return proc
+        return processor
 
-    def editParamValuesGui(self):
+    def editParameterValuesGui(self):
         webbrowser.open(self.formatFileName(self.stateName))
 
 
 class AlgorithmCollection(ParamEditor):
     def __init__(
         self,
-        procWrapType=NestedProcWrapper,
-        procType=NestedProcess,
-        procEditorType=AlgParamEditor,
+        processWrapType=NestedProcWrapper,
+        processType=NestedProcess,
+        processEditorType=AlgParamEditor,
         parent=None,
         fileType="alg",
         template: FilePath = None,
         **kwargs,
     ):
         super().__init__(parent, fileType=fileType, **kwargs)
-        self.processWrapType = procWrapType
-        self.processType = procType
-        self.processEditorType = procEditorType
+        self.processWrapType = processWrapType
+        self.processType = processType
+        self.processEditorType = processEditorType
         self.primitiveProcesses: t.Dict[str, t.Union[ProcessStage, t.List[str]]] = {}
         self.topProcesses: _procDict = {}
         self.includeModules: t.List[str] = []
@@ -257,7 +257,7 @@ class AlgorithmCollection(ParamEditor):
         )
 
     def createProcessorEditor(
-        self, saveDir: t.Union[str, t.Type], editorName="Processor"
+        self, savePath: t.Union[str, t.Type], editorName="Processor"
     ) -> AlgParamEditor:
         """
         Creates a processor editor capable of dynamically loading, saving, and editing
@@ -265,39 +265,39 @@ class AlgorithmCollection(ParamEditor):
 
         Parameters
         ----------
-        saveDir
+        savePath
             Directory for saved states. If a class type is provided, the __name__ of
             this class is used. Note: Either way, the resulting name is lowercased
             before being applied.
         editorName
             The name of the spawned editor
         """
-        if inspect.isclass(saveDir):
-            saveDir = saveDir.__name__
-            formattedClsName = fns.pascalCaseToTitle(saveDir)
-            saveDir = MENU_OPTS_DIR / formattedClsName.lower()
-        elif saveDir is not None:
-            saveDir = Path(saveDir)
+        if inspect.isclass(savePath):
+            savePath = savePath.__name__
+            formattedClsName = fns.pascalCaseToTitle(savePath)
+            savePath = MENU_OPTS_DIR / formattedClsName.lower()
+        elif savePath is not None:
+            savePath = Path(savePath)
         return self.processEditorType(
             self,
-            saveDir=saveDir,
+            saveDir=savePath,
             fileType=self.fileType,
             name=editorName,
         )
 
-    def addProcess(self, proc: ProcessStage, top=False, force=False):
+    def addProcess(self, process: ProcessStage, top=False, force=False):
         addDict = self.topProcesses if top else self.primitiveProcesses
         saveObj = (
-            {proc.name: proc}
-            if isinstance(proc, AtomicProcess)
-            else proc.saveStateFlattened()
+            {process.name: process}
+            if isinstance(process, AtomicProcess)
+            else process.saveStateFlattened()
         )
-        if force or proc.name not in addDict:
+        if force or process.name not in addDict:
             addDict.update(saveObj)
-        for stage in proc:
+        for stage in process:
             # Don't recurse 'top', since it should only hold the directly passed process
             self.addProcess(stage, False, force)
-        return proc.name
+        return process.name
 
     def addFunction(self, func: t.Callable, top=False, **kwargs):
         """
@@ -306,11 +306,11 @@ class AlgorithmCollection(ParamEditor):
         """
         return self.addProcess(AtomicProcess(func, **kwargs), top)
 
-    def parseProcStages(
+    def parseProcessStages(
         self,
         stages: t.Sequence[t.Union[dict, str]],
         name: str = None,
-        add=PRJ_ENUMS.PROC_NO_ADD,
+        add=PRJ_ENUMS.PROCESS_NO_ADD,
         allowOverwrite=False,
     ):
         """
@@ -332,46 +332,48 @@ class AlgorithmCollection(ParamEditor):
         out = self.processType(name)
         for stageName in stages:
             if isinstance(stageName, dict):
-                stage = self.parseProcDict(stageName)
+                stage = self.parseProcessDict(stageName)
             else:
-                stage = self.parseProcName(stageName, topFirst=False)
+                stage = self.parseProcessName(stageName, topFirst=False)
             out.addProcess(stage)
         exists = out.name in self.topProcesses
-        if add is not PRJ_ENUMS.PROC_NO_ADD and (not exists or allowOverwrite):
+        if add is not PRJ_ENUMS.PROCESS_NO_ADD and (not exists or allowOverwrite):
             self.addProcess(
-                out, top=add == PRJ_ENUMS.PROC_ADD_TOP, force=allowOverwrite
+                out, top=add == PRJ_ENUMS.PROCESS_ADD_TOP, force=allowOverwrite
             )
         return out
 
     @classmethod
-    def _deepCopyProcShallowCopyIo(cls, proc) -> ProcessStage:
+    def _deepCopyProcessShallowCopyIo(cls, process) -> ProcessStage:
         """
         Inputs/outputs get regenerated each run cycle, and can be potentially large. No
         need to deep copy them every run. Instead, deep copy the internal state of a
         process and add a shallow copy of the inputs
         """
-        if isinstance(proc, NestedProcess):
-            stages = [cls._deepCopyProcShallowCopyIo(stage) for stage in proc.stages]
-            originalStages = proc.stages
+        if isinstance(process, NestedProcess):
+            stages = [
+                cls._deepCopyProcessShallowCopyIo(stage) for stage in process.stages
+            ]
+            originalStages = process.stages
             try:
-                proc.stages = []
+                process.stages = []
                 # Deepcopy doesn't know to shallow copy inputs, so remove stages before
                 # this
-                out = copy.deepcopy(proc)
+                out = copy.deepcopy(process)
             finally:
-                proc.stages = originalStages
+                process.stages = originalStages
             out.stages = stages
             return out
         attrs = {}
         for attr in "input", "result", "defaultInput", "inputForResult":
-            attrs[attr] = getattr(proc, attr)
-            setattr(proc, attr, None)
+            attrs[attr] = getattr(process, attr)
+            setattr(process, attr, None)
         try:
-            out = copy.deepcopy(proc)
+            out = copy.deepcopy(process)
         finally:
             # Force re-attachment of original process attributes
             for attr in attrs:
-                setattr(proc, attr, attrs[attr])
+                setattr(process, attr, attrs[attr])
         for attr in attrs:
             setattr(out, attr, copy.copy(attrs[attr]))
         return out
@@ -379,14 +381,14 @@ class AlgorithmCollection(ParamEditor):
     # Several unwarranted false positives on type info
     # noinspection PyTypeChecker
     @classmethod
-    def parseProcQualname(cls, procName: str, **kwargs):
+    def parseProcessQualname(cls, processName: str, **kwargs):
 
         # Special case: Qualname-loaded procs should be added under their qualname
         # otherwise they won't be rediscoverable after saving->restarting S3A
-        proc = pydoc.locate(procName)
+        proc = pydoc.locate(processName)
         success = True
         if isinstance(proc, ProcessStage):
-            proc: ProcessStage = cls._deepCopyProcShallowCopyIo(proc)
+            proc: ProcessStage = cls._deepCopyProcessShallowCopyIo(proc)
         elif inspect.isclass(proc) and issubclass(proc, (AtomicProcess, NestedProcess)):
             proc: t.Type
             proc = proc(**kwargs)
@@ -395,22 +397,22 @@ class AlgorithmCollection(ParamEditor):
         else:
             success = False
         if success:
-            proc.nameForState = procName
+            proc.nameForState = processName
             return proc
         # else
         return None
 
-    def searchModulesForProc(self, procName, **kwargs):
+    def searchModulesForProcess(self, processName, **kwargs):
         proc = None
         for module in self.includeModules:
-            proc = self.parseProcModule(module, procName, **kwargs)
+            proc = self.parseProcessModule(module, processName, **kwargs)
             if proc is not None:
                 break
         return proc
 
-    def parseProcName(
+    def parseProcessName(
         self,
-        procName: str,
+        processName: str,
         topFirst=True,
         searchDicts: t.Sequence[dict] = None,
         **kwargs,
@@ -426,24 +428,24 @@ class AlgorithmCollection(ParamEditor):
             searchDicts = searchDicts[::-1]
 
         searchFuncs = [
-            lambda procName, **kwargs: searchDicts[0].get(
-                procName, searchDicts[1].get(procName)
+            lambda processName, **kwargs: searchDicts[0].get(
+                processName, searchDicts[1].get(processName)
             ),
-            self.parseProcQualname,
-            self.searchModulesForProc,
+            self.parseProcessQualname,
+            self.searchModulesForProcess,
         ]
         for loader in searchFuncs:
-            proc = loader(procName, **kwargs)
+            proc = loader(processName, **kwargs)
             if proc is not None:
                 break
         else:
             proc = None
         if proc is None:
-            raise ValueError(f'Process "{procName}" not recognized')
+            raise ValueError(f'Process "{processName}" not recognized')
         if not isinstance(proc, ProcessStage):
-            proc = self.parseProcStages(proc, procName)
+            proc = self.parseProcessStages(proc, processName)
         else:
-            proc = self._deepCopyProcShallowCopyIo(proc)
+            proc = self._deepCopyProcessShallowCopyIo(proc)
             # Default to disableale stages. For non-disablable, use parseDict
             proc.allowDisable = True
         # Make sure to cache newly discovered procs
@@ -451,14 +453,14 @@ class AlgorithmCollection(ParamEditor):
         self.addProcess(proc, topFirst and isinstance(proc, NestedProcess))
         return proc
 
-    def parseProcDict(self, procDict: dict, topFirst=False):
+    def parseProcessDict(self, processDict: dict, topFirst=False):
         # 1. First key is always the process name, values are new inputs for any
         # matching process
         # 2. Second key is whether the process is disabled
-        procDict = procDict.copy()
-        procName, updateArgs = next(iter(procDict.items()))
-        procDict.pop(procName)
-        proc = self.parseProcName(procName, topFirst=topFirst)
+        processDict = processDict.copy()
+        processName, updateArgs = next(iter(processDict.items()))
+        processDict.pop(processName)
+        proc = self.parseProcessName(processName, topFirst=topFirst)
         if isinstance(updateArgs, list):
             # TODO: Determine policy for loading nested procs, outer should already
             #  know about inner so it shouldn't _need_ to occur, given outer would've
@@ -470,7 +472,7 @@ class AlgorithmCollection(ParamEditor):
             # if isinstance(proc, AtomicProcess):
             #   proc.defaultInput.update(**updateArgs)
         # Check for process-level traits
-        for kk, vv in procDict.items():
+        for kk, vv in processDict.items():
             if hasattr(proc, kk):
                 setattr(proc, kk, vv)
         return proc
@@ -517,10 +519,10 @@ class AlgorithmCollection(ParamEditor):
                 self.addFunction(func)
 
     @classmethod
-    def parseProcModule(
+    def parseProcessModule(
         cls,
         moduleName: t.Union[str, types.ModuleType],
-        procName: str,
+        processName: str,
         formatter=algoNameFormatter,
         **factoryArgs,
     ):
@@ -531,8 +533,8 @@ class AlgorithmCollection(ParamEditor):
         if not module:
             raise ValueError(f'Module "{moduleName}" not recognized')
         # TODO: Depending on search time, maybe quickly search without formatting?
-        procName = formatter(procName)
-        # It is possible after name formatting for multiple matches to exist for procName.
+        processName = formatter(processName)
+        # It is possible after name formatting for multiple matches to exist for processName.
         # The first match that is a function or process stage will be retained.
         for name, attr in vars(module).items():
             name = formatter(name.split(".")[-1])
@@ -555,7 +557,7 @@ class AlgorithmCollection(ParamEditor):
                     continue
             if isinstance(attr, ProcessStage):
                 name = formatter(attr.name)
-            if name == procName:
+            if name == processName:
                 if isinstance(attr, ProcessStage):
                     return attr
                 if callable(attr):
