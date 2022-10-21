@@ -258,21 +258,35 @@ def cornersToFullBoundary(cornerVerts: XYVertices, sizeLimit=0) -> XYVertices:
 
 def getCroppedImg(
     image: NChanImg,
-    verts: np.ndarray,
+    vertices: np.ndarray,
     margin=0,
-    coordsAsSlices=False,
-    returnCoords=True,
+    returnSlices=False,
+    returnBoundingBox=True,
 ) -> tuple[np.ndarray, _coordType] | np.ndarray:
     """
     Crops an image according to the specified vertices such that the returned image
     does not extend past vertices plus margin (including other bboxes if specified).
-    All bboxes and output coords are of the form [[xmin, ymin], [xmax, ymax]]. Slices
-    are (row slices, col slices) if ``coordsAsSlices`` is specified.
+
+    Parameters
+    ----------
+    image
+        Image to crop
+    vertices
+        Vertices of the polygon to crop to
+    margin
+        Margin to add to the top, bottom, left, and right of the polygon formed
+        by ``vertices``
+    returnSlices
+        Whether to return the slices used to crop the image. In the format
+        ``slice(yMin, yMax), slice(xMin, xMax)``.
+    returnBoundingBox
+        Whether to return the bounding box of the cropped image. In the format
+        ``[[xmin, ymin], [xmax, ymax]]``.
     """
-    verts = np.vstack(verts)
+    vertices = np.vstack(vertices)
     img_np = image
-    compCoords = np.vstack([verts.min(0), verts.max(0)])
     compCoords = getClippedBbox(img_np.shape, compCoords, margin)
+    compCoords = np.vstack([vertices.min(0), vertices.max(0)])
     coordSlices = (
         slice(compCoords[0, 1], compCoords[1, 1]),
         slice(compCoords[0, 0], compCoords[1, 0]),
@@ -281,13 +295,12 @@ def getCroppedImg(
     indexer = coordSlices
     if image.ndim > 2:
         indexer += (slice(None),)
-    croppedImg = image[indexer]
-    if not returnCoords:
-        return croppedImg
-    if coordsAsSlices:
-        return croppedImg, coordSlices
-    else:
-        return croppedImg, compCoords
+    toReturn = [image[indexer]]
+    if returnSlices:
+        toReturn.append(coordSlices)
+    if returnBoundingBox:
+        toReturn.append(compCoords)
+    return tuple(toReturn) if len(toReturn) > 1 else toReturn[0]
 
 
 def imgCornerVertices(img: NChanImg = None) -> XYVertices:
