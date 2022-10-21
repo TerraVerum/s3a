@@ -334,7 +334,7 @@ class LblPngImporter(AnnotationImporter):
         self, importObj, labelMapping=None, distinctRegions=None, **kwargs
     ):
         labelMask = importObj
-        for numericLbl, origVal in labelMapping.iteritems():  # type: int, t.Any
+        for numericLbl, origVal in labelMapping.items():  # type: int, t.Any
             verts = ComplexXYVertices.fromBinaryMask(labelMask == numericLbl)
             if distinctRegions:
                 for vv in verts:

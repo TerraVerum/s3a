@@ -45,7 +45,7 @@ def _runFunc(param: PrjParam, values, which: str, default: t.Callable, returnErr
     takesParam = handlerRow["takesParam"]
     # Retain initial index if series-like is passed
     if isinstance(values, pd.Series):
-        enumerator = values.iteritems()
+        enumerator = values.items()
     else:
         enumerator = enumerate(values)
     for ii, val in enumerator:

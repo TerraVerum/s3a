@@ -211,7 +211,7 @@ class XYVerticesDelegate(SceneItemContainer):
         # Single coordinates and disconnected vertices are points, while connected
         # verts are shaded polygons.
         polyVerts, pointVerts, callouts = [], [], []
-        for idx, verts in comps[field].iteritems():
+        for idx, verts in comps[field].items():
             # Ignore empty vertices
             if not len(verts):
                 continue
@@ -361,7 +361,7 @@ class FieldDisplay(EditorPropsMixin):
         original fields
         """
         converter = lambda comp: "\n".join(
-            f"{index}: {data}" for index, data in comp.iteritems() if len(str(data))
+            f"{index}: {data}" for index, data in comp.items() if len(str(data))
         )
         text = comps[fields].apply(converter, axis=1)
         text.name = cls.DEFAULT_FIELD

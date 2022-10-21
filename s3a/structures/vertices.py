@@ -485,7 +485,7 @@ class S3AVertsAccessor:
         """
         newVerts = []
         newIds = []
-        for idx, verts in self.verts.iteritems():
+        for idx, verts in self.verts.items():
             tmpMask = verts.toMask().astype("uint8")
             nComps, ccompImg = cv.connectedComponents(tmpMask)
             for ii in range(1, nComps):
