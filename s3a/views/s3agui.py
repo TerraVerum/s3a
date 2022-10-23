@@ -131,7 +131,7 @@ class S3A(S3ABase):
         self.addToolBar(self.generalToolbar)
 
         _plugins = [self.classPluginMap[c] for c in [MainImagePlugin, CompTablePlugin]]
-        parents = [self.mainImage, self.componentTable]
+        parents = [self.mainImage, self.tableView]
         for plugin, parent in zip(_plugins, reversed(parents)):
             plugin.toolsEditor.actionsMenuFromProcs(
                 plugin.name, nest=True, parent=parent, outerMenu=parent.menu
@@ -145,7 +145,7 @@ class S3A(S3ABase):
         tableDock.setObjectName("Component Table Dock")
         tableContents = QtWidgets.QWidget(tableDock)
         tableLayout = QtWidgets.QVBoxLayout(tableContents)
-        tableLayout.addWidget(self.componentTable)
+        tableLayout.addWidget(self.tableView)
         tableDock.setWidget(tableContents)
 
         self.addDockWidget(QtCore.Qt.DockWidgetArea.BottomDockWidgetArea, tableDock)
@@ -184,7 +184,7 @@ class S3A(S3ABase):
     def changeFocusedComponent(self, ids: Union[int, Sequence[int]] = None):
         ret = super().changeFocusedComponent(ids)
         self.currentComponentLabel.setText(
-            f"Component ID: {self.mainImage.focusedComponent[REQD_TBL_FIELDS.ID]}"
+            f"Component ID: {self.componentManager.focusedComponent[REQD_TBL_FIELDS.ID]}"
         )
         return ret
 
@@ -193,7 +193,7 @@ class S3A(S3ABase):
             None, "Select Table Config File", "All Files (*.*);; Config Files (*.yml)"
         )
         if outFname is not None:
-            self.sharedAttrs.tableData.loadConfig(outFname)
+            self.tableData.loadConfig(outFname)
 
     def _addPluginObject(self, plugin: ParamEditorPlugin, **kwargs):
         plugin = super()._addPluginObject(plugin, **kwargs)
@@ -320,11 +320,11 @@ class S3A(S3ABase):
         selection = self.componentController.selectRowsById(keepIds)
         if (
             self.isVisible()
-            and self.componentTable.props[PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE]
+            and self.tableView.props[PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE]
         ):
             # For some reason sometimes the actual table selection doesn't propagate in
             # time, so directly forward the selection here
-            self.componentTable.setSelectedCellsAsGui(selection)
+            self.tableView.setSelectedCellsAsGui(selection)
         yield changeDict
         yield fns.gracefulNext(gen)
 

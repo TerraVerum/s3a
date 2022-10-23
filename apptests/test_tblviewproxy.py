@@ -7,20 +7,20 @@ from pyqtgraph.Qt import QtCore, mkQApp
 from s3a.constants import REQD_TBL_FIELDS
 from s3a.generalutils import imageCornerVertices, cvImreadRgb
 from s3a.structures import ComplexXYVertices, XYVertices
-from s3a.views.tableview import CompTableView, PopupTableDialog
+from s3a.views.tableview import ComponentTableView, PopupTableDialog
 
 
 @pytest.mark.withcomps
 def test_merge_selected_comps(app, mgr):
     oldLen = len(mgr.compDf)
-    app.componentTable.selectAll()
+    app.tableView.selectAll()
     mkQApp().processEvents()
     assert len(app.componentController.selectedIds) > 0
     app.componentController.mergeSelectedComponents()
     assert len(mgr.compDf) == 1
     mgr.actionStack.undo()
     assert len(mgr.compDf) == oldLen
-    app.componentTable.clearSelection()
+    app.tableView.clearSelection()
     # Nothing should happen
     app.componentController.mergeSelectedComponents()
 
@@ -37,7 +37,7 @@ def test_split_selected_comps(app, mgr):
     app.clearBoundaries()
     app.addAndFocusComponents(comp)
 
-    app.componentTable.selectAll()
+    app.tableView.selectAll()
     app.componentController.splitSelectedComponents()
     assert len(mgr.compDf) == 4
     mgr.actionStack.undo()
@@ -49,7 +49,7 @@ def test_split_selected_comps(app, mgr):
 
 def test_rm_overlap(app):
     verts = [imageCornerVertices(np.zeros(shape)) for shape in ([100, 100], [200, 200])]
-    comps = app.sharedAttrs.tableData.makeComponentDf(2)
+    comps = app.tableData.makeComponentDf(2)
     comps[REQD_TBL_FIELDS.VERTICES] = [ComplexXYVertices([v]) for v in verts]
     cd = app.componentController
     changeDict = app.addAndFocusComponents(comps)
@@ -92,7 +92,7 @@ def test_set_cells_as(app, mgr):
     # Sometimes Qt doesn't process selections programmatically. Not sure what to do about that
     if len(selection) == 0:
         return
-    app.componentTable.setSelectedCellsAs(selection, newDf)
+    app.tableView.setSelectedCellsAs(selection, newDf)
     matchList = np.tile([newFile, oldSrcFile], len(mgr.compDf) // 2)
     # Irritating that sometimes windows path comparisons fail despite having the same str
     # representations
@@ -104,7 +104,7 @@ def test_set_cells_as(app, mgr):
 
 def test_set_as_gui(sampleComps):
     # Monkeypatch gui for testing
-    view = CompTableView()
+    view = ComponentTableView()
     mgr = view.manager
     mgr.addComponents(sampleComps)
     view.popup.exec = lambda: True

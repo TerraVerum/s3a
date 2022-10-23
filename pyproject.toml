@@ -1,0 +1,4 @@
+[tool.isort]
+profile = "black"
+reverse_relative = true
+combine_as_imports = true

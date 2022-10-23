@@ -43,7 +43,7 @@ def roiFactory(app):
 def test_update(app, mgr, vertsPlugin, sampleComps):
     # Disable region simplification for accurate testing
     vertsPlugin.props[PRJ_CONSTS.PROP_REG_APPROX_EPS] = -1
-    mImg = app.mainImage
+    tblModel = app.componentManager
     newCompSer = sampleComps.iloc[-1].copy()
 
     masks = RND.random((3, 500, 500)) > 0.5
@@ -53,7 +53,7 @@ def test_update(app, mgr, vertsPlugin, sampleComps):
 
     changeDict = app.addAndFocusComponents(newCompSer.to_frame().T)
     newCompSer[REQD_TBL_FIELDS.ID] = changeDict["added"][0]
-    assert mImg.focusedComponent.equals(newCompSer)
+    assert tblModel.focusedComponent.equals(newCompSer)
     # Add two updates so one is undoable and still comparable
     for ii in range(2):
         vertsPlugin.updateRegionFromMask(masks[ii])
@@ -69,23 +69,23 @@ def test_update(app, mgr, vertsPlugin, sampleComps):
     # Test undos for comp change and non-comp changes
     vertsPlugin.actionStack.undo()
     regionCmp(oldMask)
-    assert mImg.focusedComponent.equals(newerSer)
+    assert tblModel.focusedComponent.equals(newerSer)
 
     vertsPlugin.actionStack.undo()
-    assert mImg.focusedComponent[REQD_TBL_FIELDS.ID] == newCompSer[REQD_TBL_FIELDS.ID]
+    assert tblModel.focusedComponent[REQD_TBL_FIELDS.ID] == newCompSer[REQD_TBL_FIELDS.ID]
     # Undo create new comp, nothing is selected
 
     app.sharedAttrs.actionStack.undo()
     # Undo earlier region edit, region should now equal the second-to-last edit
     regionCmp(masks[0])
-    assert mImg.focusedComponent[REQD_TBL_FIELDS.ID] == newCompSer[REQD_TBL_FIELDS.ID]
+    assert tblModel.focusedComponent[REQD_TBL_FIELDS.ID] == newCompSer[REQD_TBL_FIELDS.ID]
 
     app.sharedAttrs.actionStack.redo()
     regionCmp(masks[1])
     app.sharedAttrs.actionStack.redo()
     app.sharedAttrs.actionStack.redo()
     regionCmp(masks[2])
-    assert mImg.focusedComponent.equals(newerSer)
+    assert tblModel.focusedComponent.equals(newerSer)
     assert not app.sharedAttrs.actionStack.canRedo
 
 
@@ -103,13 +103,13 @@ def test_region_modify(sampleComps, app, mgr, vertsPlugin):
     imsum = lambda: vertsPlugin.region.toGrayImage(shapeBnds).sum()
 
     # 1st action
-    app.mainImage.updateFocusedComponent(None)
+    app.componentManager.updateFocusedComponent(None)
     assert imsum() == 0
 
     newVerts = XYVertices([[5, 5], [reach, reach], [reach, 5], [5, 5]])
 
     # 2nd action
-    app.mainImage.updateFocusedComponent(sampleComps.iloc[-1])
+    app.componentManager.updateFocusedComponent(sampleComps.iloc[-1])
     mImg.shapeCollection.sigShapeFinished.emit(newVerts)
     checkpointMask = vertsPlugin.region.toGrayImage(shapeBnds)
     assert np.any(checkpointMask)
@@ -144,7 +144,7 @@ def test_selectionbounds_all(app, mgr):
 
 @pytest.mark.withcomps
 def test_selectionbounds_none(app):
-    app.componentTable.clearSelection()
+    app.tableView.clearSelection()
     app.componentController.selectedIds = np.array([], dtype=int)
     # Selection in negative area ensures no components will be selected
     app.componentController.reflectSelectionBoundsMade(XYVertices([[-100, -100]]))

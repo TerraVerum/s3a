@@ -79,14 +79,13 @@ def test_import_large_verts(sampleComps, tmp_path, app):
 
 def test_change_comp(app, mgr):
     stack = app.actionStack
-    mImg = app.mainImage
+    tblModel = app.componentManager
     mgr.addComponents(dfTester.compDf.copy())
     comp = mgr.compDf.loc[[RND.integers(NUM_COMPS)]]
     app.changeFocusedComponent(comp.index)
-    assert app.mainImage.focusedComponent.equals(comp.squeeze())
-    assert mImg.image is not None
+    assert tblModel.focusedComponent.equals(comp.squeeze())
     stack.undo()
-    assert app.mainImage.focusedComponent[REQD_TBL_FIELDS.ID] == -1
+    assert tblModel.focusedComponent[REQD_TBL_FIELDS.ID] == -1
 
 
 def test_save_layout(app):
@@ -132,7 +131,7 @@ def test_stage_plotting(monkeypatch, app, vertsPlugin):
     mainImg.shapeCollection.sigShapeFinished.emit(XYVertices([[0, 0], [5, 5]]))
     assert len(app.componentManager.compDf) > 0
     app.changeFocusedComponent(app.componentManager.compDf.index[0])
-    assert app.mainImage.focusedComponent.loc[REQD_TBL_FIELDS.ID] >= 0
+    assert app.componentManager.focusedComponent.loc[REQD_TBL_FIELDS.ID] >= 0
     mainImgProps[CNST.PROP_MIN_COMP_SZ] = oldSz
 
     vertsPlugin.procEditor.changeActiveProcessor("Basic Shapes")

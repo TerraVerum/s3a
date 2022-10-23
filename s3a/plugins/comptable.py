@@ -16,7 +16,7 @@ class CompTablePlugin(ParamEditorPlugin):
 
     def attachWinRef(self, win: S3ABase):
 
-        tbl = win.componentTable
+        tbl = win.tableView
         for func, param in zip(
             [
                 lambda: tbl.setSelectedCellsAsGui(),
@@ -31,8 +31,8 @@ class CompTablePlugin(ParamEditorPlugin):
                 CNST.TOOL_TBL_ZOOM_TO_COMPS,
             ],
         ):
-            param.opts["ownerObj"] = win.componentTable
+            param.opts["ownerObj"] = win.tableView
             self.registerFunc(func, name=param.name, btnOpts=param)
         tbl.menu = self.toolsEditor.actionsMenuFromProcs(parent=tbl, nest=True)
         super().attachWinRef(win)
-        self.tableData = win.sharedAttrs.tableData
+        self.tableData = win.tableData

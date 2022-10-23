@@ -27,13 +27,14 @@ from ..controls.tableviewproxy import ComponentController, ComponentSorterFilter
 from ..logger import getAppLogger
 from ..models.tablemodel import ComponentManager
 from ..parameditors.appstate import AppStateEditor
+from ..parameditors.table import TableData
 from ..plugins import INTERNAL_PLUGINS, tablefield, EXTERNAL_PLUGINS
 from ..plugins.file import FilePlugin
 from ..plugins.misc import RandomToolsPlugin
 from ..shared import SharedAppSettings
 from ..structures import FilePath, NChanImg
 from ..views.imageareas import MainImage
-from ..views.tableview import CompTableView
+from ..views.tableview import ComponentTableView
 
 __all__ = ["S3ABase"]
 
@@ -122,21 +123,19 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             overrideOwnerObj=self.mainImage,
         )
 
-        self.componentManager = ComponentManager()
-        # Warning! If default IO table is not associated here, object refs throughout
-        # the application will point to the wrong table
-        ComponentIO.tableData = attrs.tableData
+        self.tableData = TableData(makeFilter=True)
+        self.componentManager = ComponentManager(self.tableData)
 
-        self.componentTable = CompTableView()
+        self.tableView = ComponentTableView()
         self.componentController = ComponentController(
-            self.componentManager, self.mainImage, self.componentTable
+            self.componentManager, self.mainImage, self.tableView
         )
 
-        self.componentTable.setSortingEnabled(True)
-        self.componentTable.setAlternatingRowColors(True)
+        self.tableView.setSortingEnabled(True)
+        self.tableView.setAlternatingRowColors(True)
         # Allow filtering/sorting
         self.sortFilterProxy = ComponentSorterFilter(self.componentManager)
-        self.componentTable.setModel(self.sortFilterProxy)
+        self.tableView.setModel(self.sortFilterProxy)
 
         self.hasUnsavedChanges = False
         self.sourceImagePath: Optional[Path] = None
@@ -162,7 +161,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         # Create links for commonly used plugins
         # noinspection PyTypeChecker
         self.filePlugin: FilePlugin = self.classPluginMap[FilePlugin]
-        attrs.tableData.sigConfigUpdated.connect(lambda: self.resetTableFields())
+        self.tableData.sigConfigUpdated.connect(self.resetTableFields)
 
         # noinspection PyTypeChecker
         self.verticesPlugin: tablefield.VerticesPlugin = self.classPluginMap[
@@ -185,7 +184,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         # MAIN IMAGE
         # -----
         def handleComponentsChanged(changedDict: dict):
-            ser = self.mainImage.focusedComponent
+            ser = self.componentManager.focusedComponent
             focusedId = ser[REQD_TBL_FIELDS.ID]
             if focusedId in changedDict["deleted"]:
                 self.componentController.selectRowsById([])
@@ -221,13 +220,11 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         # Start by adding any potentially new plugins
         for plg in self.filePlugin.projectData.spawnedPlugins:
             self._addPluginObject(plg)
-        self.componentTable.setColDelegates()
-        self.componentTable.popup.reflectDelegateChange()
+        self.tableView.setColDelegates()
+        self.tableView.popup.reflectDelegateChange()
         # Make sure this is necessary, first
-        for mgr in self.componentManager, self.componentTable.popup.tbl.manager:
-            if mgr.columnTitles == list(
-                [f.name for f in self.sharedAttrs.tableData.allFields]
-            ):
+        for mgr in self.componentManager, self.tableView.popup.tbl.manager:
+            if mgr.columnTitles == list([f.name for f in self.tableData.allFields]):
                 # Fields haven't changed since last reset. Types could be different,
                 # but nothing will break. So, the table doesn't have to be completely
                 # reset
@@ -254,7 +251,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         """
         # If the component was deleted
         mgr = self.componentManager
-        focusedId = self.mainImage.focusedComponent[REQD_TBL_FIELDS.ID]
+        focusedId = self.componentManager.focusedComponent[REQD_TBL_FIELDS.ID]
         exists = focusedId in mgr.compDf.index
         if not exists and focusedId != REQD_TBL_FIELDS.ID.value:
             # Could be a brand new component, allow in that case
@@ -263,7 +260,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
 
         self.sigRegionAccepted.emit()
 
-        ser = self.mainImage.focusedComponent
+        ser = self.componentManager.focusedComponent
         if ser[REQD_TBL_FIELDS.VERTICES].isEmpty():
             # Component should be erased. Since new components will not match existing
             # IDs the same function will work regardless of whether this was new or
@@ -306,7 +303,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             self.addAndFocusComponents(
                 oldComp, addType=PRJ_ENUMS.COMPONENT_ADD_AS_MERGE
             )
-            self.mainImage.updateFocusedComponent(focusedComponent)
+            self.componentManager.updateFocusedComponent(focusedComponent)
 
         return undo
 
@@ -555,7 +552,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         # Focus is performed by comp table
         # Arbitrarily choose the last possible component
         changeList = np.concatenate([changeDict["added"], changeDict["changed"]])
-        oldFocused = self.mainImage.focusedComponent[REQD_TBL_FIELDS.ID]
+        oldFocused = self.componentManager.focusedComponent[REQD_TBL_FIELDS.ID]
         # Nothing to undo if there were no changes
         if len(changeList) > 0:
             self.componentController.selectRowsById([changeList[-1]])
@@ -571,14 +568,15 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         if np.isscalar(ids):
             ids = [ids]
         if (
-            ids is None
+            self.mainImage.imgItem.image is None
+            or ids is None
             or len(ids) != 1
             or ids[0] not in self.componentManager.compDf.index
         ):
-            self.mainImage.updateFocusedComponent()
+            self.componentManager.updateFocusedComponent()
         else:
             newComp: pd.Series = self.componentManager.compDf.loc[ids[0]]
-            self.mainImage.updateFocusedComponent(newComp)
+            self.componentManager.updateFocusedComponent(newComp)
 
     # Stolen and adapted for python from https://stackoverflow.com/a/42910109/9463643
     # noinspection PyTypeChecker

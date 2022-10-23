@@ -44,9 +44,10 @@ class TableFieldPlugin(ProcessorPlugin):
 
     def attachWinRef(self, win):
         super().attachWinRef(win)
-        self.mainImage = mainImage = win.mainImage
+        self.mainImage = win.mainImage
+        self.componentManager = win.componentManager
         win.sigRegionAccepted.connect(self.acceptChanges)
-        mainImage.sigUpdatedFocusedComponent.connect(self.updateFocusedComponent)
+        self.componentManager.sigUpdatedFocusedComponent.connect(self.updateFocusedComponent)
         self.active = True
         self.registerFunc(
             self.processorAnalytics, btnOpts=PRJ_CONSTS.TOOL_PROC_ANALYTICS
@@ -64,7 +65,7 @@ class TableFieldPlugin(ProcessorPlugin):
     def updateFocusedComponent(self, component: pd.Series = None):
         """
         This function is called when a new component is created or the focused image is
-        updated from the main view. See :meth:`MainImage.updateFocusedComponent` for
+        updated from the main view. See :meth:`ComponentManager.updateFocusedComponent` for
         parameters.
         """
         pass

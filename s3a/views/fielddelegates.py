@@ -7,12 +7,12 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui
-from utilitys import EditorPropsMixin, PrjParam
+from utilitys import PrjParam
 
 from .regions import MultiRegionPlot
 from ..constants import REQD_TBL_FIELDS as RTF
 from ..generalutils import getTopLeftCoordinate, symbolFromVertices
-from ..shared import SharedAppSettings
+from ..structures import PrjParamGroup
 
 
 class FieldDisplayDelegate(ABC):
@@ -283,15 +283,12 @@ class ComplexXYVerticesDelegate(SceneItemContainer):
         self.region.resetRegionList(setComps)
 
 
-class FieldDisplay(EditorPropsMixin):
+class FieldDisplay:
     """
     Handles the display of component field data.
     """
 
     DEFAULT_FIELD = PrjParam("stringified display data", "", pType="uniqueval_default")
-
-    def __initEditorParams__(self, shared: SharedAppSettings):
-        self.table = shared.tableData
 
     def __init__(self, plotItem: pg.PlotItem):
         self.availableDelegates = {}
@@ -329,11 +326,12 @@ class FieldDisplay(EditorPropsMixin):
         if not len(components):
             return
 
+        allFields = list(components)
         if fields is None:
-            fields = self.table.allFields
-
-        # user arguments could be strings
-        fields = [self.table.fieldFromName(f) for f in fields]
+            fields = allFields
+        else:
+            # user arguments could be strings
+            fields = [PrjParamGroup.fieldFromParam(allFields, f) for f in fields]
 
         defaultFields = [
             f

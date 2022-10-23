@@ -65,13 +65,13 @@ class RandomToolsPlugin(ParamEditorPlugin):
             fieldsParam.setLimits(
                 [
                     str(f)
-                    for f in window.sharedAttrs.tableData.allFields
+                    for f in window.tableData.allFields
                     if f not in display.fieldDisplay.ignoreColumns
                 ]
             )
             fieldsParam.setValue(fieldsParam.opts["limits"])
 
-        window.sharedAttrs.tableData.sigConfigUpdated.connect(updateLims)
+        window.tableData.sigConfigUpdated.connect(updateLims)
         updateLims()
 
     def showDevConsoleGui(self):

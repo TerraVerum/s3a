@@ -1,4 +1,4 @@
-from typing import Union, Any
+from typing import Union, Any, TYPE_CHECKING
 from warnings import warn
 
 import numpy as np
@@ -7,15 +7,18 @@ from pyqtgraph.Qt import QtCore
 
 from ..constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
 from ..generalutils import coerceDfTypes
-from ..shared import SharedAppSettings
 from ..logger import getAppLogger
+from ..parameditors.table.data import TableData
 from ..structures import ComplexXYVertices, OneDArr
 
 __all__ = ["ComponentManager", "ComponentTableModel"]
 
-from utilitys import EditorPropsMixin
+from utilitys import EditorPropsMixin, fns
 
 from utilitys.misc import DeferredActionStackMixin as DASM
+
+if TYPE_CHECKING:
+    from ..parameditors.table.data import TableData
 
 Signal = QtCore.Signal
 
@@ -34,11 +37,9 @@ class ComponentTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
     sigComponentsChanged = Signal(dict)
     sigFieldsChanged = Signal()
 
-    def __initEditorParams__(self, shared: SharedAppSettings):
-        self.tableData = shared.tableData
-
-    def __init__(self):
+    def __init__(self, tableData: TableData = None):
         super().__init__()
+        self.tableData = tableData or TableData()
         # Create component dataframe and remove created row. This is to
         # ensure datatypes are correct
         self.resetFields()
@@ -138,6 +139,13 @@ class ComponentTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
 class ComponentManager(ComponentTableModel):
     _nextComponentId = 0
     compDf: pd.DataFrame
+
+    sigUpdatedFocusedComponent = Signal(object)
+    """pd.Series, newly focused component"""
+
+    def __init__(self, tableData: TableData = None):
+        super().__init__(tableData)
+        self.focusedComponent = self.tableData.makeComponentSeries()
 
     def resetFields(self):
         super().resetFields()
@@ -387,3 +395,30 @@ class ComponentManager(ComponentTableModel):
         overlapComps = self.compDf.loc[overlapIds].copy()
         overlapComps[RTF.VERTICES] = overlapComps[RTF.VERTICES].s3averts.removeOverlap()
         self.addComponents(overlapComps, PRJ_ENUMS.COMPONENT_ADD_AS_MERGE)
+
+    def updateFocusedComponent(self, component: pd.Series = None):
+        """
+        Updates focused image and component from provided information. Useful for
+        creating a 'zoomed-in' view that allows much faster processing than applying
+        image processing algorithms to the entire image each iteration.
+
+        Parameters
+        ----------
+        component
+            New component to edit using various plugins (See :class:`TableFieldPlugin`)
+        """
+        if component is None:
+            component = self.tableData.makeComponentSeries()
+        else:
+            # Since values INSIDE the dataframe are reset instead of modified, there is no
+            # need to go through the trouble of deep copying
+            component = component.copy(deep=False)
+
+        self.focusedComponent = component
+
+        self.sigUpdatedFocusedComponent.emit(component)
+
+    @property
+    def focusedDataframe(self):
+        """Return a dataframe version of focused component with correct dtypes"""
+        return coerceDfTypes(fns.serAsFrame(self.focusedComponent))

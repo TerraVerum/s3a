@@ -137,7 +137,7 @@ def test_table_setdata(sampleComps, app, mgr):
 
     for col, newVal in intColMapping.items():
         row = RND.integers(NUM_COMPS)
-        idx = app.componentTable.model().index(row, col)
+        idx = app.tableView.model().index(row, col)
         oldVal = mgr.data(idx, QtCore.Qt.ItemDataRole.EditRole)
         mgr.setData(idx, newVal)
         # Test with no change

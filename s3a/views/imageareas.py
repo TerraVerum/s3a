@@ -41,18 +41,13 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
     - Current draw action
     """
 
-    sigUpdatedFocusedComponent = Signal(object)
-    """pd.Series, newly focused component"""
-
     sigDrawActionChanged = Signal(object)
     """New draw action (PrjParam)"""
 
     def __initEditorParams__(self, shared: SharedAppSettings):
-        self.focusedComponent: pd.Series = shared.tableData.makeComponentSeries()
         shared.colorScheme.registerFunc(
             self.updateGridScheme, runOpts=RunOpts.ON_CHANGED
         )
-        self.tableData = shared.tableData
 
     def __init__(
         self,
@@ -73,14 +68,6 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
 
         self.toolsEditor.registerFunc(self.resetZoom, btnOpts=CNST.TOOL_RESET_ZOOM)
 
-        # -----
-        # FOCUSED COMPONENT INFORMATION
-        # -----
-        self._focusedTools: List[ParamEditor] = []
-        """
-        List of all toolsEditor that allow actions to be performed on the currently 
-        focused components
-        """
         # -----
         # DRAWING OPTIONS
         # -----
@@ -126,10 +113,6 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
         imShape = self.image.shape
         vb: RightPanViewBox = self.getViewBox()
         vb.setRange(xRange=(0, imShape[1]), yRange=(0, imShape[0]))
-
-    @property
-    def focusedComponentAsFrame(self):
-        return coerceDfTypes(fns.serAsFrame(self.focusedComponent))
 
     def shapeAssignment(self, newShapeParameter: PrjParam):
         self.shapeCollection.shapeParameter = newShapeParameter
@@ -309,14 +292,6 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
                 **registerOpts
             )
 
-    def focusedComponentImage(self, margin: int = 0):
-        return getCroppedImage(
-            self.image,
-            self.focusedComponent[RTF.VERTICES].stack(),
-            margin,
-            returnBoundingBox=False,
-        )
-
     def viewboxCoords(self, margin=0):
         """
         Returns the dimensions of the viewbox as (x,y) coordinates of its boundaries
@@ -327,8 +302,6 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
         return span * np.array([[0, 0], [0, 1], [1, 1], [1, 0]]) + offset
 
     def addTools(self, toolsEditor: ParamEditor):
-        if toolsEditor in self._focusedTools:
-            return
         toolsEditor.actionsMenuFromProcs(outerMenu=self.menu, parent=self, nest=True)
         retClctn = None
         # Define some helper functions for listening to toolsEditor changes
@@ -350,29 +323,3 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
             self.toolbar.addWidget(retClctn)
         self.getViewBox().menu = self.menu
         return retClctn
-
-    def updateFocusedComponent(self, component: pd.Series = None):
-        """
-        Updates focused image and component from provided information. Useful for
-        creating a 'zoomed-in' view that allows much faster processing than applying
-        image processing algorithms to the entire image each iteration.
-
-        Parameters
-        ----------
-        component
-            New component to edit using various plugins (See :class:`TableFieldPlugin`)
-        """
-        mainImage = self.image
-        if component is None or mainImage is None:
-            component = self.tableData.makeComponentSeries()
-        else:
-            # Since values INSIDE the dataframe are reset instead of modified, there is no
-            # need to go through the trouble of deep copying
-            component = component.copy(deep=False)
-
-        if mainImage is None:
-            self.imgItem.clear()
-            self.shapeCollection.clearAllRois()
-        self.focusedComponent = component
-
-        self.sigUpdatedFocusedComponent.emit(component)

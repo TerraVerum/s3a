@@ -140,7 +140,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
 
     def attachWinRef(self, win):
         super().attachWinRef(win)
-        self.projectData.componentIo.tableData = win.sharedAttrs.tableData
+        self.projectData.componentIo.tableData = win.tableData
         win.statusBar().addPermanentWidget(self.projNameLbl)
 
         def handleExport(_dir):

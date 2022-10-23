@@ -1,8 +1,10 @@
+from __future__ import annotations
 from typing import Sequence, Any
 from warnings import warn
 
 import numpy as np
 import pandas as pd
+import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.Parameter import PARAM_TYPES
@@ -10,10 +12,11 @@ from pyqtgraph.parametertree.Parameter import PARAM_TYPES
 from ..compio.helpers import serialize, deserialize
 from ..constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
 from ..models.tablemodel import ComponentManager
+from ..parameditors.table.data import TableData
 from ..shared import SharedAppSettings
 from ..structures import TwoDArr
 
-__all__ = ["CompTableView", "PopupTableDialog"]
+__all__ = ["ComponentTableView", "PopupTableDialog"]
 
 from utilitys import (
     ParamEditor,
@@ -134,7 +137,7 @@ class PopupTableDialog(QtWidgets.QDialog):
         # -----------
         # Table View
         # -----------
-        self.tbl = CompTableView(minimal=True)
+        self.tbl = ComponentTableView(minimal=True)
         self.model = MinimalTableModel()
         self.tbl.setModel(self.model)
 
@@ -225,7 +228,7 @@ class PopupTableDialog(QtWidgets.QDialog):
         super().reject()
 
 
-class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
+class ComponentTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
     __groupingName__ = "Component Table"
     """
     Table for displaying :class:`ComponentManager` data.
@@ -234,7 +237,6 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
 
     def __initEditorParams__(self, shared: SharedAppSettings):
         self.props = props = ParamContainer()
-        self.tableData = shared.tableData
         shared.generalProperties.registerProp(
             PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE, container=props
         )
@@ -251,7 +253,6 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
             visibleColumns=[],
         )
         props["visibleColumns"] = params.child("visibleColumns")
-        shared.tableData.sigConfigUpdated.connect(self._onTableChange)
 
     def __init__(self, *args, minimal=False):
         """
@@ -271,9 +272,10 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
         self._previouslySelectedRows = np.array([])
         self.setSortingEnabled(True)
 
-        self.manager = ComponentManager()
+        self.manager = None
+        self.instanceIdIndex = 0
         self.minimal = minimal
-        self.setModel(self.manager)
+        self.setModel(ComponentManager())
         self.setColDelegates()
 
         if not minimal:
@@ -285,7 +287,6 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
                 lambda: self.menu.exec_(cursor.pos())
             )
 
-        self.instanceIdIndex = self.tableData.allFields.index(REQD_TBL_FIELDS.ID)
         self._onTableChange()
 
     def _onTableChange(self, *_args):
@@ -346,11 +347,20 @@ class CompTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
     # When the model is changed, get a reference to the ComponentManager
     def setModel(self, modelOrProxy: QtCore.QAbstractTableModel):
         super().setModel(modelOrProxy)
+        if self.tableData:
+            pg.disconnect(self.tableData.sigConfigUpdated, self._onTableChange)
         try:
             # If successful we were given a proxy model
             self.manager = modelOrProxy.sourceModel()
         except AttributeError:
             self.manager = modelOrProxy
+        self.manager: ComponentManager
+        self.tableData.sigConfigUpdated.connect(self._onTableChange)
+        self.instanceIdIndex = self.tableData.allFields.index(REQD_TBL_FIELDS.ID)
+
+    @property
+    def tableData(self) -> TableData | None:
+        return self.manager.tableData if self.manager else None
 
     def selectionChanged(
         self, curSel: QtCore.QItemSelection, prevSel: QtCore.QItemSelection

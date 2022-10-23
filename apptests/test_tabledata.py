@@ -32,7 +32,7 @@ def td():
 def newConfig(app):
     @contextlib.contextmanager
     def newCfg(name: Union[str, Path], cfg: dict):
-        td = app.sharedAttrs.tableData
+        td = app.tableData
         oldCfg = td.config
         oldFname = td.configPath
         td.loadConfig(name, cfg)
@@ -44,11 +44,11 @@ def newConfig(app):
 
 @pytest.mark.withcomps
 def test_no_opt_fields(app, newConfig):
-    app.sharedAttrs.tableData.loadConfig("testcfg", cfgDict, force=True)
+    app.tableData.loadConfig("testcfg", cfgDict, force=True)
     with newConfig("none", {}):
         assert len(app.componentManager.compDf) == 0
         assert app.componentManager.columnTitles == list(map(str, REQD_TBL_FIELDS))
-        newComps = app.sharedAttrs.tableData.makeComponentDf(3).reset_index(drop=True)
+        newComps = app.tableData.makeComponentDf(3).reset_index(drop=True)
         dfTester.fillRandomVerts(compDf=newComps)
         # Just make sure no errors are thrown on adding components
         app.addAndFocusComponents(newComps)
@@ -57,14 +57,12 @@ def test_no_opt_fields(app, newConfig):
 
 def test_params_for_class(newConfig, app):
     with newConfig("testcfg", cfgDict):
-        assert "Class" in [f.name for f in app.sharedAttrs.tableData.allFields]
+        assert "Class" in [f.name for f in app.tableData.allFields]
 
 
 @pytest.mark.withcomps
 def test_no_change(app, newConfig):
-    with newConfig(
-        app.sharedAttrs.tableData.configPath, app.sharedAttrs.tableData.config
-    ):
+    with newConfig(app.tableData.configPath, app.tableData.config):
         assert len(app.componentManager.compDf) > 0
 
 

@@ -17,7 +17,7 @@ from ..structures import XYVertices, ComplexXYVertices
 from ..views.fielddelegates import FieldDisplay
 from ..views.imageareas import MainImage
 from ..views.regions import MultiRegionPlot
-from ..views.tableview import CompTableView
+from ..views.tableview import ComponentTableView
 
 __all__ = ["ComponentSorterFilter", "ComponentController"]
 
@@ -29,7 +29,6 @@ class ComponentSorterFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
     __groupingName__ = "Component Table"
 
     def __initEditorParams__(self, shared: SharedAppSettings):
-        self.tableData = shared.tableData
         self.props = ParamContainer()
         shared.generalProperties.registerProp(
             PRJ_CONSTS.PROP_VERT_SORT_BHV, container=self.props
@@ -55,7 +54,7 @@ class ComponentSorterFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
         # sorting numpy arrays is somewhat ambiguous
 
         noSortCols = []
-        for ii, col in enumerate(self.tableData.allFields):
+        for ii, col in enumerate(self.sourceModel().tableData.allFields):
             if isinstance(col.value, (list, np.ndarray)) and not isinstance(
                 col.value, (XYVertices, ComplexXYVertices)
             ):
@@ -115,19 +114,28 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
             self.regionPlot.boundaryOnly = val
 
         boundaryOnly.sigValueChanged.connect(_onChange)
-        self.sharedAttrs = shared
+
+        shared.colorScheme.registerFunc(
+            self.updateLabelColumn,
+            runOpts=RunOpts.ON_CHANGED,
+            nest=False,
+            container=self.props,
+        )
+        shared.generalProperties.registerProp(
+            PRJ_CONSTS.PROP_SCALE_PEN_WIDTH, container=self.props
+        )
 
     def __init__(
         self,
         componentManager: ComponentManager,
         mainImage: MainImage,
-        componentTable: CompTableView,
+        componentTable: ComponentTableView,
         parent=None,
     ):
         super().__init__(parent)
-        filterEditor = self.sharedAttrs.filter
+        self.tableData = componentManager.tableData
         self._mainImageArea = mainImage
-        self._filter = filterEditor
+        self._filter = self.tableData.filter
         self._componentTable = componentTable
         self._componentManager = componentManager
         self.regionPlot = MultiRegionPlot(disableMouseClick=True)
@@ -146,16 +154,7 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         solution is to simply preserve the cache across at most one "selection" value
         """
 
-        mainImage.sigUpdatedFocusedComponent.connect(self._onFocusedComponentChange)
-
-        attrs = self.sharedAttrs
-
-        self.updateLabelProc = attrs.colorScheme.registerFunc(
-            self.updateLabelColumn, runOpts=RunOpts.ON_CHANGED, nest=False
-        )
-        attrs.generalProperties.registerProp(
-            PRJ_CONSTS.PROP_SCALE_PEN_WIDTH, container=self.props
-        )
+        componentManager.sigUpdatedFocusedComponent.connect(self._onFocusedComponentChange)
 
         # Attach to UI signals
         def _maybeRedraw():
@@ -165,7 +164,7 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
             missing classes, etc.)
             """
             if np.array_equal(
-                attrs.tableData.allFields, self._componentManager.compDf.columns
+                self.tableData.allFields, self._componentManager.compDf.columns
             ):
                 self.redrawComponents()
 
@@ -231,7 +230,7 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
             pType: list
             limits: ['Instance ID'] # Will be updated programmatically
         """
-        self.labelColumn = self.sharedAttrs.tableData.fieldFromName(labelColumn)
+        self.labelColumn = self.tableData.fieldFromName(labelColumn)
         newLblData = self.labelColumn.toNumeric(
             self._componentManager.compDf.loc[self.displayedIds, self.labelColumn],
             rescale=True,
@@ -331,12 +330,9 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         self._componentManager.removeOverlapById(self.selectedIds)
 
     def _reflectFieldsChanged(self):
-        fields = self.sharedAttrs.tableData.allFields
+        fields = self.tableData.allFields
         # TODO: Filter out non-viable field types
-        lblParams = self.sharedAttrs.colorScheme.procToParamsMapping[
-            self.updateLabelProc
-        ]
-        lblParams.child("labelColumn").setLimits([f.name for f in fields])
+        self.props.params["labelColumn"].setLimits([f.name for f in fields])
 
         self.redrawComponents()
 

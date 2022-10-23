@@ -137,7 +137,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
     def fillRegionMask(self):
         """Completely fill the focused region mask"""
-        if self.mainImage.focusedComponent is None:
+        if self.componentManager.focusedComponent is None:
             return
         filledImg = np.ones(self.mainImage.image.shape[:2], dtype="uint16")
         self.updateRegionFromMask(filledImg)
@@ -152,11 +152,11 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         imageproc.procCache["mask"] = np.zeros_like(imageproc.procCache["mask"])
 
     def updateFocusedComponent(self, component: pd.Series = None):
-        if self.mainImage.focusedComponent[RTF.ID] == -1:
+        if self.componentManager.focusedComponent[RTF.ID] == -1:
             self.updateRegionFromDf(None)
             return
-        oldId = self.mainImage.focusedComponent[RTF.ID]
-        self.updateRegionFromDf(self.mainImage.focusedComponentAsFrame)
+        oldId = self.componentManager.focusedComponent[RTF.ID]
+        self.updateRegionFromDf(self.componentManager.focusedDataframe)
         if component is None or oldId != component[RTF.ID]:
             self.firstRun = True
 
@@ -307,17 +307,17 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         offset
             Offset of newVertices relative to main image coordinates
         """
-        fImg = self.mainImage
+        mgr = self.componentManager
         # Since some calls to this function make an undo entry and others don't,
         # be sure to save state for the undoable ones revertId is only used when
         # changedComp is true and an undo is valid
-        newId = fImg.focusedComponent[RTF.ID]
+        newId = mgr.focusedComponent[RTF.ID]
         if newData is None:
             newData = makeMultiRegionDf(0)
 
         self._maybeChangeFocusedComponent(newData.index)
 
-        if fImg.image is None:
+        if self.mainImage.image is None:
             self.region.clear()
             self.regionBuffer.append(buffEntry(newId, ComplexXYVertices()))
             return
@@ -403,7 +403,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
     def _maybeChangeFocusedComponent(self, newIds: t.Sequence[int]):
         regionId = newIds[0] if len(newIds) else -1
-        focusedId = self.mainImage.focusedComponent[RTF.ID]
+        focusedId = self.componentManager.focusedComponent[RTF.ID]
         updated = regionId != focusedId
         if updated:
             if regionId in self.win.componentManager.compDf.index:
@@ -459,7 +459,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     def acceptChanges(self, overrideVertices: ComplexXYVertices = None):
         # Add in offset from main image to VertexRegion vertices
         newVerts = overrideVertices or self.collapseRegionVerts()
-        ser = self.mainImage.focusedComponent
+        ser = self.componentManager.focusedComponent
         ser[RTF.VERTICES] = newVerts
         self.updateFocusedComponent()
 
@@ -498,7 +498,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     def clearFocusedRegion(self):
         # Reset drawn comp vertices to nothing
         # Only perform action if image currently exists
-        if self.mainImage.focusedComponent is None:
+        if self.componentManager.focusedComponent is None:
             return
         self.updateRegionFromMask(np.zeros((1, 1), bool))
 
@@ -506,9 +506,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         """
         Reset the focused image by restoring the region mask to the last saved state
         """
-        if self.mainImage.focusedComponent is None:
+        if self.componentManager.focusedComponent is None:
             return
-        self.updateRegionUndoable(self.mainImage.focusedComponentAsFrame)
+        self.updateRegionUndoable(self.componentManager.focusedDataframe)
 
     def _onActivate(self):
         self.region.show()

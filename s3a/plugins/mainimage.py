@@ -1,31 +1,37 @@
 from __future__ import annotations
 
 import warnings
+from typing import TYPE_CHECKING
 
 import cv2 as cv
 import numpy as np
-from utilitys import ParamEditorPlugin, ParamContainer
+from utilitys import ParamContainer, ParamEditorPlugin
 
-from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
-from ..models import s3abase
-from ..shared import SharedAppSettings
-from ..structures import XYVertices, ComplexXYVertices
+from ..constants import PRJ_CONSTS as CNST
+from ..constants import REQD_TBL_FIELDS as RTF
+from ..structures import ComplexXYVertices, XYVertices
+
+if TYPE_CHECKING:
+    from ..models.s3abase import S3ABase
+    from ..parameditors.table.data import TableData
+    from ..shared import SharedAppSettings
 
 
 class MainImagePlugin(ParamEditorPlugin):
     name = __groupingName__ = "Application"
     _makeMenuShortcuts = False
+    tableData: TableData
 
     def __initEditorParams__(self, shared: SharedAppSettings, **kwargs):
         self.props = ParamContainer()
         shared.generalProperties.registerProp(
             CNST.PROP_MIN_COMP_SZ, container=self.props
         )
-        self.tableData = shared.tableData
         super().__initEditorParams__(shared=shared, **kwargs)
         self._cachedRegionIntersection = False
 
-    def attachWinRef(self, win: s3abase.S3ABase):
+    def attachWinRef(self, win: S3ABase):
+        self.tableData = win.tableData
         self._hookupCopier(win)
         self._hookupDrawActions(win)
         self._hookupSelectionTools(win)
@@ -99,7 +105,7 @@ class MainImagePlugin(ParamEditorPlugin):
 
         self.registerFunc(startMove, btnOpts=CNST.TOOL_MOVE_REGIONS)
         self.registerFunc(startCopy, btnOpts=CNST.TOOL_COPY_REGIONS)
-        copier.sigMoveStopped.connect(win.mainImage.updateFocusedComponent)
+        copier.sigMoveStopped.connect(win.componentManager.updateFocusedComponent)
 
     def _hookupSelectionTools(self, window):
         disp = window.componentController

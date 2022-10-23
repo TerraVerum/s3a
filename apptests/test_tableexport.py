@@ -239,7 +239,7 @@ def test_compimgs_export(tmp_path, _simpleTbl):
 def test_convert(app, tmp_path):
     sampleComps = app.componentDf
     io = ComponentIO()
-    td = app.sharedAttrs.tableData
+    td = app.tableData
     io.tableData.loadConfig(td.configPath, td.config)
     pklFile = tmp_path / "pklexport.pkl"
     csvFile = tmp_path / "csvexport.csv"
