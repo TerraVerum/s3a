@@ -7,33 +7,33 @@ import shutil
 from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
-from typing import Optional, Set, List, Dict, Sequence, Union, Tuple, Type
+from typing import Dict, List, Optional, Sequence, Set, Tuple, Type, Union
 from warnings import warn
 
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtWidgets, QtCore
 from pyqtgraph.parametertree.Parameter import PARAM_TYPES
+from pyqtgraph.Qt import QtCore, QtWidgets
 from utilitys import (
-    CompositionMixin,
     AtomicProcess,
-    fns,
-    ParamEditorPlugin,
+    CompositionMixin,
     ParamEditor,
+    ParamEditorPlugin,
+    fns,
 )
 
 from ..compio import ComponentIO, defaultIo
 from ..compio.base import AnnotationExporter
 from ..constants import (
     APP_STATE_DIR,
-    PROJECT_FILE_TYPE,
-    PROJECT_BASE_TEMPLATE,
-    PRJ_ENUMS,
     PRJ_CONSTS as CNST,
+    PRJ_ENUMS,
+    PROJECT_BASE_TEMPLATE,
+    PROJECT_FILE_TYPE,
     REQD_TBL_FIELDS,
 )
-from ..generalutils import hierarchicalUpdate, cvImsaveRgb
+from ..generalutils import cvImsaveRgb, hierarchicalUpdate
 from ..graphicsutils import DropList
 from ..logger import getAppLogger
 from ..structures import FilePath, NChanImg

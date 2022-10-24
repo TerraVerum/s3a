@@ -6,24 +6,23 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
-from utilitys import DeferredActionStackMixin as DASM
-from utilitys import EditorPropsMixin, ParamContainer, PrjParam, RunOpts, fns
+from utilitys import (
+    DeferredActionStackMixin as DASM,
+    EditorPropsMixin,
+    ParamContainer,
+    PrjParam,
+    RunOpts,
+    fns,
+)
 
 from .clickables import BoundScatterPlot
 from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS as RTF
 from ..generalutils import stackedVerticesPlusConnections, symbolFromVertices
-from ..structures import (
-    BlackWhiteImg,
-    ComplexXYVertices,
-    GrayImg,
-    OneDArr,
-    XYVertices,
-)
+from ..structures import BlackWhiteImg, ComplexXYVertices, GrayImg, OneDArr, XYVertices
 
 __all__ = ["MultiRegionPlot", "VertexDefinedImage", "RegionMoverPlot"]
 
 from .rois import ROIManipulator
-
 from ..compio import defaultIo
 from ..shared import SharedAppSettings
 

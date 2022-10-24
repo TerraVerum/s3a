@@ -1,10 +1,10 @@
 """Most other functionality is tested under procimpls, this is for other registered functions"""
-import pytest
 import numpy as np
+import pytest
 from skimage import draw
 
 from apptests.testingconsts import SAMPLE_SMALL_IMG
-from s3a import XYVertices, REQD_TBL_FIELDS, PRJ_CONSTS
+from s3a import PRJ_CONSTS, REQD_TBL_FIELDS, XYVertices
 from s3a.generalutils import imageCornerVertices
 from s3a.plugins.file import NewProjectWizard
 from s3a.processing.algorithms import imageproc

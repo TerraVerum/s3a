@@ -1,6 +1,6 @@
 import copy
 from pathlib import Path
-from typing import Union, Dict, Callable, Any, Optional, List, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd

@@ -5,8 +5,8 @@ import errno
 import inspect
 import itertools
 import json
-import typing as t
 import os
+import typing as t
 from datetime import datetime
 from pathlib import Path
 
@@ -20,8 +20,8 @@ from utilitys.typeoverloads import FilePath
 from .base import AnnotationImporter
 from .helpers import registerIoHandler
 from ..constants import REQD_TBL_FIELDS as RTF
-from ..generalutils import DirectoryDict, orderContourPoints, cvImreadRgb, toDictGen
-from ..structures import ComplexXYVertices, XYVertices, AnnInstanceError, LabelFieldType
+from ..generalutils import DirectoryDict, cvImreadRgb, orderContourPoints, toDictGen
+from ..structures import AnnInstanceError, ComplexXYVertices, LabelFieldType, XYVertices
 
 __all__ = [
     "SerialImporter",

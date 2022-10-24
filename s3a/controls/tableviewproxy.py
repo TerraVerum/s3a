@@ -1,19 +1,22 @@
 import sys
-from typing import Union, Sequence, Tuple, Optional
+from typing import Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from utilitys import DeferredActionStackMixin as DASM
-from utilitys import EditorPropsMixin, RunOpts, ParamContainer
+from utilitys import (
+    DeferredActionStackMixin as DASM,
+    EditorPropsMixin,
+    ParamContainer,
+    RunOpts,
+)
 from utilitys.processing import AtomicProcess, ProcessIO
 
-from ..constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
+from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
 from ..models.tablemodel import ComponentManager
 from ..shared import SharedAppSettings
-from ..structures import OneDArr
-from ..structures import XYVertices, ComplexXYVertices
+from ..structures import ComplexXYVertices, OneDArr, XYVertices
 from ..views.fielddelegates import FieldDisplay
 from ..views.imageareas import MainImage
 from ..views.regions import MultiRegionPlot
@@ -154,7 +157,9 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         solution is to simply preserve the cache across at most one "selection" value
         """
 
-        componentManager.sigUpdatedFocusedComponent.connect(self._onFocusedComponentChange)
+        componentManager.sigUpdatedFocusedComponent.connect(
+            self._onFocusedComponentChange
+        )
 
         # Attach to UI signals
         def _maybeRedraw():

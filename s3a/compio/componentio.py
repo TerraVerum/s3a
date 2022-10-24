@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional, Union, Tuple, Callable
+from typing import Callable, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd

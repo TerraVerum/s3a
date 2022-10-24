@@ -5,11 +5,11 @@ import pytest
 from skimage import data
 from utilitys import PrjParam
 
-from s3a import generalutils as gu, ComplexXYVertices, PRJ_ENUMS
-from s3a.generalutils import deprecateKwargs, DirectoryDict
+from s3a import PRJ_ENUMS, ComplexXYVertices, generalutils as gu
+from s3a.compio.helpers import deserialize
+from s3a.generalutils import DirectoryDict, deprecateKwargs
 from s3a.plugins.misc import miscFunctionsPluginFactory
 from s3a.plugins.multipred import MultiPredictionsPlugin
-from s3a.compio.helpers import deserialize
 
 _rots = list(np.linspace(-180, 180, 5)) + [PRJ_ENUMS.ROTATION_OPTIMAL]
 

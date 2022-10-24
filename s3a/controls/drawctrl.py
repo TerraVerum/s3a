@@ -1,4 +1,4 @@
-from typing import Dict, Collection
+from typing import Collection, Dict
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui

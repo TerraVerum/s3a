@@ -9,17 +9,15 @@ from ..shims import entry_points
 
 
 def INTERNAL_PLUGINS():
-    from .misc import (
-        RandomToolsPlugin,
-    )
-    from .edit import EditPlugin
     from .comptable import CompTablePlugin
-    from .mainimage import MainImagePlugin
-    from .help import HelpPlugin
-    from .multipred import MultiPredictionsPlugin
-    from .usermetrics import UserMetricsPlugin
+    from .edit import EditPlugin
     from .file import FilePlugin
+    from .help import HelpPlugin
+    from .mainimage import MainImagePlugin
+    from .misc import RandomToolsPlugin
+    from .multipred import MultiPredictionsPlugin
     from .tablefield import VerticesPlugin
+    from .usermetrics import UserMetricsPlugin
 
     return [
         FilePlugin,

@@ -7,8 +7,7 @@ import cv2 as cv
 import numpy as np
 from utilitys import ParamContainer, ParamEditorPlugin
 
-from ..constants import PRJ_CONSTS as CNST
-from ..constants import REQD_TBL_FIELDS as RTF
+from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
 from ..structures import ComplexXYVertices, XYVertices
 
 if TYPE_CHECKING:

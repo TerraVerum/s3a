@@ -17,21 +17,20 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
-from utilitys import PrjParam
-from utilitys import fns
+from utilitys import PrjParam, fns
 from utilitys.typeoverloads import FilePath
 
-from .base import AnnotationExporter, NO_ERRORS
+from .base import NO_ERRORS, AnnotationExporter
 from .helpers import serialize
-from ..constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
+from ..constants import PRJ_ENUMS, REQD_TBL_FIELDS as RTF
 from ..generalutils import (
-    subImageFromVertices,
-    getCroppedImage,
     DirectoryDict,
     cvImreadRgb,
-    toDictGen,
     cvImsaveRgb,
+    getCroppedImage,
     imagePathToHtml,
+    subImageFromVertices,
+    toDictGen,
     toHtmlWithStyle,
 )
 from ..structures import ComplexXYVertices, PrjParamGroup

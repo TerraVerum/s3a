@@ -11,8 +11,16 @@ import webbrowser
 from pathlib import Path
 
 from pyqtgraph.Qt import QtCore
-from utilitys import NestedProcess, RunOpts, ProcessIO
-from utilitys import ParamEditor, NestedProcWrapper, fns, ProcessStage, AtomicProcess
+from utilitys import (
+    AtomicProcess,
+    NestedProcess,
+    NestedProcWrapper,
+    ParamEditor,
+    ProcessIO,
+    ProcessStage,
+    RunOpts,
+    fns,
+)
 from utilitys.typeoverloads import FilePath
 
 from ..constants import MENU_OPTS_DIR, PRJ_ENUMS

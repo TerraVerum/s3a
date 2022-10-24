@@ -4,20 +4,20 @@ os.environ["S3A_PLATFORM"] = "minimal"
 from typing import Type
 
 import pytest
-
-from s3a.constants import PRJ_ENUMS
-from s3a import constants, mkQApp
 from helperclasses import CompDfTester
-from s3a.views.s3agui import S3A
 from testingconsts import (
+    NUM_COMPS,
     SAMPLE_IMG,
     SAMPLE_IMG_FNAME,
-    NUM_COMPS,
     SAMPLE_SMALL_IMG,
     SAMPLE_SMALL_IMG_FNAME,
 )
-from s3a.plugins.tablefield import VerticesPlugin
+
+from s3a import constants, mkQApp
+from s3a.constants import PRJ_ENUMS
 from s3a.plugins.file import FilePlugin
+from s3a.plugins.tablefield import VerticesPlugin
+from s3a.views.s3agui import S3A
 
 mkQApp()
 

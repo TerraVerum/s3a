@@ -6,12 +6,12 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from utilitys import PrjParam, fns, RunOpts
+from utilitys import PrjParam, RunOpts, fns
 from utilitys.typeoverloads import FilePath
 
-from .helpers import serialize, deserialize, checkVerticesBounds
+from .helpers import checkVerticesBounds, deserialize, serialize
 from ..constants import REQD_TBL_FIELDS as RTF
-from ..generalutils import toDictGen, deprecateKwargs
+from ..generalutils import deprecateKwargs, toDictGen
 from ..parameditors.table import TableData
 from ..parameditors.table.data import getFieldAliases
 from ..parameditors.table.templatemgr import IOTemplateManager

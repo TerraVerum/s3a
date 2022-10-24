@@ -1,16 +1,17 @@
 from __future__ import annotations
-from typing import Sequence, Any
+
+from typing import Any, Sequence
 from warnings import warn
 
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.Parameter import PARAM_TYPES
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
-from ..compio.helpers import serialize, deserialize
-from ..constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
+from ..compio.helpers import deserialize, serialize
+from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
 from ..models.tablemodel import ComponentManager
 from ..parameditors.table.data import TableData
 from ..shared import SharedAppSettings
@@ -19,12 +20,12 @@ from ..structures import TwoDArr
 __all__ = ["ComponentTableView", "PopupTableDialog"]
 
 from utilitys import (
-    ParamEditor,
-    EditorPropsMixin,
-    RunOpts,
-    ParamContainer,
     DeferredActionStackMixin as DASM,
+    EditorPropsMixin,
+    ParamContainer,
+    ParamEditor,
     PrjParam,
+    RunOpts,
 )
 from utilitys.params.pgregistered import PgParamDelegate, PgPopupDelegate
 

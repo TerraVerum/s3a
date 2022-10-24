@@ -5,11 +5,11 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 from skimage.draw import draw
-from utilitys import PrjParam, DeferredActionStackMixin as DASM
+from utilitys import DeferredActionStackMixin as DASM, PrjParam
 
 from ..constants import PRJ_CONSTS
 from ..generalutils import orderContourPoints, symbolFromVertices
-from ..structures import XYVertices, ComplexXYVertices
+from ..structures import ComplexXYVertices, XYVertices
 from ..views.clickables import BoundScatterPlot
 
 __all__ = ["RectROI", "PlotDataROI", "PolygonROI", "PointROI", "SHAPE_ROI_MAPPING"]

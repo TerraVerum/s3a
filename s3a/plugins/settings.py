@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from utilitys import ParamEditorPlugin, ParamEditor
+from utilitys import ParamEditor, ParamEditorPlugin
 
 from ..constants import GENERAL_PROPERTIES_DIR, SCHEMES_DIR
 

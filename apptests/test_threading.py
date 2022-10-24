@@ -1,12 +1,13 @@
-import pytest
 import time
 
+import pytest
 from pyqtgraph.Qt import QtCore
+
 from s3a.processing import (
-    RunnableFunctionWrapper,
-    ThreadedFunctionWrapper,
     AbortableThreadContainer,
+    RunnableFunctionWrapper,
     RunnableThreadContainer,
+    ThreadedFunctionWrapper,
 )
 
 

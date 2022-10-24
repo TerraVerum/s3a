@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from functools import wraps
-from typing import Union, List
+from typing import List, Union
 
 import numpy as np
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtWidgets, QtCore, QtGui
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from utilitys import RunOpts
-from utilitys.widgets import ImageViewer, EasyWidget
+from utilitys.widgets import EasyWidget, ImageViewer
 
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor

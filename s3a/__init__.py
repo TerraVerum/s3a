@@ -39,17 +39,16 @@ except (ImportError, AssertionError):
         "etc."
     )
 
-from .__version__ import __version__
 from . import graphicsutils as gutils
-from .constants import REQD_TBL_FIELDS, PRJ_CONSTS, CONFIG_DIR, PRJ_ENUMS
-from .structures import ComplexXYVertices, XYVertices
+from .__version__ import __version__
 from .compio import ComponentIO, defaultIo
-from .views.s3agui import S3A
-from .shared import SharedAppSettings
-
-from .plugins.misc import RandomToolsPlugin
-from .plugins.file import ProjectData
+from .constants import CONFIG_DIR, PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
 from .parameditors.table import TableData
+from .plugins.file import ProjectData
+from .plugins.misc import RandomToolsPlugin
+from .shared import SharedAppSettings
+from .structures import ComplexXYVertices, XYVertices
+from .views.s3agui import S3A
 
 appInst = None
 

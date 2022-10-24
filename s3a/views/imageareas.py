@@ -1,26 +1,23 @@
 from functools import wraps
-from typing import Union, Collection, Callable, Any, Sequence, List
+from typing import Any, Callable, Collection, Sequence, Union
 
 import numpy as np
-import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from utilitys import (
+    DeferredActionStackMixin as DASM,
+    EditorPropsMixin,
     ParamEditor,
     PrjParam,
     RunOpts,
-    fns,
-    EditorPropsMixin,
-    DeferredActionStackMixin as DASM,
 )
 from utilitys.widgets import ButtonCollection, ImageViewer
 
 from .clickables import RightPanViewBox
 from .regions import RegionMoverPlot
 from .rois import SHAPE_ROI_MAPPING
-from ..constants import REQD_TBL_FIELDS as RTF, PRJ_CONSTS as CNST
+from ..constants import PRJ_CONSTS as CNST
 from ..controls.drawctrl import RoiCollection
-from ..generalutils import getCroppedImage, coerceDfTypes
 from ..structures import XYVertices
 
 __all__ = ["MainImage"]

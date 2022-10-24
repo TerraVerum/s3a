@@ -1,16 +1,16 @@
 import contextlib
 from io import StringIO
 from pathlib import Path
-from typing import Union, Sequence
+from typing import Sequence, Union
 
 import numpy as np
 import pytest
+from conftest import dfTester
+from utilitys import fns
 
 from apptests.testingconsts import RND
-from conftest import dfTester
 from s3a import REQD_TBL_FIELDS, ComplexXYVertices
 from s3a.parameditors.table import TableData
-from utilitys import fns
 
 cfgDict = {
     "fields": {

@@ -1,13 +1,11 @@
-from datetime import datetime
 import typing as t
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
 from pyqtgraph import SignalProxy
-from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
-from pyqtgraph.Qt import isQObjectAlive
-from utilitys import ParamContainer
-from utilitys import ParamEditorPlugin
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, isQObjectAlive
+from utilitys import ParamContainer, ParamEditorPlugin
 from utilitys.widgets import ImageViewer
 
 from ..constants import PRJ_CONSTS as CNST

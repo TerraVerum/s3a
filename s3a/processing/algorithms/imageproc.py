@@ -1,12 +1,11 @@
 import functools
-from typing import Tuple, Union, Dict, Any
+from typing import Any, Dict, Tuple, Union
 
 import cv2 as cv
 import numpy as np
 from scipy.ndimage import binary_fill_holes
-from skimage import morphology as morph, img_as_float
-from skimage import segmentation as seg
-from skimage.measure import regionprops, label
+from skimage import img_as_float, morphology as morph, segmentation as seg
+from skimage.measure import label, regionprops
 from skimage.morphology import flood
 from utilitys import fns
 from utilitys.processing import *
@@ -15,16 +14,16 @@ from ...constants import PRJ_ENUMS
 from ...generalutils import (
     cornersToFullBoundary,
     getCroppedImage,
+    getObjectsDefinedInSelfModule,
     showMaskDifference,
     tryCvResize,
-    getObjectsDefinedInSelfModule,
 )
 from ...structures import (
     BlackWhiteImg,
-    XYVertices,
     ComplexXYVertices,
-    NChanImg,
     GrayImg,
+    NChanImg,
+    XYVertices,
 )
 
 # `__all__` is defined at the bottom programmatically

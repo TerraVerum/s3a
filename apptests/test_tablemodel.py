@@ -1,13 +1,12 @@
 import numpy as np
 import pytest
-from pyqtgraph.Qt import QtCore
-
 from conftest import NUM_COMPS, dfTester
+from pyqtgraph.Qt import QtCore
 from testingconsts import RND, TEST_FILE_DIR
-from s3a.constants import PRJ_ENUMS
-from s3a.constants import REQD_TBL_FIELDS
-from s3a.structures import ComplexXYVertices, XYVertices
+
 from s3a.compio.importers import SerialImporter
+from s3a.constants import PRJ_ENUMS, REQD_TBL_FIELDS
+from s3a.structures import ComplexXYVertices, XYVertices
 
 oldIds = np.arange(NUM_COMPS, dtype=int)
 

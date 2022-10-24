@@ -5,17 +5,16 @@ import warnings
 from collections import defaultdict
 from functools import wraps
 from pathlib import Path
-from pkg_resources import parse_version
-from typing import Callable, Tuple, Union, Sequence, List, Collection, Any
+from typing import Any, Callable, Collection, List, Sequence, Tuple, Union
 
 import cv2 as cv
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
-from skimage import io, transform as trans, __version__ as _skimage_version
+from pkg_resources import parse_version
+from skimage import __version__ as _skimage_version, io, transform as trans
 from skimage.exposure import exposure
-from utilitys import PrjParam, ProcessStage
-from utilitys import fns
+from utilitys import PrjParam, ProcessStage, fns
 
 # Needs to be visible outside this file
 # noinspection PyUnresolvedReferences
@@ -23,7 +22,7 @@ from utilitys.fns import hierarchicalUpdate  # lgtm [py/unused-import]
 from utilitys.typeoverloads import FilePath
 
 from .constants import PRJ_ENUMS
-from .structures import TwoDArr, XYVertices, ComplexXYVertices, NChanImg, BlackWhiteImg
+from .structures import BlackWhiteImg, ComplexXYVertices, NChanImg, TwoDArr, XYVertices
 
 _coordType = Union[np.ndarray, Tuple[slice, slice]]
 USE_MULTICHANNEL_KWARG = parse_version(_skimage_version) < parse_version("0.19.0")

@@ -2,8 +2,6 @@ import logging
 
 import pytest
 
-from conftest import assertExInList
-
 
 @pytest.fixture()
 def ql(app):

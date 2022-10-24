@@ -10,9 +10,9 @@ from utilitys import fns
 from apptests.conftest import dfTester
 from apptests.helperclasses import CompDfTester
 from apptests.testingconsts import (
-    SAMPLE_SMALL_IMG_FNAME,
-    SAMPLE_SMALL_IMG,
     SAMPLE_IMG_FNAME,
+    SAMPLE_SMALL_IMG,
+    SAMPLE_SMALL_IMG_FNAME,
     TEST_FILE_DIR,
 )
 from s3a import S3A

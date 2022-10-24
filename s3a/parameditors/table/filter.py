@@ -5,7 +5,7 @@ from typing import List
 import numpy as np
 import pandas as pd
 from pyqtgraph.parametertree import Parameter
-from utilitys import PrjParam, ParamEditor, fns
+from utilitys import ParamEditor, PrjParam, fns
 
 from ...constants import TABLE_DIR
 

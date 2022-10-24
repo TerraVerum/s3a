@@ -5,12 +5,11 @@ import cv2 as cv
 import numpy as np
 import pandas as pd
 from scipy.ndimage import maximum_filter
-from utilitys import PrjParam
-from utilitys import ProcessIO, fns, AtomicProcess
+from utilitys import AtomicProcess, PrjParam, ProcessIO, fns
 
 from ... import generalutils as gutils
 from ...compio.componentio import defaultIo
-from ...constants import PRJ_ENUMS, REQD_TBL_FIELDS as RTF
+from ...constants import REQD_TBL_FIELDS as RTF
 from ...structures import ComplexXYVertices, XYVertices
 
 # __all__ defined programmatically at the end of this module

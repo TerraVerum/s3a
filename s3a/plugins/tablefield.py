@@ -12,29 +12,26 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 from utilitys import (
     DeferredActionStackMixin as DASM,
-    fns,
     ParamContainer,
     PrjParam,
     ProcessIO,
     RunOpts,
+    fns,
 )
 
 from .base import TableFieldPlugin
 from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
 from ..generalutils import (
     getCroppedImage,
+    maybeIncrementStageNames,
     showMaskDifference,
     tryCvResize,
-    maybeIncrementStageNames,
 )
 from ..graphicsutils import RegionHistoryViewer
 from ..processing.algorithms import imageproc
-from ..processing.processing import (
-    AbortableThreadContainer,
-    ThreadedFunctionWrapper,
-)
+from ..processing.processing import AbortableThreadContainer, ThreadedFunctionWrapper
 from ..shared import SharedAppSettings
-from ..structures import BlackWhiteImg, XYVertices, ComplexXYVertices
+from ..structures import BlackWhiteImg, ComplexXYVertices, XYVertices
 from ..views.regions import MultiRegionPlot, makeMultiRegionDf
 
 

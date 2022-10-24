@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 __version__ = ""
 line = open(Path(__file__).parent / "s3a/__version__.py").readline()

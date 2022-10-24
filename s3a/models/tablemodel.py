@@ -1,11 +1,11 @@
-from typing import Union, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Union
 from warnings import warn
 
 import numpy as np
 import pandas as pd
 from pyqtgraph.Qt import QtCore
 
-from ..constants import REQD_TBL_FIELDS as RTF, PRJ_ENUMS
+from ..constants import PRJ_ENUMS, REQD_TBL_FIELDS as RTF
 from ..generalutils import coerceDfTypes
 from ..logger import getAppLogger
 from ..parameditors.table.data import TableData
@@ -14,7 +14,6 @@ from ..structures import ComplexXYVertices, OneDArr
 __all__ = ["ComponentManager", "ComponentTableModel"]
 
 from utilitys import EditorPropsMixin, fns
-
 from utilitys.misc import DeferredActionStackMixin as DASM
 
 if TYPE_CHECKING:

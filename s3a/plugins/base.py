@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Union
 
 import pandas as pd
-from utilitys import ParamEditorPlugin, NestedProcWrapper
+from utilitys import NestedProcWrapper, ParamEditorPlugin
 
 from ..constants import PRJ_CONSTS
 from ..parameditors import algcollection
@@ -47,7 +47,9 @@ class TableFieldPlugin(ProcessorPlugin):
         self.mainImage = win.mainImage
         self.componentManager = win.componentManager
         win.sigRegionAccepted.connect(self.acceptChanges)
-        self.componentManager.sigUpdatedFocusedComponent.connect(self.updateFocusedComponent)
+        self.componentManager.sigUpdatedFocusedComponent.connect(
+            self.updateFocusedComponent
+        )
         self.active = True
         self.registerFunc(
             self.processorAnalytics, btnOpts=PRJ_CONSTS.TOOL_PROC_ANALYTICS

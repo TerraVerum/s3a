@@ -1,15 +1,15 @@
 import numpy as np
 import pytest
-from pyqtgraph.Qt import QtGui, QtCore
+from pyqtgraph.Qt import QtCore, QtGui
+from testingconsts import NUM_COMPS
 
 from apptests.testingconsts import RND
-from testingconsts import NUM_COMPS
 from s3a import REQD_TBL_FIELDS
 from s3a.constants import PRJ_CONSTS
 from s3a.controls.drawctrl import RoiCollection
-from s3a.parameditors.algcollection import AlgParamEditor, AlgorithmCollection
-from s3a.processing import ProcessIO, ImageProcess, ImgProcWrapper
-from s3a.structures import XYVertices, ComplexXYVertices, PrjParam, NChanImg
+from s3a.parameditors.algcollection import AlgorithmCollection, AlgParamEditor
+from s3a.processing import ImageProcess, ImgProcWrapper, ProcessIO
+from s3a.structures import ComplexXYVertices, NChanImg, PrjParam, XYVertices
 
 
 def leftClickGen(pos: XYVertices, dbclick=False):
@@ -72,13 +72,17 @@ def test_update(app, mgr, vertsPlugin, sampleComps):
     assert tblModel.focusedComponent.equals(newerSer)
 
     vertsPlugin.actionStack.undo()
-    assert tblModel.focusedComponent[REQD_TBL_FIELDS.ID] == newCompSer[REQD_TBL_FIELDS.ID]
+    assert (
+        tblModel.focusedComponent[REQD_TBL_FIELDS.ID] == newCompSer[REQD_TBL_FIELDS.ID]
+    )
     # Undo create new comp, nothing is selected
 
     app.sharedAttrs.actionStack.undo()
     # Undo earlier region edit, region should now equal the second-to-last edit
     regionCmp(masks[0])
-    assert tblModel.focusedComponent[REQD_TBL_FIELDS.ID] == newCompSer[REQD_TBL_FIELDS.ID]
+    assert (
+        tblModel.focusedComponent[REQD_TBL_FIELDS.ID] == newCompSer[REQD_TBL_FIELDS.ID]
+    )
 
     app.sharedAttrs.actionStack.redo()
     regionCmp(masks[1])

@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 from ast import literal_eval
-from typing import Union, List, Sequence, TypeVar
+from typing import List, Sequence, TypeVar, Union
 from warnings import warn
 
 import cv2 as cv
 import numpy as np
 import pandas as pd
 
-from .typeoverloads import NChanImg, BlackWhiteImg
-
+from .typeoverloads import BlackWhiteImg, NChanImg
 
 T = TypeVar("T")
 __all__ = ["XYVertices", "ComplexXYVertices", "S3AVertsAccessor"]

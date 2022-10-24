@@ -1,10 +1,11 @@
 from utilitys import ActionStack
-from .constants import IMAGE_PROCESSORS_DIR, MULTI_PREDICTIONS_DIR, CONFIG_DIR
+
+from .constants import CONFIG_DIR, IMAGE_PROCESSORS_DIR, MULTI_PREDICTIONS_DIR
 from .parameditors.algcollection import AlgorithmCollection
 from .parameditors.table import TableData
 from .plugins.settings import SettingsPlugin
 from .plugins.shortucts import ShortcutsPlugin
-from .processing import ImgProcWrapper, ImageProcess
+from .processing import ImageProcess, ImgProcWrapper
 
 
 class SharedAppSettings:

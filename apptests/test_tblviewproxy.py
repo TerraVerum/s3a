@@ -5,7 +5,7 @@ import pytest
 from pyqtgraph.Qt import QtCore, mkQApp
 
 from s3a.constants import REQD_TBL_FIELDS
-from s3a.generalutils import imageCornerVertices, cvImreadRgb
+from s3a.generalutils import cvImreadRgb, imageCornerVertices
 from s3a.structures import ComplexXYVertices, XYVertices
 from s3a.views.tableview import ComponentTableView, PopupTableDialog
 

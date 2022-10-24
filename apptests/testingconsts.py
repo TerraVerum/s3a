@@ -1,9 +1,8 @@
 import cv2 as cv
 import numpy as np
-from skimage import data
-from skimage import io
+from skimage import data, io
 
-from s3a.constants import REQD_TBL_FIELDS, CODE_DIR
+from s3a.constants import CODE_DIR, REQD_TBL_FIELDS
 
 NUM_COMPS = 15
 TESTS_DIR = CODE_DIR.parent / "apptests"

@@ -3,17 +3,20 @@ import warnings
 import numpy as np
 import pandas as pd
 import pytest
+from conftest import SAMPLE_SMALL_IMG
 from skimage import util
+from utilitys import ProcessIO, fns
 
 from apptests.testingconsts import SAMPLE_IMG
-from s3a import ComplexXYVertices, REQD_TBL_FIELDS
+from s3a import REQD_TBL_FIELDS, ComplexXYVertices
 from s3a.generalutils import imageCornerVertices
 from s3a.processing import ImageProcess
-from s3a.processing.algorithms import multipred as mulp, make_grid_components
+from s3a.processing.algorithms import (
+    imageproc as ip,
+    make_grid_components,
+    multipred as mulp,
+)
 from s3a.structures import XYVertices
-from s3a.processing.algorithms import imageproc as ip
-from conftest import SAMPLE_SMALL_IMG
-from utilitys import ProcessIO, fns
 
 
 @pytest.mark.smallimage

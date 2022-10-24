@@ -1,14 +1,14 @@
 import warnings
 from pathlib import Path
-from typing import List, Dict, Union, Callable, Any
+from typing import Any, Callable, Dict, List, Union
 
 import pandas as pd
 from pyqtgraph.parametertree import Parameter
-from utilitys import ParamEditor, EditorPropsMixin
-from utilitys.fns import serAsFrame, attemptFileLoad
+from utilitys import EditorPropsMixin, ParamEditor
+from utilitys.fns import attemptFileLoad, serAsFrame
 
 from ..constants import APP_STATE_DIR
-from ..generalutils import safeCallFunctionList, hierarchicalUpdate, safeCallFunction
+from ..generalutils import hierarchicalUpdate, safeCallFunction, safeCallFunctionList
 from ..logger import getAppLogger
 from ..shared import SharedAppSettings
 from ..structures import FilePath

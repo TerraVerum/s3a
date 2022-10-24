@@ -3,32 +3,32 @@ import inspect
 import os.path
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Optional, Union, Type, Dict, List, Sequence
+from typing import Dict, List, Optional, Sequence, Type, Union
 from warnings import warn
 
 import numpy as np
 import pandas as pd
 from pyqtgraph.Qt import QtCore, QtWidgets
 from utilitys import (
-    EditorPropsMixin,
-    RunOpts,
-    ParamEditorPlugin,
-    fns,
-    ParamContainer,
-    DeferredActionStackMixin as DASM,
-    ParamEditorDockGrouping,
-    ParamEditor,
     ActionStack,
+    DeferredActionStackMixin as DASM,
+    EditorPropsMixin,
+    ParamContainer,
+    ParamEditor,
+    ParamEditorDockGrouping,
+    ParamEditorPlugin,
+    RunOpts,
+    fns,
 )
 
-from .. import ComponentIO, defaultIo
-from ..constants import PRJ_CONSTS, REQD_TBL_FIELDS, PRJ_ENUMS
+from .. import defaultIo
+from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
 from ..controls.tableviewproxy import ComponentController, ComponentSorterFilter
 from ..logger import getAppLogger
 from ..models.tablemodel import ComponentManager
 from ..parameditors.appstate import AppStateEditor
 from ..parameditors.table import TableData
-from ..plugins import INTERNAL_PLUGINS, tablefield, EXTERNAL_PLUGINS
+from ..plugins import EXTERNAL_PLUGINS, INTERNAL_PLUGINS, tablefield
 from ..plugins.file import FilePlugin
 from ..plugins.misc import RandomToolsPlugin
 from ..shared import SharedAppSettings

@@ -1,15 +1,15 @@
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Union, Dict, List, Sequence
+from typing import Dict, List, Sequence, Union
 
-import pyqtgraph as pg
 import pandas as pd
+import pyqtgraph as pg
 import qdarkstyle
-from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
-from utilitys import ParamEditor, ParamEditorPlugin, RunOpts, PrjParam, fns, widgets
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from utilitys import ParamEditor, ParamEditorPlugin, PrjParam, RunOpts, fns, widgets
 
-from ..constants import LAYOUTS_DIR, REQD_TBL_FIELDS, ICON_DIR, PRJ_ENUMS, PRJ_CONSTS
+from ..constants import ICON_DIR, LAYOUTS_DIR, PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
 from ..generalutils import hierarchicalUpdate
 from ..logger import getAppLogger
 from ..models.s3abase import S3ABase

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import weakref
-from typing import Optional, Collection, Union
+from typing import Collection, Optional, Union
 from warnings import warn
 
 from utilitys import PrjParam

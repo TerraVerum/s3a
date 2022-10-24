@@ -3,7 +3,7 @@ import ast
 import numpy as np
 
 from .helpers import registerIoHandler
-from ..structures import ComplexXYVertices, XYVertices, PrjParamGroup
+from ..structures import ComplexXYVertices, PrjParamGroup, XYVertices
 
 # Wait to import compio until after registry is populated
 
