@@ -79,7 +79,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             scope = ExitStack()
         newAttrs = SharedAppSettings()
         scope.enter_context(EditorPropsMixin.setEditorPropertyOpts(shared=newAttrs))
-        scope.enter_context(DASM.setStack(newAttrs.actionStack))
+        scope.enter_context(DASM.setStack(ActionStack()))
         if returnAttributes:
             return scope, newAttrs
         return scope
@@ -106,7 +106,7 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
             self.acceptFocusedRegion, btnOpts=PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION
         )
         _, param = attrs.generalProperties.registerFunc(
-            attrs.actionStack.resizeStack,
+            self.actionStack.resizeStack,
             runOpts=RunOpts.ON_CHANGED,
             maxLength={
                 **PRJ_CONSTS.PROP_UNDO_BUF_SZ.toPgDict(),

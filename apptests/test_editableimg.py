@@ -77,20 +77,20 @@ def test_update(app, mgr, vertsPlugin, sampleComps):
     )
     # Undo create new comp, nothing is selected
 
-    app.sharedAttrs.actionStack.undo()
+    app.actionStack.undo()
     # Undo earlier region edit, region should now equal the second-to-last edit
     regionCmp(masks[0])
     assert (
         tblModel.focusedComponent[REQD_TBL_FIELDS.ID] == newCompSer[REQD_TBL_FIELDS.ID]
     )
 
-    app.sharedAttrs.actionStack.redo()
+    app.actionStack.redo()
     regionCmp(masks[1])
-    app.sharedAttrs.actionStack.redo()
-    app.sharedAttrs.actionStack.redo()
+    app.actionStack.redo()
+    app.actionStack.redo()
     regionCmp(masks[2])
     assert tblModel.focusedComponent.equals(newerSer)
-    assert not app.sharedAttrs.actionStack.canRedo
+    assert not app.actionStack.canRedo
 
 
 def test_region_modify(sampleComps, app, mgr, vertsPlugin):
@@ -120,19 +120,19 @@ def test_region_modify(sampleComps, app, mgr, vertsPlugin):
 
     mImg.drawAction = PRJ_CONSTS.DRAW_ACT_ADD
 
-    app.sharedAttrs.actionStack.undo()
-    # app.sharedAttrs.actionStack.undo()
+    app.actionStack.undo()
+    # app.actionStack.undo()
     # Cmp to first action
     assert imsum() == 0
-    app.sharedAttrs.actionStack.undo()
+    app.actionStack.undo()
     # Cmp to original
     assert vertsPlugin.region.regionData[REQD_TBL_FIELDS.VERTICES].equals(
         oldData[REQD_TBL_FIELDS.VERTICES]
     )
 
-    app.sharedAttrs.actionStack.redo()
+    app.actionStack.redo()
     assert imsum() == 0
-    app.sharedAttrs.actionStack.redo()
+    app.actionStack.redo()
     assert imsum() == checkpointMask.sum()
 
 

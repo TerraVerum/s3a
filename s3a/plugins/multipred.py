@@ -5,8 +5,15 @@ import pandas as pd
 from utilitys import ProcessIO
 
 from .base import ProcessorPlugin
-from ..constants import PRJ_CONSTS as CNST, PRJ_ENUMS, REQD_TBL_FIELDS as RTF
+from ..constants import (
+    CONFIG_DIR,
+    MULTI_PREDICTIONS_DIR,
+    PRJ_CONSTS as CNST,
+    PRJ_ENUMS,
+    REQD_TBL_FIELDS as RTF,
+)
 from ..models.tablemodel import ComponentManager
+from ..parameditors.algcollection import AlgorithmCollection
 from ..processing.algorithms import multipred
 from ..shared import SharedAppSettings
 from ..structures import ComplexXYVertices
@@ -19,11 +26,15 @@ class MultiPredictionsPlugin(ProcessorPlugin):
 
     def __initEditorParams__(self, shared: SharedAppSettings):
         super().__initEditorParams__()
-        self.procEditor = shared.multiPredictionCollection.createProcessorEditor(
+
+        self.multiPredictionCollection = AlgorithmCollection(
+            saveDir=MULTI_PREDICTIONS_DIR, template=CONFIG_DIR / "multipred.yml"
+        )
+        self.procEditor = self.multiPredictionCollection.createProcessorEditor(
             type(self), self.name + " Processor"
         )
         self.dock.addEditors([self.procEditor])
-        self.pluginRunnerProc = shared.multiPredictionCollection.parseProcessName(
+        self.pluginRunnerProc = self.multiPredictionCollection.parseProcessName(
             "Run Plugins", topFirst=False
         )
 

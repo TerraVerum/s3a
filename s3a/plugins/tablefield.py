@@ -20,7 +20,12 @@ from utilitys import (
 )
 
 from .base import TableFieldPlugin
-from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
+from ..constants import (
+    CONFIG_DIR,
+    IMAGE_PROCESSORS_DIR,
+    PRJ_CONSTS as CNST,
+    REQD_TBL_FIELDS as RTF,
+)
 from ..generalutils import (
     getCroppedImage,
     maybeIncrementStageNames,
@@ -28,8 +33,14 @@ from ..generalutils import (
     tryCvResize,
 )
 from ..graphicsutils import RegionHistoryViewer
+from ..parameditors.algcollection import AlgorithmCollection
+from ..processing import ImgProcWrapper
 from ..processing.algorithms import imageproc
-from ..processing.processing import AbortableThreadContainer, ThreadedFunctionWrapper
+from ..processing.processing import (
+    AbortableThreadContainer,
+    ImageProcess,
+    ThreadedFunctionWrapper,
+)
 from ..shared import SharedAppSettings
 from ..structures import BlackWhiteImg, ComplexXYVertices, XYVertices
 from ..views.regions import MultiRegionPlot, makeMultiRegionDf
@@ -47,7 +58,15 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
     def __initEditorParams__(self, shared: SharedAppSettings):
         super().__initEditorParams__()
-        self.procEditor = shared.imageProcessCollection.createProcessorEditor(
+
+        self.imageProcessCollection = AlgorithmCollection(
+            ImgProcWrapper,
+            ImageProcess,
+            saveDir=IMAGE_PROCESSORS_DIR,
+            template=CONFIG_DIR / "imageproc.yml",
+        )
+
+        self.procEditor = self.imageProcessCollection.createProcessorEditor(
             type(self), self.name + " Processor"
         )
 

@@ -11,11 +11,11 @@ class SettingsPlugin(ParamEditorPlugin):
     def __initEditorParams__(self, **kwargs):
         super().__initEditorParams__(**kwargs)
 
-        self.generalProps = ParamEditor(
+        self.generalProperties = ParamEditor(
             saveDir=GENERAL_PROPERTIES_DIR, fileType="genprops", name="App Settings"
         )
         self.colorScheme = ParamEditor(
             saveDir=SCHEMES_DIR, fileType="scheme", name="Color Scheme"
         )
 
-        self.dock.addEditors([self.generalProps, self.colorScheme])
+        self.dock.addEditors([self.generalProperties, self.colorScheme])

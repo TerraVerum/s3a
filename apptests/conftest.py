@@ -87,7 +87,7 @@ def resetAppAndTester(request, app, filePlugin, mgr):
         dfTester.fillRandomVerts(app.mainImage.image.shape)
         mgr.addComponents(dfTester.compDf.copy())
     yield
-    app.sharedAttrs.actionStack.clear()
+    app.actionStack.clear()
     app.clearBoundaries()
 
 

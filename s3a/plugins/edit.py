@@ -13,7 +13,7 @@ class EditPlugin(ParamEditorPlugin):
 
     def attachWinRef(self, win: S3ABase):
         super().attachWinRef(win)
-        stack = win.sharedAttrs.actionStack
+        stack = win.actionStack
 
         self.registerFunc(stack.undo, name="Undo", btnOpts=CNST.TOOL_UNDO)
         self.registerFunc(stack.redo, name="Redo", btnOpts=CNST.TOOL_REDO)

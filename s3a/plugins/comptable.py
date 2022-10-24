@@ -10,10 +10,6 @@ from ..shared import SharedAppSettings
 class CompTablePlugin(ParamEditorPlugin):
     name = "Component Table"
 
-    def __initEditorParams__(self, shared: SharedAppSettings):
-        super().__initEditorParams__()
-        self.dock.addEditors([shared.filter])
-
     def attachWinRef(self, win: S3ABase):
 
         tbl = win.tableView
@@ -34,5 +30,6 @@ class CompTablePlugin(ParamEditorPlugin):
             param.opts["ownerObj"] = win.tableView
             self.registerFunc(func, name=param.name, btnOpts=param)
         tbl.menu = self.toolsEditor.actionsMenuFromProcs(parent=tbl, nest=True)
+        self.dock.addEditors([win.tableData.filter])
         super().attachWinRef(win)
         self.tableData = win.tableData
