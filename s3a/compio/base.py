@@ -12,11 +12,9 @@ from utilitys.typeoverloads import FilePath
 from .helpers import checkVerticesBounds, deserialize, serialize
 from ..constants import REQD_TBL_FIELDS as RTF
 from ..generalutils import deprecateKwargs, toDictGen
-from ..parameditors.table import TableData
-from ..parameditors.table.data import getFieldAliases
-from ..parameditors.table.templatemgr import IOTemplateManager
 from ..shims import typing_extensions
 from ..structures import AnnInstanceError, AnnParseError
+from ..tabledata import IOTemplateManager, TableData, getFieldAliases
 
 
 class TableContainer:

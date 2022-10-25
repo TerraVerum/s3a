@@ -15,9 +15,9 @@ from .exporters import *
 from .helpers import compareDataframes
 from .importers import *
 from ..constants import PRJ_ENUMS
-from ..parameditors.table.data import TableData
 from ..shims import typing_extensions
 from ..structures import FilePath
+from ..tabledata import TableData
 
 FilePathOrDf = Union[FilePath, pd.DataFrame]
 # Values are strings

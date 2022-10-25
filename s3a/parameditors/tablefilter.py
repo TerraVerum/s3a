@@ -7,7 +7,7 @@ import pandas as pd
 from pyqtgraph.parametertree import Parameter
 from utilitys import ParamEditor, PrjParam, fns
 
-from ...constants import TABLE_DIR
+from ..constants import TABLE_DIR
 
 
 def generateParameterList(nameIter, paramType, defaultValue, defaultParam="value"):

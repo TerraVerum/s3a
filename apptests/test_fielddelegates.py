@@ -3,8 +3,8 @@ import pyqtgraph as pg
 import pytest
 
 from s3a import REQD_TBL_FIELDS as RTF, XYVertices
-from s3a.parameditors.table import TableData
 from s3a.structures.vertices import ComplexXYVertices
+from s3a.tabledata import TableData
 from s3a.views.fielddelegates import (
     ComplexXYVerticesDelegate,
     FieldDisplay,

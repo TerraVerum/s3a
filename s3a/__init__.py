@@ -43,11 +43,11 @@ from . import graphicsutils as gutils
 from .__version__ import __version__
 from .compio import ComponentIO, defaultIo
 from .constants import CONFIG_DIR, PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
-from .parameditors.table import TableData
 from .plugins.file import ProjectData
 from .plugins.misc import RandomToolsPlugin
 from .shared import SharedAppSettings
 from .structures import ComplexXYVertices, XYVertices
+from .tabledata import TableData
 from .views.s3agui import S3A
 
 appInst = None

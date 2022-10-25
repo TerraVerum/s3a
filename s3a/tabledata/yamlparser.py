@@ -5,7 +5,7 @@ from typing import Any, Tuple, Union
 from utilitys import PrjParam
 from utilitys.fns import loader
 
-from ...compio.helpers import deserialize
+from ..compio.helpers import deserialize
 
 NestedIndexer = Union[str, Tuple[Union[str, int], ...]]
 

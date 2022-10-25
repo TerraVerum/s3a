@@ -27,12 +27,12 @@ from ..controls.tableviewproxy import ComponentController, ComponentSorterFilter
 from ..logger import getAppLogger
 from ..models.tablemodel import ComponentManager
 from ..parameditors.appstate import AppStateEditor
-from ..parameditors.table import TableData
 from ..plugins import EXTERNAL_PLUGINS, INTERNAL_PLUGINS, tablefield
 from ..plugins.file import FilePlugin
 from ..plugins.misc import RandomToolsPlugin
 from ..shared import SharedAppSettings
 from ..structures import FilePath, NChanImg
+from ..tabledata import TableData
 from ..views.imageareas import MainImage
 from ..views.tableview import ComponentTableView
 

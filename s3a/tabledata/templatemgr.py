@@ -4,8 +4,8 @@ import typing as t
 from utilitys import fns
 from utilitys.typeoverloads import FilePath
 
-from ...constants import IO_TEMPLATES_DIR
-from ...generalutils import DirectoryDict
+from ..constants import IO_TEMPLATES_DIR
+from ..generalutils import DirectoryDict
 
 
 class IOTemplateManager:

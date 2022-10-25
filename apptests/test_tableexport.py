@@ -21,7 +21,7 @@ from s3a import (
     XYVertices,
 )
 from s3a.generalutils import augmentException
-from s3a.parameditors.table import TableData
+from s3a.tabledata import TableData
 
 
 @pytest.fixture

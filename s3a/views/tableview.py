@@ -13,9 +13,9 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from ..compio.helpers import deserialize, serialize
 from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
 from ..models.tablemodel import ComponentManager
-from ..parameditors.table.data import TableData
 from ..shared import SharedAppSettings
 from ..structures import TwoDArr
+from ..tabledata import TableData
 
 __all__ = ["ComponentTableView", "PopupTableDialog"]
 

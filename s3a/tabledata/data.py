@@ -10,11 +10,11 @@ from utilitys import PrjParam, fns
 from utilitys.fns import hierarchicalUpdate
 from utilitys.typeoverloads import FilePath
 
-from .filter import TableFilterEditor
 from .templatemgr import IOTemplateManager
 from .yamlparser import YamlParser
-from ...constants import REQD_TBL_FIELDS as RTF
-from ...structures import PrjParamGroup
+from ..constants import REQD_TBL_FIELDS as RTF
+from ..parameditors.tablefilter import TableFilterEditor
+from ..structures import PrjParamGroup
 
 
 def getFieldAliases(field: PrjParam):

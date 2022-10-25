@@ -16,8 +16,8 @@ from apptests.testingconsts import (
     TEST_FILE_DIR,
 )
 from s3a import S3A
-from s3a.parameditors.table import IOTemplateManager
 from s3a.plugins.file import ProjectData, absolutePath
+from s3a.tabledata import IOTemplateManager
 
 _autosaveFile = "autosave.parameter"
 

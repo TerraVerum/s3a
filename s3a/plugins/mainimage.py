@@ -12,8 +12,8 @@ from ..structures import ComplexXYVertices, XYVertices
 
 if TYPE_CHECKING:
     from ..models.s3abase import S3ABase
-    from ..parameditors.table.data import TableData
     from ..shared import SharedAppSettings
+    from ..tabledata import TableData
 
 
 class MainImagePlugin(ParamEditorPlugin):

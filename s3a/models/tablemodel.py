@@ -8,8 +8,8 @@ from pyqtgraph.Qt import QtCore
 from ..constants import PRJ_ENUMS, REQD_TBL_FIELDS as RTF
 from ..generalutils import coerceDfTypes
 from ..logger import getAppLogger
-from ..parameditors.table.data import TableData
 from ..structures import ComplexXYVertices, OneDArr
+from ..tabledata import TableData
 
 __all__ = ["ComponentManager", "ComponentTableModel"]
 
@@ -17,7 +17,7 @@ from utilitys import EditorPropsMixin, fns
 from utilitys.misc import DeferredActionStackMixin as DASM
 
 if TYPE_CHECKING:
-    from ..parameditors.table.data import TableData
+    from ..tabledata import TableData
 
 Signal = QtCore.Signal
 

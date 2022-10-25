@@ -10,7 +10,7 @@ from utilitys import fns
 
 from apptests.testingconsts import RND
 from s3a import REQD_TBL_FIELDS, ComplexXYVertices
-from s3a.parameditors.table import TableData
+from s3a.tabledata import TableData
 
 cfgDict = {
     "fields": {
