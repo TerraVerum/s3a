@@ -7,7 +7,7 @@ from apptests.testingconsts import RND
 from s3a import REQD_TBL_FIELDS
 from s3a.constants import PRJ_CONSTS
 from s3a.controls.drawctrl import RoiCollection
-from s3a.parameditors.algcollection import AlgorithmCollection, AlgParamEditor
+from s3a.parameditors.algcollection import AlgorithmCollection, AlgorithmEditor
 from s3a.processing import ImageProcess, ImgProcWrapper, ProcessIO
 from s3a.structures import ComplexXYVertices, NChanImg, PrjParam, XYVertices
 
@@ -96,7 +96,7 @@ def test_update(app, mgr, vertsPlugin, sampleComps):
 def test_region_modify(sampleComps, app, mgr, vertsPlugin):
     # Disable region simplification for accurate testing
     vertsPlugin.props[PRJ_CONSTS.PROP_REG_APPROX_EPS] = -1
-    vertsPlugin.procEditor.changeActiveProcessor("Basic Shapes")
+    vertsPlugin.processEditor.changeActiveProcessor("Basic Shapes")
     mImg = app.mainImage
     app.addAndFocusComponents(sampleComps)
     shapeBnds = mImg.image.shape[:2]
@@ -161,7 +161,7 @@ def test_proc_err(tmp_path):
 
     proc = ImageProcess.fromFunction(badProc, name="Bad")
     clctn = AlgorithmCollection(ImgProcWrapper, ImageProcess)
-    algEditor = AlgParamEditor(clctn, saveDir=tmp_path)
+    algEditor = AlgorithmEditor(clctn, saveDir=tmp_path)
     clctn.addProcess(proc, top=True)
 
     algEditor.changeActiveProcessor("Bad")
@@ -169,6 +169,6 @@ def test_proc_err(tmp_path):
         image=np.array([[True]], dtype=bool), foregroundVertices=XYVertices([[0, 0]])
     )
     with pytest.warns(UserWarning):
-        algEditor.currentProcessor.run(errorsToWarnings=True, **kwargs)
+        algEditor.currentProcessor.activate(errorsToWarnings=True, **kwargs)
     with pytest.raises(ZeroDivisionError):
-        algEditor.currentProcessor.run(**kwargs)
+        algEditor.currentProcessor.activate(**kwargs)

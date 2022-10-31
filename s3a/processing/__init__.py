@@ -1,2 +1,1 @@
-from .guiwrapper import *
-from .processing import *
+from .pipeline import *

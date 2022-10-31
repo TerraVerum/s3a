@@ -23,24 +23,20 @@ from .base import TableFieldPlugin
 from ..constants import (
     CONFIG_DIR,
     IMAGE_PROCESSORS_DIR,
+    MENU_OPTS_DIR,
     PRJ_CONSTS as CNST,
     REQD_TBL_FIELDS as RTF,
 )
 from ..generalutils import (
     getCroppedImage,
-    maybeIncrementStageNames,
     showMaskDifference,
     tryCvResize,
 )
 from ..graphicsutils import RegionHistoryViewer
-from ..parameditors.algcollection import AlgorithmCollection
-from ..processing import ImgProcWrapper
+from ..parameditors.algcollection import AlgorithmCollection, AlgorithmEditor
 from ..processing.algorithms import imageproc
-from ..processing.processing import (
-    AbortableThreadContainer,
-    ImageProcess,
-    ThreadedFunctionWrapper,
-)
+from ..processing.pipeline import ImagePipeline
+from ..processing.threads import ThreadedFunctionWrapper, AbortableThreadContainer
 from ..shared import SharedAppSettings
 from ..structures import BlackWhiteImg, ComplexXYVertices, XYVertices
 from ..views.regions import MultiRegionPlot, makeMultiRegionDf
@@ -60,17 +56,20 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         super().__initEditorParams__()
 
         self.imageProcessCollection = AlgorithmCollection(
-            ImgProcWrapper,
-            ImageProcess,
+            ImagePipeline,
             saveDir=IMAGE_PROCESSORS_DIR,
             template=CONFIG_DIR / "imageproc.yml",
         )
+        for algo in imageproc.__all__:
+            self.imageProcessCollection.addProcess(algo)
 
-        self.procEditor = self.imageProcessCollection.createProcessorEditor(
-            type(self), self.name + " Processor"
+        self.processEditor = AlgorithmEditor(
+            self.imageProcessCollection,
+            name=self.name + " Processor",
+            directory=MENU_OPTS_DIR / fns.nameFormatter(type(self).__name__).lower(),
         )
 
-        self.dock.addEditors([self.procEditor])
+        self.dock.addEditors([self.processEditor])
 
         self.props = ParamContainer()
         shared.generalProperties.registerProp(
@@ -93,11 +92,11 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         self.taskManager.sigThreadsUpdated.connect(self.updateTaskLabel)
 
         self.oldResultCache = None
-        """Holds the last result from a region run so undoables reset the proc cache"""
+        """Holds the last result from a region run so undoables reset the process cache"""
 
-        _, self._overlayParam = self.procEditor.registerFunc(
+        _, self._overlayParam = self.processEditor.registerFunc(
             self.overlayStageInfo,
-            parentParam=self.procEditor._metaParamGrp,
+            parentParam=self.processEditor._metaParamGrp,
             returnParam=True,
             runOpts=RunOpts.ON_CHANGED,
         )
@@ -192,14 +191,19 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             vertsKey = "backgroundVertices"
         kwargs = {vertsKey: verts}
         if self.queueActions:
+            # Wait to start thread to guarantee signals are connected
             thread = self.taskManager.addThread(
-                self.run, **kwargs, name="Vertices Update"
+                self.runAndWrapExceptions,
+                **kwargs,
+                name="Vertices Update",
+                updateThreads=False,
             )
             thread.sigResultReady.connect(self._onThreadFinished)
             thread.sigFailed.connect(self._onThreadFinished)
+            self.taskManager.updateThreads()
         else:
             # Run immediately
-            result = self.run(**kwargs)
+            result = self.runAndWrapExceptions(**kwargs)
             self.updateGuiFromProcessor(result)
 
     def updateTaskLabel(self):
@@ -256,7 +260,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             return
         newGrayscale = newGrayscale.astype("uint8")
 
-        matchNames = maybeIncrementStageNames(self.currentProcessor.stagesFlattened)
+        matchNames = [
+            stage.name for stage in self.currentProcessor.flattenedFunctions()
+        ]
         type(self).displayableInfos.fget.cache_clear()
         if self._displayedStage in matchNames:
             self.overlayStageInfo(self._displayedStage, self.stageInfoImage.opacity())
@@ -277,11 +283,14 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         backgroundVertices: XYVertices = None,
         updateGui=False,
     ):
+        locs = locals()
         vertsDict = {}
-        if foregroundVertices is not None:
-            vertsDict["foregroundVertices"] = foregroundVertices
-        if backgroundVertices is not None:
-            vertsDict["backgroundVertices"] = backgroundVertices
+        for key in ("foregroundVertices", "backgroundVertices"):
+            value = locs[key]
+            if value is None:
+                value = XYVertices()
+            vertsDict[key] = value
+
         img = self.mainImage.image
         if img is None:
             compMask = None
@@ -292,7 +301,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         #  where change will have to occur
         viewbox = self.mainImage.viewboxCoords()
         self.oldResultCache = imageproc.procCache.copy()
-        result = self.currentProcessor.run(
+        result = self.currentProcessor.activate(
             image=img,
             oldComponentMask=compMask,
             **vertsDict,
@@ -301,12 +310,30 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             prevCompVerts=ComplexXYVertices(
                 [r.stack() for r in self.region.regionData[RTF.VERTICES]]
             ),
-            # Warnings render dialogs on the GUI thread but not otherwise
-            errorsToWarnings=not self.queueActions,
         )
         if updateGui:
             self.updateGuiFromProcessor(result)
         return result
+
+    def runAndWrapExceptions(self, **kwargs):
+        """
+        Runs the current process and wraps exceptions to nicely print stage information.
+        Optionally converts errors into warnings if threading is not employed.
+        """
+        try:
+            result = self.run(**kwargs)
+        except Exception as ex:
+            if self.queueActions:
+                # Warnings render dialogs on the GUI thread but not otherwise
+                raise
+            else:
+                warnings.warn(str(ex), UserWarning)
+                return None
+
+        outImg = result["image"].astype(bool)
+        if outImg.ndim > 2:
+            outImg = np.bitwise_or.reduce(outImg, 2)
+        return outImg
 
     def updateRegionFromDf(
         self, newData: pd.DataFrame = None, offset: XYVertices = None
@@ -387,7 +414,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         # Broad range of things that can go wrong
         # noinspection PyBroadException
         try:
-            result = self.currentProcessor.run(
+            result = self.currentProcessor.activate(
                 image=img,
                 oldComponentMask=compMask,
                 firstRun=True,
@@ -600,15 +627,15 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     @lru_cache()
     def displayableInfos(self):
         outInfos = {}
-        stages = self.currentProcessor.processor.stagesFlattened
-        matchNames = maybeIncrementStageNames(stages)
+        stages = self.currentProcessor.flattenedFunctions()
+        matchNames = [stage.title() for stage in stages]
         boundSlices = None
 
         for name, stage in zip(matchNames, stages):
             if stage.result is None:
                 # Not run yet
                 continue
-            info = self.currentProcessor.processor.singleStageInfo(stage)
+            info = stage.stageInfo()
             if info:
                 # TODO: Figure out which 'info' to use
                 info = info[0]
@@ -637,7 +664,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
                 "pos": imPos[::-1],
             }
             # Bound slices up to the evaluated stage are used for resizing information
-            if isinstance(stage.result, ProcessIO) and "boundSlices" in stage.result:
+            if isinstance(stage.result, dict) and "boundSlices" in stage.result:
                 boundSlices = stage.result["boundSlices"]
         return outInfos
 

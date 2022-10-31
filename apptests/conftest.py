@@ -64,7 +64,7 @@ def vertsPlugin(app) -> VerticesPlugin:
         )
 
     plg.queueActions = False
-    plg.procEditor.changeActiveProcessor("Basic Shapes")
+    plg.processEditor.changeActiveProcessor("Basic Shapes")
     return plg
 
 

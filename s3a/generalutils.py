@@ -436,23 +436,6 @@ def imagePathToHtml(imgPath: FilePath, width=None):
     return outStr
 
 
-def maybeIncrementStageNames(stages: Sequence[ProcessStage]):
-    """
-    Returns a list of names numerically incrementing where they would otherwise be
-    duplicated. E.g. if the stage list was [Open, Open], this is converted to
-    [Open, Open#2]
-    """
-    preExisting = defaultdict(int)
-    names = []
-    for stage in stages:
-        name = stage.name
-        if preExisting[name] > 0:
-            name += f"#{preExisting[name] + 1}"
-        preExisting[name] += 1
-        names.append(name)
-    return names
-
-
 class DirectoryDict(MaxSizeDict):
     """
     Used to shim the API between file-system and programmatically generated content. If
@@ -960,3 +943,29 @@ def getObjectsDefinedInSelfModule(moduleVars, moduleName, ignorePrefix="_"):
         if hasattr(obj, "__module__") and obj.__module__ == moduleName:
             out.append(name)
     return out
+
+
+# Credit: https://github.com/biolab/orange3/blob/master/Orange/misc/cache.py
+# Permalink to copy date:
+# https://github.com/biolab/orange3/blob/0f5025a74a32a5b69ebf67e555131cc5b540143d/Orange/misc/cache.py  # noqa
+# Slightly modified to use equality instead of identity checks
+def simpleCache(func):
+    """Cache with size 1."""
+    # populate the cache with a dummy value to guarantee the first run succeeds
+    last_args = (object(),)
+    last_kwargs = {object(): object()}
+    last_result = None
+
+    @wraps(func)
+    def _cached(*args, **kwargs):
+        nonlocal last_args, last_kwargs, last_result
+        if (
+            len(last_args) != len(args)
+            or not all(pg.eq(x, y) for x, y in zip(args, last_args))
+            or not pg.eq(last_kwargs, kwargs)
+        ):
+            last_result = func(*args, **kwargs)
+            last_args, last_kwargs = args, kwargs
+        return last_result
+
+    return _cached

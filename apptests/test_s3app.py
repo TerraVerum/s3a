@@ -124,7 +124,7 @@ def test_autosave(tmp_path, app, filePlugin):
 def test_stage_plotting(monkeypatch, app, vertsPlugin):
     mainImg = app.mainImage
     mainImg.drawActionGroup.callFuncByParam(CNST.DRAW_ACT_CREATE)
-    vertsPlugin.procEditor.changeActiveProcessor("Basic Shapes")
+    vertsPlugin.processEditor.changeActiveProcessor("Basic Shapes")
     mainImgProps = app.classPluginMap[MainImagePlugin].props
     oldSz = mainImgProps[CNST.PROP_MIN_COMP_SZ]
     mainImgProps[CNST.PROP_MIN_COMP_SZ] = 0
@@ -134,11 +134,11 @@ def test_stage_plotting(monkeypatch, app, vertsPlugin):
     assert app.componentManager.focusedComponent.loc[REQD_TBL_FIELDS.ID] >= 0
     mainImgProps[CNST.PROP_MIN_COMP_SZ] = oldSz
 
-    vertsPlugin.procEditor.changeActiveProcessor("Basic Shapes")
+    vertsPlugin.processEditor.changeActiveProcessor("Basic Shapes")
     mainImg.drawActionGroup.callFuncByParam(CNST.DRAW_ACT_ADD)
 
     mainImg.shapeCollection.sigShapeFinished.emit(XYVertices([[0, 0], [10, 10]]))
-    proc = vertsPlugin.currentProcessor.processor
+    proc = vertsPlugin.currentProcessor
     oldMakeWidget = proc._stageSummaryWidget
 
     def patchedWidget():

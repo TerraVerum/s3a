@@ -77,7 +77,7 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         )
         vbRange = np.array(self.mainImage.getViewBox().viewRange()).T
         image = self.win.mainImage.image
-        result = self.currentProcessor.run(
+        result = self.currentProcessor.activate(
             components=components,
             fullComponents=components,
             fullImage=image,

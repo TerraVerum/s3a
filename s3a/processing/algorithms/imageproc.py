@@ -3,13 +3,13 @@ from typing import Any, Dict, Tuple, Union
 
 import cv2 as cv
 import numpy as np
+from qtextras import bindInteractorOptions as bind
 from scipy.ndimage import binary_fill_holes
 from skimage import img_as_float, morphology as morph, segmentation as seg
 from skimage.measure import label, regionprops
 from skimage.morphology import flood
-from utilitys import fns
-from utilitys.processing import *
 
+from ..pipeline import PipelineFunction
 from ...constants import PRJ_ENUMS
 from ...generalutils import (
     cornersToFullBoundary,
@@ -122,9 +122,9 @@ def format_vertices(
     # Default to bound slices that encompass the whole image
     bounds = np.array([[0, 0], image.shape[:2][::-1]])
     boundSlices = slice(*bounds[:, 1]), slice(*bounds[:, 0])
-    return ProcessIO(
+    return dict(
         image=image,
-        summaryInfo=None,
+        info=None,
         foregroundVertices=foregroundVertices,
         backgroundVertices=backgroundVertices,
         asForeground=asForeground,
@@ -135,6 +135,7 @@ def format_vertices(
     )
 
 
+@bind(reference=dict(type="list", limits=[['image', 'component', 'viewbox', 'roi']]))
 def crop_to_local_area(
     image: NChanImg,
     foregroundVertices: XYVertices,
@@ -151,9 +152,24 @@ def crop_to_local_area(
     """
     Parameters
     ----------
+    image
+        image to crop
+    foregroundVertices
+        vertices of foreground region
+    backgroundVertices
+        vertices of background region
+    oldComponentMask
+        Mask of the focused component prior to this processing run
+    prevCompVerts
+        Vertices of the focused component prior to this processing run
+    viewbox
+        Vertices of the viewbox, in the form ``[[xmin, ymin], [xmax, ymax]]``
+    historyMask
+        Mask of previous processing runs
     reference
-      pType: list
-      limits: ['image', 'component', 'viewbox', 'roi']
+        Crop reference, can be relative to image,  component, viewbox, or roi.
+    marginPct
+        Margin to add to the crop area, as a percentage of the crop area.
     maxSize
         Maximum side length for a local portion of the image. If the local area exceeds
         this, it will be rescaled to match this size. It can be beneficial for
@@ -224,7 +240,7 @@ def crop_to_local_area(
         toPlot = image.copy()
     else:
         image = image.astype("float")
-        toPlot = (((image - image.min()) / image.ptp()) * 255).astype("uint8")
+        toPlot = (((image - np.min(image)) / image.ptp()) * 255).astype("uint8")
     borderColor = 255
     if image.ndim > 2:
         borderColor = (255, *[0 for _ in range(image.shape[2] - 1)])
@@ -232,7 +248,7 @@ def crop_to_local_area(
         toPlot, tuple(bounds[0, :]), tuple(bounds[1, :]), borderColor, rectThickness
     )
     info = {"name": "Selected Area", "image": toPlot}
-    out = ProcessIO(
+    out = dict(
         image=cropped,
         foregroundVertices=foregroundVertices,
         backgroundVertices=backgroundVertices,
@@ -240,7 +256,7 @@ def crop_to_local_area(
         boundSlices=boundSlices,
         historyMask=curHistory,
         resizeRatio=ratio,
-        summaryInfo=info,
+        info=info,
     )
     if ratio < 1:
         for kk in "image", "oldComponentMask", "historyMask":
@@ -298,9 +314,7 @@ def apply_process_result(
 
     # Add 1 to max slice so stopping value is last foreground pixel
     newSlices = (slice(mins[0], maxs[0] + 1), slice(mins[1], maxs[1] + 1))
-    return ProcessIO(
-        image=outMask[newSlices], boundSlices=newSlices, summaryInfo={"image": change}
-    )
+    return dict(image=outMask[newSlices], boundSlices=newSlices, info={"image": change})
 
 
 def return_to_full_size(
@@ -315,13 +329,11 @@ def return_to_full_size(
 
     infoMask = showMaskDifference(unformattedOldComponentMask[boundSlices], image)
 
-    return ProcessIO(
-        image=out, summaryInfo={"image": infoMask, "name": "Finalize Region"}
-    )
+    return dict(image=out, info={"image": infoMask, "name": "Finalize Region"})
 
 
 def fill_holes(image: NChanImg):
-    return ProcessIO(image=binary_fill_holes(image))
+    return dict(image=binary_fill_holes(image))
 
 
 def disallow_paint_tool(
@@ -332,28 +344,28 @@ def disallow_paint_tool(
             "This algorithm requires an enclosed area to work."
             " Only one vertex was given as an input."
         )
-    return ProcessIO(image=_image)
+    return dict(image=_image)
 
 
-@fns.dynamicDocstring(morphOps=[d for d in dir(cv) if d.startswith("MORPH_")])
-def morph_op(image: NChanImg, radius=1, op: str = "", shape="rectangle"):
+@bind(
+    shape=dict(type="list", limits=["rectangle", "disk", "diamond"]),
+)
+def morph_op(image: NChanImg, op: int, radius=1, shape="rectangle"):
     """
     Perform a morphological operation on the input image.
 
     Parameters
     ----------
+    image
+        Input image
+    op
+        Morphological operation to perform. See OpenCV documentation for details.
     radius
         Radius of the structuring element. Note that the total side length of the
         structuring element will be (2*radius)+1.
     shape
         Structuring element shape
-        pType: list
-        limits: ['rectangle', 'disk', 'diamond']
-    op
-        pType: list
-        limits: {morphOps}
     """
-    opType = getattr(cv, op)
     if image.ndim > 2:
         image = image.mean(2)
     image = image.astype("uint8")
@@ -361,31 +373,31 @@ def morph_op(image: NChanImg, radius=1, op: str = "", shape="rectangle"):
     if shape == "rectangle":
         ksize = [ksize[0] * 2 + 1] * 2
     strel = getattr(morph, shape)(*ksize)
-    outImg = cv.morphologyEx(image.copy(), opType, strel)
-    return ProcessIO(image=outImg)
+    outImg = cv.morphologyEx(image.copy(), op, strel)
+    return dict(image=outImg)
 
 
-opening = AtomicProcess(morph_op, "Opening", op="MORPH_OPEN")
-closing = AtomicProcess(morph_op, "Closing", op="MORPH_CLOSE")
+opening = PipelineFunction(morph_op, "opening", op=cv.MORPH_OPEN)
+closing = PipelineFunction(morph_op, "closing", op=cv.MORPH_CLOSE)
 
 
 def keep_largest_component(image: NChanImg):
     if not np.any(image):
-        return ProcessIO(image=image)
+        return dict(image=image)
     areas, labels = _cvConnComps(image)
     # 0 is background, so skip it
     out = np.zeros_like(image, shape=image.shape[:2])
     # Offset by 1 since 0 was removed earlier
     maxAreaIdx = np.argmax(areas) + 1
     out[labels == maxAreaIdx] = True
-    return ProcessIO(image=out)
+    return dict(image=out)
 
 
 def remove_small_components(image: NChanImg, sizeThreshold=30):
     areas, labels = _cvConnComps(image, areaOnly=True)
     validLabels = np.flatnonzero(areas >= sizeThreshold) + 1
     out = np.isin(labels, validLabels)
-    return ProcessIO(image=out)
+    return dict(image=out)
 
 
 def draw_vertices(image: NChanImg, foregroundVertices: XYVertices):
@@ -393,19 +405,19 @@ def draw_vertices(image: NChanImg, foregroundVertices: XYVertices):
         image = ComplexXYVertices([foregroundVertices]).toMask(image.shape[:2]) > 0
     else:
         image = np.zeros(image.shape[:2], dtype=bool)
-    return ProcessIO(image=image)
+    return dict(image=image)
 
 
 def convert_to_squares(image: NChanImg):
     outMask = np.zeros(image.shape, dtype=bool)
     for region in regionprops(label(image)):
         outMask[region.bbox[0] : region.bbox[2], region.bbox[1] : region.bbox[3]] = True
-    return ProcessIO(image=outMask)
+    return dict(image=outMask)
 
 
-class CvGrabcut(AtomicProcess):
+class CvGrabcut(PipelineFunction):
     def __init__(self, **kwargs):
-        super().__init__(self.grabcut, "Cv Grabcut", **kwargs)
+        super().__init__(self.grabcut, "cv_grabcut", **kwargs)
 
     def grabcut(
         self,
@@ -417,7 +429,7 @@ class CvGrabcut(AtomicProcess):
         iters=5,
     ):
         if image.size == 0:
-            return ProcessIO(image=np.zeros_like(oldComponentMask))
+            return dict(image=np.zeros_like(oldComponentMask))
         img = cv.cvtColor(image, cv.COLOR_RGB2BGR)
         historyMask = historyMask.copy()
         if historyMask.size:
@@ -430,7 +442,7 @@ class CvGrabcut(AtomicProcess):
             mask[historyMask == BGND] = cv.GC_BGD
         if len(foregroundVertices) and np.all(foregroundVertices.ptp(0) > 1):
             cvRect = np.array(
-                [foregroundVertices.min(0), foregroundVertices.ptp(0)]
+                [np.min(foregroundVertices, axis=0), foregroundVertices.ptp(0)]
             ).flatten()
             mode = None
         else:
@@ -447,21 +459,21 @@ class CvGrabcut(AtomicProcess):
 
         if not np.any(mask):
             if cvRect[2] == 0 or cvRect[3] == 0:
-                return ProcessIO(image=np.zeros_like(oldComponentMask))
+                return dict(image=np.zeros_like(oldComponentMask))
             mode = mode or cv.GC_INIT_WITH_RECT
         else:
             mode = mode or cv.GC_INIT_WITH_MASK
         cv.grabCut(img, mask, cvRect, bgdModel, fgdModel, iters, mode=mode)
         outMask = np.where((mask == cv.GC_BGD) | (mask == cv.GC_PR_BGD), False, True)
-        return ProcessIO(labels=outMask, fgdModel=fgdModel, bgdModel=bgdModel)
+        return dict(labels=outMask, fgdModel=fgdModel, bgdModel=bgdModel)
 
 
 @functools.partial(
-    AtomicProcess,
-    docFunc=seg.quickshift,
+    PipelineFunction,
     name="Quickshift Segmentation",
-    ignoreKeys={"return_tree", "convert2lab", "random_seed"},
+    ignores={"return_tree", "convert2lab", "random_seed"},
 )
+@functools.wraps(seg.quickshift)
 def quickshift_segmentation(
     image: NChanImg, ratio=1.0, max_dist=10.0, kernel_size=5, sigma=0.0
 ):
@@ -474,7 +486,7 @@ def quickshift_segmentation(
         segImg = seg.quickshift(
             image, ratio=ratio, kernel_size=kernel_size, max_dist=max_dist, sigma=sigma
         )
-    return ProcessIO(labels=segImg)
+    return dict(labels=segImg)
 
 
 # Taken from example page: https://scikit-image.org/docs/dev/auto_examples/segmentation/plot_morphsnakes.html  # noqa
@@ -486,7 +498,7 @@ def morph_acwe(image: NChanImg, initialCheckerSize=6, iters=35, smoothing=3):
     outLevels = seg.morphological_chan_vese(
         image, iters, init_level_set=initLs, smoothing=smoothing
     )
-    return ProcessIO(labels=outLevels)
+    return dict(labels=outLevels)
 
 
 def k_means_segmentation(image: NChanImg, kValue=5, attempts=10):
@@ -503,7 +515,7 @@ def k_means_segmentation(image: NChanImg, kValue=5, attempts=10):
     imgMeans = imgMeans.astype(image.dtype)
     lbls = lbls.reshape(image.shape[:2])
 
-    return ProcessIO(labels=lbls, means=imgMeans)
+    return dict(labels=lbls, means=imgMeans)
 
 
 def _labelBoundaries_cv(labels: np.ndarray, thickness: int):
@@ -535,6 +547,14 @@ def binarize_labels(
 
     Parameters
     ----------
+    image
+        The image to use for color-based binarization
+    labels
+        The labels to binarize
+    foregroundVertices
+        The vertices to use for binarization
+    historyMask
+        The history mask to use for binarization
     touchingRoiOnly
         Whether to only keep labeled regions that are in contact with the current ROI
     useMeanColor
@@ -588,14 +608,14 @@ def binarize_labels(
     color = (255,) + tuple(0 for _ in range(1, nChans))
     if len(foregroundVertices):
         cv.drawContours(summaryImg, [foregroundVertices], -1, color, lineThickness)
-    return ProcessIO(image=out, summaryInfo={"image": summaryImg})
+    return dict(image=out, info={"image": summaryImg})
 
 
 def region_grow_segmentation(
     image: NChanImg, foregroundVertices: XYVertices, seedThreshold=10
 ):
     if image.size == 0:
-        return ProcessIO(image=np.zeros(image.shape[:2], bool))
+        return dict(image=np.zeros(image.shape[:2], bool))
     if np.all(foregroundVertices == foregroundVertices[0, :]):
         # Remove unnecessary redundant seedpoints
         foregroundVertices = foregroundVertices[[0], :]
@@ -605,34 +625,41 @@ def region_grow_segmentation(
         foregroundVertices = cornersToFullBoundary(foregroundVertices, 50e3)
 
     # Don't let region grow outside area of effect
-    # img_aoe, coords = getCroppedImg(image, foregroundVertices, areaOfEffect, returnSlices=True)
+    # img_aoe, coords = getCroppedImg(
+    #     image, foregroundVertices, areaOfEffect, returnSlices=True
+    # )
     # Offset vertices before filling
     # seeds = foregroundVertices - [coords[1].start, coords[0].start]
     outMask = growSeedpoint(image, foregroundVertices, seedThreshold)
 
-    return ProcessIO(image=outMask)
+    return dict(image=outMask)
 
 
-slic_segmentation = AtomicProcess(
-    seg.slic,
-    "SLIC Segmentation",
-    ignoreKeys=[
-        "max_iter",
-        "spacing",
-        "multichannel",
-        "convert2lab",
-        "enforce_connectivity",
-        "slic_zero",
-        "start_label",
-        "mask",
-    ],
-    sigma=dict(limits=[0, None], step=0.1, type="float"),
-    start_label=1,
-    wrapWith=["labels"],
+@bind(sigma=dict(limits=[0, None], step=0.1, type="float"))
+def slice_wrapper(
+    image,
+    n_segments=100,
+    compactness=10.0,
+    sigma=0,
+    min_size_factor=0.5,
+    max_size_factor=3,
+):
+    return dict(labels=seg.slic(image, **locals()))
+slice_wrapper.__doc__ = seg.slic.__doc__
+
+slic_segmentation = PipelineFunction(
+    slice_wrapper,
+    "SLIC_segmentation",
 )
 
 
-@fns.dynamicDocstring(inters=[attr for attr in vars(cv) if attr.startswith("INTER_")])
+@bind(
+    interpolation=dict(
+        type="list", limits=[attr for attr in vars(cv) if attr.startswith("INTER_")]
+    ),
+    newSize=dict(type="float", step=0.1),
+    asRatio=dict(readonly=True),
+)
 def cv_resize(
     image: np.ndarray,
     newSize: Union[float, tuple] = 0.5,
@@ -641,19 +668,6 @@ def cv_resize(
 ):
     """
     Like skimage.transform.resize, but uses cv2.resize instead for speed where posible
-
-    Parameters
-    ----------
-    image
-        Image to resize
-    interpolation
-        pType: list
-        limits: {inters}
-    newSize
-        pType: float
-        step: 0.1
-    asRatio
-        readonly: True
     """
     if isinstance(interpolation, str):
         interpolation = getattr(cv, interpolation)

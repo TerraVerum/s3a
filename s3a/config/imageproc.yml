@@ -55,6 +55,6 @@ top:
 
   SLIC:
     - Default Preprocess
-    - Slic Segmentation
+    - SLIC Segmentation
     - Binarize Labels
     - Default Postprocess

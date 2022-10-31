@@ -10,7 +10,7 @@ from utilitys import ProcessIO, fns
 from apptests.testingconsts import SAMPLE_IMG
 from s3a import REQD_TBL_FIELDS, ComplexXYVertices
 from s3a.generalutils import imageCornerVertices
-from s3a.processing import ImageProcess
+from s3a.processing import ActionGroupParameter, PipelineParameter
 from s3a.processing.algorithms import (
     imageproc as ip,
     make_grid_components,
@@ -22,10 +22,11 @@ from s3a.structures import XYVertices
 @pytest.mark.smallimage
 def test_algs_working(app, vertsPlugin):
     mImg = app.mainImage
-    pe = vertsPlugin.procEditor
-    allAlgs = vertsPlugin.procEditor.collection.topProcesses
+    pe = vertsPlugin.processEditor
+    allAlgs = vertsPlugin.processEditor.collection.topProcesses
 
-    # Some exceptions may occur in the processor, this is fine since behavior might be undefined
+    # Some exceptions may occur in the processor, this is fine since behavior might be
+    # undefined
     mImg.shapeCollection.sigShapeFinished.emit(imageCornerVertices(app.mainImage.image))
     for alg in allAlgs:
         pe.changeActiveProcessor(alg)
@@ -37,15 +38,14 @@ def test_algs_working(app, vertsPlugin):
 @pytest.mark.smallimage
 def test_disable_top_stages(app, vertsPlugin):
     mImg = app.mainImage
-    pe = vertsPlugin.procEditor
-    oldProc = pe.currentProcessor.algName
+    pe = vertsPlugin.processEditor
+    oldProc = pe.currentProcessor.title()
     mImg.shapeCollection.sigShapeFinished.emit(imageCornerVertices(app.mainImage.image))
     for name in pe.collection.topProcesses:
-        proc = pe.collection.parseProcessName(name)
+        proc: PipelineParameter = pe.collection.parseProcessName(name)
         pe.changeActiveProcessor(proc, saveBeforeChange=False)
-        for stage in proc.stagesFlattened:
-            if stage.allowDisable and isinstance(stage, ImageProcess):
-                pe.currentProcessor.setStageEnabled([stage.name], False)
+        for stage in proc:  # type: ActionGroupParameter
+            stage.setOpts(enabled=False)
         # Some exceptions may occur in the processor, this is fine since behavior might
         # be undefined
         with warnings.catch_warnings():

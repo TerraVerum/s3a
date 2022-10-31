@@ -7,10 +7,11 @@ from utilitys import NestedProcWrapper, ParamEditorPlugin
 
 from ..constants import PRJ_CONSTS
 from ..parameditors import algcollection
+from ..processing import PipelineParameter
 
 
 class ProcessorPlugin(ParamEditorPlugin):
-    procEditor: algcollection.AlgParamEditor = None
+    processEditor: algcollection.AlgorithmEditor = None
     """
     Most table field plugins will use some sort of processor to infer field data.
     This property holds spawned collections. See :class:`XYVerticesPlugin` for
@@ -18,12 +19,12 @@ class ProcessorPlugin(ParamEditorPlugin):
     """
 
     @property
-    def currentProcessor(self):
-        return self.procEditor.currentProcessor
+    def currentProcessor(self) -> PipelineParameter:
+        return self.processEditor.currentProcessor
 
     @currentProcessor.setter
     def currentProcessor(self, newProcessor: Union[str, NestedProcWrapper]):
-        self.procEditor.changeActiveProcessor(newProcessor)
+        self.processEditor.changeActiveProcessor(newProcessor)
 
 
 class TableFieldPlugin(ProcessorPlugin):

@@ -17,7 +17,7 @@ def test_registered_verts_funcs(vertsPlugin, app):
     vertsPlugin.props[PRJ_CONSTS.PROP_REG_APPROX_EPS] = -1
     togray = lambda: vertsPlugin.region.toGrayImage(SAMPLE_SMALL_IMG.shape)
     imsize = np.prod(SAMPLE_SMALL_IMG.shape[:2])
-    editor = vertsPlugin.procEditor
+    editor = vertsPlugin.processEditor
     editor.changeActiveProcessor("Basic Shapes")
     foregroundVertices = XYVertices([[0, 0], [10, 0], [10, 10]])
     vertsPlugin.run(foregroundVertices=foregroundVertices, updateGui=True)
