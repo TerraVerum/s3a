@@ -55,7 +55,7 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         win.sigPluginAdded.connect(self.updateRunnerLimits)
 
     def updateRunnerLimits(self):
-        self.pluginRunnerProc.input.params["plugins"].setLimits(
+        self.pluginRunnerProc.input.parameters["plugins"].setLimits(
             [
                 p.name
                 for p in self.win.classPluginMap.values()

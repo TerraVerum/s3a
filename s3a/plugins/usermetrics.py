@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 from pyqtgraph import SignalProxy
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, isQObjectAlive
-from utilitys import ParamContainer, ParamEditorPlugin
+from qtextras import ParameterContainer
+from utilitys import ParamEditorPlugin
 from utilitys.widgets import ImageViewer
 
 from ..constants import PRJ_CONSTS as CNST
@@ -67,7 +68,7 @@ class UserMetricsPlugin(ParamEditorPlugin):
 
     def __initEditorParams__(self, shared: SharedAppSettings):
         super().__initEditorParams__(shared=shared)
-        self.props = ParamContainer()
+        self.props = ParameterContainer()
         param = shared.generalProperties.registerProp(
             CNST.PROP_COLLECT_USR_METRICS, container=self.props
         )

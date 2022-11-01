@@ -18,10 +18,9 @@ from ..tabledata import TableData
 
 __all__ = ["ComponentTableView", "PopupTableDialog"]
 
-from qtextras import bindInteractorOptions as bind
+from qtextras import bindInteractorOptions as bind, ParameterContainer
 from utilitys import (
     DeferredActionStackMixin as DASM,
-    ParamContainer,
     ParamEditor,
     PrjParam,
 )
@@ -247,7 +246,7 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
         """
         super().__init__(*args)
 
-        self.props = ParamContainer()
+        self.props = ParameterContainer()
         prop = PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE
         self.props[prop] = prop.value
 
@@ -289,8 +288,8 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
         lims = [f.name for f in self.tableData.allFields]
         # Possible for this view to be used without registering visible columns
         # as a parameter
-        if "visibleColumns" in self.props.params:
-            self.props.params["visibleColumns"].setOpts(limits=lims, value=val)
+        if "visibleColumns" in self.props.parameters:
+            self.props.parameters["visibleColumns"].setOpts(limits=lims, value=val)
 
     @bind(visibleColumns=dict(type="checklist", expanded=False))
     def setVisibleColumns(self, visibleColumns: Sequence[str]):

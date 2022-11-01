@@ -10,9 +10,9 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
+from qtextras import ParameterContainer
 from utilitys import (
     DeferredActionStackMixin as DASM,
-    ParamContainer,
     PrjParam,
     ProcessIO,
     RunOpts,
@@ -71,7 +71,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
         self.dock.addEditors([self.processEditor])
 
-        self.props = ParamContainer()
+        self.props = ParameterContainer()
         shared.generalProperties.registerProp(
             CNST.PROP_REG_APPROX_EPS, container=self.props
         )
@@ -110,7 +110,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             newBuff.extend(self.regionBuffer)
             self.regionBuffer = newBuff
 
-        mainBufSize = win.props.params["maxLength"]
+        mainBufSize = win.props.parameters["maxLength"]
         mainBufSize.sigValueChanged.connect(resetRegBuff)
 
         funcLst = [

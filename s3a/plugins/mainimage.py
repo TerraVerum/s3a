@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING
 
 import cv2 as cv
 import numpy as np
-from utilitys import ParamContainer, ParamEditorPlugin, RunOpts, fns
+from qtextras import ParameterContainer
+from utilitys import ParamEditorPlugin, RunOpts, fns
 
 from pyqtgraph.parametertree import InteractiveFunction
 from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
@@ -27,7 +28,7 @@ class MainImagePlugin(ParamEditorPlugin):
     win: S3ABase
 
     def __initEditorParams__(self, shared: SharedAppSettings, **kwargs):
-        self.props = ParamContainer()
+        self.props = ParameterContainer()
         shared.generalProperties.registerProp(
             CNST.PROP_MIN_COMP_SZ, container=self.props
         )

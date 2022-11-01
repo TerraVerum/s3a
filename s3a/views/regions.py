@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
-from qtextras import bindInteractorOptions as bind
-from utilitys import DeferredActionStackMixin as DASM, ParamContainer, PrjParam, fns
+from qtextras import bindInteractorOptions as bind, ParameterContainer
+from utilitys import DeferredActionStackMixin as DASM, PrjParam, fns
 
 from .clickables import BoundScatterPlot
 from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS as RTF
@@ -60,6 +60,8 @@ def makeMultiRegionDf(
 
 class MultiRegionPlot(BoundScatterPlot):
     __groupingName__ = PRJ_CONSTS.CLS_MULT_REG_PLT.name
+    # Compatibility with non-interactive plot mode for ComponentController
+    props = ParameterContainer(penWidth=0)
 
     def __init__(self, parent=None, disableMouseClick=False):
         super().__init__(size=1, pxMode=False)
@@ -326,7 +328,7 @@ class VertexDefinedImage(DASM, pg.ImageItem):
 
     def __init__(self):
         super().__init__()
-        self.props = ParamContainer()
+        self.props = ParameterContainer()
         for prop in PRJ_CONSTS.SCHEME_REG_FILL_COLOR, PRJ_CONSTS.SCHEME_REG_VERT_COLOR:
             self.props[prop] = pg.mkColor(prop.value)
 

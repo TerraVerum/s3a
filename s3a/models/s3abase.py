@@ -9,11 +9,11 @@ from warnings import warn
 import numpy as np
 import pandas as pd
 from pyqtgraph.Qt import QtCore, QtWidgets
+from qtextras import ParameterContainer
 from utilitys import (
     ActionStack,
     DeferredActionStackMixin as DASM,
     EditorPropsMixin,
-    ParamContainer,
     ParamEditor,
     ParamEditorDockGrouping,
     ParamEditorPlugin,
@@ -80,7 +80,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow):
     def __init__(self, parent=None, **startupSettings):
         super().__init__(parent)
 
-        self.props = ParamContainer()
+        self.props = ParameterContainer()
         self.sharedAttrs.generalProperties.registerProps(
             [PRJ_CONSTS.EXP_ONLY_VISIBLE, PRJ_CONSTS.INCLUDE_FNAME_PATH],
             container=self.props,

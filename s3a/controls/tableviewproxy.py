@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from utilitys import DeferredActionStackMixin as DASM, ParamContainer, RunOpts
+from qtextras import ParameterContainer
+from utilitys import DeferredActionStackMixin as DASM
 from utilitys.processing import AtomicProcess, ProcessIO
 
 from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
@@ -28,7 +29,7 @@ class ComponentSorterFilter(QtCore.QSortFilterProxyModel):
 
     def __init__(self, componentManager: ComponentManager, parent=None):
         super().__init__(parent)
-        self.props = ParamContainer()
+        self.props = ParameterContainer()
         self.props[PRJ_CONSTS.PROP_VERT_SORT_BHV] = PRJ_CONSTS.PROP_VERT_SORT_BHV.value
         self.setSourceModel(componentManager)
         # TODO: Move code for filtering into the proxy too. It will be more efficient and
@@ -105,7 +106,7 @@ class ComponentController(DASM, QtCore.QObject):
         parent=None,
     ):
         super().__init__(parent)
-        self.props = ParamContainer()
+        self.props = ParameterContainer()
         for prop in PRJ_CONSTS.PROP_SCALE_PEN_WIDTH, PRJ_CONSTS.PROP_FIELD_INFO_ON_SEL:
             self.props[prop] = prop.value
 
@@ -310,7 +311,7 @@ class ComponentController(DASM, QtCore.QObject):
     def _reflectFieldsChanged(self):
         fields = self.tableData.allFields
         # TODO: Filter out non-viable field types
-        self.props.params["labelColumn"].setLimits([f.name for f in fields])
+        self.props.parameters["labelColumn"].setLimits([f.name for f in fields])
 
         self.redrawComponents()
 
