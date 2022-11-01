@@ -13,7 +13,7 @@ from ..tabledata import TableData
 
 __all__ = ["ComponentManager", "ComponentTableModel"]
 
-from utilitys import EditorPropsMixin, fns
+from utilitys import fns
 from utilitys.misc import DeferredActionStackMixin as DASM
 
 if TYPE_CHECKING:
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 Signal = QtCore.Signal
 
 
-class ComponentTableModel(DASM, EditorPropsMixin, QtCore.QAbstractTableModel):
+class ComponentTableModel(DASM, QtCore.QAbstractTableModel):
     # Emits 4-element dict: Deleted comp ids, changed comp ids, added comp ids,
     # renamed indexes. Renaming is useful when the new id for an added component should
     # be propagated. "-1" new index indicates that component was deleted (or never

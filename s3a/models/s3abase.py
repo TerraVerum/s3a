@@ -140,7 +140,9 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         self.hasUnsavedChanges = False
         self.sourceImagePath: Optional[Path] = None
 
-        self.appStateEditor = AppStateEditor(self, name="App State Editor")
+        self.appStateEditor = AppStateEditor(
+            self.sharedAttrs.quickLoader, self, name="App State Editor"
+        )
 
         # -----
         # INTERFACE WITH QUICK LOADER / PLUGINS

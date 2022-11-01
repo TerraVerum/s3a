@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING
 
 import cv2 as cv
 import numpy as np
-from utilitys import ParamContainer, ParamEditorPlugin
+from utilitys import ParamContainer, ParamEditorPlugin, RunOpts
 
 from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
 from ..structures import ComplexXYVertices, XYVertices
+from ..views.rois import PointROI
 
 if TYPE_CHECKING:
     from ..models.s3abase import S3ABase
@@ -20,11 +21,20 @@ class MainImagePlugin(ParamEditorPlugin):
     name = __groupingName__ = "Application"
     _makeMenuShortcuts = False
     tableData: TableData
+    win: S3ABase
 
     def __initEditorParams__(self, shared: SharedAppSettings, **kwargs):
         self.props = ParamContainer()
         shared.generalProperties.registerProp(
             CNST.PROP_MIN_COMP_SZ, container=self.props
+        )
+        shared.colorScheme.registerFunc(
+            self.win.mainImage.updateGridScheme, runOpts=RunOpts.ON_CHANGED
+        )
+        shared.colorScheme.registerFunc(
+            PointROI.updateRadius,
+            name="Point ROI Features",
+            runOpts=RunOpts.ON_CHANGED,
         )
         super().__initEditorParams__(shared=shared, **kwargs)
         self._cachedRegionIntersection = False

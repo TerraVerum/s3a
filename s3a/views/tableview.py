@@ -13,21 +13,20 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from ..compio.helpers import deserialize, serialize
 from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
 from ..models.tablemodel import ComponentManager
-from ..shared import SharedAppSettings
 from ..structures import TwoDArr
 from ..tabledata import TableData
 
 __all__ = ["ComponentTableView", "PopupTableDialog"]
 
+from qtextras import bindInteractorOptions as bind
 from utilitys import (
     DeferredActionStackMixin as DASM,
-    EditorPropsMixin,
     ParamContainer,
     ParamEditor,
     PrjParam,
-    RunOpts,
 )
 from utilitys.params.pgregistered import PgParamDelegate, PgPopupDelegate
+
 
 Signal = QtCore.Signal
 
@@ -229,31 +228,12 @@ class PopupTableDialog(QtWidgets.QDialog):
         super().reject()
 
 
-class ComponentTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
+class ComponentTableView(DASM, QtWidgets.QTableView):
     __groupingName__ = "Component Table"
     """
     Table for displaying :class:`ComponentManager` data.
     """
     sigSelectionChanged = Signal(object)
-
-    def __initEditorParams__(self, shared: SharedAppSettings):
-        self.props = props = ParamContainer()
-        shared.generalProperties.registerProp(
-            PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE, container=props
-        )
-
-        self.toolsEditor = ParamEditor.buildClsToolsEditor(
-            type(self), name="Component Table Tools"
-        )
-
-        proc, params = shared.generalProperties.registerFunc(
-            self.setVisibleColumns,
-            runOpts=RunOpts.ON_CHANGED,
-            nest=False,
-            returnParam=True,
-            visibleColumns=[],
-        )
-        props["visibleColumns"] = params.child("visibleColumns")
 
     def __init__(self, *args, minimal=False):
         """
@@ -266,6 +246,14 @@ class ComponentTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
             table with context menu options. Otherwise, only contains minimal features.
         """
         super().__init__(*args)
+
+        self.props = ParamContainer()
+        prop = PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE
+        self.props[prop] = prop.value
+
+        self.toolsEditor = ParamEditor.buildClsToolsEditor(
+            type(self), name="Component Table Tools"
+        )
 
         self.setStyleSheet(
             "QTableView { selection-color: white; selection-background-color: #0078d7; }"
@@ -299,17 +287,15 @@ class ComponentTableView(DASM, EditorPropsMixin, QtWidgets.QTableView):
                 val.append(name)
             lims.append(name)
         lims = [f.name for f in self.tableData.allFields]
-        self.props.params["visibleColumns"].setOpts(limits=lims, value=val)
+        # Possible for this view to be used without registering visible columns
+        # as a parameter
+        if "visibleColumns" in self.props.params:
+            self.props.params["visibleColumns"].setOpts(limits=lims, value=val)
 
+    @bind(visibleColumns=dict(type="checklist", expanded=False))
     def setVisibleColumns(self, visibleColumns: Sequence[str]):
         """
         Determines which columns to show. All unspecified columns will be hidden.
-
-        Parameters
-        ----------
-        visibleColumns
-            pType: checklist
-            expanded: False
         """
         for ii, col in enumerate(self.manager.columnTitles):
             self.setColumnHidden(ii, col not in visibleColumns)

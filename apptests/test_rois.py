@@ -4,20 +4,17 @@ import numpy as np
 import pyqtgraph as pg
 import pytest
 from pyqtgraph.Qt import QtCore, QtGui
-from utilitys import EditorPropsMixin
 
 from s3a import XYVertices
 from s3a.constants import PRJ_CONSTS
-from s3a.shared import SharedAppSettings
 from s3a.views.imageareas import MainImage
 from s3a.views.rois import SHAPE_ROI_MAPPING
 
 shapes = tuple(SHAPE_ROI_MAPPING.keys())
-with EditorPropsMixin.setEditorPropertyOpts(shared=SharedAppSettings()):
-    editableImg = MainImage(
-        drawShapes=shapes,
-        drawActions=(PRJ_CONSTS.DRAW_ACT_SELECT,),
-    )
+editableImg = MainImage(
+    drawShapes=shapes,
+    drawActions=(PRJ_CONSTS.DRAW_ACT_SELECT,),
+)
 clctn = editableImg.shapeCollection
 
 

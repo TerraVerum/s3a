@@ -4,13 +4,7 @@ from typing import Any, Callable, Collection, Sequence, Union
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from utilitys import (
-    DeferredActionStackMixin as DASM,
-    EditorPropsMixin,
-    ParamEditor,
-    PrjParam,
-    RunOpts,
-)
+from utilitys import DeferredActionStackMixin as DASM, ParamEditor, PrjParam
 from utilitys.widgets import ButtonCollection, ImageViewer
 
 from .clickables import RightPanViewBox
@@ -22,15 +16,13 @@ from ..structures import XYVertices
 
 __all__ = ["MainImage"]
 
-from ..shared import SharedAppSettings
-
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
 
 DrawActFn = Union[Callable[[XYVertices, PrjParam], Any], Callable[[XYVertices], Any]]
 
 
-class MainImage(DASM, EditorPropsMixin, ImageViewer):
+class MainImage(DASM, ImageViewer):
     sigShapeFinished = Signal(object, object)
     """
     (XYVertices, PrjParam) emitted when a shape is finished
@@ -40,11 +32,6 @@ class MainImage(DASM, EditorPropsMixin, ImageViewer):
 
     sigDrawActionChanged = Signal(object)
     """New draw action (PrjParam)"""
-
-    def __initEditorParams__(self, shared: SharedAppSettings):
-        shared.colorScheme.registerFunc(
-            self.updateGridScheme, runOpts=RunOpts.ON_CHANGED
-        )
 
     def __init__(
         self,

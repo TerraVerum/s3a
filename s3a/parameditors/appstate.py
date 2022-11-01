@@ -1,25 +1,26 @@
+from __future__ import annotations
+
 import warnings
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Callable, Dict, List, Union, TYPE_CHECKING
 
 import pandas as pd
 from pyqtgraph.parametertree import Parameter
-from utilitys import EditorPropsMixin, ParamEditor
+from utilitys import ParamEditor
 from utilitys.fns import attemptFileLoad, serAsFrame
 
 from ..constants import APP_STATE_DIR
 from ..generalutils import hierarchicalUpdate, safeCallFunction, safeCallFunctionList
 from ..logger import getAppLogger
-from ..shared import SharedAppSettings
 from ..structures import FilePath
 
+if TYPE_CHECKING:
+    from .quickloader import QuickLoaderEditor
 
-class AppStateEditor(EditorPropsMixin, ParamEditor):
-    def __initEditorParams__(self, shared: SharedAppSettings):
-        self.quickLoader = shared.quickLoader
-
+class AppStateEditor(ParamEditor):
     def __init__(
         self,
+        quickLoader: QuickLoaderEditor = None,
         parent=None,
         paramList: List[Dict] = None,
         saveDir: FilePath = APP_STATE_DIR,
@@ -29,6 +30,7 @@ class AppStateEditor(EditorPropsMixin, ParamEditor):
     ):
         # TODO: Add params to choose which features are saved, etc.
         super().__init__(parent, paramList, saveDir, fileType, name, topTreeChild)
+        self.quickLoader = quickLoader
         self.stateFuncsDf = pd.DataFrame(
             columns=["importFunction", "exportFunction", "required"]
         )

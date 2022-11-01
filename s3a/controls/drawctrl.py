@@ -2,25 +2,16 @@ from typing import Collection, Dict
 
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
-from utilitys import EditorPropsMixin, RunOpts
 
-from ..shared import SharedAppSettings
 from ..structures import PrjParam, XYVertices
-from ..views.rois import SHAPE_ROI_MAPPING, PlotDataROI, PointROI
+from ..views.rois import SHAPE_ROI_MAPPING, PlotDataROI
 
 __all__ = ["RoiCollection"]
 
 
-class RoiCollection(EditorPropsMixin, QtCore.QObject):
+class RoiCollection(QtCore.QObject):
     # Signal(ExtendedROI)
     sigShapeFinished = QtCore.Signal(object)  # roiVertices : XYVertices
-
-    def __initEditorParams__(self, shared: SharedAppSettings):
-        shared.colorScheme.registerFunc(
-            PointROI.updateRadius,
-            name="Point ROI Features",
-            runOpts=RunOpts.ON_CHANGED,
-        )
 
     def __init__(
         self, allowableShapes: Collection[PrjParam] = (), parent: pg.GraphicsView = None

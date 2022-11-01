@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from ..models.s3abase import S3ABase
     from ..tabledata import TableData
 
+
 class CompTablePlugin(ParamEditorPlugin):
     name = "Component Table"
     win: S3ABase
@@ -19,17 +20,25 @@ class CompTablePlugin(ParamEditorPlugin):
         shared.generalProperties.registerProp(
             CNST.PROP_VERT_SORT_BHV, container=self.win.sortFilterProxy.props
         )
-
         shared.generalProperties.registerProps(
             [CNST.PROP_SCALE_PEN_WIDTH, CNST.PROP_FIELD_INFO_ON_SEL],
             container=self.win.componentController.props,
         )
-
         shared.colorScheme.registerFunc(
             self.win.componentController.updateLabelColumn,
             runOpts=RunOpts.ON_CHANGED,
             nest=False,
             container=self.win.componentController.props,
+        )
+        shared.generalProperties.registerProp(
+            CNST.PROP_SHOW_TBL_ON_COMP_CREATE, container=self.win.tableView.props
+        )
+        shared.generalProperties.registerFunc(
+            self.win.tableView.setVisibleColumns,
+            runOpts=RunOpts.ON_CHANGED,
+            nest=False,
+            returnParam=True,
+            visibleColumns=[],
         )
 
     def attachWinRef(self, win: S3ABase):
