@@ -39,7 +39,7 @@ from ..views.tableview import ComponentTableView
 __all__ = ["S3ABase"]
 
 
-class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
+class S3ABase(DASM, QtWidgets.QMainWindow):
     """
     Top-level widget for producing component bounding regions from an input image.
     """
@@ -66,13 +66,6 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
         obj.sharedAttrs = newAttrs
         return obj
 
-    def __initEditorParams__(self, shared: SharedAppSettings):
-        self.props = ParamContainer()
-        shared.generalProperties.registerProps(
-            [PRJ_CONSTS.EXP_ONLY_VISIBLE, PRJ_CONSTS.INCLUDE_FNAME_PATH],
-            container=self.props,
-        )
-
     @staticmethod
     def createScope(scope: ExitStack = None, returnAttributes=False):
         if scope is None:
@@ -86,6 +79,12 @@ class S3ABase(DASM, EditorPropsMixin, QtWidgets.QMainWindow):
 
     def __init__(self, parent=None, **startupSettings):
         super().__init__(parent)
+
+        self.props = ParamContainer()
+        self.sharedAttrs.generalProperties.registerProps(
+            [PRJ_CONSTS.EXP_ONLY_VISIBLE, PRJ_CONSTS.INCLUDE_FNAME_PATH],
+            container=self.props,
+        )
 
         self.classPluginMap: Dict[Type[ParamEditorPlugin], ParamEditorPlugin] = {}
         """
