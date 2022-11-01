@@ -212,7 +212,7 @@ class PRJ_CONSTS:
         "Component Selection Behavior",
         "Entire Component",
         "list",
-        limits=["Boundary Only", "Entire Component"],
+        limits={"Boundary Only": True, "Entire Component": False},
         helpText="When `Boundary Only`, components are selected when clicking on "
         "their boundaries.\nWhen `Entire Component`, clicking anywhere within "
         "the component will select it",

@@ -82,6 +82,9 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
             container=self.props,
             labelColormap=dict(limits=fns.listAllPgColormaps() + ["None"]),
         )
+        shared.generalProperties.registerFunc(
+            self.setBoundaryOnly, runOpts=RunOpts.ON_CHANGED, nest=False
+        )
         setattr(self, "updateColors", proc)
 
     def __init__(self, parent=None, disableMouseClick=False):
@@ -107,6 +110,9 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
             # signal won't get code that runs but never triggers
             # self.centroidPlts.sigClicked = None
             self.sigClicked = None
+
+    def setBoundaryOnly(self, boundaryOnly=False):
+        self.boundaryOnly = boundaryOnly
 
     def resetRegionList(
         self,

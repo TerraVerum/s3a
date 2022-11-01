@@ -5,12 +5,7 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from utilitys import (
-    DeferredActionStackMixin as DASM,
-    EditorPropsMixin,
-    ParamContainer,
-    RunOpts,
-)
+from utilitys import DeferredActionStackMixin as DASM, ParamContainer, RunOpts
 from utilitys.processing import AtomicProcess, ProcessIO
 
 from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
@@ -28,17 +23,13 @@ Signal = QtCore.Signal
 QISM = QtCore.QItemSelectionModel
 
 
-class ComponentSorterFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
+class ComponentSorterFilter(QtCore.QSortFilterProxyModel):
     __groupingName__ = "Component Table"
-
-    def __initEditorParams__(self, shared: SharedAppSettings):
-        self.props = ParamContainer()
-        shared.generalProperties.registerProp(
-            PRJ_CONSTS.PROP_VERT_SORT_BHV, container=self.props
-        )
 
     def __init__(self, componentManager: ComponentManager, parent=None):
         super().__init__(parent)
+        self.props = ParamContainer()
+        self.props[PRJ_CONSTS.PROP_VERT_SORT_BHV] = PRJ_CONSTS.PROP_VERT_SORT_BHV.value
         self.setSourceModel(componentManager)
         # TODO: Move code for filtering into the proxy too. It will be more efficient and
         #  easier to generalize than the current solution in ComponentController.
@@ -101,32 +92,10 @@ class ComponentSorterFilter(EditorPropsMixin, QtCore.QSortFilterProxyModel):
         )
 
 
-class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
+class ComponentController(DASM, QtCore.QObject):
     sigComponentsSelected = Signal(object)
 
     __groupingName__ = "Main Image"
-
-    def __initEditorParams__(self, shared: SharedAppSettings):
-        self.props = ParamContainer()
-        boundaryOnly, _ = shared.generalProperties.registerProps(
-            [PRJ_CONSTS.PROP_COMP_SEL_BHV, PRJ_CONSTS.PROP_FIELD_INFO_ON_SEL],
-            container=self.props,
-        )
-
-        def _onChange(param, val):
-            self.regionPlot.boundaryOnly = val
-
-        boundaryOnly.sigValueChanged.connect(_onChange)
-
-        shared.colorScheme.registerFunc(
-            self.updateLabelColumn,
-            runOpts=RunOpts.ON_CHANGED,
-            nest=False,
-            container=self.props,
-        )
-        shared.generalProperties.registerProp(
-            PRJ_CONSTS.PROP_SCALE_PEN_WIDTH, container=self.props
-        )
 
     def __init__(
         self,
@@ -136,6 +105,10 @@ class ComponentController(DASM, EditorPropsMixin, QtCore.QObject):
         parent=None,
     ):
         super().__init__(parent)
+        self.props = ParamContainer()
+        for prop in PRJ_CONSTS.PROP_SCALE_PEN_WIDTH, PRJ_CONSTS.PROP_FIELD_INFO_ON_SEL:
+            self.props[prop] = prop.value
+
         self.tableData = componentManager.tableData
         self._mainImageArea = mainImage
         self._filter = self.tableData.filter
