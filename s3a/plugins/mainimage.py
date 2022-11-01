@@ -5,10 +5,13 @@ from typing import TYPE_CHECKING
 
 import cv2 as cv
 import numpy as np
-from utilitys import ParamContainer, ParamEditorPlugin, RunOpts
+from utilitys import ParamContainer, ParamEditorPlugin, RunOpts, fns
 
+from pyqtgraph.parametertree import InteractiveFunction
 from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
+from ..generalutils import ClassInteractiveFunction
 from ..structures import ComplexXYVertices, XYVertices
+from ..views.regions import MultiRegionPlot
 from ..views.rois import PointROI
 
 if TYPE_CHECKING:
@@ -36,6 +39,25 @@ class MainImagePlugin(ParamEditorPlugin):
             name="Point ROI Features",
             runOpts=RunOpts.ON_CHANGED,
         )
+
+        if not isinstance(MultiRegionPlot.updateColors, InteractiveFunction):
+            MultiRegionPlot.updateColors = ClassInteractiveFunction(
+                MultiRegionPlot.updateColors
+            )
+            MultiRegionPlot.setBoundaryOnly = ClassInteractiveFunction(
+                MultiRegionPlot.setBoundaryOnly
+            )
+            shared.colorScheme.registerFunc(
+                MultiRegionPlot.updateColors,
+                runOpts=RunOpts.ON_CHANGED,
+                nest=False,
+                container=MultiRegionPlot.props,
+                labelColormap=dict(limits=fns.listAllPgColormaps() + ["None"]),
+            )
+            shared.generalProperties.registerFunc(
+                MultiRegionPlot.setBoundaryOnly, runOpts=RunOpts.ON_CHANGED, nest=False
+            )
+
         super().__initEditorParams__(shared=shared, **kwargs)
         self._cachedRegionIntersection = False
 

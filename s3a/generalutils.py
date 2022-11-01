@@ -11,10 +11,11 @@ import cv2 as cv
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
+from pyqtgraph.parametertree.interactive import InteractiveFunction
 from pkg_resources import parse_version
 from skimage import __version__ as _skimage_version, io, transform as trans
 from skimage.exposure import exposure
-from utilitys import PrjParam, ProcessStage, fns
+from utilitys import PrjParam, fns
 
 # Needs to be visible outside this file
 # noinspection PyUnresolvedReferences
@@ -969,3 +970,11 @@ def simpleCache(func):
         return last_result
 
     return _cached
+
+class ClassInteractiveFunction(InteractiveFunction):
+    def __get__(self, instance, owner=None):
+        if instance is None:
+            self.extra.pop("self", None)
+            return self
+        self.extra["self"] = instance
+        return self

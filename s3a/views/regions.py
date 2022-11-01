@@ -6,14 +6,8 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
-from utilitys import (
-    DeferredActionStackMixin as DASM,
-    EditorPropsMixin,
-    ParamContainer,
-    PrjParam,
-    RunOpts,
-    fns,
-)
+from qtextras import bindInteractorOptions as bind
+from utilitys import DeferredActionStackMixin as DASM, ParamContainer, PrjParam, fns
 
 from .clickables import BoundScatterPlot
 from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS as RTF
@@ -24,7 +18,6 @@ __all__ = ["MultiRegionPlot", "VertexDefinedImage", "RegionMoverPlot"]
 
 from .rois import ROIManipulator
 from ..compio import defaultIo
-from ..shared import SharedAppSettings
 
 Signal = QtCore.Signal
 
@@ -65,32 +58,12 @@ def makeMultiRegionDf(
     return outDf
 
 
-class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
+class MultiRegionPlot(BoundScatterPlot):
     __groupingName__ = PRJ_CONSTS.CLS_MULT_REG_PLT.name
-
-    def __initEditorParams__(self, shared: SharedAppSettings = None):
-        self.props = ParamContainer()
-        # Allow working without centralized color settings if needed
-        if shared is None:
-            return
-        # Use setattr so pycharm autocomplete doesn't forget arg hints
-        proc = shared.colorScheme.registerFunc(
-            self.updateColors,
-            runOpts=RunOpts.ON_CHANGED,
-            nest=False,
-            ignoreKeys=["hideFocused"],
-            container=self.props,
-            labelColormap=dict(limits=fns.listAllPgColormaps() + ["None"]),
-        )
-        shared.generalProperties.registerFunc(
-            self.setBoundaryOnly, runOpts=RunOpts.ON_CHANGED, nest=False
-        )
-        setattr(self, "updateColors", proc)
 
     def __init__(self, parent=None, disableMouseClick=False):
         super().__init__(size=1, pxMode=False)
-        # Wrapping in atomic process means when users make changes to properties,
-        # these are maintained when calling the function internally with no parameters
+
         self.setParent(parent)
         self.setZValue(50)
         self.regionData = makeMultiRegionDf(0)
@@ -261,8 +234,7 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
 
     def _createPlotForHiddenRegions(self, hiddenDf):
         symbLut = self.createSybolLut(hiddenDf)
-        with type(self).setEditorPropertyOpts(shared=None):
-            checkerPlot = BoundScatterPlot()
+        checkerPlot = BoundScatterPlot()
 
         plotRegions = np.vstack(symbLut["location"])
         checkerPlot.setData(
@@ -347,23 +319,17 @@ class MultiRegionPlot(EditorPropsMixin, BoundScatterPlot):
         return list(bounds[:, ax])
 
 
-class VertexDefinedImage(DASM, EditorPropsMixin, pg.ImageItem):
+class VertexDefinedImage(DASM, pg.ImageItem):
     sigRegionReverted = Signal(object)  # new GrayImg
 
     __groupingName__ = "Focused Image Graphics"
 
-    def __initEditorParams__(self, shared: SharedAppSettings):
-        self.props = ParamContainer()
-        shared.colorScheme.registerProps(
-            [PRJ_CONSTS.SCHEME_REG_FILL_COLOR, PRJ_CONSTS.SCHEME_REG_VERT_COLOR],
-            container=self.props,
-        )
-        shared.colorScheme.sigChangesApplied.connect(
-            lambda: self.setImage(lut=self.getLUTFromScheme())
-        )
-
     def __init__(self):
         super().__init__()
+        self.props = ParamContainer()
+        for prop in PRJ_CONSTS.SCHEME_REG_FILL_COLOR, PRJ_CONSTS.SCHEME_REG_VERT_COLOR:
+            self.props[prop] = pg.mkColor(prop.value)
+
         self.verts = ComplexXYVertices()
 
     def embedMaskInImg(self, toEmbedShape: Tuple[int, int]):
