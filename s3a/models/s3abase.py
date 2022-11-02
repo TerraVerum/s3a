@@ -589,7 +589,9 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
             parser = argparse.ArgumentParser("S3A")
         ql = self.appStateEditor.quickLoader
         for editor in ql.listModel.uniqueEditors:
-            states = ql.listModel.getParamStateFiles(editor.saveDir, editor.fileType)
+            states = ql.listModel.getParameterStateFiles(
+                editor.stateManager.directory, editor.stateManager.suffix
+            )
             formatted = [f'"{s}"' for s in states]
             parser.add_argument(
                 f'--{editor.name.lower().replace(" ", "")}', choices=formatted

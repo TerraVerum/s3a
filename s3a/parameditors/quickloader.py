@@ -1,70 +1,69 @@
+import functools
 import warnings
 from pathlib import Path
 from typing import List, Union
 
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.Qt import QtCore, QtWidgets
-from utilitys import ParamEditor, ParamEditorDockGrouping, widgets as uw
-from utilitys.params.pgregistered import ShortcutKeySeqParameter as ShcKeySeq
-from utilitys.typeoverloads import FilePath
-
+from qtextras import (
+    ParameterEditor,
+    PopupLineEditor,
+    getParameterChild,
+    attemptFileLoad,
+)
+from . import MetaTreeParameterEditor
 from ..constants import QUICK_LOAD_DIR
 from ..generalutils import lowerNoSpaces
 from ..logger import getAppLogger
 
 
 class EditorListModel(QtCore.QAbstractListModel):
-    def __init__(self, editorList: List[ParamEditor], parent: QtWidgets.QWidget = None):
+    def __init__(
+        self, editorList: List[ParameterEditor], parent: QtWidgets.QWidget = None
+    ):
         super().__init__(parent)
         self.displayFormat = "{stateName} | {editor.name}"
-        self.paramStatesLst: List[str] = []
-        self.editorList: List[ParamEditor] = []
-        self.uniqueEditors: List[ParamEditor] = []
+        self.parameterStates: List[str] = []
+        self.editorList: List[ParameterEditor] = []
+        self.uniqueEditors: List[ParameterEditor] = []
 
         self.addEditors(editorList)
 
-    def addEditors(self, editorList: List[ParamEditor]):
+    def addEditors(self, editorList: List[ParameterEditor]):
         editorList = [
             e
             for e in editorList
-            if e not in self.uniqueEditors and e.saveDir is not None
+            if e not in self.uniqueEditors and e.stateManager.directory is not None
         ]
         self.uniqueEditors.extend(editorList)
         self.layoutAboutToBeChanged.emit()
         for editor in editorList:
-            for stateName in self.getParamStateFiles(editor.saveDir, editor.fileType):
-                self.paramStatesLst.append(stateName)
+            for stateName in self.getParameterStateFiles(
+                editor.stateManager.directory, editor.stateManager.suffix
+            ):
+                self.parameterStates.append(stateName)
                 self.editorList.append(editor)
-            editor.sigParamStateCreated.connect(
+            editor.stateManager.signals.created.connect(
                 lambda name, e=editor: self.addOptionForEditor(e, name)
             )
         self.layoutChanged.emit()
 
-    def addOptionForEditor(self, editor: ParamEditor, name: str):
+    def addOptionForEditor(self, editor: ParameterEditor, name: str):
         if (
             self.displayFormat.format(editor=editor, stateName=name)
             in self.displayedData
         ):
             return
         self.layoutAboutToBeChanged.emit()
-        self.paramStatesLst.append(name)
+        self.parameterStates.append(name)
         self.editorList.append(editor)
         self.layoutChanged.emit()
-
-    # def updateEditorOpts(self, editor: PrjParamEditor):
-    #   self.layoutAboutToBeChanged.emit()
-    #   for ii in range(len(self.paramStatesLst) - 1, -1, -1):
-    #     if self.editorList[ii] is editor:
-    #       del self.paramStatesLst[ii]
-    #       del self.editorList[ii]
-    #   self.addEditors([editor])
-    #   self.layoutChanged.emit()
 
     def data(
         self, index: QtCore.QModelIndex, role: int = QtCore.Qt.ItemDataRole.DisplayRole
     ):
         row = index.row()
-        paramState = self.paramStatesLst[row]
+        paramState = self.parameterStates[row]
         editor = self.editorList[row]
         if role == QtCore.Qt.ItemDataRole.DisplayRole:
             return self.displayFormat.format(stateName=paramState, editor=editor)
@@ -79,62 +78,49 @@ class EditorListModel(QtCore.QAbstractListModel):
     @property
     def displayedData(self):
         return [
-            self.displayFormat.format(stateName=stng, editor=edtr)
-            for stng, edtr in zip(self.paramStatesLst, self.editorList)
+            self.displayFormat.format(stateName=name, editor=editor)
+            for name, editor in zip(self.parameterStates, self.editorList)
         ]
 
     def rowCount(self, paren=QtCore.QModelIndex()) -> int:
-        return len(self.paramStatesLst)
+        return len(self.parameterStates)
 
     def headerData(self, section, orientation, role=QtCore.Qt.ItemDataRole.DisplayRole):
         return "Parameter State List"
 
     @staticmethod
-    def getParamStateFiles(stateDir: Path, fileExt: str) -> List[str]:
-        if stateDir is None:
+    def getParameterStateFiles(directory: Path, suffix: str) -> List[str]:
+        if directory is None:
             return []
-        files = stateDir.glob(f"*.{fileExt}")
+        files = directory.glob(f"*{suffix}")
         return [file.stem for file in files]
 
 
-def _addRmOption(param: Parameter):
-    item = next(iter(param.items.keys()))
-
-    try:
-        menu: QtWidgets.QMenu = item.contextMenu
-    except AttributeError:  # If the menu doesn't exist yet
-        menu = QtWidgets.QMenu()
-        item.contextMenu = menu
-    existingActs = [act.text() for act in menu.actions()]
-    if "Remove" not in existingActs:
-        item.contextMenu.addAction("Remove").triggered.connect(item.requestRemove)
-
-
-class QuickLoaderEditor(ParamEditor):
-    def __init__(self, parent=None, editorList: List[ParamEditor] = None):
-        super().__init__(
-            parent,
-            paramList=[],
-            saveDir=QUICK_LOAD_DIR,
-            fileType="loader",
-            name="Quick Loader",
-        )
+class QuickLoaderEditor(MetaTreeParameterEditor):
+    def __init__(self, editorList: List[ParameterEditor] = None):
         if editorList is None:
             editorList = []
         self.listModel = EditorListModel(editorList, self)
-
-        self.addNewParamState = uw.PopupLineEditor(
+        self.addNewParamState = PopupLineEditor(
             self, self.listModel, clearOnComplete=False
         )
-        self.centralLayout.insertWidget(0, self.addNewParamState)
+
+        super().__init__(
+            name="Quick Loader", directory=QUICK_LOAD_DIR, suffix=".loader"
+        )
 
         # self.addNewParamState.completer().activated.connect(self.addFromLineEdit)
         self.addNewParamState.returnPressed.connect(self.addFromLineEdit)
 
-    def saveParamValues(self, saveName: str = None, paramState: dict = None, **kwargs):
+    def _guiChildren(self) -> list:
+        return [self.addNewParamState, *super()._guiChildren()]
+
+    def saveParameterValues(
+        self, saveName: str = None, parameterState: dict = None, **kwargs
+    ):
         kwargs.pop("includeDefaults", None)
-        return super().saveParamValues(
-            saveName, paramState, **kwargs, includeDefaults=True
+        return super().saveParameterValues(
+            saveName, parameterState, **kwargs, includeDefaults=True
         )
 
     def buildFromStartupParameters(self, startupSource: dict):
@@ -144,15 +130,15 @@ class QuickLoaderEditor(ParamEditor):
         # Ignore case and spacing on input keys
         startupSource = {lowerNoSpaces(kk): vv for kk, vv in startupSource.items()}
 
-        for editor in [self] + self.listModel.uniqueEditors:  # type: ParamEditor
+        for editor in [self] + self.listModel.uniqueEditors:  # type: ParameterEditor
             paramStateInfo: Union[dict, str] = startupSource.get(
                 lowerNoSpaces(editor.name), None
             )
             try:
                 if isinstance(paramStateInfo, dict):
-                    editor.loadParamValues(self.stateName, paramStateInfo)
+                    editor.loadParameterValues(self.stateName, paramStateInfo)
                 elif paramStateInfo is not None:
-                    editor.loadParamValues(paramStateInfo)
+                    editor.loadParameterValues(paramStateInfo)
             except Exception as ex:
                 errSettings.append(f"{editor.name}: {ex}")
         if len(errSettings) > 0:
@@ -163,22 +149,20 @@ class QuickLoaderEditor(ParamEditor):
             )
         return startupSource
 
-    def addDock(self, dock: Union[ParamEditor, ParamEditorDockGrouping]):
-        if isinstance(dock, ParamEditorDockGrouping):
-            self.listModel.addEditors(dock.editors)
-        else:
-            self.listModel.addEditors([dock])
+    def addEditor(self, editor: ParameterEditor):
+        self.listModel.addEditors([editor])
 
-    def loadParamValues(
+    def loadParameterValues(
         self,
-        stateName: Union[str, Path],
+        stateName: Union[str, Path] = None,
         stateDict: dict = None,
         useDefaults=True,
         **kwargs,
     ):
-        stateDict = self._parseStateDict(stateName, stateDict)
+        if stateDict is None:
+            stateDict = attemptFileLoad(self.stateManager.formatFileName(stateName))
         if useDefaults:
-            self.params.clearChildren()
+            self.rootParameter.clearChildren()
         if len(stateDict):
             for editorName, shcOpts in stateDict.items():
                 matches = [
@@ -192,16 +176,9 @@ class QuickLoaderEditor(ParamEditor):
                 editor = matches[0]
                 for state, shcValue in shcOpts.items():
                     self.addActionForEditor(editor, state, shcValue)
-        return super().loadParamValues(
-            stateName, stateDict, useDefaults=False, candidateParams=[], **kwargs
+        return super().loadParameterValues(
+            stateName, stateDict, useDefaults=False, candidateParameters=[]
         )
-
-    def applyChanges(self, newName: FilePath = None, newState: dict = None):
-        super().applyChanges(newName, newState)
-        for grp in self.params.childs:
-            if grp.hasChildren():
-                act: ShcKeySeq = next(iter(grp))
-                act.activate()
 
     def addFromLineEdit(self):
         try:
@@ -221,53 +198,46 @@ class QuickLoaderEditor(ParamEditor):
         # self.addNewParamState.clear()
 
     def addActionForEditor(
-        self, editor: ParamEditor, parameterState: str, shortcut: str = None
+        self, editor: ParameterEditor, parameterState: str, shortcut: str = None
     ):
         """
         Ensures the specified editor shortcut will exist in the quickloader parameter
         tree. The action can either be None (if no shortcut should be defaulted) or the
         starting shortcut value.
         """
-        act = None
-        if editor.name not in self.params.names:
-            curGroup = self.params.addChild(
-                dict(name=editor.name, type="group", removable=True)
-            )
-        else:
-            # Bug: If 'removable' is not specified on construction of the parameter item,
-            # It is not made possible through the context menu. Fix this
-            curGroup = self.params.names[editor.name]
-            _addRmOption(curGroup)
-            if parameterState in curGroup.names:
-                act = curGroup.child(parameterState)
-
-        if (
-            parameterState in curGroup.names
-            and act is not None
-            and act.isActivateConnected
-        ):
-            # Duplicate option, no reason to add, but value might be different
-            act.setValue(shortcut)
-            return
-        curGroup.opts["removable"] = True
-        if act is None:
-            act = ShcKeySeq(
+        act = getParameterChild(
+            self.rootParameter,
+            editor.name,
+            parameterState,
+            groupOpts=dict(removable=True),
+            childOpts=dict(
                 name=parameterState,
                 value=shortcut or "",
                 removable=True,
-                type="shortcutkeyseq",
-            )
-        curGroup.addChild(act)
-
-        act.opts["removable"] = True
-        _addRmOption(act)
-        act.sigActivated.connect(
-            lambda _act: self._safeLoadParamValues(_act, editor, parameterState)
+                type="keysequence",
+            ),
         )
-        act.isActivateConnected = True
+
+        # Ensure the value matches this new action in the event it already existed
+        # Also set `removable` in case this was added through a different execution
+        # path
+        act.setOpts(removable=True, value=shortcut or "")
+        if not (qShortcut := act.opts.get("shortcut")):
+            qShortcut = QtWidgets.QShortcut(
+                act.value(),
+                context=QtCore.Qt.ShortcutContext.ApplicationShortcut,
+            )
+            qShortcut.activated.connect(
+                functools.partial(
+                    self._safeLoadParamValues, act, editor, parameterState
+                )
+            )
+            act.setOpts(shortcut=qShortcut)
+        else:
+            qShortcut.setKey(act.value())
 
     def _safeLoadParamValues(
-        self, action: ShcKeySeq, editor: ParamEditor, paramState: str
+        self, action: Parameter, editor: ParameterEditor, parameterState: str
     ):
         """
         It is possible for the quick loader to refer to a parameter state that no longer
@@ -275,12 +245,14 @@ class QuickLoaderEditor(ParamEditor):
         deleted
         """
         try:
-            editor.loadParamValues(paramState)
+            editor.loadParameterValues(parameterState)
         except FileNotFoundError:
+            action.opts["shortcut"].deleteLater()
+            del action.opts["shortcut"]
             action.remove()
             # Wait until end of process cycle to raise error
             formattedState = self.listModel.displayFormat.format(
-                editor=editor, stateName=paramState
+                editor=editor, stateName=parameterState
             )
             getAppLogger(__name__).critical(
                 f"Attempted to load {formattedState} but the setting was not found."
