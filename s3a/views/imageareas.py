@@ -272,7 +272,6 @@ class MainImage(DASM, ImageViewer):
                 actParam,
                 self.actionAssignment,
                 checkable=True,
-                namePath=(self.__groupingName__,),
                 **registerOpts
             )
 

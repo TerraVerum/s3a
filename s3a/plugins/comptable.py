@@ -26,6 +26,9 @@ class CompTablePlugin(ParamEditorPlugin):
         )
         shared.colorScheme.registerFunc(
             self.win.componentController.updateLabelColumn,
+            labelColumn=dict(
+                type="list", limits=[f.name for f in self.win.tableData.allFields]
+            ),
             runOpts=RunOpts.ON_CHANGED,
             nest=False,
             container=self.win.componentController.props,

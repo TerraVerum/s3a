@@ -11,7 +11,6 @@ from utilitys.processing import AtomicProcess, ProcessIO
 
 from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
 from ..models.tablemodel import ComponentManager
-from ..shared import SharedAppSettings
 from ..structures import ComplexXYVertices, OneDArr, XYVertices
 from ..views.fielddelegates import FieldDisplay
 from ..views.imageareas import MainImage
@@ -201,13 +200,6 @@ class ComponentController(DASM, QtCore.QObject):
     def updateLabelColumn(self, labelColumn=REQD_TBL_FIELDS.ID.name):
         """
         Changes the data column used to label (color) the region plot data
-
-        Parameters
-        ----------
-        labelColumn:
-            New column to use
-            pType: list
-            limits: ['Instance ID'] # Will be updated programmatically
         """
         self.labelColumn = self.tableData.fieldFromName(labelColumn)
         newLblData = self.labelColumn.toNumeric(
@@ -311,7 +303,8 @@ class ComponentController(DASM, QtCore.QObject):
     def _reflectFieldsChanged(self):
         fields = self.tableData.allFields
         # TODO: Filter out non-viable field types
-        self.props.parameters["labelColumn"].setLimits([f.name for f in fields])
+        if "labelColumn" in self.props.parameters:
+            self.props.parameters["labelColumn"].setLimits([f.name for f in fields])
 
         self.redrawComponents()
 
