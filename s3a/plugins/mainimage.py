@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING
 import cv2 as cv
 import numpy as np
 from pyqtgraph.parametertree import InteractiveFunction
-from qtextras import ParameterContainer
-from utilitys import ParamEditorPlugin, RunOpts, fns
+from qtextras import ParameterContainer, RunOptions, fns
 
+from .base import ParameterEditorPlugin
 from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
 from ..generalutils import ClassInteractiveFunction
 from ..structures import ComplexXYVertices, XYVertices
@@ -21,24 +21,23 @@ if TYPE_CHECKING:
     from ..tabledata import TableData
 
 
-class MainImagePlugin(ParamEditorPlugin):
-    name = __groupingName__ = "Application"
+class MainImagePlugin(ParameterEditorPlugin):
     _makeMenuShortcuts = False
     tableData: TableData
     win: S3ABase
 
-    def __initEditorParams__(self, shared: SharedAppSettings, **kwargs):
+    def __initSharedSettings__(self, shared: SharedAppSettings = None, **kwargs):
         self.props = ParameterContainer()
-        shared.generalProperties.registerProp(
+        shared.generalProperties.registerParameter(
             CNST.PROP_MIN_COMP_SZ, container=self.props
         )
-        shared.colorScheme.registerFunc(
-            self.win.mainImage.updateGridScheme, runOpts=RunOpts.ON_CHANGED
+        shared.colorScheme.registerFunction(
+            self.win.mainImage.updateGridScheme, runOptions=RunOptions.ON_CHANGED
         )
-        shared.colorScheme.registerFunc(
+        shared.colorScheme.registerFunction(
             PointROI.updateRadius,
             name="Point ROI Features",
-            runOpts=RunOpts.ON_CHANGED,
+            runOptions=RunOptions.ON_CHANGED,
         )
 
         if not isinstance(MultiRegionPlot.updateColors, InteractiveFunction):
@@ -48,30 +47,29 @@ class MainImagePlugin(ParamEditorPlugin):
             MultiRegionPlot.setBoundaryOnly = ClassInteractiveFunction(
                 MultiRegionPlot.setBoundaryOnly
             )
-            shared.colorScheme.registerFunc(
+            shared.colorScheme.registerFunction(
                 MultiRegionPlot.updateColors,
-                runOpts=RunOpts.ON_CHANGED,
+                runOptions=RunOptions.ON_CHANGED,
                 nest=False,
                 container=MultiRegionPlot.props,
                 labelColormap=dict(limits=fns.listAllPgColormaps() + ["None"]),
             )
-            shared.generalProperties.registerFunc(
-                MultiRegionPlot.setBoundaryOnly, runOpts=RunOpts.ON_CHANGED, nest=False
+            shared.generalProperties.registerFunction(
+                MultiRegionPlot.setBoundaryOnly,
+                runOptions=RunOptions.ON_CHANGED,
+                nest=False,
             )
 
-        super().__initEditorParams__(shared=shared, **kwargs)
-        self._cachedRegionIntersection = False
+        super().__initSharedSettings__(shared=shared, **kwargs)
 
-    def attachWinRef(self, win: S3ABase):
-        self.tableData = win.tableData
-        self._hookupCopier(win)
-        self._hookupDrawActions(win)
-        self._hookupSelectionTools(win)
+    def attachToWindow(self, window: S3ABase):
+        self.tableData = window.tableData
+        self._hookupCopier(window)
+        self._hookupDrawActions(window)
+        self._hookupSelectionTools(window)
 
-        win.mainImage.addTools(self.toolsEditor)
-        # No need for a dropdown menu
-        self.dock = None
-        super().attachWinRef(win)
+        window.mainImage.addTools(self)
+        super().attachToWindow(window)
 
     def _hookupDrawActions(self, win):
         disp = win.componentController
@@ -135,20 +133,22 @@ class MainImagePlugin(ParamEditorPlugin):
             copier.inCopyMode = False
             copier.sigMoveStarted.emit()
 
-        self.registerFunc(startMove, btnOpts=CNST.TOOL_MOVE_REGIONS)
-        self.registerFunc(startCopy, btnOpts=CNST.TOOL_COPY_REGIONS)
+        self.registerFunction(startMove, runActionTemplate=CNST.TOOL_MOVE_REGIONS)
+        self.registerFunction(startCopy, runActionTemplate=CNST.TOOL_COPY_REGIONS)
         copier.sigMoveStopped.connect(win.componentManager.updateFocusedComponent)
 
     def _hookupSelectionTools(self, window):
         disp = window.componentController
-        self.registerFunc(
+        self.registerFunction(
             disp.mergeSelectedComponents,
-            btnOpts=CNST.TOOL_MERGE_COMPS,
-            ignoreKeys=["keepId"],
+            runActionTemplate=CNST.TOOL_MERGE_COMPS,
+            ignores=["keepId"],
         )
-        self.registerFunc(disp.splitSelectedComponents, btnOpts=CNST.TOOL_SPLIT_COMPS)
-        self.registerFunc(
-            disp.removeSelectedComponentOverlap, btnOpts=CNST.TOOL_REM_OVERLAP
+        self.registerFunction(
+            disp.splitSelectedComponents, runActionTemplate=CNST.TOOL_SPLIT_COMPS
+        )
+        self.registerFunction(
+            disp.removeSelectedComponentOverlap, runActionTemplate=CNST.TOOL_REM_OVERLAP
         )
 
     @property
