@@ -1,16 +1,62 @@
 from __future__ import annotations
 
-from typing import Union
+from pathlib import Path
+from typing import Union, TYPE_CHECKING
 
 import pandas as pd
-from utilitys import NestedProcWrapper, ParamEditorPlugin
 
-from ..constants import PRJ_CONSTS
+from pyqtgraph.Qt import QtWidgets
+from qtextras import ParameterEditor, fns
+
+from ..constants import PRJ_CONSTS, MENU_OPTS_DIR
 from ..parameditors import algcollection
 from ..processing import PipelineParameter
 
+if TYPE_CHECKING:
+    from ..views.s3agui import S3A
+    from ..models.tablemodel import ComponentManager
+    from ..shared import SharedAppSettings
 
-class ProcessorPlugin(ParamEditorPlugin):
+_UNSET_NAME = object()
+
+
+class ParameterEditorPlugin(ParameterEditor):
+    window: S3A = None
+    directoryParent: str | None = MENU_OPTS_DIR
+    menuTitle: str = None
+
+    dock: QtWidgets.QDockWidget | None = None
+    menu: QtWidgets.QMenu | None = None
+
+    def __initSharedSettings__(self, shared: SharedAppSettings = None, **kwargs):
+        """
+        Overload this method to add parameters to the editor. This method is called
+        when the plugin is attached to the window.
+        """
+        pass
+
+    def __init__(self, *, name: str = None, directory: str = None, **kwargs):
+        if name is None:
+            name = fns.nameFormatter(self.__class__.__name__.replace("Plugin", ""))
+        if directory is None and self.directoryParent is not None:
+            directory = Path(self.directoryParent) / name
+
+        super().__init__(name=name, directory=directory)
+
+    def attachToWindow(self, window: S3A):
+        self.__initSharedSettings__(shared=window.sharedSettings)
+        self.window = window
+        self.menuTitle = self._resolveMenuTitle(self.name)
+        self.dock, self.menu = self.createWindowDock(window, self.menuTitle)
+
+    def _resolveMenuTitle(self, name: str = None, ensureShortcut=True):
+        name = self.menuTitle or name
+        if ensureShortcut and "&" not in name:
+            name = f"&{name}"
+        return name
+
+
+class ProcessorPlugin(ParameterEditorPlugin):
     processEditor: algcollection.AlgorithmEditor = None
     """
     Most table field plugins will use some sort of processor to infer field data.
@@ -34,6 +80,11 @@ class TableFieldPlugin(ProcessorPlugin):
     This is useful for most table field plugins, since mainImage will hold a reference to 
     the component series that is modified by the plugins.
     """
+    componentManager: ComponentManager = None
+    """
+    Holds a reference to the focused image and set when the s3a reference is set.
+    Offers a convenient way to access component data.
+    """
 
     _active = False
 
@@ -41,26 +92,26 @@ class TableFieldPlugin(ProcessorPlugin):
 
     # @property
     # def parentMenu(self):
-    #   return self.win.tableFieldToolbar
+    #   return self.window.tableFieldToolbar
 
-    def attachWinRef(self, win):
-        super().attachWinRef(win)
-        self.mainImage = win.mainImage
-        self.componentManager = win.componentManager
-        win.sigRegionAccepted.connect(self.acceptChanges)
+    def attachToWindow(self, window: S3A):
+        super().attachToWindow(window)
+        self.mainImage = window.mainImage
+        self.componentManager = window.componentManager
+        window.sigRegionAccepted.connect(self.acceptChanges)
         self.componentManager.sigUpdatedFocusedComponent.connect(
             self.updateFocusedComponent
         )
         self.active = True
-        self.registerFunc(
-            self.processorAnalytics, btnOpts=PRJ_CONSTS.TOOL_PROC_ANALYTICS
+        self.registerFunction(
+            self.processorAnalytics, runActionTemplate=PRJ_CONSTS.TOOL_PROC_ANALYTICS
         )
 
     def processorAnalytics(self):
         proc = self.currentProcessor
-        try:
-            proc.processor.stageSummaryGui()
-        except NotImplementedError:
+        if hasattr(proc, "stageSummaryGui"):
+            proc.stageSummaryGui()
+        else:
             raise TypeError(
                 f"Processor type {type(proc)} does not implement summary analytics."
             )

@@ -1,13 +1,15 @@
-from .plugins.settings import SettingsPlugin
-from .plugins.shortucts import ShortcutsPlugin
+from qtextras import ParameterEditor
+from .constants import GENERAL_PROPERTIES_DIR, SCHEMES_DIR
+from .parameditors.quickloader import QuickLoaderEditor
 
 
 class SharedAppSettings:
     def __init__(self):
-        self.settingsPlugin = SettingsPlugin()
-        self.colorScheme = self.settingsPlugin.colorScheme
-        self.generalProperties = self.settingsPlugin.generalProperties
+        self.generalProperties = ParameterEditor(
+            name="App Settings", directory=GENERAL_PROPERTIES_DIR, suffix=".genprops"
+        )
+        self.colorScheme = ParameterEditor(
+            name="Color Scheme", directory=SCHEMES_DIR, suffix=".scheme"
+        )
 
-        self.shortcutsPlugin = ShortcutsPlugin()
-        self.shortcuts = self.shortcutsPlugin.shortcuts
-        self.quickLoader = self.shortcutsPlugin.quickLoader
+        self.quickLoader = QuickLoaderEditor()
