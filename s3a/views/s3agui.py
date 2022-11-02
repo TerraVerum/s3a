@@ -13,7 +13,7 @@ from ..constants import ICON_DIR, LAYOUTS_DIR, PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_F
 from ..generalutils import hierarchicalUpdate
 from ..logger import getAppLogger
 from ..models.s3abase import S3ABase
-from ..plugins.comptable import CompTablePlugin
+from ..plugins.table import ComponentTablePlugin
 from ..plugins.mainimage import MainImagePlugin
 from ..plugins.misc import RandomToolsPlugin
 from ..shared import SharedAppSettings
@@ -129,7 +129,7 @@ class S3A(S3ABase):
         self.generalToolbar.setObjectName("General")
         self.addToolBar(self.generalToolbar)
 
-        _plugins = [self.classPluginMap[c] for c in [MainImagePlugin, CompTablePlugin]]
+        _plugins = [self.classPluginMap[c] for c in [MainImagePlugin, ComponentTablePlugin]]
         parents = [self.mainImage, self.tableView]
         for plugin, parent in zip(_plugins, reversed(parents)):
             plugin.toolsEditor.actionsMenuFromProcs(

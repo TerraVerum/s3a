@@ -1,0 +1,71 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from qtextras import ParameterEditor
+
+from pyqtgraph.parametertree import RunOptions
+from ..constants import PRJ_CONSTS as CNST
+from ..shared import SharedAppSettings
+from .base import ParameterEditorPlugin
+
+if TYPE_CHECKING:
+    from ..tabledata import TableData
+
+
+class ComponentTablePlugin(ParameterEditorPlugin):
+    name = "Component Table"
+    tableData: TableData
+
+    def __initSharedSettings__(self, shared: SharedAppSettings = None, **kwargs):
+        shared.generalProperties.registerProp(
+            CNST.PROP_VERT_SORT_BHV, container=self.window.sortFilterProxy.props
+        )
+        shared.generalProperties.registerProps(
+            [CNST.PROP_SCALE_PEN_WIDTH, CNST.PROP_FIELD_INFO_ON_SEL],
+            container=self.window.componentController.props,
+        )
+        shared.colorScheme.registerFunc(
+            self.window.componentController.updateLabelColumn,
+            labelColumn=dict(
+                type="list", limits=[f.name for f in self.tableData.allFields]
+            ),
+            runOptions=RunOptions.ON_CHANGED,
+            nest=False,
+            container=self.window.componentController.props,
+        )
+        shared.generalProperties.registerProp(
+            CNST.PROP_SHOW_TBL_ON_COMP_CREATE, container=self.window.tableView.props
+        )
+        shared.generalProperties.registerFunc(
+            self.window.tableView.setVisibleColumns,
+            runOptions=RunOptions.ON_CHANGED,
+            nest=False,
+            returnParam=True,
+            visibleColumns=[],
+        )
+
+    def attachToWindow(self, window):
+        tbl = window.tableView
+        for func, param in zip(
+            [
+                lambda: tbl.setSelectedCellsAsGui(),
+                tbl.removeSelectedRowsGui,
+                tbl.setSelectedCellsAsFirst,
+                lambda: window.componentController.scaleViewboxToSelectedIds(),
+            ],
+            [
+                CNST.TOOL_TBL_SET_AS,
+                CNST.TOOL_TBL_DEL_ROWS,
+                CNST.TOOL_TBL_SET_SAME_AS_FIRST,
+                CNST.TOOL_TBL_ZOOM_TO_COMPS,
+            ],
+        ):
+            param.opts["ownerWidget"] = tbl
+            self.registerFunction(func, name=param.name, runActionTemplate=param)
+        tbl.menu = self.createActionsFromProcesses()
+        tbl.menu.setParent(tbl)
+        filter_: ParameterEditor = self.tableData.filter
+        filter_.createWindowDock(window)
+        self.tableData = window.tableData
+        super().attachToWindow(window)

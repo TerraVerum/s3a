@@ -5,7 +5,7 @@ from typing import List
 import numpy as np
 import pandas as pd
 from pyqtgraph.parametertree import Parameter
-from utilitys import ParamEditor, PrjParam, fns
+from qtextras import OptionsDict, ParameterEditor, fns
 
 from ..constants import TABLE_DIR
 
@@ -18,7 +18,7 @@ def generateParameterList(nameIter, paramType, defaultValue, defaultParam="value
     ]
 
 
-def _filterForParameter(parameter: PrjParam):
+def _filterForParameter(parameter: OptionsDict):
     """Constructs a filter for the parameter based on its type"""
     children = []
     pType = parameter.pType.lower()
@@ -44,7 +44,7 @@ def _filterForParameter(parameter: PrjParam):
         paramWithChildren = Parameter.create(**paramWithChildren)
         paramWithChildren.addChild(optsParam)
     elif "xyvertices" in pType:
-        minMax = _filterForParameter(PrjParam("", 5))
+        minMax = _filterForParameter(OptionsDict("", 5))
         minMax.removeChild(minMax.childs[0])
         minMax = minMax.saveState()["children"]
         xyVerts = generateParameterList(
@@ -63,7 +63,7 @@ def _filterForParameter(parameter: PrjParam):
     return paramWithChildren
 
 
-def filterParameterColumn(compDf: pd.DataFrame, column: PrjParam, filterOpts: dict):
+def filterParameterColumn(compDf: pd.DataFrame, column: OptionsDict, filterOpts: dict):
     # TODO: Each type should probably know how to filter itself. That is,
     #  find some way of keeping this logic from just being an if/else tree...
     pType = column.pType
@@ -85,11 +85,11 @@ def filterParameterColumn(compDf: pd.DataFrame, column: PrjParam, filterOpts: di
             compDf = compDf.loc[~validList]
         if not allowFalse:
             compDf = compDf.loc[validList]
-    elif pType in ["prjparam", "list", "popuplineeditor"]:
+    elif pType in ["optionsdict", "list", "popuplineeditor"]:
         existingParams = np.array(dfAtParam)
         allowedParams = []
         filterOpts = filterOpts["Options"]
-        if pType == "prjparam":
+        if pType == "optionsdict":
             groupSubParams = [p.name for p in column.value.group]
         else:
             groupSubParams = column.opts["limits"]
@@ -132,22 +132,21 @@ def filterParameterColumn(compDf: pd.DataFrame, column: PrjParam, filterOpts: di
     return compDf
 
 
-class TableFilterEditor(ParamEditor):
-    def __init__(self, parameterList: List[PrjParam] = None, parent=None):
+class TableFilterEditor(ParameterEditor):
+    def __init__(self, parameterList: List[OptionsDict] = None):
         if parameterList is None:
             parameterList = []
         filterParams = [
             fil for fil in map(_filterForParameter, parameterList) if fil is not None
         ]
         super().__init__(
-            parent,
-            paramList=filterParams,
-            saveDir=TABLE_DIR,
-            fileType="filter",
             name="Component Table Filter",
+            directory=TABLE_DIR,
+            suffix=".filter",
         )
+        self.rootParameter.addChildren(filterParams)
 
-    def updateParameterList(self, paramList: List[PrjParam]):
+    def updateParameterList(self, paramList: List[OptionsDict]):
         newParams = []
         badCols = []
         for param in paramList:

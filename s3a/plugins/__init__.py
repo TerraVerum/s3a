@@ -9,7 +9,7 @@ from ..shims import entry_points
 
 
 def INTERNAL_PLUGINS():
-    from .comptable import CompTablePlugin
+    from .table import ComponentTablePlugin
     from .edit import EditPlugin
     from .file import FilePlugin
     from .help import HelpPlugin
@@ -25,7 +25,7 @@ def INTERNAL_PLUGINS():
         MultiPredictionsPlugin,
         VerticesPlugin,
         MainImagePlugin,
-        CompTablePlugin,
+        ComponentTablePlugin,
         RandomToolsPlugin,
         HelpPlugin,
         UserMetricsPlugin,
