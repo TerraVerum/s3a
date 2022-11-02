@@ -38,8 +38,19 @@ from ..views.tableview import ComponentTableView
 
 __all__ = ["S3ABase"]
 
+class S3ABaseMeta(type(QtCore.QObject)):
+    """
+    Define metaclass responsible for making an enclosure for the ActionStack used
+    by the main S3A window. This allows separate windows to own different undo/redo
+    stacks.
+    """
 
-class S3ABase(DASM, QtWidgets.QMainWindow):
+    def __call__(self, *args, **kwargs):
+        with DASM.setStack(ActionStack()):
+            return super().__call__(*args, **kwargs)
+
+
+class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
     """
     Top-level widget for producing component bounding regions from an input image.
     """
@@ -48,37 +59,12 @@ class S3ABase(DASM, QtWidgets.QMainWindow):
     sigPluginAdded = QtCore.Signal(object)  # Plugin object
     __groupingName__ = "S3A Window"
 
-    scope = ExitStack()
-    """
-    Allows each instance of s3a to act like a "scope" for all objecats instantiated 
-    within. Keeps multiple instances of separate S3A pieces from e.g. sharing the same 
-    undo buffer. This is managed by __new__. 
-    """
-
     sharedAttrs: SharedAppSettings
     """App-level properties that many moving pieces use"""
 
-    def __new__(cls, *args, **kwargs):
-        cls.scope.close()
-        cls.scope, newAttrs = cls.createScope(cls.scope, returnAttributes=True)
-        newAttrs: SharedAppSettings
-        obj = super().__new__(cls, *args, **kwargs)
-        obj.sharedAttrs = newAttrs
-        return obj
-
-    @staticmethod
-    def createScope(scope: ExitStack = None, returnAttributes=False):
-        if scope is None:
-            scope = ExitStack()
-        newAttrs = SharedAppSettings()
-        scope.enter_context(EditorPropsMixin.setEditorPropertyOpts(shared=newAttrs))
-        scope.enter_context(DASM.setStack(ActionStack()))
-        if returnAttributes:
-            return scope, newAttrs
-        return scope
-
-    def __init__(self, parent=None, **startupSettings):
-        super().__init__(parent)
+    def __init__(self, **startupSettings):
+        super().__init__()
+        self.sharedAttrs = SharedAppSettings()
 
         self.props = ParameterContainer()
         self.sharedAttrs.generalProperties.registerProps(

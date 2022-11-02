@@ -38,14 +38,13 @@ class S3A(S3ABase):
 
     def __init__(
         self,
-        parent=None,
         log: Union[str, Sequence[str]] = PRJ_ENUMS.LOG_TERM,
         loadLastState=True,
         **startupSettings,
     ):
         # Wait to import quick loader profiles until after self initialization so
         # customized loading functions also get called
-        super().__init__(parent, **startupSettings)
+        super().__init__(**startupSettings)
         self.setWindowIcon(QtGui.QIcon(str(ICON_DIR / "s3alogo.svg")))
         logger = getAppLogger()
         if PRJ_ENUMS.LOG_GUI in log:
