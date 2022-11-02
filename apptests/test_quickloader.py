@@ -5,12 +5,12 @@ import pytest
 
 @pytest.fixture()
 def ql(app):
-    return app.sharedAttrs.quickLoader
+    return app.sharedSettings.quickLoader
 
 
 @pytest.fixture()
 def editor(app):
-    return app.sharedAttrs.generalProperties
+    return app.sharedSettings.generalProperties
 
 
 def test_normal_add(ql, editor):

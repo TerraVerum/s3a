@@ -201,7 +201,7 @@ class S3A(S3ABase):
         dock = plugin.dock
         if dock is None:
             return
-        self.sharedAttrs.quickLoader.addDock(dock)
+        self.sharedSettings.quickLoader.addDock(dock)
         self.addTabbedDock(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock)
 
         if plugin.menu is None:

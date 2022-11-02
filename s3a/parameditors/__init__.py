@@ -8,7 +8,7 @@ class MetaTreeParameterEditor(ParameterEditor):
     Tree for controlling meta-parameters, useful for configuring the parameter 
     editor itself (i.e. loading state, etc.)
     """
-    _metaParametersGroup: Parameter
+    _metaParameter: Parameter
     """
     Group responsible for storing the parameters that influence ``rootParameter``
     states.
@@ -21,13 +21,13 @@ class MetaTreeParameterEditor(ParameterEditor):
         return outList
 
     def _makeMetaTree(self):
-        self._metaParametersGroup = Parameter.create(
+        self._metaParameter = Parameter.create(
             name="Meta Parameters", type="group"
         )
         self._metaTree = fns.flexibleParameterTree(
-            self._metaParametersGroup, showTop=False
+            self._metaParameter, showTop=False
         )
-        # self._metaParametersGroup.sigChildAdded.connect(
+        # self._metaParameter.sigChildAdded.connect(
         #     lambda: mt.setMinimumHeight(int(mt.sizeHint().height() * 1.1))
         # )
-        return self._metaTree, self._metaParametersGroup
+        return self._metaTree, self._metaParameter

@@ -67,7 +67,7 @@ class AlgorithmEditor(MetaTreeParameterEditor):
         self.registerFunction(
             self.changeActiveProcessor,
             runOptions=RunOptions.ON_CHANGED,
-            parent=self._metaParametersGroup,
+            parent=self._metaParameter,
             process=processName,
             container=self.props,
         )

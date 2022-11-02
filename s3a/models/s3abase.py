@@ -58,15 +58,15 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
     sigPluginAdded = QtCore.Signal(object)  # Plugin object
     __groupingName__ = "S3A Window"
 
-    sharedAttrs: SharedAppSettings
+    sharedSettings: SharedAppSettings
     """App-level properties that many moving pieces use"""
 
     def __init__(self, **startupSettings):
         super().__init__()
-        self.sharedAttrs = SharedAppSettings()
+        self.sharedSettings = SharedAppSettings()
 
         self.props = ParameterContainer()
-        self.sharedAttrs.generalProperties.registerProps(
+        self.sharedSettings.generalProperties.registerProps(
             [PRJ_CONSTS.EXP_ONLY_VISIBLE, PRJ_CONSTS.INCLUDE_FNAME_PATH],
             container=self.props,
         )
@@ -85,7 +85,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
 
         self.mainImage = MainImage(toolbar=self.generalToolbar)
         PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION.opts["ownerObj"] = self.mainImage
-        attrs = self.sharedAttrs
+        attrs = self.sharedSettings
         self.mainImage.toolsEditor.registerFunc(
             self.acceptFocusedRegion, btnOpts=PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION
         )
@@ -125,7 +125,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         self.sourceImagePath: Optional[Path] = None
 
         self.appStateEditor = AppStateEditor(
-            self.sharedAttrs.quickLoader, self, name="App State Editor"
+            self.sharedSettings.quickLoader, self, name="App State Editor"
         )
 
         # -----
@@ -135,7 +135,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         # Insert "settings" and "shortcuts" in a more logical location (after file + edit)
         toAdd = (
             toAdd[:2]
-            + [self.sharedAttrs.settingsPlugin, self.sharedAttrs.shortcutsPlugin]
+            + [self.sharedSettings.settingsPlugin, self.sharedSettings.shortcutsPlugin]
             + toAdd[2:]
         )
         for plg in toAdd:
