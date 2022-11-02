@@ -2,3 +2,9 @@
 profile = "black"
 reverse_relative = true
 combine_as_imports = true
+
+[tool.black]
+# Use all defaults for now, but keep the header to indicate usage of black
+
+[tool.unimport]
+ignore_init=true
