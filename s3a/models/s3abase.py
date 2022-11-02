@@ -1,7 +1,6 @@
 import argparse
 import inspect
 import os.path
-from contextlib import ExitStack
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Type, Union
 from warnings import warn
@@ -13,7 +12,6 @@ from qtextras import ParameterContainer
 from utilitys import (
     ActionStack,
     DeferredActionStackMixin as DASM,
-    EditorPropsMixin,
     ParamEditor,
     ParamEditorDockGrouping,
     ParamEditorPlugin,
@@ -37,6 +35,7 @@ from ..views.imageareas import MainImage
 from ..views.tableview import ComponentTableView
 
 __all__ = ["S3ABase"]
+
 
 class S3ABaseMeta(type(QtCore.QObject)):
     """

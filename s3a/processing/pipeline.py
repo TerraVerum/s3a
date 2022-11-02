@@ -3,7 +3,6 @@ from __future__ import annotations
 import typing as t
 
 import numpy as np
-
 import pyqtgraph as pg
 from pyqtgraph.parametertree import InteractiveFunction, Parameter
 from pyqtgraph.parametertree.parameterTypes import (
@@ -11,8 +10,9 @@ from pyqtgraph.parametertree.parameterTypes import (
     ActionGroupParameterItem,
 )
 from pyqtgraph.Qt import QtCore, QtGui
-from qtextras import ParameterContainer, ParameterEditor, fns, RunOptions
+from qtextras import ParameterContainer, ParameterEditor, fns
 from qtextras._funcparse import FROM_PREV_IO
+
 from ..generalutils import simpleCache
 
 __all__ = [

@@ -11,13 +11,7 @@ import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 from qtextras import ParameterContainer
-from utilitys import (
-    DeferredActionStackMixin as DASM,
-    PrjParam,
-    ProcessIO,
-    RunOpts,
-    fns,
-)
+from utilitys import DeferredActionStackMixin as DASM, PrjParam, ProcessIO, RunOpts, fns
 
 from .base import TableFieldPlugin
 from ..constants import (
@@ -27,16 +21,12 @@ from ..constants import (
     PRJ_CONSTS as CNST,
     REQD_TBL_FIELDS as RTF,
 )
-from ..generalutils import (
-    getCroppedImage,
-    showMaskDifference,
-    tryCvResize,
-)
+from ..generalutils import getCroppedImage, showMaskDifference, tryCvResize
 from ..graphicsutils import RegionHistoryViewer
 from ..parameditors.algcollection import AlgorithmCollection, AlgorithmEditor
 from ..processing.algorithms import imageproc
 from ..processing.pipeline import ImagePipeline
-from ..processing.threads import ThreadedFunctionWrapper, AbortableThreadContainer
+from ..processing.threads import AbortableThreadContainer, ThreadedFunctionWrapper
 from ..shared import SharedAppSettings
 from ..structures import BlackWhiteImg, ComplexXYVertices, XYVertices
 from ..views.regions import MultiRegionPlot, makeMultiRegionDf

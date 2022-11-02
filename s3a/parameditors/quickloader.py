@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import List, Union
 
 from pyqtgraph.parametertree import Parameter
-from pyqtgraph.parametertree.parameterTypes import GroupParameter
 from pyqtgraph.Qt import QtCore, QtWidgets
 from utilitys import ParamEditor, ParamEditorDockGrouping, widgets as uw
 from utilitys.params.pgregistered import ShortcutKeySeqParameter as ShcKeySeq
@@ -199,7 +198,7 @@ class QuickLoaderEditor(ParamEditor):
 
     def applyChanges(self, newName: FilePath = None, newState: dict = None):
         super().applyChanges(newName, newState)
-        for grp in self.params.childs:  # type: GroupParameter
+        for grp in self.params.childs:
             if grp.hasChildren():
                 act: ShcKeySeq = next(iter(grp))
                 act.activate()

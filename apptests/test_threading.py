@@ -4,8 +4,10 @@ import pytest
 from pyqtgraph.Qt import QtCore
 
 from s3a.processing.threads import (
-    RunnableFunctionWrapper, ThreadedFunctionWrapper,
-    RunnableThreadContainer, AbortableThreadContainer,
+    AbortableThreadContainer,
+    RunnableFunctionWrapper,
+    RunnableThreadContainer,
+    ThreadedFunctionWrapper,
 )
 
 

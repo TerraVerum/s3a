@@ -269,10 +269,7 @@ class MainImage(DASM, ImageViewer):
             self.sigShapeFinished.connect(wrapper)
         for actParam in actionParameters:
             self.drawActionGroup.createAndAddBtn(
-                actParam,
-                self.actionAssignment,
-                checkable=True,
-                **registerOpts
+                actParam, self.actionAssignment, checkable=True, **registerOpts
             )
 
     def viewboxCoords(self, margin=0):

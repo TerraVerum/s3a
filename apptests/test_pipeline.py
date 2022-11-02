@@ -1,6 +1,6 @@
 import pytest
-
 from pyqtgraph.parametertree import interact
+
 from s3a.parameditors.algcollection import AlgorithmCollection
 from s3a.processing.pipeline import PipelineParameter, maybeGetFunction
 

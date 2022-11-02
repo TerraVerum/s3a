@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 from pyqtgraph.Qt import QtCore, QtGui
-from testingconsts import NUM_COMPS
 
 from apptests.testingconsts import RND
 from s3a import REQD_TBL_FIELDS
@@ -9,7 +8,7 @@ from s3a.constants import PRJ_CONSTS
 from s3a.controls.drawctrl import RoiCollection
 from s3a.parameditors.algcollection import AlgorithmCollection, AlgorithmEditor
 from s3a.processing import ImageProcess, ImgProcWrapper, ProcessIO
-from s3a.structures import ComplexXYVertices, NChanImg, PrjParam, XYVertices
+from s3a.structures import NChanImg, PrjParam, XYVertices
 
 
 def leftClickGen(pos: XYVertices, dbclick=False):

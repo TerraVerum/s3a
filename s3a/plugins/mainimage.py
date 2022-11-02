@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING
 
 import cv2 as cv
 import numpy as np
+from pyqtgraph.parametertree import InteractiveFunction
 from qtextras import ParameterContainer
 from utilitys import ParamEditorPlugin, RunOpts, fns
 
-from pyqtgraph.parametertree import InteractiveFunction
 from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
 from ..generalutils import ClassInteractiveFunction
 from ..structures import ComplexXYVertices, XYVertices

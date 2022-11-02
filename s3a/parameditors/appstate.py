@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Union
 
 import pandas as pd
 from pyqtgraph.parametertree import Parameter
@@ -16,6 +16,7 @@ from ..structures import FilePath
 
 if TYPE_CHECKING:
     from .quickloader import QuickLoaderEditor
+
 
 class AppStateEditor(ParamEditor):
     def __init__(

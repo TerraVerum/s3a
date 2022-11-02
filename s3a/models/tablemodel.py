@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Union
+from typing import Any, Union
 from warnings import warn
 
 import numpy as np
@@ -15,9 +15,6 @@ __all__ = ["ComponentManager", "ComponentTableModel"]
 
 from utilitys import fns
 from utilitys.misc import DeferredActionStackMixin as DASM
-
-if TYPE_CHECKING:
-    from ..tabledata import TableData
 
 Signal = QtCore.Signal
 

@@ -13,6 +13,7 @@ class MetaTreeParameterEditor(ParameterEditor):
     Group responsible for storing the parameters that influence ``rootParameter``
     states.
     """
+
     def _guiChildren(self) -> list:
         self._makeMetaTree()
         outList = super()._guiChildren()
@@ -20,7 +21,9 @@ class MetaTreeParameterEditor(ParameterEditor):
         return outList
 
     def _makeMetaTree(self):
-        self._metaParametersGroup = Parameter.create(name="Meta Parameters", type="group")
+        self._metaParametersGroup = Parameter.create(
+            name="Meta Parameters", type="group"
+        )
         self._metaTree = fns.flexibleParameterTree(
             self._metaParametersGroup, showTop=False
         )

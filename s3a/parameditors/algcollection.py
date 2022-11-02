@@ -7,16 +7,16 @@ import webbrowser
 from collections import defaultdict
 from pathlib import Path
 
-from utilitys.typeoverloads import FilePath
-
 from pyqtgraph.Qt import QtCore
 from qtextras import (
-    fns,
-    RunOptions,
-    ParameterEditor,
-    bindInteractorOptions as bind,
     ParameterContainer,
+    ParameterEditor,
+    RunOptions,
+    bindInteractorOptions as bind,
+    fns,
 )
+from utilitys.typeoverloads import FilePath
+
 from . import MetaTreeParameterEditor
 from ..constants import PRJ_ENUMS
 from ..processing.pipeline import (

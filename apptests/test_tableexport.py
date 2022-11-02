@@ -12,14 +12,7 @@ from apptests.testingconsts import (
     SAMPLE_SMALL_IMG_FNAME,
     TEST_FILE_DIR,
 )
-from s3a import (
-    PRJ_CONSTS as CNST,
-    PRJ_ENUMS,
-    REQD_TBL_FIELDS,
-    ComplexXYVertices,
-    ComponentIO,
-    XYVertices,
-)
+from s3a import PRJ_CONSTS as CNST, PRJ_ENUMS, REQD_TBL_FIELDS, ComponentIO, XYVertices
 from s3a.generalutils import augmentException
 from s3a.tabledata import TableData
 

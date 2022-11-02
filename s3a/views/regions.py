@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
-from qtextras import bindInteractorOptions as bind, ParameterContainer
+from qtextras import ParameterContainer
 from utilitys import DeferredActionStackMixin as DASM, PrjParam, fns
 
 from .clickables import BoundScatterPlot

@@ -10,7 +10,7 @@ from utilitys import ProcessIO, fns
 from apptests.testingconsts import SAMPLE_IMG
 from s3a import REQD_TBL_FIELDS, ComplexXYVertices
 from s3a.generalutils import imageCornerVertices
-from s3a.processing import ActionGroupParameter, PipelineParameter
+from s3a.processing import PipelineParameter
 from s3a.processing.algorithms import (
     imageproc as ip,
     make_grid_components,
@@ -44,7 +44,7 @@ def test_disable_top_stages(app, vertsPlugin):
     for name in pe.collection.topProcesses:
         proc: PipelineParameter = pe.collection.parseProcessName(name)
         pe.changeActiveProcessor(proc, saveBeforeChange=False)
-        for stage in proc:  # type: ActionGroupParameter
+        for stage in proc:
             stage.setOpts(enabled=False)
         # Some exceptions may occur in the processor, this is fine since behavior might
         # be undefined

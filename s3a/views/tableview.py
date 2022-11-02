@@ -18,14 +18,9 @@ from ..tabledata import TableData
 
 __all__ = ["ComponentTableView", "PopupTableDialog"]
 
-from qtextras import bindInteractorOptions as bind, ParameterContainer
-from utilitys import (
-    DeferredActionStackMixin as DASM,
-    ParamEditor,
-    PrjParam,
-)
+from qtextras import ParameterContainer, bindInteractorOptions as bind
+from utilitys import DeferredActionStackMixin as DASM, ParamEditor, PrjParam
 from utilitys.params.pgregistered import PgParamDelegate, PgPopupDelegate
-
 
 Signal = QtCore.Signal
 
