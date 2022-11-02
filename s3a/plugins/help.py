@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from utilitys import ParamEditorPlugin
+from .base import ParameterEditorPlugin
 
 
-class HelpPlugin(ParamEditorPlugin):
+class HelpPlugin(ParameterEditorPlugin):
     name = "Help"
 
-    def attachWinRef(self, win: QtWidgets.QMainWindow):
-        super().attachWinRef(win)
-        self.registerFunc(
+    def attachToWindow(self, window: QtWidgets.QMainWindow):
+        super().attachToWindow(window)
+        self.registerFunction(
             lambda: QtGui.QDesktopServices.openUrl(
                 QtCore.QUrl(
                     "https://gitlab.com/ficsresearch/s3a/-/wikis/docs/user's-guide"
@@ -17,10 +17,10 @@ class HelpPlugin(ParamEditorPlugin):
             ),
             name="Online User Guide",
         )
-        self.registerFunc(
-            lambda: QtWidgets.QMessageBox.aboutQt(win, "About Qt"), name="About Qt"
+        self.registerFunction(
+            lambda: QtWidgets.QMessageBox.aboutQt(window, "About Qt"), name="About Qt"
         )
-        self.registerFunc(self.iconAttributionsGui, name="Icon Attributions")
+        self.registerFunction(self.iconAttributionsGui, name="Icon Attributions")
 
     def iconAttributionsGui(self):
         flaticonUrl = "<a href='https://www.flaticon.com/'>flaticon</a>"
@@ -39,4 +39,4 @@ class HelpPlugin(ParamEditorPlugin):
             Google</a> from {flaticonUrl}</div> 
         """
 
-        QtWidgets.QMessageBox.information(self.win, "Icon Attributions", htmlStr)
+        QtWidgets.QMessageBox.information(self.window, "Icon Attributions", htmlStr)

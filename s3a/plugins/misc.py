@@ -1,18 +1,21 @@
 from __future__ import annotations
 
 import sys
-from typing import Callable, Sequence
+from typing import Callable, Sequence, TYPE_CHECKING
 
 from pyqtgraph import console as pg_console
 from pyqtgraph.Qt import QtCore
-from utilitys import ParamEditorPlugin, widgets as uw
+from utilitys import widgets as uw
 
 from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
+from .base import ParameterEditorPlugin
+
+if TYPE_CHECKING:
+    from ..views.s3agui import S3A
 
 
-class RandomToolsPlugin(ParamEditorPlugin):
+class RandomToolsPlugin(ParameterEditorPlugin):
     name = "Tools"
-    _showFuncDetails = True
 
     _deferredRegisters: dict[Callable, dict] = {}
     """
@@ -20,28 +23,32 @@ class RandomToolsPlugin(ParamEditorPlugin):
     during registration (kwargs are the value)
     """
 
-    def attachWinRef(self, win):
-        super().attachWinRef(win)
+    def attachToWindow(self, window):
+        super().attachToWindow(window)
 
-        self.registerFunc(self.showDevConsoleGui, name="Show Dev Console")
-        self.registerFunc(win.clearBoundaries, btnOpts=CNST.TOOL_CLEAR_BOUNDARIES)
-        self.registerFunc(
-            win.componentController.exportComponentOverlay,
+        self.registerFunction(self.showDevConsoleGui, name="Show Dev Console")
+        self.registerFunction(
+            window.clearBoundaries, runActionTemplate=CNST.TOOL_CLEAR_BOUNDARIES
+        )
+        self.registerFunction(
+            window.componentController.exportComponentOverlay,
             name="Export Component Overlay",
             toClipboard=True,
         )
-        self.registerFunc(lambda: win.setMainImage(None), name="Clear Current Image")
+        self.registerFunction(
+            lambda: window.setMainImage(None), name="Clear Current Image"
+        )
 
-        self._hookupFieldDisplay(win)
+        self._hookupFieldDisplay(window)
 
         for deferred, kwargs in self._deferredRegisters.items():
-            self.registerFunc(deferred, **kwargs)
+            self.registerFunction(deferred, **kwargs)
 
     def _hookupFieldDisplay(self, window):
         display = window.componentController
         # This option shouldn't show in the menu dropdown, so register directly to the
         # tools
-        _, param = self.toolsEditor.registerFunc(
+        _, param = self.registerFunction(
             display.fieldInfoProc,
             name="Show Field Info",
             returnParam=True,
@@ -57,7 +64,7 @@ class RandomToolsPlugin(ParamEditorPlugin):
                     ids=window.componentManager.compDf.index, force=True
                 )
 
-        self.registerFunc(toggleAll, name="Toggle All Field Info")
+        self.registerFunction(toggleAll, name="Toggle All Field Info")
 
         fieldsParam = param.child("fields")
 
@@ -80,7 +87,7 @@ class RandomToolsPlugin(ParamEditorPlugin):
         IPython is on your system, a qt console will be loaded. Otherwise, a (less
         capable) standard pyqtgraph console will be used.
         """
-        namespace = dict(app=self.win, rtf=RTF)
+        namespace = dict(app=self.window, rtf=RTF)
         # "dict" default is to use repr instead of string for internal elements,
         # so expanding into string here ensures repr is not used
         nsPrintout = [f"{k}: {v}" for k, v in namespace.items()]
@@ -95,7 +102,7 @@ class RandomToolsPlugin(ParamEditorPlugin):
             # without a stack trace, so attempt to catch this situation early
             if sys.gettrace() is None:
                 console = uw.ConsoleWidget(
-                    parent=self.win, namespace=namespace, text=text
+                    parent=self.window, namespace=namespace, text=text
                 )
             else:
                 # Raising an error goes into the except clause
@@ -106,13 +113,13 @@ class RandomToolsPlugin(ParamEditorPlugin):
             # Ipy kernel can have issues for many reasons. Always be ready to fall back
             # to traditional console
             console = pg_console.ConsoleWidget(
-                parent=self.win, namespace=namespace, text=text
+                parent=self.window, namespace=namespace, text=text
             )
         console.setWindowFlags(QtCore.Qt.WindowType.Window)
         console.show()
 
     @classmethod
-    def deferredRegisterFunction(cls, func: Callable, **registerKwargs):
+    def deferredregisterFunctiontion(cls, func: Callable, **registerKwargs):
         cls._deferredRegisters[func] = registerKwargs
 
 
@@ -122,12 +129,12 @@ def miscFunctionsPluginFactory(
     titles: Sequence[str] = None,
     showFunctionDetails=False,
 ):
-    class FuncContainerPlugin(ParamEditorPlugin):
+    class FuncContainerPlugin(ParameterEditorPlugin):
         name = name_
         _showFuncDetails = showFunctionDetails
 
-        def attachWinRef(self, win: s3abase.S3ABase):
-            super().attachWinRef(win)
+        def attachToWindow(self, window: S3A):
+            super().attachToWindow(window)
 
             nonlocal functions, titles
             if functions is None:
@@ -135,6 +142,6 @@ def miscFunctionsPluginFactory(
             if titles is None:
                 titles = [None] * len(functions)
             for func, title in zip(functions, titles):
-                self.registerFunc(func, title)
+                self.registerFunction(func, name=title)
 
     return FuncContainerPlugin

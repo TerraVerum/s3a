@@ -1,22 +1,20 @@
 from __future__ import annotations
 
-from utilitys import ParamEditorPlugin
-
 from ..constants import PRJ_CONSTS as CNST
 from ..logger import getAppLogger
 from ..models.s3abase import S3ABase
+from .base import ParameterEditorPlugin
 
-
-class EditPlugin(ParamEditorPlugin):
+class EditPlugin(ParameterEditorPlugin):
 
     name = "Edit"
 
-    def attachWinRef(self, win: S3ABase):
-        super().attachWinRef(win)
-        stack = win.actionStack
+    def attachToWindow(self, window: S3ABase):
+        super().attachToWindow(window)
+        stack = window.actionStack
 
-        self.registerFunc(stack.undo, name="Undo", btnOpts=CNST.TOOL_UNDO)
-        self.registerFunc(stack.redo, name="Redo", btnOpts=CNST.TOOL_REDO)
+        self.registerFunction(stack.undo, name="Undo", runActionTemplate=CNST.TOOL_UNDO)
+        self.registerFunction(stack.redo, name="Redo", runActionTemplate=CNST.TOOL_REDO)
 
         def updateUndoRedoTxts(_action=None):
             self.undoAction.setText(f"Undo: {stack.undoDescr}")

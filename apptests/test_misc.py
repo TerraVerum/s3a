@@ -50,7 +50,7 @@ def test_plg_factory(app):
         count += 1
 
     mp = miscFunctionsPluginFactory("test", [add])()
-    mp.attachWinRef(app)
+    mp.attachToWindow(app)
     assert mp.toolsEditor.procToParamsMapping
     assert mp.name == "test"
     next(iter(mp.toolsEditor.procToParamsMapping)).run()
