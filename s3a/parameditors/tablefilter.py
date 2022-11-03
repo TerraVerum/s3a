@@ -21,29 +21,29 @@ def generateParameterList(nameIter, paramType, defaultValue, defaultParam="value
 def _filterForParameter(parameter: OptionsDict):
     """Constructs a filter for the parameter based on its type"""
     children = []
-    pType = parameter.type.lower()
+    parameterType = parameter.type.lower()
     paramWithChildren = {"name": parameter.name, "type": "group", "children": children}
     children.append(dict(name="Active", type="bool", value=False))
-    if pType in ["int", "float"]:
-        retVal = generateParameterList(["min", "max"], pType, 0)
+    if parameterType in ["int", "float"]:
+        retVal = generateParameterList(["min", "max"], parameterType, 0)
         retVal[0]["value"] = -sys.maxsize
         retVal[1]["value"] = sys.maxsize
         children.extend(retVal)
-    elif pType in ["prjparam", "enum", "list", "popuplineeditor", "bool"]:
-        if pType == "prjparam":
+    elif parameterType in ["prjparam", "enum", "list", "popuplineeditor", "bool"]:
+        if parameterType == "prjparam":
             iterGroup = [param.name for param in parameter.value.group]
-        elif pType == "enum":
+        elif parameterType == "enum":
             iterGroup = [param for param in parameter.value]
-        elif pType == "bool":
+        elif parameterType == "bool":
             iterGroup = [f"{parameter.name}", f"Not {parameter.name}"]
-        else:  # pType == 'list' or 'popuplineeditor'
+        else:  # parameterType == 'list' or 'popuplineeditor'
             iterGroup = parameter.opts["limits"]
         optsParam = Parameter.create(
             name="Options", type="checklist", limits=iterGroup, value=iterGroup
         )
         paramWithChildren = Parameter.create(**paramWithChildren)
         paramWithChildren.addChild(optsParam)
-    elif "xyvertices" in pType:
+    elif "xyvertices" in parameterType:
         minMax = _filterForParameter(OptionsDict("", 5))
         minMax.removeChild(minMax.childs[0])
         minMax = minMax.saveState()["children"]
@@ -51,7 +51,7 @@ def _filterForParameter(parameter: OptionsDict):
             ["X Bounds", "Y Bounds"], "group", minMax, "children"
         )
         children.extend(xyVerts)
-    elif pType in ["str", "text"]:
+    elif parameterType in ["str", "text"]:
         # Assumes string
         children.append(dict(name="Regex Value", type="str", value=""))
     else:
@@ -66,15 +66,15 @@ def _filterForParameter(parameter: OptionsDict):
 def filterParameterColumn(compDf: pd.DataFrame, column: OptionsDict, filterOpts: dict):
     # TODO: Each type should probably know how to filter itself. That is,
     #  find some way of keeping this logic from just being an if/else tree...
-    pType = column.type
+    parameterType = column.type
     # idx 0 = value, 1 = children
     dfAtParam = compDf.loc[:, column]
 
-    if pType in ["int", "float"]:
+    if parameterType in ["int", "float"]:
         curmin, curmax = [filterOpts[name] for name in ["min", "max"]]
 
         compDf = compDf.loc[(dfAtParam >= curmin) & (dfAtParam <= curmax)]
-    elif pType == "bool":
+    elif parameterType == "bool":
         filterOpts = filterOpts["Options"]
         allowTrue, allowFalse = [
             filterOpts[name] for name in [f"{column.name}", f"Not {column.name}"]
@@ -85,11 +85,11 @@ def filterParameterColumn(compDf: pd.DataFrame, column: OptionsDict, filterOpts:
             compDf = compDf.loc[~validList]
         if not allowFalse:
             compDf = compDf.loc[validList]
-    elif pType in ["optionsdict", "list", "popuplineeditor"]:
+    elif parameterType in ["optionsdict", "list", "popuplineeditor"]:
         existingParams = np.array(dfAtParam)
         allowedParams = []
         filterOpts = filterOpts["Options"]
-        if pType == "optionsdict":
+        if parameterType == "optionsdict":
             groupSubParams = [p.name for p in column.value.group]
         else:
             groupSubParams = column.opts["limits"]
@@ -98,11 +98,11 @@ def filterParameterColumn(compDf: pd.DataFrame, column: OptionsDict, filterOpts:
             if isAllowed:
                 allowedParams.append(groupSubParam)
         compDf = compDf.loc[np.isin(existingParams, allowedParams)]
-    elif pType in ["str", "text"]:
+    elif parameterType in ["str", "text"]:
         allowedRegex = filterOpts["Regex Value"]
         isCompAllowed = dfAtParam.str.contains(allowedRegex, regex=True, case=False)
         compDf = compDf.loc[isCompAllowed]
-    elif pType in ["complexxyvertices", "xyvertices"]:
+    elif parameterType in ["complexxyvertices", "xyvertices"]:
         vertsAllowed = np.ones(len(dfAtParam), dtype=bool)
 
         xParam = filterOpts["X Bounds"]
@@ -112,7 +112,7 @@ def filterParameterColumn(compDf: pd.DataFrame, column: OptionsDict, filterOpts:
         ]
 
         for vertIdx, verts in enumerate(dfAtParam):
-            if pType == "complexxyvertices":
+            if parameterType == "complexxyvertices":
                 stackedVerts = verts.stack()
             else:
                 stackedVerts = verts
@@ -125,7 +125,7 @@ def filterParameterColumn(compDf: pd.DataFrame, column: OptionsDict, filterOpts:
     else:
         warnings.warn(
             "No filter type exists for parameters of type "
-            f"{pType}."
+            f"{parameterType}."
             f" Did not filter column {column.name}.",
             UserWarning,
         )

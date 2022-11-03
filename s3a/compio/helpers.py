@@ -21,14 +21,14 @@ def _newHandlerTemplate():
 _serdesHandlers = pd.DataFrame(columns=list(_newHandlerTemplate()))
 
 
-def registerIoHandler(pType: str, force=False, **kwargs):
+def registerIoHandler(parameterType: str, force=False, **kwargs):
     global _serdesHandlers
-    if pType not in _serdesHandlers.index:
-        _serdesHandlers.loc[pType] = _newHandlerTemplate()
+    if parameterType not in _serdesHandlers.index:
+        _serdesHandlers.loc[parameterType] = _newHandlerTemplate()
     for which in {"serialize", "deserialize"} & set(kwargs):
-        if _serdesHandlers.loc[pType, which] is not None and not force:
-            raise KeyError(f'Already have {which} handler for "{pType}"')
-    _serdesHandlers.loc[pType, list(kwargs)] = list(kwargs.values())
+        if _serdesHandlers.loc[parameterType, which] is not None and not force:
+            raise KeyError(f'Already have {which} handler for "{parameterType}"')
+    _serdesHandlers.loc[parameterType, list(kwargs)] = list(kwargs.values())
 
 
 def _runFunc(
