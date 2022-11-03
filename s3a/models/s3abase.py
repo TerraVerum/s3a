@@ -280,7 +280,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
 
     def addPlugin(self, pluginClass: t.Type[PEPlugin], *args, **kwargs):
         """
-        From a class inheriting the ``PrjParamEditorPlugin``, creates a plugin object
+        From a class inheriting the ``ParameterEditorPlugin``, creates a plugin object
         that will appear in the S3A toolbar. An entry is created with dropdown options
         for each editor in ``pluginCls``'s ``editors`` attribute.
 

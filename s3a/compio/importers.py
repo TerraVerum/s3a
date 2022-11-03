@@ -292,8 +292,8 @@ class LblPngImporter(AnnotationImporter):
         labelMap
             For parameters that aren't numeric and don't have limits (e.g. arbitrary
             string values), this mapping determines how numeric values should be turned
-            into field values. See ``PrjParam.toNumeric`` for details, since this is the
-            mapping expected. If not provided, first the image metadata tags are
+            into field values. See ``OptionsDict.toNumeric`` for details, since this is
+            the mapping expected. If not provided, first the image metadata tags are
             searched for a 'labelMap' text attribute (this is often added to label
             images saved by S3A). Note that metadata can only be read from the file if
             a file path is provided, of course. If this check fails, it is inferred

@@ -30,15 +30,6 @@ registerIoHandler(
     deserialize=lambda strVal: strVal.lower() == "true",
 )
 
-registerIoHandler(
-    "prjparam",
-    deserialize=lambda param, strVal: OptionsDictGroup.fieldFromParameter(
-        param.group, strVal
-    ),
-    serialize=lambda param, val: str(val),
-    takesParam=True,
-)
-
 
 def listDeserializer(param, strVal):
     # Slight adjustment to value interpretation for checklist

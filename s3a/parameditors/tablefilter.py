@@ -29,10 +29,8 @@ def _filterForParameter(parameter: OptionsDict):
         retVal[0]["value"] = -sys.maxsize
         retVal[1]["value"] = sys.maxsize
         children.extend(retVal)
-    elif parameterType in ["prjparam", "enum", "list", "popuplineeditor", "bool"]:
-        if parameterType == "prjparam":
-            iterGroup = [param.name for param in parameter.value.group]
-        elif parameterType == "enum":
+    elif parameterType in ["enum", "list", "popuplineeditor", "bool"]:
+        if parameterType == "enum":
             iterGroup = [param for param in parameter.value]
         elif parameterType == "bool":
             iterGroup = [f"{parameter.name}", f"Not {parameter.name}"]

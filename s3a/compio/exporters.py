@@ -89,7 +89,7 @@ class LblPngExporter(AnnotationExporter):
             Data field to use as an index label. E.g. "Class" will use the 'class'
             column, but any other column can be specified. The output ground truth
             masks will be colored according to this field.  See
-            :meth:`PrjParam.toNumeric` for details. If `labelField` is *None*,
+            :meth:`OptionsDict.toNumeric` for details. If `labelField` is *None*,
             the foreground mask will be boolean instead of integer-colored.
         backgroundColor
             Color of the mask background. Must be an integer.

@@ -7,8 +7,8 @@ from s3a import REQD_TBL_FIELDS
 from s3a.constants import PRJ_CONSTS
 from s3a.controls.drawctrl import RoiCollection
 from s3a.parameditors.algcollection import AlgorithmCollection, AlgorithmEditor
-from s3a.processing import ImageProcess, ImgProcWrapper, ProcessIO
-from s3a.structures import NChanImg, PrjParam, XYVertices
+from s3a.processing import ImagePipeline
+from s3a.structures import NChanImg, OptionsDict, XYVertices
 
 
 def leftClickGen(pos: XYVertices, dbclick=False):
@@ -29,7 +29,7 @@ def roiFactory(app):
         (PRJ_CONSTS.DRAW_SHAPE_POLY, PRJ_CONSTS.DRAW_SHAPE_RECT), app.mainImage
     )
 
-    def _polyRoi(pts: XYVertices, shape: PrjParam = PRJ_CONSTS.DRAW_SHAPE_RECT):
+    def _polyRoi(pts: XYVertices, shape: OptionsDict = PRJ_CONSTS.DRAW_SHAPE_RECT):
         clctn.shapeParameter = shape
         for pt in pts:
             ev = leftClickGen(pt)
@@ -156,10 +156,11 @@ def test_selectionbounds_none(app):
 
 def test_proc_err(tmp_path):
     def badProc(image: NChanImg):
-        return ProcessIO(image=image, extra=1 / 0)
+        return dict(image=image, extra=1 / 0)
 
-    proc = ImageProcess.fromFunction(badProc, name="Bad")
-    clctn = AlgorithmCollection(ImgProcWrapper, ImageProcess)
+    proc = ImagePipeline(name="Bad")
+    proc.addStage(badProc)
+    clctn = AlgorithmCollection(ImagePipeline)
     algEditor = AlgorithmEditor(clctn, saveDir=tmp_path)
     clctn.addProcess(proc, top=True)
 

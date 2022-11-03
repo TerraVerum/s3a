@@ -3,7 +3,7 @@ from typing import Collection, Dict
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 
-from ..structures import PrjParam, XYVertices
+from ..structures import OptionsDict, XYVertices
 from ..views.rois import SHAPE_ROI_MAPPING, PlotDataROI
 
 __all__ = ["RoiCollection"]
@@ -14,7 +14,9 @@ class RoiCollection(QtCore.QObject):
     sigShapeFinished = QtCore.Signal(object)  # roiVertices : XYVertices
 
     def __init__(
-        self, allowableShapes: Collection[PrjParam] = (), parent: pg.GraphicsView = None
+        self,
+        allowableShapes: Collection[OptionsDict] = (),
+        parent: pg.GraphicsView = None,
     ):
         super().__init__(parent)
 
@@ -22,7 +24,7 @@ class RoiCollection(QtCore.QObject):
             allowableShapes = set()
         self.shapeVerts = XYVertices()
         # Make a new graphics item for each roi type
-        self.parameterRoiMap: Dict[PrjParam, PlotDataROI] = {}
+        self.parameterRoiMap: Dict[OptionsDict, PlotDataROI] = {}
         self._shapeParameter = (
             next(iter(allowableShapes)) if len(allowableShapes) > 0 else None
         )
@@ -134,7 +136,7 @@ class RoiCollection(QtCore.QObject):
         return self._shapeParameter
 
     @shapeParameter.setter
-    def shapeParameter(self, newShape: PrjParam):
+    def shapeParameter(self, newShape: OptionsDict):
         """
         When the shape is changed, be sure to reset the underlying ROIs
         """
