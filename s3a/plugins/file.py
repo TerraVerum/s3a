@@ -18,7 +18,7 @@ import pyqtgraph as pg
 from pyqtgraph.parametertree.Parameter import PARAM_TYPES, Parameter
 from pyqtgraph.parametertree.parameterTypes.file import popupFilePicker
 from pyqtgraph.Qt import QtCore, QtWidgets
-from qtextras import CompositionMixin, fns
+from qtextras import CompositionMixin, fns, bindInteractorOptions as bind
 from .base import ParameterEditorPlugin
 from ..compio import ComponentIO, defaultIo
 from ..compio.base import AnnotationExporter
@@ -279,7 +279,12 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         self.projectData.saveConfig()
         getAppLogger(__name__).attention("Saved project")
 
-    @fns.dynamicDocstring(ioTypes=["<Unchanged>"] + list(defaultIo.roundTripTypes))
+    @bind(
+        tableConfg=dict(type="file"),
+        annotationFormat=dict(
+            type="list", limits=["<Unchanged>"] + list(defaultIo.roundTripTypes)
+        ),
+    )
     def updateProjectProperties(
         self, tableConfig: FilePath = None, annotationFormat: str = None
     ):
@@ -289,12 +294,10 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         Parameters
         ----------
         tableConfig
-            pType: filepicker
+            Path to a new table configuration file
         annotationFormat
             How to save annotations internally. Note that altering this value may
             alter the speed of saving and loading annotations.
-            pType: list
-            limits: {ioTypes}
         """
         if tableConfig is not None:
             tableConfig = Path(tableConfig)
@@ -306,7 +309,11 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         ):
             self.projectData.config["annotation-format"] = annotationFormat
 
-    @fns.dynamicDocstring(ioTypes=list(defaultIo.exportTypes))
+    @bind(
+        interval=dict(limits=[1, None]),
+        backupFolder=dict(type="file", fileMode="Directory"),
+        annotationFormat=dict(type="list", limits=list(defaultIo.exportTypes)),
+    )
     def startAutosave(
         self, interval=5, backupFolder="", baseName="autosave", annotationFormat="csv"
     ):
@@ -317,19 +324,14 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         ----------
         interval
             Interval in minutes between saves
-            limits: [1, None]
         backupFolder
             If provided, annotations are saved here sequentially afte reach *interval*
             minutes. Each output is named `[Parent Folder]/[base name]_[counter].[
             export type]`, where `counter` is the current save file number.
-            pType: filepicker
-            asFolder: True
         baseName
             What to name the saved annotation file
         annotationFormat
             File format for backups
-            pType: list
-            limits: {ioTypes}
         """
         self.autosaveTimer.stop()
         self.autosaveTimer = QtCore.QTimer()
@@ -479,7 +481,9 @@ class NewProjectWizard(QtWidgets.QWizard):
                 tip="Whether to keep annotations specified in the existing config",
             ),
         ]
-        param = Parameter.create(name="Project Settings", type="group", children=settings)
+        param = Parameter.create(
+            name="Project Settings", type="group", children=settings
+        )
         tree = fns.flexibleParameterTree(param)
         self.projSettings = param
         self.nameToPageMapping: Dict[str, QtWidgets.QWizardPage] = {}
@@ -813,6 +817,7 @@ class ProjectData(QtCore.QObject):
             self.componentIo.updateOptions(ioType, source=self.imagesPath)
 
     @classmethod
+    @bind(name=dict(type="file"))
     def create(
         cls,
         *,
@@ -828,7 +833,6 @@ class ProjectData(QtCore.QObject):
         name
             Project Name. The parent directory of this name indicates the directory
             in which to create the project
-            pType: filepicker
         config
             see ``ProjectData.loadConfig`` for information
         parent
@@ -1223,6 +1227,7 @@ class ProjectData(QtCore.QObject):
             raise IOError(msg)
         return candidates.pop()
 
+    @bind(outputFolder=dict(type="file", fileMode="Directory"))
     def exportProject(self, outputFolder: FilePath = "s3a-export"):
         """
         Exports the entire project, making a copy of it at the destination directory
@@ -1231,13 +1236,15 @@ class ProjectData(QtCore.QObject):
         ----------
         outputFolder
             Where to place the exported project
-            pType: filepicker
-            asFolder: True
         """
         shutil.copytree(self.location, outputFolder)
         getAppLogger(__name__).info("Exported project")
 
     @fns.dynamicDocstring(fileTypes=list(defaultIo.exportTypes))
+    @bind(
+        outputFolder=dict(type="file", fileMode="Directory"),
+        annotationFormat=dict(type="list", values=list(defaultIo.exportTypes)),
+    )
     def exportAnnotations(
         self,
         outputFolder: FilePath = "s3a-export",
@@ -1253,13 +1260,9 @@ class ProjectData(QtCore.QObject):
         ----------
         outputFolder
             Folder for exported annotations
-            pType: filepicker
-            asFolder: True
         annotationFormat
             Annotation file type. E.g. if 'csv', annotations will be saved as csv files.
             Available file types are: {fileTypes}
-            pType: list
-            limits: {fileTypes}
         combine
             If `True`, all annotation files will be combined into one exported file
             with name `annotations.<format>`

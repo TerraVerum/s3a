@@ -506,6 +506,7 @@ class ComponentController(DASM, QtCore.QObject):
                 newComps, PRJ_ENUMS.COMPONENT_ADD_AS_MERGE
             )
 
+    @bind(file=dict(type="file", fileMode="ExistingFile"))
     def exportComponentOverlay(self, file="", toClipboard=False):
         """
         Exports the current component overlay to a file or clipboard
@@ -514,8 +515,8 @@ class ComponentController(DASM, QtCore.QObject):
         ----------
         file : str | Path
             File to save to. If empty, no file is saved
-            pType: filepicker
-            existing: False
+        toClipboard : bool
+            If ``True``, the image is copied to the clipboard
         """
         oldShowFocused = self.regionPlot.showFocused
         oldShowSelected = self.regionPlot.showSelected

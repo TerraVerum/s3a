@@ -6,8 +6,13 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
-from qtextras import ParameterContainer
-from qtextras import DeferredActionStackMixin as DASM, OptionsDict, fns
+from qtextras import (
+    ParameterContainer,
+    DeferredActionStackMixin as DASM,
+    OptionsDict,
+    fns,
+    bindInteractorOptions as bind,
+)
 
 from .clickables import BoundScatterPlot
 from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS as RTF
@@ -20,6 +25,7 @@ from .rois import ROIManipulator
 from ..compio import defaultIo
 
 Signal = QtCore.Signal
+_colorType = dict(type="color")
 
 
 def makeMultiRegionDf(
@@ -245,6 +251,13 @@ class MultiRegionPlot(BoundScatterPlot):
         )
         return checkerPlot
 
+    @bind(
+        penColor=_colorType,
+        selectedFill=_colorType,
+        focusedFill=_colorType,
+        labelColormap=dict(type="popuplineeditor"),
+        fillAlpha=dict(limits=[0, 1], step=0.1),
+    )
     def updateColors(
         self,
         penWidth=0,
@@ -263,21 +276,15 @@ class MultiRegionPlot(BoundScatterPlot):
             Width of the pen in pixels
         penColor
             Color of the border of each non-selected boundary
-            pType: color
         selectedFill
             Fill color for components selected in the component table
-            pType: color
-        focusedFill:
+        focusedFill
             Fill color for the component currently in the focused image
-            pType: color
         labelColormap
             Colormap to use for fill colors by component label. If `None` is selected,
             the fill will be transparent.
-            pType: popuplineeditor
         fillAlpha
             Transparency of fill color (0 is totally transparent, 1 is totally opaque)
-            limits: [0,1]
-            step: 0.1
         """
         # Account for maybe hidden spots
         regionData = self.regionData.loc[self.data["data"]]

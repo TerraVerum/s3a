@@ -6,7 +6,13 @@ from typing import List, Union
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from qtextras import RunOptions, EasyWidget, ImageViewer, ParameterContainer
+from qtextras import (
+    RunOptions,
+    EasyWidget,
+    ImageViewer,
+    ParameterContainer,
+    bindInteractorOptions as bind,
+)
 
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
@@ -194,14 +200,8 @@ class RegionHistoryViewer(QtWidgets.QMainWindow):
         super().show()
         self.displayPlot.toolsEditor.show()
 
+    @bind(curSlice=dict(type="slider", limits=[0, 10]))
     def updateImage(self, curSlice=0):
-        """
-        Parameters
-        ----------
-        curSlice
-            pType: slider
-            limits: [0, 10]
-        """
         self.differenceImage.setImage(self.differenceImages[curSlice])
 
     def discardLeftEntries(self):

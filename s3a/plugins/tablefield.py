@@ -11,6 +11,7 @@ import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 from qtextras import (
+    bindInteractorOptions as bind,
     ParameterContainer,
     DeferredActionStackMixin as DASM,
     RunOptions,
@@ -175,8 +176,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         # noinspection PyTypeChecker
         verts: XYVertices = verts.astype(int)
         activeEdits = len(self.region.regionData["Vertices"]) > 0
-        if not activeEdits and self.window.componentController.selectionIntersectsRegion(
-            verts
+        if (
+            not activeEdits
+            and self.window.componentController.selectionIntersectsRegion(verts)
         ):
             # Warning already handled by main image
             return
@@ -584,6 +586,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             outImgs.append(img)
         return initialImg, outImgs
 
+    @bind(info=dict(type="list", limits=[""]), alpha=dict(limits=[0, 1], step=0.01))
     def overlayStageInfo(self, info: t.Union[str, dict] = "", alpha=1.0):
         """
         Parameters
@@ -593,12 +596,8 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             image. Note that if multiple stages exist with the same name and a string
             is passed, include the 1-based numeric index in the name, i.e. if two
             'Open' stages exist, to select the second stage pass 'Open#2'.
-            pType: list
-            limits: ['']
         alpha
             Opacity of this overlay
-            limits: [0, 1]
-            step: 0.1
         """
         if not isinstance(info, dict):
             self._displayedStage = info

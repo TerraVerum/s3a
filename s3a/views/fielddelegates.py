@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui
-from qtextras import OptionsDict
+from qtextras import OptionsDict, bindInteractorOptions as bind
 
 from .regions import MultiRegionPlot
 from ..constants import REQD_TBL_FIELDS as RTF
@@ -105,6 +105,7 @@ class TextFieldDelegate(SceneItemContainer):
         self.bgScatter.setZValue(99)
         self.items = [self.scatter, self.bgScatter]
 
+    @bind(textColor=dict(type="color"))
     def setData(
         self,
         components: pd.DataFrame,
@@ -113,12 +114,6 @@ class TextFieldDelegate(SceneItemContainer):
         textColor="w",
         **kwargs,
     ):
-        """
-        Parameters
-        ----------
-        textColor
-            pType: color
-        """
         positions = np.row_stack(
             components[RTF.VERTICES].apply(lambda el: getTopLeftCoordinate(el.stack()))
         )
@@ -198,6 +193,7 @@ class XYVerticesDelegate(SceneItemContainer):
         for it in self.items:
             it.setZValue(100)
 
+    @bind(spotColor=dict(type="color"))
     def setData(
         self,
         components: pd.DataFrame,
@@ -207,12 +203,6 @@ class XYVerticesDelegate(SceneItemContainer):
         calloutWidth=1,
         **kwargs,
     ):
-        """
-        Parameters
-        ----------
-        spotColor
-            pType: color
-        """
         # Single coordinates and disconnected vertices are points, while connected
         # vertices are shaded polygons.
         polyVerts, pointVerts, callouts = [], [], []

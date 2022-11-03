@@ -12,6 +12,7 @@ import pandas as pd
 from pyqtgraph.Qt import QtCore, QtWidgets
 from qtextras import (
     ParameterContainer,
+    bindInteractorOptions as bind,
     ActionStack,
     DeferredActionStackMixin as DASM,
     RunOptions,
@@ -432,7 +433,15 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
                 # otherwise they would overwrite, so it's safe to break here
                 break
 
-    @fns.dynamicDocstring(filters=defaultIo.ioFileFilter(PRJ_ENUMS.IO_EXPORT))
+    @bind(
+        outputPath=dict(
+            title=fns.nameFormatter("output_file"),
+            type="file",
+            value="",
+            fileMode="ExistingFile",
+            filter=defaultIo.ioFileFilter(PRJ_ENUMS.IO_EXPORT),
+        )
+    )
     def exportCurrentAnnotation(self, outputPath: str | Path, **kwargs):
         """
         Exports current image annotations to a file. This may be more convenient than
@@ -442,10 +451,6 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         ----------
         outputPath
             Where to export. The file extension determines the save type
-            title: Output File
-            pType: filepicker
-            existing: False
-            fileFilter: {filters}
         **kwargs
             Passed to the exporter
         """

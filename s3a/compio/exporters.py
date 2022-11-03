@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
-from qtextras import OptionsDict, fns
+from qtextras import OptionsDict, fns, bindInteractorOptions as bind
 from qtextras.typeoverloads import FilePath
 
 from .base import NO_ERRORS, AnnotationExporter
@@ -63,6 +63,7 @@ class LblPngExporter(AnnotationExporter):
             maskType = "int32"
         return np.full(shape, backgroundColor, dtype=maskType)
 
+    @bind(colormap=dict(type="str", value=""))
     def populateMetadata(
         self,
         file: FilePath = None,
@@ -98,11 +99,9 @@ class LblPngExporter(AnnotationExporter):
             exported file
         colormap
             If provided, must correspond to a pyqtgraph colormap. Results
-          in an RGB output instead of grayscale mask where each label is indexed into
-          the colormap (including the background label). Note that providing a colormap
-          prevents the export from being re-imported later by a LblPngImporter.
-          type: str
-          value: ''
+            in an RGB output instead of grayscale mask where each label is indexed into
+            the colormap (including the background label). Note that providing a colormap
+            prevents the export from being re-imported later by a LblPngImporter.
         returnLabelMap
             Whether to return a pd.Series matching original index values to their
             numeric counterparts. Note: this is important in cases where an offset must
@@ -288,7 +287,14 @@ class CompImgsDfExporter(AnnotationExporter):
         super().__init__(*args, **kwargs)
         self.exportLblPng = LblPngExporter()
 
-    @fns.dynamicDocstring(cols=list(allOutputColumns))
+    @bind(
+        includeFields=dict(
+            type="checklist",
+            value=list(allOutputColumns),
+            limits=list(allOutputColumns),
+            expanded=False,
+        )
+    )
     def populateMetadata(
         self,
         source: FilePath | dict | DirectoryDict = None,
@@ -313,10 +319,6 @@ class CompImgsDfExporter(AnnotationExporter):
             absolute. Alternatively, can be a dict of name to np.ndarray image mappings
         includeFields
             Which columns to include in the export list
-            pType: checklist
-            limits: {cols}
-            value: {cols}
-            expanded: False
         labelField
             See ``ComponentIO.exportLblPng``. This label is provided in the output
             dataframe as well, if specified.

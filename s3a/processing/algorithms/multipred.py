@@ -83,7 +83,11 @@ def points_to_components(matchPts: np.ndarray, component: pd.Series):
     return outComps
 
 
-@fns.dynamicDocstring(metricTypes=[d for d in dir(cv) if d.startswith("TM")])
+@bind(
+    threshold=dict(limits=[0, 1], step=0.1),
+    metric=dict(type="list", limits=["TM_CCOEFF_NORMED"]),
+    area=dict(type="list", limits=["image", "viewbox"]),
+)
 def cv_template_match_single(
     component: pd.Series,
     image: np.ndarray,
@@ -103,16 +107,10 @@ def cv_template_match_single(
         Main image
     threshold
         Cutoff point to consider a matched template
-        limits: [0, 1]
-        step: 0.1
     metric
         Template maching metric
-        pType: list
-        limits: {metricTypes}
     area
         Where to apply the new components
-        pType: list
-        limits: ['image', 'viewbox']
     """
     template, templateBbox = gutils.getCroppedImage(
         image, component[RTF.VERTICES].stack()
@@ -157,6 +155,10 @@ cv_template_match = ProcessDispatcher(
 )
 
 
+@bind(
+    area=dict(type="list", limits=["image", "viewbox"]),
+    winType=dict(type="list", limits=["Row/Col Divisions", "Raw Size"]),
+)
 def make_grid_components(
     image: np.ndarray,
     components: pd.DataFrame,
@@ -179,8 +181,6 @@ def make_grid_components(
         zoomed-in boundingBox coordinates relative to the main image
     area
         Area to apply gridding
-        type: list
-        limits: ['image', 'viewbox']
     windowParam
         Number used during the calculation of window size. Its meaning changes
         depending on ``winType``
@@ -190,8 +190,6 @@ def make_grid_components(
         instance, if ``windowParam`` is 5 and image shape is (500, 300, 3), winSize
         will be 60x60 since min(500/5, 300/5) is 60. If "Raw Size", the window size is
         directly set to ``windowParam``.
-        type: list
-        limits: ['Row/Col Divisions', 'Raw Size']
     maxNumComponents
         To prevent instances where the window parameters create too many regions,
         the number of outputs will be clipped to ``maxNumComponents``
@@ -307,6 +305,7 @@ def merge_overlapping_components(components: pd.DataFrame):
     return dict(components=outComps)
 
 
+@bind(epsilon=dict(limits=[-1, None]))
 def simplify_component_vertices(components: pd.DataFrame, epsilon=1):
     """
     Runs ``ComplexXYVertices.simplify`` on each component vertices
@@ -317,7 +316,6 @@ def simplify_component_vertices(components: pd.DataFrame, epsilon=1):
         Dataframe of components to simplify
     epsilon
         Passed to ``ComplexXYVertices.simplify``
-        limits: [-1, None]
     """
     outComps = components.copy()
     outComps[RTF.VERTICES] = [
@@ -341,6 +339,7 @@ def _components_in_bounds(components: pd.DataFrame, bounds: np.ndarray):
     return pd.DataFrame(keepComps, columns=components.columns)
 
 
+@bind(overlapThreshold=dict(limits=[0, 1], step=0.1))
 def remove_overlapping_components(
     components: pd.DataFrame,
     fullComponents: pd.DataFrame,
@@ -361,8 +360,6 @@ def remove_overlapping_components(
     overlapThreshold
         Percentage overlap between any new component and existing component over which
         the new component will be discarded
-        limits: [0,1]
-        step: 0.1
     removeOverlapWithExisting
         If *True*, new components overlapping with pre-existing components will be removed
     removeOverlapWithNew
@@ -412,6 +409,7 @@ def model_prediction_factory():
     return ProcessDispatcher(categorical_prediction)
 
 
+@bind(inputShape=dict(type="str"))
 def single_categorical_prediction(
     component: pd.Series, image: np.ndarray, model, inputShape=None
 ):
@@ -429,9 +427,8 @@ def single_categorical_prediction(
         not specified, ``model.input_shape[1:3]`` will be used
     inputShape
         Specifies the image shape the model requires to run a prediction
-        type: str
     """
-    if inputShape is None:
+    if inputShape is None or not inputShape:
         raise ValueError(
             '"inputShape" must be specified either as a (h, w) tuple or string eval '
             'with namespace "model=model"'
@@ -478,6 +475,7 @@ class RunPlugins(PipelineFunction):
         the vertices plugin
         """
         return dict(plugins=plugins)
+
 
 def remove_small_components(components: pd.DataFrame, sizeThreshold=30):
     outComps = []

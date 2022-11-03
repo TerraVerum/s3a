@@ -4,8 +4,14 @@ from typing import Any, Callable, Collection, Sequence, Union
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from qtextras import DeferredActionStackMixin as DASM, ParameterEditor, OptionsDict, \
-    ButtonCollection, ImageViewer
+from qtextras import (
+    DeferredActionStackMixin as DASM,
+    ParameterEditor,
+    OptionsDict,
+    ButtonCollection,
+    ImageViewer,
+    bindInteractorOptions as bind,
+)
 
 from .clickables import RightPanViewBox
 from .regions import RegionMoverPlot
@@ -206,6 +212,7 @@ class MainImage(DASM, ImageViewer):
                 newEvFn = lambda ev: ev.ignore()
                 setattr(ax, evFn, newEvFn)
 
+    @bind(gridColor=dict(type="color"))
     def updateGridScheme(self, showGrid=False, gridWidth=1, gridColor="#fff"):
         """
         Update the grid scheme for the image plot to either show a grid with
@@ -219,7 +226,6 @@ class MainImage(DASM, ImageViewer):
             Width of the grid lines
         gridColor
             Color of the grid lines
-            pType: color
         """
         pi: pg.PlotItem = self.plotItem
         pi.showGrid(showGrid, showGrid)
