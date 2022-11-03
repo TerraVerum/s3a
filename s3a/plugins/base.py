@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Union, TYPE_CHECKING
+import typing as t
 
 import pandas as pd
 
+from pyqtgraph.parametertree import InteractiveFunction
 from pyqtgraph.Qt import QtWidgets
-from qtextras import ParameterEditor, fns
+from qtextras import ParameterEditor, fns, OptionsDict
 
 from ..constants import PRJ_CONSTS, MENU_OPTS_DIR
 from ..parameditors import algcollection
 from ..processing import PipelineParameter
 
-if TYPE_CHECKING:
+if t.TYPE_CHECKING:
     from ..models.s3abase import S3ABase
     from ..models.tablemodel import ComponentManager
     from ..shared import SharedAppSettings
@@ -49,6 +50,32 @@ class ParameterEditorPlugin(ParameterEditor):
         self.menuTitle = self._resolveMenuTitle(self.name)
         self.dock, self.menu = self.createWindowDock(window, self.menuTitle)
         self.__initSharedSettings__(shared=window.sharedSettings)
+
+    def registerPopoutFunctions(
+        self,
+        functionList: t.Sequence[t.Callable],
+        nameList: t.Sequence[str] = None,
+        groupName: str = None,
+        runActionTemplate: dict = None,
+    ):
+        if groupName is None and runActionTemplate is None:
+            raise ValueError("Must provide either group name or action options")
+        if groupName is None:
+            groupName = runActionTemplate["name"]
+        function = InteractiveFunction(
+            fns.parameterDialog, parameter=self.rootParameter.child(groupName)
+        )
+        act = self.menu.addAction(groupName, function)
+
+        if nameList is None:
+            nameList = [None] * len(functionList)
+
+        for title, func in zip(nameList, functionList):
+            self.registerFunction(func, name=title, namePath=(groupName,))
+        if "shortcut" in runActionTemplate:
+            act.setShortcut(runActionTemplate["shortcut"])
+
+        self.menu.addSeparator()
 
     def _resolveMenuTitle(self, name: str = None, ensureShortcut=True):
         name = self.menuTitle or name

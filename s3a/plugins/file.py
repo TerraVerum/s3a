@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import inspect
 import os
 import pydoc
@@ -12,17 +13,13 @@ from warnings import warn
 
 import numpy as np
 import pandas as pd
-import pyqtgraph as pg
-from pyqtgraph.parametertree.Parameter import PARAM_TYPES
-from pyqtgraph.Qt import QtCore, QtWidgets
-from utilitys import (
-    AtomicProcess,
-    CompositionMixin,
-    ParamEditor,
-    ParamEditorPlugin,
-    fns,
-)
 
+import pyqtgraph as pg
+from pyqtgraph.parametertree.Parameter import PARAM_TYPES, Parameter
+from pyqtgraph.parametertree.parameterTypes.file import popupFilePicker
+from pyqtgraph.Qt import QtCore, QtWidgets
+from qtextras import CompositionMixin, fns
+from .base import ParameterEditorPlugin
 from ..compio import ComponentIO, defaultIo
 from ..compio.base import AnnotationExporter
 from ..constants import (
@@ -36,6 +33,7 @@ from ..constants import (
 from ..generalutils import cvImsaveRgb, hierarchicalUpdate
 from ..graphicsutils import DropList
 from ..logger import getAppLogger
+from ..processing import PipelineFunction
 from ..structures import FilePath, NChanImg
 
 
@@ -49,7 +47,7 @@ def absolutePath(p: Optional[Path]):
     return Path(os.path.abspath(p))
 
 
-class FilePlugin(CompositionMixin, ParamEditorPlugin):
+class FilePlugin(CompositionMixin, ParameterEditorPlugin):
     name = "File"
 
     def __init__(self, startupName: FilePath = None, startupCfg: dict = None):
@@ -57,28 +55,28 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         self.projectData = self.exposes(ProjectData(startupName, startupCfg))
         self.autosaveTimer = QtCore.QTimer()
 
-        self.registerFunc(self.save, btnOpts=CNST.TOOL_PROJ_SAVE)
-        self.registerFunc(self.showProjectImagesGui, btnOpts=CNST.TOOL_PROJ_OPEN_IMG)
+        self.registerFunction(self.save, btnOpts=CNST.TOOL_PROJ_SAVE)
+        self.registerFunction(self.showProjectImagesGui, btnOpts=CNST.TOOL_PROJ_OPEN_IMG)
         self.menu.addSeparator()
 
-        self.registerFunc(self.createGui, btnOpts=CNST.TOOL_PROJ_CREATE)
-        self.registerFunc(self.openGui, btnOpts=CNST.TOOL_PROJ_OPEN)
+        self.registerFunction(self.createGui, btnOpts=CNST.TOOL_PROJ_CREATE)
+        self.registerFunction(self.openGui, btnOpts=CNST.TOOL_PROJ_OPEN)
 
-        self.registerPopoutFuncs(
+        self.registerPopoutFunctions(
             [self.updateProjectProperties, self.addImagesGui, self.addAnnotationsGui],
             ["Update Project Properties", "Add Images", "Add Annotations"],
-            btnOpts=CNST.TOOL_PROJ_SETTINGS,
+            runActionTemplate=CNST.TOOL_PROJ_SETTINGS,
         )
 
-        self.registerFunc(
+        self.registerFunction(
             lambda: self.win.setMainImageGui(), btnOpts=CNST.TOOL_PROJ_ADD_IMG
         )
-        self.registerFunc(
+        self.registerFunction(
             lambda: self.win.openAnnotationGui(), btnOpts=CNST.TOOL_PROJ_ADD_ANN
         )
 
-        self.registerPopoutFuncs(
-            [self.startAutosave, self.stopAutosave], btnOpts=CNST.TOOL_AUTOSAVE
+        self.registerPopoutFunctions(
+            [self.startAutosave, self.stopAutosave], runActionTemplate=CNST.TOOL_AUTOSAVE
         )
 
         self._projectImagePane = ProjectImagePane()
@@ -100,7 +98,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
                     hierarchicalUpdate(state.startupSettings, self.projectData.startup)
                 else:
                     # Opening a project after s3a is already loaded
-                    state.loadParamValues(stateDict={}, **self.projectData.startup)
+                    state.loadParameterValues(stateDict={}, **self.projectData.startup)
 
         self.projectData.sigConfigLoaded.connect(onCfgLoad)
 
@@ -119,7 +117,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         funcs have already been created
         """
         componentIo = self.projectData.componentIo
-        exportOptsParam = fns.getParamChild(
+        exportOptsParam = fns.getParameterChild(
             self.toolsEditor.params, CNST.TOOL_PROJ_EXPORT.name, "Export Options"
         )
         # Use a wrapper to easily get hyperparams created
@@ -131,7 +129,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
                 if child["value"] is None or child["type"] not in PARAM_TYPES:
                     # Not representable
                     continue
-                fns.getParamChild(exportOptsParam, chOpts=child)
+                fns.getParameterChild(exportOptsParam, childOpts=child)
         # Add catch-all that will be literally evaluated later
         exportOptsParam.addChild(
             dict(name="extra", type="text", value="", expanded=False)
@@ -182,7 +180,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
             cfg = {}
             for proc, params in self.toolsEditor.procToParamsMapping.items():
                 if proc.name == "Start Autosave":
-                    cfg = fns.paramValues(params).pop("Start Autosave", {})
+                    cfg = fns.parameterValues(params).pop("Start Autosave", {})
                     break
 
             saveName = str(savePath / "autosave.params")
@@ -207,6 +205,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         )
 
         def exportWrapper(func):
+            @functools.wraps(func)
             def wrapper(**kwargs):
                 initial = {**self.exportOptsParam}
                 # Fixup the special "extra" parameter
@@ -222,20 +221,18 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
 
             return wrapper
 
-        doctoredCur = AtomicProcess(
+        doctoredCur = PipelineFunction(
             exportWrapper(win.exportCurrentAnnotation),
-            "Current Annotation",
+            name="Current Annotation",
             outFname="",
-            docFunc=win.exportCurrentAnnotation,
         )
-        doctoredAll = AtomicProcess(
+        doctoredAll = PipelineFunction(
             exportWrapper(self.projectData.exportAnnotations),
-            docFunc=self.projectData.exportAnnotations,
         )
-        self.registerPopoutFuncs(
+        self.registerPopoutFunctions(
             [self.projectData.exportProject, doctoredAll, doctoredCur],
             ["Project", "All Annotations", "Current Annotation"],
-            btnOpts=CNST.TOOL_PROJ_EXPORT,
+            runActionTemplate=CNST.TOOL_PROJ_EXPORT,
         )
         self._projectImagePane.hide()
         self._updateProjectLabel()
@@ -268,7 +265,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
             self.projectData.loadConfig(configPath, configDict, force=True)
 
     def openGui(self):
-        fname = fns.popupFilePicker(
+        fname = popupFilePicker(
             None, "Select Project File", f"S3A Project (*.{PROJECT_FILE_TYPE})"
         )
         with pg.BusyCursor():
@@ -430,7 +427,7 @@ class FilePlugin(CompositionMixin, ParamEditorPlugin):
         else:
             baseCfg = {}
         projPath = Path(wiz.projSettings["Location"]) / projName
-        outPrj = self.projectData.create(name=projPath, cfg=baseCfg)
+        outPrj = self.projectData.create(name=projPath, config=baseCfg)
         if prevTemplate:
             prevTemplateLoc = Path(prevTemplate).parent
             if settings["Keep Existing Images"]:
@@ -479,10 +476,9 @@ class NewProjectWizard(QtWidgets.QWizard):
                 tip="Whether to keep annotations specified in the existing config",
             ),
         ]
-        # Use ParamEditor for speedy tree building
-        editor = ParamEditor(paramList=settings, saveDir=None)
-        tree = editor.tree
-        self.projSettings = editor.params
+        param = Parameter.create(name="Project Settings", type="group", children=settings)
+        tree = fns.flexibleParameterTree(param)
+        self.projSettings = param
         self.nameToPageMapping: Dict[str, QtWidgets.QWizardPage] = {}
         layout = QtWidgets.QVBoxLayout()
         page.setLayout(layout)
@@ -619,7 +615,7 @@ class ProjectData(QtCore.QObject):
         self.imageFolders: Set[Path] = set()
         self.imageAnnotationMap: Dict[Path, Path] = {}
         """Records annotations belonging to each image"""
-        self.spawnedPlugins: List[ParamEditorPlugin] = []
+        self.spawnedPlugins: List[ParameterEditorPlugin] = []
         """
         Plugin instances stored separately from plugin-cfg to maintain serializability 
         of ``self.config`` 
@@ -737,7 +733,7 @@ class ProjectData(QtCore.QObject):
         warnPlgs = []
         for plgName, plgPath in newPlugins.items():
             # noinspection PyTypeChecker
-            pluginCls: Type[ParamEditorPlugin] = pydoc.locate(plgPath)
+            pluginCls: Type[ParameterEditorPlugin] = pydoc.locate(plgPath)
             if pluginCls:
                 # False Positive
                 # noinspection PyCallingNonCallable
@@ -1025,7 +1021,7 @@ class ProjectData(QtCore.QObject):
         fileFilter = (
             "Image Files (*.png *.tif *.jpg *.jpeg *.bmp *.jfif);;All files(*.*)"
         )
-        fname = fns.popupFilePicker(None, "Add Image to Project", fileFilter)
+        fname = popupFilePicker(None, "Add Image to Project", fileFilter)
         if fname is not None:
             self.addImage(fname, copyToProject=copyToProject)
 
