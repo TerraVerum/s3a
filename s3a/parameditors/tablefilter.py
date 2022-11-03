@@ -5,6 +5,7 @@ from typing import List
 import numpy as np
 import pandas as pd
 from pyqtgraph.parametertree import Parameter
+from pyqtgraph.Qt import QtWidgets
 from qtextras import OptionsDict, ParameterEditor, fns
 
 from ..constants import TABLE_DIR
@@ -144,6 +145,13 @@ class TableFilterEditor(ParameterEditor):
         )
         self.rootParameter.addChildren(filterParams)
 
+    def _buildGui(self, **kwargs):
+        self.applyButton = QtWidgets.QPushButton("Apply Filter")
+        return super()._buildGui(**kwargs)
+
+    def _guiChildren(self) -> list:
+        return super()._guiChildren() + [self.applyButton]
+
     def updateParameterList(self, paramList: List[OptionsDict]):
         newParams = []
         badCols = []
@@ -172,7 +180,7 @@ class TableFilterEditor(ParameterEditor):
     @property
     def activeFilters(self):
         filters = {}
-        for child in self.params.childs:
+        for child in self.rootParameter.childs:
             if child["Active"]:
                 cState = next(
                     iter(fns.parameterValues(child, includeDefaults=True).values())

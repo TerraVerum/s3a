@@ -150,7 +150,7 @@ class ComponentController(DASM, QtCore.QObject):
             ):
                 self.redrawComponents()
 
-        self._filter.sigChangesApplied.connect(_maybeRedraw)
+        self._filter.applyButton.clicked.connect(_maybeRedraw)
 
         self.regionMover.sigMoveStarted.connect(
             lambda *args: self.activateRegionCopier()
@@ -182,7 +182,9 @@ class ComponentController(DASM, QtCore.QObject):
             delegIo = ParameterEditor.defaultInteractor.functionToParameterDict(
                 deleg.setData
             )
-            useIo = {ch["name"]: ch for ch in delegIo["children"]}
+            useIo = {
+                ch["name"]: ch for ch in delegIo["children"] if ch["type"] != "type"
+            }
             io.update(useIo)
         return InteractiveFunction(self.showFieldInfoById, **io)
 
