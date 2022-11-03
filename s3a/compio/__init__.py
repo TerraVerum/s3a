@@ -3,7 +3,7 @@ import ast
 import numpy as np
 
 from .helpers import registerIoHandler
-from ..structures import ComplexXYVertices, PrjParamGroup, XYVertices
+from ..structures import ComplexXYVertices, OptionsDictGroup, XYVertices
 
 # Wait to import compio until after registry is populated
 
@@ -32,7 +32,7 @@ registerIoHandler(
 
 registerIoHandler(
     "prjparam",
-    deserialize=lambda param, strVal: PrjParamGroup.fieldFromParam(param.group, strVal),
+    deserialize=lambda param, strVal: OptionsDictGroup.fieldFromParameter(param.group, strVal),
     serialize=lambda param, val: str(val),
     takesParam=True,
 )

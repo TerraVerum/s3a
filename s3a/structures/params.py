@@ -4,12 +4,12 @@ import weakref
 from typing import Collection, Optional, Union
 from warnings import warn
 
-from utilitys import PrjParam
+from qtextras import OptionsDict
 
-__all__ = ["PrjParam", "PrjParamGroup"]
+__all__ = ["OptionsDict", "OptionsDictGroup"]
 
 
-class PrjParamGroup:
+class OptionsDictGroup:
     """
     Hosts all child parameters and offers convenience function for iterating over them
     """
@@ -17,7 +17,7 @@ class PrjParamGroup:
     def __init__(self, fields=None):
         self.fields = fields if len(fields) else []
 
-    def paramNames(self):
+    def parameterNames(self):
         """
         Outputs the column names of each parameter in the group.
         """
@@ -37,24 +37,24 @@ class PrjParamGroup:
             param.group = weakref.proxy(self)
 
     @staticmethod
-    def fieldFromParam(
-        group: Collection[PrjParam],
-        param: Union[str, PrjParam],
-        default: PrjParam = None,
+    def fieldFromParameter(
+        group: Collection[OptionsDict],
+        parameter: Union[str, OptionsDict],
+        default: OptionsDict = None,
     ):
         """
-        Allows user to create a :class:`PrjParam` object from its string value (or a
+        Allows user to create a :class:`OptionsDict` object from its string value (or a
         parameter that can equal one of the parameters in this list)
         """
-        param = str(param).lower()
+        parameter = str(parameter).lower()
         for matchParam in group:
-            if str(matchParam).lower() == param:
+            if str(matchParam).lower() == parameter:
                 return matchParam
         # If we reach here the value didn't match any CNSTomponentTypes values. Throw
         # an error
         if default is None and hasattr(group, "getDefault"):
             default = group.getDefault()
-        baseWarnMsg = f'String representation "{param}" was not recognized.\n'
+        baseWarnMsg = f'String representation "{parameter}" was not recognized.\n'
         if default is None:
             # No default specified, so we have to raise Exception
             raise ValueError(
@@ -67,7 +67,7 @@ class PrjParamGroup:
         return default
 
     @classmethod
-    def getDefault(cls) -> Optional[PrjParam]:
+    def getDefault(cls) -> Optional[OptionsDict]:
         """
         Returns the default Param from the group. This can be overloaded in derived
         classes to yield a safe fallback class if the :func:`fieldFromParam` method

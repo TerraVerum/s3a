@@ -1,17 +1,19 @@
 import pytest
 
-from s3a.structures import PrjParam, PrjParamGroup
+from s3a.structures import OptionsDict, OptionsDictGroup
 
-pgroup = [PrjParam("test"), PrjParam("this")]
+pgroup = [OptionsDict("test"), OptionsDict("this")]
 
 
 def test_fromString_valid():
-    assert PrjParamGroup.fieldFromParam(pgroup, "test") == pgroup[0]
+    assert OptionsDictGroup.fieldFromParameter(pgroup, "test") == pgroup[0]
 
 
 def test_fromString_invalid():
     with pytest.raises(ValueError):
-        PrjParamGroup.fieldFromParam(pgroup, "noparam")
+        OptionsDictGroup.fieldFromParameter(pgroup, "noparam")
     with pytest.warns(UserWarning):
-        newParam = PrjParamGroup.fieldFromParam(pgroup, "noparam", default=pgroup[0])
+        newParam = OptionsDictGroup.fieldFromParameter(
+            pgroup, "noparam", default=pgroup[0]
+        )
     assert newParam == pgroup[0]

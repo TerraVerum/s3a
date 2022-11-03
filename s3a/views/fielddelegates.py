@@ -12,7 +12,7 @@ from qtextras import OptionsDict
 from .regions import MultiRegionPlot
 from ..constants import REQD_TBL_FIELDS as RTF
 from ..generalutils import getTopLeftCoordinate, symbolFromVertices
-from ..structures import PrjParamGroup
+from ..structures import OptionsDictGroup
 
 
 class FieldDisplayDelegate(ABC):
@@ -331,7 +331,7 @@ class FieldDisplay:
             fields = allFields
         else:
             # user arguments could be strings
-            fields = [PrjParamGroup.fieldFromParam(allFields, f) for f in fields]
+            fields = [OptionsDictGroup.fieldFromParameter(allFields, f) for f in fields]
 
         defaultFields = [
             f

@@ -33,7 +33,7 @@ from ..generalutils import (
     toDictGen,
     toHtmlWithStyle,
 )
-from ..structures import ComplexXYVertices, PrjParamGroup
+from ..structures import ComplexXYVertices, OptionsDictGroup
 
 __all__ = [
     "LblPngExporter",
@@ -118,7 +118,7 @@ class LblPngExporter(AnnotationExporter):
             Additional keyword arguments to pass to
             :meth:`AnnotationExporter.populateMetadata`
         """
-        labelField = PrjParamGroup.fieldFromParam(
+        labelField = OptionsDictGroup.fieldFromParameter(
             list(self.componentDf.columns), labelField
         )
         if backgroundColor < 0 and not colormap:
@@ -396,7 +396,7 @@ class CompImgsDfExporter(AnnotationExporter):
             resizeOptions = {}
             cropperFunc = getCroppedImage
         self.cropperFunction = cropperFunc
-        labelField = PrjParamGroup.fieldFromParam(self.componentDf, labelField)
+        labelField = OptionsDictGroup.fieldFromParameter(self.componentDf, labelField)
         return self._forwardMetadata(locals())
 
     def writeFile(self, file: FilePath, exportObject, **kwargs):
@@ -800,7 +800,7 @@ class YoloV5Exporter(CsvExporter):
             raise ValueError("Cannot export yolov5 without specifying `imageShape`")
         if labelField is None:
             raise ValueError("Cannot export yolov5 without specifying `labelField`")
-        labelField = PrjParamGroup.fieldFromParam(self.componentDf, labelField)
+        labelField = OptionsDictGroup.fieldFromParameter(self.componentDf, labelField)
         return self._forwardMetadata(locals())
 
     def bulkExport(

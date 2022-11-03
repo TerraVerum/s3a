@@ -13,7 +13,7 @@ from .templatemgr import IOTemplateManager
 from .yamlparser import YamlParser
 from ..constants import REQD_TBL_FIELDS as RTF
 from ..parameditors.tablefilter import TableFilterEditor
-from ..structures import PrjParamGroup
+from ..structures import OptionsDictGroup
 
 
 def getFieldAliases(field: OptionsDict):
@@ -201,7 +201,7 @@ class TableData(QtCore.QObject):
         Helper function to retrieve the OptionsDict corresponding to the field with this
         name
         """
-        return PrjParamGroup.fieldFromParam(self.allFields, name, default)
+        return OptionsDictGroup.fieldFromParameter(self.allFields, name, default)
 
     def resolveFieldAliases(self, fields: Sequence[OptionsDict], mapping: dict = None):
         """
