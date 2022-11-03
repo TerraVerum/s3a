@@ -5,10 +5,9 @@ import numpy as np
 import pandas as pd
 from pyqtgraph import SignalProxy
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, isQObjectAlive
-from qtextras import ParameterContainer
-from utilitys import ParamEditorPlugin
-from utilitys.widgets import ImageViewer
+from qtextras import ParameterContainer, ImageViewer
 
+from .base import ParameterEditorPlugin
 from ..constants import PRJ_CONSTS as CNST
 from ..logger import getAppLogger
 from ..shared import SharedAppSettings
@@ -30,7 +29,7 @@ class MetricsEventFilter(QtCore.QObject):
         self.metrics = metrics
 
     def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent):
-        mImg = self.metrics.win.mainImage
+        mImg = self.metrics.window.mainImage
         if not (
             QtWidgets.QApplication.mouseButtons() == QtCore.Qt.MouseButton.LeftButton
             and event.type() in [event.Type.MetaCall]
@@ -51,7 +50,7 @@ class MetricsEventFilter(QtCore.QObject):
         return False
 
 
-class UserMetricsPlugin(ParamEditorPlugin):
+class UserMetricsPlugin(ParameterEditorPlugin):
     name = "User Metrics"
 
     def __init__(self, *args, **kwargs):
@@ -63,13 +62,13 @@ class UserMetricsPlugin(ParamEditorPlugin):
         self._metricsImage = None
         self._metricsViewer = self._metricsViewerContainer = None
         self.collectorProxies: t.List[SignalProxy] = []
-        self.registerFunc(self.showMetricsWidgetGui, name="Show Metrics Widget")
-        self.registerFunc(self.resetMetrics)
+        self.registerFunction(self.showMetricsWidgetGui, name="Show Metrics Widget")
+        self.registerFunction(self.resetMetrics)
 
-    def __initEditorParams__(self, shared: SharedAppSettings):
-        super().__initEditorParams__(shared=shared)
+    def __initSharedSettings__(self, shared: SharedAppSettings=None, **kwargs):
+        super().__initSharedSettings__(shared=shared)
         self.props = ParameterContainer()
-        param = shared.generalProperties.registerProp(
+        param = shared.generalProperties.registerParameter(
             CNST.PROP_COLLECT_USR_METRICS, container=self.props
         )
 
@@ -82,8 +81,8 @@ class UserMetricsPlugin(ParamEditorPlugin):
 
         param.sigValueChanged.connect(onPropChange)
 
-    def attachWinRef(self, win):
-        super().attachWinRef(win)
+    def attachToWindow(self, win):
+        super().attachToWindow(win)
 
         if self.props[CNST.PROP_COLLECT_USR_METRICS]:
             self.activateMetricCollection()
@@ -93,7 +92,7 @@ class UserMetricsPlugin(ParamEditorPlugin):
         win.mainImage.imgItem.sigImageChanged.connect(self.resetMetrics)
 
     def activateMetricCollection(self):
-        mImg: MainImage = self.win.mainImage
+        mImg: MainImage = self.window.mainImage
 
         def collectViewboxMetrics(args):
             vb, vbRange, axes = args
@@ -119,7 +118,7 @@ class UserMetricsPlugin(ParamEditorPlugin):
         mImg.scene().installEventFilter(self.mainImageMouseFilter)
 
     def deactivateMetricCollection(self):
-        mImg: MainImage = self.win.mainImage
+        mImg: MainImage = self.window.mainImage
         mImg.scene().removeEventFilter(self.mainImageMouseFilter)
         for proxy in self.collectorProxies:
             proxy.disconnect()
@@ -159,7 +158,7 @@ class UserMetricsPlugin(ParamEditorPlugin):
         else:
             image = self._metricsImage
         if image is None:
-            image = np.zeros((*self.win.mainImage.image.shape[:2], len(actions)))
+            image = np.zeros((*self.window.mainImage.image.shape[:2], len(actions)))
 
         vbRanges = metricsToUse.loc[
             metricsToUse["viewbox_range"].notnull(), "viewbox_range"
