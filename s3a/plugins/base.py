@@ -13,9 +13,10 @@ from ..parameditors import algcollection
 from ..processing import PipelineParameter
 
 if TYPE_CHECKING:
-    from ..views.s3agui import S3A
+    from ..models.s3abase import S3ABase
     from ..models.tablemodel import ComponentManager
     from ..shared import SharedAppSettings
+    from ..views.s3agui import S3A
 
 _UNSET_NAME = object()
 
@@ -43,11 +44,11 @@ class ParameterEditorPlugin(ParameterEditor):
 
         super().__init__(name=name, directory=directory)
 
-    def attachToWindow(self, window: S3A):
-        self.__initSharedSettings__(shared=window.sharedSettings)
+    def attachToWindow(self, window: S3A | S3ABase):
         self.window = window
         self.menuTitle = self._resolveMenuTitle(self.name)
         self.dock, self.menu = self.createWindowDock(window, self.menuTitle)
+        self.__initSharedSettings__(shared=window.sharedSettings)
 
     def _resolveMenuTitle(self, name: str = None, ensureShortcut=True):
         name = self.menuTitle or name
