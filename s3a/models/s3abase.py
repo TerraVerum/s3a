@@ -83,7 +83,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         self.mainImage = MainImage(toolbar=self.generalToolbar)
         PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION.opts["ownerObj"] = self.mainImage
         attrs = self.sharedSettings
-        self.mainImage.toolsEditor.registerFunc(
+        self.mainImage.toolsEditor.registerFunction(
             self.acceptFocusedRegion, btnOpts=PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION
         )
         attrs.generalProperties.registerFunction(
@@ -115,7 +115,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         self.sourceImagePath: t.Optional[Path] = None
 
         self.appStateEditor = AppStateEditor(
-            self.sharedSettings.quickLoader, self, name="App State Editor"
+            name="App State Editor", quickLoader=self.sharedSettings.quickLoader
         )
 
         # -----

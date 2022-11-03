@@ -6,8 +6,10 @@ from typing import Dict, List, Sequence, Union
 import pandas as pd
 import pyqtgraph as pg
 import qdarkstyle
+
+from pyqtgraph.parametertree.parameterTypes.file import popupFilePicker
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from utilitys import ParamEditor, ParamEditorPlugin, PrjParam, RunOpts, fns, widgets
+from qtextras import OptionsDict, RunOptions, fns, widgets, ParameterEditor
 
 from ..constants import ICON_DIR, LAYOUTS_DIR, PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
 from ..generalutils import hierarchicalUpdate
@@ -16,6 +18,7 @@ from ..models.s3abase import S3ABase
 from ..plugins.table import ComponentTablePlugin
 from ..plugins.mainimage import MainImagePlugin
 from ..plugins.misc import RandomToolsPlugin
+from ..plugins import ParameterEditorPlugin
 from ..shared import SharedAppSettings
 from ..structures import FilePath, NChanImg
 
@@ -27,15 +30,6 @@ _MENU_PLUGINS = [RandomToolsPlugin]
 class S3A(S3ABase):
     sigLayoutSaved = QtCore.Signal()
 
-    __groupingName__ = "Application"
-
-    def __initEditorParams__(self, shared: SharedAppSettings):
-        super().__initEditorParams__(shared)
-        self.toolsEditor = ParamEditor.buildClsToolsEditor(type(self), "Application")
-        shared.colorScheme.registerFunc(
-            self.updateTheme, runOpts=RunOpts.ON_CHANGED, nest=False
-        )
-
     def __init__(
         self,
         log: Union[str, Sequence[str]] = PRJ_ENUMS.LOG_TERM,
@@ -45,6 +39,12 @@ class S3A(S3ABase):
         # Wait to import quick loader profiles until after self initialization so
         # customized loading functions also get called
         super().__init__(**startupSettings)
+
+        self.toolsEditor = ParameterEditor(name="Application")
+        self.sharedSettings.colorScheme.registerFunction(
+            self.updateTheme, runOptions=RunOptions.ON_CHANGED, nest=False
+        )
+
         self.setWindowIcon(QtGui.QIcon(str(ICON_DIR / "s3alogo.svg")))
         logger = getAppLogger()
         if PRJ_ENUMS.LOG_GUI in log:
@@ -76,7 +76,9 @@ class S3A(S3ABase):
         # -----
         # Dummy editor for layout options since it doesn't really have editable settings
         # Maybe later this can be elevated to have more options
-        self.layoutEditor = ParamEditor(self, None, LAYOUTS_DIR, "dockstate", "Layout")
+        self.layoutEditor = ParameterEditor(
+            name="Layout", directory=LAYOUTS_DIR, suffix=".dockstate"
+        )
 
         def loadLayout(layoutName: Union[str, Path]):
             layoutName = Path(layoutName)
@@ -120,7 +122,7 @@ class S3A(S3ABase):
         self.setCentralWidget(centralWidget)
         layout = QtWidgets.QVBoxLayout(centralWidget)
 
-        self.toolbarWidgets: Dict[PrjParam, List[QtGui.QAction]] = defaultdict(list)
+        self.toolbarWidgets: Dict[OptionsDict, List[QtGui.QAction]] = defaultdict(list)
         layout.addWidget(self.mainImage)
 
         self.tableFieldToolbar.setObjectName("Table Field Plugins")
@@ -129,7 +131,9 @@ class S3A(S3ABase):
         self.generalToolbar.setObjectName("General")
         self.addToolBar(self.generalToolbar)
 
-        _plugins = [self.classPluginMap[c] for c in [MainImagePlugin, ComponentTablePlugin]]
+        _plugins = [
+            self.classPluginMap[c] for c in [MainImagePlugin, ComponentTablePlugin]
+        ]
         parents = [self.mainImage, self.tableView]
         for plugin, parent in zip(_plugins, reversed(parents)):
             plugin.toolsEditor.actionsMenuFromProcs(
@@ -194,7 +198,7 @@ class S3A(S3ABase):
         if outFname is not None:
             self.tableData.loadConfig(outFname)
 
-    def _addPluginObject(self, plugin: ParamEditorPlugin, **kwargs):
+    def _addPluginObject(self, plugin: ParameterEditorPlugin, **kwargs):
         plugin = super()._addPluginObject(plugin, **kwargs)
         if not plugin:
             return
@@ -233,7 +237,7 @@ class S3A(S3ABase):
         fileFilter = (
             "Image Files (*.png *.tif *.jpg *.jpeg *.bmp *.jfif);;All files(*.*)"
         )
-        fname = fns.popupFilePicker(None, "Select Main Image", fileFilter)
+        fname = popupFilePicker(None, "Select Main Image", fileFilter)
         if fname is not None:
             with pg.BusyCursor():
                 self.setMainImage(fname)
@@ -241,7 +245,7 @@ class S3A(S3ABase):
     def exportAnnotationsGui(self):
         """Saves the component table to a file"""
         fileFilters = self.componentIo.ioFileFilter(**{"*": "All Files"})
-        outFname = fns.popupFilePicker(
+        outFname = popupFilePicker(
             None, "Select Save File", fileFilters, existing=False
         )
         if outFname is not None:
@@ -251,7 +255,7 @@ class S3A(S3ABase):
         # TODO: See note about exporting components. Delegate the filepicker activity to
         #  importer
         fileFilter = self.componentIo.ioFileFilter(which=PRJ_ENUMS.IO_IMPORT)
-        fname = fns.popupFilePicker(None, "Select Load File", fileFilter)
+        fname = popupFilePicker(None, "Select Load File", fileFilter)
         if fname is None:
             return
         self.openAnnotations(fname)
@@ -288,9 +292,8 @@ class S3A(S3ABase):
         if shouldExit:
             # Clean up all editor windows, which could potentially be left open
             ev.accept()
-            fns.restoreExceptionBehavior()
             if not forceClose:
-                self.appStateEditor.saveParamValues()
+                self.appStateEditor.saveParameterValues()
 
     def forceClose(self):
         """
