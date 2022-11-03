@@ -573,5 +573,5 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
             parser.add_argument(
                 f'--{editor.name.lower().replace(" ", "")}', choices=formatted
             )
-        for loader in self.appStateEditor.stateFuncsDf.index:
+        for loader in self.appStateEditor.stateFunctionsDf.index:
             parser.add_argument(f"--{loader}", type=str)

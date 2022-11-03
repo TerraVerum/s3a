@@ -109,7 +109,7 @@ def test_load_startup_img(tmp_path, app, filePlugin):
     )
     for img in None, filePlugin.projectData.imagesPath / "my-image.jpg":
         app.sourceImagePath = img
-        app.appStateEditor.stateFuncsDf.at["project", "exportFunction"](
+        app.appStateEditor.stateFunctionsDf.at["project", "exportFunction"](
             tmp_path / "another"
         )
         assert bool(img) == ("image" in filePlugin.projectData.startup)
@@ -290,7 +290,7 @@ def test_load_autosave(app, filePlugin, tmp_path):
 
     fns.saveToFile({"interval": 10}, tmp_path / _autosaveFile)
 
-    importer = state.stateFuncsDf.at["autosave", "importFunction"]
+    importer = state.stateFunctionsDf.at["autosave", "importFunction"]
     importer(True)
     assert filePlugin.autosaveTimer.isActive()
 
@@ -306,7 +306,7 @@ def test_export_autosave(app, filePlugin, tmp_path):
 
     fns.saveToFile({"interval": 10}, tmp_path / _autosaveFile)
 
-    exporter = state.stateFuncsDf.at["autosave", "exportFunction"]
+    exporter = state.stateFunctionsDf.at["autosave", "exportFunction"]
     for proc, params in filePlugin.toolsEditor.procToParamsMapping.items():
         if proc.name == "Start Autosave":
             break

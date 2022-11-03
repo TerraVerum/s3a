@@ -5,9 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Union
 
 import pandas as pd
-from pyqtgraph.parametertree import Parameter
-from utilitys import ParamEditor
-from utilitys.fns import attemptFileLoad, serAsFrame
+from qtextras import attemptFileLoad, seriesAsFrame, ParameterEditor
 
 from ..constants import APP_STATE_DIR
 from ..generalutils import hierarchicalUpdate, safeCallFunction, safeCallFunctionList
@@ -18,21 +16,18 @@ if TYPE_CHECKING:
     from .quickloader import QuickLoaderEditor
 
 
-class AppStateEditor(ParamEditor):
+class AppStateEditor(ParameterEditor):
     def __init__(
         self,
-        quickLoader: QuickLoaderEditor = None,
-        parent=None,
-        paramList: List[Dict] = None,
-        saveDir: FilePath = APP_STATE_DIR,
-        fileType="parameter",
         name=None,
-        topTreeChild: Parameter = None,
+        quickLoader: QuickLoaderEditor = None,
+        directory: FilePath = APP_STATE_DIR,
+        suffix=".appstate",
     ):
         # TODO: Add params to choose which features are saved, etc.
-        super().__init__(parent, paramList, saveDir, fileType, name, topTreeChild)
+        super().__init__(name=name, directory=directory, suffix=suffix)
         self.quickLoader = quickLoader
-        self.stateFuncsDf = pd.DataFrame(
+        self.stateFunctionsDf = pd.DataFrame(
             columns=["importFunction", "exportFunction", "required"]
         )
         self.loading = False
@@ -44,9 +39,9 @@ class AppStateEditor(ParamEditor):
             saveName = self.RECENT_STATE_FNAME
         if paramState is None:
             # TODO: May be good in the future to be able to choose which should be saved
-            legitKeys = self.stateFuncsDf.index
-            exportFuncs = self.stateFuncsDf.exportFunction
-            saveOnExitDir = self.saveDir / "saved_on_exit"
+            legitKeys = self.stateFunctionsDf.index
+            exportFuncs = self.stateFunctionsDf.exportFunction
+            saveOnExitDir = self.stateManager.directory / "saved_on_exit"
             saveOnExitDir.mkdir(exist_ok=True)
             rets, errs = safeCallFunctionList(
                 legitKeys, exportFuncs, [[saveOnExitDir]] * len(legitKeys)
@@ -64,7 +59,7 @@ class AppStateEditor(ParamEditor):
         else:
             errs = []
 
-        ret = super().saveParamValues(saveName, paramState, **kwargs)
+        ret = super().saveParameterValues(saveName, paramState, **kwargs)
         self.raiseErrorMessageIfNeeded(errs)
         return ret
 
@@ -95,14 +90,14 @@ class AppStateEditor(ParamEditor):
             def nextKey():
                 hierarchicalUpdate(stateDict, self.startupSettings)
                 self.startupSettings.clear()
-                legitKeys = self.stateFuncsDf.index.intersection(stateDict)
+                legitKeys = self.stateFunctionsDf.index.intersection(stateDict)
                 if legitKeys.size > 0:
                     return legitKeys[0]
 
             key = nextKey()
             rets, errs = [], {}
             while key:
-                importFunc = self.stateFuncsDf.loc[key, "importFunction"]
+                importFunc = self.stateFunctionsDf.loc[key, "importFunction"]
                 arg = stateDict.pop(key, None)
                 curRet, curErr = safeCallFunction(key, importFunc, arg)
                 rets.append(curRet)
@@ -136,7 +131,7 @@ class AppStateEditor(ParamEditor):
             out = self._parseStateDict(stateName, stateDict)
         except FileNotFoundError:
             out = {}
-        for k in self.stateFuncsDf.index[self.stateFuncsDf["required"]]:
+        for k in self.stateFunctionsDf.index[self.stateFunctionsDf["required"]]:
             out.setdefault(k, defaults.get(k))
         return out
 
@@ -187,18 +182,18 @@ class AppStateEditor(ParamEditor):
         newRow = pd.Series(
             [importFunction, exportFunction, required],
             name=optionName,
-            index=self.stateFuncsDf.columns,
+            index=self.stateFunctionsDf.columns,
         )
         if index is not None:
             # First, shift old entries
-            df = self.stateFuncsDf
-            self.stateFuncsDf = pd.concat(
-                [df.iloc[:index], serAsFrame(newRow), df.iloc[index:]]
+            df = self.stateFunctionsDf
+            self.stateFunctionsDf = pd.concat(
+                [df.iloc[:index], seriesAsFrame(newRow), df.iloc[index:]]
             )
         else:
-            self.stateFuncsDf: pd.DataFrame
-            self.stateFuncsDf.loc[optionName] = newRow
+            self.stateFunctionsDf: pd.DataFrame
+            self.stateFunctionsDf.loc[optionName] = newRow
 
     @property
     def RECENT_STATE_FNAME(self):
-        return self.saveDir / f"recent.{self.fileType}"
+        return self.stateManager.directory / f"recent.{self.stateManager.suffix}"
