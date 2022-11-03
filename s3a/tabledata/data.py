@@ -39,6 +39,7 @@ def aliasesToRequired(field: OptionsDict):
 class TableData(QtCore.QObject):
     sigConfigUpdated = QtCore.Signal(object)
     """dict (self.config) during update"""
+    filter: Optional[TableFilterEditor]
 
     def __init__(
         self,

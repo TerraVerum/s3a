@@ -16,17 +16,17 @@ def editor(app):
 def test_normal_add(ql, editor):
     ql.addActionForEditor(editor, "Default")
     ql.applyChanges()
-    assert editor.name in ql.params.names
-    ql.params.clearChildren()
+    assert editor.name in ql.rootParameter.names
+    ql.rootParameter.clearChildren()
 
 
 def test_double_add(ql, editor):
     ql.addActionForEditor(editor, "Default")
     ql.addActionForEditor(editor, "Default")
-    assert editor.name in ql.params.names
-    param = ql.params.child(editor.name)
+    assert editor.name in ql.rootParameter.names
+    param = ql.rootParameter.child(editor.name)
     assert len(param.children()) == 1
-    ql.params.clearChildren()
+    ql.rootParameter.clearChildren()
 
 
 @pytest.mark.qt_no_exception_capture
@@ -40,8 +40,8 @@ def test_invalid_load(caplog, ql, editor):
     invalidLoadCaller()
     crits = [r for r in caplog.records if r.levelno == logging.CRITICAL]
     assert crits
-    assert len(ql.params.child(editor.name).children()) == 0
-    ql.params.clearChildren()
+    assert len(ql.rootParameter.child(editor.name).children()) == 0
+    ql.rootParameter.clearChildren()
     caplog.clear()
 
 
@@ -50,14 +50,14 @@ def test_from_line_edit(ql, editor):
         ql.listModel.displayFormat.format(stateName="Default", editor=editor)
     )
     ql.addFromLineEdit()
-    assert len(ql.params.child(editor.name).children()) == 1
-    ql.params.clearChildren()
+    assert len(ql.rootParameter.child(editor.name).children()) == 1
+    ql.rootParameter.clearChildren()
 
 
 def test_invalid_line_edit_add(ql):
     ql.addNewParamState.setText("Doesnt Exist")
     ql.addFromLineEdit()
-    assert len(ql.params.children()) == 0
+    assert len(ql.rootParameter.children()) == 0
 
 
 def test_bad_user_profile(ql):
@@ -73,7 +73,7 @@ def test_load_state(ql):
         "App Settings": {"Default": None},
     }
     ql.loadParameterValues("test", state)
-    assert len(ql.params.childs) == 3
+    assert len(ql.rootParameter.childs) == 3
     for ch in ql.params:
         assert "Default" in ch.names
 

@@ -92,7 +92,7 @@ def test_filter():
     del parsed["fields"]["Bad"]
     td.loadConfig(td.configPath, parsed, force=True)
     for name in parsed["fields"]:
-        assert name in td.filter.params.names
+        assert name in td.filter.rootParameter.names
         assert td.fieldFromName(name)
 
     filterStatus = {"List": {"Active": True, "A": True, "B": False, "C": False}}
