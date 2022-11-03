@@ -1,21 +1,20 @@
+from __future__ import annotations
+
 import argparse
 import inspect
 import os.path
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Type, Union
+import typing as t
 from warnings import warn
 
 import numpy as np
 import pandas as pd
 from pyqtgraph.Qt import QtCore, QtWidgets
-from qtextras import ParameterContainer
-from utilitys import (
+from qtextras import (
+    ParameterContainer,
     ActionStack,
     DeferredActionStackMixin as DASM,
-    ParamEditor,
-    ParamEditorDockGrouping,
-    ParamEditorPlugin,
-    RunOpts,
+    RunOptions,
     fns,
 )
 
@@ -25,6 +24,7 @@ from ..controls.tableviewproxy import ComponentController, ComponentSorterFilter
 from ..logger import getAppLogger
 from ..models.tablemodel import ComponentManager
 from ..parameditors.appstate import AppStateEditor
+from ..plugins.base import ParameterEditorPlugin as PEPlugin
 from ..plugins import EXTERNAL_PLUGINS, INTERNAL_PLUGINS, tablefield
 from ..plugins.file import FilePlugin
 from ..plugins.misc import RandomToolsPlugin
@@ -71,14 +71,11 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
             container=self.props,
         )
 
-        self.classPluginMap: Dict[Type[ParamEditorPlugin], ParamEditorPlugin] = {}
+        self.classPluginMap: dict[t.Type[PEPlugin], PEPlugin] = {}
         """
         Maintains a record of all plugins added to this window. Only up to one instance
         of each plugin class is expected.
         """
-
-        self.docks: List[QtWidgets.QDockWidget] = []
-        """List of docks from added plugins"""
 
         self.tableFieldToolbar = QtWidgets.QToolBar("Table Field Plugins")
         self.generalToolbar = QtWidgets.QToolBar("General")
@@ -89,22 +86,15 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         self.mainImage.toolsEditor.registerFunc(
             self.acceptFocusedRegion, btnOpts=PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION
         )
-        _, param = attrs.generalProperties.registerFunc(
+        attrs.generalProperties.registerFunction(
             self.actionStack.resizeStack,
-            runOpts=RunOpts.ON_CHANGED,
+            runOptions=RunOptions.ON_CHANGED,
             maxLength={
                 **PRJ_CONSTS.PROP_UNDO_BUF_SZ.toPgDict(),
                 "title": PRJ_CONSTS.PROP_UNDO_BUF_SZ.name,
             },
-            returnParam=True,
             nest=False,
             container=self.props,
-        )
-
-        attrs.shortcuts.registerShortcut(
-            PRJ_CONSTS.TOOL_CLEAR_ROI,
-            self.mainImage.clearCurrentRoi,
-            overrideOwnerObj=self.mainImage,
         )
 
         self.tableData = TableData(makeFilter=True)
@@ -122,7 +112,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         self.tableView.setModel(self.sortFilterProxy)
 
         self.hasUnsavedChanges = False
-        self.sourceImagePath: Optional[Path] = None
+        self.sourceImagePath: t.Optional[Path] = None
 
         self.appStateEditor = AppStateEditor(
             self.sharedSettings.quickLoader, self, name="App State Editor"
@@ -132,12 +122,6 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         # INTERFACE WITH QUICK LOADER / PLUGINS
         # -----
         toAdd = INTERNAL_PLUGINS() + EXTERNAL_PLUGINS()
-        # Insert "settings" and "shortcuts" in a more logical location (after file + edit)
-        toAdd = (
-            toAdd[:2]
-            + [self.sharedSettings.settingsPlugin, self.sharedSettings.shortcutsPlugin]
-            + toAdd[2:]
-        )
         for plg in toAdd:
             if inspect.isclass(plg):
                 self.addPlugin(plg)
@@ -222,12 +206,8 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
             mgr.endResetModel()
 
     def saveAllEditorDefaults(self):
-        for editor in self.docks:
-            if isinstance(editor, ParamEditorDockGrouping):
-                for subEditor in editor.editors:
-                    subEditor.saveCurStateAsDefault()
-            else:
-                editor.saveCurStateAsDefault()
+        for editor in self.classPluginMap.values():
+            editor.saveParameterValues(editor.stateManager.getDefaultState())
 
     @DASM.undoable("Accept Focused Region")
     def acceptFocusedRegion(self):
@@ -264,7 +244,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
 
     def _acceptFocusedNew(self, focusedComponent: pd.Series):
         # New, make a brand new table entry
-        compAsDf = fns.serAsFrame(focusedComponent)
+        compAsDf = fns.seriesAsFrame(focusedComponent)
         newIds = self.componentManager.addComponents(compAsDf)["added"]
         compAsDf[REQD_TBL_FIELDS.ID] = newIds
         compAsDf = compAsDf.set_index(REQD_TBL_FIELDS.ID, drop=False)
@@ -280,7 +260,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         oldComp = self.componentManager.compDf.loc[
             [focusedComponent[REQD_TBL_FIELDS.ID]]
         ].copy()
-        modifiedDf = fns.serAsFrame(focusedComponent)
+        modifiedDf = fns.seriesAsFrame(focusedComponent)
         self.componentManager.addComponents(
             modifiedDf, addType=PRJ_ENUMS.COMPONENT_ADD_AS_MERGE
         )
@@ -297,7 +277,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         """Removes all components from the component table"""
         self.componentManager.removeComponents()
 
-    def addPlugin(self, pluginCls: Type[ParamEditorPlugin], *args, **kwargs):
+    def addPlugin(self, pluginClass: t.Type[PEPlugin], *args, **kwargs):
         """
         From a class inheriting the ``PrjParamEditorPlugin``, creates a plugin object
         that will appear in the S3A toolbar. An entry is created with dropdown options
@@ -305,22 +285,22 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
 
         Parameters
         ----------
-        pluginCls
+        pluginClass
             Class containing plugin actions
         args
             Passed to class constructor
         kwargs
             Passed to class constructor
         """
-        if pluginCls in self.classPluginMap:
+        if pluginClass in self.classPluginMap:
             getAppLogger(__name__).info(
-                f"Ignoring {pluginCls} since it was previously added", UserWarning
+                f"Ignoring {pluginClass} since it was previously added", UserWarning
             )
 
-        plugin: ParamEditorPlugin = pluginCls(*args, **kwargs)
+        plugin: PEPlugin = pluginClass(*args, **kwargs)
         return self._addPluginObject(plugin)
 
-    def _addPluginObject(self, plugin: ParamEditorPlugin, overwriteExisting=False):
+    def _addPluginObject(self, plugin: PEPlugin, overwriteExisting=False):
         """
         Adds already intsantiated plugin. Discourage public use of this API since most
         plugin use should be class-based until window registration. This mainly
@@ -330,11 +310,8 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         if not overwriteExisting and pluginCls in self.classPluginMap:
             return None
         self.classPluginMap[pluginCls] = plugin
-        if plugin.dock is not None and plugin.dock not in self.docks:
-            self.docks.append(plugin.dock)
-        # Many plugins register functions when attaching win
-        with ParamEditor.setBaseRegisterPath(plugin.__groupingName__):
-            plugin.attachWinRef(self)
+
+        plugin.attachToWindow(self)
         if plugin.dock:
             plugin.dock.setParent(self)
         self.sigPluginAdded.emit(plugin)
@@ -438,7 +415,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
             # saved.
             self.hasUnsavedChanges = False
 
-    def _maybeLoadActiveAnnotation(self, addedAnnotations: List[Path]):
+    def _maybeLoadActiveAnnotation(self, addedAnnotations: list[Path]):
         """
         When annotations are added to a project while an image is active, that image
         will not receive the new annotations. This function looks through recently
@@ -456,7 +433,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
                 break
 
     @fns.dynamicDocstring(filters=defaultIo.ioFileFilter(PRJ_ENUMS.IO_EXPORT))
-    def exportCurrentAnnotation(self, outputPath: Union[str, Path], **kwargs):
+    def exportCurrentAnnotation(self, outputPath: str | Path, **kwargs):
         """
         Exports current image annotations to a file. This may be more convenient than
         exporting an entire project if just the current annotations are needed
@@ -548,7 +525,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
             dummyStack.undo()
         self.componentController.selectRowsById([oldFocused])
 
-    def changeFocusedComponent(self, ids: Union[int, Sequence[int]] = None):
+    def changeFocusedComponent(self, ids: int | t.Sequence[int] | None = None):
         # TODO: More robust scenario if multiple components are in the dataframe
         #   For now, treat ambiguity by not focusing anything
         if np.isscalar(ids):

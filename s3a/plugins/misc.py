@@ -25,7 +25,13 @@ class RandomToolsPlugin(ParameterEditorPlugin):
 
     def attachToWindow(self, window):
         super().attachToWindow(window)
-
+        self.registerFunction(
+            self.window.mainImage.clearCurrentRoi,
+            runActionTemplate={
+                "ownerWidget": self.window.mainImage,
+                **CNST.TOOL_CLEAR_ROI,
+            },
+        )
         self.registerFunction(self.showDevConsoleGui, name="Show Dev Console")
         self.registerFunction(
             window.clearBoundaries, runActionTemplate=CNST.TOOL_CLEAR_BOUNDARIES
