@@ -81,15 +81,15 @@ class UserMetricsPlugin(ParameterEditorPlugin):
 
         param.sigValueChanged.connect(onPropChange)
 
-    def attachToWindow(self, win):
-        super().attachToWindow(win)
+    def attachToWindow(self, window):
+        super().attachToWindow(window)
 
         if self.props[CNST.PROP_COLLECT_USR_METRICS]:
             self.activateMetricCollection()
         else:
             self.menu.menuAction().setVisible(False)
 
-        win.mainImage.imgItem.sigImageChanged.connect(self.resetMetrics)
+        window.mainImage.imgItem.sigImageChanged.connect(self.resetMetrics)
 
     def activateMetricCollection(self):
         mImg: MainImage = self.window.mainImage

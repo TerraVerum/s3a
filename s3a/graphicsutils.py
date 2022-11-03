@@ -174,7 +174,7 @@ class RegionHistoryViewer(QtWidgets.QMainWindow):
             self.discardLeftEntries, name="Discard Entries Left of Slider"
         )
 
-        EasyWidget.buildMainWindow([dp], layout="H", win=self)
+        EasyWidget.buildMainWindow([dp], layout="H", window=self)
         dp.toolsEditor.createWindowDock(self, createProcessesMenu=False)
 
     def setDifferenceImages(self, differenceImages: List[np.ndarray]):

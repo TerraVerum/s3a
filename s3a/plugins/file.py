@@ -70,10 +70,12 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         )
 
         self.registerFunction(
-            lambda: self.win.setMainImageGui(), runActionTemplate=CNST.TOOL_PROJ_ADD_IMG
+            lambda: self.window.setMainImageGui,
+            runActionTemplate=CNST.TOOL_PROJ_ADD_IMG,
         )
         self.registerFunction(
-            lambda: self.win.openAnnotationGui(), runActionTemplate=CNST.TOOL_PROJ_ADD_ANN
+            lambda: self.window.openAnnotationGui,
+            runActionTemplate=CNST.TOOL_PROJ_ADD_ANN,
         )
 
         self.registerPopoutFunctions(
@@ -83,7 +85,7 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
 
         self._projectImagePane = ProjectImagePane()
         self._projectImagePane.sigImageSelected.connect(
-            lambda imgFname: self.win.setMainImage(imgFname)
+            lambda imgFname: self.window.setMainImage(imgFname)
         )
         self.projectData.sigConfigLoaded.connect(
             lambda: self._projectImagePane.setRootDirectory(
@@ -95,7 +97,7 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
             self._updateProjectLabel()
             if self.win:
                 # Other arguments are consumed by app state editor
-                state = self.win.appStateEditor
+                state = self.window.appStateEditor
                 if state.loading:
                     hierarchicalUpdate(state.startupSettings, self.projectData.startup)
                 else:
@@ -200,7 +202,7 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
             if not imgName.exists():
                 return
             addedName = self.projectData.addImage(imgName)
-            self.win.setMainImage(addedName or imgName)
+            self.window.setMainImage(addedName or imgName)
 
         win.appStateEditor.addImportExportOptions(
             "image", startImage, lambda *args: None, 1
@@ -263,7 +265,7 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
             absolutePath(configPath) != self.projectData.configPath
             or not pg.eq(configDict, self.projectData.config)
         ):
-            self.win.setMainImage(None)
+            self.window.setMainImage(None)
             self.projectData.loadConfig(configPath, configDict, force=True)
 
     def openGui(self):
@@ -274,7 +276,7 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
             self.open(fname)
 
     def save(self):
-        self.win.saveCurrentAnnotation()
+        self.window.saveCurrentAnnotation()
         self.projectData.saveConfig()
         getAppLogger(__name__).attention("Saved project")
 
@@ -343,7 +345,7 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         backupFolder = Path(backupFolder)
         backupFolder.mkdir(exist_ok=True, parents=True)
         # LGTM false positive, used in closure below
-        lastSavedDf = self.win.componentDf.copy()  # lgtm [py/unused-local-variable]
+        lastSavedDf = self.window.componentDf.copy()  # lgtm [py/unused-local-variable]
         # Qtimer expects ms, turn mins->s->ms
         # Figure out where to start the counter
         globExpr = lambda: backupFolder.glob(f"{baseName}*.{annotationFormat}")
@@ -362,7 +364,7 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
                 backupFolder / f"{baseName}_{counter}.{annotationFormat}"
             )
             counter += 1
-            curDf = self.win.componentDf
+            curDf = self.window.componentDf
             # A few things can go wrong during the comparison
             # noinspection PyBroadException
             try:
@@ -370,12 +372,12 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
             except Exception:
                 isEqual = False
             if not isEqual:
-                self.win.exportCurrentAnnotation(baseSaveNamePlusFolder)
+                self.window.exportCurrentAnnotation(baseSaveNamePlusFolder)
                 lastSavedDf = curDf.copy()
 
         if saveToBackup:
             self.autosaveTimer.timeout.connect(saveAndIncrementCounter)
-        self.autosaveTimer.timeout.connect(self.win.saveCurrentAnnotation)
+        self.autosaveTimer.timeout.connect(self.window.saveCurrentAnnotation)
         self.autosaveTimer.start(int(interval * 60 * 1000))
         getAppLogger(__name__).attention(f"Started autosaving")
 
@@ -409,7 +411,7 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         if wiz.exec_():
             # Make sure if a file is added on top of the current image, recent changes
             # don't get lost
-            self.win.saveCurrentAnnotation()
+            self.window.saveCurrentAnnotation()
             for file in page.fileList.files:
                 self.projectData.addAnnotationByPath(file)
 

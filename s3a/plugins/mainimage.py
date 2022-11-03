@@ -24,7 +24,6 @@ if TYPE_CHECKING:
 class MainImagePlugin(ParameterEditorPlugin):
     _makeMenuShortcuts = False
     tableData: TableData
-    win: S3ABase
 
     def __initSharedSettings__(self, shared: SharedAppSettings = None, **kwargs):
         self.props = ParameterContainer()
@@ -32,7 +31,7 @@ class MainImagePlugin(ParameterEditorPlugin):
             CNST.PROP_MIN_COMP_SZ, container=self.props
         )
         shared.colorScheme.registerFunction(
-            self.win.mainImage.updateGridScheme, runOptions=RunOptions.ON_CHANGED
+            self.window.mainImage.updateGridScheme, runOptions=RunOptions.ON_CHANGED
         )
         shared.colorScheme.registerFunction(
             PointROI.updateRadius,
@@ -71,15 +70,15 @@ class MainImagePlugin(ParameterEditorPlugin):
         window.mainImage.addTools(self)
         super().attachToWindow(window)
 
-    def _hookupDrawActions(self, win):
-        disp = win.componentController
+    def _hookupDrawActions(self, window):
+        disp = window.componentController
 
         def actHandler(verts, param):
-            activeEdits = len(self.win.verticesPlugin.region.regionData["Vertices"]) > 0
+            activeEdits = len(self.window.verticesPlugin.region.regionData["Vertices"]) > 0
             if (
                 param in [CNST.DRAW_ACT_REM, CNST.DRAW_ACT_ADD]
                 and not activeEdits
-                and self.win.componentController.selectionIntersectsRegion(verts)
+                and self.window.componentController.selectionIntersectsRegion(verts)
             ):
                 warnings.warn(
                     "Made a selection on top of an existing component. It is ambiguous"
@@ -95,7 +94,7 @@ class MainImagePlugin(ParameterEditorPlugin):
                 return
             # Special case: Selection with point shape should be a point
             if (
-                self.win.mainImage.shapeCollection.shapeParameter
+                self.window.mainImage.shapeCollection.shapeParameter
                 == CNST.DRAW_SHAPE_POINT
             ):
                 verts = verts.mean(0, keepdims=True)
@@ -107,12 +106,12 @@ class MainImagePlugin(ParameterEditorPlugin):
             CNST.DRAW_ACT_SELECT,
             CNST.DRAW_ACT_PAN,
         ]
-        win.mainImage.registerDrawAction(acts, actHandler)
+        window.mainImage.registerDrawAction(acts, actHandler)
         # Create checks an edge case for selection, so no need to add to above acts
-        win.mainImage.registerDrawAction(CNST.DRAW_ACT_CREATE, self.createComponent)
+        window.mainImage.registerDrawAction(CNST.DRAW_ACT_CREATE, self.createComponent)
 
-    def _hookupCopier(self, win):
-        mainImage = win.mainImage
+    def _hookupCopier(self, window):
+        mainImage = window.mainImage
 
         copier = mainImage.regionMover
 
@@ -135,7 +134,7 @@ class MainImagePlugin(ParameterEditorPlugin):
 
         self.registerFunction(startMove, runActionTemplate=CNST.TOOL_MOVE_REGIONS)
         self.registerFunction(startCopy, runActionTemplate=CNST.TOOL_COPY_REGIONS)
-        copier.sigMoveStopped.connect(win.componentManager.updateFocusedComponent)
+        copier.sigMoveStopped.connect(window.componentManager.updateFocusedComponent)
 
     def _hookupSelectionTools(self, window):
         disp = window.componentController
@@ -153,19 +152,19 @@ class MainImagePlugin(ParameterEditorPlugin):
 
     @property
     def image(self):
-        return self.win.mainImage.image
+        return self.window.mainImage.image
 
     def createComponent(self, roiVertices: XYVertices):
         verts = np.clip(roiVertices.astype(int), 0, self.image.shape[:2][::-1])
 
         if cv.contourArea(verts) < self.props[CNST.PROP_MIN_COMP_SZ]:
             # Use as selection instead of creation
-            self.win.componentController.reflectSelectionBoundsMade(roiVertices[[0]])
+            self.window.componentController.reflectSelectionBoundsMade(roiVertices[[0]])
             return
 
         verts = ComplexXYVertices([verts]).simplify(
-            self.win.verticesPlugin.props[CNST.PROP_REG_APPROX_EPS]
+            self.window.verticesPlugin.props[CNST.PROP_REG_APPROX_EPS]
         )
         newComps = self.tableData.makeComponentDf()
         newComps[RTF.VERTICES] = [verts]
-        self.win.addAndFocusComponents(newComps)
+        self.window.addAndFocusComponents(newComps)
