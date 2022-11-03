@@ -233,14 +233,14 @@ class QuickLoaderEditor(MetaTreeParameterEditor):
             )
             qShortcut.activated.connect(
                 functools.partial(
-                    self._safeLoadParamValues, act, editor, parameterState
+                    self._safeLoadParameterValues, act, editor, parameterState
                 )
             )
             act.setOpts(shortcut=qShortcut)
         else:
             qShortcut.setKey(act.value())
 
-    def _safeLoadParamValues(
+    def _safeLoadParameterValues(
         self, action: Parameter, editor: ParameterEditor, parameterState: str
     ):
         """

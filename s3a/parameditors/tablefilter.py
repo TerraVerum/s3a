@@ -167,8 +167,7 @@ class TableFilterEditor(ParameterEditor):
                 f' since types {", ".join(colTypes)} do not have corresponding filters',
                 UserWarning,
             )
-        self.saveParamValues(blockWrite=True)
-        self.saveCurStateAsDefault()
+        self.saveParameterValues(self.stateManager.getDefaultState())
 
     @property
     def activeFilters(self):
@@ -176,7 +175,7 @@ class TableFilterEditor(ParameterEditor):
         for child in self.params.childs:
             if child["Active"]:
                 cState = next(
-                    iter(fns.paramValues(child, includeDefaults=True).values())
+                    iter(fns.parameterValues(child, includeDefaults=True).values())
                 )
                 cState.pop("Active")
                 filters[child.name()] = cState

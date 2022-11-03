@@ -34,36 +34,38 @@ class AppStateEditor(ParameterEditor):
 
         self.startupSettings = {}
 
-    def saveParamValues(self, saveName: str = None, paramState: dict = None, **kwargs):
+    def saveParameterValues(
+        self, saveName: str = None, parameterState: dict = None, **kwargs
+    ):
         if saveName is None:
             saveName = self.RECENT_STATE_FNAME
-        if paramState is None:
+        if parameterState is None:
             # TODO: May be good in the future to be able to choose which should be saved
             legitKeys = self.stateFunctionsDf.index
             exportFuncs = self.stateFunctionsDf.exportFunction
-            saveOnExitDir = self.stateManager.directory / "saved_on_exit"
+            saveOnExitDir = self.directory / "saved_on_exit"
             saveOnExitDir.mkdir(exist_ok=True)
             rets, errs = safeCallFunctionList(
                 legitKeys, exportFuncs, [[saveOnExitDir]] * len(legitKeys)
             )
             updateDict = {k: ret for k, ret in zip(legitKeys, rets) if ret is not None}
-            paramState = dict(**updateDict)
+            parameterState = dict(**updateDict)
             for editor in self.quickLoader.listModel.uniqueEditors:
-                if editor.stateManager.stateName == "Default":
+                if editor.stateName == editor.stateManager.DEFAULT_STATE_NAME:
                     curSaveName = str(saveOnExitDir / editor.name)
                 else:
-                    curSaveName = editor.stateManager.stateName
+                    curSaveName = editor.stateName
                 formattedName = editor.name.replace(" ", "").lower()
-                editor.saveParamValues(curSaveName)
-                paramState.update({formattedName: curSaveName})
+                editor.saveParameterValues(curSaveName)
+                parameterState.update({formattedName: curSaveName})
         else:
             errs = []
 
-        ret = super().saveParameterValues(saveName, paramState, **kwargs)
+        ret = super().saveParameterValues(saveName, parameterState, **kwargs)
         self.raiseErrorMessageIfNeeded(errs)
         return ret
 
-    def loadParamValues(
+    def loadParameterValues(
         self,
         stateName: Union[str, Path] = None,
         stateDict: dict = None,
@@ -112,7 +114,7 @@ class AppStateEditor(ParameterEditor):
                 )
             if stateDict:
                 self.quickLoader.buildFromStartupParameters(stateDict)
-            ret = super().loadParamValues(stateName, paramDict)
+            ret = super().loadParameterValues(stateName, paramDict)
         finally:
             self.loading = False
             hierarchicalUpdate(self.startupSettings, oldStartup)

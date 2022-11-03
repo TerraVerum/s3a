@@ -72,7 +72,7 @@ def test_load_state(ql):
         "Vertices Processor": {"Default": None},
         "App Settings": {"Default": None},
     }
-    ql.loadParamValues("test", state)
+    ql.loadParameterValues("test", state)
     assert len(ql.params.childs) == 3
     for ch in ql.params:
         assert "Default" in ch.names
@@ -84,4 +84,4 @@ def test_bad_load_state(ql):
         "Nonsense": {"Default": None},
     }
     with pytest.raises(ValueError):
-        ql.loadParamValues("test", state)
+        ql.loadParameterValues("test", state)

@@ -127,7 +127,7 @@ def test_filter():
 def apply_assertFilter(tableData, status: dict, resultLen: int, setVals: Sequence):
     fieldName = next(iter(status))
     param = tableData.fieldFromName(fieldName)
-    tableData.filter.loadParamValues(tableData.filter.stateName, status)
+    tableData.filter.loadParameterValues(tableData.filter.stateName, status)
     df = tableData.makeComponentDf(len(setVals))
     df[param] = setVals
     filteredDf = tableData.filter.filterComponentDf(df)

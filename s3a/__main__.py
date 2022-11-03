@@ -49,7 +49,7 @@ class S3AHelp(Action):
         win = S3A(loadLastState=False, log=PRJ_ENUMS.LOG_NONE)
         win.updateCliOptions(parser)
         # Prevent settings overwrite
-        win.appStateEditor.saveParamValues = lambda *args, **kwargs: None
+        win.appStateEditor.saveParameterValues = lambda *args, **kwargs: None
         win.forceClose()
         parser.print_help()
         parser.exit()

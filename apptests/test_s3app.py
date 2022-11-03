@@ -171,7 +171,7 @@ def test_set_colorinfo(app):
 def test_quickload_profile(tmp_path, app):
     outfile = tmp_path / "tmp.csv"
     app.exportCurrentAnnotation(outfile)
-    app.appStateEditor.loadParamValues(
+    app.appStateEditor.loadParameterValues(
         stateDict=dict(
             annotations=str(outfile),
             mainimageprocessor="Default",
@@ -188,13 +188,13 @@ def test_quickload_profile(tmp_path, app):
 
 def test_load_last_settings(tmp_path, sampleComps, app):
     oldSaveDir = app.appStateEditor.saveDir
-    app.appStateEditor.saveDir = tmp_path
+    app.appStateEditor.stateManager.directory = tmp_path
     app.setMainImage(SAMPLE_IMG_FNAME, SAMPLE_IMG)
     app.addAndFocusComponents(sampleComps)
-    app.appStateEditor.saveParamValues()
+    app.appStateEditor.saveParameterValues()
     app.forceClose()
-    app.appStateEditor.loadParamValues()
-    app.appStateEditor.saveDir = oldSaveDir
+    app.appStateEditor.loadParameterValues()
+    app.appStateEditor.stateManager.directory = oldSaveDir
     assert np.array_equal(app.mainImage.image, SAMPLE_IMG)
     sampleComps[REQD_TBL_FIELDS.IMAGE_FILE] = SAMPLE_IMG_FNAME.name
     sampleComps[REQD_TBL_FIELDS.ID] = sampleComps.index

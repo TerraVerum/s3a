@@ -90,8 +90,8 @@ class S3A(S3ABase):
             self.saveLayout(outFile)
             return str(outFile)
 
-        self.layoutEditor.loadParamValues = loadLayout
-        self.layoutEditor.saveParamValues = saveRecentLayout
+        self.layoutEditor.loadParameterValues = loadLayout
+        self.layoutEditor.saveParameterValues = saveRecentLayout
         self.appStateEditor.addImportExportOptions(
             "layout", loadLayout, saveRecentLayout
         )
@@ -103,7 +103,7 @@ class S3A(S3ABase):
         # Load in startup settings
         stateDict = None if loadLastState else {}
         hierarchicalUpdate(self.appStateEditor.startupSettings, startupSettings)
-        self.appStateEditor.loadParamValues(stateDict=stateDict)
+        self.appStateEditor.loadParameterValues(stateDict=stateDict)
 
     def _hookupSignals(self):
         # EDIT
