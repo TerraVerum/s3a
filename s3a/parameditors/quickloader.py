@@ -101,14 +101,17 @@ class QuickLoaderEditor(MetaTreeParameterEditor):
     def __init__(self, editorList: List[ParameterEditor] = None):
         if editorList is None:
             editorList = []
-        self.listModel = EditorListModel(editorList, self)
+        self.listModel = EditorListModel(editorList)
         self.addNewParamState = PopupLineEditor(
-            self, self.listModel, clearOnComplete=False
+            model=self.listModel, clearOnComplete=False
         )
 
         super().__init__(
             name="Quick Loader", directory=QUICK_LOAD_DIR, suffix=".loader"
         )
+        # Now that `self` is initialized, it can be used as a parent
+        for widget in self.listModel, self.addNewParamState:
+            widget.setParent(self)
 
         # self.addNewParamState.completer().activated.connect(self.addFromLineEdit)
         self.addNewParamState.returnPressed.connect(self.addFromLineEdit)
