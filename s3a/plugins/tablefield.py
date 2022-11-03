@@ -10,8 +10,13 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
-from qtextras import ParameterContainer
-from utilitys import DeferredActionStackMixin as DASM, PrjParam, ProcessIO, RunOpts, fns
+from qtextras import (
+    ParameterContainer,
+    DeferredActionStackMixin as DASM,
+    RunOptions,
+    OptionsDict,
+    fns,
+)
 
 from .base import TableFieldPlugin
 from ..constants import (
@@ -42,8 +47,8 @@ buffEntry = namedtuple("buffentry", "id_ vertices")
 class VerticesPlugin(DASM, TableFieldPlugin):
     name = "Vertices"
 
-    def __initEditorParams__(self, shared: SharedAppSettings):
-        super().__initEditorParams__()
+    def __initSharedSettings__(self, shared: SharedAppSettings = None, **kwargs):
+        super().__initSharedSettings__(shared, **kwargs)
 
         self.imageProcessCollection = AlgorithmCollection(
             ImagePipeline,
@@ -59,7 +64,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             directory=MENU_OPTS_DIR / fns.nameFormatter(type(self).__name__).lower(),
         )
 
-        self.dock.addEditors([self.processEditor])
+        _, self.processorMenu = self.processEditor.createWindowDock(
+            self.window, self.processEditor.name
+        )
 
         self.props = ParameterContainer()
         shared.generalProperties.registerProp(
@@ -84,23 +91,23 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         self.oldResultCache = None
         """Holds the last result from a region run so undoables reset the process cache"""
 
-        _, self._overlayParam = self.processEditor.registerFunc(
+        _, self._overlayParam = self.processEditor.registerFunction(
             self.overlayStageInfo,
-            parentParam=self.processEditor._metaParamGrp,
+            parentParam=self.processEditor._metaParameter,
             returnParam=True,
-            runOpts=RunOpts.ON_CHANGED,
+            runOpts=RunOptions.ON_CHANGED,
         )
 
-    def attachWinRef(self, win):
-        win.mainImage.addItem(self.region)
-        win.mainImage.addItem(self.stageInfoImage)
+    def attachToWindow(self, window):
+        window.mainImage.addItem(self.region)
+        window.mainImage.addItem(self.stageInfoImage)
 
         def resetRegBuff(_, newSize):
             newBuff = deque(maxlen=newSize)
             newBuff.extend(self.regionBuffer)
             self.regionBuffer = newBuff
 
-        mainBufSize = win.props.parameters["maxLength"]
+        mainBufSize = window.props.parameters["maxLength"]
         mainBufSize.sigValueChanged.connect(resetRegBuff)
 
         funcLst = [
@@ -118,27 +125,26 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             CNST.TOOL_INVERT_FOC_REGION,
         ]
         for func, param in zip(funcLst, paramLst):
-            self.registerFunc(func, btnOpts=param)
+            self.registerFunction(func, runActionTemplate=param)
 
         def onChange():
             self.firstRun = True
             self.clearFocusedRegion()
             self.stageInfoImage.hide()
 
-        win.mainImage.imgItem.sigImageChanged.connect(onChange)
+        window.mainImage.imgItem.sigImageChanged.connect(onChange)
 
-        win.mainImage.registerDrawAction(
+        window.mainImage.registerDrawAction(
             [CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self._runFromDrawAct
         )
-        win.mainImage.addTools(self.toolsEditor)
-        self.vb: pg.ViewBox = win.mainImage.getViewBox()
+        window.mainImage.addTools(self)
 
         self.statusButton = QtWidgets.QPushButton("No pending actions")
         self.statusButton.setToolTip("Click to abort all active/pending actions")
         self.statusButton.clicked.connect(self.endQueuedActionsGui)
-        win.statusBar().addPermanentWidget(self.statusButton)
+        window.statusBar().addPermanentWidget(self.statusButton)
 
-        super().attachWinRef(win)
+        super().attachToWindow(window)
 
     def fillRegionMask(self):
         """Completely fill the focused region mask"""
@@ -165,11 +171,11 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         if component is None or oldId != component[RTF.ID]:
             self.firstRun = True
 
-    def _runFromDrawAct(self, verts: XYVertices, param: PrjParam):
+    def _runFromDrawAct(self, verts: XYVertices, param: OptionsDict):
         # noinspection PyTypeChecker
         verts: XYVertices = verts.astype(int)
         activeEdits = len(self.region.regionData["Vertices"]) > 0
-        if not activeEdits and self.win.componentController.selectionIntersectsRegion(
+        if not activeEdits and self.window.componentController.selectionIntersectsRegion(
             verts
         ):
             # Warning already handled by main image
@@ -370,7 +376,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         if oldData.equals(centeredData):
             return
 
-        lblCol = self.win.componentController.labelColumn
+        lblCol = self.window.componentController.labelColumn
         self.region.resetRegionList(newRegionDf=centeredData, labelField=lblCol)
         self.region.focusById(centeredData.index.values)
 
@@ -381,7 +387,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
     def runOnComponent(self, component: pd.Series):
         def makeReturnValue():
-            return ProcessIO(components=fns.serAsFrame(component))
+            return dict(components=fns.seriesAsFrame(component))
 
         component = component.copy()
         img = self.mainImage.image
@@ -439,10 +445,10 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         focusedId = self.componentManager.focusedComponent[RTF.ID]
         updated = regionId != focusedId
         if updated:
-            if regionId in self.win.componentManager.compDf.index:
-                self.win.changeFocusedComponent([regionId])
+            if regionId in self.window.componentManager.compDf.index:
+                self.window.changeFocusedComponent([regionId])
             else:
-                self.win.changeFocusedComponent()
+                self.window.changeFocusedComponent()
         return updated
 
     def updateRegionFromMask(self, mask: BlackWhiteImg, offset=None, componentId=None):
@@ -545,11 +551,11 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
     def _onActivate(self):
         self.region.show()
-        self.win.componentController.regionPlot.showFocused = False
+        self.window.componentController.regionPlot.showFocused = False
 
     def _onDeactivate(self):
         self.region.hide()
-        self.win.componentController.regionPlot.showFocused = True
+        self.window.componentController.regionPlot.showFocused = True
 
     def getRegionHistory(self):
         outImgs = []
