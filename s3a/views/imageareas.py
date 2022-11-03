@@ -56,7 +56,9 @@ class MainImage(DASM, ImageViewer):
         self.lastClickPos = QtCore.QPoint()
         self.toolbar = toolbar
 
-        self.toolsEditor.registerFunction(self.resetZoom, btnOpts=CNST.TOOL_RESET_ZOOM)
+        self.toolsEditor.registerFunction(
+            self.resetZoom, runActionTemplate=CNST.TOOL_RESET_ZOOM
+        )
 
         # -----
         # DRAWING OPTIONS

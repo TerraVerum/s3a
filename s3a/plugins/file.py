@@ -55,14 +55,13 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         self.projectData = self.exposes(ProjectData(startupName, startupCfg))
         self.autosaveTimer = QtCore.QTimer()
 
-        self.registerFunction(self.save, btnOpts=CNST.TOOL_PROJ_SAVE)
+        self.registerFunction(self.save, runActionTemplate=CNST.TOOL_PROJ_SAVE)
         self.registerFunction(
-            self.showProjectImagesGui, btnOpts=CNST.TOOL_PROJ_OPEN_IMG
+            self.showProjectImagesGui, runActionTemplate=CNST.TOOL_PROJ_OPEN_IMG
         )
-        self.menu.addSeparator()
 
-        self.registerFunction(self.createGui, btnOpts=CNST.TOOL_PROJ_CREATE)
-        self.registerFunction(self.openGui, btnOpts=CNST.TOOL_PROJ_OPEN)
+        self.registerFunction(self.createGui, runActionTemplate=CNST.TOOL_PROJ_CREATE)
+        self.registerFunction(self.openGui, runActionTemplate=CNST.TOOL_PROJ_OPEN)
 
         self.registerPopoutFunctions(
             [self.updateProjectProperties, self.addImagesGui, self.addAnnotationsGui],
@@ -71,10 +70,10 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         )
 
         self.registerFunction(
-            lambda: self.win.setMainImageGui(), btnOpts=CNST.TOOL_PROJ_ADD_IMG
+            lambda: self.win.setMainImageGui(), runActionTemplate=CNST.TOOL_PROJ_ADD_IMG
         )
         self.registerFunction(
-            lambda: self.win.openAnnotationGui(), btnOpts=CNST.TOOL_PROJ_ADD_ANN
+            lambda: self.win.openAnnotationGui(), runActionTemplate=CNST.TOOL_PROJ_ADD_ANN
         )
 
         self.registerPopoutFunctions(
