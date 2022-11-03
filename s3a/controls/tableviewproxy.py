@@ -4,10 +4,10 @@ from typing import Optional, Sequence, Tuple, Union
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
+from pyqtgraph.parametertree import InteractiveFunction
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from qtextras import ParameterContainer
-from utilitys import DeferredActionStackMixin as DASM
-from utilitys.processing import AtomicProcess, ProcessIO
+from qtextras import ParameterContainer, ParameterEditor, FROM_PREV_IO
+from qtextras import DeferredActionStackMixin as DASM, bindInteractorOptions as bind
 
 from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
 from ..models.tablemodel import ComponentManager
@@ -175,18 +175,12 @@ class ComponentController(DASM, QtCore.QObject):
     def _createFieldDisplayProcess(self):
         io = {}
         for deleg in self.fieldDisplay.availableDelegates.values():
-            delegIo = ProcessIO.fromFunction(deleg.setData)
-            useIo = {k: v.saveState() for k, v in delegIo.params.items()}
-            useIo.update(
-                {
-                    k: v
-                    for k, v in delegIo.extras.items()
-                    if v is not ProcessIO.FROM_PREV_IO
-                }
+            delegIo = ParameterEditor.defaultInteractor.functionToParameterDict(
+                deleg.setData
             )
-            # Remove keys from prev io (have no default)
+            useIo = {ch["name"]: ch for ch in delegIo["children"]}
             io.update(useIo)
-        return AtomicProcess(self.showFieldInfoById, **io)
+        return InteractiveFunction(self.showFieldInfoById, **io)
 
     def recomputePenWidth(self):
         if not self.props[PRJ_CONSTS.PROP_SCALE_PEN_WIDTH]:
@@ -385,19 +379,12 @@ class ComponentController(DASM, QtCore.QObject):
         # else: # Add to selection without clearing old selection
         #   self.selectedIds = np.concatenate([self.selectedIds, ids])
 
+    @bind(
+        ids=dict(ignore=True),
+        fields=dict(type="checklist", limits=[], expanded=False),
+        force=dict(ignore=True),
+    )
     def showFieldInfoById(self, ids=None, fields=None, force=False, **kwargs):
-        """
-        Parameters
-        ----------
-        ids
-            ignore: True
-        fields
-            pType: checklist
-            limits: []
-            expanded: False
-        force
-            ignore: True
-        """
         if not self.fieldsShowing and not force:
             return
         if not fields:
