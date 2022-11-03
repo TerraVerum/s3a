@@ -7,11 +7,11 @@ from qtextras import nameFormatter
 from .base import ProcessorPlugin
 from ..constants import (
     CONFIG_DIR,
+    MENU_OPTS_DIR,
     MULTI_PREDICTIONS_DIR,
     PRJ_CONSTS as CNST,
     PRJ_ENUMS,
     REQD_TBL_FIELDS as RTF,
-    MENU_OPTS_DIR,
 )
 from ..models.tablemodel import ComponentManager
 from ..parameditors.algcollection import AlgorithmCollection, AlgorithmEditor

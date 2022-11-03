@@ -4,8 +4,8 @@ from typing import Callable, Dict, Optional
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
-from skimage.draw import draw
 from qtextras import DeferredActionStackMixin as DASM, OptionsDict
+from skimage.draw import draw
 
 from ..constants import PRJ_CONSTS
 from ..generalutils import orderContourPoints, symbolFromVertices

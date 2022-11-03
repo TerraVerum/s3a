@@ -7,11 +7,11 @@ import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
 from qtextras import (
-    ParameterContainer,
     DeferredActionStackMixin as DASM,
     OptionsDict,
-    fns,
+    ParameterContainer,
     bindInteractorOptions as bind,
+    fns,
 )
 
 from .clickables import BoundScatterPlot

@@ -3,19 +3,19 @@ from __future__ import annotations
 import argparse
 import inspect
 import os.path
-from pathlib import Path
 import typing as t
+from pathlib import Path
 from warnings import warn
 
 import numpy as np
 import pandas as pd
 from pyqtgraph.Qt import QtCore, QtWidgets
 from qtextras import (
-    ParameterContainer,
-    bindInteractorOptions as bind,
     ActionStack,
     DeferredActionStackMixin as DASM,
+    ParameterContainer,
     RunOptions,
+    bindInteractorOptions as bind,
     fns,
 )
 
@@ -25,8 +25,8 @@ from ..controls.tableviewproxy import ComponentController, ComponentSorterFilter
 from ..logger import getAppLogger
 from ..models.tablemodel import ComponentManager
 from ..parameditors.appstate import AppStateEditor
-from ..plugins.base import ParameterEditorPlugin as PEPlugin
 from ..plugins import EXTERNAL_PLUGINS, INTERNAL_PLUGINS, tablefield
+from ..plugins.base import ParameterEditorPlugin as PEPlugin
 from ..plugins.file import FilePlugin
 from ..plugins.misc import RandomToolsPlugin
 from ..shared import SharedAppSettings

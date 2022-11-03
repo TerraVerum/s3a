@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from .base import ParameterEditorPlugin
 from ..constants import PRJ_CONSTS as CNST
 from ..logger import getAppLogger
 from ..models.s3abase import S3ABase
-from .base import ParameterEditorPlugin
+
 
 class EditPlugin(ParameterEditorPlugin):
 

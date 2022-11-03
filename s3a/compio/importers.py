@@ -14,8 +14,8 @@ import cv2 as cv
 import numpy as np
 import pandas as pd
 from PIL import Image
-from skimage import draw
 from qtextras.typeoverloads import FilePath
+from skimage import draw
 
 from .base import AnnotationImporter
 from .helpers import registerIoHandler

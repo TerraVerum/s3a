@@ -13,12 +13,12 @@ from warnings import warn
 
 import numpy as np
 import pandas as pd
-
 import pyqtgraph as pg
 from pyqtgraph.parametertree.Parameter import PARAM_TYPES, Parameter
 from pyqtgraph.parametertree.parameterTypes.file import popupFilePicker
 from pyqtgraph.Qt import QtCore, QtWidgets
-from qtextras import CompositionMixin, fns, bindInteractorOptions as bind
+from qtextras import CompositionMixin, bindInteractorOptions as bind, fns
+
 from .base import ParameterEditorPlugin
 from ..compio import ComponentIO, defaultIo
 from ..compio.base import AnnotationExporter

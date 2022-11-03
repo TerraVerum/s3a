@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
-from qtextras import fns, OptionsDict
+from qtextras import OptionsDict, fns
 from qtextras.typeoverloads import FilePath
 
 from .templatemgr import IOTemplateManager

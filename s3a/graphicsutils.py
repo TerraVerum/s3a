@@ -7,10 +7,10 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from qtextras import (
-    RunOptions,
     EasyWidget,
     ImageViewer,
     ParameterContainer,
+    RunOptions,
     bindInteractorOptions as bind,
 )
 

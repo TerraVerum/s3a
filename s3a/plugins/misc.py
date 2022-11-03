@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import sys
-from typing import Callable, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Sequence
 
 from pyqtgraph import console as pg_console
 from pyqtgraph.Qt import QtCore
 from qtextras import ConsoleWidget
 
-from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
 from .base import ParameterEditorPlugin
+from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
 
 if TYPE_CHECKING:
     from ..views.s3agui import S3A

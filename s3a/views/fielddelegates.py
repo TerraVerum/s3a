@@ -278,7 +278,9 @@ class FieldDisplay:
     Handles the display of component field data.
     """
 
-    DEFAULT_FIELD = OptionsDict("stringified display data", "", type="uniqueval_default")
+    DEFAULT_FIELD = OptionsDict(
+        "stringified display data", "", type="uniqueval_default"
+    )
 
     def __init__(self, plotItem: pg.PlotItem):
         self.availableDelegates = {}

@@ -1,4 +1,5 @@
 from qtextras import ParameterEditor
+
 from .constants import GENERAL_PROPERTIES_DIR, SCHEMES_DIR
 from .parameditors.quickloader import QuickLoaderEditor
 

@@ -4,18 +4,17 @@ import warnings
 from functools import lru_cache
 
 from .base import ParameterEditorPlugin
-
 from ..shims import entry_points
 
 
 def INTERNAL_PLUGINS():
-    from .table import ComponentTablePlugin
     from .edit import EditPlugin
     from .file import FilePlugin
     from .help import HelpPlugin
     from .mainimage import MainImagePlugin
     from .misc import RandomToolsPlugin
     from .multipred import MultiPredictionsPlugin
+    from .table import ComponentTablePlugin
     from .tablefield import VerticesPlugin
     from .usermetrics import UserMetricsPlugin
 

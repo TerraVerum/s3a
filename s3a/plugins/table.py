@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pyqtgraph.parametertree import RunOptions
 from qtextras import ParameterEditor
 
-from pyqtgraph.parametertree import RunOptions
+from .base import ParameterEditorPlugin
 from ..constants import PRJ_CONSTS as CNST
 from ..shared import SharedAppSettings
-from .base import ParameterEditorPlugin
 
 if TYPE_CHECKING:
     from ..tabledata import TableData

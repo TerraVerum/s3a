@@ -5,11 +5,11 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 from qtextras import (
-    DeferredActionStackMixin as DASM,
-    ParameterEditor,
-    OptionsDict,
     ButtonCollection,
+    DeferredActionStackMixin as DASM,
     ImageViewer,
+    OptionsDict,
+    ParameterEditor,
     bindInteractorOptions as bind,
 )
 

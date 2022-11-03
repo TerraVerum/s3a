@@ -21,12 +21,8 @@ class MetaTreeParameterEditor(ParameterEditor):
         return outList
 
     def _makeMetaTree(self):
-        self._metaParameter = Parameter.create(
-            name="Meta Parameters", type="group"
-        )
-        self._metaTree = fns.flexibleParameterTree(
-            self._metaParameter, showTop=False
-        )
+        self._metaParameter = Parameter.create(name="Meta Parameters", type="group")
+        self._metaTree = fns.flexibleParameterTree(self._metaParameter, showTop=False)
         # self._metaParameter.sigChildAdded.connect(
         #     lambda: mt.setMinimumHeight(int(mt.sizeHint().height() * 1.1))
         # )

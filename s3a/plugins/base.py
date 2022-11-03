@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from pathlib import Path
 import typing as t
+from pathlib import Path
 
 import pandas as pd
-
 from pyqtgraph.parametertree import InteractiveFunction
 from pyqtgraph.Qt import QtWidgets
-from qtextras import ParameterEditor, fns, OptionsDict
+from qtextras import ParameterEditor, fns
 
-from ..constants import PRJ_CONSTS, MENU_OPTS_DIR
+from ..constants import MENU_OPTS_DIR, PRJ_CONSTS
 from ..parameditors import algcollection
 from ..processing import PipelineParameter
 

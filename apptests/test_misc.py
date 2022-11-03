@@ -2,8 +2,8 @@ import ast
 
 import numpy as np
 import pytest
-from skimage import data
 from qtextras import OptionsDict
+from skimage import data
 
 from s3a import PRJ_ENUMS, ComplexXYVertices, generalutils as gu
 from s3a.compio.helpers import deserialize
@@ -97,7 +97,9 @@ def test_list_serdes(type_, fixedLims, value, limits):
         initialValue = limits[0]
         # 'a' or 'b'
         value = trueValue = trueValue[-1]
-    param = OptionsDict("test", initialValue, type_, fixedLimits=fixedLims, limits=limits)
+    param = OptionsDict(
+        "test", initialValue, type_, fixedLimits=fixedLims, limits=limits
+    )
     out, errs = deserialize(param, [value])
     if trueValue in limits or not set(trueValue).difference(limits) or not fixedLims:
         assert len(out) == 1 and out[0] == trueValue

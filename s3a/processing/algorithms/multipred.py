@@ -4,10 +4,10 @@ import typing as t
 import cv2 as cv
 import numpy as np
 import pandas as pd
+from qtextras import FROM_PREV_IO, OptionsDict, bindInteractorOptions as bind, fns
 from scipy.ndimage import maximum_filter
-from qtextras import OptionsDict, fns, FROM_PREV_IO, bindInteractorOptions as bind
-from .. import PipelineFunction
 
+from .. import PipelineFunction
 from ... import generalutils as gutils
 from ...compio.componentio import defaultIo
 from ...constants import REQD_TBL_FIELDS as RTF

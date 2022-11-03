@@ -11,11 +11,11 @@ import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
 from qtextras import (
-    bindInteractorOptions as bind,
-    ParameterContainer,
     DeferredActionStackMixin as DASM,
-    RunOptions,
     OptionsDict,
+    ParameterContainer,
+    RunOptions,
+    bindInteractorOptions as bind,
     fns,
 )
 

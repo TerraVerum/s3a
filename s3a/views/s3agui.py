@@ -6,20 +6,18 @@ from typing import Dict, List, Sequence, Union
 import pandas as pd
 import pyqtgraph as pg
 import qdarkstyle
-
 from pyqtgraph.parametertree.parameterTypes.file import popupFilePicker
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from qtextras import OptionsDict, RunOptions, fns, widgets, ParameterEditor
+from qtextras import OptionsDict, ParameterEditor, RunOptions, fns, widgets
 
 from ..constants import ICON_DIR, LAYOUTS_DIR, PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
 from ..generalutils import hierarchicalUpdate
 from ..logger import getAppLogger
 from ..models.s3abase import S3ABase
-from ..plugins.table import ComponentTablePlugin
+from ..plugins import ParameterEditorPlugin
 from ..plugins.mainimage import MainImagePlugin
 from ..plugins.misc import RandomToolsPlugin
-from ..plugins import ParameterEditorPlugin
-from ..shared import SharedAppSettings
+from ..plugins.table import ComponentTablePlugin
 from ..structures import FilePath, NChanImg
 
 __all__ = ["S3A"]

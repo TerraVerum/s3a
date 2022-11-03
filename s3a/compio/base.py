@@ -6,13 +6,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from qtextras import FROM_PREV_IO, OptionsDict, ParameterEditor, fns
 from qtextras.typeoverloads import FilePath
-from qtextras import (
-    fns,
-    OptionsDict,
-    ParameterEditor,
-    FROM_PREV_IO,
-)
 
 from .helpers import checkVerticesBounds, deserialize, serialize
 from ..constants import REQD_TBL_FIELDS as RTF

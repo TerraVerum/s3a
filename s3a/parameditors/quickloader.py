@@ -8,9 +8,10 @@ from pyqtgraph.Qt import QtCore, QtWidgets
 from qtextras import (
     ParameterEditor,
     PopupLineEditor,
-    getParameterChild,
     attemptFileLoad,
+    getParameterChild,
 )
+
 from . import MetaTreeParameterEditor
 from ..constants import QUICK_LOAD_DIR
 from ..generalutils import lowerNoSpaces

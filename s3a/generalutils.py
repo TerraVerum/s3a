@@ -12,13 +12,13 @@ import pandas as pd
 import pyqtgraph as pg
 from pkg_resources import parse_version
 from pyqtgraph.parametertree.interactive import InteractiveFunction
-from skimage import __version__ as _skimage_version, io, transform as trans
-from skimage.exposure import exposure
 from qtextras import OptionsDict, fns
 
 # Needs to be visible outside this file
 from qtextras.fns import hierarchicalUpdate  # noqa
 from qtextras.typeoverloads import FilePath
+from skimage import __version__ as _skimage_version, io, transform as trans
+from skimage.exposure import exposure
 
 from .constants import PRJ_ENUMS
 from .structures import BlackWhiteImg, ComplexXYVertices, NChanImg, TwoDArr, XYVertices

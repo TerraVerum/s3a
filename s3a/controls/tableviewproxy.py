@@ -6,8 +6,12 @@ import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.parametertree import InteractiveFunction
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from qtextras import ParameterContainer, ParameterEditor, FROM_PREV_IO
-from qtextras import DeferredActionStackMixin as DASM, bindInteractorOptions as bind
+from qtextras import (
+    DeferredActionStackMixin as DASM,
+    ParameterContainer,
+    ParameterEditor,
+    bindInteractorOptions as bind,
+)
 
 from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
 from ..models.tablemodel import ComponentManager

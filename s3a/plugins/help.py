@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+
 from .base import ParameterEditorPlugin
 
 

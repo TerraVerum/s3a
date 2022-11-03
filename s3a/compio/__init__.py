@@ -32,7 +32,9 @@ registerIoHandler(
 
 registerIoHandler(
     "prjparam",
-    deserialize=lambda param, strVal: OptionsDictGroup.fieldFromParameter(param.group, strVal),
+    deserialize=lambda param, strVal: OptionsDictGroup.fieldFromParameter(
+        param.group, strVal
+    ),
     serialize=lambda param, val: str(val),
     takesParam=True,
 )

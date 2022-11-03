@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
-from qtextras import OptionsDict, fns, bindInteractorOptions as bind
+from qtextras import OptionsDict, bindInteractorOptions as bind, fns
 from qtextras.typeoverloads import FilePath
 
 from .base import NO_ERRORS, AnnotationExporter

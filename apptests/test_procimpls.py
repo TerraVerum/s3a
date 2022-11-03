@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 from conftest import SAMPLE_SMALL_IMG
-from skimage import util
 from qtextras import seriesAsFrame
+from skimage import util
 
 from apptests.testingconsts import SAMPLE_IMG
 from s3a import REQD_TBL_FIELDS, ComplexXYVertices

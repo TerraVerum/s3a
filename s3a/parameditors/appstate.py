@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Union
+from typing import TYPE_CHECKING, Any, Callable, List, Union
 
 import pandas as pd
-from qtextras import attemptFileLoad, seriesAsFrame, ParameterEditor
+from qtextras import ParameterEditor, attemptFileLoad, seriesAsFrame
 
 from ..constants import APP_STATE_DIR
 from ..generalutils import hierarchicalUpdate, safeCallFunction, safeCallFunctionList

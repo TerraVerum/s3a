@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from qtextras import fns, OptionsDict, constants as C
+from qtextras import OptionsDict, constants as C, fns
 
 from .structures import ComplexXYVertices
 

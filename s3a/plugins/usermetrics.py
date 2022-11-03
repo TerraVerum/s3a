@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from pyqtgraph import SignalProxy
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets, isQObjectAlive
-from qtextras import ParameterContainer, ImageViewer
+from qtextras import ImageViewer, ParameterContainer
 
 from .base import ParameterEditorPlugin
 from ..constants import PRJ_CONSTS as CNST
@@ -65,7 +65,7 @@ class UserMetricsPlugin(ParameterEditorPlugin):
         self.registerFunction(self.showMetricsWidgetGui, name="Show Metrics Widget")
         self.registerFunction(self.resetMetrics)
 
-    def __initSharedSettings__(self, shared: SharedAppSettings=None, **kwargs):
+    def __initSharedSettings__(self, shared: SharedAppSettings = None, **kwargs):
         super().__initSharedSettings__(shared=shared)
         self.props = ParameterContainer()
         param = shared.generalProperties.registerParameter(
