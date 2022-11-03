@@ -5,7 +5,7 @@ import cv2 as cv
 import numpy as np
 import pandas as pd
 from testingconsts import RND, TEST_FILE_DIR
-from utilitys import CompositionMixin, PrjParam
+from qtextras import CompositionMixin, OptionsDict
 
 from s3a.constants import REQD_TBL_FIELDS
 from s3a.structures import ComplexXYVertices
@@ -27,7 +27,7 @@ class CompDfTester(CompositionMixin):
                 self.fillRandomCategorical(field)
 
     def fillRandomCategorical(
-        self, field: Union[str, PrjParam], compDf: pd.DataFrame = None
+        self, field: Union[str, OptionsDict], compDf: pd.DataFrame = None
     ):
         if compDf is None:
             compDf = self.compDf

@@ -2,8 +2,8 @@ import copy
 from functools import lru_cache
 from typing import Any, Tuple, Union
 
-from utilitys import PrjParam
-from utilitys.fns import loader
+from qtextras import OptionsDict
+from qtextras.fns import loader
 
 from ..compio.helpers import deserialize
 
@@ -26,7 +26,7 @@ class YamlParser:
             parameterName = (parameterName,)
         leafName = parameterName[-1]
         # Assume leaf until proven otherwise since most mechanics are still applicable
-        if isinstance(value, PrjParam):
+        if isinstance(value, OptionsDict):
             # Can happen with programmatically generated cfgs. Make a copy to
             # ensure no funky business
             parsedParam = copy.copy(value)
@@ -34,7 +34,7 @@ class YamlParser:
             parsedParam = self.parseLeaf(leafName, value)
         else:
             value = value.copy()
-            # Format nicely for PrjParam creation
+            # Format nicely for OptionsDict creation
             pVal = value.pop("value", None)
             # Ignore name, since it comes from the leaf name
             value.pop("name", None)
@@ -44,7 +44,7 @@ class YamlParser:
                 "helpText": value.pop("helpText", ""),
             }
             # Forward additional args if they exist
-            parsedParam = PrjParam(leafName, **nameArgs, **value)
+            parsedParam = OptionsDict(leafName, **nameArgs, **value)
             # Make sure value is formatted according to its type if needed
             if parsedParam.pType.lower() not in _yamlReps:
                 deserialized, err = deserialize(parsedParam, [str(parsedParam.value)])
@@ -57,7 +57,7 @@ class YamlParser:
         return parsedParam
 
     def parseLeaf(self, parameterName: str, value: Any):
-        leafParam = PrjParam(parameterName, value)
+        leafParam = OptionsDict(parameterName, value)
         value = leafParam.value
         if isinstance(value, bool):
             pass

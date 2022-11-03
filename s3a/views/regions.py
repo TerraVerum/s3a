@@ -7,7 +7,7 @@ import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
 from qtextras import ParameterContainer
-from utilitys import DeferredActionStackMixin as DASM, PrjParam, fns
+from qtextras import DeferredActionStackMixin as DASM, OptionsDict, fns
 
 from .clickables import BoundScatterPlot
 from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS as RTF
@@ -28,7 +28,7 @@ def makeMultiRegionDf(
     selected: Sequence[bool] = None,
     focused: Sequence[bool] = None,
     vertices: Sequence[ComplexXYVertices] = None,
-    labelField: PrjParam = None,
+    labelField: OptionsDict = None,
 ):
     """
     Helper for creating new dataframe holding information determining color data.
@@ -59,7 +59,6 @@ def makeMultiRegionDf(
 
 
 class MultiRegionPlot(BoundScatterPlot):
-    __groupingName__ = PRJ_CONSTS.CLS_MULT_REG_PLT.name
     # Compatibility with non-interactive plot mode for ComponentController
     props = ParameterContainer(penWidth=0)
 
@@ -92,7 +91,7 @@ class MultiRegionPlot(BoundScatterPlot):
     def resetRegionList(
         self,
         newRegionDf: Optional[pd.DataFrame] = None,
-        labelField: PrjParam = RTF.ID,
+        labelField: OptionsDict = RTF.ID,
     ):
         idList = None
         if newRegionDf is not None and labelField in newRegionDf.columns:

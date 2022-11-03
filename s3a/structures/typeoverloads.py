@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pandas as pd
 from numpy import ndarray
-from utilitys import PrjParam
-from utilitys.typeoverloads import FilePath
+from qtextras import OptionsDict
+from qtextras.typeoverloads import FilePath
 
 # `FilePath` Exposed for convenience
 
@@ -41,7 +41,7 @@ OneDArr = ndarray
 TwoDArr = ndarray
 ThreeDArr = ndarray
 
-LabelFieldType = t.Union[str, PrjParam]
+LabelFieldType = t.Union[str, OptionsDict]
 
 
 class AnnParseError(ValueError):

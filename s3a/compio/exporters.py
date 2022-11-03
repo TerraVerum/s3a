@@ -17,8 +17,8 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
-from utilitys import PrjParam, fns
-from utilitys.typeoverloads import FilePath
+from qtextras import OptionsDict, fns
+from qtextras.typeoverloads import FilePath
 
 from .base import NO_ERRORS, AnnotationExporter
 from .helpers import serialize
@@ -67,7 +67,7 @@ class LblPngExporter(AnnotationExporter):
         self,
         file: FilePath = None,
         imageShape: tuple[int] = None,
-        labelField: PrjParam | str = "Instance ID",
+        labelField: OptionsDict | str = "Instance ID",
         backgroundColor=0,
         offset: np.ndarray = None,
         colormap: str = None,
@@ -751,7 +751,7 @@ class SerialExporter(AnnotationExporter):
         # Since CSV export significantly modifies the df, make a copy before doing all
         # these operations
         for col in exportObject:
-            if not isinstance(col, PrjParam):
+            if not isinstance(col, OptionsDict):
                 exportObject[col] = exportObject[col].apply(str)
             elif not isinstance(col.value, str):
                 serial, errs = serialize(col, exportObject[col])

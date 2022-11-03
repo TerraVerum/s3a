@@ -6,9 +6,8 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
-from utilitys import PrjParam, fns
-from utilitys.fns import hierarchicalUpdate
-from utilitys.typeoverloads import FilePath
+from qtextras import fns, OptionsDict
+from qtextras.typeoverloads import FilePath
 
 from .templatemgr import IOTemplateManager
 from .yamlparser import YamlParser
@@ -17,14 +16,14 @@ from ..parameditors.tablefilter import TableFilterEditor
 from ..structures import PrjParamGroup
 
 
-def getFieldAliases(field: PrjParam):
+def getFieldAliases(field: OptionsDict):
     """
     Returns the set of all potential aliases to a given field
     """
     return set([field.name] + field.opts.get("aliases", []))
 
 
-def aliasesToRequired(field: PrjParam):
+def aliasesToRequired(field: OptionsDict):
     """
     Returns true or false depending on whether this field shares aliases with required
     fields. This is useful when an alternative (incoming) representation of e.g. Vertices
@@ -53,7 +52,7 @@ class TableData(QtCore.QObject):
             template = IOTemplateManager.getTableConfig("s3a")
         self.template = template
 
-        self.factories: Dict[PrjParam, Callable[[], Any]] = {}
+        self.factories: Dict[OptionsDict, Callable[[], Any]] = {}
 
         if makeFilter:
             self.filter = TableFilterEditor()
@@ -64,7 +63,7 @@ class TableData(QtCore.QObject):
         self.configPath: Optional[Path] = None
         self.config: Optional[dict] = {}
 
-        self.allFields: List[PrjParam] = []
+        self.allFields: List[OptionsDict] = []
         self.resetLists()
 
         configPath = configPath or None
@@ -103,7 +102,7 @@ class TableData(QtCore.QObject):
             outDf = outDf.iloc[0:0]
         return outDf
 
-    def addFieldFactory(self, fieldLabel: PrjParam, factory: Callable[[], Any]):
+    def addFieldFactory(self, fieldLabel: OptionsDict, factory: Callable[[], Any]):
         """
         For fields that are simple functions (i.e. don't require input from the user),
         a factory can be used to create default values when instantiating new table rows.
@@ -117,7 +116,7 @@ class TableData(QtCore.QObject):
         """
         self.factories[fieldLabel] = factory
 
-    def addField(self, field: PrjParam):
+    def addField(self, field: OptionsDict):
         """
         Adds a new field to the table. If the field already exists in the current
         table, no action is performed. Returns *True* if a field really was added,
@@ -174,7 +173,7 @@ class TableData(QtCore.QObject):
         if configDict is not None and "table-config" in configDict:
             configDict = configDict["table-config"]
 
-        hierarchicalUpdate(baseConfigDict, configDict, uniqueListElements=True)
+        fns.hierarchicalUpdate(baseConfigDict, configDict, uniqueListElements=True)
         cfg = baseConfigDict
         if not force and self.configPath == configPath and pg.eq(cfg, self.config):
             return None
@@ -197,14 +196,14 @@ class TableData(QtCore.QObject):
     def resetLists(self):
         self.allFields.clear()
 
-    def fieldFromName(self, name: Union[str, PrjParam], default=None):
+    def fieldFromName(self, name: Union[str, OptionsDict], default=None):
         """
-        Helper function to retrieve the PrjParam corresponding to the field with this
+        Helper function to retrieve the OptionsDict corresponding to the field with this
         name
         """
         return PrjParamGroup.fieldFromParam(self.allFields, name, default)
 
-    def resolveFieldAliases(self, fields: Sequence[PrjParam], mapping: dict = None):
+    def resolveFieldAliases(self, fields: Sequence[OptionsDict], mapping: dict = None):
         """
         Several forms of imports / exports handle data that may not be compatible with
         the current table data. In these cases, it is beneficial to determine a mapping
@@ -232,7 +231,7 @@ class TableData(QtCore.QObject):
             mapping = {}
         potentialSrcNames = getFieldAliases(srcField)
         for key in srcField, srcField.name:
-            # Mapping can either be by string or PrjParam, so account for either case
+            # Mapping can either be by string or OptionsDict, so account for either case
             outCol = mapping.get(key)
             if outCol:
                 break

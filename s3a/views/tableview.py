@@ -19,14 +19,14 @@ from ..tabledata import TableData
 __all__ = ["ComponentTableView", "PopupTableDialog"]
 
 from qtextras import ParameterContainer, bindInteractorOptions as bind
-from utilitys import DeferredActionStackMixin as DASM, ParamEditor, PrjParam
-from utilitys.params.pgregistered import PgParamDelegate, PgPopupDelegate
+from qtextras import DeferredActionStackMixin as DASM, ParameterEditor, OptionsDict
+from qtextras import PgParameterDelegate, PgPopupDelegate
 
 Signal = QtCore.Signal
 
 
 class SerDesDelegate(QtWidgets.QStyledItemDelegate):
-    def __init__(self, param: PrjParam, asLineEdit=False, parent=None):
+    def __init__(self, param: OptionsDict, asLineEdit=False, parent=None):
         """
         Creates a string-editable item delegate which uses ComponentIO's serialize and
         deserialize methods to convert to actual values.
@@ -34,7 +34,7 @@ class SerDesDelegate(QtWidgets.QStyledItemDelegate):
         Parameters
         ----------
         param
-            PrjParam which dictates the serialization/deserialization of this value
+            OptionsDict which dictates the serialization/deserialization of this value
         asLineEdit
             Whether to give this delegate a line editor text edit to set the serialized
             form of value
@@ -245,9 +245,7 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
         prop = PRJ_CONSTS.PROP_SHOW_TBL_ON_COMP_CREATE
         self.props[prop] = prop.value
 
-        self.toolsEditor = ParamEditor.buildClsToolsEditor(
-            type(self), name="Component Table Tools"
-        )
+        self.toolsEditor = ParameterEditor(name="Component Table Tools")
 
         self.setStyleSheet(
             "QTableView { selection-color: white; selection-background-color: #0078d7; }"
@@ -296,13 +294,13 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
 
     def setColDelegates(self):
         for ii, field in enumerate(self.tableData.allFields):
-            curType = field.pType.lower()
+            curType = field.type.lower()
             curval = field.value
             paramDict = dict(type=curType, default=curval, **field.opts)
             if curType == "enum":
                 paramDict["type"] = "list"
                 paramDict.update(values=list(type(curval)))
-            elif curType == "prjparam":
+            elif curType == "OptionsDict":
                 paramDict["type"] = "list"
                 paramDict.update(values=list(curval.group))
             elif curType == "bool":
@@ -311,7 +309,7 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
                 paramDict["type"] = "list"
                 paramDict.update(values={"True": True, "False": False})
             try:
-                self.setItemDelegateForColumn(ii, PgParamDelegate(paramDict, self))
+                self.setItemDelegateForColumn(ii, PgParameterDelegate(paramDict, self))
             except TypeError:
                 if paramDict["type"] in PARAM_TYPES:
                     paramDict["name"] = field.name

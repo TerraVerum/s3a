@@ -1,7 +1,7 @@
 from argparse import Action
 
 from pyqtgraph.Qt import QtCore
-from utilitys import fns
+from qtextras import fns
 
 from . import __version__, mkQApp
 from .constants import PRJ_ENUMS

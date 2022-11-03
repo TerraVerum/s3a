@@ -5,7 +5,7 @@ from typing import Callable, Sequence, TYPE_CHECKING
 
 from pyqtgraph import console as pg_console
 from pyqtgraph.Qt import QtCore
-from utilitys import widgets as uw
+from qtextras import ConsoleWidget
 
 from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
 from .base import ParameterEditorPlugin
@@ -107,7 +107,7 @@ class RandomToolsPlugin(ParameterEditorPlugin):
             # mode. PyCharm among other IDEs crash trying to spawn a jupyter console
             # without a stack trace, so attempt to catch this situation early
             if sys.gettrace() is None:
-                console = uw.ConsoleWidget(
+                console = ConsoleWidget(
                     parent=self.window, namespace=namespace, text=text
                 )
             else:

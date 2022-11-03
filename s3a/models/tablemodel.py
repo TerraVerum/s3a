@@ -13,8 +13,7 @@ from ..tabledata import TableData
 
 __all__ = ["ComponentManager", "ComponentTableModel"]
 
-from utilitys import fns
-from utilitys.misc import DeferredActionStackMixin as DASM
+from qtextras import DeferredActionStackMixin as DASM, seriesAsFrame
 
 Signal = QtCore.Signal
 
@@ -417,4 +416,4 @@ class ComponentManager(ComponentTableModel):
     @property
     def focusedDataframe(self):
         """Return a dataframe version of focused component with correct dtypes"""
-        return coerceDfTypes(fns.serAsFrame(self.focusedComponent))
+        return coerceDfTypes(seriesAsFrame(self.focusedComponent))

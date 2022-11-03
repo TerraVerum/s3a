@@ -3,7 +3,7 @@ from __future__ import annotations
 import typing as t
 
 from pyqtgraph import QtCore
-from utilitys import AtomicProcess
+from . import PipelineFunction
 
 
 class RunnableFunctionWrapperSignals(QtCore.QObject):
@@ -20,16 +20,16 @@ class RunnableFunctionWrapper(QtCore.QRunnable):
     def __init__(self, func, **kwargs):
         super().__init__()
         self.signals = RunnableFunctionWrapperSignals()
-        if not isinstance(func, AtomicProcess):
+        if not isinstance(func, PipelineFunction):
             kwargs.update(interactive=False)
-            func = AtomicProcess(func, **kwargs)
+            func = PipelineFunction(func, **kwargs)
         self.proc = func
         self.inProgress = False
 
     def run(self):
         self.inProgress = True
         try:
-            self.proc.run()
+            self.proc()
             # This could go in a "finally" block to avoid duplication below, but now
             # "inProgress" will be false before the signal is emitted
             self.inProgress = False
@@ -62,14 +62,14 @@ class ThreadedFunctionWrapper(QtCore.QThread):
 
     def __init__(self, func, **kwargs):
         super().__init__()
-        if not isinstance(func, AtomicProcess):
+        if not isinstance(func, PipelineFunction):
             kwargs.update(interactive=False)
-            func = AtomicProcess(func, **kwargs)
+            func = PipelineFunction(func, **kwargs)
         self.proc = func
 
     def run(self):
         try:
-            self.proc.run()
+            self.proc()
             self.sigResultReady.emit(self)
         except Exception as ex:
             self.sigFailed.emit(self, ex)

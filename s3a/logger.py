@@ -1,6 +1,6 @@
 import logging
 
-from utilitys.fns import AppLogger
+from qtextras import AppLogger
 
 
 def getAppLogger(name="s3a"):

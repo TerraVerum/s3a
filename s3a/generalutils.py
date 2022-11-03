@@ -14,11 +14,11 @@ from pkg_resources import parse_version
 from pyqtgraph.parametertree.interactive import InteractiveFunction
 from skimage import __version__ as _skimage_version, io, transform as trans
 from skimage.exposure import exposure
-from utilitys import PrjParam, fns
+from qtextras import OptionsDict, fns
 
 # Needs to be visible outside this file
-from utilitys.fns import hierarchicalUpdate  # noqa
-from utilitys.typeoverloads import FilePath
+from qtextras.fns import hierarchicalUpdate  # noqa
+from qtextras.typeoverloads import FilePath
 
 from .constants import PRJ_ENUMS
 from .structures import BlackWhiteImg, ComplexXYVertices, NChanImg, TwoDArr, XYVertices
@@ -79,7 +79,7 @@ def getClippedBoundingBox(shape: tuple, boundingBox: TwoDArr, margin: int):
     return np.clip(boundingBox, 0, shape[::-1])
 
 
-def coerceDfTypes(dataframe: pd.DataFrame, constParams: Collection[PrjParam] = None):
+def coerceDfTypes(dataframe: pd.DataFrame, constParams: Collection[OptionsDict] = None):
     """
     Pandas currently has a bug where datatypes are not preserved after update
     operations. Current workaround is to coerce all types to their original values

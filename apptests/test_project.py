@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-from utilitys import fns
+from qtextras import fns
 
 from apptests.conftest import dfTester
 from apptests.helperclasses import CompDfTester

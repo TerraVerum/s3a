@@ -6,8 +6,7 @@ from typing import List, Union
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from utilitys import RunOpts
-from utilitys.widgets import EasyWidget, ImageViewer
+from qtextras import RunOptions, EasyWidget, ImageViewer, ParameterContainer
 
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
@@ -143,6 +142,7 @@ class RegionHistoryViewer(QtWidgets.QMainWindow):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.props = ParameterContainer()
         self.differenceImages: List[np.ndarray] = []
         self.histTimer = QtCore.QTimer(self)
 
@@ -151,23 +151,25 @@ class RegionHistoryViewer(QtWidgets.QMainWindow):
         self.displayPlot.addItem(self.differenceImage)
         self.differenceImage.setOpacity(0.5)
 
-        _, param = dp.toolsEditor.registerFunc(
-            self.updateImage, runOpts=RunOpts.ON_CHANGED, returnParam=True
+        dp.toolsEditor.registerFunction(
+            self.updateImage, runOptions=RunOptions.ON_CHANGED, container=self.props
         )
-        self.slider = param.child("curSlice")
+        self.slider = self.props.parameters["curSlice"]
         self.sigImageBufferChanged.connect(
             lambda: self.slider.setLimits([0, len(self.differenceImages) - 1])
         )
         self.histTimer.timeout.connect(self.incrSlicer)
 
-        dp.toolsEditor.registerFunc(self.autoPlay)
-        dp.toolsEditor.registerFunc(lambda: self.histTimer.stop(), name="Stop Autoplay")
-        dp.toolsEditor.registerFunc(
+        dp.toolsEditor.registerFunction(self.autoPlay)
+        dp.toolsEditor.registerFunction(
+            lambda: self.histTimer.stop(), name="Stop Autoplay"
+        )
+        dp.toolsEditor.registerFunction(
             self.discardLeftEntries, name="Discard Entries Left of Slider"
         )
 
-        EasyWidget.buildMainWin([dp], layout="H", win=self)
-        self.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dp.toolsEditor)
+        EasyWidget.buildMainWindow([dp], layout="H", win=self)
+        dp.toolsEditor.createWindowDock(self, createProcessesMenu=False)
 
     def setDifferenceImages(self, differenceImages: List[np.ndarray]):
         self.differenceImages = differenceImages

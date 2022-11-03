@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from skimage import draw
-from utilitys.typeoverloads import FilePath
+from qtextras.typeoverloads import FilePath
 
 from .base import AnnotationImporter
 from .helpers import registerIoHandler

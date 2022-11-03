@@ -6,8 +6,13 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from utilitys import PrjParam, RunOpts, fns
-from utilitys.typeoverloads import FilePath
+from qtextras.typeoverloads import FilePath
+from qtextras import (
+    fns,
+    OptionsDict,
+    ParameterEditor,
+    FROM_PREV_IO,
+)
 
 from .helpers import checkVerticesBounds, deserialize, serialize
 from ..constants import REQD_TBL_FIELDS as RTF
@@ -110,19 +115,17 @@ class AnnotationIOBase:
         ]
         # Reverse so most current class is last to override options
         for subcls in reversed(classes):
-            parsed = fns.funcToParamDict(
+            parsed = ParameterEditor.defaultInteractor.functionToParameterDict(
                 subcls.populateMetadata, title=fns.nameFormatter
             )
             curMeta = {
                 ch["name"]: ch
                 for ch in parsed["children"]
                 if not ch.get("ignore", False)
-                and ch.get("value") is not RunOpts.PARAM_UNSET
+                and ch.get("value") is not FROM_PREV_IO
+                and not ch["name"].startswith("_")
             }
             metadata.update(curMeta)
-        for kk in list(metadata.keys()):
-            if kk.startswith("_"):
-                del metadata[kk]
         return metadata
 
     def _forwardMetadata(self, locals_=None, **kwargs):
@@ -349,8 +352,8 @@ class AnnotationImporter(AnnotationIOBase):
         # Objects in the original frame may be represented as strings, so try to
         # convert these as needed
         outDf = pd.DataFrame()
-        # Preserve / transcribe fields that are already PrjParams
-        for destField in [f for f in componentDf.columns if isinstance(f, PrjParam)]:
+        # Preserve / transcribe fields that are already OptionsDicts
+        for destField in [f for f in componentDf.columns if isinstance(f, OptionsDict)]:
             outDf[destField] = componentDf[destField]
 
         # Need to serialize / convert string names since they indicate yet-to-serialize

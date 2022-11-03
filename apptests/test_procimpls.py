@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from conftest import SAMPLE_SMALL_IMG
 from skimage import util
-from utilitys import ProcessIO, fns
+from qtextras import seriesAsFrame
 
 from apptests.testingconsts import SAMPLE_IMG
 from s3a import REQD_TBL_FIELDS, ComplexXYVertices
@@ -120,7 +120,7 @@ def test_template_dispatch(app):
 
 def test_focused_dispatch(sampleComps):
     def dummyFunc(component: pd.Series, image=None):
-        return ProcessIO(components=fns.serAsFrame(component), image=image)
+        return dict(components=seriesAsFrame(component), image=image)
 
     dispatched = mulp.ProcessDispatcher(dummyFunc)
     result = dispatched(image=SAMPLE_SMALL_IMG, components=sampleComps)

@@ -5,7 +5,8 @@ import cv2 as cv
 import numpy as np
 import pandas as pd
 from scipy.ndimage import maximum_filter
-from utilitys import AtomicProcess, PrjParam, ProcessIO, fns
+from qtextras import OptionsDict, fns, FROM_PREV_IO, bindInteractorOptions as bind
+from .. import PipelineFunction
 
 from ... import generalutils as gutils
 from ...compio.componentio import defaultIo
@@ -24,16 +25,14 @@ def get_component_images(image: np.ndarray, components: pd.DataFrame):
         gutils.getCroppedImage(image, verts.stack(), 0)
         for verts in components[RTF.VERTICES]
     ]
-    return ProcessIO(subimages=imgs)
+    return dict(subimages=imgs)
 
 
-class ProcessDispatcher(AtomicProcess):
+class ProcessDispatcher(PipelineFunction):
     def __init__(
         self,
         func,
-        resultConverter: t.Callable[
-            [t.Union[dict, t.Any], pd.Series], ProcessIO
-        ] = None,
+        resultConverter: t.Callable[[t.Union[dict, t.Any], pd.Series], dict] = None,
         **kwargs,
     ):
         self.singleRunner = func
@@ -43,11 +42,11 @@ class ProcessDispatcher(AtomicProcess):
         ignores.append("component")
         kwargs["ignoreKeys"] = ignores
         super().__init__(self.dispatcher, **kwargs)
-        self.input["components"] = ProcessIO.FROM_PREV_IO
+        self.input["components"] = FROM_PREV_IO
 
     def dispatcher(self, components: pd.DataFrame, **kwargs):
         compList = []
-        result = ProcessIO()
+        result = dict()
         for ii, comp in components.iterrows():
             kwargs.update(component=comp)
             # TODO: Determine appropriate behavior. For now, just remember last result
@@ -61,18 +60,18 @@ class ProcessDispatcher(AtomicProcess):
         else:
             # Concat fails with empty list, just make an empty dataframe
             outComps = components.iloc[0:0].copy()
-        out = ProcessIO(**result, components=outComps)
+        out = dict(**result, components=outComps)
         return out
 
 
 def points_to_components(matchPts: np.ndarray, component: pd.Series):
     numOutComps = len(matchPts)
     if numOutComps == 0:
-        ret = fns.serAsFrame(component).copy()
+        ret = fns.seriesAsFrame(component).copy()
         return ret.loc[[]]
     # Explicit copy otherwise all rows point to the same component
     outComps = pd.concat(
-        [fns.serAsFrame(component)] * numOutComps, ignore_index=True
+        [fns.seriesAsFrame(component)] * numOutComps, ignore_index=True
     ).copy()
     origOffset = component[RTF.VERTICES].stack().min(0)
     allNewverts = []
@@ -146,7 +145,7 @@ def cv_template_match_single(
         ious.append(
             gutils.boundingBoxIou(templateBbox, np.vstack([pt, pt + templateShp[::-1]]))
         )
-    return ProcessIO(
+    return dict(
         scores=scores,
         matchImg=maxFilter,
         components=points_to_components(matchPts, component),
@@ -230,13 +229,13 @@ def make_grid_components(
     boxes = boxes[:maxNumComponents]
     # Fill in other dummy fields based on passed in component dataframe fields
     df = pd.DataFrame(
-        columns=[c for c in components.columns if isinstance(c, PrjParam)]
+        columns=[c for c in components.columns if isinstance(c, OptionsDict)]
     )
     numOutputs = len(boxes)
-    for field in components:  # type: PrjParam
+    for field in components:  # type: OptionsDict
         df[field] = [copy.copy(field.value) for _ in range(numOutputs)]
     df[RTF.VERTICES] = boxes
-    return ProcessIO(components=df)
+    return dict(components=df)
 
 
 def merge_overlapping_components(components: pd.DataFrame):
@@ -251,13 +250,13 @@ def merge_overlapping_components(components: pd.DataFrame):
     components
         Dataframe of components to merge -> split
     """
-    out = ProcessIO(components=components)
+    out = dict(components=components)
     if not len(components):
         return out
     # Guarantee each component is labeled uniquely, something that is not true when
     # components are new (i.e. many have id -1)
     components = components.copy()
-    dummyLabel = PrjParam("__lbl_merge_overlap__", 0)
+    dummyLabel = OptionsDict("__lbl_merge_overlap__", 0)
     components[dummyLabel] = np.arange(len(components))
     mask, mapping = defaultIo.exportLblPng(
         components, returnLabelMap=True, labelField=dummyLabel
@@ -305,7 +304,7 @@ def merge_overlapping_components(components: pd.DataFrame):
     ]
     outComps = pd.concat([newComps, delComponents]).set_index("__old_index__")
     outComps.index.name = oldName
-    return ProcessIO(components=outComps)
+    return dict(components=outComps)
 
 
 def simplify_component_vertices(components: pd.DataFrame, epsilon=1):
@@ -324,11 +323,11 @@ def simplify_component_vertices(components: pd.DataFrame, epsilon=1):
     outComps[RTF.VERTICES] = [
         v.simplify(epsilon=epsilon) for v in outComps[RTF.VERTICES]
     ]
-    return ProcessIO(components=outComps)
+    return dict(components=outComps)
 
 
 def get_selected_components(components: pd.DataFrame, selectedIds: np.ndarray):
-    return ProcessIO(components=components.loc[selectedIds])
+    return dict(components=components.loc[selectedIds])
 
 
 def _components_in_bounds(components: pd.DataFrame, bounds: np.ndarray):
@@ -371,7 +370,7 @@ def remove_overlapping_components(
     """
     if not len(components):
         # Nothing to do...
-        return ProcessIO(components=components)
+        return dict(components=components)
     # Save computation time by only considering full components that *could* overlap
     accessor = components[RTF.VERTICES].s3averts
     newBounds = np.row_stack([accessor.min(), accessor.max()])
@@ -406,7 +405,7 @@ def remove_overlapping_components(
             # Make sure no new checks can overlap with this component
             referenceMask[coords] |= vertsMask
     # Force columns to match in the event output dataframe is empty
-    return ProcessIO(components=pd.DataFrame(keepComps, columns=components.columns))
+    return dict(components=pd.DataFrame(keepComps, columns=components.columns))
 
 
 def model_prediction_factory():
@@ -457,43 +456,28 @@ def single_categorical_prediction(
         prediction.astype("uint8"), stats, gutils.coordsToBox(verts)
     )
     if not np.any(prediction):
-        return ProcessIO(components=pd.DataFrame(columns=component.index))
+        return dict(components=pd.DataFrame(columns=component.index))
     out = component.copy()
     paddingOffset = verts.min(0) - stats["subImageBbox"][0]
     totalOffset = -(coords[0] + paddingOffset).astype(int)
     out[RTF.VERTICES] = ComplexXYVertices.fromBinaryMask(prediction).removeOffset(
         totalOffset
     )
-    return ProcessIO(components=fns.serAsFrame(out))
+    return dict(components=fns.serAsFrame(out))
 
 
-class RunPlugins(AtomicProcess):
+class RunPlugins(PipelineFunction):
     def __init__(self, **kwargs):
-        super().__init__(func=self.run_plugins, **kwargs)
+        super().__init__(function=self.run_plugins, **kwargs)
 
     @staticmethod
+    @bind(plugins=dict(type="checklist", value=[], limits=[RTF.VERTICES.name]))
     def run_plugins(plugins=None):
         """
         Sets flags which trigger runs of various plugins, i.e. "Vertices" will trigger
         the vertices plugin
-
-        Parameters
-        ----------
-        plugins
-            type: checklist
-            value: []
-            limits: ["Vertices"]
         """
-        return ProcessIO(plugins=plugins)
-
-    def run(self, io: ProcessIO = None, disable=False, **runKwargs):
-        disable = self.disabled or disable
-        result = super().run(io, disable, **runKwargs)
-        if disable:
-            result = result.copy()
-            result.pop("plugins", None)
-        return result
-
+        return dict(plugins=plugins)
 
 def remove_small_components(components: pd.DataFrame, sizeThreshold=30):
     outComps = []
@@ -505,7 +489,7 @@ def remove_small_components(components: pd.DataFrame, sizeThreshold=30):
             > sizeThreshold
         ):
             outComps.append(comp)
-    return ProcessIO(components=pd.DataFrame(outComps, columns=components.columns))
+    return dict(components=pd.DataFrame(outComps, columns=components.columns))
 
 
 categorical_prediction = ProcessDispatcher(

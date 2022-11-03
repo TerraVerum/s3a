@@ -3,7 +3,7 @@ import ast
 import numpy as np
 import pytest
 from skimage import data
-from utilitys import PrjParam
+from qtextras import OptionsDict
 
 from s3a import PRJ_ENUMS, ComplexXYVertices, generalutils as gu
 from s3a.compio.helpers import deserialize
@@ -85,19 +85,19 @@ def test_deprecation(warningType):
         assert sampleFunc(b=10) == 10
 
 
-@pytest.mark.parametrize("ptype", ["checklist", "list"])
+@pytest.mark.parametrize("type_", ["checklist", "list"])
 @pytest.mark.parametrize("fixedLims", [True, False])
 @pytest.mark.parametrize("limits", [["a"], ["a", "b"]])
 @pytest.mark.parametrize("value", ["['a', 'b']", "['a']"])
-def test_list_serdes(ptype, fixedLims, value, limits):
+def test_list_serdes(type_, fixedLims, value, limits):
     trueValue = ast.literal_eval(value)
-    if ptype == "checklist":
+    if type_ == "checklist":
         initialValue = limits
     else:
         initialValue = limits[0]
         # 'a' or 'b'
         value = trueValue = trueValue[-1]
-    param = PrjParam("test", initialValue, ptype, fixedLimits=fixedLims, limits=limits)
+    param = OptionsDict("test", initialValue, type_, fixedLimits=fixedLims, limits=limits)
     out, errs = deserialize(param, [value])
     if trueValue in limits or not set(trueValue).difference(limits) or not fixedLims:
         assert len(out) == 1 and out[0] == trueValue

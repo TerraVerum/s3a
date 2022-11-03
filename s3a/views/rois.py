@@ -5,7 +5,7 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui
 from skimage.draw import draw
-from utilitys import DeferredActionStackMixin as DASM, PrjParam
+from qtextras import DeferredActionStackMixin as DASM, OptionsDict
 
 from ..constants import PRJ_CONSTS
 from ..generalutils import orderContourPoints, symbolFromVertices
@@ -348,7 +348,7 @@ class FreehandRoi(PlotDataROI):
         return super().updateShape(ev, xyEventCoords)
 
 
-SHAPE_ROI_MAPPING: Dict[PrjParam, Callable[[], PlotDataROI]] = {
+SHAPE_ROI_MAPPING: Dict[OptionsDict, Callable[[], PlotDataROI]] = {
     PRJ_CONSTS.DRAW_SHAPE_RECT: RectROI,
     PRJ_CONSTS.DRAW_SHAPE_FREE: FreehandRoi,
     PRJ_CONSTS.DRAW_SHAPE_POLY: PolygonROI,

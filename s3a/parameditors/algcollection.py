@@ -15,7 +15,7 @@ from qtextras import (
     bindInteractorOptions as bind,
     fns,
 )
-from utilitys.typeoverloads import FilePath
+from qtextras.typeoverloads import FilePath
 
 from . import MetaTreeParameterEditor
 from ..constants import PRJ_ENUMS

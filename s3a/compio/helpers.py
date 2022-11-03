@@ -5,7 +5,7 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 from pandas.core.dtypes.missing import array_equivalent
-from utilitys import PrjParam
+from qtextras import OptionsDict
 
 from ..constants import REQD_TBL_FIELDS as RTF
 
@@ -31,12 +31,14 @@ def registerIoHandler(pType: str, force=False, **kwargs):
     _serdesHandlers.loc[pType, list(kwargs)] = list(kwargs.values())
 
 
-def _runFunc(param: PrjParam, values, which: str, default: t.Callable, returnErrs=True):
+def _runFunc(
+    param: OptionsDict, values, which: str, default: t.Callable, returnErrs=True
+):
     # Using a dictionary instead of list of (value, key) pairs would clash on duplicate
     # keys
     out = []
     errs = []
-    parseType = param.opts.get("parser", param.pType)
+    parseType = param.opts.get("parser", param.type)
     if parseType not in _serdesHandlers.index:
         handlerRow = _newHandlerTemplate()
     else:
@@ -60,7 +62,7 @@ def _runFunc(param: PrjParam, values, which: str, default: t.Callable, returnErr
     return out
 
 
-def serialize(param: PrjParam, values: t.Sequence[t.Any], returnErrs=True):
+def serialize(param: OptionsDict, values: t.Sequence[t.Any], returnErrs=True):
     default = lambda *args: str(args[-1])
     hasValues = len(values) > 0
     # Series objects will use loc-based indexing, so use an iterator to guarantee first
@@ -80,7 +82,7 @@ def serialize(param: PrjParam, values: t.Sequence[t.Any], returnErrs=True):
     return defaultRet[0]
 
 
-def deserialize(param: PrjParam, values: t.Sequence[str], returnErrs=True):
+def deserialize(param: OptionsDict, values: t.Sequence[str], returnErrs=True):
     # Calling 'deserialize' on a stringified data is a no-op
     # TODO: heterogeneous arrays?
     # Unlike serialize, dtype could be different depending on 'parameter', so leave empty

@@ -1,5 +1,5 @@
-from utilitys import ParamEditorPlugin
+from s3a.plugins import ParameterEditorPlugin
 
 
-class SamplePlugin(ParamEditorPlugin):
+class SamplePlugin(ParameterEditorPlugin):
     name = "test plugin via module name"

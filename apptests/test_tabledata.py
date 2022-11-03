@@ -6,7 +6,7 @@ from typing import Sequence, Union
 import numpy as np
 import pytest
 from conftest import dfTester
-from utilitys import fns
+from qtextras import fns
 
 from apptests.testingconsts import RND
 from s3a import REQD_TBL_FIELDS, ComplexXYVertices

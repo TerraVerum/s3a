@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui
-from utilitys import PrjParam
+from qtextras import OptionsDict
 
 from .regions import MultiRegionPlot
 from ..constants import REQD_TBL_FIELDS as RTF
@@ -40,7 +40,7 @@ class FieldDisplayDelegate(ABC):
         """Hide data without clearing it"""
         raise NotImplementedError
 
-    def setData(self, components: pd.DataFrame, field: PrjParam, **kwargs):
+    def setData(self, components: pd.DataFrame, field: OptionsDict, **kwargs):
         """
         Called with all data that matches this delegate.
 
@@ -108,7 +108,7 @@ class TextFieldDelegate(SceneItemContainer):
     def setData(
         self,
         components: pd.DataFrame,
-        field: PrjParam,
+        field: OptionsDict,
         fontSize=10,
         textColor="w",
         **kwargs,
@@ -201,7 +201,7 @@ class XYVerticesDelegate(SceneItemContainer):
     def setData(
         self,
         components: pd.DataFrame,
-        field: PrjParam,
+        field: OptionsDict,
         spotSize=15,
         spotColor="y",
         calloutWidth=1,
@@ -270,13 +270,13 @@ class XYVerticesDelegate(SceneItemContainer):
 
 
 class ComplexXYVerticesDelegate(SceneItemContainer):
-    LBL_PARAM = PrjParam("complex delegate label")
+    LBL_PARAM = OptionsDict("complex delegate label")
 
     def __init__(self):
         self.region = MultiRegionPlot(disableMouseClick=True)
         self.items = [self.region]
 
-    def setData(self, components: pd.DataFrame, field: PrjParam, **kwargs):
+    def setData(self, components: pd.DataFrame, field: OptionsDict, **kwargs):
         setComps = pd.DataFrame()
         setComps[RTF.VERTICES] = components[field]
         # TODO: Expose label parameter for coloring, etc.
@@ -288,7 +288,7 @@ class FieldDisplay:
     Handles the display of component field data.
     """
 
-    DEFAULT_FIELD = PrjParam("stringified display data", "", pType="uniqueval_default")
+    DEFAULT_FIELD = OptionsDict("stringified display data", "", pType="uniqueval_default")
 
     def __init__(self, plotItem: pg.PlotItem):
         self.availableDelegates = {}
@@ -311,7 +311,7 @@ class FieldDisplay:
         """
         Assigns a delegate for displaying a type of data. I.e. a MultiRegionPlot is the
         delegate for vertices-like data. `fieldType` corresponds to the same field as
-        PrjParam.fieldType, which is a registered form of field data. It may be a single
+        OptionsDict.fieldType, which is a registered form of field data. It may be a single
         string or tuple of strings, each denoting a type (i.e. 'int', 'list', etc.).
         """
         if not isinstance(fieldType, tuple):

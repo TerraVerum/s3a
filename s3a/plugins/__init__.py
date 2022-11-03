@@ -3,7 +3,7 @@ import typing
 import warnings
 from functools import lru_cache
 
-from utilitys import ParamEditorPlugin
+from .base import ParameterEditorPlugin
 
 from ..shims import entry_points
 
@@ -60,6 +60,6 @@ def EXTERNAL_PLUGINS():
     return externPlgs
 
 
-def addExternalPlugin(pluginClass: typing.Type[ParamEditorPlugin]):
+def addExternalPlugin(pluginClass: typing.Type[ParameterEditorPlugin]):
     if pluginClass not in _nonEntryPointExternalPlugins:
         _nonEntryPointExternalPlugins.append(pluginClass)
