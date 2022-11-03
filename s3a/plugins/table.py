@@ -18,14 +18,14 @@ class ComponentTablePlugin(ParameterEditorPlugin):
     tableData: TableData
 
     def __initSharedSettings__(self, shared: SharedAppSettings = None, **kwargs):
-        shared.generalProperties.registerProp(
+        shared.generalProperties.registerParameter(
             CNST.PROP_VERT_SORT_BHV, container=self.window.sortFilterProxy.props
         )
-        shared.generalProperties.registerProps(
+        shared.generalProperties.registerParameters(
             [CNST.PROP_SCALE_PEN_WIDTH, CNST.PROP_FIELD_INFO_ON_SEL],
             container=self.window.componentController.props,
         )
-        shared.colorScheme.registerFunc(
+        shared.colorScheme.registerFunction(
             self.window.componentController.updateLabelColumn,
             labelColumn=dict(
                 type="list", limits=[f.name for f in self.tableData.allFields]
@@ -34,10 +34,10 @@ class ComponentTablePlugin(ParameterEditorPlugin):
             nest=False,
             container=self.window.componentController.props,
         )
-        shared.generalProperties.registerProp(
+        shared.generalProperties.registerParameter(
             CNST.PROP_SHOW_TBL_ON_COMP_CREATE, container=self.window.tableView.props
         )
-        shared.generalProperties.registerFunc(
+        shared.generalProperties.registerFunction(
             self.window.tableView.setVisibleColumns,
             runOptions=RunOptions.ON_CHANGED,
             nest=False,
