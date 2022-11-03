@@ -4,8 +4,8 @@ from typing import Any, Callable, Collection, Sequence, Union
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
-from utilitys import DeferredActionStackMixin as DASM, ParamEditor, PrjParam
-from utilitys.widgets import ButtonCollection, ImageViewer
+from qtextras import DeferredActionStackMixin as DASM, ParameterEditor, OptionsDict, \
+    ButtonCollection, ImageViewer
 
 from .clickables import RightPanViewBox
 from .regions import RegionMoverPlot
@@ -19,24 +19,24 @@ __all__ = ["MainImage"]
 Signal = QtCore.Signal
 QCursor = QtGui.QCursor
 
-DrawActFn = Union[Callable[[XYVertices, PrjParam], Any], Callable[[XYVertices], Any]]
+DrawActFn = Union[Callable[[XYVertices, OptionsDict], Any], Callable[[XYVertices], Any]]
 
 
 class MainImage(DASM, ImageViewer):
     sigShapeFinished = Signal(object, object)
     """
-    (XYVertices, PrjParam) emitted when a shape is finished
+    (XYVertices, OptionsDict) emitted when a shape is finished
     - XYVerts from roi, re-thrown from self.shapeCollection
     - Current draw action
     """
 
     sigDrawActionChanged = Signal(object)
-    """New draw action (PrjParam)"""
+    """New draw action (OptionsDict)"""
 
     def __init__(
         self,
         parent=None,
-        drawShapes: Collection[PrjParam] = None,
+        drawShapes: Collection[OptionsDict] = None,
         toolbar: QtWidgets.QToolBar = None,
         **kargs
     ):
@@ -57,13 +57,13 @@ class MainImage(DASM, ImageViewer):
         # -----
         self.regionMover = RegionMoverPlot()
 
-        self.drawAction: PrjParam = CNST.DRAW_ACT_PAN
+        self.drawAction: OptionsDict = CNST.DRAW_ACT_PAN
         self.shapeCollection = RoiCollection(drawShapes, self)
         self.shapeCollection.sigShapeFinished.connect(
             lambda roiVerts: self.sigShapeFinished.emit(roiVerts, self.drawAction)
         )
 
-        self.drawShapeGrp = ButtonCollection(
+        self.drawShapeGroup = ButtonCollection(
             self,
             "Shapes",
             drawShapes,
@@ -78,12 +78,12 @@ class MainImage(DASM, ImageViewer):
         )
 
         # Initialize draw shape/action buttons
-        self.drawActionGroup.callFuncByParam(self.drawAction)
-        self.drawShapeGrp.callFuncByParam(self.shapeCollection.shapeParameter)
+        self.drawActionGroup.callAssociatedFunction(self.drawAction)
+        self.drawShapeGroup.callAssociatedFunction(self.shapeCollection.shapeParameter)
 
         self.toolsGroup = None
         if toolbar is not None:
-            toolbar.addWidget(self.drawShapeGrp)
+            toolbar.addWidget(self.drawShapeGroup)
             toolbar.addWidget(self.drawActionGroup)
             self.toolsGroup = self.addTools(self.toolsEditor)
 
@@ -98,12 +98,12 @@ class MainImage(DASM, ImageViewer):
         vb: RightPanViewBox = self.getViewBox()
         vb.setRange(xRange=(0, imShape[1]), yRange=(0, imShape[0]))
 
-    def shapeAssignment(self, newShapeParameter: PrjParam):
+    def shapeAssignment(self, newShapeParameter: OptionsDict):
         self.shapeCollection.shapeParameter = newShapeParameter
         if self.regionMover.active:
             self.regionMover.erase()
 
-    def actionAssignment(self, newActionParameter: PrjParam):
+    def actionAssignment(self, newActionParameter: OptionsDict):
         self.drawAction = newActionParameter
         if self.regionMover.active:
             self.regionMover.erase()
@@ -122,12 +122,12 @@ class MainImage(DASM, ImageViewer):
             ev.accept()
         return finished
 
-    def switchButtonMode(self, newMode: PrjParam):
+    def switchButtonMode(self, newMode: OptionsDict):
         # EAFP
         try:
-            self.drawActionGroup.callFuncByParam(newMode)
+            self.drawActionGroup.callAssociatedFunction(newMode)
         except KeyError:
-            self.drawShapeGrp.callFuncByParam(newMode)
+            self.drawShapeGroup.callAssociatedFunction(newMode)
 
     def mousePressEvent(self, ev: QtGui.QMouseEvent):
         self.maybeBuildRoi(ev)
@@ -186,7 +186,7 @@ class MainImage(DASM, ImageViewer):
         self.regionMover.erase()
 
     def _widgetContainerChildren(self):
-        return [self.drawActionGroup, self.drawShapeGrp, self]
+        return [self.drawActionGroup, self.drawShapeGroup, self]
 
     def _initGrid(self):
         pi: pg.PlotItem = self.plotItem
@@ -230,7 +230,7 @@ class MainImage(DASM, ImageViewer):
 
     def registerDrawAction(
         self,
-        actionParameters: Union[PrjParam, Sequence[PrjParam]],
+        actionParameters: Union[OptionsDict, Sequence[OptionsDict]],
         function: DrawActFn,
         **registerOpts
     ):
@@ -242,7 +242,7 @@ class MainImage(DASM, ImageViewer):
         Parameters
         ----------
         actionParameters
-            Single or multiple ``PrjParam``s that are allowed to trigger this funciton.
+            Single or multiple ``OptionsDict``s that are allowed to trigger this funciton.
             If empty, triggers on every parameter
         function
             Function to trigger when a shape is completed during the requested actions.
@@ -252,11 +252,11 @@ class MainImage(DASM, ImageViewer):
         registerOpts
             Extra arguments for button registration
         """
-        if isinstance(actionParameters, PrjParam):
+        if isinstance(actionParameters, OptionsDict):
             actionParameters = [actionParameters]
 
         @wraps(function)
-        def wrapper(roiPolygon: XYVertices, param: PrjParam):
+        def wrapper(roiPolygon: XYVertices, param: OptionsDict):
             if param in actionParameters:
                 if len(actionParameters) > 1:
                     function(roiPolygon, param)
@@ -268,7 +268,7 @@ class MainImage(DASM, ImageViewer):
         else:
             self.sigShapeFinished.connect(wrapper)
         for actParam in actionParameters:
-            self.drawActionGroup.createAndAddBtn(
+            self.drawActionGroup.createAndAddButton(
                 actParam, self.actionAssignment, checkable=True, **registerOpts
             )
 
@@ -281,8 +281,9 @@ class MainImage(DASM, ImageViewer):
         offset = vbRange[:, 0]
         return span * np.array([[0, 0], [0, 1], [1, 1], [1, 0]]) + offset
 
-    def addTools(self, toolsEditor: ParamEditor):
-        toolsEditor.actionsMenuFromProcs(outerMenu=self.menu, parent=self, nest=True)
+    def addTools(self, toolsEditor: ParameterEditor):
+        menu = toolsEditor.createActionsFromProcesses(self.menu)
+        menu.setParent(self)
         retClctn = None
         # Define some helper functions for listening to toolsEditor changes
         def visit(param, child=None):
@@ -293,13 +294,13 @@ class MainImage(DASM, ImageViewer):
                 for ch in param:
                     visit(ch)
             else:
-                retClctn.addByParam(param, copy=False)
+                retClctn.addByParameter(param, copy=False)
 
         if self.toolbar is not None:
             retClctn = ButtonCollection(title=toolsEditor.name)
             # Regular "fromToolsEditors" doesn't listen for changes in group parameters,
             # so do a dfs node visit here
-            visit(toolsEditor.params)
+            visit(toolsEditor.rootParameter)
             self.toolbar.addWidget(retClctn)
         self.getViewBox().menu = self.menu
         return retClctn
