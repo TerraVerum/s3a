@@ -7,6 +7,6 @@ fields:
     readonly: True
     aliases: ['Source Image Filename']
   Vertices:
-    pType: 'complexxyvertices'
+    type: 'complexxyvertices'
     readonly: True
     value: []

@@ -1,7 +1,7 @@
 fields:
   className:
     value: ''
-    pType: list
+    type: list
     limits: []
     aliases: [Class, Label]
   createdAt:

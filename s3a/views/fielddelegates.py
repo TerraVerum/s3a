@@ -288,7 +288,7 @@ class FieldDisplay:
     Handles the display of component field data.
     """
 
-    DEFAULT_FIELD = OptionsDict("stringified display data", "", pType="uniqueval_default")
+    DEFAULT_FIELD = OptionsDict("stringified display data", "", type="uniqueval_default")
 
     def __init__(self, plotItem: pg.PlotItem):
         self.availableDelegates = {}
@@ -296,7 +296,7 @@ class FieldDisplay:
         self.inUseDelegates = []
         self.defaultDelegate = TextFieldDelegate
         self.registerDelegate(
-            self.DEFAULT_FIELD.pType, self.defaultDelegate, override=True
+            self.DEFAULT_FIELD.type, self.defaultDelegate, override=True
         )
         self.registerDelegate("xyvertices", XYVerticesDelegate, override=True)
         self.registerDelegate(
@@ -336,7 +336,7 @@ class FieldDisplay:
         defaultFields = [
             f
             for f in fields
-            if self.availableDelegates.get(f.pType, self.defaultDelegate)
+            if self.availableDelegates.get(f.type, self.defaultDelegate)
             is self.defaultDelegate
             and f not in self.ignoreColumns
         ]
@@ -349,7 +349,7 @@ class FieldDisplay:
         for field in components:
             if field in self.ignoreColumns or field not in fields:
                 continue
-            delegateCls = self.availableDelegates.get(field.pType, None)
+            delegateCls = self.availableDelegates.get(field.type, None)
             if delegateCls is None:
                 continue
             delegate = delegateCls()

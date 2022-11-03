@@ -66,7 +66,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         self.sharedSettings = SharedAppSettings()
 
         self.props = ParameterContainer()
-        self.sharedSettings.generalProperties.registerProps(
+        self.sharedSettings.generalProperties.registerParameterList(
             [PRJ_CONSTS.EXP_ONLY_VISIBLE, PRJ_CONSTS.INCLUDE_FNAME_PATH],
             container=self.props,
         )
@@ -90,7 +90,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
             self.actionStack.resizeStack,
             runOptions=RunOptions.ON_CHANGED,
             maxLength={
-                **PRJ_CONSTS.PROP_UNDO_BUF_SZ.toPgDict(),
+                **PRJ_CONSTS.PROP_UNDO_BUF_SZ,
                 "title": PRJ_CONSTS.PROP_UNDO_BUF_SZ.name,
             },
             nest=False,

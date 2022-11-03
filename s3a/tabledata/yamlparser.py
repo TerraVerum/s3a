@@ -40,13 +40,13 @@ class YamlParser:
             value.pop("name", None)
             nameArgs = {
                 "value": pVal,
-                "pType": value.pop("pType", type(pVal).__name__.lower()),
+                "type": value.pop("type", type(pVal).__name__.lower()),
                 "helpText": value.pop("helpText", ""),
             }
             # Forward additional args if they exist
             parsedParam = OptionsDict(leafName, **nameArgs, **value)
             # Make sure value is formatted according to its type if needed
-            if parsedParam.pType.lower() not in _yamlReps:
+            if parsedParam.type.lower() not in _yamlReps:
                 deserialized, err = deserialize(parsedParam, [str(parsedParam.value)])
                 if len(deserialized):
                     # Success
@@ -63,12 +63,12 @@ class YamlParser:
             pass
             # Keeps 'int' from triggering
         elif isinstance(value, float):
-            leafParam.pType = "float"
+            leafParam.type = "float"
         elif isinstance(value, int):
-            leafParam.pType = "int"
+            leafParam.type = "int"
 
         elif isinstance(value, list):
-            leafParam.pType = "list"
+            leafParam.type = "list"
             testVal = value[0]
             if isinstance(testVal, dict):
                 # Value is on the other side of the mapping

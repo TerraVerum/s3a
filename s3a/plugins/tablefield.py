@@ -69,7 +69,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         )
 
         self.props = ParameterContainer()
-        shared.generalProperties.registerProp(
+        shared.generalProperties.registerParameter(
             CNST.PROP_REG_APPROX_EPS, container=self.props
         )
 
@@ -91,11 +91,11 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         self.oldResultCache = None
         """Holds the last result from a region run so undoables reset the process cache"""
 
-        _, self._overlayParam = self.processEditor.registerFunction(
+        self.processEditor.registerFunction(
             self.overlayStageInfo,
-            parentParam=self.processEditor._metaParameter,
-            returnParam=True,
-            runOpts=RunOptions.ON_CHANGED,
+            parent=self.processEditor._metaParameter,
+            runOptions=RunOptions.ON_CHANGED,
+            container=self.props,
         )
 
     def attachToWindow(self, window):
@@ -224,7 +224,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             # Only running threads are left, ensure the user really wants to violently
             # kill them
             confirm = QtWidgets.QMessageBox.question(
-                self.win,
+                self.window,
                 "Kill Running Actions?",
                 "Killing in-progress actions may cause memory leaks or unintended "
                 "side effects. Are you sure you want to continue?",
@@ -267,7 +267,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         # Can't set limits to actual infos since equality comparison fails in pyqtgraph
         # setLimits
         limits = [""] + list(self.displayableInfos)
-        self._overlayParam.child("info").setLimits(limits)
+        self.props.parameters["info"].setLimits(limits)
 
         self.firstRun = False
         if not np.array_equal(newGrayscale, compGrayscale):

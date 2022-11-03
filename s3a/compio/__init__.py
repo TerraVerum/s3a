@@ -42,7 +42,7 @@ def listDeserializer(param, strVal):
     # Slight adjustment to value interpretation for checklist
     fixedLims = param.opts.get("fixedLimits", False)
     lims = param.opts["limits"]
-    if param.pType == "checklist":
+    if param.type == "checklist":
         if param.opts.get("exclusive"):
             val = [strVal]
         else:

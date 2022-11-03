@@ -177,7 +177,7 @@ class PRJ_CONSTS:
     SCHEME_GRID_CLR = OptionsDict("Grid Line Color", "#fff", "color")
     SCHEME_SHOW_GRID = OptionsDict("Show Grid", False)
     SCHEME_LBL_COL = OptionsDict(
-        "Labeling Column", REQD_TBL_FIELDS.ID.name, pType="list", limits=[]
+        "Labeling Column", REQD_TBL_FIELDS.ID.name, type="list", limits=[]
     )
 
     # --------------------------

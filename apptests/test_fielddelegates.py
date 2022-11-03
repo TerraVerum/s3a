@@ -19,8 +19,8 @@ def td():
             "class": "test",
             "another": 2,
             "oncemore": True,
-            "xyvertices": {"pType": "xyvertices", "value": XYVertices()},
-            "complex": {"pType": "complexxyvertices", "value": ComplexXYVertices()},
+            "xyvertices": {"type": "xyvertices", "value": XYVertices()},
+            "complex": {"type": "complexxyvertices", "value": ComplexXYVertices()},
         }
     }
     td = TableData("temp", configDict=cfg)

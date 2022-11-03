@@ -56,7 +56,9 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         self.autosaveTimer = QtCore.QTimer()
 
         self.registerFunction(self.save, btnOpts=CNST.TOOL_PROJ_SAVE)
-        self.registerFunction(self.showProjectImagesGui, btnOpts=CNST.TOOL_PROJ_OPEN_IMG)
+        self.registerFunction(
+            self.showProjectImagesGui, btnOpts=CNST.TOOL_PROJ_OPEN_IMG
+        )
         self.menu.addSeparator()
 
         self.registerFunction(self.createGui, btnOpts=CNST.TOOL_PROJ_CREATE)
@@ -76,7 +78,8 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         )
 
         self.registerPopoutFunctions(
-            [self.startAutosave, self.stopAutosave], runActionTemplate=CNST.TOOL_AUTOSAVE
+            [self.startAutosave, self.stopAutosave],
+            runActionTemplate=CNST.TOOL_AUTOSAVE,
         )
 
         self._projectImagePane = ProjectImagePane()

@@ -21,7 +21,7 @@ def generateParameterList(nameIter, paramType, defaultValue, defaultParam="value
 def _filterForParameter(parameter: OptionsDict):
     """Constructs a filter for the parameter based on its type"""
     children = []
-    pType = parameter.pType.lower()
+    pType = parameter.type.lower()
     paramWithChildren = {"name": parameter.name, "type": "group", "children": children}
     children.append(dict(name="Active", type="bool", value=False))
     if pType in ["int", "float"]:
@@ -66,7 +66,7 @@ def _filterForParameter(parameter: OptionsDict):
 def filterParameterColumn(compDf: pd.DataFrame, column: OptionsDict, filterOpts: dict):
     # TODO: Each type should probably know how to filter itself. That is,
     #  find some way of keeping this logic from just being an if/else tree...
-    pType = column.pType
+    pType = column.type
     # idx 0 = value, 1 = children
     dfAtParam = compDf.loc[:, column]
 
@@ -158,11 +158,11 @@ class TableFilterEditor(ParameterEditor):
                 badCols.append(param)
             else:
                 newParams.append(curFilter)
-        self.params.clearChildren()
-        self.params.addChildren(newParams)
+        self.rootParameter.clearChildren()
+        self.rootParameter.addChildren(newParams)
         if len(badCols) > 0:
             colNames = [f'"{col}"' for col in badCols]
-            colTypes = np.unique([f'"{col.pType}"' for col in badCols])
+            colTypes = np.unique([f'"{col.type}"' for col in badCols])
             warnings.warn(
                 f"The table does not know how to create a filter for fields"
                 f' {", ".join(colNames)}'

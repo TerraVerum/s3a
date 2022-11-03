@@ -16,7 +16,7 @@ cfgDict = {
     "fields": {
         "Class": {
             "value": "test",
-            "pType": "popuplineeditor",
+            "type": "popuplineeditor",
             "limits": ["test", "this", "out"],
         }
     }
@@ -79,10 +79,10 @@ def test_filter():
     Int: 0
     String: ''
     Complex:
-      pType: complexxyvertices
+      type: complexxyvertices
       vaue: [[[0,0], [100,100]]]
     Bad:
-      pType: unrecognizable
+      type: unrecognizable
   """
     file = StringIO(mockCfg)
     parsed = fns.yamlLoad(file)

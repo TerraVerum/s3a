@@ -1,6 +1,6 @@
 fields:
   geometry:
-    pType: 'complexxyvertices'
+    type: 'complexxyvertices'
     parser: 'geojsonregion'
     value: '{ "type": "Polygon", "coordinates": [] }'
     aliases: ['Vertices']

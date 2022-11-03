@@ -41,7 +41,6 @@ class ComponentTablePlugin(ParameterEditorPlugin):
             self.window.tableView.setVisibleColumns,
             runOptions=RunOptions.ON_CHANGED,
             nest=False,
-            returnParam=True,
             visibleColumns=[],
         )
 

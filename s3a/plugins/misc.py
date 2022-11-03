@@ -54,11 +54,7 @@ class RandomToolsPlugin(ParameterEditorPlugin):
         display = window.componentController
         # This option shouldn't show in the menu dropdown, so register directly to the
         # tools
-        _, param = self.registerFunction(
-            display.fieldInfoProc,
-            name="Show Field Info",
-            returnParam=True,
-        )
+        func = self.registerFunction(display.fieldInfoProc, name="Show Field Info")
 
         # There should also be an option that *does* show in the menu, which displays
         # field info for every component
@@ -72,7 +68,7 @@ class RandomToolsPlugin(ParameterEditorPlugin):
 
         self.registerFunction(toggleAll, name="Toggle All Field Info")
 
-        fieldsParam = param.child("fields")
+        fieldsParam = func.parameters["fields"]
 
         def updateLims():
             fieldsParam.setLimits(

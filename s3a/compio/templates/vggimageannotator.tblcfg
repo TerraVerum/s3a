@@ -1,6 +1,6 @@
 fields:
   region_shape_attributes:
-    pType: 'complexxyvertices'
+    type: 'complexxyvertices'
     value: []
     parser: 'viaregion'
     aliases: ['Vertices']
