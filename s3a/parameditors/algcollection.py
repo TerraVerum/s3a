@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import importlib
 import inspect
 import pydoc
+import types
 import typing as t
 import webbrowser
 from collections import defaultdict
@@ -252,6 +254,15 @@ class AlgorithmCollection(ParameterEditor):
             ):
                 self.addProcess(function or stage, top=False, force=force)
         return process.name()
+
+    def addAllModuleProcesses(self, module: str | types.ModuleType, force=False):
+        if isinstance(module, str):
+            module = importlib.import_module(module)
+        for name, process in inspect.getmembers(module):
+            if isinstance(process, PipelineStageType.__args__):
+                self.addProcess(process, force=force)
+            elif callable(process):
+                self.addFunction(process, force=force)
 
     def addFunction(self, func: t.Callable, top=False, **kwargs):
         """

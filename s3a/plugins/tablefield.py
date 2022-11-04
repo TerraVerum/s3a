@@ -53,11 +53,10 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
         self.imageProcessCollection = AlgorithmCollection(
             ImagePipeline,
-            saveDir=IMAGE_PROCESSORS_DIR,
+            directory=IMAGE_PROCESSORS_DIR,
             template=CONFIG_DIR / "imageproc.yml",
         )
-        for algo in imageproc.__all__:
-            self.imageProcessCollection.addProcess(algo)
+        self.imageProcessCollection.addAllModuleProcesses(imageproc)
 
         self.processEditor = AlgorithmEditor(
             self.imageProcessCollection,

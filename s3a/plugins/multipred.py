@@ -29,8 +29,10 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         super().__initSharedSettings__()
 
         self.multiPredictionCollection = AlgorithmCollection(
-            saveDir=MULTI_PREDICTIONS_DIR, template=CONFIG_DIR / "multipred.yml"
+            name="Multi-Predictions", directory=MULTI_PREDICTIONS_DIR,
+            template=CONFIG_DIR / "multipred.yml"
         )
+        self.multiPredictionCollection.addAllModuleProcesses(multipred)
         self.processEditor = AlgorithmEditor(
             self.multiPredictionCollection,
             name=self.name + " Processor",
