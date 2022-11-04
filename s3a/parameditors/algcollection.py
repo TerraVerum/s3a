@@ -258,11 +258,27 @@ class AlgorithmCollection(ParameterEditor):
     def addAllModuleProcesses(self, module: str | types.ModuleType, force=False):
         if isinstance(module, str):
             module = importlib.import_module(module)
+
+        added = []
         for name, process in inspect.getmembers(module):
             if isinstance(process, PipelineStageType.__args__):
-                self.addProcess(process, force=force)
+                added.append(self.addProcess(process, force=force))
+                continue
+            if (
+                not hasattr(process, "__module__")
+                or process.__module__ != module.__name__
+            ):
+                continue
+            if inspect.isclass(process):
+                try:
+                    process = process()
+                except TypeError:
+                    # Needs arguments
+                    continue
+                added.append(self.addProcess(process, force=force))
             elif callable(process):
-                self.addFunction(process, force=force)
+                added.append(self.addFunction(process, force=force))
+        return added
 
     def addFunction(self, func: t.Callable, top=False, **kwargs):
         """
