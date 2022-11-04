@@ -56,25 +56,28 @@ class ParameterEditorPlugin(ParameterEditor):
         nameList: t.Sequence[str] = None,
         groupName: str = None,
         runActionTemplate: dict = None,
+        menu: QtWidgets.QMenu = None,
     ):
         if groupName is None and runActionTemplate is None:
             raise ValueError("Must provide either group name or action options")
         if groupName is None:
             groupName = runActionTemplate["name"]
         function = InteractiveFunction(
-            fns.parameterDialog, parameter=self.rootParameter.child(groupName)
+            fns.parameterDialog,
+            parameter=fns.getParameterChild(self.rootParameter, groupName),
         )
-        act = self.menu.addAction(groupName, function)
 
         if nameList is None:
             nameList = [None] * len(functionList)
 
         for title, func in zip(nameList, functionList):
             self.registerFunction(func, name=title, namePath=(groupName,))
-        if "shortcut" in runActionTemplate:
-            act.setShortcut(runActionTemplate["shortcut"])
 
-        self.menu.addSeparator()
+        if menu is not None:
+            act = menu.addAction(groupName, function)
+            if runActionTemplate is not None and runActionTemplate.get("shortcut"):
+                act.setShortcut(runActionTemplate["shortcut"])
+        return function
 
     def _resolveMenuTitle(self, name: str = None, ensureShortcut=True):
         name = self.menuTitle or name
