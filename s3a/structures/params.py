@@ -63,7 +63,7 @@ class OptionsDictGroup:
             )
         # No exception needed, since the user specified a default type in the derived
         # class
-        warn(baseWarnMsg + f"Defaulting to {default}", UserWarning)
+        warn(baseWarnMsg + f"Defaulting to {default}", UserWarning, stacklevel=2)
         return default
 
     @classmethod

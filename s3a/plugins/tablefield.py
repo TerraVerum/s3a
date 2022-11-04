@@ -239,7 +239,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         if not ex:
             self.updateGuiFromProcessor(thread.result)
         else:
-            warnings.warn(str(ex), UserWarning)
+            warnings.warn(str(ex), UserWarning, stacklevel=2)
 
     def updateGuiFromProcessor(self, procResult: dict | np.ndarray):
         img = self.mainImage.image
@@ -323,7 +323,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
                 # Warnings render dialogs on the GUI thread but not otherwise
                 raise
             else:
-                warnings.warn(str(ex), UserWarning)
+                warnings.warn(str(ex), UserWarning, stacklevel=2)
                 return None
 
         outImg = result["image"].astype(bool)
@@ -664,7 +664,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     def playbackRegionHistory(self):
         initialImg, history = self.getRegionHistory()
         if initialImg is None:
-            warnings.warn("No edits found, nothing to do", UserWarning)
+            warnings.warn("No edits found, nothing to do", UserWarning, stacklevel=2)
             return
         # Add current state as final result
         history += [history[-1]]

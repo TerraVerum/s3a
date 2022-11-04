@@ -43,6 +43,7 @@ def EXTERNAL_PLUGINS():
         warnings.warn(
             f"'{ep.value}' did not expose a callable. No plugins were found.",
             UserWarning,
+            stacklevel=2,
         )
         return []
 

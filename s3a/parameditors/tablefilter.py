@@ -127,6 +127,7 @@ def filterParameterColumn(compDf: pd.DataFrame, column: OptionsDict, filterOpts:
             f"{parameterType}."
             f" Did not filter column {column.name}.",
             UserWarning,
+            stacklevel=3,
         )
     return compDf
 
@@ -174,6 +175,7 @@ class TableFilterEditor(ParameterEditor):
                 f' {", ".join(colNames)}'
                 f' since types {", ".join(colTypes)} do not have corresponding filters',
                 UserWarning,
+                stacklevel=2,
             )
         self.saveParameterValues(self.stateManager.getDefaultState())
 

@@ -334,6 +334,7 @@ class ComponentManager(ComponentTableModel):
             warn(
                 f'Less than two components are selected, so "merge" is a no-op.',
                 UserWarning,
+                stacklevel=2,
             )
             return
         mergeComps: pd.DataFrame = self.compDf.loc[mergeIds]

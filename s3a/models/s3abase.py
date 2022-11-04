@@ -85,7 +85,8 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION.opts["ownerObj"] = self.mainImage
         attrs = self.sharedSettings
         self.mainImage.toolsEditor.registerFunction(
-            self.acceptFocusedRegion, runActionTemplate=PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION
+            self.acceptFocusedRegion,
+            runActionTemplate=PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION,
         )
         attrs.generalProperties.registerFunction(
             self.actionStack.resizeStack,
@@ -222,7 +223,11 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         exists = focusedId in mgr.compDf.index
         if not exists and focusedId != REQD_TBL_FIELDS.ID.value:
             # Could be a brand new component, allow in that case
-            warn("Cannot accept region as this component was deleted.", UserWarning)
+            warn(
+                "Cannot accept region as this component was deleted.",
+                UserWarning,
+                stacklevel=2,
+            )
             return
 
         self.sigRegionAccepted.emit()

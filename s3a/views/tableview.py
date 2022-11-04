@@ -439,7 +439,7 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
         if len(retLists) == 0:
             retLists.shape = (-1, 3)
         if warnNoneSelection and len(retLists) == 0:
-            warn("No editable columns selected.", UserWarning)
+            warn("No editable columns selected.", UserWarning, stacklevel=2)
         return retLists
 
     def setSelectedCellsAsFirst(self):

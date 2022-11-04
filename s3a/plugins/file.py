@@ -222,7 +222,7 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
                         newOpts = eval(f"dict({extra})", {}, {})
                         initial.update(newOpts)
                     except Exception as ex:
-                        warn(f"Could not parse extra arguments:\n{ex}")
+                        warn(f"Could not parse extra arguments:\n{ex}", stacklevel=3)
                 initial.update(kwargs)
                 return func(**initial)
 
@@ -756,6 +756,7 @@ class ProjectData(QtCore.QObject):
                 f"Some project plugins were specified, but could not be found:\n"
                 f"{warnPlgs}",
                 UserWarning,
+                stacklevel=2,
             )
 
         self.configPath = configPath

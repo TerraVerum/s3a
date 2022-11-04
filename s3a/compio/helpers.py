@@ -125,6 +125,7 @@ def checkVerticesBounds(verticesSeries: pd.Series, imageShape: tuple):
             f"Perhaps this export came from a different image?\n"
             f"Offending IDs: {offendingIds}",
             UserWarning,
+            stacklevel=2,
         )
 
 
@@ -161,4 +162,5 @@ def compareDataframes(componentDf, loadedDf):
             f"{problemMsg}\n"
             f"Please try manually altering these values before exporting again.",
             UserWarning,
+            stacklevel=2,
         )

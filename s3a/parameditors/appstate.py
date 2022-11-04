@@ -111,6 +111,7 @@ class AppStateEditor(ParameterEditor):
                     "The following settings could not be loaded (shown as [setting]: "
                     "[exception])\n" + "\n\n".join(errs.values()),
                     UserWarning,
+                    stacklevel=3,
                 )
             if stateDict:
                 self.quickLoader.buildFromStartupParameters(stateDict)

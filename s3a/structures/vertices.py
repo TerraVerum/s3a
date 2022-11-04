@@ -241,7 +241,8 @@ class ComplexXYVertices(list):
             if np.any(vertMax > np.array(cmpShape[:2])):
                 warn(
                     "Vertices don't fit in the provided mask size.\n"
-                    f"Vertex shape: {vertMax}, mask shape: {cmpShape}"
+                    f"Vertex shape: {vertMax}, mask shape: {cmpShape}",
+                    stacklevel=2,
                 )
         if checkForDisconnectedVerts:
             fillArg = []

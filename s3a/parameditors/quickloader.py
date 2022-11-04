@@ -150,6 +150,7 @@ class QuickLoaderEditor(MetaTreeParameterEditor):
                 "The following settings could not be loaded (shown as [setting]: "
                 "[exception])\n" + "\n\n".join(errSettings),
                 UserWarning,
+                stacklevel=3,
             )
         return startupSource
 
