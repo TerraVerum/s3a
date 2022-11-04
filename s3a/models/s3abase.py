@@ -541,7 +541,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         if np.isscalar(ids):
             ids = [ids]
         if (
-            self.mainImage.imgItem.image is None
+            self.mainImage.imageItem.image is None
             or ids is None
             or len(ids) != 1
             or ids[0] not in self.componentManager.compDf.index

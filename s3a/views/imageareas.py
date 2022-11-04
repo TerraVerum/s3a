@@ -125,7 +125,7 @@ class MainImage(DASM, ImageViewer):
             or self.regionMover.active
         ):
             return False
-        finished = self.shapeCollection.buildRoi(ev, self.imgItem)
+        finished = self.shapeCollection.buildRoi(ev, self.imageItem)
         if not finished:
             ev.accept()
         return finished
@@ -176,7 +176,7 @@ class MainImage(DASM, ImageViewer):
                 and self.drawAction == CNST.DRAW_ACT_PAN
                 and not self.regionMover.active
             ):
-                pos = self.imgItem.mapFromScene(eventPos)
+                pos = self.imageItem.mapFromScene(eventPos)
                 xx, yy, = (
                     pos.x(),
                     pos.y(),

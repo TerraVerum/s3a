@@ -419,8 +419,8 @@ class ImagePipeline(PipelineParameter):
                 pltItem.setXLink(sameSizePlt)
                 pltItem.setYLink(sameSizePlt)
             sizeToAxMapping[imShp] = pltItem
-            imgItem = pg.ImageItem(npImg)
-            pltItem.addItem(imgItem)
+            imageItem = pg.ImageItem(npImg)
+            pltItem.addItem(imageItem)
 
             if ii % ncols == ncols - 1:
                 outGrid.nextRow()

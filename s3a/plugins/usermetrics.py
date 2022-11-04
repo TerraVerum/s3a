@@ -39,12 +39,12 @@ class MetricsEventFilter(QtCore.QObject):
             return False
         globalPos = QtGui.QCursor.pos()
         scenePos = mImg.mapFromGlobal(globalPos)
-        itemPos = mImg.imgItem.mapFromScene(scenePos)
+        itemPos = mImg.imageItem.mapFromScene(scenePos)
         # Aspect ratio is locked, so pixel width and height are the same
         toEmit = dict(
             action=mImg.drawAction,
             mouse_pos=(itemPos.x(), itemPos.y()),
-            pixel_size=mImg.imgItem.pixelWidth(),
+            pixel_size=mImg.imageItem.pixelWidth(),
         )
         self.sigMouseMoved.emit(toEmit)
         return False
@@ -89,7 +89,7 @@ class UserMetricsPlugin(ParameterEditorPlugin):
         else:
             self.menu.menuAction().setVisible(False)
 
-        window.mainImage.imgItem.sigImageChanged.connect(self.resetMetrics)
+        window.mainImage.imageItem.sigImageChanged.connect(self.resetMetrics)
 
     def activateMetricCollection(self):
         mImg: MainImage = self.window.mainImage

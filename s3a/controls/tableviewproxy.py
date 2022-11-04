@@ -527,7 +527,7 @@ class ComponentController(DASM, QtCore.QObject):
         oldShowFocused = self.regionPlot.showFocused
         oldShowSelected = self.regionPlot.showSelected
 
-        pm = self._mainImageArea.imgItem.getPixmap()
+        pm = self._mainImageArea.imageItem.getPixmap()
         painter = QtGui.QPainter(pm)
         try:
             self.regionPlot.showFocused = True

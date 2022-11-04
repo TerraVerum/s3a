@@ -34,8 +34,8 @@ def leftClick(pt: Tuple[int, int]):
 def mouseDragFactory(qtbot):
     def mouseDrag(widget: MainImage, startPos, endPos):
         btns = QtCore.Qt.MouseButton
-        startPos = widget.imgItem.mapToScene(pg.Point(startPos))
-        endPos = widget.imgItem.mapToScene(pg.Point(endPos))
+        startPos = widget.imageItem.mapToScene(pg.Point(startPos))
+        endPos = widget.imageItem.mapToScene(pg.Point(endPos))
         press = QtGui.QMouseEvent(
             QtGui.QMouseEvent.Type.MouseButtonPress,
             startPos,

@@ -14,7 +14,7 @@ def test_metrics_image(app):
         dict(
             action=CNST.DRAW_ACT_ADD,
             mouse_pos=pos,
-            pixel_size=app.mainImage.imgItem.pixelWidth(),
+            pixel_size=app.mainImage.imageItem.pixelWidth(),
         )
         for pos in [(50, 50), (40, 40)]
     ]

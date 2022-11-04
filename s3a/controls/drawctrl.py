@@ -99,7 +99,7 @@ class RoiCollection(QtCore.QObject):
             Mouse event
         """
         # Unblock on mouse press
-        # None imgitem is only the case during programmatic calls so allow this case
+        # None imageItem is only the case during programmatic calls so allow this case
         if (
             (imageItem is None or imageItem.image is not None)
             and ev.type() == QtCore.QEvent.Type.MouseButtonPress

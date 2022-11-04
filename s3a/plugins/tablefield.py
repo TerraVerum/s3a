@@ -133,7 +133,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             self.clearFocusedRegion()
             self.stageInfoImage.hide()
 
-        window.mainImage.imgItem.sigImageChanged.connect(onChange)
+        window.mainImage.imageItem.sigImageChanged.connect(onChange)
 
         window.mainImage.registerDrawAction(
             [CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self._runFromDrawAct

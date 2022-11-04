@@ -105,7 +105,7 @@ def test_region_history(vertsPlugin, app, monkeypatch):
         m.setattr(vertsPlugin.playbackWindow, "show", lambda *args: None)
         m.setattr(vertsPlugin.playbackWindow, "raise_", lambda *args: None)
         vertsPlugin.playbackRegionHistory()
-        winImg = vertsPlugin.playbackWindow.displayPlot.imgItem.image
+        winImg = vertsPlugin.playbackWindow.displayPlot.imageItem.image
         assert np.array_equal(winImg, initial)
 
 
