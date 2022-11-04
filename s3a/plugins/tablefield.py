@@ -51,30 +51,17 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     def __initSharedSettings__(self, shared: SharedAppSettings = None, **kwargs):
         super().__initSharedSettings__(shared, **kwargs)
 
-        self.imageProcessCollection = AlgorithmCollection(
-            ImagePipeline,
-            directory=IMAGE_PROCESSORS_DIR,
-            template=CONFIG_DIR / "imageproc.yml",
-        )
-        self.imageProcessCollection.addAllModuleProcesses(imageproc)
-
-        self.processEditor = AlgorithmEditor(
-            self.imageProcessCollection,
-            name=self.name + " Processor",
-            directory=MENU_OPTS_DIR / fns.nameFormatter(type(self).__name__).lower(),
-        )
-
         _, self.processorMenu = self.processEditor.createWindowDock(
             self.window, self.processEditor.name
         )
 
-        self.props = ParameterContainer()
         shared.generalProperties.registerParameter(
             CNST.PROP_REG_APPROX_EPS, container=self.props
         )
 
     def __init__(self):
         super().__init__()
+        self.props = ParameterContainer()
         self.queueActions = True
         self.region = MultiRegionPlot(disableMouseClick=True)
         self.region.hide()
@@ -91,6 +78,19 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         self.oldResultCache = None
         """Holds the last result from a region run so undoables reset the process cache"""
 
+        self.imageProcessCollection = AlgorithmCollection(
+            ImagePipeline,
+            directory=IMAGE_PROCESSORS_DIR,
+            template=CONFIG_DIR / "imageproc.yml",
+        )
+        self.imageProcessCollection.addAllModuleProcesses(imageproc)
+
+        self.processEditor = AlgorithmEditor(
+            self.imageProcessCollection,
+            name=self.name + " Processor",
+            directory=MENU_OPTS_DIR / fns.nameFormatter(type(self).__name__).lower(),
+        )
+
         self.processEditor.registerFunction(
             self.overlayStageInfo,
             parent=self.processEditor._metaParameter,
@@ -99,6 +99,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         )
 
     def attachToWindow(self, window):
+        super().attachToWindow(window)
         window.mainImage.addItem(self.region)
         window.mainImage.addItem(self.stageInfoImage)
 
@@ -143,8 +144,6 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         self.statusButton.setToolTip("Click to abort all active/pending actions")
         self.statusButton.clicked.connect(self.endQueuedActionsGui)
         window.statusBar().addPermanentWidget(self.statusButton)
-
-        super().attachToWindow(window)
 
     def fillRegionMask(self):
         """Completely fill the focused region mask"""

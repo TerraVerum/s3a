@@ -21,7 +21,7 @@ class ComponentTablePlugin(ParameterEditorPlugin):
         shared.generalProperties.registerParameter(
             CNST.PROP_VERT_SORT_BHV, container=self.window.sortFilterProxy.props
         )
-        shared.generalProperties.registerParameters(
+        shared.generalProperties.registerParameterList(
             [CNST.PROP_SCALE_PEN_WIDTH, CNST.PROP_FIELD_INFO_ON_SEL],
             container=self.window.componentController.props,
         )
@@ -46,6 +46,7 @@ class ComponentTablePlugin(ParameterEditorPlugin):
 
     def attachToWindow(self, window):
         tbl = window.tableView
+        self.tableData = window.tableData
         for func, param in zip(
             [
                 lambda: tbl.setSelectedCellsAsGui(),

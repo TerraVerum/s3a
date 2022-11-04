@@ -134,9 +134,9 @@ class S3A(S3ABase):
         ]
         parents = [self.mainImage, self.tableView]
         for plugin, parent in zip(_plugins, reversed(parents)):
-            plugin.toolsEditor.actionsMenuFromProcs(
-                plugin.name, nest=True, parent=parent, outerMenu=parent.menu
-            )
+            newMenu = plugin.createActionsFromProcesses()
+            parent.menu.addMenu(newMenu)
+            newMenu.setParent(parent)
 
         tableDock = QtWidgets.QDockWidget("Component Table Window", self)
         tableDock.setFeatures(
@@ -168,18 +168,14 @@ class S3A(S3ABase):
         statusBar.addPermanentWidget(self.pixelColorLabel)
         self.mainImage.pxColorLbl = self.pixelColorLabel
 
-    def saveLayout(
-        self, layoutName: Union[str, Path] = None, allowOverwriteDefault=False
-    ):
+    def saveLayout(self, layoutName: Union[str, Path] = None):
         dockStates = self.saveState().data()
         if Path(layoutName).is_absolute():
             savePathPlusStem = layoutName
         else:
             savePathPlusStem = LAYOUTS_DIR / layoutName
         saveFile = savePathPlusStem.with_suffix(f".dockstate")
-        fns.saveToFile(
-            {"docks": dockStates}, saveFile, allowOverwriteDefault=allowOverwriteDefault
-        )
+        fns.saveToFile({"docks": dockStates}, saveFile)
         self.sigLayoutSaved.emit()
 
     def changeFocusedComponent(self, ids: Union[int, Sequence[int]] = None):
@@ -190,7 +186,7 @@ class S3A(S3ABase):
         return ret
 
     def resetTableFieldsGui(self):
-        outFname = fns.popupFilePicker(
+        outFname = popupFilePicker(
             None, "Select Table Config File", "All Files (*.*);; Config Files (*.yml)"
         )
         if outFname is not None:
@@ -203,16 +199,12 @@ class S3A(S3ABase):
         dock = plugin.dock
         if dock is None:
             return
-        self.sharedSettings.quickLoader.addDock(dock)
-        self.addTabbedDock(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock)
+        self.sharedSettings.quickLoader.addEditor(plugin)
 
         if plugin.menu is None:
             # No need to add menu and graphics options
             return plugin
 
-        parentTb = plugin.parentMenu
-        if parentTb is not None:
-            plugin.addToWindow(self, parentToolbarOrMenu=parentTb)
         return plugin
 
     def setMainImage(
@@ -302,7 +294,8 @@ class S3A(S3ABase):
         self.close()
 
     def _populateLoadLayoutOptions(self):
-        self.layoutEditor.addDirItemsToMenu(self.menuLayout)
+        self.menuLayout = self.menuBar().addMenu("Layout")
+        self.layoutEditor.stateManager.addSavedStatesToMenu(self.menuLayout)
 
     def updateTheme(self, useDarkTheme=False):
         style = ""

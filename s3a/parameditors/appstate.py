@@ -77,7 +77,7 @@ class AppStateEditor(ParameterEditor):
         try:  # try block to ensure loading is false after
             if stateName is None:
                 stateName = self.RECENT_STATE_FNAME
-            stateName = self.formatFileName(stateName)
+            stateName = self.stateManager.formatFileName(stateName)
             if not stateName.exists() and stateDict is None:
                 stateDict = {}
             if isinstance(stateDict, str):
@@ -129,13 +129,11 @@ class AppStateEditor(ParameterEditor):
             defaults = attemptFileLoad(self.RECENT_STATE_FNAME)
         else:
             defaults = {}
-        try:
-            out = self._parseStateDict(stateName, stateDict)
-        except FileNotFoundError:
-            out = {}
+        if stateDict is None:
+            stateDict = attemptFileLoad(stateName)
         for k in self.stateFunctionsDf.index[self.stateFunctionsDf["required"]]:
-            out.setdefault(k, defaults.get(k))
-        return out
+            stateDict.setdefault(k, defaults.get(k))
+        return stateDict
 
     @staticmethod
     def raiseErrorMessageIfNeeded(errorMessages: List[str]):

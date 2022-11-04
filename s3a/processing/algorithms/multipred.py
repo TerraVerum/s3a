@@ -4,7 +4,13 @@ import typing as t
 import cv2 as cv
 import numpy as np
 import pandas as pd
-from qtextras import FROM_PREV_IO, OptionsDict, bindInteractorOptions as bind, fns
+from qtextras import (
+    FROM_PREV_IO,
+    OptionsDict,
+    ParameterEditor,
+    bindInteractorOptions as bind,
+    fns,
+)
 from scipy.ndimage import maximum_filter
 
 from .. import PipelineFunction
@@ -466,6 +472,8 @@ def single_categorical_prediction(
 class RunPlugins(PipelineFunction):
     def __init__(self, **kwargs):
         super().__init__(function=self.run_plugins, **kwargs)
+        # Instantiate parameters
+        ParameterEditor.defaultInteractor.interact(self, nest=False, runOptions=[])
 
     @staticmethod
     @bind(plugins=dict(type="checklist", value=[], limits=[RTF.VERTICES.name]))

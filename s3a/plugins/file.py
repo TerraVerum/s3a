@@ -54,34 +54,8 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         super().__init__()
         self.projectData = self.exposes(ProjectData(startupName, startupCfg))
         self.autosaveTimer = QtCore.QTimer()
-
-        self.registerFunction(self.save, runActionTemplate=CNST.TOOL_PROJ_SAVE)
-        self.registerFunction(
-            self.showProjectImagesGui, runActionTemplate=CNST.TOOL_PROJ_OPEN_IMG
-        )
-
-        self.registerFunction(self.createGui, runActionTemplate=CNST.TOOL_PROJ_CREATE)
-        self.registerFunction(self.openGui, runActionTemplate=CNST.TOOL_PROJ_OPEN)
-
-        self.registerPopoutFunctions(
-            [self.updateProjectProperties, self.addImagesGui, self.addAnnotationsGui],
-            ["Update Project Properties", "Add Images", "Add Annotations"],
-            runActionTemplate=CNST.TOOL_PROJ_SETTINGS,
-        )
-
-        self.registerFunction(
-            lambda: self.window.setMainImageGui,
-            runActionTemplate=CNST.TOOL_PROJ_ADD_IMG,
-        )
-        self.registerFunction(
-            lambda: self.window.openAnnotationGui,
-            runActionTemplate=CNST.TOOL_PROJ_ADD_ANN,
-        )
-
-        self.registerPopoutFunctions(
-            [self.startAutosave, self.stopAutosave],
-            runActionTemplate=CNST.TOOL_AUTOSAVE,
-        )
+        self.projNameLbl = QtWidgets.QLabel()
+        self.exportOptsParam = self._buildIoOptions()
 
         self._projectImagePane = ProjectImagePane()
         self._projectImagePane.sigImageSelected.connect(
@@ -95,7 +69,7 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
 
         def onCfgLoad():
             self._updateProjectLabel()
-            if self.win:
+            if self.window:
                 # Other arguments are consumed by app state editor
                 state = self.window.appStateEditor
                 if state.loading:
@@ -105,8 +79,6 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
                     state.loadParameterValues(stateDict={}, **self.projectData.startup)
 
         self.projectData.sigConfigLoaded.connect(onCfgLoad)
-
-        self.projNameLbl = QtWidgets.QLabel()
 
         useDefault = startupName is None and startupCfg is None
         self._createDefaultProject(useDefault)
@@ -122,7 +94,7 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         """
         componentIo = self.projectData.componentIo
         exportOptsParam = fns.getParameterChild(
-            self.toolsEditor.params, CNST.TOOL_PROJ_EXPORT.name, "Export Options"
+            self.rootParameter, CNST.TOOL_PROJ_EXPORT.name, "Export Options"
         )
         # Use a wrapper to easily get hyperparams created
         for name, fn in inspect.getmembers(
@@ -140,13 +112,13 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         )
         return exportOptsParam
 
-    def attachWinRef(self, win):
-        super().attachWinRef(win)
-        self.projectData.componentIo.tableData = win.tableData
-        win.statusBar().addPermanentWidget(self.projNameLbl)
+    def attachToWindow(self, window):
+        super().attachToWindow(window)
+        self.projectData.componentIo.tableData = window.tableData
+        window.statusBar().addPermanentWidget(self.projNameLbl)
 
         def handleExport(_dir):
-            saveImg = win.sourceImagePath
+            saveImg = window.sourceImagePath
             ret = str(self.projectData.configPath)
             if not saveImg:
                 self.projectData.startup.pop("image", None)
@@ -157,7 +129,38 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
             self.save()
             return ret
 
-        win.appStateEditor.addImportExportOptions("project", self.open, handleExport, 0)
+        window.appStateEditor.addImportExportOptions(
+            "project", self.open, handleExport, index=0
+        )
+
+        self.registerFunction(self.save, runActionTemplate=CNST.TOOL_PROJ_SAVE)
+        self.registerFunction(
+            self.showProjectImagesGui, runActionTemplate=CNST.TOOL_PROJ_OPEN_IMG
+        )
+
+        self.registerFunction(self.createGui, runActionTemplate=CNST.TOOL_PROJ_CREATE)
+        self.registerFunction(self.openGui, runActionTemplate=CNST.TOOL_PROJ_OPEN)
+
+        self.registerPopoutFunctions(
+            [self.updateProjectProperties, self.addImagesGui, self.addAnnotationsGui],
+            ["Update Project Properties", "Add Images", "Add Annotations"],
+            runActionTemplate=CNST.TOOL_PROJ_SETTINGS,
+            menu=self.menu,
+        )
+
+        self.registerFunction(
+            window.setMainImageGui,
+            runActionTemplate=CNST.TOOL_PROJ_ADD_IMG,
+        )
+        self.registerFunction(
+            window.openAnnotationGui,
+            runActionTemplate=CNST.TOOL_PROJ_ADD_ANN,
+        )
+
+        self.registerPopoutFunctions(
+            [self.startAutosave, self.stopAutosave],
+            runActionTemplate=CNST.TOOL_AUTOSAVE,
+        )
 
         def receiveAutosave(autosaveArg: Union[bool, FilePath, dict]):
             """Loads autosave configuration from file and starts autosaving"""
@@ -182,16 +185,16 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
                 return None
 
             cfg = {}
-            for proc, params in self.toolsEditor.procToParamsMapping.items():
-                if proc.name == "Start Autosave":
-                    cfg = fns.parameterValues(params).pop("Start Autosave", {})
+            for name, function in self.nameFunctionMap.items():
+                if name == "Start Autosave":
+                    cfg = {**function.extra, **function.parameterCache}
                     break
 
             saveName = str(savePath / "autosave.params")
             fns.saveToFile(cfg, saveName)
             return saveName
 
-        win.appStateEditor.addImportExportOptions(
+        window.appStateEditor.addImportExportOptions(
             "autosave", receiveAutosave, exportAutosave
         )
 
@@ -204,7 +207,7 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
             addedName = self.projectData.addImage(imgName)
             self.window.setMainImage(addedName or imgName)
 
-        win.appStateEditor.addImportExportOptions(
+        window.appStateEditor.addImportExportOptions(
             "image", startImage, lambda *args: None, 1
         )
 
@@ -226,7 +229,7 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
             return wrapper
 
         doctoredCur = PipelineFunction(
-            exportWrapper(win.exportCurrentAnnotation),
+            exportWrapper(window.exportCurrentAnnotation),
             name="Current Annotation",
             outFname="",
         )
@@ -237,13 +240,13 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
             [self.projectData.exportProject, doctoredAll, doctoredCur],
             ["Project", "All Annotations", "Current Annotation"],
             runActionTemplate=CNST.TOOL_PROJ_EXPORT,
+            menu=self.menu,
         )
         self._projectImagePane.hide()
         self._updateProjectLabel()
-        win.addTabbedDock(
+        window.addTabbedDock(
             QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self._projectImagePane
         )
-        self.exportOptsParam = self._buildIoOptions()
 
     def _createDefaultProject(self, setAsCur=True):
         defaultName = APP_STATE_DIR / PROJECT_FILE_TYPE

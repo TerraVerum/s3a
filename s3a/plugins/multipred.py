@@ -28,9 +28,18 @@ class MultiPredictionsPlugin(ProcessorPlugin):
     def __initSharedSettings__(self, shared: SharedAppSettings = None, **kwargs):
         super().__initSharedSettings__()
 
+        _, self.processEditorMenu = self.processEditor.createWindowDock(
+            self.window, self.processEditor.name
+        )
+
+    def __init__(self):
+        super().__init__()
+        self.registerFunction(self.lastRunAnalytics)
+
         self.multiPredictionCollection = AlgorithmCollection(
-            name="Multi-Predictions", directory=MULTI_PREDICTIONS_DIR,
-            template=CONFIG_DIR / "multipred.yml"
+            name="Multi-Predictions",
+            directory=MULTI_PREDICTIONS_DIR,
+            template=CONFIG_DIR / "multipred.yml",
         )
         self.multiPredictionCollection.addAllModuleProcesses(multipred)
         self.processEditor = AlgorithmEditor(
@@ -38,16 +47,9 @@ class MultiPredictionsPlugin(ProcessorPlugin):
             name=self.name + " Processor",
             directory=MENU_OPTS_DIR / nameFormatter(type(self).__name__).lower(),
         )
-        _, self.processEditorMenu = self.processEditor.createWindowDock(
-            self.window, self.processEditor.name
-        )
         self.pluginRunnerProc = self.multiPredictionCollection.parseProcessName(
             "Run Plugins", topFirst=False
         )
-
-    def __init__(self):
-        super().__init__()
-        self.registerFunction(self.lastRunAnalytics)
 
     def attachToWindow(self, window):
         super().attachToWindow(window)
@@ -62,13 +64,12 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         window.sigPluginAdded.connect(self.updateRunnerLimits)
 
     def updateRunnerLimits(self):
-        self.pluginRunnerProc.input.parameters["plugins"].setLimits(
-            [
-                p.name
-                for p in self.window.classPluginMap.values()
-                if hasattr(p, "runOnComponent")
-            ]
-        )
+        newLimits = [
+            p.name
+            for p in self.window.classPluginMap.values()
+            if hasattr(p, "runOnComponent")
+        ]
+        self.pluginRunnerProc.input.parameters["plugins"].setLimits(newLimits)
 
     def makePrediction(self, components: pd.DataFrame = None, **runKwargs):
         if self.window.mainImage.image is None:
