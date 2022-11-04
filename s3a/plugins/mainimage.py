@@ -5,14 +5,11 @@ from typing import TYPE_CHECKING
 
 import cv2 as cv
 import numpy as np
-from pyqtgraph.parametertree import InteractiveFunction
-from qtextras import ParameterContainer, RunOptions, fns
+from qtextras import ParameterContainer, RunOptions
 
 from .base import ParameterEditorPlugin
 from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
-from ..generalutils import ClassInteractiveFunction
 from ..structures import ComplexXYVertices, XYVertices
-from ..views.regions import MultiRegionPlot
 from ..views.rois import PointROI
 
 if TYPE_CHECKING:
@@ -39,26 +36,6 @@ class MainImagePlugin(ParameterEditorPlugin):
             runOptions=RunOptions.ON_CHANGED,
         )
 
-        if not isinstance(MultiRegionPlot.updateColors, InteractiveFunction):
-            MultiRegionPlot.updateColors = ClassInteractiveFunction(
-                MultiRegionPlot.updateColors
-            )
-            MultiRegionPlot.setBoundaryOnly = ClassInteractiveFunction(
-                MultiRegionPlot.setBoundaryOnly
-            )
-            shared.colorScheme.registerFunction(
-                MultiRegionPlot.updateColors,
-                runOptions=RunOptions.ON_CHANGED,
-                nest=False,
-                container=MultiRegionPlot.props,
-                labelColormap=dict(limits=fns.listAllPgColormaps() + ["None"]),
-            )
-            shared.generalProperties.registerFunction(
-                MultiRegionPlot.setBoundaryOnly,
-                runOptions=RunOptions.ON_CHANGED,
-                nest=False,
-            )
-
         super().__initSharedSettings__(shared=shared, **kwargs)
 
     def attachToWindow(self, window: S3ABase):
@@ -74,7 +51,9 @@ class MainImagePlugin(ParameterEditorPlugin):
         disp = window.componentController
 
         def actHandler(verts, param):
-            activeEdits = len(self.window.verticesPlugin.region.regionData["Vertices"]) > 0
+            activeEdits = (
+                len(self.window.verticesPlugin.region.regionData["Vertices"]) > 0
+            )
             if (
                 param in [CNST.DRAW_ACT_REM, CNST.DRAW_ACT_ADD]
                 and not activeEdits

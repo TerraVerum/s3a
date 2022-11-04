@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import inspect
 from typing import Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
+from pyqtgraph.parametertree import InteractiveFunction, RunOptions
 from pyqtgraph.Qt import QtCore
 from qtextras import (
     DeferredActionStackMixin as DASM,
     OptionsDict,
     ParameterContainer,
+    ParameterEditor,
     bindInteractorOptions as bind,
     fns,
 )
@@ -65,10 +68,14 @@ def makeMultiRegionDf(
 
 
 class MultiRegionPlot(BoundScatterPlot):
-    # Compatibility with non-interactive plot mode for ComponentController
-    props = ParameterContainer(penWidth=0)
+    props = ParameterContainer()
 
-    def __init__(self, parent=None, disableMouseClick=False):
+    def __init__(
+        self,
+        parent=None,
+        disableMouseClick=False,
+        props: ParameterContainer | None = None,
+    ):
         super().__init__(size=1, pxMode=False)
 
         self.setParent(parent)
@@ -79,6 +86,13 @@ class MultiRegionPlot(BoundScatterPlot):
         self.updateColors()
         self.showSelected = True
         self.showFocused = True
+        self.props = props or type(self).props
+
+        # Use `setattr` so autocomplete works
+        for func in self.updateColors, self.setBoundaryOnly:
+            interactive = InteractiveFunction(func)
+            setattr(self, func.__name__, interactive)
+            self._linkContainerToFunction(self.props, interactive)
 
         # 'pointsAt' is an expensive operation if many points are in the scatterplot.
         # Since this will be called anyway when a selection box is made in the main
@@ -90,6 +104,26 @@ class MultiRegionPlot(BoundScatterPlot):
             # signal won't get code that runs but never triggers
             # self.centroidPlts.sigClicked = None
             self.sigClicked = None
+
+    @classmethod
+    def _linkContainerToFunction(
+        cls, props: ParameterContainer, interactive: InteractiveFunction
+    ):
+        signatureParams = inspect.signature(interactive.function).parameters
+        useParams = [
+            props.parameters[name]
+            for name in set(signatureParams).intersection(props.parameters)
+        ]
+        if useParams:
+            for param in useParams:
+                param.sigValueChanged.connect(interactive.runFromChangedOrChanging)
+            interactive.hookupParameters(useParams)
+        else:
+            # Need to populate properties for the first time
+            ParameterEditor.defaultInteractor(
+                interactive, runOptions=RunOptions.ON_CHANGED
+            )
+            props.update(interactive.parameters)
 
     def setBoundaryOnly(self, boundaryOnly=False):
         self.boundaryOnly = boundaryOnly
@@ -255,7 +289,9 @@ class MultiRegionPlot(BoundScatterPlot):
         penColor=_colorType,
         selectedFill=_colorType,
         focusedFill=_colorType,
-        labelColormap=dict(type="popuplineeditor"),
+        labelColormap=dict(
+            type="popuplineeditor", limits=fns.listAllPgColormaps() + ["None"]
+        ),
         fillAlpha=dict(limits=[0, 1], step=0.1),
     )
     def updateColors(
