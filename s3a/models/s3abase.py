@@ -123,7 +123,15 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         # -----
         # INTERFACE WITH QUICK LOADER / PLUGINS
         # -----
-        toAdd = INTERNAL_PLUGINS() + EXTERNAL_PLUGINS()
+        toAdd = (
+            INTERNAL_PLUGINS()
+            + [
+                self.sharedSettings.generalProperties,
+                # self.sharedSettings.quickLoader,
+                self.sharedSettings.colorScheme,
+            ]
+            + EXTERNAL_PLUGINS()
+        )
         for plg in toAdd:
             if inspect.isclass(plg):
                 self.addPlugin(plg)

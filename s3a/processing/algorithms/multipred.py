@@ -1,4 +1,5 @@
 import copy
+import functools
 import typing as t
 
 import cv2 as cv
@@ -37,17 +38,18 @@ def get_component_images(image: np.ndarray, components: pd.DataFrame):
 class ProcessDispatcher(PipelineFunction):
     def __init__(
         self,
-        func,
+        function,
         resultConverter: t.Callable[[t.Union[dict, t.Any], pd.Series], dict] = None,
         **kwargs,
     ):
-        self.singleRunner = func
+        self.singleRunner = function
         self.resultConverter = resultConverter
-        kwargs.setdefault("docFunc", func)
-        ignores = list(kwargs.setdefault("ignoreKeys", []))
-        ignores.append("component")
-        kwargs["ignoreKeys"] = ignores
-        super().__init__(self.dispatcher, **kwargs)
+        kwargs["ignores"] = list(kwargs.setdefault("ignores", [])) + ["component"]
+        super().__init__(function, **kwargs)
+        # Now that `self` is initialized, it can be wrapped with correct attributes
+        functools.update_wrapper(self, function, updated=())
+        if kwargs.get("name"):
+            self.__name__ = kwargs["name"]
         self.input["components"] = FROM_PREV_IO
 
     def dispatcher(self, components: pd.DataFrame, **kwargs):

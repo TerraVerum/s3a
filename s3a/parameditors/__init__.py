@@ -1,5 +1,5 @@
 from pyqtgraph.parametertree import Parameter, ParameterTree
-from qtextras import ParameterEditor, fns
+from qtextras import ParameterEditor, fns, EasyWidget
 
 
 class MetaTreeParameterEditor(ParameterEditor):
@@ -16,9 +16,11 @@ class MetaTreeParameterEditor(ParameterEditor):
 
     def _guiChildren(self) -> list:
         self._makeMetaTree()
-        outList = super()._guiChildren()
-        outList.insert(outList.index(self.treeButtonsWidget) + 1, self._metaTree)
-        return outList
+        return [
+            self.treeButtonsWidget,
+            EasyWidget([self._metaTree, self.tree], useSplitter=True, layout="V"),
+            [self.saveAsButton, self.loadButton],
+        ]
 
     def _makeMetaTree(self):
         self._metaParameter = Parameter.create(name="Meta Parameters", type="group")

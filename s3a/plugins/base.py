@@ -48,6 +48,7 @@ class ParameterEditorPlugin(ParameterEditor):
         self.window = window
         self.menuTitle = self._resolveMenuTitle(self.name)
         self.dock, self.menu = self.createWindowDock(window, self.menuTitle)
+        window.menuBar().addMenu(self.menu)
         self.__initSharedSettings__(shared=window.sharedSettings)
 
     def registerPopoutFunctions(

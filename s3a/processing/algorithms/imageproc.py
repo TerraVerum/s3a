@@ -135,7 +135,7 @@ def format_vertices(
     )
 
 
-@bind(reference=dict(type="list", limits=[["image", "component", "viewbox", "roi"]]))
+@bind(reference=dict(type="list", limits=["image", "component", "viewbox", "roi"]))
 def crop_to_local_area(
     image: NChanImg,
     foregroundVertices: XYVertices,

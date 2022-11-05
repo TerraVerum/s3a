@@ -51,7 +51,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     def __initSharedSettings__(self, shared: SharedAppSettings = None, **kwargs):
         super().__initSharedSettings__(shared, **kwargs)
 
-        _, self.processorMenu = self.processEditor.createWindowDock(
+        _, self.processEditorMenu = self.processEditor.createWindowDock(
             self.window, self.processEditor.name
         )
 
@@ -100,6 +100,8 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
     def attachToWindow(self, window):
         super().attachToWindow(window)
+        beforeAction = self.menu.actions()[0] if len(self.menu.actions()) else None
+        self.menu.insertMenu(beforeAction, self.processEditorMenu)
         window.mainImage.addItem(self.region)
         window.mainImage.addItem(self.stageInfoImage)
 

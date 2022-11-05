@@ -197,4 +197,4 @@ class AppStateEditor(ParameterEditor):
 
     @property
     def RECENT_STATE_FNAME(self):
-        return self.stateManager.directory / f"recent.{self.stateManager.suffix}"
+        return self.stateManager.directory / f"recent{self.stateManager.suffix}"

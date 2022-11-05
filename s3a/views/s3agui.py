@@ -136,7 +136,6 @@ class S3A(S3ABase):
         for plugin, parent in zip(_plugins, reversed(parents)):
             newMenu = plugin.createActionsFromProcesses()
             parent.menu.addMenu(newMenu)
-            newMenu.setParent(parent)
 
         tableDock = QtWidgets.QDockWidget("Component Table Window", self)
         tableDock.setFeatures(

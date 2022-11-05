@@ -103,7 +103,7 @@ class AlgorithmEditor(MetaTreeParameterEditor):
             self.props["process"] = name
 
         self.collection.stateManager.signals.updated.connect(onStateUpdated)
-        self.sigProcessorChanged.fconnect(onChange)
+        self.sigProcessorChanged.connect(onChange)
         onStateUpdated()
         self.changeActiveProcessor(next(iter(self.collection.topProcesses)))
 

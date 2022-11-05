@@ -64,8 +64,9 @@ class ComponentTablePlugin(ParameterEditorPlugin):
             param.opts["ownerWidget"] = tbl
             self.registerFunction(func, name=param.name, runActionTemplate=param)
         tbl.menu = self.createActionsFromProcesses()
-        tbl.menu.setParent(tbl)
         filter_: ParameterEditor = self.tableData.filter
-        filter_.createWindowDock(window)
+        _, menu = filter_.createWindowDock(window)
         self.tableData = window.tableData
         super().attachToWindow(window)
+        beforeAction = self.menu.actions()[0] if len(self.menu.actions()) else None
+        self.menu.insertMenu(beforeAction, menu)

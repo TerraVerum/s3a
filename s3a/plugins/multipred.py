@@ -53,6 +53,8 @@ class MultiPredictionsPlugin(ProcessorPlugin):
 
     def attachToWindow(self, window):
         super().attachToWindow(window)
+        beforeAction = self.menu.actions()[0] if len(self.menu.actions()) else None
+        self.menu.insertMenu(beforeAction, self.processEditorMenu)
         self.manager = window.componentManager
         self.mainImage = window.mainImage
         window.mainImage.toolsEditor.registerFunction(
