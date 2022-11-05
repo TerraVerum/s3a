@@ -451,5 +451,7 @@ class AlgorithmCollection(ParameterEditor):
         self.topProcesses.update(top)
         self.primitiveProcesses.update(primitive)
         stateDict = self.saveParameterValues(blockWrite=True)
-        super().loadParameterValues(stateName, stateDict, candidateParameters=[])
+        super().loadParameterValues(
+            stateName, stateDict, candidateParameters=[], **kwargs
+        )
         return stateDict
