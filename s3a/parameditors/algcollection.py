@@ -45,6 +45,28 @@ def _peekFirst(iterable):
     return next(iter(iterable))
 
 
+def _splitNameValueMetaDict(processDict: dict):
+    """
+    Split a dict of ``{process: {valueOpts}, metaOpts}`` into a tuple of
+    ``(process, valueOpts, metaOpts)``
+    """
+    # 1. First key is always the process name, values are new inputs for any
+    # matching process
+    # 2. Second key is whether the process is disabled
+    processDict = processDict.copy()
+    processName = _peekFirst(processDict)
+    updateKwargs = processDict.pop(processName, {})
+    if isinstance(updateKwargs, list):
+        # TODO: Determine policy for loading nested procs, outer should already
+        #  know about inner so it shouldn't _need_ to occur, given outer would've
+        #  been saved previously
+        raise ValueError("Parsing deep nested processes is currently undefined")
+    # TODO: Add recursion, if it's something that will be done. For now, assume
+    #  only 1-depth nesting. Otherwise, it's hard to distinguish between actual
+    #  input optiosn and a nested process
+    return processName, updateKwargs, processDict
+
+
 def onlyFirstKeyValue(dict_):
     key, value = _peekFirst(dict_.items())
     return {key: value}
@@ -60,34 +82,30 @@ class AlgorithmEditor(MetaTreeParameterEditor):
             collection = AlgorithmCollection()
         self.collection = collection
 
-        processName = _peekFirst(self.collection.topProcesses)
-        proc = collection.parseProcessName(processName)
-        # Set to None first to force switch, init states
-        self.currentProcessor = proc
-
+        # Will be set by changeActiveProcessor
+        self.currentProcessor: PipelineParameter | None = None
         self.props = ParameterContainer()
         self.registerFunction(
             self.changeActiveProcessor,
             runOptions=RunOptions.ON_CHANGED,
             parent=self._metaParameter,
-            process=processName,
+            process="",
             container=self.props,
         )
         fns.setParametersExpanded(self._metaTree)
-        procSelector = self.props.parameters["process"]
-        self.collection.stateManager.signals.updated.connect(
-            lambda: procSelector.setLimits(list(self.collection.topProcesses))
-        )
+
+        def onStateUpdated():
+            self.props.parameters["process"].setLimits(
+                list(self.collection.topProcesses)
+            )
 
         def onChange(name):
-            with fns.makeDummySignal(procSelector, "sigValueChanged"):
-                procSelector.setValue(name)
-                # Manually set item labels since valueChange was forcefully disconnected
-                for item in procSelector.items:
-                    item.valueChanged(procSelector, name)
+            self.props["process"] = name
 
-        self.sigProcessorChanged.connect(onChange)
-        self.changeActiveProcessor(proc)
+        self.collection.stateManager.signals.updated.connect(onStateUpdated)
+        self.sigProcessorChanged.fconnect(onChange)
+        onStateUpdated()
+        self.changeActiveProcessor(next(iter(self.collection.topProcesses)))
 
     def saveParameterValues(
         self,
@@ -148,13 +166,21 @@ class AlgorithmEditor(MetaTreeParameterEditor):
         """
         # TODO: Maybe there's a better way of doing this? Ensures process label is updated
         #  for programmatic calls
-        if saveBeforeChange:
+        title = process.title() if isinstance(process, PipelineParameter) else process
+        if not process or title == (
+            self.currentProcessor and self.currentProcessor.title()
+        ):
+            return
+
+        if saveBeforeChange and self.currentProcessor:
             self.saveParameterValues(self.stateManager.stateName, blockWrite=True)
-        process = self._resolveProccessor(process)
         if process is None:
             return
-        self.rootParameter.clearChildren()
+        if self.currentProcessor:
+            self.currentProcessor.remove()
+        process = self._resolveProccessor(process)
         self.currentProcessor = process
+        self.rootParameter.addChild(process)
         fns.setParametersExpanded(self.tree)
         self.sigProcessorChanged.emit(process.title())
 
@@ -280,12 +306,12 @@ class AlgorithmCollection(ParameterEditor):
                 added.append(self.addFunction(process, force=force))
         return added
 
-    def addFunction(self, func: t.Callable, top=False, **kwargs):
+    def addFunction(self, func: t.Callable, top=False, force=False, **kwargs):
         """
         Helper function to wrap a function in a pipeline process and add it as a
         stage
         """
-        return self.addProcess(PipelineFunction(func, **kwargs), top)
+        return self.addProcess(PipelineFunction(func, **kwargs), top, force)
 
     def parseProcessName(
         self,
@@ -350,49 +376,18 @@ class AlgorithmCollection(ParameterEditor):
         """
         out = self.processType(name=name)
         for stageName in stages:
+            valueOpts, metaOpts = {}, {}
             if isinstance(stageName, dict):
-                stage = self.parseProcessDict(stageName)
-            else:
-                stage = self.parseProcessName(stageName, topFirst=False)
-            out.addStage(stage)
+                stageName, valueOpts, metaOpts = _splitNameValueMetaDict(stageName)
+            stage = self.parseProcessName(stageName, topFirst=False)
+            out.addStage(stage, stageInputOptions=valueOpts, **metaOpts)
+
         exists = out.name in self.topProcesses
         if add is not PRJ_ENUMS.PROCESS_NO_ADD and (not exists or allowOverwrite):
             self.addProcess(
                 out, top=add == PRJ_ENUMS.PROCESS_ADD_TOP, force=allowOverwrite
             )
         return out
-
-    def parseProcessDict(self, processDict: dict, topFirst=False):
-        # 1. First key is always the process name, values are new inputs for any
-        # matching process
-        # 2. Second key is whether the process is disabled
-        processDict = processDict.copy()
-        processName, updateKwargs = _peekFirst(processDict.items())
-        processDict.pop(processName)
-        proc = self.parseProcessName(processName, topFirst=topFirst)
-        if isinstance(updateKwargs, list):
-            # TODO: Determine policy for loading nested procs, outer should already
-            #  know about inner so it shouldn't _need_ to occur, given outer would've
-            #  been saved previously
-            raise ValueError("Parsing deep nested processes is currently undefined")
-        elif updateKwargs:
-            # TODO: Determine when it makes sense to override defaults when kwargs
-            #  are passed
-            proc.updateInput(updateKwargs)
-        # Check for process-level traits
-        # For PipelineFunctions, "enabled" status lives with the ActionGroupParameter
-        # so query the parent PipelineParameter for its ActionGroup child and set
-        # *those* options
-        optsSetter = (
-            proc.parent.child(proc.__name__)
-            if isinstance(proc, PipelineFunction)
-            else proc
-        )
-        optsSetter.setOpts(**processDict)
-        return proc
-        # TODO: Add recursion, if it's something that will be done. For now, assume
-        #  only 1-depth nesting. Otherwise, it's hard to distinguish between actual
-        #  input optiosn and a nested process
 
     def parseProcessQualname(self, processName: str, **kwargs):
 
