@@ -58,8 +58,7 @@ class PipelineFunction(InteractiveFunction):
         if name:
             self.__name__ = name
 
-        self.input = ParameterContainer()
-        self._hookupInput(self)
+        self.defaultInput = dict(self.input)
         self.parent: PipelineParameter | None = None
 
         self.result = None
@@ -72,17 +71,16 @@ class PipelineFunction(InteractiveFunction):
         # them from the reference InteractiveFunction during clears/etc.
         obj.parameters, obj.parameterCache = {}, {}
         obj.hookupParameters(function.parameters, clearOld=False)
-        obj._hookupInput(function)
+        obj.defaultInput = dict(obj.input)
         return obj
-
-    def _hookupInput(self, function: InteractiveFunction):
-        self.input.parameters = function.parameters
-        self.input.extra = function.extra
-        self.defaultInput = dict(self.input)
 
     def hookupParameters(self, params=None, clearOld=True):
         super().hookupParameters(params, clearOld)
-        self._hookupInput(self)
+        self.defaultInput = dict(self.input)
+
+    @property
+    def input(self):
+        return ParameterContainer(self.parameters, self.extra)
 
     def __call__(self, **kwargs):
         try:
@@ -185,11 +183,14 @@ class PipelineParameter(ActionGroupParameter):
         self.sigOptionsChanged.connect(self.optsChanged)
 
     def addStage(
-        self, stage: InteractiveFunction | PipelineStageType | t.Callable, cache=True
+        self,
+        stage: InteractiveFunction | PipelineStageType | t.Callable,
+        cache=True,
+        stageInputOptions: dict = None,
+        **metaOptions,
     ):
         if isinstance(stage, PipelineParameter):
-            self.addChild(stage)
-            return
+            return self.addChild(stage)
         if isinstance(stage, InteractiveFunction):
             # If already a PipelineFunction, the copy created is still useful
             # in case caching is needed or other modifications are made
@@ -205,11 +206,12 @@ class PipelineParameter(ActionGroupParameter):
             stage.function = simpleCache(stage.function)
 
         registered = ParameterEditor.defaultInteractor(
-            stage, parent=self, runOptions=[]
+            stage, parent=self, runOptions=[], **(stageInputOptions or {})
         )
         # Override item class to allow checkboxes on stages
         registered.itemClass = PipelineParameterItem
-        registered.setOpts(title=stage.title(), function=stage)
+        registered.setOpts(title=stage.title(), function=stage, **metaOptions)
+        return registered
 
     def activate(self, **kwargs):
         super().activate()
