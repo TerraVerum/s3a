@@ -223,16 +223,16 @@ class PRJ_CONSTS:
     # --------------------------
     # MISC TOOLS
     # --------------------------
-    TOOL_UNDO = OptionsDict("Undo", "Ctrl+Z")
-    TOOL_REDO = OptionsDict("Redo", "Ctrl+Y")
+    TOOL_UNDO = OptionsDict("Undo", shortcut="Ctrl+Z")
+    TOOL_REDO = OptionsDict("Redo", shortcut="Ctrl+Y")
     # --------------------------
     # IMAGE TOOLS
     # --------------------------
     TOOL_MERGE_COMPS = OptionsDict(
-        "Merge Selected", f"{SHORTCUT_BASE}+S,M", icon=str(ICON_DIR / "merge.svg")
+        "Merge Selected", shortcut=f"{SHORTCUT_BASE}+S,M", icon=str(ICON_DIR / "merge.svg")
     )
     TOOL_SPLIT_COMPS = OptionsDict(
-        "Split Selected", f"{SHORTCUT_BASE}+S,S", icon=str(ICON_DIR / "split.svg")
+        "Split Selected", shortcut=f"{SHORTCUT_BASE}+S,S", icon=str(ICON_DIR / "split.svg")
     )
     TOOL_REM_OVERLAP = OptionsDict(
         "Remove Component Overlap",
@@ -240,27 +240,27 @@ class PRJ_CONSTS:
         icon=str(ICON_DIR / "mutex.svg"),
     )
     TOOL_COPY_REGIONS = OptionsDict(
-        "Copy Selected", f"{SHORTCUT_BASE}+S,C", icon=str(ICON_DIR / "copy.svg")
+        "Copy Selected", shortcut=f"{SHORTCUT_BASE}+S,C", icon=str(ICON_DIR / "copy.svg")
     )
     TOOL_MOVE_REGIONS = OptionsDict(
-        "Move Selected", f"{SHORTCUT_BASE}+S,V", icon=str(ICON_DIR / "move.svg")
+        "Move Selected", shortcut=f"{SHORTCUT_BASE}+S,V", icon=str(ICON_DIR / "move.svg")
     )
     TOOL_CLEAR_FOC_REGION = OptionsDict(
-        "Clear", f"{SHORTCUT_BASE}+V,C", icon=str(ICON_DIR / "clear.svg")
+        "Clear", shortcut=f"{SHORTCUT_BASE}+V,C", icon=str(ICON_DIR / "clear.svg")
     )
     TOOL_RESET_FOC_REGION = OptionsDict(
-        "Reset", f"{SHORTCUT_BASE}+V,R", icon=str(ICON_DIR / "reset.svg")
+        "Reset", shortcut=f"{SHORTCUT_BASE}+V,R", icon=str(ICON_DIR / "reset.svg")
     )
     TOOL_FILL_FOC_REGION = OptionsDict(
-        "Fill", f"{SHORTCUT_BASE}+V,F", icon=str(ICON_DIR / "fill.svg")
+        "Fill", shortcut=f"{SHORTCUT_BASE}+V,F", icon=str(ICON_DIR / "fill.svg")
     )
     TOOL_INVERT_FOC_REGION = OptionsDict(
-        "Invert", f"{SHORTCUT_BASE}+V,I", icon=str(ICON_DIR / "invert.svg")
+        "Invert", shortcut=f"{SHORTCUT_BASE}+V,I", icon=str(ICON_DIR / "invert.svg")
     )
     TOOL_ACCEPT_FOC_REGION = OptionsDict(
-        "Accept", "Ctrl+Shift+A", icon=str(ICON_DIR / "accept.svg")
+        "Accept", shortcut="Ctrl+Shift+A", icon=str(ICON_DIR / "accept.svg")
     )
-    TOOL_CLEAR_ROI = OptionsDict("Clear ROI", "Esc")
+    TOOL_CLEAR_ROI = OptionsDict("Clear ROI", shortcut="Esc")
     TOOL_CLEAR_HISTORY = OptionsDict(
         "Clear Processor History",
         f"{SHORTCUT_BASE}+V,H",
@@ -270,39 +270,39 @@ class PRJ_CONSTS:
         "Show Analytics", icon=str(ICON_DIR / "analytics.svg")
     )
     TOOL_RESET_ZOOM = OptionsDict(
-        "Reset Zoom", f"{SHORTCUT_BASE}+Z,R", icon=str(ICON_DIR / "reset_zoom.svg")
+        "Reset Zoom", shortcut=f"{SHORTCUT_BASE}+Z,R", icon=str(ICON_DIR / "reset_zoom.svg")
     )
 
     # --------------------------
     # WINDOW TOOLS
     # --------------------------
-    TOOL_ESTIMATE_BOUNDARIES = OptionsDict("Estimate Boundaries", "Ctrl+Alt+Shift+E")
-    TOOL_CLEAR_BOUNDARIES = OptionsDict("Clear Boundaries", "Ctrl+Alt+Shift+C")
-    TOOL_EXPORT_COMP_LIST = OptionsDict("Export Current Table", f"{SHORTCUT_BASE}+E,T")
-    TOOL_TBL_SET_SAME_AS_FIRST = OptionsDict("Set Cells as First", "Ctrl+D")
-    TOOL_TBL_SET_AS = OptionsDict("Set Cells As...", "Ctrl+Shift+D")
-    TOOL_TBL_DEL_ROWS = OptionsDict("Delete Table Rows", "Del")
-    TOOL_TBL_ZOOM_TO_COMPS = OptionsDict("Zoom to Selection  ", f"{SHORTCUT_BASE}+Z,S")
+    TOOL_ESTIMATE_BOUNDARIES = OptionsDict("Estimate Boundaries", shortcut="Ctrl+Alt+Shift+E")
+    TOOL_CLEAR_BOUNDARIES = OptionsDict("Clear Boundaries", shortcut="Ctrl+Alt+Shift+C")
+    TOOL_EXPORT_COMP_LIST = OptionsDict("Export Current Table", shortcut=f"{SHORTCUT_BASE}+E,T")
+    TOOL_TBL_SET_SAME_AS_FIRST = OptionsDict("Set Cells as First", shortcut="Ctrl+D")
+    TOOL_TBL_SET_AS = OptionsDict("Set Cells As...", shortcut="Ctrl+Shift+D")
+    TOOL_TBL_DEL_ROWS = OptionsDict("Delete Table Rows", shortcut="Del")
+    TOOL_TBL_ZOOM_TO_COMPS = OptionsDict("Zoom to Selection  ", shortcut=f"{SHORTCUT_BASE}+Z,S")
 
     # --------------------------
     # PROJECT
     # --------------------------
-    TOOL_PROJ_SAVE = OptionsDict("Save", "Ctrl+S")
-    TOOL_PROJ_OPEN = OptionsDict("Open Project", f"{SHORTCUT_BASE}+P,O")
-    TOOL_PROJ_OPEN_IMG = OptionsDict("Open Project Image", f"{SHORTCUT_BASE}+I,O")
-    TOOL_PROJ_CREATE = OptionsDict("Create Project", f"{SHORTCUT_BASE}+P,C")
-    TOOL_PROJ_ADD_IMG = OptionsDict("Add New Image", f"{SHORTCUT_BASE}+I,A")
-    TOOL_PROJ_ADD_ANN = OptionsDict("Add New Annotation", f"{SHORTCUT_BASE}+A,A")
-    TOOL_PROJ_SETTINGS = OptionsDict("Project Settings...", f"{SHORTCUT_BASE}+P,S")
-    TOOL_PROJ_EXPORT = OptionsDict("Export...", f"{SHORTCUT_BASE}+P,E")
-    TOOL_AUTOSAVE = OptionsDict("Autosave...", f"{SHORTCUT_BASE}+A,O")
+    TOOL_PROJ_SAVE = OptionsDict("Save", shortcut="Ctrl+S")
+    TOOL_PROJ_OPEN = OptionsDict("Open Project", shortcut=f"{SHORTCUT_BASE}+P,O")
+    TOOL_PROJ_OPEN_IMG = OptionsDict("Open Project Image", shortcut=f"{SHORTCUT_BASE}+I,O")
+    TOOL_PROJ_CREATE = OptionsDict("Create Project", shortcut=f"{SHORTCUT_BASE}+P,C")
+    TOOL_PROJ_ADD_IMG = OptionsDict("Add New Image", shortcut=f"{SHORTCUT_BASE}+I,A")
+    TOOL_PROJ_ADD_ANN = OptionsDict("Add New Annotation", shortcut=f"{SHORTCUT_BASE}+A,A")
+    TOOL_PROJ_SETTINGS = OptionsDict("Project Settings...", shortcut=f"{SHORTCUT_BASE}+P,S")
+    TOOL_PROJ_EXPORT = OptionsDict("Export...", shortcut=f"{SHORTCUT_BASE}+P,E")
+    TOOL_AUTOSAVE = OptionsDict("Autosave...", shortcut=f"{SHORTCUT_BASE}+A,O")
 
     # --------------------------
     # GLOBAL PREDICTIONS
     # --------------------------
     TOOL_MULT_PRED = OptionsDict(
         "Make Multi-Prediction",
-        f"{SHORTCUT_BASE}+M,P",
+        shortcut=f"{SHORTCUT_BASE}+M,P",
         icon=str(ICON_DIR / "predict.svg"),
     )
 
@@ -330,38 +330,34 @@ class PRJ_CONSTS:
     # Modes
     DRAW_MODE_FOCUSED = OptionsDict(
         'Activate "Edit" draw mode',
-        f"{SHORTCUT_BASE}+D,E",
-        "registeredaction",
+        shortcut=f"{SHORTCUT_BASE}+D,E",
         icon=str(ICON_DIR / "edit.svg"),
     )
 
     # Shapes
     DRAW_SHAPE_RECT = OptionsDict(
         'Activate "Rectangular" draw shape',
-        f"{SHORTCUT_BASE}+D,R",
-        "registeredaction",
+        shortcut=f"{SHORTCUT_BASE}+D,R",
         icon=str(ICON_DIR / "rectangle.svg"),
     )
     DRAW_SHAPE_POLY = OptionsDict(
         'Activate "Polygon" draw shape',
-        f"{SHORTCUT_BASE}+D,Y",
-        "registeredaction",
+        shortcut=f"{SHORTCUT_BASE}+D,Y",
         icon=str(ICON_DIR / "polygon.svg"),
     )
     DRAW_SHAPE_ELLIPSE = OptionsDict(
         'Activate "Ellipse" draw shape',
-        f"{SHORTCUT_BASE}+D,L",
-        "registeredaction",
+        shortcut=f"{SHORTCUT_BASE}+D,L",
         icon=str(ICON_DIR / "ellipse.svg"),
     )
     DRAW_SHAPE_FREE = OptionsDict(
         'Activate "Freehand" draw shape',
-        f"{SHORTCUT_BASE}+D,H",
+        shortcut=f"{SHORTCUT_BASE}+D,H",
         icon=str(ICON_DIR / "freehand.svg"),
     )
     DRAW_SHAPE_POINT = OptionsDict(
         'Activate "Point" draw shape',
-        f"{SHORTCUT_BASE}+D,N",
+        shortcut=f"{SHORTCUT_BASE}+D,N",
         icon=str(ICON_DIR / "point.svg"),
     )
     DRAW_SHAPE_NONE = OptionsDict("None")
@@ -369,24 +365,21 @@ class PRJ_CONSTS:
     # Actions
     DRAW_ACT_CREATE = OptionsDict(
         'Activate "Create Component" action',
-        f"{SHORTCUT_BASE}+D,C",
-        "registeredaction",
+        shortcut=f"{SHORTCUT_BASE}+D,C",
         icon=str(ICON_DIR / "create.svg"),
         helpText="When an ROI is created, the image processor will attempt to make a new"
         " component at that location. Right-click and drag to pan.",
     )
     DRAW_ACT_ADD = OptionsDict(
         'Activate "Add to Foreground" action',
-        f"{SHORTCUT_BASE}+D,F",
-        "registeredaction",
+        shortcut=f"{SHORTCUT_BASE}+D,F",
         icon=str(ICON_DIR / "foreground.svg"),
         helpText="When an ROI is created, the image processor will attempt to make a new"
         " component at that location. Right-click and drag to pan.",
     )
     DRAW_ACT_REM = OptionsDict(
         'Activate "Add to Background" action',
-        f"{SHORTCUT_BASE}+D, B",
-        "registeredaction",
+        shortcut=f"{SHORTCUT_BASE}+D, B",
         icon=str(ICON_DIR / "background.svg"),
         helpText="When an ROI is created, the image processor will attempt to take the "
         "enclosedarea away from the current component shape. Right-click and "
@@ -394,16 +387,14 @@ class PRJ_CONSTS:
     )
     DRAW_ACT_SELECT = OptionsDict(
         'Activate "Select" draw action',
-        f"{SHORTCUT_BASE}+D, S",
-        "registeredaction",
+        shortcut=f"{SHORTCUT_BASE}+D, S",
         icon=str(ICON_DIR / "select.svg"),
         helpText="When component boundaries are enclosed by this ROI, they will be "
         "selected in the component table. Right-click and drag to pan.",
     )
     DRAW_ACT_PAN = OptionsDict(
         'Activate "Pan" draw action',
-        f"{SHORTCUT_BASE}+D,P",
-        "registeredaction",
+        shortcut=f"{SHORTCUT_BASE}+D,P",
         icon=str(ICON_DIR / "pan.svg"),
         helpText="No ROI will be drawn in this mode. Right- or left-click and drag "
         "to pan.",
