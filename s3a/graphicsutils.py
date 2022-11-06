@@ -175,7 +175,7 @@ class RegionHistoryViewer(QtWidgets.QMainWindow):
         )
 
         EasyWidget.buildMainWindow([dp], layout="H", window=self)
-        dp.toolsEditor.createWindowDock(self, createProcessesMenu=False)
+        dp.toolsEditor.createWindowDock(self, createProcessMenu=False)
 
     def setDifferenceImages(self, differenceImages: List[np.ndarray]):
         self.differenceImages = differenceImages
