@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 import cv2 as cv
 import numpy as np
-from qtextras import ParameterContainer, RunOptions
+from qtextras import ParameterContainer, RunOptions, fns
 
 from .base import ParameterEditorPlugin
 from ..constants import PRJ_CONSTS as CNST, REQD_TBL_FIELDS as RTF
@@ -34,6 +34,14 @@ class MainImagePlugin(ParameterEditorPlugin):
             PointROI.updateRadius,
             name="Point ROI Features",
             runOptions=RunOptions.ON_CHANGED,
+        )
+        regionProps = fns.getParameterChild(
+            shared.colorScheme.rootParameter,
+            shared.colorScheme.defaultNamePath,
+            "Region Features",
+        )
+        regionProps.addChildren(
+            self.window.componentController.regionPlot.props.parameters.values()
         )
 
         super().__initSharedSettings__(shared=shared, **kwargs)

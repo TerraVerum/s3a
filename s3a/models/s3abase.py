@@ -125,11 +125,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         # -----
         toAdd = (
             INTERNAL_PLUGINS()
-            + [
-                self.sharedSettings.generalProperties,
-                # self.sharedSettings.quickLoader,
-                self.sharedSettings.colorScheme,
-            ]
+            + [self.sharedSettings.settingsPlugin]
             + EXTERNAL_PLUGINS()
         )
         for plg in toAdd:

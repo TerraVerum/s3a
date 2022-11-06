@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import typing as t
+from contextlib import ExitStack
 from pathlib import Path
 
 import pandas as pd
@@ -26,6 +27,9 @@ class ParameterEditorPlugin(ParameterEditor):
     directoryParent: str | None = MENU_OPTS_DIR
     menuTitle: str = None
 
+    createDock = False
+    createProcessMenu = True
+
     dock: QtWidgets.QDockWidget | None = None
     menu: QtWidgets.QMenu | None = None
 
@@ -47,9 +51,24 @@ class ParameterEditorPlugin(ParameterEditor):
     def attachToWindow(self, window: S3A | S3ABase):
         self.window = window
         self.menuTitle = self._resolveMenuTitle(self.name)
-        self.dock, self.menu = self.createWindowDock(window, self.menuTitle)
-        window.menuBar().addMenu(self.menu)
-        self.__initSharedSettings__(shared=window.sharedSettings)
+        if self.createDock:
+            self.dock, self.menu = self.createWindowDock(
+                window, self.menuTitle, createProcessMenu=self.createProcessMenu
+            )
+        elif self.createProcessMenu:
+            self.menu = self.createActionsFromProcesses(QtWidgets.QMenu(self.menuTitle))
+
+        if self.menu:
+            window.menuBar().addMenu(self.menu)
+
+        # Temporarily set the default name path for where shared parameters get registered
+        attrs = window.sharedSettings
+        with ExitStack() as stack:
+            for editor in [attrs.colorScheme, attrs.generalProperties]:
+                stack.enter_context(
+                    fns.overrideAttr(editor, "defaultNamePath", self.name)
+                )
+            self.__initSharedSettings__(shared=window.sharedSettings)
 
     def registerPopoutFunctions(
         self,
