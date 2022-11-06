@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 from pyqtgraph.parametertree import InteractiveFunction
-from pyqtgraph.Qt import QtWidgets
+from pyqtgraph.Qt import QtWidgets, QtGui
 from qtextras import ParameterEditor, fns
 
 from ..constants import MENU_OPTS_DIR, PRJ_CONSTS
@@ -104,6 +104,19 @@ class ParameterEditorPlugin(ParameterEditor):
         if ensureShortcut and "&" not in name:
             name = f"&{name}"
         return name
+
+    @staticmethod
+    def dockRaiseAction(dock, text: str = None):
+        if text is None:
+            text = f"Show {dock.objectName()} Pane".title()
+
+        def onShow():
+            dock.show()
+            dock.raise_()
+
+        action = QtGui.QAction(text)
+        action.triggered.connect(onShow)
+        return action
 
 
 class ProcessorPlugin(ParameterEditorPlugin):

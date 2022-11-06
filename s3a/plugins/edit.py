@@ -7,8 +7,8 @@ from ..models.s3abase import S3ABase
 
 
 class EditPlugin(ParameterEditorPlugin):
-
     name = "Edit"
+    createDock = True
 
     def attachToWindow(self, window: S3ABase):
         super().attachToWindow(window)
@@ -16,6 +16,15 @@ class EditPlugin(ParameterEditorPlugin):
 
         self.registerFunction(stack.undo, name="Undo", runActionTemplate=CNST.TOOL_UNDO)
         self.registerFunction(stack.redo, name="Redo", runActionTemplate=CNST.TOOL_REDO)
+
+        for editor in (
+            window.sharedSettings.settingsPlugin,
+            window.sharedSettings.colorScheme,
+        ):
+            dock, _ = editor.createWindowDock(
+                window, createProcessMenu=False, addShowAction=False
+            )
+            self.menu.addAction(self.dockRaiseAction(dock))
 
         def updateUndoRedoTxts(_action=None):
             self.undoAction.setText(f"Undo: {stack.undoDescr}")

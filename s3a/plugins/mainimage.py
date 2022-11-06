@@ -19,7 +19,8 @@ if TYPE_CHECKING:
 
 
 class MainImagePlugin(ParameterEditorPlugin):
-    _makeMenuShortcuts = False
+    createDock = False
+    createProcessMenu = False
     tableData: TableData
 
     def __initSharedSettings__(self, shared: SharedAppSettings = None, **kwargs):
