@@ -76,7 +76,6 @@ class PipelineFunction(InteractiveFunction):
 
     def hookupParameters(self, params=None, clearOld=True):
         super().hookupParameters(params, clearOld)
-        self.defaultInput = dict(self.input)
 
     @property
     def input(self):
