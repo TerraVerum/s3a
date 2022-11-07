@@ -79,16 +79,23 @@ class ParameterEditorPlugin(ParameterEditor):
             raise ValueError("Must provide either group name or action options")
         if groupName is None:
             groupName = runActionTemplate["name"]
-        function = InteractiveFunction(
-            fns.parameterDialog,
-            parameter=fns.getParameterChild(self.rootParameter, groupName),
+
+        groupParameter = fns.getParameterChild(
+            self.rootParameter, groupName, groupOpts=dict(type="_actiongroup")
+        )
+        function = InteractiveFunction(lambda: fns.parameterDialog(groupParameter))
+        self.registerFunction(
+            function, name=groupName, runActionTemplate=runActionTemplate, runOptions=[]
         )
 
         if nameList is None:
             nameList = [None] * len(functionList)
 
-        for title, func in zip(nameList, functionList):
-            self.registerFunction(func, name=title, parent=(groupName,))
+        # Don't allow registration listeners to find children; they are a subset
+        # of the already-registed parent
+        with fns.makeDummySignal(self, "sigFunctionRegistered"):
+            for title, func in zip(nameList, functionList):
+                self.registerFunction(func, name=title, parent=groupParameter)
 
         if menu is not None:
             act = menu.addAction(groupName, function)

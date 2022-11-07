@@ -94,7 +94,8 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         """
         componentIo = self.projectData.componentIo
         exportOptsParam = fns.getParameterChild(
-            self.rootParameter, CNST.TOOL_PROJ_EXPORT.name, "Export Options"
+            self.rootParameter, CNST.TOOL_PROJ_EXPORT.name, "Export Options",
+            groupOpts=dict(type="_actiongroup")
         )
         # Use a wrapper to easily get hyperparams created
         for name, fn in inspect.getmembers(
@@ -145,7 +146,6 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
             [self.updateProjectProperties, self.addImagesGui, self.addAnnotationsGui],
             ["Update Project Properties", "Add Images", "Add Annotations"],
             runActionTemplate=CNST.TOOL_PROJ_SETTINGS,
-            menu=self.menu,
         )
 
         self.registerFunction(
@@ -240,7 +240,6 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
             [self.projectData.exportProject, doctoredAll, doctoredCur],
             ["Project", "All Annotations", "Current Annotation"],
             runActionTemplate=CNST.TOOL_PROJ_EXPORT,
-            menu=self.menu,
         )
         self._projectImagePane.hide()
         self._updateProjectLabel()
