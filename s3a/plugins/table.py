@@ -61,9 +61,10 @@ class ComponentTablePlugin(ParameterEditorPlugin):
                 CNST.TOOL_TBL_ZOOM_TO_COMPS,
             ],
         ):
-            param.opts["ownerWidget"] = tbl
+            # Optionally scope shortcuts to only work in the table widget
+            # param.opts["ownerWidget"] = tbl
             self.registerFunction(func, name=param.name, runActionTemplate=param)
-        tbl.menu = self.createActionsFromProcesses()
+        tbl.menu = self.createActionsFromProcesses(stealShortcuts=False)
         filter_: ParameterEditor = self.tableData.filter
         _, menu = filter_.createWindowDock(window)
         self.tableData = window.tableData

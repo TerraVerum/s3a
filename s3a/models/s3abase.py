@@ -80,10 +80,12 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         self.generalToolbar = QtWidgets.QToolBar("General")
 
         self.mainImage = MainImage(toolbar=self.generalToolbar)
-        PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION.opts["ownerObj"] = self.mainImage
         self.mainImage.toolsEditor.registerFunction(
             self.acceptFocusedRegion,
-            runActionTemplate=PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION,
+            runActionTemplate={
+                **PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION,
+                "ownerWidget": self.mainImage,
+            },
         )
 
         self.tableData = TableData(makeFilter=True)
@@ -469,7 +471,10 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         else:
             exportIds = self.componentManager.compDf.index
         exportDf: pd.DataFrame = self.componentManager.compDf.loc[exportIds].copy()
-        if not self.props[PRJ_CONSTS.PROP_INCLUDE_FNAME_PATH] and srcImgFname is not None:
+        if (
+            not self.props[PRJ_CONSTS.PROP_INCLUDE_FNAME_PATH]
+            and srcImgFname is not None
+        ):
             # Only use the file name, not the whole path
             srcImgFname = srcImgFname.name
         elif srcImgFname is not None:

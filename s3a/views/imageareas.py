@@ -44,9 +44,9 @@ class MainImage(DASM, ImageViewer):
         parent=None,
         drawShapes: Collection[OptionsDict] = None,
         toolbar: QtWidgets.QToolBar = None,
-        **kargs
+        **kwargs,
     ):
-        super().__init__(parent, viewBox=RightPanViewBox(), **kargs)
+        super().__init__(parent, viewBox=RightPanViewBox(), **kwargs)
         self.menu.clear()
 
         if drawShapes is None:
@@ -78,6 +78,9 @@ class MainImage(DASM, ImageViewer):
             self.shapeAssignment,
             checkable=True,
         )
+        for options, button in self.drawShapeGroup.optionsButtonMap.items():
+            if options.get("shortcut"):
+                self.toolsEditor.registerObjectShortcut(button, **dict(options))
         self.drawActionGroup = ButtonCollection(self, "Actions")
 
         # Make sure panning is allowed before creating draw widget
@@ -238,9 +241,9 @@ class MainImage(DASM, ImageViewer):
 
     def registerDrawAction(
         self,
-        actionParameters: Union[OptionsDict, Sequence[OptionsDict]],
+        actionOptions: Union[OptionsDict, Sequence[OptionsDict]],
         function: DrawActFn,
-        **registerOpts
+        **registerOpts,
     ):
         """
         Adds specified action(s) to the list of allowable roi actions if any do not
@@ -249,9 +252,9 @@ class MainImage(DASM, ImageViewer):
 
         Parameters
         ----------
-        actionParameters
-            Single or multiple ``OptionsDict``s that are allowed to trigger this funciton.
-            If empty, triggers on every parameter
+        actionOptions
+            Single or multiple ``OptionsDict``s that are allowed to trigger this function.
+            If empty, triggers on every option
         function
             Function to trigger when a shape is completed during the requested actions.
             If only one parameter is registered to this function, it is expected to
@@ -260,25 +263,28 @@ class MainImage(DASM, ImageViewer):
         registerOpts
             Extra arguments for button registration
         """
-        if isinstance(actionParameters, OptionsDict):
-            actionParameters = [actionParameters]
+        if isinstance(actionOptions, OptionsDict):
+            actionOptions = [actionOptions]
 
         @wraps(function)
         def wrapper(roiPolygon: XYVertices, param: OptionsDict):
-            if param in actionParameters:
-                if len(actionParameters) > 1:
+            if param in actionOptions:
+                if len(actionOptions) > 1:
                     function(roiPolygon, param)
                 else:
                     function(roiPolygon)
 
-        if len(actionParameters) == 0:
+        if len(actionOptions) == 0:
             self.sigShapeFinished.connect(function)
         else:
             self.sigShapeFinished.connect(wrapper)
-        for actParam in actionParameters:
-            self.drawActionGroup.createAndAddButton(
-                actParam, self.actionAssignment, checkable=True, **registerOpts
-            )
+        for option in actionOptions:
+            if (
+                button := self.drawActionGroup.createAndAddButton(
+                    option, self.actionAssignment, checkable=True, **registerOpts
+                )
+            ) and option.get("shortcut"):
+                self.toolsEditor.registerObjectShortcut(button, **dict(option))
 
     def viewboxCoords(self, margin=0):
         """
@@ -290,7 +296,7 @@ class MainImage(DASM, ImageViewer):
         return span * np.array([[0, 0], [0, 1], [1, 1], [1, 0]]) + offset
 
     def addTools(self, toolsEditor: ParameterEditor):
-        menu = toolsEditor.createActionsFromProcesses()
+        menu = toolsEditor.createActionsFromProcesses(stealShortcuts=False)
         self.menu.addMenu(menu)
         retClctn = None
         # Define some helper functions for listening to toolsEditor changes
@@ -302,7 +308,7 @@ class MainImage(DASM, ImageViewer):
                 for ch in param:
                     visit(ch)
             else:
-                retClctn.addByParameter(param, copy=False)
+                retClctn.addByParameter(param)
 
         if self.toolbar is not None:
             retClctn = ButtonCollection(title=toolsEditor.name)
