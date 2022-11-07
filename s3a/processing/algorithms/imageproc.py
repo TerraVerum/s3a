@@ -636,7 +636,7 @@ def region_grow_segmentation(
 
 
 @bind(sigma=dict(limits=[0, None], step=0.1, type="float"))
-def slice_wrapper(
+def slic_wrapper(
     image,
     n_segments=100,
     compactness=10.0,
@@ -644,13 +644,13 @@ def slice_wrapper(
     min_size_factor=0.5,
     max_size_factor=3,
 ):
-    return dict(labels=seg.slic(image, **locals()))
+    return dict(labels=seg.slic(**locals()))
 
 
-slice_wrapper.__doc__ = seg.slic.__doc__
+slic_wrapper.__doc__ = seg.slic.__doc__
 
 slic_segmentation = PipelineFunction(
-    slice_wrapper,
+    slic_wrapper,
     "SLIC_segmentation",
 )
 
