@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import warnings
 from typing import TYPE_CHECKING
 
@@ -35,16 +36,12 @@ class MainImagePlugin(ParameterEditorPlugin):
             nest=False,
         )
         shared.colorScheme.registerFunction(
-            self.window.mainImage.updateGridScheme, runOptions=RunOptions.ON_CHANGED
+            self.window.mainImage.updateGridScheme,
+            runOptions=RunOptions.ON_CHANGED,
+            name="grid_scheme",
         )
-        regionProps = fns.getParameterChild(
-            shared.colorScheme.rootParameter,
-            shared.colorScheme.defaultParent,
-            "Region Features",
-        )
-        regionProps.addChildren(
-            self.window.componentController.regionPlot.props.parameters.values()
-        )
+
+        self._hookupRegionPlotProperties(self.window)
 
         super().__initSharedSettings__(shared=shared, **kwargs)
 
@@ -137,6 +134,29 @@ class MainImagePlugin(ParameterEditorPlugin):
         )
         self.registerFunction(
             disp.removeSelectedComponentOverlap, runActionTemplate=CNST.TOOL_REM_OVERLAP
+        )
+
+    def _hookupRegionPlotProperties(self, window):
+        scheme = window.sharedSettings.colorScheme
+        general = window.sharedSettings.generalProperties
+
+        regionPlot = self.window.componentController.regionPlot
+        availableParams = list(regionPlot.props.parameters.values())
+        colorsSig = inspect.signature(regionPlot.updateColors).parameters
+        regionNamePath = (scheme.defaultParent, "Region Features")
+
+        colorPropsParameter = fns.getParameterChild(
+            scheme.rootParameter, *regionNamePath
+        )
+        generalPropsParameter = fns.getParameterChild(
+            general.rootParameter, *regionNamePath
+        )
+
+        colorPropsParameter.addChildren(
+            [p for p in availableParams if p.name() in colorsSig]
+        )
+        generalPropsParameter.addChildren(
+            [p for p in availableParams if p.name() not in colorsSig]
         )
 
     @property
