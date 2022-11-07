@@ -341,7 +341,7 @@ class PRJ_CONSTS:
     # GLOBAL PREDICTIONS
     # --------------------------
     TOOL_MULT_PRED = OptionsDict(
-        "Make Multi-Prediction",
+        "Make Multi Prediction",
         shortcut=f"{SHORTCUT_BASE}+M,P",
         icon=str(ICON_DIR / "predict.svg"),
     )

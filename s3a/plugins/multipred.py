@@ -21,12 +21,10 @@ from ..structures import ComplexXYVertices
 
 
 class MultiPredictionsPlugin(ProcessorPlugin):
-    name = "Multi-Predictions"
-
     manager: ComponentManager
 
     def __initSharedSettings__(self, shared: SharedAppSettings = None, **kwargs):
-        super().__initSharedSettings__()
+        super().__initSharedSettings__(shared, **kwargs)
 
         _, self.processEditorMenu = self.processEditor.createWindowDock(
             self.window, self.processEditor.name
@@ -37,7 +35,7 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         self.registerFunction(self.lastRunAnalytics)
 
         self.multiPredictionCollection = AlgorithmCollection(
-            name="Multi-Predictions",
+            name="Multi Predictions",
             directory=MULTI_PREDICTIONS_DIR,
             template=CONFIG_DIR / "multipred.yml",
         )

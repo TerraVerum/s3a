@@ -42,8 +42,9 @@ class ParameterEditorPlugin(ParameterEditor):
         pass
 
     def __init__(self, *, name: str = None, directory: str = None, **kwargs):
+        defaultName = self.name or self.__class__.__name__.replace("Plugin", "")
         if name is None:
-            name = fns.nameFormatter(self.__class__.__name__.replace("Plugin", ""))
+            name = fns.nameFormatter(defaultName)
         if directory is None and self.directoryParent is not None:
             directory = Path(self.directoryParent) / name
 
