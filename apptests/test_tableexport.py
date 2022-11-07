@@ -27,7 +27,7 @@ def _simpleTbl(tmp_path):
 @pytest.mark.withcomps
 def test_normal_export(sampleComps, tmp_path, app):
     io = app.componentIo
-    app.props[CNST.EXP_ONLY_VISIBLE] = False
+    app.props[CNST.PROP_EXP_ONLY_VISIBLE] = False
     for ftype in io.exportTypes:
         curPath = tmp_path / f"normalExport - All IDs.{ftype}"
         doAndAssertExport(
@@ -47,7 +47,7 @@ def test_filter_export(tmp_path, monkeypatch, app):
     filterIds = np.array([0, 3, 2])
     sampleComps = app.componentManager.compDf
     with monkeypatch.context() as m:
-        m.setitem(app.props, CNST.EXP_ONLY_VISIBLE, False)
+        m.setitem(app.props, CNST.PROP_EXP_ONLY_VISIBLE, False)
         m.setattr(app.componentController, "displayedIds", filterIds)
         exportDf = app.componentDf
     np.testing.assert_array_equal(
@@ -68,7 +68,7 @@ def test_filter_export(tmp_path, monkeypatch, app):
 
     curPath = tmp_path / "normalExport - Filtered IDs export filtered.csv"
     with monkeypatch.context() as m:
-        m.setitem(app.props, CNST.EXP_ONLY_VISIBLE, True)
+        m.setitem(app.props, CNST.PROP_EXP_ONLY_VISIBLE, True)
         m.setattr(app.componentController, "displayedIds", filterIds)
         exportDf = app.componentDf
     np.testing.assert_array_equal(

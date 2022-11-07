@@ -30,8 +30,8 @@ class SortableGroupParameter(GroupParameter):
 
 
 class SettingsPlugin(ParameterEditorPlugin):
-    createProcessMenu = True
-    createDock = True
+    createProcessMenu = False
+    createDock = False
 
     def __init__(self):
         super().__init__(name="Settings")
@@ -46,17 +46,6 @@ class SettingsPlugin(ParameterEditorPlugin):
             editor.rootParameter.sortKey = lambda p: p.name()
             editor.tree.setParameters(editor.rootParameter, showTop=False)
         self.extraDocks = []
-
-    def attachToWindow(self, window):
-        super().attachToWindow(window)
-        # Remove "show settings" action from the menu
-        self.menu.removeAction(self.menu.actions()[0])
-        for editor in self.generalProperties, self.colorScheme:
-            dock, _ = editor.createWindowDock(
-                window, createProcessMenu=False, addShowAction=False
-            )
-            self.extraDocks.append(dock)
-            self.menu.addAction(self.dockRaiseAction(dock))
 
 
 class ColorSchemePlugin(ParameterEditorPlugin):

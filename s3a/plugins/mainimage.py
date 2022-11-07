@@ -28,13 +28,14 @@ class MainImagePlugin(ParameterEditorPlugin):
         shared.generalProperties.registerParameter(
             CNST.PROP_MIN_COMP_SZ, container=self.props
         )
-        shared.colorScheme.registerFunction(
-            self.window.mainImage.updateGridScheme, runOptions=RunOptions.ON_CHANGED
+        shared.generalProperties.registerFunction(
+            PointROI.updateRadius,
+            radius=dict(title="Point ROI Radius"),
+            runOptions=RunOptions.ON_CHANGED,
+            nest=False,
         )
         shared.colorScheme.registerFunction(
-            PointROI.updateRadius,
-            name="Point ROI Features",
-            runOptions=RunOptions.ON_CHANGED,
+            self.window.mainImage.updateGridScheme, runOptions=RunOptions.ON_CHANGED
         )
         regionProps = fns.getParameterChild(
             shared.colorScheme.rootParameter,

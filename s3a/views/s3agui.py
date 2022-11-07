@@ -39,9 +39,6 @@ class S3A(S3ABase):
         super().__init__(**startupSettings)
 
         self.toolsEditor = ParameterEditor(name="Application")
-        self.sharedSettings.colorScheme.registerFunction(
-            self.updateTheme, runOptions=RunOptions.ON_CHANGED, nest=False
-        )
 
         self.setWindowIcon(QtGui.QIcon(str(ICON_DIR / "s3alogo.svg")))
         logger = getAppLogger()

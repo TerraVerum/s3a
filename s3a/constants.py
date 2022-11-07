@@ -193,14 +193,14 @@ class PRJ_CONSTS:
         "Entire Component",
         "list",
         limits={"Boundary Only": True, "Entire Component": False},
-        helpText="When `Boundary Only`, components are selected when clicking on "
+        tip="When `Boundary Only`, components are selected when clicking on "
         "their boundaries.\nWhen `Entire Component`, clicking anywhere within "
         "the component will select it",
     )
     PROP_FIELD_INFO_ON_SEL = OptionsDict(
         "Show field info after selection",
         False,
-        helpText="Whether to show field information in the main image"
+        tip="Whether to show field information in the main image"
         " every time the current selection changes",
     )
     PROP_VERT_SORT_BHV = OptionsDict(
@@ -208,7 +208,7 @@ class PRJ_CONSTS:
         "X First",
         "list",
         limits=["X First", "Y First"],
-        helpText="Whether to sort first by X or Y when sorting a vertices-like field",
+        tip="Whether to sort first by X or Y when sorting a vertices-like field",
     )
     PROP_SHOW_TBL_ON_COMP_CREATE = OptionsDict(
         "Show popup table when creating component", False
@@ -218,8 +218,26 @@ class PRJ_CONSTS:
     PROP_COLLECT_USR_METRICS = OptionsDict(
         "Collect user metrics",
         False,
-        helpText="Collect user metrics for smarter segmentation algorithms",
+        tip="Collect user metrics for smarter segmentation algorithms",
     )
+    # --------------------------
+    # COMPONENT EXPORT PARAMETERS
+    # --------------------------
+    PROP_EXP_ONLY_VISIBLE = OptionsDict(
+        "Only Export Visible Components",
+        False,
+        tip="If *True*, only components showing on the main image will be included "
+        "in file exports.",
+    )
+    PROP_INCLUDE_FNAME_PATH = OptionsDict(
+        "Include full image path on export",
+        False,
+        None,
+        "If *False*, only the image name is included in export information, e.g. "
+        "``<img>.png``. Otherwise, the full filepath is included, e.g. "
+        "``C:/Users/.../<img>.png``",
+    )
+
     # --------------------------
     # MISC TOOLS
     # --------------------------
@@ -229,10 +247,14 @@ class PRJ_CONSTS:
     # IMAGE TOOLS
     # --------------------------
     TOOL_MERGE_COMPS = OptionsDict(
-        "Merge Selected", shortcut=f"{SHORTCUT_BASE}+S,M", icon=str(ICON_DIR / "merge.svg")
+        "Merge Selected",
+        shortcut=f"{SHORTCUT_BASE}+S,M",
+        icon=str(ICON_DIR / "merge.svg"),
     )
     TOOL_SPLIT_COMPS = OptionsDict(
-        "Split Selected", shortcut=f"{SHORTCUT_BASE}+S,S", icon=str(ICON_DIR / "split.svg")
+        "Split Selected",
+        shortcut=f"{SHORTCUT_BASE}+S,S",
+        icon=str(ICON_DIR / "split.svg"),
     )
     TOOL_REM_OVERLAP = OptionsDict(
         "Remove Component Overlap",
@@ -240,10 +262,14 @@ class PRJ_CONSTS:
         icon=str(ICON_DIR / "mutex.svg"),
     )
     TOOL_COPY_REGIONS = OptionsDict(
-        "Copy Selected", shortcut=f"{SHORTCUT_BASE}+S,C", icon=str(ICON_DIR / "copy.svg")
+        "Copy Selected",
+        shortcut=f"{SHORTCUT_BASE}+S,C",
+        icon=str(ICON_DIR / "copy.svg"),
     )
     TOOL_MOVE_REGIONS = OptionsDict(
-        "Move Selected", shortcut=f"{SHORTCUT_BASE}+S,V", icon=str(ICON_DIR / "move.svg")
+        "Move Selected",
+        shortcut=f"{SHORTCUT_BASE}+S,V",
+        icon=str(ICON_DIR / "move.svg"),
     )
     TOOL_CLEAR_FOC_REGION = OptionsDict(
         "Clear", shortcut=f"{SHORTCUT_BASE}+V,C", icon=str(ICON_DIR / "clear.svg")
@@ -270,30 +296,44 @@ class PRJ_CONSTS:
         "Show Analytics", icon=str(ICON_DIR / "analytics.svg")
     )
     TOOL_RESET_ZOOM = OptionsDict(
-        "Reset Zoom", shortcut=f"{SHORTCUT_BASE}+Z,R", icon=str(ICON_DIR / "reset_zoom.svg")
+        "Reset Zoom",
+        shortcut=f"{SHORTCUT_BASE}+Z,R",
+        icon=str(ICON_DIR / "reset_zoom.svg"),
     )
 
     # --------------------------
     # WINDOW TOOLS
     # --------------------------
-    TOOL_ESTIMATE_BOUNDARIES = OptionsDict("Estimate Boundaries", shortcut="Ctrl+Alt+Shift+E")
+    TOOL_ESTIMATE_BOUNDARIES = OptionsDict(
+        "Estimate Boundaries", shortcut="Ctrl+Alt+Shift+E"
+    )
     TOOL_CLEAR_BOUNDARIES = OptionsDict("Clear Boundaries", shortcut="Ctrl+Alt+Shift+C")
-    TOOL_EXPORT_COMP_LIST = OptionsDict("Export Current Table", shortcut=f"{SHORTCUT_BASE}+E,T")
+    TOOL_EXPORT_COMP_LIST = OptionsDict(
+        "Export Current Table", shortcut=f"{SHORTCUT_BASE}+E,T"
+    )
     TOOL_TBL_SET_SAME_AS_FIRST = OptionsDict("Set Cells as First", shortcut="Ctrl+D")
     TOOL_TBL_SET_AS = OptionsDict("Set Cells As...", shortcut="Ctrl+Shift+D")
     TOOL_TBL_DEL_ROWS = OptionsDict("Delete Table Rows", shortcut="Del")
-    TOOL_TBL_ZOOM_TO_COMPS = OptionsDict("Zoom to Selection  ", shortcut=f"{SHORTCUT_BASE}+Z,S")
+    TOOL_TBL_ZOOM_TO_COMPS = OptionsDict(
+        "Zoom to Selection  ", shortcut=f"{SHORTCUT_BASE}+Z,S"
+    )
 
     # --------------------------
     # PROJECT
     # --------------------------
     TOOL_PROJ_SAVE = OptionsDict("Save", shortcut="Ctrl+S")
     TOOL_PROJ_OPEN = OptionsDict("Open Project", shortcut=f"{SHORTCUT_BASE}+P,O")
-    TOOL_PROJ_OPEN_IMG = OptionsDict("Open Project Image", shortcut=f"{SHORTCUT_BASE}+I,O")
+    TOOL_PROJ_OPEN_IMG = OptionsDict(
+        "Open Project Image", shortcut=f"{SHORTCUT_BASE}+I,O"
+    )
     TOOL_PROJ_CREATE = OptionsDict("Create Project", shortcut=f"{SHORTCUT_BASE}+P,C")
     TOOL_PROJ_ADD_IMG = OptionsDict("Add New Image", shortcut=f"{SHORTCUT_BASE}+I,A")
-    TOOL_PROJ_ADD_ANN = OptionsDict("Add New Annotation", shortcut=f"{SHORTCUT_BASE}+A,A")
-    TOOL_PROJ_SETTINGS = OptionsDict("Project Settings...", shortcut=f"{SHORTCUT_BASE}+P,S")
+    TOOL_PROJ_ADD_ANN = OptionsDict(
+        "Add New Annotation", shortcut=f"{SHORTCUT_BASE}+A,A"
+    )
+    TOOL_PROJ_SETTINGS = OptionsDict(
+        "Project Settings...", shortcut=f"{SHORTCUT_BASE}+P,S"
+    )
     TOOL_PROJ_EXPORT = OptionsDict("Export...", shortcut=f"{SHORTCUT_BASE}+P,E")
     TOOL_AUTOSAVE = OptionsDict("Autosave...", shortcut=f"{SHORTCUT_BASE}+A,O")
 
@@ -304,24 +344,6 @@ class PRJ_CONSTS:
         "Make Multi-Prediction",
         shortcut=f"{SHORTCUT_BASE}+M,P",
         icon=str(ICON_DIR / "predict.svg"),
-    )
-
-    # --------------------------
-    # COMPONENT EXPORT PARAMETERS
-    # --------------------------
-    EXP_ONLY_VISIBLE = OptionsDict(
-        "Only Export Visible Components",
-        False,
-        helpText="If *True*, only components showing on the main image will be included "
-        "in file exports.",
-    )
-    INCLUDE_FNAME_PATH = OptionsDict(
-        "Include full image path on export",
-        False,
-        None,
-        "If *False*, only the image name is included in export information, e.g. "
-        "``<img>.png``. Otherwise, the full filepath is included, e.g. "
-        "``C:/Users/.../<img>.png``",
     )
 
     # -------------------
@@ -367,21 +389,21 @@ class PRJ_CONSTS:
         'Activate "Create Component" action',
         shortcut=f"{SHORTCUT_BASE}+D,C",
         icon=str(ICON_DIR / "create.svg"),
-        helpText="When an ROI is created, the image processor will attempt to make a new"
+        tip="When an ROI is created, the image processor will attempt to make a new"
         " component at that location. Right-click and drag to pan.",
     )
     DRAW_ACT_ADD = OptionsDict(
         'Activate "Add to Foreground" action',
         shortcut=f"{SHORTCUT_BASE}+D,F",
         icon=str(ICON_DIR / "foreground.svg"),
-        helpText="When an ROI is created, the image processor will attempt to make a new"
+        tip="When an ROI is created, the image processor will attempt to make a new"
         " component at that location. Right-click and drag to pan.",
     )
     DRAW_ACT_REM = OptionsDict(
         'Activate "Add to Background" action',
         shortcut=f"{SHORTCUT_BASE}+D, B",
         icon=str(ICON_DIR / "background.svg"),
-        helpText="When an ROI is created, the image processor will attempt to take the "
+        tip="When an ROI is created, the image processor will attempt to take the "
         "enclosedarea away from the current component shape. Right-click and "
         "drag to pan.",
     )
@@ -389,13 +411,13 @@ class PRJ_CONSTS:
         'Activate "Select" draw action',
         shortcut=f"{SHORTCUT_BASE}+D, S",
         icon=str(ICON_DIR / "select.svg"),
-        helpText="When component boundaries are enclosed by this ROI, they will be "
+        tip="When component boundaries are enclosed by this ROI, they will be "
         "selected in the component table. Right-click and drag to pan.",
     )
     DRAW_ACT_PAN = OptionsDict(
         'Activate "Pan" draw action',
         shortcut=f"{SHORTCUT_BASE}+D,P",
         icon=str(ICON_DIR / "pan.svg"),
-        helpText="No ROI will be drawn in this mode. Right- or left-click and drag "
+        tip="No ROI will be drawn in this mode. Right- or left-click and drag "
         "to pan.",
     )

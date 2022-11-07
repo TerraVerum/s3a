@@ -1,30 +1,60 @@
 from __future__ import annotations
 
-from .base import ParameterEditorPlugin
+from qtextras import RunOptions
+
+from .base import ParameterEditorPlugin, ParameterEditor
 from ..constants import PRJ_CONSTS as CNST
 from ..logger import getAppLogger
 from ..models.s3abase import S3ABase
+from ..constants import PRJ_CONSTS
 
 
 class EditPlugin(ParameterEditorPlugin):
     name = "Edit"
     createDock = True
+    createProcessMenu = True
+
+    def __initSharedSettings__(self, shared=None, **kwargs):
+        prop = PRJ_CONSTS.PROP_UNDO_BUF_SZ
+        shared.generalProperties.registerFunction(
+            self.window.actionStack.resizeStack,
+            namePath=self.window.name,
+            runOptions=RunOptions.ON_CHANGED,
+            maxLength={**prop, "title": prop.name},
+            nest=False,
+            container=self.window.props,
+        )
+        shared.generalProperties.registerParameterList(
+            [PRJ_CONSTS.PROP_EXP_ONLY_VISIBLE, PRJ_CONSTS.PROP_INCLUDE_FNAME_PATH],
+            container=self.window.props,
+            namePath="Import/Export",
+        )
+        shared.colorScheme.registerFunction(
+            self.window.updateTheme,
+            runOptions=RunOptions.ON_CHANGED,
+            nest=False,
+            namePath=self.window.name,
+        )
 
     def attachToWindow(self, window: S3ABase):
         super().attachToWindow(window)
+        # Remove "show dock" option
+        self.menu.removeAction(self.menu.actions()[0])
         stack = window.actionStack
 
         self.registerFunction(stack.undo, name="Undo", runActionTemplate=CNST.TOOL_UNDO)
         self.registerFunction(stack.redo, name="Redo", runActionTemplate=CNST.TOOL_REDO)
 
         for editor in (
-            window.sharedSettings.settingsPlugin,
+            window.sharedSettings.generalProperties,
             window.sharedSettings.colorScheme,
         ):
             dock, _ = editor.createWindowDock(
                 window, createProcessMenu=False, addShowAction=False
             )
-            self.menu.addAction(self.dockRaiseAction(dock))
+            showAction = self.dockRaiseAction(dock)
+            showAction.setParent(self.menu)
+            self.menu.addAction(showAction)
 
         def updateUndoRedoTxts(_action=None):
             self.undoAction.setText(f"Undo: {stack.undoDescr}")

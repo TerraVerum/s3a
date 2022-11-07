@@ -57,20 +57,18 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
 
     sigRegionAccepted = QtCore.Signal()
     sigPluginAdded = QtCore.Signal(object)  # Plugin object
-    __groupingName__ = "S3A Window"
 
     sharedSettings: SharedAppSettings
     """App-level properties that many moving pieces use"""
+
+    name = "Application"
 
     def __init__(self, **startupSettings):
         super().__init__()
         self.sharedSettings = SharedAppSettings()
 
+        # Filled by "Edit" plugin
         self.props = ParameterContainer()
-        self.sharedSettings.generalProperties.registerParameterList(
-            [PRJ_CONSTS.EXP_ONLY_VISIBLE, PRJ_CONSTS.INCLUDE_FNAME_PATH],
-            container=self.props,
-        )
 
         self.classPluginMap: dict[t.Type[PEPlugin], PEPlugin] = {}
         """
@@ -83,20 +81,9 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
 
         self.mainImage = MainImage(toolbar=self.generalToolbar)
         PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION.opts["ownerObj"] = self.mainImage
-        attrs = self.sharedSettings
         self.mainImage.toolsEditor.registerFunction(
             self.acceptFocusedRegion,
             runActionTemplate=PRJ_CONSTS.TOOL_ACCEPT_FOC_REGION,
-        )
-        attrs.generalProperties.registerFunction(
-            self.actionStack.resizeStack,
-            runOptions=RunOptions.ON_CHANGED,
-            maxLength={
-                **PRJ_CONSTS.PROP_UNDO_BUF_SZ,
-                "title": PRJ_CONSTS.PROP_UNDO_BUF_SZ.name,
-            },
-            nest=False,
-            container=self.props,
         )
 
         self.tableData = TableData(makeFilter=True)
@@ -477,12 +464,12 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         """
         displayIds = self.componentController.displayedIds
         srcImgFname = self.sourceImagePath
-        if self.props[PRJ_CONSTS.EXP_ONLY_VISIBLE] and displayIds is not None:
+        if self.props[PRJ_CONSTS.PROP_EXP_ONLY_VISIBLE] and displayIds is not None:
             exportIds = displayIds
         else:
             exportIds = self.componentManager.compDf.index
         exportDf: pd.DataFrame = self.componentManager.compDf.loc[exportIds].copy()
-        if not self.props[PRJ_CONSTS.INCLUDE_FNAME_PATH] and srcImgFname is not None:
+        if not self.props[PRJ_CONSTS.PROP_INCLUDE_FNAME_PATH] and srcImgFname is not None:
             # Only use the file name, not the whole path
             srcImgFname = srcImgFname.name
         elif srcImgFname is not None:
