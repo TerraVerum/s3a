@@ -39,7 +39,7 @@ class MainImagePlugin(ParameterEditorPlugin):
         )
         regionProps = fns.getParameterChild(
             shared.colorScheme.rootParameter,
-            shared.colorScheme.defaultNamePath,
+            shared.colorScheme.defaultParent,
             "Region Features",
         )
         regionProps.addChildren(

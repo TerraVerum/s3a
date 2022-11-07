@@ -18,7 +18,7 @@ class EditPlugin(ParameterEditorPlugin):
         prop = PRJ_CONSTS.PROP_UNDO_BUF_SZ
         shared.generalProperties.registerFunction(
             self.window.actionStack.resizeStack,
-            namePath=self.window.name,
+            parent=self.window.name,
             runOptions=RunOptions.ON_CHANGED,
             maxLength={**prop, "title": prop.name},
             nest=False,
@@ -27,13 +27,13 @@ class EditPlugin(ParameterEditorPlugin):
         shared.generalProperties.registerParameterList(
             [PRJ_CONSTS.PROP_EXP_ONLY_VISIBLE, PRJ_CONSTS.PROP_INCLUDE_FNAME_PATH],
             container=self.window.props,
-            namePath="Import/Export",
+            parent="Import/Export",
         )
         shared.colorScheme.registerFunction(
             self.window.updateTheme,
             runOptions=RunOptions.ON_CHANGED,
             nest=False,
-            namePath=self.window.name,
+            parent=self.window.name,
         )
 
     def attachToWindow(self, window: S3ABase):

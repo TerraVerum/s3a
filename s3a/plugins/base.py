@@ -64,7 +64,7 @@ class ParameterEditorPlugin(ParameterEditor):
             window.menuBar().addMenu(self.menu)
 
         # Temporarily set the default name path for where shared parameters get registered
-        with self.sharedDefaultNamePathContext():
+        with self.sharedDefaultParentContext():
             self.__initSharedSettings__(shared=window.sharedSettings)
 
     def registerPopoutFunctions(
@@ -88,7 +88,7 @@ class ParameterEditorPlugin(ParameterEditor):
             nameList = [None] * len(functionList)
 
         for title, func in zip(nameList, functionList):
-            self.registerFunction(func, name=title, namePath=(groupName,))
+            self.registerFunction(func, name=title, parent=(groupName,))
 
         if menu is not None:
             act = menu.addAction(groupName, function)
@@ -116,15 +116,13 @@ class ParameterEditorPlugin(ParameterEditor):
         return action
 
     @contextlib.contextmanager
-    def sharedDefaultNamePathContext(self, name: str = None):
+    def sharedDefaultParentContext(self, name: str = None):
         if name is None:
             name = self.name
         attrs = self.window.sharedSettings
         with ExitStack() as stack:
             for editor in [attrs.colorScheme, attrs.generalProperties]:
-                stack.enter_context(
-                    fns.overrideAttr(editor, "defaultNamePath", name)
-                )
+                stack.enter_context(fns.overrideAttr(editor, "defaultParent", name))
             yield
 
 
