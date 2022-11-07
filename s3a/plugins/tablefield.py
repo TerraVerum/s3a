@@ -259,16 +259,15 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         newGrayscale = newGrayscale.astype("uint8")
 
         matchNames = [
-            stage.name for stage in self.currentProcessor.flattenedFunctions()
+            stage.title() for stage in self.currentProcessor.flattenedFunctions()
         ]
-        type(self).displayableInfos.fget.cache_clear()
         if self._displayedStage in matchNames:
             self.overlayStageInfo(self._displayedStage, self.stageInfoImage.opacity())
         else:
             self.stageInfoImage.hide()
         # Can't set limits to actual infos since equality comparison fails in pyqtgraph
         # setLimits
-        limits = [""] + list(self.displayableInfos)
+        limits = [""] + list(self.getDisplayableInfos())
         self.props.parameters["info"].setLimits(limits)
 
         self.firstRun = False
@@ -601,7 +600,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         """
         if not isinstance(info, dict):
             self._displayedStage = info
-            info = self.displayableInfos.get(info, None)
+            info = self.getDisplayableInfos().get(info, None)
         else:
             self._displayedStage = info["name"]
         if not info:
@@ -618,9 +617,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         self.stageInfoImage.setOpts(opacity=alpha)
         self.stageInfoImage.show()
 
-    @property
-    @lru_cache()
-    def displayableInfos(self):
+    def getDisplayableInfos(self):
         outInfos = {}
         stages = self.currentProcessor.flattenedFunctions()
         matchNames = [stage.title() for stage in stages]
@@ -631,7 +628,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
                 # Not run yet
                 continue
             info = stage.stageInfo()
-            if info:
+            if info and isinstance(info, list):
                 # TODO: Figure out which 'info' to use
                 info = info[0]
             if info is None or "image" not in info:

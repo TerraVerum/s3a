@@ -22,7 +22,6 @@ class RunnableFunctionWrapper(QtCore.QRunnable):
         super().__init__()
         self.signals = RunnableFunctionWrapperSignals()
         if not isinstance(func, PipelineFunction):
-            kwargs.update(interactive=False)
             func = PipelineFunction(func, **kwargs)
         self.proc = func
         self.inProgress = False
@@ -64,7 +63,6 @@ class ThreadedFunctionWrapper(QtCore.QThread):
     def __init__(self, func, **kwargs):
         super().__init__()
         if not isinstance(func, PipelineFunction):
-            kwargs.update(interactive=False)
             func = PipelineFunction(func, **kwargs)
         self.proc = func
 

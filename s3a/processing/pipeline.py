@@ -29,9 +29,16 @@ __all__ = [
 class PipelineException(Exception):
     def __init__(self, stage: PipelineFunction):
         super().__init__("Exception during processor run")
-        stages = [stage]
-        while stage := stage.parent:
+        stages = []
+        while stage:
             stages.append(stage)
+            if isinstance(stage, PipelineStageType.__args__):
+                if isinstance(stage, PipelineParameter):
+                    stage = stage.parent()
+                else:
+                    stage = stage.parent
+            else:
+                stage = None
         # Reverse the list so that the first stage is at the beginning
         self.stages = stages[::-1]
 
@@ -40,7 +47,7 @@ class PipelineException(Exception):
         stages = [a.title() for a in self.stages]
         stagePath = " > ".join(stages)
         stageMsg = f"Stage: {stagePath}\n"
-        initialMsg = super().__str__()
+        initialMsg = ": ".join([super().__str__(), str(self.__cause__ or "")])
         return stageMsg + initialMsg
 
 
