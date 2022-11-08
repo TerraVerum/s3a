@@ -67,11 +67,6 @@ def _splitNameValueMetaDict(processDict: dict):
     return processName, updateKwargs, processDict
 
 
-def onlyFirstKeyValue(dict_):
-    key, value = _peekFirst(dict_.items())
-    return {key: value}
-
-
 class AlgorithmEditor(MetaTreeParameterEditor):
     sigProcessorChanged = QtCore.Signal(str)
     """Name of newly selected process"""
@@ -219,10 +214,19 @@ class AlgorithmEditor(MetaTreeParameterEditor):
             # Don't record meta changes for top process since it breaks
             # logic for loading from a collection.
             # Do this by only keeping the first key (non-meta information)
-            dest = "top" if pipe is process else "primitive"
-            outState[dest].update(
-                onlyFirstKeyValue(pipe.saveState(recurse=False, **kwargs))
+            title, children = _peekFirst(
+                pipe.saveState(recurse=False, **kwargs).items()
             )
+            # Since all nested pipelines are already recorded, disregard
+            # kwargs propagated from them. Avoids info duplication
+            children = [
+                chState
+                if not isinstance(ch, PipelineParameter) or isinstance(chState, str)
+                else _peekFirst(chState)
+                for ch, chState in zip(pipe, children)
+            ]
+            dest = "top" if pipe is process else "primitive"
+            outState[dest][title] = children
         return outState
 
 
