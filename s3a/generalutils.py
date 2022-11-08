@@ -944,6 +944,23 @@ def getObjectsDefinedInSelfModule(moduleVars, moduleName, ignorePrefix="_"):
     return out
 
 
+def safeEquals(a, b):
+    """
+    Pyqtgraph's equality checker handles several cases, but is deficient for custom types.
+    In these cases, convert a ``TypeError`` into a `False` equality.
+
+    Also handle known failure cases like pandas dataframes / series
+    """
+    if isinstance(a, (pd.DataFrame, pd.Series)) or isinstance(
+        b, (pd.DataFrame, pd.Series)
+    ):
+        return a.equals(b)
+    try:
+        return pg.eq(a, b)
+    except TypeError:
+        return False
+
+
 # Credit: https://github.com/biolab/orange3/blob/master/Orange/misc/cache.py
 # Permalink to copy date:
 # https://github.com/biolab/orange3/blob/0f5025a74a32a5b69ebf67e555131cc5b540143d/Orange/misc/cache.py  # noqa
@@ -960,8 +977,8 @@ def simpleCache(func):
         nonlocal last_args, last_kwargs, last_result
         if (
             len(last_args) != len(args)
-            or not all(pg.eq(x, y) for x, y in zip(args, last_args))
-            or not pg.eq(last_kwargs, kwargs)
+            or not all(safeEquals(x, y) for x, y in zip(args, last_args))
+            or not safeEquals(last_kwargs, kwargs)
         ):
             last_result = func(*args, **kwargs)
             last_args, last_kwargs = args, kwargs

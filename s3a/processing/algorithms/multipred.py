@@ -44,13 +44,21 @@ class ProcessDispatcher(PipelineFunction):
     ):
         self.singleRunner = function
         self.resultConverter = resultConverter
-        kwargs["ignores"] = list(kwargs.setdefault("ignores", [])) + ["component"]
-        super().__init__(function, **kwargs)
-        # Now that `self` is initialized, it can be wrapped with correct attributes
-        functools.update_wrapper(self, function, updated=())
+        # Ignore the "component" argument, which is added by the dispatcher
+        function = bind(component=dict(ignore=True))(function)
+
+        # Something tricky: `inspect.signature` can follow __wrapped__ to get the
+        # signature of the wrapped function. However, this cannot be set on
+        # instance methods (like `self.dispatcher`). So, wrap in a partial
+        # which *can* have a signature set.
+        wrappable = functools.partial(self.dispatcher)
+        super().__init__(
+            functools.update_wrapper(wrappable, function),
+            **kwargs,
+            components=FROM_PREV_IO,
+        )
         if kwargs.get("name"):
             self.__name__ = kwargs["name"]
-        self.input["components"] = FROM_PREV_IO
 
     def dispatcher(self, components: pd.DataFrame, **kwargs):
         compList = []
@@ -397,7 +405,7 @@ def remove_overlapping_components(
         if not len(stacked):
             continue
         checkArea, coords = gutils.getCroppedImage(
-            referenceMask, stacked, returnSlices=True
+            referenceMask, stacked, returnSlices=True, returnBoundingBox=False
         )
         # Prediction is entirely outside the image
         if checkArea.size <= 0:

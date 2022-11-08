@@ -58,7 +58,6 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         window.mainImage.toolsEditor.registerFunction(
             self.makePrediction,
             runActionTemplate=CNST.TOOL_MULT_PRED,
-            ignores=["components"],
         )
         self.updateRunnerLimits()
         window.sigPluginAdded.connect(self.updateRunnerLimits)
