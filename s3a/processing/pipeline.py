@@ -78,11 +78,17 @@ class PipelineFunction(InteractiveFunction):
         # them from the reference InteractiveFunction during clears/etc.
         obj.parameters, obj.parameterCache = {}, {}
         obj.hookupParameters(function.parameters, clearOld=False)
-        obj.defaultInput = dict(obj.input)
         return obj
 
     def hookupParameters(self, params=None, clearOld=True):
-        super().hookupParameters(params, clearOld)
+        ret = super().hookupParameters(params, clearOld)
+        self.defaultInput = self.extra.copy()
+        for param in self.parameters.values():
+            self.defaultInput[param.name()] = param.defaultValue()
+        # TODO: connect `defaultInput` values to signals when a parameter's default
+        #   changes
+
+        return ret
 
     @property
     def input(self):
