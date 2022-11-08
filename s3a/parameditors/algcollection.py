@@ -127,7 +127,7 @@ class AlgorithmEditor(MetaTreeParameterEditor):
             # save updated parameter values for the outermost stage
             parameterState = self.unnestedProcessState(proc, filter=("meta",))
         self.collection.loadParameterValues(
-            self.collection.stateManager.stateName, parameterState
+            self.collection.stateName, parameterState
         )
         clctnState = self.collection.saveParameterValues(saveName, blockWrite=True)
         parameterState = {"active": self.currentProcessor.title(), **clctnState}
@@ -139,7 +139,7 @@ class AlgorithmEditor(MetaTreeParameterEditor):
         self, stateName: FilePath = None, stateDict: dict = None, **kwargs
     ):
         if stateDict is None:
-            stateDict = fns.attemptFileLoad(self.stateManager.formatFileName(stateName))
+            stateDict = fns.attemptFileLoad(self.formatFileName(stateName))
         processName = stateDict.pop("active", None)
 
         self.collection.loadParameterValues(stateName, stateDict, **kwargs)
@@ -173,7 +173,7 @@ class AlgorithmEditor(MetaTreeParameterEditor):
             return
 
         if saveBeforeChange and self.currentProcessor:
-            self.saveParameterValues(self.stateManager.stateName, blockWrite=True)
+            self.saveParameterValues(self.stateName, blockWrite=True)
         if process is None:
             return
         if self.currentProcessor:
@@ -192,7 +192,7 @@ class AlgorithmEditor(MetaTreeParameterEditor):
         return processor
 
     def editParameterValuesGui(self):
-        webbrowser.open(self.stateManager.formatFileName())
+        webbrowser.open(self.formatFileName())
 
     def unnestedProcessState(self, process: PipelineParameter, **kwargs):
         outState = dict(top={}, primitive={}, modules=self.collection.includeModules)
@@ -443,8 +443,7 @@ class AlgorithmCollection(ParameterEditor):
         stateDict: _CollectionDict = None,
         **kwargs,
     ):
-        if stateDict is None:
-            stateDict = self.stateManager.loadState(stateName)
+        stateDict = self.stateManager.loadState(stateName, stateDict)
         top, primitive = stateDict.get("top", {}), stateDict.get("primitive", {})
         modules = stateDict.get("modules", [])
         self.includeModules = modules

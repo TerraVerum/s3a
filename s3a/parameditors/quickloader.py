@@ -34,13 +34,13 @@ class EditorListModel(QtCore.QAbstractListModel):
         editorList = [
             e
             for e in editorList
-            if e not in self.uniqueEditors and e.stateManager.directory is not None
+            if e not in self.uniqueEditors and e.directory is not None
         ]
         self.uniqueEditors.extend(editorList)
         self.layoutAboutToBeChanged.emit()
         for editor in editorList:
             for stateName in self.getParameterStateFiles(
-                editor.stateManager.directory, editor.stateManager.suffix
+                editor.directory, editor.suffix
             ):
                 self.parameterStates.append(stateName)
                 self.editorList.append(editor)
@@ -165,7 +165,7 @@ class QuickLoaderEditor(MetaTreeParameterEditor):
         **kwargs,
     ):
         if stateDict is None:
-            stateDict = attemptFileLoad(self.stateManager.formatFileName(stateName))
+            stateDict = attemptFileLoad(self.formatFileName(stateName))
         if useDefaults:
             self.rootParameter.clearChildren()
         if len(stateDict):

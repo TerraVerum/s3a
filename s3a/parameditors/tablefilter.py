@@ -177,7 +177,7 @@ class TableFilterEditor(ParameterEditor):
                 UserWarning,
                 stacklevel=2,
             )
-        self.saveParameterValues(self.stateManager.getDefaultState())
+        self.saveParameterValues(self.getDefaultState())
 
     @property
     def activeFilters(self):

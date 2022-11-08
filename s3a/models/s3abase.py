@@ -198,7 +198,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
 
     def saveAllEditorDefaults(self):
         for editor in self.classPluginMap.values():
-            editor.saveParameterValues(editor.stateManager.getDefaultState())
+            editor.saveParameterValues(editor.getDefaultState())
 
     @DASM.undoable("Accept Focused Region")
     def acceptFocusedRegion(self):
@@ -569,7 +569,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         ql = self.appStateEditor.quickLoader
         for editor in ql.listModel.uniqueEditors:
             states = ql.listModel.getParameterStateFiles(
-                editor.stateManager.directory, editor.stateManager.suffix
+                editor.directory, editor.suffix
             )
             formatted = [f'"{s}"' for s in states]
             parser.add_argument(
