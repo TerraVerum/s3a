@@ -25,6 +25,7 @@ from ..controls.tableviewproxy import ComponentController, ComponentSorterFilter
 from ..logger import getAppLogger
 from ..models.tablemodel import ComponentManager
 from ..parameditors.appstate import AppStateEditor
+from ..parameditors.tablefilter import TableFilterEditor
 from ..plugins import EXTERNAL_PLUGINS, INTERNAL_PLUGINS, tablefield
 from ..plugins.base import ParameterEditorPlugin as PEPlugin
 from ..plugins.file import FilePlugin
@@ -88,7 +89,13 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
             },
         )
 
-        self.tableData = TableData(makeFilter=True)
+        self.filePlugin = FilePlugin()
+        self.tableData = self.filePlugin.projectData.tableData
+        self.componentIo = self.filePlugin.projectData.componentIo
+        self.tableData.filter = TableFilterEditor()
+        # Since filter was added after construction, manually update fields
+        self.tableData.filter.updateParameterList(self.tableData.allFields)
+
         self.componentManager = ComponentManager(self.tableData)
 
         self.tableView = ComponentTableView()
@@ -112,6 +119,8 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         # -----
         # INTERFACE WITH QUICK LOADER / PLUGINS
         # -----
+        # File plugin is a special case
+        self._addPluginObject(self.filePlugin)
         toAdd = INTERNAL_PLUGINS() + EXTERNAL_PLUGINS()
         for plg in toAdd:
             if inspect.isclass(plg):
@@ -130,7 +139,6 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         ]
         # noinspection PyTypeChecker
         self.miscPlugin: RandomToolsPlugin = self.classPluginMap[RandomToolsPlugin]
-        self.componentIo = self.filePlugin.projectData.componentIo
 
         # Connect signals
         # -----

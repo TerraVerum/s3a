@@ -184,9 +184,7 @@ class TableFilterEditor(ParameterEditor):
         filters = {}
         for child in self.rootParameter.childs:
             if child["Active"]:
-                cState = next(
-                    iter(fns.parameterValues(child, includeDefaults=True).values())
-                )
+                cState = fns.parameterValues(child, includeDefaults=True)
                 cState.pop("Active")
                 filters[child.name()] = cState
         return filters

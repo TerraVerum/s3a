@@ -35,6 +35,7 @@ from ..graphicsutils import DropList
 from ..logger import getAppLogger
 from ..processing import PipelineFunction
 from ..structures import FilePath, NChanImg
+from ..tabledata import TableData
 
 
 def absolutePath(p: Optional[Path]):
@@ -617,7 +618,8 @@ class ProjectData(QtCore.QObject):
 
     def __init__(self, configPath: FilePath = None, cfgDict: dict = None):
         super().__init__()
-        self.componentIo = ComponentIO()
+        self.tableData = TableData()
+        self.componentIo = ComponentIO(self.tableData)
         self.templateName = PROJECT_BASE_TEMPLATE
         self.config = fns.attemptFileLoad(self.templateName)
         self.configPath: Optional[Path] = None
@@ -690,10 +692,6 @@ class ProjectData(QtCore.QObject):
     @property
     def pluginConfig(self) -> Dict[str, str]:
         return self.config["plugin-cfg"]
-
-    @property
-    def tableData(self):
-        return self.componentIo.tableData
 
     def clearImagesAndAnnotations(self):
         oldImgs = self.images.copy()

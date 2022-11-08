@@ -8,8 +8,9 @@ from ..shims import entry_points
 
 
 def INTERNAL_PLUGINS():
+    # Special case: FilePlugin is ommitted since it is added explicitly by
+    # the main window
     from .edit import EditPlugin
-    from .file import FilePlugin
     from .help import HelpPlugin
     from .mainimage import MainImagePlugin
     from .misc import RandomToolsPlugin
@@ -19,7 +20,6 @@ def INTERNAL_PLUGINS():
     from .usermetrics import UserMetricsPlugin
 
     return [
-        FilePlugin,
         EditPlugin,
         MultiPredictionsPlugin,
         VerticesPlugin,
