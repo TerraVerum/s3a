@@ -120,11 +120,11 @@ class QuickLoaderEditor(MetaTreeParameterEditor):
         return [self.addNewParamState, *super()._guiChildren()]
 
     def saveParameterValues(
-        self, saveName: str = None, parameterState: dict = None, **kwargs
+        self, saveName: str = None, stateDict: dict = None, **kwargs
     ):
         kwargs.pop("includeDefaults", None)
         return super().saveParameterValues(
-            saveName, parameterState, **kwargs, includeDefaults=True
+            saveName, stateDict, **kwargs, includeDefaults=True
         )
 
     def buildFromStartupParameters(self, startupSource: dict):
@@ -164,8 +164,7 @@ class QuickLoaderEditor(MetaTreeParameterEditor):
         useDefaults=True,
         **kwargs,
     ):
-        if stateDict is None:
-            stateDict = attemptFileLoad(self.formatFileName(stateName))
+        stateDict = self.stateManager.loadState(stateName, stateDict)
         if useDefaults:
             self.rootParameter.clearChildren()
         if len(stateDict):
@@ -203,7 +202,7 @@ class QuickLoaderEditor(MetaTreeParameterEditor):
         # self.addNewParamState.clear()
 
     def addActionForEditor(
-        self, editor: ParameterEditor, parameterState: str, shortcut: str = None
+        self, editor: ParameterEditor, stateDict: str, shortcut: str = None
     ):
         """
         Ensures the specified editor shortcut will exist in the quickloader parameter
@@ -213,10 +212,10 @@ class QuickLoaderEditor(MetaTreeParameterEditor):
         act = getParameterChild(
             self.rootParameter,
             editor.name,
-            parameterState,
+            stateDict,
             groupOpts=dict(removable=True),
             childOpts=dict(
-                name=parameterState,
+                name=stateDict,
                 value=shortcut or "",
                 removable=True,
                 type="keysequence",
@@ -234,7 +233,7 @@ class QuickLoaderEditor(MetaTreeParameterEditor):
             )
             qShortcut.activated.connect(
                 functools.partial(
-                    self._safeLoadParameterValues, act, editor, parameterState
+                    self._safeLoadParameterValues, act, editor, stateDict
                 )
             )
             act.setOpts(shortcut=qShortcut)
@@ -242,7 +241,7 @@ class QuickLoaderEditor(MetaTreeParameterEditor):
             qShortcut.setKey(act.value())
 
     def _safeLoadParameterValues(
-        self, action: Parameter, editor: ParameterEditor, parameterState: str
+        self, action: Parameter, editor: ParameterEditor, stateDict: str
     ):
         """
         It is possible for the quick loader to refer to a parameter state that no longer
@@ -250,14 +249,14 @@ class QuickLoaderEditor(MetaTreeParameterEditor):
         deleted
         """
         try:
-            editor.loadParameterValues(parameterState)
+            editor.loadParameterValues(stateDict)
         except FileNotFoundError:
             action.opts["shortcut"].deleteLater()
             del action.opts["shortcut"]
             action.remove()
             # Wait until end of process cycle to raise error
             formattedState = self.listModel.displayFormat.format(
-                editor=editor, stateName=parameterState
+                editor=editor, stateName=stateDict
             )
             getAppLogger(__name__).critical(
                 f"Attempted to load {formattedState} but the setting was not found."

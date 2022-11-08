@@ -35,11 +35,11 @@ class AppStateEditor(ParameterEditor):
         self.startupSettings = {}
 
     def saveParameterValues(
-        self, saveName: str = None, parameterState: dict = None, **kwargs
+        self, saveName: str = None, stateDict: dict = None, **kwargs
     ):
         if saveName is None:
             saveName = self.RECENT_STATE_FILENAME
-        if parameterState is None:
+        if stateDict is None:
             # TODO: May be good in the future to be able to choose which should be saved
             legitKeys = self.stateFunctionsDf.index
             exportFuncs = self.stateFunctionsDf.exportFunction
@@ -49,7 +49,7 @@ class AppStateEditor(ParameterEditor):
                 legitKeys, exportFuncs, [[saveOnExitDir]] * len(legitKeys)
             )
             updateDict = {k: ret for k, ret in zip(legitKeys, rets) if ret is not None}
-            parameterState = dict(**updateDict)
+            stateDict = dict(**updateDict)
             for editor in self.quickLoader.listModel.uniqueEditors:
                 if editor.stateName == editor.getDefaultState().stem:
                     curSaveName = str(saveOnExitDir / editor.name)
@@ -57,11 +57,11 @@ class AppStateEditor(ParameterEditor):
                     curSaveName = editor.stateName
                 formattedName = editor.name.replace(" ", "").lower()
                 editor.saveParameterValues(curSaveName)
-                parameterState.update({formattedName: curSaveName})
+                stateDict.update({formattedName: curSaveName})
         else:
             errs = []
 
-        ret = super().saveParameterValues(saveName, parameterState, **kwargs)
+        ret = super().saveParameterValues(saveName, stateDict, **kwargs)
         self.raiseErrorMessageIfNeeded(errs)
         return ret
 
@@ -74,16 +74,15 @@ class AppStateEditor(ParameterEditor):
         self.loading = True
         # Copy old settings to put them back after loading
         oldStartup = self.startupSettings.copy()
-        try:  # try block to ensure loading is false after
-            if stateName is None:
-                stateName = self.RECENT_STATE_FILENAME
-            stateName = self.stateManager.formatFileName(stateName)
-            if not stateName.exists() and stateDict is None:
-                stateDict = {}
-            if isinstance(stateDict, str):
-                stateDict = {"quickloader": stateDict}
+        if stateName is None:
+            stateName = self.RECENT_STATE_FILENAME
+        stateName = self.stateManager.formatFileName(stateName)
+        if isinstance(stateDict, str):
+            stateDict = {"quickloader": stateDict}
+
+        try:  # try block to ensure `loading` is false after
             stateDict = self._parseStateDictIncludeRequired(stateName, stateDict)
-            paramDict = stateDict.pop("Parameters", {}) or {}
+            initialStateDict = stateDict.copy()
 
             # It's possible for some functions (e.g. project load) to add or remove
             # startup args, so chack for this
@@ -115,7 +114,7 @@ class AppStateEditor(ParameterEditor):
                 )
             if stateDict:
                 self.quickLoader.buildFromStartupParameters(stateDict)
-            ret = super().loadParameterValues(stateName, paramDict)
+            ret = super().loadParameterValues(stateName, initialStateDict)
         finally:
             self.loading = False
             hierarchicalUpdate(self.startupSettings, oldStartup)
@@ -127,11 +126,10 @@ class AppStateEditor(ParameterEditor):
         stateDict: dict = None,
     ):
         if self.RECENT_STATE_FILENAME.exists():
-            defaults = attemptFileLoad(self.RECENT_STATE_FILENAME)
+            defaults = attemptFileLoad(self.RECENT_STATE_FILENAME) or {}
         else:
             defaults = {}
-        if stateDict is None:
-            stateDict = attemptFileLoad(stateName)
+        stateDict = self.stateManager.loadState(stateName, stateDict) or {}
         for k in self.stateFunctionsDf.index[self.stateFunctionsDf["required"]]:
             stateDict.setdefault(k, defaults.get(k))
         return stateDict

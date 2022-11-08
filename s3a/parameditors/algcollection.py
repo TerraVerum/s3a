@@ -102,7 +102,7 @@ class AlgorithmEditor(MetaTreeParameterEditor):
         def onChange(name):
             self.props["process"] = name
 
-        self.collection.stateManager.signals.updated.connect(onStateUpdated)
+        self.collection.stateManager.signals.loadRequested.connect(onStateUpdated)
         self.sigProcessorChanged.connect(onChange)
         onStateUpdated()
         self.changeActiveProcessor(next(iter(self.collection.topProcesses)))
@@ -110,7 +110,7 @@ class AlgorithmEditor(MetaTreeParameterEditor):
     def saveParameterValues(
         self,
         saveName: str = None,
-        parameterState: dict = None,
+        stateDict: dict = None,
         *,
         includeDefaults=False,
         **kwargs,
@@ -122,31 +122,29 @@ class AlgorithmEditor(MetaTreeParameterEditor):
         """
         proc = self.currentProcessor
         # Make sure any newly added stages are accounted for
-        if parameterState is None:
+        if stateDict is None:
             # Since inner nested processes are already recorded, flatten here to just
             # save updated parameter values for the outermost stage
-            parameterState = self.unnestedProcessState(proc, filter=("meta",))
-        self.collection.loadParameterValues(
-            self.collection.stateName, parameterState
-        )
+            stateDict = self.unnestedProcessState(proc, filter=("meta",))
+        self.collection.loadParameterValues(self.collection.stateName, stateDict)
         clctnState = self.collection.saveParameterValues(saveName, blockWrite=True)
-        parameterState = {"active": self.currentProcessor.title(), **clctnState}
+        stateDict = {"active": self.currentProcessor.title(), **clctnState}
         return super().saveParameterValues(
-            saveName, parameterState, includeDefaults=includeDefaults, **kwargs
+            saveName, stateDict, includeDefaults=includeDefaults, **kwargs
         )
 
     def loadParameterValues(
         self, stateName: FilePath = None, stateDict: dict = None, **kwargs
     ):
-        if stateDict is None:
-            stateDict = fns.attemptFileLoad(self.formatFileName(stateName))
+        stateDict = self.stateManager.loadState(stateName, stateDict)
         processName = stateDict.pop("active", None)
 
         self.collection.loadParameterValues(stateName, stateDict, **kwargs)
         if processName:
             self.changeActiveProcessor(processName, saveBeforeChange=False)
+        # Parameter tree is managed by the collection, so don't load any candidates
         return super().loadParameterValues(
-            stateName, {}, candidateParameters=[], **kwargs
+            stateName, stateDict, candidateParameters=[], **kwargs
         )
 
     @bind(process=dict(type="popuplineeditor", limits=[], title="Algorithm"))
@@ -418,7 +416,7 @@ class AlgorithmCollection(ParameterEditor):
         return None
 
     def saveParameterValues(
-        self, saveName: str = None, parameterState: dict = None, **kwargs
+        self, saveName: str = None, stateDict: dict = None, **kwargs
     ):
         def converter(procDict):
             return {
@@ -429,13 +427,13 @@ class AlgorithmCollection(ParameterEditor):
                 if not isinstance(stage, PipelineFunction)
             }
 
-        if parameterState is None:
-            parameterState = {
+        if stateDict is None:
+            stateDict = {
                 "top": converter(self.topProcesses),
                 "primitive": converter(self.primitiveProcesses),
                 "modules": self.includeModules,
             }
-        return super().saveParameterValues(saveName, parameterState, **kwargs)
+        return super().saveParameterValues(saveName, stateDict, **kwargs)
 
     def loadParameterValues(
         self,
