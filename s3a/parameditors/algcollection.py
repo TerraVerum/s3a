@@ -76,6 +76,8 @@ class AlgorithmEditor(MetaTreeParameterEditor):
     sigProcessorChanged = QtCore.Signal(str)
     """Name of newly selected process"""
 
+    DEFAULT_PROCESS_NAME = "<None>"
+
     def __init__(self, collection: "AlgorithmCollection" = None, **kwargs):
         super().__init__(**kwargs)
         if collection is None:
@@ -83,7 +85,7 @@ class AlgorithmEditor(MetaTreeParameterEditor):
         self.collection = collection
 
         # Will be set by changeActiveProcessor
-        self.currentProcessor: PipelineParameter | None = None
+        self.currentProcessor = PipelineParameter(name=self.DEFAULT_PROCESS_NAME)
         self.props = ParameterContainer()
         self.registerFunction(
             self.changeActiveProcessor,
@@ -141,15 +143,18 @@ class AlgorithmEditor(MetaTreeParameterEditor):
 
         self.collection.loadParameterValues(stateName, stateDict, **kwargs)
         if processName:
-            self.changeActiveProcessor(processName, saveBeforeChange=False)
+            self.changeActiveProcessor(processName, saveBeforeChange=False, force=True)
         # Parameter tree is managed by the collection, so don't load any candidates
         return super().loadParameterValues(
             stateName, stateDict, candidateParameters=[], **kwargs
         )
 
-    @bind(process=dict(type="popuplineeditor", limits=[], title="Algorithm"))
+    @bind(
+        process=dict(type="popuplineeditor", limits=[], title="Algorithm"),
+        force=dict(ignore=True),
+    )
     def changeActiveProcessor(
-        self, process: str | PipelineParameter, saveBeforeChange=True
+        self, process: str | PipelineParameter, saveBeforeChange=True, force=False
     ):
         """
         Changes which processor is active.
@@ -161,21 +166,26 @@ class AlgorithmEditor(MetaTreeParameterEditor):
         saveBeforeChange
             Whether to propagate current algorithm settings to the processor collection
             before changing
+        force
+            Whether to force the change, even if the processor is already active. This
+            is useful if the processor is changed from a state being loaded rather than
+            an updated algorithm name.
         """
         # TODO: Maybe there's a better way of doing this? Ensures process label is updated
         #  for programmatic calls
         title = process.title() if isinstance(process, PipelineParameter) else process
-        if not process or title == (
-            self.currentProcessor and self.currentProcessor.title()
+        needsChange = process and (force or title != self.currentProcessor.title())
+        # Easier to understand "if not needsChange" vs. a double negative from direct
+        # evaluation
+        if not needsChange:
+            return
+        if (
+            saveBeforeChange
+            and self.currentProcessor.name() != self.DEFAULT_PROCESS_NAME
         ):
-            return
-
-        if saveBeforeChange and self.currentProcessor:
             self.saveParameterValues(self.stateName, blockWrite=True)
-        if process is None:
-            return
-        if self.currentProcessor:
-            self.currentProcessor.remove()
+
+        self.rootParameter.clearChildren()
         process = self._resolveProccessor(process)
         self.currentProcessor = process
         self.rootParameter.addChild(process)
