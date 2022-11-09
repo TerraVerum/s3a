@@ -2,32 +2,20 @@ from __future__ import annotations
 
 import inspect
 import typing as t
+import warnings
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
 from qtextras import FROM_PREV_IO, OptionsDict, ParameterEditor, fns
 from qtextras.typeoverloads import FilePath
-
-from .helpers import checkVerticesBounds, deserialize, serialize
+from .helpers import checkVerticesBounds, deserialize
 from ..constants import REQD_TBL_FIELDS as RTF
-from ..generalutils import deprecateKwargs, toDictGen
+from ..generalutils import toDictGen
 from ..shims import typing_extensions
 from ..structures import AnnInstanceError, AnnParseError
-from ..tabledata import IOTemplateManager, TableData, getFieldAliases
-
-
-class TableContainer:
-    """
-    Dummy component io in case a raw tableData is directly given to an importer/exporter
-    """
-
-    def __init__(self, tableData=None):
-        self.tableData = tableData
-
-
-class TblContainer_T(typing_extensions.Protocol):
-    tableData: TableData
+from ..tabledata import TableData
 
 
 class _GenericExportProtocol(typing_extensions.Protocol):
@@ -49,16 +37,15 @@ _exportCallable = t.Callable[[pd.DataFrame, t.Any], t.Tuple[t.Any, pd.DataFrame]
 
 
 class AnnotationIOBase:
-    class UNSET_IO_TYPE:
-        pass
 
     __name__: t.Optional[str] = None
-    ioType: t.Optional[str] = None
     """
-    Type indicating what required fields from the IOTemplateManager should be applied
+    Determines which config template's required fields are necessary for this input. 
+    That way, required fields don't have to be explicitly enumerated in a project's 
+    table configuration
     """
 
-    def __init__(self, ioType=UNSET_IO_TYPE, options=None):
+    def __init__(self, options=None):
         """
         Provides access to a modularized version of the common import structure:
           * read a file
@@ -71,10 +58,6 @@ class AnnotationIOBase:
 
         Parameters
         ----------
-        ioType
-            Determines which config template's required fields are necessary for this
-            input. That way, required fields don't have to be explicitly enumerated in
-            a project's table configuration
         options
             Dict-like metadata for this importer/exporter. If *None*, defaults to empty
             option set. This will be updated with kwargs from being called.
@@ -84,11 +67,6 @@ class AnnotationIOBase:
         prefix = "import" if "Importer" in clsName else "export"
         fmtName = type(self).__name__.replace("Importer", "").replace("Exporter", "")
         self.__name__ = self.__name__ or f"{prefix}{fmtName}"
-
-        useType = ioType
-        if useType is self.UNSET_IO_TYPE:
-            useType = self.ioType or fmtName.lower()
-        self.ioType = useType
 
         if options is None:
             options = {}
@@ -227,7 +205,9 @@ class AnnotationExporter(AnnotationIOBase):
 
 
 class AnnotationImporter(AnnotationIOBase):
-    importObj: t.Any
+    ioTemplate = "s3a"
+
+    importObject: t.Any
 
     formatSingleInstance = None
     """
@@ -245,11 +225,7 @@ class AnnotationImporter(AnnotationIOBase):
     you wish.
     """
 
-    def __init__(
-        self,
-        tableData: TableData | TblContainer_T = None,
-        ioType=AnnotationIOBase.UNSET_IO_TYPE,
-    ):
+    def __init__(self, tableData: TableData = None):
         """
         Provides access to a modularized version of the common import structure:
 
@@ -264,129 +240,91 @@ class AnnotationImporter(AnnotationIOBase):
         Parameters
         ----------
         tableData
-            Table configuration for fields in the input file. If a container,
-            ``container.tableData`` leads to the table data. This allows references to
-            be reassigned in e.g. an outer ComponentIO without losing connection to
-            this importer
-
-        ioType
-            Determines which config template's required fields are necessary for this
-            input. That way, required fields don't have to be explicitly enumerated in
-            a project's table configuration
+            Table configuration dictating how each metadata field is parsed, i.e.
+            converting "True"/"False" to booleans, etc. If not provided, all fields
+            will be parsed as strings.
         """
 
-        # Make a copy to allow for internal changes such as adding extra required
-        # fields, aliasing, etc. 'and' avoids asking for 'config' of 'none' table
-        super().__init__(ioType=ioType)
-        if tableData is None:
-            tableData = TableData()
-        if isinstance(tableData, TableData):
-            container = TableContainer(tableData)
-        else:
-            container = tableData
-        self.container = container
-        self.tableData = TableData()
-        self.destinationTable = self.container.tableData
-        self.refreshTableData()
-
-    def refreshTableData(self):
-        self.destinationTable = tableData = self.container.tableData
-        requiredCfg = IOTemplateManager.getTableConfig(self.ioType)
-        if tableData is not None:
-            # Make sure not to incorporate fields that only exist to provide logistics
-            # for the other table setup
-            optionalFields = {
-                key: val
-                for key, val in tableData.config["fields"].items()
-                if key not in tableData.template["fields"]
-            }
-            optionalCfg = {"fields": optionalFields}
-        else:
-            optionalCfg = None
-        self.tableData.template = requiredCfg
-        self.tableData.loadConfig(configDict=optionalCfg)
+        super().__init__()
+        self.tableData = tableData
 
     def readFile(self, file: FilePath, **kwargs):
         raise NotImplementedError
 
-    def getInstances(self, importObj, **kwargs):
+    def getInstances(self, importObject, **kwargs):
         raise NotImplementedError
-
-    @staticmethod
-    def _findSourceFieldForDestination(destField, allSourceFields):
-        """
-        Helper function during ``finalizeImport`` to find a match between a
-        yet-to-serialize dataframe and destination tableData. Basically,
-        a more primitive version of ``resolveFieldAliases`` Returns *None* if no
-        sensible mapping could be found, and errs if multiple sources alias to the same
-        destination
-        """
-        # Check for destination aliases primitively (one-way mappings). A full (
-        # two-way) check will occur later (see __call__ -> resolveFieldAliases)
-        match = tuple(getFieldAliases(destField) & allSourceFields)
-        if not match:
-            return
-        if len(match) == 1:
-            srcField = match[0]
-        else:
-            # Make sure there aren't multiple aliases, since this is not easily
-            # resolvable The only exception is that direct matches trump alias matches,
-            # so check for this directly
-            if destField.name in match:
-                srcField = destField.name
-            else:
-                raise IndexError(
-                    f'Multiple aliases to "{destField}": {match}\n'
-                    f"Cannot determine appropriate column matchup."
-                )
-        return srcField
 
     def finalizeImport(self, componentDf, **kwargs):
         """Deserializes any columns that are still strings"""
+        if not len(componentDf):
+            return componentDf.copy()
+        fields = self.tableData.allFields if self.tableData else []
 
-        # Objects in the original frame may be represented as strings, so try to
-        # convert these as needed
         outDf = pd.DataFrame()
-        # Preserve / transcribe fields that are already OptionsDicts
-        for destField in [f for f in componentDf.columns if isinstance(f, OptionsDict)]:
-            outDf[destField] = componentDf[destField]
-
-        # Need to serialize / convert string names since they indicate yet-to-serialize
-        # columns
-        toConvert = set(componentDf.columns)
-        for destField in self.tableData.allFields:
-            srcField = self._findSourceFieldForDestination(destField, toConvert)
-            if not srcField:
-                # No match
-                continue
-            dfVals = componentDf[srcField]
-            # Parsing functions only know how to convert from strings to themselves.
-            # So, assume the exting types can first convert themselves to strings
-            serializedDfVals, errs = serialize(destField, dfVals)
-            parsedDfVals, parsedErrs = deserialize(destField, serializedDfVals)
-            # Turn problematic cells into instance errors for detecting problems in the
-            # outer scope
-            errs = errs.apply(AnnInstanceError)
-            parsedErrs = parsedErrs.apply(AnnInstanceError)
-            parsedDfVals = pd.concat([parsedDfVals, errs, parsedErrs])
-            outDf[destField] = parsedDfVals
-        # All recognized output fields should now be deserialied; make sure required
-        # fields exist
+        # If tableData or column spec are provided, attempt to serialize as needed.
+        # Otherwise, assume all fields are strings and leave them as is.
+        for col in componentDf.columns:
+            dfVals = componentDf[col]
+            if col in fields:
+                # get OptionsDict version that knows how to deserialize
+                col = fields[fields.index(col)]
+            if isinstance(col, OptionsDict):
+                # Serialize with native option from column
+                dfVals, parsedErrs = deserialize(col, dfVals)
+                parsedErrs = parsedErrs.apply(AnnInstanceError)
+                dfVals = pd.concat([dfVals, parsedErrs])
+            # Else, assume field should stay as-is
+            outDf[col] = dfVals
+        # All recognized output fields should now be deserialied
         return outDf
 
-    @deprecateKwargs(keepExtraColumns="keepExtraFields", warningType=FutureWarning)
     def __call__(
         self,
         inputFileOrObject: t.Union[FilePath, t.Any],
         *,
         parseErrorOk=False,
         reindex=False,
-        keepExtraFields=False,
+        keepExtraFields=None,
         addMissingFields=False,
         **kwargs,
     ):
-        self.refreshTableData()
+        """
+        Imports a file or dataframe object by converting string data representations
+        into S3A-compatible types (like :class:`ComplexXYVertices`, etc.).
 
+        Parameters
+        ----------
+        inputFileOrObject
+            File path or object to import
+        parseErrorOk
+            If True, rows in the table with parsing errors will be silently removed.
+            Otherwise, an error will be raised.
+        reindex
+            If True, the index of the returned dataframe will be reset to range(n) where
+            n is the number of rows. Otherwise, the index will be preserved. Note that
+            ``RTF.ID`` is used as the index, so if this column is not present, the index
+            will be reset regardless of this parameter.
+        keepExtraFields
+            If True, any fields in the input file that are not recognized by the
+            :class:`TableData` will be kept in the output dataframe. If False, they will
+            be removed. If None, will be ``True`` if ``self.tableData` is populated
+            else ``False``.
+        addMissingFields
+            If True, any fields in the :class:`TableData` that are not present in the
+            input file will be added to the output dataframe with their default values.
+            Otherwise, no additional action is performed.
+        **kwargs
+            Additional keyword arguments to pass to the import function.
+        """
+        if keepExtraFields is None:
+            keepExtraFields = self.tableData is not None
+        if self.tableData is None and (keepExtraFields or addMissingFields):
+            warnings.warn(
+                "Specifying `keepExtraFields` or `addMissingFields` while "
+                "`self.tableData` is None will have no effect.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
         file = (
             Path(inputFileOrObject)
             if isinstance(inputFileOrObject, FilePath.__args__)
@@ -394,7 +332,7 @@ class AnnotationImporter(AnnotationIOBase):
         )
         if file is not None:
             inputFileOrObject = self.readFile(inputFileOrObject, **kwargs)
-        self.importObj = inputFileOrObject
+        self.importObject = inputFileOrObject
 
         kwargs.update(file=file, reindex=reindex)
         activeOpts = {**self.options, **kwargs}
@@ -418,33 +356,18 @@ class AnnotationImporter(AnnotationIOBase):
         # still serialized cases
         parsedDf = self.finalizeImport(bulkParsedDf, **kwargs)
 
-        # Determine any destination mappings
-        importedCols = parsedDf.columns.copy()
-        if self.destinationTable:
-            parsedDf.columns = self.destinationTable.resolveFieldAliases(
-                parsedDf.columns, kwargs.get("mapping", {})
-            )
+        if not keepExtraFields and self.tableData:
+            keepCols = [col for col in parsedDf if col in self.tableData.allFields]
+            parsedDf = parsedDf[keepCols]
 
-        if keepExtraFields:
-            # Columns not specified in the table data should be kept in their
-            # unmodified state
-            extraCols = bulkParsedDf.columns.difference(importedCols)
-            alreadyParsed = np.isin(bulkParsedDf.columns, importedCols)
-            # Make sure column ordering matches original
-            newOrder = np.array(bulkParsedDf.columns)
-            newOrder[alreadyParsed] = parsedDf.columns
-
-            parsedDf[extraCols] = bulkParsedDf[extraCols]
-            parsedDf = parsedDf[newOrder]
-
-        if addMissingFields:
+        if addMissingFields and self.tableData:
             # False positive SettingWithCopyWarning occurs if missing fields were added
             # and the df was reordered, but copy() is not a performance bottleneck
             # and at least grants the new `parsedDf` explicit ownership of its data
             parsedDf = parsedDf.copy()
 
-            # Desintation fields that never showed up should be appended
-            for field in self.destinationTable.allFields:
+            # Destination fields that never showed up should be appended
+            for field in self.tableData.allFields:
                 # Special case: instance id is handled below
                 if field not in parsedDf and field != RTF.ID:
                     parsedDf[field] = field.value
@@ -454,7 +377,8 @@ class AnnotationImporter(AnnotationIOBase):
 
         # Now that all column names and settings are resolve, handle any bad imports
         validDf = self.validInstances(parsedDf, parseErrorOk)
-        # Ensure reindexing still takes place if requested
+        # Ensure reindexing still takes place if requested, some instances were invalid,
+        # and invalid instances were allowed to be dropped (`parseErrorOk`)
         if reindex and len(validDf) != len(parsedDf):
             validDf[RTF.ID] = validDf.index = np.arange(len(validDf))
 
@@ -466,6 +390,7 @@ class AnnotationImporter(AnnotationIOBase):
     @staticmethod
     def _ensureIdsAsIndex(df, reindex=None):
         alreadyExists = RTF.ID in df
+        inserIndex = 0 if alreadyExists else len(df.columns)
         if reindex or not alreadyExists:
             sequentialIds = np.arange(len(df), dtype=int)
             if alreadyExists:  # Just reindexing
@@ -492,14 +417,14 @@ class AnnotationImporter(AnnotationIOBase):
         # when this df is modified elsewhere
         return parsedDf[~errIdxs].copy()
 
-    def defaultBulkImport(self, importObj, **kwargs) -> pd.DataFrame:
-        return pd.DataFrame(self.getInstances(importObj, **kwargs))
+    def defaultBulkImport(self, importObject, **kwargs) -> pd.DataFrame:
+        return pd.DataFrame(self.getInstances(importObject, **kwargs))
 
-    def individualImport(self, importObj, **kwargs):
+    def individualImport(self, importObject, **kwargs):
         parsed = []
         if self.formatSingleInstance is None:
             return pd.DataFrame()
-        for inst in self.getInstances(importObj, **kwargs):
+        for inst in self.getInstances(importObject, **kwargs):
             parsedInst = self.formatSingleInstance(inst, **kwargs)
             parsed.append(parsedInst)
 

@@ -41,6 +41,8 @@ class TableData(QtCore.QObject):
     """dict (self.config) during update"""
     filter: Optional[TableFilterEditor]
 
+    ioTemplate = "s3a"
+
     def __init__(
         self,
         configPath: FilePath = None,
@@ -50,7 +52,7 @@ class TableData(QtCore.QObject):
     ):
         super().__init__()
         if template is None:
-            template = IOTemplateManager.getTableConfig("s3a")
+            template = IOTemplateManager.getTableConfig(self.ioTemplate)
         self.template = template
 
         self.factories: Dict[OptionsDict, Callable[[], Any]] = {}

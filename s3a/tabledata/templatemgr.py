@@ -1,5 +1,6 @@
 import copy
 import typing as t
+from pathlib import Path
 
 from qtextras import fns
 from qtextras.typeoverloads import FilePath
@@ -21,26 +22,29 @@ class IOTemplateManager:
     templates = DirectoryDict(IO_TEMPLATES_DIR, fns.attemptFileLoad, allowAbsolute=True)
 
     @classmethod
-    def getTableConfig(cls, ioType: str):
-        if ioType is None:
+    def getTableConfig(cls, ioTemplate: str):
+        if ioTemplate is None:
             return None
-        configPath = ioType.lower() + ".tblcfg"
-        cfg = cls.templates.get(configPath)
+        ioTemplate = Path(ioTemplate)
+        if not ioTemplate.suffix:
+            ioTemplate = ioTemplate.with_suffix(".tblcfg")
+
+        cfg = cls.templates.get(ioTemplate)
         if cfg is None:
             return None
         return copy.deepcopy(cfg)
 
     @classmethod
     def registerTableConfig(
-        cls, ioType: str, config: t.Union[FilePath, dict], force=False
+        cls, ioTemplate: str, config: t.Union[FilePath, dict], force=False
     ):
         """
         Associates the given field information as containing required fields for
-        ``ioType``. Either an absolute filepath to a configuration or a dictionary of
+        ``ioTemplate``. Either an absolute filepath to a configuration or a dictionary of
         ``fields: {}`` data can be passed. These are fields that must exist in the io
         format
         """
-        key = ioType.lower() + ".tblcfg"
+        key = ioTemplate.lower() + ".tblcfg"
         # DirectoryDict doesn't yet implement 'contains', so just try to get the key first
         try:
             ret = cls.templates[key]
@@ -50,7 +54,7 @@ class IOTemplateManager:
         else:
             if not force:
                 raise KeyError(
-                    f'I/O type "{ioType}" already has associated data and `force` '
+                    f'I/O type "{ioTemplate}" already has associated data and `force` '
                     f"is false:\n{ret}"
                 )
 

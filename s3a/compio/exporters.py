@@ -42,7 +42,6 @@ __all__ = [
     "SerialExporter",
     "CsvExporter",
     "PklExporter",
-    "YoloV5Exporter",
 ]
 
 
@@ -777,60 +776,3 @@ class PklExporter(AnnotationExporter):
 
     def createExportObject(self, **kwargs):
         return self.componentDf.copy()
-
-
-class YoloV5Exporter(CsvExporter):
-    ioType = "yolov5"
-    mapping: pd.Series
-
-    def writeFile(self, file: FilePath, exportObject: pd.DataFrame, **kwargs):
-        kwargs.setdefault("float_format", "%.6f")
-
-        classLen = exportObject["class"].astype(str).str.len().max()
-        kwargs.setdefault("formatters", {"class": f"{{:<{classLen}}}".format})
-
-        exportObject.to_string(file, index=False, header=False)
-
-    def populateMetadata(
-        self,
-        labelField=None,
-        imageShape=None,
-        returnLabelMap=False,
-        **kwargs,
-    ):
-        if imageShape is None:
-            raise ValueError("Cannot export yolov5 without specifying `imageShape`")
-        if labelField is None:
-            raise ValueError("Cannot export yolov5 without specifying `labelField`")
-        labelField = OptionsDictGroup.fieldFromParameter(self.componentDf, labelField)
-        return self._forwardMetadata(locals())
-
-    def bulkExport(
-        self,
-        componentDf,
-        exportObject,
-        readonly=None,
-        imageShape=None,
-        labelField=None,
-        **kwargs,
-    ):
-        numericVals, mapping = labelField.toNumeric(
-            exportObject[labelField], returnMapping=True
-        )
-        self.mapping = mapping
-        if not np.issubdtype(numericVals.dtype, np.integer):
-            raise ValueError("Yolo export only supports integer class values")
-        stacked = exportObject[RTF.VERTICES].apply(ComplexXYVertices.stack)
-        mins = np.vstack(stacked.apply(lambda el: el.min(0)))
-        ptps = np.vstack(stacked.apply(lambda el: el.ptp(0)))
-        imageShapeXy = np.array(imageShape[::-1])[None, :]
-        exportObject = pd.DataFrame()
-        exportObject["class"] = numericVals
-        exportObject[["center_x", "center_y"]] = (mins + (ptps / 2)) / imageShapeXy
-        exportObject[["width", "height"]] = ptps / imageShapeXy
-        return super().bulkExport(componentDf, exportObject, readonly, **kwargs)
-
-    def formatReturnObject(self, exportObject, returnLabelMap=None, **kwargs):
-        if returnLabelMap:
-            return exportObject, self.mapping
-        return exportObject

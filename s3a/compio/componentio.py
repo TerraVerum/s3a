@@ -85,7 +85,6 @@ class ComponentIO:
         # Since both import and export should have these keys, can use either dict
         return {k: self.importTypes[k] for k in ["csv", "pkl"]}
 
-    tableData = TableData()
     """
     Table to use for import/export cross checks. This is how class and table field 
     information is derived.
@@ -102,19 +101,12 @@ class ComponentIO:
     """
 
     def __init__(self, tableData: TableData = None):
-        if tableData is not None:
-            self.tableData = tableData
-        td = self
+        self.tableData = td = tableData
         self.importCsv = CsvImporter(td)
         self.importSerialized = SerialImporter(td)
         self.importLblPng = LblPngImporter(td)
         self.importPkl = PklImporter(td)
         self.importCompImgsDf = CompImgsDfImporter(td)
-        self.importYoloV5 = YoloV5Importer(td)
-
-        self.importSuperannotateJson = SuperannotateJsonImporter(td)
-        self.importGeojson = GeojsonImporter(td)
-        self.importViaCsv = VGGImageAnnotatorImporter(td)
 
         self.exportCsv = CsvExporter()
         self.exportLblPng = LblPngExporter()
@@ -122,7 +114,6 @@ class ComponentIO:
         self.exportCompImgsDf = CompImgsDfExporter()
         self.exportPkl = PklExporter()
         self.exportSerialized = SerialExporter()
-        self.exportYoloV5 = YoloV5Exporter()
 
     def updateOptions(self, importOrExport: _litLst, **opts):
         # Propagate custom defaults to each desired function

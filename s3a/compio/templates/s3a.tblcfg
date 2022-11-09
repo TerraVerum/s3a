@@ -5,7 +5,6 @@ fields:
   Image File:
     value: 'Newly Added'
     readonly: True
-    aliases: ['Source Image Filename']
   Vertices:
     type: 'complexxyvertices'
     readonly: True

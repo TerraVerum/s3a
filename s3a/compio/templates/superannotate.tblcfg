@@ -3,10 +3,8 @@ fields:
     value: ''
     type: list
     limits: []
-    aliases: [Class, Label]
   createdAt:
     value: ''
     readonly: True
     parser: 'superanntime'
-    aliases: [Timestamp]
   probability: 100.0
