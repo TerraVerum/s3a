@@ -101,8 +101,10 @@ class AlgorithmEditor(MetaTreeParameterEditor):
 
         self.collection.stateManager.signals.loadRequested.connect(onStateUpdated)
         self.sigProcessorChanged.connect(onChange)
+        if self.collection.topProcesses:
+            top = next(iter(self.collection.topProcesses))
+            self.props["process"] = top
         onStateUpdated()
-        self.changeActiveProcessor(next(iter(self.collection.topProcesses)))
 
     def saveParameterValues(
         self,
@@ -118,11 +120,16 @@ class AlgorithmEditor(MetaTreeParameterEditor):
         default save.
         """
         proc = self.currentProcessor
-        # Make sure any newly added stages are accounted for
         if stateDict is None:
             # Since inner nested processes are already recorded, flatten here to just
             # save updated parameter values for the outermost stage
-            stateDict = self.unnestedProcessState(proc, filter=("meta",))
+            filter_ = ["meta"]
+            if includeDefaults:
+                filter_.append("defaults")
+            stateDict = self.collection.unnestedProcessState(
+                proc, processFilter=filter_
+            )
+        # Make sure the collection gets info about this process
         self.collection.loadParameterValues(self.collection.stateName, stateDict)
         clctnState = self.collection.saveParameterValues(saveName, blockWrite=True)
         stateDict = {"active": self.currentProcessor.title(), **clctnState}
@@ -196,38 +203,6 @@ class AlgorithmEditor(MetaTreeParameterEditor):
 
     def editParameterValuesGui(self):
         webbrowser.open(self.formatFileName())
-
-    def unnestedProcessState(self, process: PipelineParameter, **kwargs):
-        outState = dict(top={}, primitive={}, modules=self.collection.includeModules)
-
-        # Make sure to visit the most deeply nested stages first, so that stages
-        # can be accurately ignored if they are already included in a parent stage
-        visit = [process]
-        depths = defaultdict(int, {process: 0})
-        while visit:
-            pipe = visit.pop()
-            for child in filter(lambda el: isinstance(el, PipelineParameter), pipe):
-                depths[child] = max(depths[child], depths[pipe] + 1)
-                visit.append(child)
-
-        for pipe in sorted(depths, key=depths.get, reverse=True):
-            # Don't record meta changes for top process since it breaks
-            # logic for loading from a collection.
-            # Do this by only keeping the first key (non-meta information)
-            title, children = _peekFirst(
-                pipe.saveState(recurse=False, **kwargs).items()
-            )
-            # Since all nested pipelines are already recorded, disregard
-            # kwargs propagated from them. Avoids info duplication
-            children = [
-                chState
-                if not isinstance(ch, PipelineParameter) or isinstance(chState, str)
-                else _peekFirst(chState)
-                for ch, chState in zip(pipe, children)
-            ]
-            dest = "top" if pipe is process else "primitive"
-            outState[dest][title] = children
-        return outState
 
 
 class AlgorithmCollection(ParameterEditor):
@@ -430,7 +405,11 @@ class AlgorithmCollection(ParameterEditor):
         return None
 
     def saveParameterValues(
-        self, saveName: str = None, stateDict: dict = None, **kwargs
+        self,
+        saveName: str = None,
+        stateDict: dict = None,
+        includeDefaults=False,
+        **kwargs,
     ):
         def converter(procDict):
             return {
@@ -466,3 +445,58 @@ class AlgorithmCollection(ParameterEditor):
             stateName, stateDict, candidateParameters=[], **kwargs
         )
         return stateDict
+
+    def unnestedProcessState(self, process: PipelineParameter, processFilter=("meta",)):
+        outState = dict(top={}, primitive={}, modules=self.includeModules)
+
+        # Make sure to visit the most deeply nested stages first, so that stages
+        # can be accurately ignored if they are already included in a parent stage
+        visit = [process]
+        depths = defaultdict(int, {process: 0})
+        while visit:
+            pipe = visit.pop()
+            for child in filter(lambda el: isinstance(el, PipelineParameter), pipe):
+                depths[child] = max(depths[child], depths[pipe] + 1)
+                visit.append(child)
+
+        for pipe in sorted(depths, key=depths.get, reverse=True):
+            # Don't record meta changes for top process since it breaks
+            # logic for loading from a collection.
+            # Do this by only keeping the first key (non-meta information)
+            title, children = _peekFirst(
+                pipe.saveState(recurse=False, filter=processFilter).items()
+            )
+            # Since all nested pipelines are already recorded, disregard
+            # kwargs propagated from them. Avoids info duplication
+            children = [
+                chState
+                if not isinstance(ch, PipelineParameter) or isinstance(chState, str)
+                else _peekFirst(chState)
+                for ch, chState in zip(pipe, children)
+            ]
+            dest = "top" if pipe is process else "primitive"
+            outState[dest][title] = children
+        return outState
+
+    def getFullyExpandedState(self, *filters):
+        """
+        Since processes aren't given values until after being parsed, some top processes
+        will remain strings even when ``includeDefaults`` is specified in
+        ``saveParameterValeus()``. To prevent this, parse every process in order to
+        collect their default values.
+        """
+        outState = dict(top={}, primitive={}, modules=self.includeModules)
+        for parseDict in self.topProcesses, self.primitiveProcesses:
+            for title, process in parseDict.items():
+                if isinstance(process, PipelineParameter):
+                    pipe = process
+                elif isinstance(process, list):
+                    pipe = self.parseProcessName(title)
+                else:
+                    continue
+                unnested = self.unnestedProcessState(pipe, filters)
+                if parseDict is self.primitiveProcesses:
+                    # "top" needs to be moved into primitive
+                    unnested["primitive"].update(unnested.pop("top"))
+                fns.hierarchicalUpdate(outState, unnested)
+        return outState
