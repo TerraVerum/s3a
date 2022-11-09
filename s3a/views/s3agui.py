@@ -16,13 +16,11 @@ from ..logger import getAppLogger
 from ..models.s3abase import S3ABase
 from ..plugins import ParameterEditorPlugin
 from ..plugins.mainimage import MainImagePlugin
-from ..plugins.misc import RandomToolsPlugin
+from ..plugins.tools import ToolsPlugin
 from ..plugins.table import ComponentTablePlugin
 from ..structures import FilePath, NChanImg
 
 __all__ = ["S3A"]
-
-_MENU_PLUGINS = [RandomToolsPlugin]
 
 
 class S3A(S3ABase):

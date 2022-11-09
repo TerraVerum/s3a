@@ -29,7 +29,7 @@ from ..parameditors.tablefilter import TableFilterEditor
 from ..plugins import EXTERNAL_PLUGINS, INTERNAL_PLUGINS, tablefield
 from ..plugins.base import ParameterEditorPlugin as PEPlugin
 from ..plugins.file import FilePlugin
-from ..plugins.misc import RandomToolsPlugin
+from ..plugins.tools import ToolsPlugin
 from ..shared import SharedAppSettings
 from ..structures import FilePath, NChanImg
 from ..tabledata import TableData
@@ -138,7 +138,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
             tablefield.VerticesPlugin
         ]
         # noinspection PyTypeChecker
-        self.miscPlugin: RandomToolsPlugin = self.classPluginMap[RandomToolsPlugin]
+        self.toolsPlugin: ToolsPlugin = self.classPluginMap[ToolsPlugin]
 
         # Connect signals
         # -----

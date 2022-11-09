@@ -13,7 +13,7 @@ def INTERNAL_PLUGINS():
     from .edit import EditPlugin
     from .help import HelpPlugin
     from .mainimage import MainImagePlugin
-    from .misc import RandomToolsPlugin
+    from .tools import ToolsPlugin
     from .multipred import MultiPredictionsPlugin
     from .table import ComponentTablePlugin
     from .tablefield import VerticesPlugin
@@ -25,7 +25,7 @@ def INTERNAL_PLUGINS():
         VerticesPlugin,
         MainImagePlugin,
         ComponentTablePlugin,
-        RandomToolsPlugin,
+        ToolsPlugin,
         HelpPlugin,
         UserMetricsPlugin,
     ]

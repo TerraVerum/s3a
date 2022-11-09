@@ -8,7 +8,7 @@ from skimage import data
 from s3a import PRJ_ENUMS, ComplexXYVertices, generalutils as gu
 from s3a.compio.helpers import deserialize
 from s3a.generalutils import DirectoryDict, deprecateKwargs
-from s3a.plugins.misc import miscFunctionsPluginFactory
+from s3a.plugins.tools import functionPluginFactory
 from s3a.plugins.multipred import MultiPredictionsPlugin
 
 _rots = list(np.linspace(-180, 180, 5)) + [PRJ_ENUMS.ROTATION_OPTIMAL]
@@ -49,7 +49,7 @@ def test_plg_factory(app):
         nonlocal count
         count += 1
 
-    mp = miscFunctionsPluginFactory("test", [add])()
+    mp = functionPluginFactory([add], name="My Random Tools")()
     mp.attachToWindow(app)
     assert mp.toolsEditor.procToParamsMapping
     assert mp.name == "test"

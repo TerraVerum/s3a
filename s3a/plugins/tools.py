@@ -14,14 +14,14 @@ if TYPE_CHECKING:
     from ..views.s3agui import S3A
 
 
-class RandomToolsPlugin(ParameterEditorPlugin):
-    name = "Tools"
-
+class ToolsPlugin(ParameterEditorPlugin):
     _deferredRegisters: dict[Callable, dict] = {}
     """
     Keeps track of requested functions to register (the key) and the arguments to pass 
     during registration (kwargs are the value)
     """
+
+    createDock = True
 
     def attachToWindow(self, window):
         super().attachToWindow(window)
@@ -32,7 +32,9 @@ class RandomToolsPlugin(ParameterEditorPlugin):
                 **CNST.TOOL_CLEAR_ROI,
             },
         )
-        self.registerFunction(self.showDevConsoleGui, name="Show Dev Console")
+        self.registerFunction(
+            self.showDevConsoleGui, runActionTemplate=CNST.TOOL_SHOW_DEV_CONSOLE
+        )
         self.registerFunction(
             window.clearBoundaries, runActionTemplate=CNST.TOOL_CLEAR_BOUNDARIES
         )
@@ -125,16 +127,12 @@ class RandomToolsPlugin(ParameterEditorPlugin):
         cls._deferredRegisters[func] = registerKwargs
 
 
-def miscFunctionsPluginFactory(
-    name_: str = None,
+def functionPluginFactory(
     functions: Sequence[Callable] = None,
     titles: Sequence[str] = None,
-    showFunctionDetails=False,
+    **pluginProperties,
 ):
-    class FuncContainerPlugin(ParameterEditorPlugin):
-        name = name_
-        _showFuncDetails = showFunctionDetails
-
+    class FunctionContainerPlugin(ParameterEditorPlugin):
         def attachToWindow(self, window: S3A):
             super().attachToWindow(window)
 
@@ -146,4 +144,7 @@ def miscFunctionsPluginFactory(
             for func, title in zip(functions, titles):
                 self.registerFunction(func, name=title)
 
-    return FuncContainerPlugin
+    for name, prop in pluginProperties.items():
+        setattr(FunctionContainerPlugin, name, prop)
+
+    return FunctionContainerPlugin
