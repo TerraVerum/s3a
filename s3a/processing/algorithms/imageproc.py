@@ -468,25 +468,26 @@ class CvGrabcut(PipelineFunction):
         return dict(labels=outMask, fgdModel=fgdModel, bgdModel=bgdModel)
 
 
-@functools.partial(
-    PipelineFunction,
-    name="Quickshift Segmentation",
-    ignores={"return_tree", "convert2lab", "random_seed"},
-)
-@functools.wraps(seg.quickshift)
-def quickshift_segmentation(
-    image: NChanImg, ratio=1.0, max_dist=10.0, kernel_size=5, sigma=0.0
-):
-    if max_dist == 0:
-        # Make sure output is still 1-channel
-        segImg = image.mean(2).astype(int) if image.ndim > 2 else image
-    else:
-        if image.ndim < 3:
-            image = np.tile(image[:, :, None], (1, 1, 3))
-        segImg = seg.quickshift(
-            image, ratio=ratio, kernel_size=kernel_size, max_dist=max_dist, sigma=sigma
-        )
-    return dict(labels=segImg)
+class QuickShift(PipelineFunction):
+    def __init__(self, name: str = "quickshift_segmentation", **kwargs):
+        super().__init__(self.quickshift_segmentation, name, **kwargs)
+
+    @staticmethod
+    def quickshift_segmentation(
+        image: NChanImg, ratio=1.0, max_dist=10.0, kernel_size=5, sigma=0.0
+    ):
+        locs = locals()
+        del locs["image"]
+        if max_dist == 0:
+            # Make sure output is still 1-channel
+            segImg = image.mean(2).astype(int) if image.ndim > 2 else image
+        else:
+            if image.ndim < 3:
+                image = np.tile(image[:, :, None], (1, 1, 3))
+            segImg = seg.quickshift(image, **locs)
+        return dict(labels=segImg)
+
+    quickshift_segmentation.__doc__ = seg.quickshift.__doc__
 
 
 # Taken from example page: https://scikit-image.org/docs/dev/auto_examples/segmentation/plot_morphsnakes.html  # noqa

@@ -11,7 +11,6 @@ from ..constants import PRJ_CONSTS
 
 class EditPlugin(ParameterEditorPlugin):
     name = "Edit"
-    createDock = True
     createProcessMenu = True
 
     def __initSharedSettings__(self, shared=None, **kwargs):
@@ -35,26 +34,20 @@ class EditPlugin(ParameterEditorPlugin):
             nest=False,
             parent=self.window.name,
         )
+        self.registeredEditors.extend(
+            [shared.generalProperties, shared.colorScheme, shared.quickLoader]
+        )
+        super().__initSharedSettings__(shared, **kwargs)
 
     def attachToWindow(self, window: S3ABase):
         super().attachToWindow(window)
-        # Remove "show dock" option
-        self.menu.removeAction(self.menu.actions()[0])
         stack = window.actionStack
 
         self.registerFunction(stack.undo, name="Undo", runActionTemplate=CNST.TOOL_UNDO)
         self.registerFunction(stack.redo, name="Redo", runActionTemplate=CNST.TOOL_REDO)
 
-        for editor in (
-            window.sharedSettings.generalProperties,
-            window.sharedSettings.colorScheme,
-        ):
-            dock, _ = editor.createWindowDock(
-                window, createProcessMenu=False, addShowAction=False
-            )
-            showAction = self.dockRaiseAction(dock)
-            showAction.setParent(self.menu)
-            self.menu.addAction(showAction)
+        for editor in self.registeredEditors:
+            self.createDockWithoutFunctionMenu(editor, reorder=False)
 
         def updateUndoRedoTxts(_action=None):
             self.undoAction.setText(f"Undo: {stack.undoDescr}")

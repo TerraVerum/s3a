@@ -93,16 +93,11 @@ class S3A(S3ABase):
 
         self._buildGui()
         self._buildMenu()
-        self._hookupSignals()
 
         # Load in startup settings
         stateDict = None if loadLastState else {}
         hierarchicalUpdate(self.appStateEditor.startupSettings, startupSettings)
         self.appStateEditor.loadParameterValues(stateDict=stateDict)
-
-    def _hookupSignals(self):
-        # EDIT
-        self.saveAllEditorDefaults()
 
     def _buildMenu(self):
         # Nothing to do for now
@@ -129,7 +124,7 @@ class S3A(S3ABase):
         ]
         parents = [self.mainImage, self.tableView]
         for plugin, parent in zip(_plugins, reversed(parents)):
-            newMenu = plugin.createActionsFromProcesses(stealShortcuts=False)
+            newMenu = plugin.createActionsFromFunctions(stealShortcuts=False)
             parent.menu.addMenu(newMenu)
 
         tableDock = QtWidgets.QDockWidget("Component Table Window", self)
@@ -185,21 +180,6 @@ class S3A(S3ABase):
         )
         if outFname is not None:
             self.tableData.loadConfig(outFname)
-
-    def _addPluginObject(self, plugin: ParameterEditorPlugin, **kwargs):
-        plugin = super()._addPluginObject(plugin, **kwargs)
-        if not plugin:
-            return
-        dock = plugin.dock
-        if dock is None:
-            return
-        self.sharedSettings.quickLoader.addEditor(plugin)
-
-        if plugin.menu is None:
-            # No need to add menu and graphics options
-            return plugin
-
-        return plugin
 
     def setMainImage(
         self,

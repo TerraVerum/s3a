@@ -7,11 +7,13 @@ from pathlib import Path
 
 import pandas as pd
 from pyqtgraph.parametertree import InteractiveFunction
-from pyqtgraph.Qt import QtWidgets, QtGui
-from qtextras import ParameterEditor, fns
+from pyqtgraph.Qt import QtWidgets
+from qtextras import ParameterEditor, fns, FilePath
 
 from ..constants import MENU_OPTS_DIR, PRJ_CONSTS
+from ..graphicsutils import reorderMenuActions
 from ..parameditors import algcollection
+from ..parameditors.algcollection import AlgorithmCollection, AlgorithmEditor
 from ..processing import PipelineParameter
 
 if t.TYPE_CHECKING:
@@ -46,9 +48,11 @@ class ParameterEditorPlugin(ParameterEditor):
         if name is None:
             name = fns.nameFormatter(defaultName)
         if directory is None and self.directoryParent is not None:
-            directory = Path(self.directoryParent) / name
-
+            directory = Path(self.directoryParent) / name.lower()
         super().__init__(name=name, directory=directory)
+        self.registeredEditors: list[ParameterEditor] = []
+        if self.createDock:
+            self.registeredEditors.append(self)
 
     def attachToWindow(self, window: S3A | S3ABase):
         self.window = window
@@ -58,7 +62,7 @@ class ParameterEditorPlugin(ParameterEditor):
                 window, self.menuTitle, createProcessMenu=self.createProcessMenu
             )
         elif self.createProcessMenu:
-            self.menu = self.createActionsFromProcesses(QtWidgets.QMenu(self.menuTitle))
+            self.menu = self.createActionsFromFunctions(QtWidgets.QMenu(self.menuTitle))
 
         if self.menu:
             window.menuBar().addMenu(self.menu)
@@ -109,19 +113,6 @@ class ParameterEditorPlugin(ParameterEditor):
             name = f"&{name}"
         return name
 
-    @staticmethod
-    def dockRaiseAction(dock, text: str = None):
-        if text is None:
-            text = f"Show {dock.objectName()} Pane".title()
-
-        def onShow():
-            dock.show()
-            dock.raise_()
-
-        action = QtGui.QAction(text)
-        action.triggered.connect(onShow)
-        return action
-
     @contextlib.contextmanager
     def sharedDefaultParentContext(self, name: str = None):
         if name is None:
@@ -132,6 +123,23 @@ class ParameterEditorPlugin(ParameterEditor):
                 stack.enter_context(fns.overrideAttr(editor, "defaultParent", name))
             yield
 
+    def createDockWithoutFunctionMenu(self, editor: ParameterEditor, reorder=True):
+        """
+        Convenience function to call ``createWindowDock`` with
+        ``createProcessMenu=False`` and optionally ensure the "show" action is first in
+        self's menu
+        """
+        if self.menu is None:
+            raise ValueError(
+                "`self.menu` must exist before creating dock. Perhaps you made this "
+                "function call before `super().attachToWindow(window)`?"
+            )
+        editor.createWindowDock(
+            self.window, editor.name, createProcessMenu=False, menu=self.menu
+        )
+        if reorder:
+            reorderMenuActions(self.menu, oldIndex=-1, newIndex=0)
+
 
 class ProcessorPlugin(ParameterEditorPlugin):
     processEditor: algcollection.AlgorithmEditor = None
@@ -140,14 +148,41 @@ class ProcessorPlugin(ParameterEditorPlugin):
     This property holds spawned collections. See :class:`XYVerticesPlugin` for
     an example.
     """
+    _processorDirectoryParent = MENU_OPTS_DIR
+
+    def __init__(
+        self,
+        algorithmCollection: AlgorithmCollection,
+        processorParentPath: FilePath,
+        processorSuffix: str = ".alg",
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.algorithmCollection = algorithmCollection
+
+        procName = f"{self.name} Processor"
+        procDir = Path(processorParentPath) / procName.lower()
+        procDir.mkdir(exist_ok=True)
+
+        self.processEditor = AlgorithmEditor(
+            self.algorithmCollection,
+            name=procName,
+            directory=procDir,
+            suffix=processorSuffix,
+        )
 
     @property
     def currentProcessor(self) -> PipelineParameter:
         return self.processEditor.currentProcessor
 
     @currentProcessor.setter
-    def currentProcessor(self, newProcessor: Union[str, NestedProcWrapper]):
+    def currentProcessor(self, newProcessor: str | PipelineParameter):
         self.processEditor.changeActiveProcessor(newProcessor)
+
+    def attachToWindow(self, window: S3A | S3ABase):
+        super().attachToWindow(window)
+        self.createDockWithoutFunctionMenu(self.processEditor)
+        self.registeredEditors.append(self.processEditor)
 
 
 class TableFieldPlugin(ProcessorPlugin):
@@ -166,10 +201,6 @@ class TableFieldPlugin(ProcessorPlugin):
     _active = False
 
     _makeMenuShortcuts = False
-
-    # @property
-    # def parentMenu(self):
-    #   return self.window.tableFieldToolbar
 
     def attachToWindow(self, window: S3A):
         super().attachToWindow(window)
@@ -196,8 +227,8 @@ class TableFieldPlugin(ProcessorPlugin):
     def updateFocusedComponent(self, component: pd.Series = None):
         """
         This function is called when a new component is created or the focused image is
-        updated from the main view. See :meth:`ComponentManager.updateFocusedComponent` for
-        parameters.
+        updated from the main view. See :meth:`ComponentManager.updateFocusedComponent`
+        for parameters.
         """
         pass
 

@@ -20,7 +20,7 @@ from qtextras import (
 )
 
 from .. import defaultIo
-from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
+from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS, TABLE_DIR
 from ..controls.tableviewproxy import ComponentController, ComponentSorterFilter
 from ..logger import getAppLogger
 from ..models.tablemodel import ComponentManager
@@ -67,6 +67,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
     def __init__(self, **startupSettings):
         super().__init__()
         self.sharedSettings = SharedAppSettings()
+        self.sigPluginAdded.connect(self.sharedSettings.quickLoader.addPlugin)
 
         # Filled by "Edit" plugin
         self.props = ParameterContainer()
@@ -92,7 +93,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         self.filePlugin = FilePlugin()
         self.tableData = self.filePlugin.projectData.tableData
         self.componentIo = self.filePlugin.projectData.componentIo
-        self.tableData.filter = TableFilterEditor()
+        self.tableData.filter = TableFilterEditor(directory=TABLE_DIR)
         # Since filter was added after construction, manually update fields
         self.tableData.filter.updateParameterList(self.tableData.allFields)
 
@@ -205,8 +206,8 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
             mgr.endResetModel()
 
     def saveAllEditorDefaults(self):
-        for editor in self.classPluginMap.values():
-            editor.saveParameterValues(editor.getDefaultState())
+        for editor in self.sharedSettings.quickLoader.listModel.uniqueEditors:
+            editor.saveParameterValues(editor.getDefaultState(), includeDefaults=True)
 
     @DASM.undoable("Accept Focused Region")
     def acceptFocusedRegion(self):

@@ -22,7 +22,12 @@ from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS as RTF
 from ..generalutils import stackedVerticesPlusConnections, symbolFromVertices
 from ..structures import BlackWhiteImg, ComplexXYVertices, GrayImg, OneDArr, XYVertices
 
-__all__ = ["MultiRegionPlot", "VertexDefinedImage", "RegionMoverPlot"]
+__all__ = [
+    "makeMultiRegionDf",
+    "MultiRegionPlot",
+    "VertexDefinedImage",
+    "RegionMoverPlot",
+]
 
 from .rois import ROIManipulator
 from ..compio import defaultIo

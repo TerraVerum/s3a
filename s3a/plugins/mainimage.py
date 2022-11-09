@@ -51,7 +51,12 @@ class MainImagePlugin(ParameterEditorPlugin):
         self._hookupDrawActions(window)
         self._hookupSelectionTools(window)
 
-        window.mainImage.addTools(self)
+        collection = window.mainImage.addTools(self)
+        # "self" doesn't have a gui component, so if shortcuts aren't reassigned to
+        # visible objects, they will never be activatable
+        for options, button in collection.optionsButtonMap.items():
+            shortcut = self.nameShortcutMap[options.name].key()
+            self.registerObjectShortcut(button, shortcut, options.name, force=True)
         super().attachToWindow(window)
 
     def _hookupDrawActions(self, window):

@@ -13,13 +13,10 @@ __all__ = [
     "LAYOUTS_DIR",
     "TABLE_DIR",
     "GENERAL_PROPERTIES_DIR",
-    "SHORTCUTS_DIR",
+    # "SHORTCUTS_DIR",
     "SHORTCUT_BASE",
-    "MAIN_IMAGE_DIR",
     "APP_STATE_DIR",
     "CONFIG_DIR",
-    "IMAGE_PROCESSORS_DIR",
-    "MULTI_PREDICTIONS_DIR",
     "REQD_TBL_FIELDS",
     "PRJ_CONSTS",
     "PRJ_ENUMS",
@@ -33,30 +30,34 @@ BASE_DIR = Path.home() / ".s3a"
 
 CONFIG_DIR = CODE_DIR / "config"
 ICON_DIR = CODE_DIR / "icons"
-MENU_OPTS_DIR = BASE_DIR / "menuopts"
 IO_TEMPLATES_DIR = CODE_DIR / "compio/templates"
+MENU_OPTS_DIR = BASE_DIR / "menuopts"
+APP_STATE_DIR = BASE_DIR
+
+# Ensure menuopts directory exists
+MENU_OPTS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _createOptionPath(name: str, base=MENU_OPTS_DIR):
+    out = base / name
+    out.mkdir(exist_ok=True)
+    return out
+
 
 # -----
 # EDITORS
 # -----
-LAYOUTS_DIR = MENU_OPTS_DIR / "layouts"
-QUICK_LOAD_DIR = MENU_OPTS_DIR / "quickloader"
-SCHEMES_DIR = MENU_OPTS_DIR / "schemes"
-GENERAL_PROPERTIES_DIR = MENU_OPTS_DIR / "genprops"
-SHORTCUTS_DIR = MENU_OPTS_DIR / "shortcuts"
-MAIN_IMAGE_DIR = MENU_OPTS_DIR / "mainimg"
-IMAGE_PROCESSORS_DIR = MENU_OPTS_DIR / "imageproc"
-MULTI_PREDICTIONS_DIR = MENU_OPTS_DIR / "multiproc"
-TABLE_DIR = MENU_OPTS_DIR / "table"
-APP_STATE_DIR = BASE_DIR
+LAYOUTS_DIR = _createOptionPath("layouts")
+QUICK_LOAD_DIR = _createOptionPath("quickloader")
+SCHEMES_DIR = _createOptionPath("schemes")
+GENERAL_PROPERTIES_DIR = _createOptionPath("properties")
+# SHORTCUTS_DIR = _createOptionPath("shortcuts")
+TABLE_DIR = _createOptionPath("table")
+TOOLS_DIR = _createOptionPath("tools")
 
 
 PROJECT_BASE_TEMPLATE = CONFIG_DIR / "projectcfg.yml"
 PROJECT_FILE_TYPE = "s3aprj"
-
-# Ensure menuopts and layouts directories exist
-LAYOUTS_DIR.mkdir(parents=True, exist_ok=True)
-APP_STATE_DIR.mkdir(parents=True, exist_ok=True)
 
 SHORTCUT_BASE = "Shift"
 
@@ -258,7 +259,7 @@ class PRJ_CONSTS:
     )
     TOOL_REM_OVERLAP = OptionsDict(
         "Remove Component Overlap",
-        f"{SHORTCUT_BASE}+S,E",
+        shortcut=f"{SHORTCUT_BASE}+S,E",
         icon=str(ICON_DIR / "mutex.svg"),
     )
     TOOL_COPY_REGIONS = OptionsDict(
@@ -289,7 +290,7 @@ class PRJ_CONSTS:
     TOOL_CLEAR_ROI = OptionsDict("Clear ROI", shortcut="Esc")
     TOOL_CLEAR_HISTORY = OptionsDict(
         "Clear Processor History",
-        f"{SHORTCUT_BASE}+V,H",
+        shortcut=f"{SHORTCUT_BASE}+V,H",
         icon=str(ICON_DIR / "clear_history.svg"),
     )
     TOOL_PROC_ANALYTICS = OptionsDict(
@@ -304,6 +305,7 @@ class PRJ_CONSTS:
     # --------------------------
     # WINDOW TOOLS
     # --------------------------
+    TOOL_SHOW_DEV_CONSOLE = OptionsDict("Show Dev Console", shortcut="Ctrl+`")
     TOOL_ESTIMATE_BOUNDARIES = OptionsDict(
         "Estimate Boundaries", shortcut="Ctrl+Alt+Shift+E"
     )

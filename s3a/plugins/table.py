@@ -43,6 +43,7 @@ class ComponentTablePlugin(ParameterEditorPlugin):
             nest=False,
             visibleColumns=[],
         )
+        super().__initSharedSettings__(shared, **kwargs)
 
     def attachToWindow(self, window):
         tbl = window.tableView
@@ -64,10 +65,9 @@ class ComponentTablePlugin(ParameterEditorPlugin):
             # Optionally scope shortcuts to only work in the table widget
             # param.opts["ownerWidget"] = tbl
             self.registerFunction(func, name=param.name, runActionTemplate=param)
-        tbl.menu = self.createActionsFromProcesses(stealShortcuts=False)
+        tbl.menu = self.createActionsFromFunctions(stealShortcuts=False)
         filter_: ParameterEditor = self.tableData.filter
-        _, menu = filter_.createWindowDock(window)
         self.tableData = window.tableData
         super().attachToWindow(window)
-        beforeAction = self.menu.actions()[0] if len(self.menu.actions()) else None
-        self.menu.insertMenu(beforeAction, menu)
+        self.createDockWithoutFunctionMenu(filter_)
+        self.registeredEditors.append(filter_)

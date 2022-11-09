@@ -95,8 +95,10 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         """
         componentIo = self.projectData.componentIo
         exportOptsParam = fns.getParameterChild(
-            self.rootParameter, CNST.TOOL_PROJ_EXPORT.name, "Export Options",
-            groupOpts=dict(type="_actiongroup")
+            self.rootParameter,
+            CNST.TOOL_PROJ_EXPORT.name,
+            "Export Options",
+            groupOpts=dict(type="_actiongroup"),
         )
         # Use a wrapper to easily get hyperparams created
         for name, fn in inspect.getmembers(

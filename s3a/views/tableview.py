@@ -262,8 +262,7 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
         self.manager = None
         self.instanceIdIndex = 0
         self.minimal = minimal
-        self.setModel(ComponentManager())
-        self.setColDelegates()
+        # self.setColDelegates()
 
         if not minimal:
             self.popup = PopupTableDialog(*args)
@@ -277,6 +276,10 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
         self._onTableChange()
 
     def _onTableChange(self, *_args):
+        if not self.tableData or "visibleColumns" not in self.props.parameters:
+            # Possible for this view to be used without registering visible columns
+            # as a parameter, or without setting table information
+            return
         lims = []
         val = []
         for f in self.tableData.allFields:
@@ -285,10 +288,7 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
                 val.append(name)
             lims.append(name)
         lims = [f.name for f in self.tableData.allFields]
-        # Possible for this view to be used without registering visible columns
-        # as a parameter
-        if "visibleColumns" in self.props.parameters:
-            self.props.parameters["visibleColumns"].setOpts(limits=lims, value=val)
+        self.props.parameters["visibleColumns"].setOpts(limits=lims, value=val)
 
     @bind(visibleColumns=dict(type="checklist", expanded=False))
     def setVisibleColumns(self, visibleColumns: Sequence[str]):
@@ -299,6 +299,8 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
             self.setColumnHidden(ii, col not in visibleColumns)
 
     def setColDelegates(self):
+        if not self.tableData:
+            return
         for ii, field in enumerate(self.tableData.allFields):
             curType = field.type.lower()
             curval = field.value

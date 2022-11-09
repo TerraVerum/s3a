@@ -8,8 +8,6 @@ from pyqtgraph.parametertree import Parameter
 from pyqtgraph.Qt import QtWidgets
 from qtextras import OptionsDict, ParameterEditor, fns
 
-from ..constants import TABLE_DIR
-
 
 def generateParameterList(nameIter, paramType, defaultValue, defaultParam="value"):
     """Helper for generating children elements"""
@@ -133,17 +131,19 @@ def filterParameterColumn(compDf: pd.DataFrame, column: OptionsDict, filterOpts:
 
 
 class TableFilterEditor(ParameterEditor):
-    def __init__(self, parameterList: List[OptionsDict] = None):
+    def __init__(
+        self,
+        parameterList: List[OptionsDict] = None,
+        name="Component Table Filter",
+        directory=None,
+        suffix=".filter",
+    ):
         if parameterList is None:
             parameterList = []
         filterParams = [
             fil for fil in map(_filterForParameter, parameterList) if fil is not None
         ]
-        super().__init__(
-            name="Component Table Filter",
-            directory=TABLE_DIR,
-            suffix=".filter",
-        )
+        super().__init__(name=name, directory=directory, suffix=suffix)
         self.rootParameter.addChildren(filterParams)
 
     def _buildGui(self, **kwargs):
@@ -177,7 +177,6 @@ class TableFilterEditor(ParameterEditor):
                 UserWarning,
                 stacklevel=2,
             )
-        self.saveParameterValues(self.getDefaultState())
 
     @property
     def activeFilters(self):

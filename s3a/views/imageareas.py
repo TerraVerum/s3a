@@ -296,7 +296,7 @@ class MainImage(DASM, ImageViewer):
         return span * np.array([[0, 0], [0, 1], [1, 1], [1, 0]]) + offset
 
     def addTools(self, toolsEditor: ParameterEditor):
-        menu = toolsEditor.createActionsFromProcesses(stealShortcuts=False)
+        menu = toolsEditor.createActionsFromFunctions(stealShortcuts=False)
         self.menu.addMenu(menu)
         retClctn = None
         # Define some helper functions for listening to toolsEditor changes

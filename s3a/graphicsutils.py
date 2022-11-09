@@ -32,20 +32,18 @@ def disableAppDuringFunc(func):
     return disableApp
 
 
-def createAndAddMenuAction(
-    mainWindow: QtWidgets.QWidget, parentMenu: QtWidgets.QMenu, title: str, asMenu=False
-) -> Union[QtWidgets.QMenu, QtGui.QAction]:
-    menu = None
-    if asMenu:
-        menu = QtWidgets.QMenu(title, mainWindow)
-        act = menu.menuAction()
-    else:
-        act = QtGui.QAction(title)
-    parentMenu.addAction(act)
-    if asMenu:
-        return menu
-    else:
-        return act
+def reorderMenuActions(menu: QtWidgets.QMenu, *, oldIndex: int, newIndex: int):
+    """
+    Change an action's position in a menu.
+    """
+    actions = menu.actions()
+    action = actions[oldIndex]
+    try:
+        beforeAction = actions[newIndex]
+    except IndexError:
+        beforeAction = None
+    menu.removeAction(action)
+    menu.insertAction(beforeAction, action)
 
 
 def autosaveOptionsDialog(parent):

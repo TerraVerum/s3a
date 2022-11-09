@@ -4,7 +4,6 @@ import copy
 import typing as t
 import warnings
 from collections import deque, namedtuple
-from functools import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -22,14 +21,13 @@ from qtextras import (
 from .base import TableFieldPlugin
 from ..constants import (
     CONFIG_DIR,
-    IMAGE_PROCESSORS_DIR,
     MENU_OPTS_DIR,
     PRJ_CONSTS as CNST,
     REQD_TBL_FIELDS as RTF,
 )
 from ..generalutils import getCroppedImage, showMaskDifference, tryCvResize
 from ..graphicsutils import RegionHistoryViewer
-from ..parameditors.algcollection import AlgorithmCollection, AlgorithmEditor
+from ..parameditors.algcollection import AlgorithmCollection
 from ..processing.algorithms import imageproc
 from ..processing.pipeline import ImagePipeline
 from ..processing.threads import AbortableThreadContainer, ThreadedFunctionWrapper
@@ -51,18 +49,19 @@ class VerticesPlugin(DASM, TableFieldPlugin):
     def __initSharedSettings__(self, shared: SharedAppSettings = None, **kwargs):
         super().__initSharedSettings__(shared, **kwargs)
 
-        _, self.processEditorMenu = self.processEditor.createWindowDock(
-            self.window, self.processEditor.name
-        )
-
         shared.generalProperties.registerParameter(
             CNST.PROP_REG_APPROX_EPS, container=self.props
         )
 
     def __init__(self):
-        super().__init__()
+        clctn = AlgorithmCollection(
+            ImagePipeline, template=CONFIG_DIR / "imageproc.yml"
+        )
+        clctn.addAllModuleProcesses(imageproc)
+        super().__init__(clctn, MENU_OPTS_DIR)
+
         self.props = ParameterContainer()
-        self.queueActions = True
+        self.queueActions = False
         self.region = MultiRegionPlot(disableMouseClick=True)
         self.region.hide()
         self.firstRun = True
@@ -78,19 +77,6 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         self.oldResultCache = None
         """Holds the last result from a region run so undoables reset the process cache"""
 
-        self.imageProcessCollection = AlgorithmCollection(
-            ImagePipeline,
-            directory=IMAGE_PROCESSORS_DIR,
-            template=CONFIG_DIR / "imageproc.yml",
-        )
-        self.imageProcessCollection.addAllModuleProcesses(imageproc)
-
-        self.processEditor = AlgorithmEditor(
-            self.imageProcessCollection,
-            name=self.name + " Processor",
-            directory=MENU_OPTS_DIR / fns.nameFormatter(type(self).__name__).lower(),
-        )
-
         self.processEditor.registerFunction(
             self.overlayStageInfo,
             parent=self.processEditor._metaParameter,
@@ -100,8 +86,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
     def attachToWindow(self, window):
         super().attachToWindow(window)
-        beforeAction = self.menu.actions()[0] if len(self.menu.actions()) else None
-        self.menu.insertMenu(beforeAction, self.processEditorMenu)
+
         window.mainImage.addItem(self.region)
         window.mainImage.addItem(self.stageInfoImage)
 

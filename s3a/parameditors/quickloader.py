@@ -1,21 +1,16 @@
-import functools
 import warnings
 from pathlib import Path
 from typing import List, Union
 
 from pyqtgraph.parametertree import Parameter
+from pyqtgraph.parametertree.parameterTypes import ActionGroupParameter
 from pyqtgraph.Qt import QtCore, QtWidgets
-from qtextras import (
-    ParameterEditor,
-    PopupLineEditor,
-    attemptFileLoad,
-    getParameterChild,
-)
+from qtextras import ParameterEditor, PopupLineEditor
 
-from . import MetaTreeParameterEditor
 from ..constants import QUICK_LOAD_DIR
 from ..generalutils import lowerNoSpaces
 from ..logger import getAppLogger
+from ..plugins import ParameterEditorPlugin
 
 
 class EditorListModel(QtCore.QAbstractListModel):
@@ -45,19 +40,20 @@ class EditorListModel(QtCore.QAbstractListModel):
                 self.parameterStates.append(stateName)
                 self.editorList.append(editor)
             editor.stateManager.signals.created.connect(
-                lambda name, e=editor: self.addOptionForEditor(e, name)
+                lambda name, e=editor: self.addOptionsForEditor(e, name)
             )
         self.layoutChanged.emit()
 
-    def addOptionForEditor(self, editor: ParameterEditor, name: str):
-        if (
-            self.displayFormat.format(editor=editor, stateName=name)
-            in self.displayedData
-        ):
-            return
+    def addOptionsForEditor(self, editor: ParameterEditor, names: list[str]):
         self.layoutAboutToBeChanged.emit()
-        self.parameterStates.append(name)
-        self.editorList.append(editor)
+        for name in names:
+            if (
+                self.displayFormat.format(editor=editor, stateName=name)
+                in self.displayedData
+            ):
+                return
+            self.parameterStates.append(name)
+            self.editorList.append(editor)
         self.layoutChanged.emit()
 
     def data(
@@ -97,7 +93,7 @@ class EditorListModel(QtCore.QAbstractListModel):
         return [file.stem for file in files]
 
 
-class QuickLoaderEditor(MetaTreeParameterEditor):
+class QuickLoaderEditor(ParameterEditor):
     def __init__(self, editorList: List[ParameterEditor] = None):
         if editorList is None:
             editorList = []
@@ -134,14 +130,18 @@ class QuickLoaderEditor(MetaTreeParameterEditor):
         # Ignore case and spacing on input keys
         startupSource = {lowerNoSpaces(kk): vv for kk, vv in startupSource.items()}
 
-        for editor in [self] + self.listModel.uniqueEditors:  # type: ParameterEditor
+        for editor in self.listModel.uniqueEditors:  # type: ParameterEditor
             paramStateInfo: Union[dict, str] = startupSource.get(
                 lowerNoSpaces(editor.name), None
             )
             try:
                 if isinstance(paramStateInfo, dict):
                     editor.loadParameterValues(self.stateName, paramStateInfo)
-                elif paramStateInfo is not None:
+                elif (
+                    paramStateInfo is not None
+                    # Possible for state to be deleted since last run
+                    and editor.formatFileName(paramStateInfo).exists()
+                ):
                     editor.loadParameterValues(paramStateInfo)
             except Exception as ex:
                 errSettings.append(f"{editor.name}: {ex}")
@@ -150,12 +150,15 @@ class QuickLoaderEditor(MetaTreeParameterEditor):
                 "The following settings could not be loaded (shown as [setting]: "
                 "[exception])\n" + "\n\n".join(errSettings),
                 UserWarning,
-                stacklevel=3,
+                stacklevel=2,
             )
         return startupSource
 
     def addEditor(self, editor: ParameterEditor):
         self.listModel.addEditors([editor])
+
+    def addPlugin(self, plugin: ParameterEditorPlugin):
+        self.listModel.addEditors(plugin.registeredEditors)
 
     def loadParameterValues(
         self,
@@ -167,22 +170,26 @@ class QuickLoaderEditor(MetaTreeParameterEditor):
         stateDict = self.stateManager.loadState(stateName, stateDict)
         if useDefaults:
             self.rootParameter.clearChildren()
-        if len(stateDict):
-            for editorName, shcOpts in stateDict.items():
-                matches = [
-                    e for e in self.listModel.uniqueEditors if e.name == editorName
-                ]
-                if len(matches) != 1:
-                    raise ValueError(
-                        f'Exactly one editor name must match "{editorName}" but '
-                        f"{len(matches)} were found"
-                    )
-                editor = matches[0]
-                for state, shcValue in shcOpts.items():
-                    self.addActionForEditor(editor, state, shcValue)
+        for editorName, options in stateDict.items():
+            self.loadEditorDict(editorName, options)
+
         return super().loadParameterValues(
             stateName, stateDict, useDefaults=False, candidateParameters=[]
         )
+
+    def loadEditorDict(self, editorName: str, options: dict):
+        matches = [e for e in self.listModel.uniqueEditors if e.name == editorName]
+        if len(matches) != 1:
+            raise ValueError(
+                f'Exactly one editor name must match "{editorName}" but '
+                f"{len(matches)} were found"
+            )
+        editor = matches[0]
+        for state, shortcut in options.items():
+            # Shortcut is nested under a "shortcut" key when set using the gui
+            if isinstance(shortcut, dict):
+                shortcut = shortcut["shortcut"]
+            self.addActionForEditor(editor, state, shortcut)
 
     def addFromLineEdit(self):
         try:
@@ -209,36 +216,44 @@ class QuickLoaderEditor(MetaTreeParameterEditor):
         tree. The action can either be None (if no shortcut should be defaulted) or the
         starting shortcut value.
         """
-        act = getParameterChild(
-            self.rootParameter,
-            editor.name,
-            stateDict,
-            groupOpts=dict(removable=True),
-            childOpts=dict(
-                name=stateDict,
-                value=shortcut or "",
-                removable=True,
-                type="keysequence",
-            ),
+        if shortcut is None:
+            shortcut = ""
+        groupOpts = dict(name=editor.name, type="group", editor=editor)
+        actionOpts = dict(
+            name=stateDict,
+            removable=True,
+            type="_actiongroup",
+            button=dict(visible=True, title="load"),
+            expanded=False,
+        )
+        seqOpts = dict(
+            name="shortcut", value=shortcut, removable=True, type="keysequence"
+        )
+        action = self.rootParameter.addChild(groupOpts, existOk=True).addChild(
+            actionOpts, existOk=True
+        )
+        # For some reason, the action doesn't do well with an initial shortcut,
+        # so set explicitly here
+        action.setButtonOpts(shortcut=shortcut)
+        param = action.addChild(seqOpts, existOk=True)
+
+        param.sigValueChanged.connect(
+            self.onKeySequenceChanged, QtCore.Qt.ConnectionType.UniqueConnection
+        )
+        action.sigActivated.connect(
+            self.onActionActivated, QtCore.Qt.ConnectionType.UniqueConnection
         )
 
-        # Ensure the value matches this new action in the event it already existed
-        # Also set `removable` in case this was added through a different execution
-        # path
-        act.setOpts(removable=True, value=shortcut or "")
-        if not (qShortcut := act.opts.get("shortcut")):
-            qShortcut = QtWidgets.QShortcut(
-                act.value(),
-                context=QtCore.Qt.ShortcutContext.ApplicationShortcut,
-            )
-            qShortcut.activated.connect(
-                functools.partial(
-                    self._safeLoadParameterValues, act, editor, stateDict
-                )
-            )
-            act.setOpts(shortcut=qShortcut)
-        else:
-            qShortcut.setKey(act.value())
+    def onActionActivated(self, action: Parameter):
+        state = action.name()
+        editor = action.parent().opts["editor"]
+        self._safeLoadParameterValues(action, editor, state)
+
+    def onKeySequenceChanged(self, keyParam, value):
+        if value is None:
+            value = ""
+        assert isinstance(parent := keyParam.parent(), ActionGroupParameter)
+        parent.setButtonOpts(shortcut=value)
 
     def _safeLoadParameterValues(
         self, action: Parameter, editor: ParameterEditor, stateDict: str
