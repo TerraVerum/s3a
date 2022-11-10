@@ -463,10 +463,10 @@ class NewProjectWizard(QtWidgets.QWizard):
         page.setTitle("Project Settings")
         settings = [
             dict(name="Name", type="str", value="new-project"),
-            dict(name="Location", type="filepicker", value=".", asFolder=True),
+            dict(name="Location", type="file", value=".", fileMode="Directory"),
             dict(
                 name="Template Project",
-                type="filepicker",
+                type="file",
                 value=None,
                 tip="Path to existing project config file. This will serve as a template "
                 "for the newly created project, except for overridden settings",
