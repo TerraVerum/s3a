@@ -187,11 +187,8 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
             if not self.autosaveTimer.isActive():
                 return None
 
-            cfg = {}
-            for name, function in self.nameFunctionMap.items():
-                if name == "Start Autosave":
-                    cfg = {**function.extra, **function.parameterCache}
-                    break
+            registered = self.nameFunctionMap[self.startAutosave.__name__]
+            cfg = {**registered.extra, **registered.parameterCache}
 
             saveName = str(savePath / "autosave.params")
             fns.saveToFile(cfg, saveName)
