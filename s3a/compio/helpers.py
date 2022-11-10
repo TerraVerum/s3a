@@ -88,8 +88,11 @@ def deserialize(param: OptionsDict, values: t.Sequence[str], returnErrs=True):
     # Unlike serialize, dtype could be different depending on 'parameter', so leave empty
     # creation to the handler Series objects will use loc-based indexing, so use an
     # iterator to guarantee first access regardless of sequence type
+    toReturn = [pd.Series(name=param, dtype=object) for _ in range(2)]
     if len(values) and not isinstance(next(iter(values)), str):
-        return pd.Series(values, name=param)
+        toReturn[0] = pd.Series(values, name=param)
+        return toReturn if returnErrs else toReturn[0]
+
     paramType = type(param.value)
     # Also account for when takesParam=True, where val will be the last option
     default = lambda *args: paramType(args[-1])
