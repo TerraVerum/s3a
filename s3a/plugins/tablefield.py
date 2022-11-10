@@ -123,7 +123,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         window.mainImage.imageItem.sigImageChanged.connect(onChange)
 
         window.mainImage.registerDrawAction(
-            [CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self._runFromDrawAct
+            [CNST.DRAW_ACT_ADD, CNST.DRAW_ACT_REM], self.runFromDrawAction
         )
         window.mainImage.addTools(self)
 
@@ -157,7 +157,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         if component is None or oldId != component[RTF.ID]:
             self.firstRun = True
 
-    def _runFromDrawAct(self, verts: XYVertices, param: OptionsDict):
+    def runFromDrawAction(self, verts: XYVertices, param: OptionsDict):
         # noinspection PyTypeChecker
         verts: XYVertices = verts.astype(int)
         activeEdits = len(self.region.regionData["Vertices"]) > 0

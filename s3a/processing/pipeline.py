@@ -263,6 +263,13 @@ class PipelineParameter(ActionGroupParameter):
                 stages.extend(child.flattenedFunctions())
         return stages
 
+    @property
+    def result(self):
+        stages = self.flattenedFunctions()
+        if not stages:
+            return None
+        return stages[-1].result
+
     def saveState(self, filter=("meta",), recurse=True) -> dict[str, t.Any]:
         children = []
         addDefaults = "defaults" in filter
@@ -465,7 +472,7 @@ class ImagePipeline(PipelineParameter):
         return outGrid
 
     def stageSummaryGui(self):
-        if self.flattenedFunctions()[-1].result is None:
+        if self.result is None:
             raise RuntimeError(
                 "Analytics can only be shown after the algorithm was run."
             )
