@@ -5,12 +5,28 @@ stages:
 
 pytest:
   stage: Test
-  image: "python:3.9.7"
+  image: "python:3.10"
   before_script:
   - apt-get update
-  - apt-get install -y python3-pyqt5
+  - "
+  apt-get install --no-install-recommends -y \
+    libxkbcommon-x11-0 \
+    x11-utils \
+    libyaml-dev \
+    libegl1-mesa \
+    libxcb-icccm4 \
+    libxcb-image0 \
+    libxcb-keysyms1 \
+    libxcb-randr0 \
+    libxcb-render-util0 \
+    libxcb-xinerama0 \
+    libdbus-1-3 \
+    libopengl0
+  "
   - python --version
   - pip install -e .[full]
+  # Until 0.13.2 is released
+  - pip install pyqtgraph@git+https://github.com/pyqtgraph/pyqtgraph.git@553287a
   - pip install pytest
   - pip install pytest-cov
   - pip install pytest-qt
