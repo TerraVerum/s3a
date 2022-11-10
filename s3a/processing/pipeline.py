@@ -13,7 +13,7 @@ from pyqtgraph.Qt import QtCore, QtGui
 from qtextras import ParameterContainer, ParameterEditor, fns
 from qtextras._funcparse import FROM_PREV_IO
 
-from ..generalutils import simpleCache
+from ..generalutils import simpleCache, augmentException
 
 __all__ = [
     "ActionGroupParameter",
@@ -23,12 +23,16 @@ __all__ = [
     "PipelineParameter",
     "PipelineParameterItem",
     "PipelineStageType",
+    "StageAncestryPrinter"
 ]
 
 
-class PipelineException(Exception):
+class StageAncestryPrinter:
+    """
+    Used to format exceptions raised during pipeline processing so they show the full
+    path to the stage that caused the error
+    """
     def __init__(self, stage: PipelineFunction):
-        super().__init__("Exception during processor run")
         stages = []
         while stage:
             stages.append(stage)
@@ -45,10 +49,7 @@ class PipelineException(Exception):
     def __str__(self):
         # Convert stage info into a more readable format
         stages = [a.title() for a in self.stages]
-        stagePath = " > ".join(stages)
-        stageMsg = f"Stage: {stagePath}\n"
-        initialMsg = ": ".join([super().__str__(), str(self.__cause__ or "")])
-        return stageMsg + initialMsg
+        return " > ".join(stages)
 
 
 def maybeGetFunction(parameter: Parameter) -> PipelineFunction | None:
@@ -98,7 +99,8 @@ class PipelineFunction(InteractiveFunction):
         try:
             self.result = super().__call__(**kwargs)
         except Exception as ex:
-            raise PipelineException(self) from ex
+            augmentException(ex, str(StageAncestryPrinter(self)))
+            raise
         return self.result
 
     def stageInfo(self) -> dict | list | None:

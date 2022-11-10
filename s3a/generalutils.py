@@ -106,9 +106,14 @@ def largestList(verts: List[XYVertices]) -> XYVertices:
     return XYVertices(maxLenList)
 
 
-def augmentException(ex: Exception, prependedMsg: str):
-    exMsg = str(ex)
-    ex.args = (prependedMsg + exMsg,)
+def augmentException(ex: Exception, message: str, stringifyException=True):
+    if stringifyException:
+        message += str(ex)
+        ex.args = (message,)
+        return ex
+    args = ex.args or ()
+    ex.args = (message,) + args
+    return ex
 
 
 def lowerNoSpaces(name: str):
