@@ -74,26 +74,16 @@ def filterParameterColumn(compDf: pd.DataFrame, column: OptionsDict, filterOpts:
     elif parameterType == "bool":
         filterOpts = filterOpts["Options"]
         allowTrue, allowFalse = [
-            filterOpts[name] for name in [f"{column.name}", f"Not {column.name}"]
+            name in filterOpts for name in [f"{column.name}", f"Not {column.name}"]
         ]
-
         validList = np.array(dfAtParam, dtype=bool)
         if not allowTrue:
             compDf = compDf.loc[~validList]
         if not allowFalse:
             compDf = compDf.loc[validList]
-    elif parameterType in ["optionsdict", "list", "popuplineeditor"]:
+    elif parameterType in ["list", "popuplineeditor"]:
         existingParams = np.array(dfAtParam)
-        allowedParams = []
-        filterOpts = filterOpts["Options"]
-        if parameterType == "optionsdict":
-            groupSubParams = [p.name for p in column.value.group]
-        else:
-            groupSubParams = column.opts["limits"]
-        for groupSubParam in groupSubParams:
-            isAllowed = filterOpts[groupSubParam]
-            if isAllowed:
-                allowedParams.append(groupSubParam)
+        allowedParams = filterOpts["Options"]
         compDf = compDf.loc[np.isin(existingParams, allowedParams)]
     elif parameterType in ["str", "text"]:
         allowedRegex = filterOpts["Regex Value"]
