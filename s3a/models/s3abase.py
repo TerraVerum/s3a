@@ -99,16 +99,15 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
 
         self.componentManager = ComponentManager(self.tableData)
 
-        self.tableView = ComponentTableView()
+        # Allow filtering/sorting
+        self.sortFilterProxy = ComponentSorterFilter(self.componentManager)
+        self.tableView = ComponentTableView(manager=self.sortFilterProxy)
+        self.tableView.setSortingEnabled(True)
+        self.tableView.setAlternatingRowColors(True)
+
         self.componentController = ComponentController(
             self.componentManager, self.mainImage, self.tableView
         )
-
-        self.tableView.setSortingEnabled(True)
-        self.tableView.setAlternatingRowColors(True)
-        # Allow filtering/sorting
-        self.sortFilterProxy = ComponentSorterFilter(self.componentManager)
-        self.tableView.setModel(self.sortFilterProxy)
 
         self.hasUnsavedChanges = False
         self.sourceImagePath: t.Optional[Path] = None

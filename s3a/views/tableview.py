@@ -235,7 +235,7 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
     """
     sigSelectionChanged = Signal(object)
 
-    def __init__(self, *args, minimal=False):
+    def __init__(self, *args, minimal=False, manager: ComponentManager | Any = None):
         """
         Creates the table.
 
@@ -272,7 +272,7 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
             self.customContextMenuRequested.connect(
                 lambda: self.menu.exec_(cursor.pos())
             )
-
+        self.setModel(manager or ComponentManager())
         self._onTableChange()
 
     def _onTableChange(self, *_args):
