@@ -43,7 +43,8 @@ class SerialImporter(AnnotationImporter):
                 f' Must be one of {",".join(cls._getPandasImporters())}'
             )
         # Special case: csv imports need to avoid interpreting nan results
-        kwargs.update(na_filter=False, dtype=str)
+        kwargs.setdefault("na_filter", False)
+        kwargs.setdefault("dtype", str)
         acceptedArgs = inspect.signature(importFn).parameters
         useArgs = kwargs.keys() & acceptedArgs
         serialDf = importFn(file, **{k: kwargs[k] for k in useArgs})

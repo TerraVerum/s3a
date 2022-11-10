@@ -52,7 +52,9 @@ class TableData(QtCore.QObject):
     ):
         super().__init__()
         if template is None:
-            template = IOTemplateManager.getTableConfig(self.ioTemplate)
+            template = self.ioTemplate
+        if isinstance(template, str):
+            template = IOTemplateManager.getTableConfig(template)
         self.template = template
 
         self.factories: Dict[OptionsDict, Callable[[], Any]] = {}

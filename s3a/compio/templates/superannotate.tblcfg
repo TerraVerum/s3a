@@ -6,5 +6,4 @@ fields:
   createdAt:
     value: ''
     readonly: True
-    parser: 'superanntime'
   probability: 100.0

@@ -1,5 +1,4 @@
 fields:
   geometry:
     type: 'complexxyvertices'
-    parser: 'geojsonregion'
     value: '{ "type": "Polygon", "coordinates": [] }'

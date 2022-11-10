@@ -85,6 +85,8 @@ class YoloV5Exporter(CsvExporter):
 
 
 class GeojsonImporter(AnnotationImporter):
+    ioTemplate = "geojson"
+
     def readFile(self, file: FilePath, **kwargs):
         with open(Path(file), "r") as ifile:
             return json.load(ifile)
@@ -93,11 +95,12 @@ class GeojsonImporter(AnnotationImporter):
         return importObject["features"]
 
     def formatSingleInstance(self, inst, **kwargs):
-        return inst["properties"]
+        out = dict(inst["properties"])
+        out[RTF.VERTICES] = self.parseRegion(inst["geometry"])
+        return out
 
     @staticmethod
     def parseRegion(geometry):
-        geometry = ast.literal_eval(geometry)
         if geometry["type"] == "Polygon":
             return ComplexXYVertices(geometry["coordinates"], coerceListElements=True)
         else:
@@ -150,6 +153,10 @@ class SuperannotateImporter(AnnotationImporter):
             verts = ComplexXYVertices([verts])
         # Need to serialize since wrapper function tries to deserialize
         out[RTF.VERTICES] = verts
+        if "createdAt" in inst:
+            out["createdAt"] = self.parseTime(inst["createdAt"])
+        if "attributes" in inst:
+            out["attributes"] = self.parseAttributes(inst["attributes"])
         return out
 
     @staticmethod
@@ -199,8 +206,15 @@ class SuperannotateImporter(AnnotationImporter):
 class VGGImageAnnotatorImporter(CsvImporter):
     ioTemplate = "vggimageannotator"  # Will be auto-assigned in init
 
+    def bulkImport(self, importObject, **kwargs):
+        df = super().bulkImport(importObject, **kwargs)
+        return df.drop(
+            columns=["file_attributes", "region_shape_attributes", "region_attributes"]
+        )
+
     def formatSingleInstance(self, inst, **kwargs):
         out = json.loads(inst["region_attributes"])
+        out[RTF.VERTICES] = self.parseRegion(inst["region_shape_attributes"])
         return out
 
     def getInstances(self, importObject: pd.DataFrame, **kwargs):
@@ -290,16 +304,3 @@ class YoloV5Importer(CsvImporter):
             classVals = labelMap[classVals]
         out["class"] = classVals
         return out
-
-
-registerIoHandler("geojsonregion", deserialize=GeojsonImporter.parseRegion)
-
-registerIoHandler(
-    "superannattributes", deserialize=SuperannotateImporter.parseAttributes
-)
-registerIoHandler(
-    "superanntime",
-    deserialize=SuperannotateImporter.parseTime,
-)
-
-registerIoHandler("viaregion", deserialize=VGGImageAnnotatorImporter.parseRegion)

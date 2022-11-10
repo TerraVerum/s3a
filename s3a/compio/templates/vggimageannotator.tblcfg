@@ -2,7 +2,6 @@ fields:
   region_shape_attributes:
     type: 'complexxyvertices'
     value: []
-    parser: 'viaregion'
   filename:
     value: ''
   region_id:
