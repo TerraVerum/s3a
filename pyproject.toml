@@ -1,3 +1,63 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "s3a"
+description = "Semantic labeling made simple"
+authors = [
+    {name = "Nathan Jessurun", email = "ntjessu@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+urls = {homepage = "https://gitlab.com/s3a/s3a"}
+dependencies = [
+    "numpy",
+    "pandas       >= 1.4.3",
+    "scipy",
+    "scikit-image >= 0.18.1",
+    # Note! Before 0.13.2 release, should ideally use git >= 553287a
+    "pyqtgraph    >= 0.13.1",
+    "Pillow",
+    "qdarkstyle",
+    "qtextras     == 0.6.3",
+]
+dynamic = ["version"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Build Tools",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+keywords = ["semantic", "labeling", "image", "annotation"]
+
+[project.scripts]
+s3a-gui = "s3a.__main__:mainCli"
+
+[project.optional-dependencies]
+full = [
+    "PySide6                >= 6.2.0",
+    "opencv-python-headless >= 4.1.2.30"
+]
+
+[tool.setuptools]
+packages = ["s3a"]
+
+[tool.setuptools.dynamic]
+version = { attr = "s3a.__version__" }
+
+[tool.coverage.report]
+# Delegate is only spawned on gui ops
+exclude_lines = ["def .*Gui\\(", "def .*Event", "SerDesDelegate"]
+
+[tool.coverage.run]
+omit = ["s3a/graphicsutils.py"]
+
+# ... other project metadata fields as specified in:
+#     https://packaging.python.org/en/latest/specifications/declaring-project-metadata/
+
 [tool.isort]
 profile = "black"
 reverse_relative = true
