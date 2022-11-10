@@ -18,11 +18,13 @@ editableImg = MainImage(
 clctn = editableImg.shapeCollection
 
 
-def leftClick(pt: Tuple[int, int]):
+def leftClick(pt: Tuple[int, int], widget):
     btns = QtCore.Qt.MouseButton
+    globalPt = QtCore.QPointF(widget.mapToGlobal(QtCore.QPoint(*pt)))
     event = QtGui.QMouseEvent(
         QtCore.QEvent.Type.MouseButtonPress,
         QtCore.QPoint(*pt),
+        globalPt,
         btns.LeftButton,
         btns.LeftButton,
         QtCore.Qt.KeyboardModifier.NoModifier,
@@ -33,12 +35,16 @@ def leftClick(pt: Tuple[int, int]):
 @pytest.fixture
 def mouseDragFactory(qtbot):
     def mouseDrag(widget: MainImage, startPos, endPos):
+        gblEndPos = QtCore.QPointF(widget.mapToGlobal(QtCore.QPoint(*endPos)))
+        gblStartPos = QtCore.QPointF(widget.mapToGlobal(QtCore.QPoint(*startPos)))
+
         btns = QtCore.Qt.MouseButton
         startPos = widget.imageItem.mapToScene(pg.Point(startPos))
         endPos = widget.imageItem.mapToScene(pg.Point(endPos))
         press = QtGui.QMouseEvent(
             QtGui.QMouseEvent.Type.MouseButtonPress,
             startPos,
+            gblStartPos,
             btns.LeftButton,
             btns.LeftButton,
             QtCore.Qt.KeyboardModifier.NoModifier,
@@ -48,6 +54,7 @@ def mouseDragFactory(qtbot):
         move = QtGui.QMouseEvent(
             QtCore.QEvent.Type.MouseMove,
             endPos,
+            gblEndPos,
             btns.LeftButton,
             btns.LeftButton,
             QtCore.Qt.KeyboardModifier.NoModifier,
@@ -57,6 +64,7 @@ def mouseDragFactory(qtbot):
         release = QtGui.QMouseEvent(
             QtGui.QMouseEvent.Type.MouseButtonRelease,
             endPos,
+            gblEndPos,
             btns.LeftButton,
             btns.LeftButton,
             QtCore.Qt.KeyboardModifier.NoModifier,
@@ -74,7 +82,7 @@ def test_simple_click():
     editableImg.drawAction = PRJ_CONSTS.DRAW_ACT_SELECT
     for curShape in shapes:
         clctn.shapeParameter = curShape
-        leftClick(pt)
+        leftClick(pt, editableImg)
         assert np.all(pt in clctn.currentShape.vertices)
 
 

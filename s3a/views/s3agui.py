@@ -100,8 +100,10 @@ class S3A(S3ABase):
         pass
 
     def _buildGui(self):
-        self.setDockOptions(self.ForceTabbedDocks)
-        self.setTabPosition(QtCore.Qt.AllDockWidgetAreas, QtWidgets.QTabWidget.North)
+        self.setDockOptions(QtWidgets.QMainWindow.DockOption.ForceTabbedDocks)
+        self.setTabPosition(
+            QtCore.Qt.AllDockWidgetAreas, QtWidgets.QTabWidget.TabPosition.North
+        )
         centralWidget = QtWidgets.QWidget()
         self.setCentralWidget(centralWidget)
         layout = QtWidgets.QVBoxLayout(centralWidget)
@@ -124,9 +126,8 @@ class S3A(S3ABase):
             parent.menu.addMenu(newMenu)
 
         tableDock = QtWidgets.QDockWidget("Component Table Window", self)
-        tableDock.setFeatures(
-            tableDock.DockWidgetMovable | tableDock.DockWidgetFloatable
-        )
+        feat = QtWidgets.QDockWidget.DockWidgetFeature
+        tableDock.setFeatures(feat.DockWidgetMovable | feat.DockWidgetFloatable)
 
         tableDock.setObjectName("Component Table Dock")
         tableContents = QtWidgets.QWidget(tableDock)
@@ -237,17 +238,18 @@ class S3A(S3ABase):
             ev.ignore()
             forceClose = False
             msg = QtWidgets.QMessageBox()
+            btnTypes = QtWidgets.QMessageBox.StandardButton
             msg.setWindowTitle("Confirm Exit")
             msg.setText(
                 "Component table has unsaved changes.\nYou can choose to save and exit "
                 "or discard changes "
             )
-            msg.setDefaultButton(msg.Save)
-            msg.setStandardButtons(msg.Discard | msg.Cancel | msg.Save)
+            msg.setDefaultButton(btnTypes.Save)
+            msg.setStandardButtons(btnTypes.Discard | btnTypes.Cancel | btnTypes.Save)
             code = msg.exec_()
-            if code == msg.Discard:
+            if code == btnTypes.Discard:
                 forceClose = True
-            elif code == msg.Cancel:
+            elif code == btnTypes.Cancel:
                 shouldExit = False
         if shouldExit:
             # Clean up all editor windows, which could potentially be left open

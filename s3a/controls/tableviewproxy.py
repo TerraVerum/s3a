@@ -372,7 +372,7 @@ class ComponentController(DASM, QtCore.QObject):
             selectionList.select(idxForId, idxForId)
             if isFirst and shouldScroll:
                 self._componentTable.scrollTo(
-                    idxForId, self._componentTable.PositionAtCenter
+                    idxForId, QtWidgets.QAbstractItemView.ScrollHint.PositionAtCenter
                 )
                 isFirst = False
             tblRow = idxForId.row()

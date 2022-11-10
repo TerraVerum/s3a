@@ -3,6 +3,8 @@ from __future__ import annotations
 import typing as t
 
 import numpy as np
+from pkg_resources import parse_version
+
 import pyqtgraph as pg
 from pyqtgraph.parametertree import InteractiveFunction, Parameter
 from pyqtgraph.parametertree.parameterTypes import (
@@ -173,10 +175,15 @@ class PipelineParameterItem(ActionGroupParameterItem):
         self.setFlags(flags)
 
     def setData(self, column, role, value):
-        if role != QtCore.Qt.ItemDataRole.CheckStateRole:
+        castedRole = QtCore.Qt.ItemDataRole(role)
+        if parse_version(pg.Qt.QtVersion) >= parse_version("6.0"):
+            # 'int' no longer implicitly cast. However, casting role on earlier
+            # versions results in an error.
+            role = castedRole
+        if castedRole != QtCore.Qt.ItemDataRole.CheckStateRole:
             return super().setData(column, role, value)
         cs = QtCore.Qt.CheckState
-        newEnabled = value == cs.Checked
+        newEnabled = cs(value) == cs.Checked
         if newEnabled == self.param.opts["enabled"]:
             # Ensure no mismatch between param enabled and item checkstate
             super().setData(column, role, value)

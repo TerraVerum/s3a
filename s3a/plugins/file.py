@@ -553,8 +553,9 @@ class ProjectImagePane(QtWidgets.QDockWidget):
         super().__init__(parent)
         self.setWindowTitle("Project Images")
         self.setObjectName("Project Images")
+        feats = QtWidgets.QDockWidget.DockWidgetFeature
         self.setFeatures(
-            self.DockWidgetMovable | self.DockWidgetFloatable | self.DockWidgetClosable
+            feats.DockWidgetMovable | feats.DockWidgetFloatable | feats.DockWidgetClosable
         )
         wid = QtWidgets.QWidget()
         self.setWidget(wid)

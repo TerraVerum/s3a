@@ -182,6 +182,7 @@ class AppStateEditor(ParameterEditor):
             [importFunction, exportFunction, required],
             name=optionName,
             index=self.stateFunctionsDf.columns,
+            dtype=object,
         )
         if index is not None:
             # First, shift old entries
@@ -190,8 +191,9 @@ class AppStateEditor(ParameterEditor):
                 [df.iloc[:index], seriesAsFrame(newRow), df.iloc[index:]]
             )
         else:
-            self.stateFunctionsDf: pd.DataFrame
-            self.stateFunctionsDf.loc[optionName] = newRow
+            self.stateFunctionsDf = pd.concat(
+                [self.stateFunctionsDf, seriesAsFrame(newRow)]
+            )
 
     @property
     def RECENT_STATE_FILENAME(self):
