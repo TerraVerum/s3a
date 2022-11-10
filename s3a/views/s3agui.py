@@ -34,8 +34,6 @@ class S3A(S3ABase):
         # customized loading functions also get called
         super().__init__(**startupSettings)
 
-        self.toolsEditor = ParameterEditor(name="Application")
-
         self.setWindowIcon(QtGui.QIcon(str(ICON_DIR / "s3alogo.svg")))
         logger = getAppLogger()
         if PRJ_ENUMS.LOG_GUI in log:
