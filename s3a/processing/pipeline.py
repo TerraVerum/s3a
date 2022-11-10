@@ -13,7 +13,7 @@ from pyqtgraph.Qt import QtCore, QtGui
 from qtextras import ParameterContainer, ParameterEditor, fns
 from qtextras._funcparse import FROM_PREV_IO
 
-from ..generalutils import simpleCache, augmentException
+from ..generalutils import augmentException, simpleCache
 
 __all__ = [
     "ActionGroupParameter",
@@ -23,7 +23,7 @@ __all__ = [
     "PipelineParameter",
     "PipelineParameterItem",
     "PipelineStageType",
-    "StageAncestryPrinter"
+    "StageAncestryPrinter",
 ]
 
 
@@ -32,6 +32,7 @@ class StageAncestryPrinter:
     Used to format exceptions raised during pipeline processing so they show the full
     path to the stage that caused the error
     """
+
     def __init__(self, stage: PipelineFunction):
         stages = []
         while stage:
@@ -337,8 +338,7 @@ class PipelineParameter(ActionGroupParameter):
         meta = {}
         for kk, vv in function.input.items():
             if vv is not FROM_PREV_IO and (
-                addDefaults
-                or not pg.eq(vv, function.defaultInput.get(kk, sentinal))
+                addDefaults or not pg.eq(vv, function.defaultInput.get(kk, sentinal))
             ):
                 changedValues[kk] = vv
         if includeMeta and not parameter.opts["enabled"]:

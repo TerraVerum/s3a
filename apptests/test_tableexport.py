@@ -14,7 +14,8 @@ from apptests.testingconsts import (
 )
 from s3a import PRJ_CONSTS as CNST, PRJ_ENUMS, REQD_TBL_FIELDS, ComponentIO, XYVertices
 from s3a.compio.converters import (
-    GeojsonImporter, SuperannotateImporter,
+    GeojsonImporter,
+    SuperannotateImporter,
     VGGImageAnnotatorImporter,
 )
 from s3a.generalutils import augmentException

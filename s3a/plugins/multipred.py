@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from qtextras import nameFormatter
 
 from .base import ProcessorPlugin
 from ..constants import (
@@ -13,9 +12,8 @@ from ..constants import (
     REQD_TBL_FIELDS as RTF,
 )
 from ..models.tablemodel import ComponentManager
-from ..parameditors.algcollection import AlgorithmCollection, AlgorithmEditor
+from ..parameditors.algcollection import AlgorithmCollection
 from ..processing.algorithms import multipred
-from ..shared import SharedAppSettings
 from ..structures import ComplexXYVertices
 
 

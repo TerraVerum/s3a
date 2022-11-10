@@ -4,15 +4,14 @@ import errno
 import inspect
 import json
 import os
-import typing as t
 from pathlib import Path
 
 import cv2 as cv
 import numpy as np
 import pandas as pd
 from PIL import Image
-
 from qtextras.typeoverloads import FilePath
+
 from .base import AnnotationImporter
 from ..constants import REQD_TBL_FIELDS as RTF
 from ..generalutils import cvImreadRgb, toDictGen
@@ -141,7 +140,8 @@ class LblPngImporter(AnnotationImporter):
 
     def getInstances(self, importObject, labelMap=None, distinctRegions=None, **kwargs):
         labelMask = importObject
-        for numericLbl, origVal in labelMap.items():  # type: int, t.Any
+        for numericLbl, origVal in labelMap.items():
+            numericLbl: int
             verts = ComplexXYVertices.fromBinaryMask(labelMask == numericLbl)
             if distinctRegions:
                 for vv in verts:

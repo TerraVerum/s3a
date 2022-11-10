@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import wraps
-from typing import List, Union
+from typing import List
 
 import numpy as np
 import pyqtgraph as pg

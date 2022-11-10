@@ -1,5 +1,5 @@
 from pyqtgraph.parametertree import Parameter, ParameterTree
-from qtextras import ParameterEditor, fns, EasyWidget
+from qtextras import EasyWidget, ParameterEditor, fns
 
 
 class MetaTreeParameterEditor(ParameterEditor):

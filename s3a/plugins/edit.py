@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from qtextras import RunOptions
 
-from .base import ParameterEditorPlugin, ParameterEditor
-from ..constants import PRJ_CONSTS as CNST
+from .base import ParameterEditorPlugin
+from ..constants import PRJ_CONSTS, PRJ_CONSTS as CNST
 from ..logger import getAppLogger
 from ..models.s3abase import S3ABase
-from ..constants import PRJ_CONSTS
 
 
 class EditPlugin(ParameterEditorPlugin):

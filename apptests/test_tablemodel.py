@@ -2,9 +2,9 @@ import numpy as np
 import pytest
 from conftest import NUM_COMPS, dfTester
 from pyqtgraph.Qt import QtCore
-from s3a import TableData
 from testingconsts import RND, TEST_FILE_DIR
 
+from s3a import TableData
 from s3a.compio.importers import SerialImporter
 from s3a.constants import PRJ_ENUMS, REQD_TBL_FIELDS
 from s3a.structures import ComplexXYVertices, XYVertices

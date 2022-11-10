@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 from pyqtgraph.parametertree import InteractiveFunction
 from pyqtgraph.Qt import QtWidgets
-from qtextras import ParameterEditor, fns, FilePath
+from qtextras import FilePath, ParameterEditor, fns
 
 from ..constants import MENU_OPTS_DIR, PRJ_CONSTS
 from ..graphicsutils import reorderMenuActions

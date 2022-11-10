@@ -7,9 +7,9 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
 from qtextras import FROM_PREV_IO, OptionsDict, ParameterEditor, fns
 from qtextras.typeoverloads import FilePath
+
 from .helpers import checkVerticesBounds, deserialize
 from ..constants import REQD_TBL_FIELDS as RTF
 from ..generalutils import toDictGen

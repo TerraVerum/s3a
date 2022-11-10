@@ -13,10 +13,10 @@ def INTERNAL_PLUGINS():
     from .edit import EditPlugin
     from .help import HelpPlugin
     from .mainimage import MainImagePlugin
-    from .tools import ToolsPlugin
     from .multipred import MultiPredictionsPlugin
     from .table import ComponentTablePlugin
     from .tablefield import VerticesPlugin
+    from .tools import ToolsPlugin
     from .usermetrics import UserMetricsPlugin
 
     return [

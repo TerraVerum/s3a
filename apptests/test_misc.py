@@ -8,8 +8,8 @@ from skimage import data
 from s3a import PRJ_ENUMS, ComplexXYVertices, generalutils as gu
 from s3a.compio.helpers import deserialize
 from s3a.generalutils import DirectoryDict, deprecateKwargs
-from s3a.plugins.tools import functionPluginFactory
 from s3a.plugins.multipred import MultiPredictionsPlugin
+from s3a.plugins.tools import functionPluginFactory
 
 _rots = list(np.linspace(-180, 180, 5)) + [PRJ_ENUMS.ROTATION_OPTIMAL]
 

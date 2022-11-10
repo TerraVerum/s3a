@@ -14,7 +14,6 @@ from qtextras import (
     ActionStack,
     DeferredActionStackMixin as DASM,
     ParameterContainer,
-    RunOptions,
     bindInteractorOptions as bind,
     fns,
 )
@@ -32,7 +31,6 @@ from ..plugins.file import FilePlugin
 from ..plugins.tools import ToolsPlugin
 from ..shared import SharedAppSettings
 from ..structures import FilePath, NChanImg
-from ..tabledata import TableData
 from ..views.imageareas import MainImage
 from ..views.tableview import ComponentTableView
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import itertools
 import json
 import typing as t
@@ -9,20 +8,18 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from qtextras.typeoverloads import FilePath
 from skimage import draw
 
-from qtextras.typeoverloads import FilePath
 from .base import AnnotationImporter
-from .componentio import ComponentIO
 from .exporters import CsvExporter
-from .helpers import registerIoHandler
 from .importers import CsvImporter
 from ..constants import REQD_TBL_FIELDS as RTF
 from ..generalutils import DirectoryDict, orderContourPoints, toDictGen
 from ..structures import (
+    AnnInstanceError,
     ComplexXYVertices,
     OptionsDictGroup,
-    AnnInstanceError,
     XYVertices,
 )
 
