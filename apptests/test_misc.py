@@ -51,9 +51,9 @@ def test_plg_factory(app):
 
     mp = functionPluginFactory([add], name="My Random Tools")()
     mp.attachToWindow(app)
-    assert mp.toolsEditor.procToParamsMapping
-    assert mp.name == "test"
-    next(iter(mp.toolsEditor.procToParamsMapping)).run()
+    assert mp.nameFunctionMap
+    assert mp.name == "My Random Tools"
+    next(iter(mp.nameFunctionMap.values()))()
     assert count == 1
 
 

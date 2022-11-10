@@ -15,7 +15,6 @@ def editor(app):
 
 def test_normal_add(ql, editor):
     ql.addActionForEditor(editor, "Default")
-    ql.applyChanges()
     assert editor.name in ql.rootParameter.names
     ql.rootParameter.clearChildren()
 
@@ -35,7 +34,7 @@ def test_invalid_load(caplog, ql, editor):
     # function within qt event loop
     def invalidLoadCaller():
         ql.addActionForEditor(editor, "SaveOptionThatDoesntExist")
-        ql.applyChanges()
+        ql.loadFirstStateFromEachEditor()
 
     invalidLoadCaller()
     crits = [r for r in caplog.records if r.levelno == logging.CRITICAL]
@@ -46,7 +45,7 @@ def test_invalid_load(caplog, ql, editor):
 
 
 def test_from_line_edit(ql, editor):
-    ql.addNewParamState.setText(
+    ql.addNewEditorState.setText(
         ql.listModel.displayFormat.format(stateName="Default", editor=editor)
     )
     ql.addFromLineEdit()
@@ -55,7 +54,7 @@ def test_from_line_edit(ql, editor):
 
 
 def test_invalid_line_edit_add(ql):
-    ql.addNewParamState.setText("Doesnt Exist")
+    ql.addNewEditorState.setText("Doesnt Exist")
     ql.addFromLineEdit()
     assert len(ql.rootParameter.children()) == 0
 
@@ -73,8 +72,8 @@ def test_load_state(ql):
         "App Settings": {"Default": None},
     }
     ql.loadParameterValues("test", state)
-    assert len(ql.rootParameter.childs) == 3
-    for ch in ql.params:
+    assert len(ql.rootParameter.children()) == 3
+    for ch in ql.rootParameter:
         assert "Default" in ch.names
 
 

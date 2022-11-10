@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from conftest import NUM_COMPS, dfTester
 from pyqtgraph.Qt import QtCore
+from s3a import TableData
 from testingconsts import RND, TEST_FILE_DIR
 
 from s3a.compio.importers import SerialImporter
@@ -157,7 +158,7 @@ def test_table_getdata(sampleComps, mgr):
 
 def test_simplify_diags():
     # Ensure removal of diagonal vertices has no effect on output accuracy
-    df = SerialImporter()(TEST_FILE_DIR / "simplify_verts.csv")
+    df = SerialImporter(TableData())(TEST_FILE_DIR / "simplify_verts.csv")
     verts = df.at[0, "Vertices"]
     mask = verts.toMask()
     verts2 = ComplexXYVertices.fromBinaryMask(mask)

@@ -39,7 +39,6 @@ def test_algs_working(app, vertsPlugin):
 def test_disable_top_stages(app, vertsPlugin):
     mImg = app.mainImage
     pe = vertsPlugin.processEditor
-    oldProc = pe.currentProcessor.title()
     mImg.shapeCollection.sigShapeFinished.emit(imageCornerVertices(app.mainImage.image))
     for name in pe.collection.topProcesses:
         proc: PipelineParameter = pe.collection.parseProcessName(name)
@@ -52,7 +51,7 @@ def test_disable_top_stages(app, vertsPlugin):
             warnings.simplefilter("ignore", UserWarning)
             mImg.shapeCollection.sigShapeFinished.emit(XYVertices())
     # Make sure to put stages back after
-    pe.changeActiveProcessor(oldProc, saveBeforeChange=False)
+    pe.loadParameterValues(pe.stateName)
 
 
 # -----

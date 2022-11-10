@@ -161,14 +161,12 @@ def test_proc_err(tmp_path):
     proc = ImagePipeline(name="Bad")
     proc.addStage(badProc)
     clctn = AlgorithmCollection(ImagePipeline)
-    algEditor = AlgorithmEditor(clctn, saveDir=tmp_path)
+    algEditor = AlgorithmEditor(clctn, directory=tmp_path)
     clctn.addProcess(proc, top=True)
 
     algEditor.changeActiveProcessor("Bad")
     kwargs = dict(
         image=np.array([[True]], dtype=bool), foregroundVertices=XYVertices([[0, 0]])
     )
-    with pytest.warns(UserWarning):
-        algEditor.currentProcessor.activate(errorsToWarnings=True, **kwargs)
     with pytest.raises(ZeroDivisionError):
         algEditor.currentProcessor.activate(**kwargs)

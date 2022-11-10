@@ -13,6 +13,10 @@ from apptests.testingconsts import (
     TEST_FILE_DIR,
 )
 from s3a import PRJ_CONSTS as CNST, PRJ_ENUMS, REQD_TBL_FIELDS, ComponentIO, XYVertices
+from s3a.compio.converters import (
+    GeojsonImporter, SuperannotateImporter,
+    VGGImageAnnotatorImporter,
+)
 from s3a.generalutils import augmentException
 from s3a.tabledata import TableData
 
@@ -231,9 +235,7 @@ def test_compimgs_export(tmp_path, _simpleTbl):
 @pytest.mark.withcomps
 def test_convert(app, tmp_path):
     sampleComps = app.componentDf
-    io = ComponentIO()
-    td = app.tableData
-    io.tableData.loadConfig(td.configPath, td.config)
+    io = ComponentIO(app.tableData)
     pklFile = tmp_path / "pklexport.pkl"
     csvFile = tmp_path / "csvexport.csv"
     io.exportPkl(sampleComps, pklFile)
@@ -273,10 +275,11 @@ def test_lblpng_export(_simpleTbl):
 
 def test_geojson_import():
     # Limited support for now so need tmp files to test this functionality
-    io = ComponentIO()
+    importer = GeojsonImporter()
+    importer.tableData = TableData(template=importer.ioTemplate)
     with pytest.raises(ValueError):
-        io.importByFileType(TEST_FILE_DIR / "sample.geojson")
-    df = io.importByFileType(TEST_FILE_DIR / "sample.geojson", parseErrorOk=True)
+        importer(TEST_FILE_DIR / "sample.geojson")
+    df = importer(TEST_FILE_DIR / "sample.geojson", parseErrorOk=True)
     assert len(df) == 1
     cmpVerts = XYVertices([[100, 0], [101, 0], [101, 1], [100, 1], [100, 0]])
     loadedVerts = df.at[df.index[0], REQD_TBL_FIELDS.VERTICES].stack()
@@ -285,11 +288,12 @@ def test_geojson_import():
 
 def test_superannotate_import():
     # Limited support for now so need tmp files to test this functionality
-    io = ComponentIO()
+    importer = SuperannotateImporter()
+    importer.tableData = TableData(template=importer.ioTemplate)
     file = TEST_FILE_DIR / "sample.superannotate.json"
     with pytest.raises(ValueError):
-        io.importByFileType(file)
-    df = io.importByFileType(file, parseErrorOk=True).reset_index(drop=True)
+        importer(file)
+    df = importer(file, parseErrorOk=True).reset_index(drop=True)
     assert len(df) == 3
     loadedVerts = df.at[df.index[1], REQD_TBL_FIELDS.VERTICES].stack()
     assert len(loadedVerts) == 17
@@ -297,8 +301,9 @@ def test_superannotate_import():
 
 def test_vgg_annotator_import():
     cfg = {"fields": {"name": "", "type": ""}}
-    io = ComponentIO(tableData=TableData(configDict=cfg))
+    importer = VGGImageAnnotatorImporter()
+    importer.tableData = TableData(configDict=cfg, template=importer.ioTemplate)
     file = TEST_FILE_DIR / "sample.vgg.csv"
-    df = io.importViaCsv(file)
+    df = importer(file)
     assert np.any(np.isin(df["type"], ["human"]))
     assert len(df) == 9

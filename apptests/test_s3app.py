@@ -89,8 +89,6 @@ def test_change_comp(app, mgr):
 
 
 def test_save_layout(app):
-    with pytest.raises(IOError):
-        app.saveLayout("default")
     app.saveLayout("tmp")
     savePath = LAYOUTS_DIR / f"tmp.dockstate"
     assert savePath.exists()
@@ -123,7 +121,7 @@ def test_autosave(tmp_path, app, filePlugin):
 @pytest.mark.withcomps
 def test_stage_plotting(monkeypatch, app, vertsPlugin):
     mainImg = app.mainImage
-    mainImg.drawActionGroup.callFuncByParam(CNST.DRAW_ACT_CREATE)
+    mainImg.drawActionGroup.callAssociatedFunction(CNST.DRAW_ACT_CREATE)
     vertsPlugin.processEditor.changeActiveProcessor("Basic Shapes")
     mainImgProps = app.classPluginMap[MainImagePlugin].props
     oldSz = mainImgProps[CNST.PROP_MIN_COMP_SZ]
@@ -135,10 +133,10 @@ def test_stage_plotting(monkeypatch, app, vertsPlugin):
     mainImgProps[CNST.PROP_MIN_COMP_SZ] = oldSz
 
     vertsPlugin.processEditor.changeActiveProcessor("Basic Shapes")
-    mainImg.drawActionGroup.callFuncByParam(CNST.DRAW_ACT_ADD)
 
-    mainImg.shapeCollection.sigShapeFinished.emit(XYVertices([[0, 0], [10, 10]]))
+    vertsPlugin.runFromDrawAction(XYVertices([[0, 0], [10, 10]]), CNST.DRAW_ACT_ADD)
     proc = vertsPlugin.currentProcessor
+    assert proc.result is not None, "Processor result not set"
     oldMakeWidget = proc._stageSummaryWidget
 
     def patchedWidget():
@@ -187,7 +185,7 @@ def test_quickload_profile(tmp_path, app):
 
 
 def test_load_last_settings(tmp_path, sampleComps, app):
-    oldSaveDir = app.appStateEditor.saveDir
+    oldSaveDir = app.appStateEditor.directory
     app.appStateEditor.stateManager.directory = tmp_path
     app.setMainImage(SAMPLE_IMG_FNAME, SAMPLE_IMG)
     app.addAndFocusComponents(sampleComps)

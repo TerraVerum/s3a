@@ -95,11 +95,11 @@ def test_filter():
         assert name in td.filter.rootParameter.names
         assert td.fieldFromName(name)
 
-    filterStatus = {"List": {"Active": True, "A": True, "B": False, "C": False}}
+    filterStatus = {"List": {"Active": True, "Options": ["A"]}}
     filtered = apply_assertFilter(td, filterStatus, 2, list("AABBCCC"))
     assert np.array_equal(["A"], np.unique(filtered))
 
-    filterStatus = {"Bool": {"Active": True, "Bool": True, "Not Bool": False}}
+    filterStatus = {"Bool": {"Active": True, "Options": ["Bool"]}}
     vals = RND.integers(0, 1, size=15, endpoint=True, dtype=bool)
     numTrue = np.count_nonzero(vals)
     filtered = apply_assertFilter(td, filterStatus, numTrue, vals)
@@ -127,7 +127,9 @@ def test_filter():
 def apply_assertFilter(tableData, status: dict, resultLen: int, setVals: Sequence):
     fieldName = next(iter(status))
     param = tableData.fieldFromName(fieldName)
-    tableData.filter.loadParameterValues(tableData.filter.stateName, status)
+    tableData.filter.loadParameterValues(
+        tableData.filter.stateName, status, addDefaults=True
+    )
     df = tableData.makeComponentDf(len(setVals))
     df[param] = setVals
     filteredDf = tableData.filter.filterComponentDf(df)

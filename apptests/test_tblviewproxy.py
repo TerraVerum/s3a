@@ -170,9 +170,9 @@ def test_export_overlay(app, mgr, tmp_path):
     app.componentController.exportComponentOverlay(file=exportLoc)
     app.componentController.regionPlot.showFocused = False
     img = cvImreadRgb(exportLoc)
-    checkPix = img[20, 20, :]
+    checkPix = img[0, 0, 0]
     # Red channel should be largest for overlay export and red focus fill
-    assert np.array_equal(checkPix, [255, 0, 0])
+    assert checkPix == 255
 
 
 @pytest.mark.withcomps

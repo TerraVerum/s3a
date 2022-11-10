@@ -129,7 +129,7 @@ def test_load_with_plg(monkeypatch, tmp_path):
         filePlugin.open(tmp_path / "plgprj.s3aprj", cfg)
         assert SamplePlugin in app.classPluginMap
         assert len(filePlugin.projectData.spawnedPlugins) == 1
-        assert filePlugin.projectData.spawnedPlugins[0].win
+        assert filePlugin.projectData.spawnedPlugins[0].window
 
     # Remove existing plugin
     cfg = {"plugin-cfg": {"New Name": "nonsense.Plugin"}}
@@ -307,15 +307,14 @@ def test_export_autosave(app, filePlugin, tmp_path):
     fns.saveToFile({"interval": 10}, tmp_path / _autosaveFile)
 
     exporter = state.stateFunctionsDf.at["autosave", "exportFunction"]
-    for proc, params in filePlugin.toolsEditor.procToParamsMapping.items():
-        if proc.name == "Start Autosave":
+    for name, function in filePlugin.nameFunctionMap.items():
+        if fns.nameFormatter(name) == "Start Autosave":
             break
     else:
-        raise ValueError("Autosave proc not found")
+        raise ValueError("Autosave process not found")
 
-    params["interval"] = 10
-    params["backupFolder"] = str(tmp_path)
-    proc()
+    assert len(set(function.parameters).intersection(["interval", "backupFolder"])) == 2
+    function(interval=10, backupFolder=str(tmp_path))
 
     outpath = tmp_path / "autosave_export"
     outpath.mkdir()
