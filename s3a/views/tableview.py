@@ -307,15 +307,15 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
             paramDict = dict(type=curType, default=curval, **field.opts)
             if curType == "enum":
                 paramDict["type"] = "list"
-                paramDict.update(values=list(type(curval)))
+                paramDict.update(limits=list(type(curval)))
             elif curType == "OptionsDict":
                 paramDict["type"] = "list"
-                paramDict.update(values=list(curval.group))
+                paramDict.update(limits=list(curval.group))
             elif curType == "bool":
                 # TODO: Get checkbox to stay in table after editing for a smoother
                 #  appearance. For now, the easiest solution is to just use dropdown
                 paramDict["type"] = "list"
-                paramDict.update(values={"True": True, "False": False})
+                paramDict.update(limits={"True": True, "False": False})
             try:
                 self.setItemDelegateForColumn(ii, PgParameterDelegate(paramDict, self))
             except TypeError:

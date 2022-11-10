@@ -1247,7 +1247,7 @@ class ProjectData(QtCore.QObject):
     @fns.dynamicDocstring(fileTypes=list(defaultIo.exportTypes))
     @bind(
         outputFolder=dict(type="file", fileMode="Directory"),
-        annotationFormat=dict(type="list", values=list(defaultIo.exportTypes)),
+        annotationFormat=dict(type="list", limits=list(defaultIo.exportTypes)),
     )
     def exportAnnotations(
         self,
