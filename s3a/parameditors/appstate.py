@@ -51,7 +51,7 @@ class AppStateEditor(ParameterEditor):
             updateDict = {k: ret for k, ret in zip(legitKeys, rets) if ret is not None}
             stateDict = dict(**updateDict)
             for editor in self.quickLoader.listModel.uniqueEditors:
-                if editor.stateName == editor.getDefaultState().stem:
+                if editor.stateName == editor.getDefaultStateName().stem:
                     curSaveName = str(saveOnExitDir / editor.name)
                 else:
                     curSaveName = editor.stateName

@@ -265,14 +265,14 @@ class PipelineParameter(ActionGroupParameter):
 
     def saveState(self, filter=("meta",), recurse=True) -> dict[str, t.Any]:
         children = []
-        includeDefaults = "defaults" in filter
+        addDefaults = "defaults" in filter
         includeMeta = "meta" in filter
         stateTitle, meta = self.getTitleAndMaybeMetadata(includeMeta)
         for child in self:
             if maybeGetFunction(child):
                 childState = self._actionGroupSaveState(
                     child,
-                    includeDefaults,
+                    addDefaults,
                     includeMeta,
                 )
             elif isinstance(child, PipelineParameter):
@@ -309,7 +309,7 @@ class PipelineParameter(ActionGroupParameter):
     ) -> dict[str, t.Any] | str:
         stateTitle, meta = self.getTitleAndMaybeMetadata("meta" in filter)
         stateKwargs = self.getFunctionKwargs(
-            flatten=flatten, includeDefaults="defaults" in filter
+            flatten=flatten, addDefaults="defaults" in filter
         )
         if not meta and not stateKwargs:
             return stateTitle
@@ -318,7 +318,7 @@ class PipelineParameter(ActionGroupParameter):
 
     @classmethod
     def _actionGroupSaveState(
-        cls, parameter: ActionGroupParameter, includeDefaults=False, includeMeta=False
+        cls, parameter: ActionGroupParameter, addDefaults=False, includeMeta=False
     ):
         """
         Action group is defined and used in other contexts, so have a special override
@@ -330,7 +330,7 @@ class PipelineParameter(ActionGroupParameter):
         meta = {}
         for kk, vv in function.input.items():
             if vv is not FROM_PREV_IO and (
-                includeDefaults
+                addDefaults
                 or not pg.eq(vv, function.defaultInput.get(kk, sentinal))
             ):
                 changedValues[kk] = vv
@@ -349,7 +349,7 @@ class PipelineParameter(ActionGroupParameter):
         for func in self.flattenedFunctions():
             func.updateInput(setDefaults=setDefaults, **kwargs)
 
-    def getFunctionKwargs(self, flatten=False, includeDefaults=False):
+    def getFunctionKwargs(self, flatten=False, addDefaults=False):
         """
         Returns all keywords of all functions in this pipeline
 
@@ -359,7 +359,7 @@ class PipelineParameter(ActionGroupParameter):
             If ``True``, returns kwargs for all functions in recursively nested
             pipelines as a single dictionary. Otherwise, only returns keywords
             for ``PipelineFunction`` objects in this pipeline.
-        includeDefaults
+        addDefaults
             If ``True``, includes default values for all parameters in the returned
             dictionary. Otherwise, only returns values that have been changed from
             the default.
@@ -372,7 +372,7 @@ class PipelineParameter(ActionGroupParameter):
         def valueFilter(function, key):
             value = function.input[key]
             return value is not FROM_PREV_IO and (
-                includeDefaults
+                addDefaults
                 or not pg.eq(value, function.defaultInput.get(key, object()))
             )
 
@@ -419,7 +419,7 @@ class ImagePipeline(PipelineParameter):
         outGrid = pg.GraphicsLayoutWidget()
         sizeToAxMapping: t.Dict[tuple, pg.PlotItem] = {}
         for ii, info in enumerate(flattened):
-            if info is None:
+            if info is None or "image" not in info:
                 continue
             pltItem: pg.PlotItem = outGrid.addPlot(title=info.get("title", None))
             vb = pltItem.getViewBox()

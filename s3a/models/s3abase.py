@@ -207,7 +207,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
 
     def saveAllEditorDefaults(self):
         for editor in self.sharedSettings.quickLoader.listModel.uniqueEditors:
-            editor.saveParameterValues(editor.getDefaultState(), includeDefaults=True)
+            editor.saveParameterValues(editor.getDefaultStateName(), addDefaults=True)
 
     @DASM.undoable("Accept Focused Region")
     def acceptFocusedRegion(self):

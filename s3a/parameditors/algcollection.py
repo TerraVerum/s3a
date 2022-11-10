@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import importlib
 import inspect
 import pydoc
@@ -110,32 +111,28 @@ class AlgorithmEditor(MetaTreeParameterEditor):
         self,
         saveName: str = None,
         stateDict: dict = None,
-        *,
-        includeDefaults=False,
         **kwargs,
     ):
-        """
-        The algorithm editor also needs to store information about the selected
-        process, so lump this in with the other parameter information before calling
-        default save.
-        """
-        proc = self.currentProcessor
-        if stateDict is None:
-            # Since inner nested processes are already recorded, flatten here to just
-            # save updated parameter values for the outermost stage
-            filter_ = ["meta"]
-            if includeDefaults:
-                filter_.append("defaults")
-            stateDict = self.collection.unnestedProcessState(
-                proc, processFilter=filter_
-            )
+        state = super().saveParameterValues(saveName, stateDict, **kwargs)
         # Make sure the collection gets info about this process
-        self.collection.loadParameterValues(self.collection.stateName, stateDict)
-        clctnState = self.collection.saveParameterValues(saveName, blockWrite=True)
-        stateDict = {"active": self.currentProcessor.title(), **clctnState}
-        return super().saveParameterValues(
-            saveName, stateDict, includeDefaults=includeDefaults, **kwargs
-        )
+        self.collection.loadParameterValues(self.collection.stateName, state)
+        return state
+
+    def getParameterValues(self):
+        proc = self.currentProcessor
+        filter_ = ["meta", "default"]
+        stateDict = self.collection.unnestedProcessState(proc, processFilter=filter_)
+        clctnState = copy.deepcopy(self.collection.getParameterValues())
+        fns.hierarchicalUpdate(clctnState, stateDict)
+        return {"active": self.currentProcessor.title(), **clctnState}
+
+    def getParameterDefaults(self):
+        proc = self.currentProcessor
+        filter_ = ["meta"]
+        stateDict = self.collection.unnestedProcessState(proc, processFilter=filter_)
+        clctnState = copy.deepcopy(self.collection.getParameterDefaults())
+        fns.hierarchicalUpdate(clctnState, stateDict)
+        return {"active": self.currentProcessor.title(), **clctnState}
 
     def loadParameterValues(
         self, stateName: FilePath = None, stateDict: dict = None, **kwargs
@@ -404,30 +401,6 @@ class AlgorithmCollection(ParameterEditor):
         # else
         return None
 
-    def saveParameterValues(
-        self,
-        saveName: str = None,
-        stateDict: dict = None,
-        includeDefaults=False,
-        **kwargs,
-    ):
-        def converter(procDict):
-            return {
-                name: self.saveStagesByReference(stage)[name]
-                if isinstance(stage, PipelineParameter)
-                else stage
-                for name, stage in procDict.items()
-                if not isinstance(stage, PipelineFunction)
-            }
-
-        if stateDict is None:
-            stateDict = {
-                "top": converter(self.topProcesses),
-                "primitive": converter(self.primitiveProcesses),
-                "modules": self.includeModules,
-            }
-        return super().saveParameterValues(saveName, stateDict, **kwargs)
-
     def loadParameterValues(
         self,
         stateName: t.Union[str, Path] = None,
@@ -440,11 +413,26 @@ class AlgorithmCollection(ParameterEditor):
         self.includeModules = modules
         self.topProcesses.update(top)
         self.primitiveProcesses.update(primitive)
-        stateDict = self.saveParameterValues(blockWrite=True)
-        super().loadParameterValues(
-            stateName, stateDict, candidateParameters=[], **kwargs
-        )
-        return stateDict
+        return super().loadParameterValues(stateName, candidateParameters=[], **kwargs)
+
+    def getParameterValues(self):
+        def converter(procDict):
+            return {
+                name: self.saveStagesByReference(stage)[name]
+                if isinstance(stage, PipelineParameter)
+                else stage
+                for name, stage in procDict.items()
+                if not isinstance(stage, PipelineFunction)
+            }
+
+        return {
+            "top": converter(self.topProcesses),
+            "primitive": converter(self.primitiveProcesses),
+            "modules": self.includeModules,
+        }
+
+    def getParameterDefaults(self):
+        return self.getFullyExpandedState("meta", "default")
 
     def unnestedProcessState(self, process: PipelineParameter, processFilter=("meta",)):
         outState = dict(top={}, primitive={}, modules=self.includeModules)
@@ -481,7 +469,7 @@ class AlgorithmCollection(ParameterEditor):
     def getFullyExpandedState(self, *filters):
         """
         Since processes aren't given values until after being parsed, some top processes
-        will remain strings even when ``includeDefaults`` is specified in
+        will remain strings even when ``addDefaults`` is specified in
         ``saveParameterValeus()``. To prevent this, parse every process in order to
         collect their default values.
         """

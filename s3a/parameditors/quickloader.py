@@ -98,29 +98,31 @@ class QuickLoaderEditor(ParameterEditor):
         if editorList is None:
             editorList = []
         self.listModel = EditorListModel(editorList)
-        self.addNewParamState = PopupLineEditor(
+        self.addNewEditorState = PopupLineEditor(
             model=self.listModel, clearOnComplete=False
         )
-
+        self.applyButton = QtWidgets.QPushButton("Load All First States")
         super().__init__(
             name="Quick Loader", directory=QUICK_LOAD_DIR, suffix=".loader"
         )
         # Now that `self` is initialized, it can be used as a parent
-        for widget in self.listModel, self.addNewParamState:
+        for widget in self.listModel, self.addNewEditorState:
             widget.setParent(self)
 
-        # self.addNewParamState.completer().activated.connect(self.addFromLineEdit)
-        self.addNewParamState.returnPressed.connect(self.addFromLineEdit)
+        # self.addNewEditorState.completer().activated.connect(self.addFromLineEdit)
+        self.addNewEditorState.returnPressed.connect(self.addFromLineEdit)
+        self.applyButton.clicked.connect(self.loadFirstStateFromEachEditor)
+        self.applyButton.setToolTip(self.loadFirstStateFromEachEditor.__doc__)
 
     def _guiChildren(self) -> list:
-        return [self.addNewParamState, *super()._guiChildren()]
+        return [self.addNewEditorState, self.applyButton, *super()._guiChildren()]
 
     def saveParameterValues(
         self, saveName: str = None, stateDict: dict = None, **kwargs
     ):
-        kwargs.pop("includeDefaults", None)
+        kwargs.pop("addDefaults", None)
         return super().saveParameterValues(
-            saveName, stateDict, **kwargs, includeDefaults=True
+            saveName, stateDict, **kwargs, addDefaults=True
         )
 
     def buildFromStartupParameters(self, startupSource: dict):
@@ -137,11 +139,7 @@ class QuickLoaderEditor(ParameterEditor):
             try:
                 if isinstance(paramStateInfo, dict):
                     editor.loadParameterValues(self.stateName, paramStateInfo)
-                elif (
-                    paramStateInfo is not None
-                    # Possible for state to be deleted since last run
-                    and editor.formatFileName(paramStateInfo).exists()
-                ):
+                elif paramStateInfo is not None:
                     editor.loadParameterValues(paramStateInfo)
             except Exception as ex:
                 errSettings.append(f"{editor.name}: {ex}")
@@ -164,18 +162,28 @@ class QuickLoaderEditor(ParameterEditor):
         self,
         stateName: Union[str, Path] = None,
         stateDict: dict = None,
-        useDefaults=True,
+        addDefaults=True,
         **kwargs,
     ):
         stateDict = self.stateManager.loadState(stateName, stateDict)
-        if useDefaults:
+        if addDefaults:
+            # Default is an empty state
             self.rootParameter.clearChildren()
         for editorName, options in stateDict.items():
             self.loadEditorDict(editorName, options)
 
         return super().loadParameterValues(
-            stateName, stateDict, useDefaults=False, candidateParameters=[]
+            stateName, stateDict, addDefaults=False, candidateParameters=[]
         )
+
+    def loadFirstStateFromEachEditor(self):
+        """
+        Load the first state from each present editor group. This is useful for
+        quickly changing multiple aspects of the program at once.
+        """
+        for grp in filter(Parameter.hasChildren, self.rootParameter.children()):
+            act: ActionGroupParameter = next(iter(grp))
+            act.activate()
 
     def loadEditorDict(self, editorName: str, options: dict):
         matches = [e for e in self.listModel.uniqueEditors if e.name == editorName]
@@ -194,7 +202,7 @@ class QuickLoaderEditor(ParameterEditor):
     def addFromLineEdit(self):
         try:
             selectionIdx = self.listModel.displayedData.index(
-                self.addNewParamState.text()
+                self.addNewEditorState.text()
             )
         except ValueError:
             selectionIdx = None
@@ -206,7 +214,7 @@ class QuickLoaderEditor(ParameterEditor):
         #   selectionIdx = completer.currentIndex()
         paramState, editor = qtSelectionIdx.data(QtCore.Qt.ItemDataRole.EditRole)
         self.addActionForEditor(editor, paramState)
-        # self.addNewParamState.clear()
+        # self.addNewEditorState.clear()
 
     def addActionForEditor(
         self, editor: ParameterEditor, stateDict: str, shortcut: str = None
@@ -266,8 +274,6 @@ class QuickLoaderEditor(ParameterEditor):
         try:
             editor.loadParameterValues(stateDict)
         except FileNotFoundError:
-            action.opts["shortcut"].deleteLater()
-            del action.opts["shortcut"]
             action.remove()
             # Wait until end of process cycle to raise error
             formattedState = self.listModel.displayFormat.format(
