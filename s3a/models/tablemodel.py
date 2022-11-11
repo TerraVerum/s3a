@@ -228,7 +228,11 @@ class ComponentManager(ComponentTableModel):
         # Signal to table that rows should change
         self.layoutAboutToBeChanged.emit()
         # Ensure indices overlap with the components these are replacing
-        self.compDf.update(componentsDf)
+        updateColumns = [c for c in componentsDf if c in self.compDf]
+        updateIdxs = self.compDf.index.intersection(changedIds)
+        self.compDf.loc[updateIdxs, updateColumns] = componentsDf.loc[
+            updateIdxs, updateColumns
+        ]
         toEmit["changed"] = changedIds
 
         # Record mapping for exterior scopes

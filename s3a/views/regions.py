@@ -151,7 +151,8 @@ class MultiRegionPlot(BoundScatterPlot):
             numRows, idList=idList, labelField=labelField
         )
         if newRegionDf is not None:
-            self.regionData.update(newRegionDf)
+            overlap = self.regionData.columns.intersection(newRegionDf.columns)
+            self.regionData[overlap] = newRegionDf[overlap]
         self.updatePlot()
 
     def selectById(self, selectedIds: OneDArr):
