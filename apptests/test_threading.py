@@ -1,24 +1,23 @@
 import time
 
 import pytest
-from pyqtgraph.Qt import QtCore
 
 from s3a.processing.threads import (
     AbortableThreadContainer,
-    RunnableFunctionWrapper,
-    RunnableThreadContainer,
+    # RunnableFunctionWrapper,
+    # RunnableThreadContainer,
     ThreadedFunctionWrapper,
 )
 
 
-class GlobalThreadPoolContainer(RunnableThreadContainer):
-    """
-    See https://github.com/pytest-dev/pytest-qt/issues/199#issuecomment-366518687
-    for why this might work
-    """
-
-    def __init__(self, maxThreadCount=1):
-        super().__init__(QtCore.QThreadPool.globalInstance(), maxThreadCount)
+# class GlobalThreadPoolContainer(RunnableThreadContainer):
+#     """
+#     See https://github.com/pytest-dev/pytest-qt/issues/199#issuecomment-366518687
+#     for why this might work
+#     """
+#
+#     def __init__(self, maxThreadCount=1):
+#         super().__init__(QtCore.QThreadPool.globalInstance(), maxThreadCount)
 
 
 def sleepUntilCallback(cb, timeoutSeconds=5.0):
@@ -30,18 +29,20 @@ def sleepUntilCallback(cb, timeoutSeconds=5.0):
     if timeout:
         raise TimeoutError(f"{cb} never occurred")
 
-
+# Leave as parametrize for now in case GlobalThreadPoolContainer is used
 @pytest.mark.parametrize(
-    "container", [GlobalThreadPoolContainer, AbortableThreadContainer]
+    "container", [AbortableThreadContainer]
 )
 def test_containers(qtbot, container):
     pool = container()
-    if isinstance(pool, GlobalThreadPoolContainer):
-        addFunc = pool.addRunner
-        queue = pool.unfinishedRunners
-    else:
-        addFunc = pool.addThread
-        queue = pool.threads
+    # if isinstance(pool, GlobalThreadPoolContainer):
+    #     addFunc = pool.addRunner
+    #     queue = pool.unfinishedRunners
+    # else:
+    #     addFunc = pool.addThread
+    #     queue = pool.threads
+    addFunc = pool.addThread
+    queue = pool.threads
 
     def runner_func(id_):
         values.append(id_)
@@ -51,20 +52,22 @@ def test_containers(qtbot, container):
         addFunc(runner_func, id_=ii)
 
     qtbot.waitUntil(lambda: len(values) == 5)
+    # Clean threads that haven't had a chance to remove themselves
+    pool.endThreads(queue)
     assert not len(queue)
     # One thread at a time *should* guarantee concurrency
     assert values == list(range(5))
 
 
-def test_terminate_waiting(qtbot):
-    pool = GlobalThreadPoolContainer()
-    end = False
-    runner = pool.addRunner(sleepUntilCallback, cb=lambda: end)
-    pool.addRunner(sleepUntilCallback, cb=lambda: end)
-    pool.discardUnfinishedRunners()
-    assert len(pool.unfinishedRunners) == 1
-    with qtbot.waitSignal(runner.sigResultReady):
-        end = True
+# def test_terminate_waiting(qtbot):
+#     pool = GlobalThreadPoolContainer()
+#     end = False
+#     runner = pool.addRunner(sleepUntilCallback, cb=lambda: end)
+#     pool.addRunner(sleepUntilCallback, cb=lambda: end)
+#     pool.discardUnfinishedRunners()
+#     assert len(pool.unfinishedRunners) == 1
+#     with qtbot.waitSignal(runner.sigResultReady):
+#         end = True
 
 
 def test_abort_during_run(qtbot):
@@ -103,8 +106,9 @@ def test_waiting(qtbot):
     assert doneCounter == 1
 
 
+# Leave as parametrize for now in case GlobalThreadPoolContainer is used
 @pytest.mark.parametrize(
-    "threadOrRunnable", [RunnableFunctionWrapper, ThreadedFunctionWrapper]
+    "threadOrRunnable", [ThreadedFunctionWrapper]
 )
 def test_wrappers(qtbot, threadOrRunnable):
     def myfunc(id_, err=False):

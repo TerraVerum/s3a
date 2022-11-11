@@ -7,49 +7,49 @@ from pyqtgraph import QtCore
 from . import PipelineFunction
 
 
-class RunnableFunctionWrapperSignals(QtCore.QObject):
-    resultReady = QtCore.Signal(object)
-    """ThreadedFunctionWrapper instance, emmitted on successful function run"""
-    failed = QtCore.Signal(object, object)
-    """
-    ThreadedFunctionWrapper instance, exception instance, emmitted on any exception during
-    function run 
-    """
+# class RunnableFunctionWrapperSignals(QtCore.QObject):
+#     resultReady = QtCore.Signal(object)
+#     """ThreadedFunctionWrapper instance, emmitted on successful function run"""
+#     failed = QtCore.Signal(object, object)
+#     """
+#     ThreadedFunctionWrapper instance, exception instance, emmitted on any exception during
+#     function run
+#     """
 
 
-class RunnableFunctionWrapper(QtCore.QRunnable):
-    def __init__(self, func, **kwargs):
-        super().__init__()
-        self.signals = RunnableFunctionWrapperSignals()
-        if not isinstance(func, PipelineFunction):
-            func = PipelineFunction(func, **kwargs)
-        self.proc = func
-        self.inProgress = False
-
-    def run(self):
-        self.inProgress = True
-        try:
-            self.proc()
-            # This could go in a "finally" block to avoid duplication below, but now
-            # "inProgress" will be false before the signal is emitted
-            self.inProgress = False
-            self.signals.resultReady.emit(self)
-        except Exception as ex:
-            self.inProgress = False
-            self.signals.failed.emit(self, ex)
-
-    @property
-    def result(self):
-        return self.proc.result
-
-    @property
-    def sigResultReady(self):
-        return self.signals.resultReady
-
-    @property
-    def sigFailed(self):
-        return self.signals.failed
-
+# class RunnableFunctionWrapper(QtCore.QRunnable):
+#     def __init__(self, func, **kwargs):
+#         super().__init__()
+#         self.signals = RunnableFunctionWrapperSignals()
+#         if not isinstance(func, PipelineFunction):
+#             func = PipelineFunction(func, **kwargs)
+#         self.proc = func
+#         self.inProgress = False
+#
+#     def run(self):
+#         self.inProgress = True
+#         try:
+#             self.proc()
+#             # This could go in a "finally" block to avoid duplication below, but now
+#             # "inProgress" will be false before the signal is emitted
+#             self.inProgress = False
+#             self.signals.resultReady.emit(self)
+#         except Exception as ex:
+#             self.inProgress = False
+#             self.signals.failed.emit(self, ex)
+#
+#     @property
+#     def result(self):
+#         return self.proc.result
+#
+#     @property
+#     def sigResultReady(self):
+#         return self.signals.resultReady
+#
+#     @property
+#     def sigFailed(self):
+#         return self.signals.failed
+#
 
 class ThreadedFunctionWrapper(QtCore.QThread):
     sigResultReady = QtCore.Signal(object)
@@ -78,43 +78,43 @@ class ThreadedFunctionWrapper(QtCore.QThread):
         return self.proc.result
 
 
-class RunnableThreadContainer(QtCore.QObject):
-    sigTasksUpdated = QtCore.Signal()
-
-    def __init__(self, pool: QtCore.QThreadPool = None, maxThreadCount=1):
-        if pool is None:
-            pool = QtCore.QThreadPool()
-        pool.setMaxThreadCount(maxThreadCount)
-        self.pool = pool
-        # QThreadPool doesn't expose pending workers, so keep track of these manually
-        self.unfinishedRunners = []
-        super().__init__()
-
-    def discardUnfinishedRunners(self):
-        # Reverse to avoid race condition where first runner is supposed to happen
-        # before second, first is deleted, and second runs regardless
-        update = False
-        for runner in reversed(self.unfinishedRunners):  # type: RunnableFunctionWrapper
-            if runner in self.unfinishedRunners and self.pool.tryTake(runner):
-                self.unfinishedRunners.remove(runner)
-                update = True
-        if update:
-            self.sigTasksUpdated.emit()
-
-    def addRunner(self, runner: t.Callable | RunnableFunctionWrapper, **kwargs):
-        if not isinstance(runner, RunnableFunctionWrapper):
-            runner = RunnableFunctionWrapper(runner, **kwargs)
-        self.unfinishedRunners.append(runner)
-
-        def onFinish(*_):
-            if runner in self.unfinishedRunners:
-                self.unfinishedRunners.remove(runner)
-
-        for signal in runner.sigResultReady, runner.sigFailed:
-            signal.connect(onFinish)
-        self.pool.start(runner)
-        self.sigTasksUpdated.emit()
-        return runner
+# class RunnableThreadContainer(QtCore.QObject):
+#     sigTasksUpdated = QtCore.Signal()
+#
+#     def __init__(self, pool: QtCore.QThreadPool = None, maxThreadCount=1):
+#         if pool is None:
+#             pool = QtCore.QThreadPool()
+#         pool.setMaxThreadCount(maxThreadCount)
+#         self.pool = pool
+#         # QThreadPool doesn't expose pending workers, so keep track of these manually
+#         self.unfinishedRunners = []
+#         super().__init__()
+#
+#     def discardUnfinishedRunners(self):
+#         # Reverse to avoid race condition where first runner is supposed to happen
+#         # before second, first is deleted, and second runs regardless
+#         update = False
+#         for runner in reversed(self.unfinishedRunners):  # type: RunnableFunctionWrapper
+#             if runner in self.unfinishedRunners and self.pool.tryTake(runner):
+#                 self.unfinishedRunners.remove(runner)
+#                 update = True
+#         if update:
+#             self.sigTasksUpdated.emit()
+#
+#     def addRunner(self, runner: t.Callable | RunnableFunctionWrapper, **kwargs):
+#         if not isinstance(runner, RunnableFunctionWrapper):
+#             runner = RunnableFunctionWrapper(runner, **kwargs)
+#         self.unfinishedRunners.append(runner)
+#
+#         def onFinish(*_):
+#             if runner in self.unfinishedRunners:
+#                 self.unfinishedRunners.remove(runner)
+#
+#         for signal in runner.sigResultReady, runner.sigFailed:
+#             signal.connect(onFinish)
+#         self.pool.start(runner)
+#         self.sigTasksUpdated.emit()
+#         return runner
 
 
 class AbortableThreadContainer(QtCore.QObject):
