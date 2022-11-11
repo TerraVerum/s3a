@@ -303,7 +303,7 @@ class MainImage(DASM, ImageViewer):
         def visit(param, child=None):
             if child:
                 param = child
-            if param.type() in ["group", "actiongroup"]:
+            if param.type() == "group":
                 param.sigChildAdded.connect(visit)
                 for ch in param:
                     visit(ch)
