@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
-from conftest import NUM_COMPS, dfTester
+from apptests.conftest import NUM_COMPS, dfTester
 from pyqtgraph.Qt import QtCore
-from testingconsts import RND, TEST_FILE_DIR
+from apptests.testingconsts import RND, TEST_FILE_DIR
 
 from s3a import TableData
 from s3a.compio.importers import SerialImporter

@@ -3,7 +3,7 @@ import warnings
 import numpy as np
 import pandas as pd
 import pytest
-from conftest import SAMPLE_SMALL_IMG
+from apptests.conftest import SAMPLE_SMALL_IMG
 from qtextras import seriesAsFrame
 from skimage import util
 

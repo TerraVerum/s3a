@@ -4,8 +4,8 @@ os.environ["S3A_PLATFORM"] = "minimal"
 from typing import Type
 
 import pytest
-from helperclasses import CompDfTester
-from testingconsts import (
+from apptests.helperclasses import CompDfTester
+from apptests.testingconsts import (
     NUM_COMPS,
     SAMPLE_IMG,
     SAMPLE_IMG_FNAME,
@@ -13,7 +13,7 @@ from testingconsts import (
     SAMPLE_SMALL_IMG_FNAME,
 )
 
-from s3a import constants, mkQApp
+from s3a import constants, mkQApp, REQD_TBL_FIELDS
 from s3a.constants import PRJ_ENUMS
 from s3a.plugins.file import FilePlugin
 from s3a.plugins.tablefield import VerticesPlugin
@@ -85,6 +85,7 @@ def resetAppAndTester(request, app, filePlugin, mgr):
         app.setMainImage(SAMPLE_IMG_FNAME, SAMPLE_IMG)
     if "withcomps" in request.keywords:
         dfTester.fillRandomVerts(app.mainImage.image.shape)
+        dfTester.compDf[REQD_TBL_FIELDS.IMAGE_FILE] = str(app.sourceImagePath)
         mgr.addComponents(dfTester.compDf.copy())
     yield
     app.actionStack.clear()

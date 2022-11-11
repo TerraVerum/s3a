@@ -5,7 +5,7 @@ from typing import Sequence, Union
 
 import numpy as np
 import pytest
-from conftest import dfTester
+from apptests.conftest import dfTester
 from qtextras import fns
 
 from apptests.testingconsts import RND

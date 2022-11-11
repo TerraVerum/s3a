@@ -122,10 +122,9 @@ def test_load_with_plg(monkeypatch, tmp_path):
     app = S3A(loadLastState=False)
     filePlugin = app.filePlugin
     with monkeypatch.context() as m:
-        m.syspath_prepend(str(TEST_FILE_DIR))
-        from files.sample_plg import SamplePlugin
+        from apptests.files.sample_plg import SamplePlugin
 
-        cfg = {"plugin-cfg": {"Test": "files.sample_plg.SamplePlugin"}}
+        cfg = {"plugin-cfg": {"Test": "apptests.files.sample_plg.SamplePlugin"}}
         filePlugin.open(tmp_path / "plgprj.s3aprj", cfg)
         assert SamplePlugin in app.classPluginMap
         assert len(filePlugin.projectData.spawnedPlugins) == 1

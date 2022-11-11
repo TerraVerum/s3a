@@ -33,6 +33,7 @@ def _simpleTbl(tmp_path):
 def test_normal_export(sampleComps, tmp_path, app):
     io = app.componentIo
     app.props[CNST.PROP_EXP_ONLY_VISIBLE] = False
+    sampleComps[REQD_TBL_FIELDS.IMAGE_FILE] = SAMPLE_IMG_FNAME
     for ftype in io.exportTypes:
         curPath = tmp_path / f"normalExport - All IDs.{ftype}"
         doAndAssertExport(
