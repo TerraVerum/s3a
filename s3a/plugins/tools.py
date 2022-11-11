@@ -31,6 +31,8 @@ class ToolsPlugin(ParameterEditorPlugin):
                 "ownerWidget": self.window.mainImage,
                 **CNST.TOOL_CLEAR_ROI,
             },
+            # Hide this button from the dropdown to avoid shortcut capture
+            runOptions=[],
         )
         self.registerFunction(
             self.showDevConsoleGui, runActionTemplate=CNST.TOOL_SHOW_DEV_CONSOLE
