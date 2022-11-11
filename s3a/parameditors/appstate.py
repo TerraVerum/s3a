@@ -125,11 +125,9 @@ class AppStateEditor(ParameterEditor):
         stateName: Union[str, Path],
         stateDict: dict = None,
     ):
-        if self.RECENT_STATE_FILENAME.exists():
-            defaults = attemptFileLoad(self.RECENT_STATE_FILENAME) or {}
-        else:
-            defaults = {}
-        stateDict = self.stateManager.loadState(stateName, stateDict) or {}
+        defaults = attemptFileLoad(self.RECENT_STATE_FILENAME, missingOk=True) or {}
+        if not stateDict:
+            stateDict = attemptFileLoad(stateName, missingOk=True) or {}
         for k in self.stateFunctionsDf.index[self.stateFunctionsDf["required"]]:
             stateDict.setdefault(k, defaults.get(k))
         return stateDict
