@@ -18,10 +18,10 @@ dependencies = [
     "scipy",
     "scikit-image >= 0.18.1",
     # Note! Before 0.13.2 release, should ideally use git >= 553287a
-    "pyqtgraph    >= 0.13.1",
+    "pyqtgraph",
     "Pillow",
     "qdarkstyle",
-    "qtextras     == 0.6.3",
+    "qtextras     ~= 0.6.4",
 ]
 dynamic = ["version"]
 classifiers = [
