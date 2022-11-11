@@ -61,7 +61,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         super().__init__(clctn, MENU_OPTS_DIR)
 
         self.props = ParameterContainer()
-        self.queueActions = False
+        self.queueActions = True
         self.region = MultiRegionPlot(disableMouseClick=True)
         self.region.hide()
         self.firstRun = True
