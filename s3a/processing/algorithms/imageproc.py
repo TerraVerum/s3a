@@ -78,7 +78,7 @@ def format_vertices(
     image: NChanImg,
     foregroundVertices: XYVertices,
     backgroundVertices: XYVertices,
-    oldComponentMask: BlackWhiteImg,
+    componentMask: BlackWhiteImg,
     firstRun: bool,
     useFullBoundary=True,
     keepVerticesHistory=True,
@@ -114,9 +114,9 @@ def format_vertices(
         backgroundVertices = XYVertices()
 
     if asForeground:
-        foregroundAdjustedCompMask = oldComponentMask
+        foregroundAdjustedCompMask = componentMask
     else:
-        foregroundAdjustedCompMask = ~oldComponentMask
+        foregroundAdjustedCompMask = ~componentMask
 
     # Default to bound slices that encompass the whole image
     bounds = np.array([[0, 0], image.shape[:2][::-1]])
@@ -128,8 +128,8 @@ def format_vertices(
         backgroundVertices=backgroundVertices,
         asForeground=asForeground,
         historyMask=curHistory,
-        oldComponentMask=foregroundAdjustedCompMask,
-        unformattedOldComponentMask=oldComponentMask,
+        componentMask=foregroundAdjustedCompMask,
+        unformattedComponentMask=componentMask,
         boundSlices=boundSlices,
     )
 
@@ -139,8 +139,8 @@ def crop_to_local_area(
     image: NChanImg,
     foregroundVertices: XYVertices,
     backgroundVertices: XYVertices,
-    oldComponentMask: BlackWhiteImg,
-    prevCompVerts: ComplexXYVertices,
+    componentMask: BlackWhiteImg,
+    componentVertices: ComplexXYVertices,
     viewbox: XYVertices,
     historyMask: GrayImg,
     reference="viewbox",
@@ -157,9 +157,9 @@ def crop_to_local_area(
         vertices of foreground region
     backgroundVertices
         vertices of background region
-    oldComponentMask
+    componentMask
         Mask of the focused component prior to this processing run
-    prevCompVerts
+    componentVertices
         Vertices of the focused component prior to this processing run
     viewbox
         Vertices of the viewbox, in the form ``[[xmin, ymin], [xmax, ymax]]``
@@ -180,7 +180,7 @@ def crop_to_local_area(
         (i.e. heavily rectangular), this prevents a large area from being used every time
     """
     roiVerts = np.vstack([foregroundVertices, backgroundVertices])
-    compVerts = np.vstack([prevCompVerts.stack(), roiVerts])
+    compVerts = np.vstack([componentVertices.stack(), roiVerts])
     if reference == "image":
         allVerts = np.array([[0, 0], image.shape[:2]])
     elif reference == "roi" and len(roiVerts) > 1:
@@ -230,7 +230,7 @@ def crop_to_local_area(
     foregroundVertices, backgroundVertices = useVerts
 
     boundSlices = slice(*bounds[:, 1]), slice(*bounds[:, 0])
-    croppedCompMask = oldComponentMask[boundSlices]
+    croppedCompMask = componentMask[boundSlices]
     curHistory = historyMask[boundSlices]
 
     rectThickness = int(max(1, *image.shape) * 0.005)
@@ -251,14 +251,14 @@ def crop_to_local_area(
         image=cropped,
         foregroundVertices=foregroundVertices,
         backgroundVertices=backgroundVertices,
-        oldComponentMask=croppedCompMask,
+        componentMask=croppedCompMask,
         boundSlices=boundSlices,
         historyMask=curHistory,
         resizeRatio=ratio,
         info=info,
     )
     if ratio < 1:
-        for kk in "image", "oldComponentMask", "historyMask":
+        for kk in "image", "componentMask", "historyMask":
             out[kk] = cv_resize(out[kk], ratio, interpolation="INTER_NEAREST")
     return out
 
@@ -266,8 +266,8 @@ def crop_to_local_area(
 def apply_process_result(
     image: NChanImg,
     asForeground: bool,
-    oldComponentMask: BlackWhiteImg,
-    unformattedOldComponentMask: BlackWhiteImg,
+    componentMask: BlackWhiteImg,
+    unformattedComponentMask: BlackWhiteImg,
     boundSlices: Tuple[slice, slice],
     resizeRatio: float,
 ):
@@ -280,8 +280,8 @@ def apply_process_result(
     # so expand the current area of interest only as much as needed. Returning to full
     # size now would incur unnecessary addtional processing times for the full-sized
     # image
-    outMask = unformattedOldComponentMask.copy()
-    change = bitOperation(oldComponentMask, image)
+    outMask = unformattedComponentMask.copy()
+    change = bitOperation(componentMask, image)
     if resizeRatio < 1:
         origSize = (
             boundSlices[0].stop - boundSlices[0].start,
@@ -318,15 +318,15 @@ def apply_process_result(
 
 def return_to_full_size(
     image: NChanImg,
-    unformattedOldComponentMask: BlackWhiteImg,
+    unformattedComponentMask: BlackWhiteImg,
     boundSlices: Tuple[slice],
 ):
-    out = np.zeros_like(unformattedOldComponentMask)
+    out = np.zeros_like(unformattedComponentMask)
     if image.ndim > 2:
         image = image.mean(2).astype(int)
     out[boundSlices] = image
 
-    infoMask = showMaskDifference(unformattedOldComponentMask[boundSlices], image)
+    infoMask = showMaskDifference(unformattedComponentMask[boundSlices], image)
 
     return dict(image=out, info={"image": infoMask, "name": "Finalize Region"})
 
@@ -421,22 +421,22 @@ class CvGrabcut(PipelineFunction):
     def grabcut(
         self,
         image: NChanImg,
-        oldComponentMask: BlackWhiteImg,
+        componentMask: BlackWhiteImg,
         foregroundVertices: XYVertices,
         firstRun: bool,
         historyMask: GrayImg,
         iters=5,
     ):
         if image.size == 0:
-            return dict(image=np.zeros_like(oldComponentMask))
+            return dict(image=np.zeros_like(componentMask))
         img = cv.cvtColor(image, cv.COLOR_RGB2BGR)
         historyMask = historyMask.copy()
         if historyMask.size:
             historyMask[foregroundVertices.rows, foregroundVertices.columns] = FGND
-        mask = np.zeros(oldComponentMask.shape, dtype="uint8")
+        mask = np.zeros(componentMask.shape, dtype="uint8")
         if historyMask.shape == mask.shape:
-            mask[oldComponentMask == 1] = cv.GC_PR_FGD
-            mask[oldComponentMask == 0] = cv.GC_PR_BGD
+            mask[componentMask == 1] = cv.GC_PR_FGD
+            mask[componentMask == 0] = cv.GC_PR_BGD
             mask[historyMask == FGND] = cv.GC_FGD
             mask[historyMask == BGND] = cv.GC_BGD
         if len(foregroundVertices) and np.all(foregroundVertices.ptp(0) > 1):
@@ -458,7 +458,7 @@ class CvGrabcut(PipelineFunction):
 
         if not np.any(mask):
             if cvRect[2] == 0 or cvRect[3] == 0:
-                return dict(image=np.zeros_like(oldComponentMask))
+                return dict(image=np.zeros_like(componentMask))
             mode = mode or cv.GC_INIT_WITH_RECT
         else:
             mode = mode or cv.GC_INIT_WITH_MASK

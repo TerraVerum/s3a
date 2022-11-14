@@ -285,11 +285,11 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         self.oldResultCache = imageproc.procCache.copy()
         result = self.currentProcessor.activate(
             image=img,
-            oldComponentMask=compMask,
+            componentMask=compMask,
             **vertsDict,
             firstRun=self.firstRun,
             viewbox=XYVertices(viewbox),
-            prevCompVerts=ComplexXYVertices(
+            componentVertices=ComplexXYVertices(
                 [r.stack() for r in self.region.regionData[RTF.VERTICES]]
             ),
         )
@@ -371,7 +371,12 @@ class VerticesPlugin(DASM, TableFieldPlugin):
             buffVerts.extend(inner)
         self.regionBuffer.append(buffEntry(newId, buffVerts))
 
-    def runOnComponent(self, component: pd.Series):
+    def runOnComponent(
+        self,
+        component: pd.Series,
+        verticesAs: t.Literal["foreground", "background", "none"] = "background",
+        **kwargs,
+    ):
         def makeReturnValue():
             return dict(components=fns.seriesAsFrame(component))
 
@@ -395,13 +400,23 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         oldProcCache = imageproc.procCache.copy()
         # Broad range of things that can go wrong
         # noinspection PyBroadException
+        vertsArgs = dict(
+            foregroundVertices=XYVertices(), backgroundVertices=XYVertices()
+        )
+        if verticesAs == "foreground":
+            vertsArgs["foregroundVertices"] = verts.stack()
+        elif verticesAs == "background":
+            vertsArgs["backgroundVertices"] = verts.stack()
+        for key in vertsArgs:
+            vertsArgs[key].connected = False
         try:
             result = self.currentProcessor.activate(
                 image=img,
-                oldComponentMask=compMask,
+                componentMask=compMask,
                 firstRun=True,
                 viewbox=XYVertices(viewbox),
-                prevCompVerts=verts,
+                componentVertices=verts,
+                **vertsArgs,
                 # Warnings render dialogs on the GUI thread but not otherwise
             )
         except Exception:

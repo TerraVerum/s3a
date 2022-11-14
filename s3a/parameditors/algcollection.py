@@ -92,20 +92,13 @@ class AlgorithmEditor(MetaTreeParameterEditor):
         )
         fns.setParametersExpanded(self._metaTree)
 
-        def onStateUpdated():
-            self.props.parameters["process"].setLimits(
-                list(self.collection.topProcesses)
-            )
-
         def onChange(name):
             self.props["process"] = name
 
-        self.collection.stateManager.signals.loadRequested.connect(onStateUpdated)
         self.sigProcessorChanged.connect(onChange)
         if self.collection.topProcesses:
             top = next(iter(self.collection.topProcesses))
             self.props["process"] = top
-        onStateUpdated()
 
     def saveParameterValues(
         self,
@@ -141,6 +134,8 @@ class AlgorithmEditor(MetaTreeParameterEditor):
         processName = stateDict.pop("active", None)
 
         self.collection.loadParameterValues(stateName, stateDict, **kwargs)
+        self.props.parameters["process"].setLimits(list(self.collection.topProcesses))
+
         if processName:
             self.changeActiveProcessor(processName, saveBeforeChange=False, force=True)
         # Parameter tree is managed by the collection, so don't load any candidates
@@ -350,7 +345,7 @@ class AlgorithmCollection(ParameterEditor):
         stages
             Stages to parse
         name
-            Pipeline name, defaults to ``:function:fns.nameFormatter(<unnamed>)`
+            Pipeline name, defaults to :function:`fns.nameFormatter(<unnamed>)`
         add
             Whether to add this new pipeline to the current collection's top or
             primitive process blocks, or to not add at all (if ``NO_ADD``)

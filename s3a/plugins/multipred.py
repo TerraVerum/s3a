@@ -1,7 +1,9 @@
 from __future__ import annotations
+import typing as t
 
 import numpy as np
 import pandas as pd
+from qtextras import fns, bindInteractorOptions as bind
 
 from .base import ProcessorPlugin
 from ..constants import (
@@ -30,9 +32,14 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         self.registerFunction(
             self.lastRunAnalytics, runActionTemplate=CNST.TOOL_PROC_ANALYTICS
         )
-        self.pluginRunnerFunction = self.algorithmCollection.parseProcessName(
-            "Run Plugins", topFirst=False
+        runnerName = self.algorithmCollection.addFunction(
+            self.applyPluginRunners,
+            name=fns.nameFormatter("run_plugins"),
         )
+        self.pluginRunnerFunction = self.algorithmCollection.parseProcessName(
+            runnerName
+        )
+        self.pluginRunnerFunction.cachable = False
 
     def attachToWindow(self, window):
         super().attachToWindow(window)
@@ -50,7 +57,14 @@ class MultiPredictionsPlugin(ProcessorPlugin):
             for p in self.window.classPluginMap.values()
             if hasattr(p, "runOnComponent")
         ]
-        self.pluginRunnerFunction.input.parameters["plugins"].setLimits(newLimits)
+        if "plugins" in self.pluginRunnerFunction.input.parameters:
+            self.pluginRunnerFunction.input.parameters["plugins"].setOpts(
+                limits=newLimits
+            )
+        else:
+            # Change bound limits for this function
+            boundAttrs = type(self).applyPluginRunners.__interactor_bind_options__
+            boundAttrs["plugins"]["limits"] = newLimits
 
     def makePrediction(self, components: pd.DataFrame = None, **runKwargs):
         if self.window.mainImage.image is None:
@@ -80,35 +94,60 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         compsToAdd = result["components"]
         if not len(compsToAdd):
             return
-        if "plugins" in result:
-            compsToAdd = self.applyPluginRunners(compsToAdd, result["plugins"])
 
         addType = runKwargs.get("addType") or result.get(
             "addType", PRJ_ENUMS.COMPONENT_ADD_AS_MERGE
         )
         return self.manager.addComponents(compsToAdd, addType)
 
-    def applyPluginRunners(self, components: pd.DataFrame, plugins: list[str]):
-        if not plugins:
+    @bind(
+        plugins=dict(type="checklist", value=[RTF.VERTICES.name], limits=[]),
+        verticesAs=dict(
+            type="list",
+            limits=["foreground", "background", "none"],
+            tip="Whether to treat component vertices as foreground information, "
+            "background information, or to disregard them during plugin processing",
+            title=fns.nameFormatter("treat_vertices_as"),
+        ),
+    )
+    def applyPluginRunners(
+        self,
+        components: pd.DataFrame,
+        plugins: list[str],
+        verticesAs: t.Literal["foreground", "background", "none"] = "background",
+    ):
+        if not plugins or not len(components):
             return components
         # Don't run on empty components, since these only exist to indicate deletion
         # But keep them recorded to handle them later on
-        emptyComps = []
-        for pluginName in plugins:
-            for plugin in self.window.classPluginMap.values():
-                if plugin.name == pluginName and hasattr(plugin, "runOnComponent"):
-                    dispatched = multipred.ProcessDispatcher(plugin.runOnComponent)
-                    emptyIdxs = (
-                        components[RTF.VERTICES]
-                        .apply(ComplexXYVertices.isEmpty)
-                        .to_numpy(bool)
-                    )
-                    emptyComps.append(components[emptyIdxs])
-                    components = dispatched(components=components[~emptyIdxs])[
-                        "components"
-                    ]
-                    continue
-        return pd.concat([components, *emptyComps])
+        # Add a sentinel dataframe to avoid error from empty components
+        emptyComps = [components.iloc[0:0]]
+        usePlugins = [
+            p
+            for p in self.window.classPluginMap.values()
+            if p.name in plugins and hasattr(p, "runOnComponent")
+        ]
+        for plugin in usePlugins:
+            dispatched = multipred.ProcessDispatcher(plugin.runOnComponent)
+            components, empty = self._handleDispatchedComponents(
+                components, dispatched, verticesAs=verticesAs
+            )
+            if len(empty):
+                emptyComps.append(empty)
+        return dict(components=pd.concat([components, *emptyComps]))
+
+    def _handleDispatchedComponents(
+        self,
+        components: pd.DataFrame,
+        dispatched: multipred.ProcessDispatcher,
+        **kwargs,
+    ):
+        if not len(components):
+            return components
+        result = dispatched(components=components, **kwargs)
+        newComponents = result["components"]
+        emptyIdxs = (newComponents[RTF.VERTICES].apply(len) < 1).to_numpy(bool)
+        return newComponents[~emptyIdxs], newComponents[emptyIdxs]
 
     def lastRunAnalytics(self):
         raise NotImplementedError

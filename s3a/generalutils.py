@@ -973,9 +973,7 @@ def safeEquals(a, b):
 def simpleCache(func):
     """Cache with size 1."""
     # populate the cache with a dummy value to guarantee the first run succeeds
-    last_args = (object(),)
-    last_kwargs = {object(): object()}
-    last_result = None
+    last_args, last_kwargs, last_result = None, {}, None
 
     @wraps(func)
     def _cached(*args, **kwargs):
@@ -988,6 +986,15 @@ def simpleCache(func):
             last_result = func(*args, **kwargs)
             last_args, last_kwargs = args, kwargs
         return last_result
+
+    def clear():
+        nonlocal last_args, last_kwargs, last_result
+        last_args = (object(),)
+        last_kwargs = {object(): object()}
+        last_result = None
+
+    _cached.clearCache = clear
+    clear()
 
     return _cached
 

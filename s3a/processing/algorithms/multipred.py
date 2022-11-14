@@ -1,5 +1,6 @@
 import copy
 import functools
+import inspect
 import typing as t
 
 import cv2 as cv
@@ -45,6 +46,10 @@ class ProcessDispatcher(PipelineFunction):
         self.singleRunner = function
         self.resultConverter = resultConverter
         # Ignore the "component" argument, which is added by the dispatcher
+        # See note below about functools.partial. If methods are encountered,
+        # wrap them once more so they can have attributes set
+        if inspect.ismethod(function):
+            function = functools.partial(function)
         function = bind(component=dict(ignore=True))(function)
 
         # Something tricky: `inspect.signature` can follow __wrapped__ to get the
@@ -476,23 +481,7 @@ def single_categorical_prediction(
     out[RTF.VERTICES] = ComplexXYVertices.fromBinaryMask(prediction).removeOffset(
         totalOffset
     )
-    return dict(components=fns.serAsFrame(out))
-
-
-class RunPlugins(PipelineFunction):
-    def __init__(self, **kwargs):
-        super().__init__(function=self.run_plugins, **kwargs)
-        # Instantiate parameters
-        ParameterEditor.defaultInteractor.interact(self, nest=False, runOptions=[])
-
-    @staticmethod
-    @bind(plugins=dict(type="checklist", value=[], limits=[RTF.VERTICES.name]))
-    def run_plugins(plugins=None):
-        """
-        Sets flags which trigger runs of various plugins, i.e. "Vertices" will trigger
-        the vertices plugin
-        """
-        return dict(plugins=plugins)
+    return dict(components=fns.seriesAsFrame(out))
 
 
 def remove_small_components(components: pd.DataFrame, sizeThreshold=30):

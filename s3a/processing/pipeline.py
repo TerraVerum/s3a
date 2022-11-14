@@ -37,15 +37,12 @@ class StageAncestryPrinter:
 
     def __init__(self, stage: PipelineFunction):
         stages = []
-        while stage:
+        while stage and isinstance(stage, PipelineStageType.__args__):
             stages.append(stage)
-            if isinstance(stage, PipelineStageType.__args__):
-                if isinstance(stage, PipelineParameter):
-                    stage = stage.parent()
-                else:
-                    stage = stage.parent
+            if isinstance(stage, PipelineParameter):
+                stage = stage.parent()
             else:
-                stage = None
+                stage = stage.parent
         # Reverse the list so that the first stage is at the beginning
         self.stages = stages[::-1]
 
@@ -63,6 +60,7 @@ def maybeGetFunction(parameter: Parameter) -> PipelineFunction | None:
 class PipelineFunction(InteractiveFunction):
     defaultInput: dict[str, t.Any] = {}
     infoKey = "info"
+    cachable = True
 
     def __init__(self, function, name: str = None, **kwargs):
         super().__init__(function, **kwargs)
@@ -75,13 +73,13 @@ class PipelineFunction(InteractiveFunction):
         self.result = None
 
     @classmethod
-    def fromInteractive(cls, function: InteractiveFunction, title: str = None):
-        obj = cls(function.function, title)
-        obj.__dict__.update(function.__dict__)
+    def fromInteractive(cls, interactive: InteractiveFunction, name: str = None):
+        obj = cls(interactive.function, name)
+        obj.__dict__.update(interactive.__dict__)
         # `parameters` and their cache should be copied specifically to avoid clearing
         # them from the reference InteractiveFunction during clears/etc.
         obj.parameters, obj.parameterCache = {}, {}
-        obj.hookupParameters(function.parameters, clearOld=False)
+        obj.hookupParameters(interactive.parameters.values(), clearOld=False)
         return obj
 
     def hookupParameters(self, params=None, clearOld=True):
@@ -102,7 +100,7 @@ class PipelineFunction(InteractiveFunction):
         try:
             self.result = super().__call__(**kwargs)
         except Exception as ex:
-            augmentException(ex, str(StageAncestryPrinter(self)))
+            augmentException(ex, f"{StageAncestryPrinter(self)}\n")
             raise
         return self.result
 
@@ -224,11 +222,18 @@ class PipelineParameter(ActionGroupParameter):
 
         stage: PipelineFunction
         stage.parent = self
-        if cache:
+        if cache and stage.cachable:
             stage.function = simpleCache(stage.function)
 
-        registered = ParameterEditor.defaultInteractor(
-            stage, parent=self, runOptions=[], **(stageInputOptions or {})
+        # Treat stage input options that collide with already-registered parameters
+        # as value options
+        registered = fns.interactAndHandleExistingParameters(  # noqa
+            ParameterEditor.defaultInteractor,
+            stage,
+            allowSetValue=True,
+            parent=self,
+            runOptions=[],
+            **(stageInputOptions or {}),
         )
         # Override item class to allow checkboxes on stages
         registered.itemClass = PipelineParameterItem
