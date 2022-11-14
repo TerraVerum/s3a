@@ -386,14 +386,15 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
         # Make sure the user actually wants this
         idList = pd.unique(idList)
         dlg = QtWidgets.QMessageBox()
+        btnType = dlg.StandardButton
         confirm = dlg.question(
             self,
             "Remove Rows",
             f"Are you sure you want to remove {len(idList)} selected row(s)?",
-            dlg.Yes | dlg.Cancel,
-            dlg.Yes,
+            btnType.Yes | btnType.Cancel,
+            btnType.Yes,
         )
-        if confirm == dlg.Yes:
+        if confirm == btnType.Yes:
             # Proceed with operation
             # Since each selection represents a row, remove duplicate row indices
             self.manager.removeComponents(idList)
