@@ -12,16 +12,17 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 urls = {homepage = "https://gitlab.com/s3a/s3a"}
+# Note! For qtextras/pyqtgraph dependencies, see requirements-intermed.txt
+# for git versions of these packages. Only used until next pypi release.
 dependencies = [
     "numpy",
     "pandas       >= 1.4.3",
     "scipy",
     "scikit-image >= 0.18.1",
-    # Note! Before 0.13.2 release, should ideally use git >= 553287a
     "pyqtgraph",
     "Pillow",
     "qdarkstyle",
-    "qtextras     ~= 0.6.4",
+    "qtextras ~= 0.6.5",
 ]
 dynamic = ["version"]
 classifiers = [

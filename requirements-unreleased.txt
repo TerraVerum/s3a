@@ -1,0 +1,3 @@
+# Used to specify temporary requirements for packages whose updates are not yet
+# available in on pypi
+pyqtgraph@git+https://github.com/pyqtgraph/pyqtgraph.git@553287a

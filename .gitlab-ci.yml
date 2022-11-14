@@ -24,9 +24,7 @@ pytest:
     libopengl0
   "
   - python --version
-  - pip install -e .[full]
-  # Until 0.13.2 is released
-  - pip install pyqtgraph@git+https://github.com/pyqtgraph/pyqtgraph.git@553287a
+  - pip install -r requirements-pinned.txt
   - pip install pytest
   - pip install pytest-cov
   - pip install pytest-qt
