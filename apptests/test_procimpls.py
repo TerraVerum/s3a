@@ -3,10 +3,10 @@ import warnings
 import numpy as np
 import pandas as pd
 import pytest
-from apptests.conftest import SAMPLE_SMALL_IMG
 from qtextras import seriesAsFrame
 from skimage import util
 
+from apptests.conftest import SAMPLE_SMALL_IMG
 from apptests.testingconsts import SAMPLE_IMG
 from s3a import REQD_TBL_FIELDS, ComplexXYVertices
 from s3a.generalutils import imageCornerVertices

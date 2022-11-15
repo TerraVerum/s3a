@@ -13,7 +13,6 @@ from apptests.testingconsts import (
     SAMPLE_IMG_FNAME,
     SAMPLE_SMALL_IMG,
     SAMPLE_SMALL_IMG_FNAME,
-    TEST_FILE_DIR,
 )
 from s3a import S3A
 from s3a.plugins.file import ProjectData, absolutePath

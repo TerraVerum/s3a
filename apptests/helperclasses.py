@@ -5,8 +5,8 @@ import cv2 as cv
 import numpy as np
 import pandas as pd
 from qtextras import CompositionMixin, OptionsDict
-from apptests.testingconsts import RND, TEST_FILE_DIR
 
+from apptests.testingconsts import RND, TEST_FILE_DIR
 from s3a.constants import REQD_TBL_FIELDS
 from s3a.structures import ComplexXYVertices
 from s3a.tabledata import TableData

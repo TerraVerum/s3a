@@ -2,13 +2,14 @@ import time
 
 import pytest
 
+# isort: off
 from s3a.processing.threads import (
     AbortableThreadContainer,
     # RunnableFunctionWrapper,
     # RunnableThreadContainer,
     ThreadedFunctionWrapper,
 )
-
+# isort: on
 
 # class GlobalThreadPoolContainer(RunnableThreadContainer):
 #     """
@@ -29,10 +30,9 @@ def sleepUntilCallback(cb, timeoutSeconds=5.0):
     if timeout:
         raise TimeoutError(f"{cb} never occurred")
 
+
 # Leave as parametrize for now in case GlobalThreadPoolContainer is used
-@pytest.mark.parametrize(
-    "container", [AbortableThreadContainer]
-)
+@pytest.mark.parametrize("container", [AbortableThreadContainer])
 def test_containers(qtbot, container):
     pool = container()
     # if isinstance(pool, GlobalThreadPoolContainer):
@@ -107,9 +107,7 @@ def test_waiting(qtbot):
 
 
 # Leave as parametrize for now in case GlobalThreadPoolContainer is used
-@pytest.mark.parametrize(
-    "threadOrRunnable", [ThreadedFunctionWrapper]
-)
+@pytest.mark.parametrize("threadOrRunnable", [ThreadedFunctionWrapper])
 def test_wrappers(qtbot, threadOrRunnable):
     def myfunc(id_, err=False):
         if err:

@@ -5,9 +5,9 @@ from typing import Sequence, Union
 
 import numpy as np
 import pytest
-from apptests.conftest import dfTester
 from qtextras import fns
 
+from apptests.conftest import dfTester
 from apptests.testingconsts import RND
 from s3a import REQD_TBL_FIELDS, ComplexXYVertices
 from s3a.tabledata import TableData

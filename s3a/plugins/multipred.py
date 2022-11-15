@@ -1,9 +1,10 @@
 from __future__ import annotations
+
 import typing as t
 
 import numpy as np
 import pandas as pd
-from qtextras import fns, bindInteractorOptions as bind
+from qtextras import bindInteractorOptions as bind, fns
 
 from .base import ProcessorPlugin
 from ..constants import (
@@ -16,7 +17,6 @@ from ..constants import (
 from ..models.tablemodel import ComponentManager
 from ..parameditors.algcollection import AlgorithmCollection
 from ..processing.algorithms import multipred
-from ..structures import ComplexXYVertices
 
 
 class MultiPredictionsPlugin(ProcessorPlugin):

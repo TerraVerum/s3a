@@ -6,7 +6,6 @@ from pyqtgraph import QtCore
 
 from . import PipelineFunction
 
-
 # class RunnableFunctionWrapperSignals(QtCore.QObject):
 #     resultReady = QtCore.Signal(object)
 #     """ThreadedFunctionWrapper instance, emmitted on successful function run"""
@@ -50,6 +49,7 @@ from . import PipelineFunction
 #     def sigFailed(self):
 #         return self.signals.failed
 #
+
 
 class ThreadedFunctionWrapper(QtCore.QThread):
     sigResultReady = QtCore.Signal(object)

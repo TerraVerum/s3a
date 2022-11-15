@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
-from apptests.conftest import NUM_COMPS, dfTester
 from pyqtgraph.Qt import QtCore
-from apptests.testingconsts import RND, TEST_FILE_DIR
 
+from apptests.conftest import NUM_COMPS, dfTester
+from apptests.testingconsts import RND, TEST_FILE_DIR
 from s3a import TableData
 from s3a.compio.importers import SerialImporter
 from s3a.constants import PRJ_ENUMS, REQD_TBL_FIELDS

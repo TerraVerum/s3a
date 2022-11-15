@@ -3,9 +3,8 @@ from __future__ import annotations
 import typing as t
 
 import numpy as np
-from pkg_resources import parse_version
-
 import pyqtgraph as pg
+from pkg_resources import parse_version
 from pyqtgraph.parametertree import InteractiveFunction, Parameter
 from pyqtgraph.parametertree.parameterTypes import (
     ActionGroupParameter,

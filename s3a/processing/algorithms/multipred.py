@@ -6,13 +6,7 @@ import typing as t
 import cv2 as cv
 import numpy as np
 import pandas as pd
-from qtextras import (
-    FROM_PREV_IO,
-    OptionsDict,
-    ParameterEditor,
-    bindInteractorOptions as bind,
-    fns,
-)
+from qtextras import FROM_PREV_IO, OptionsDict, bindInteractorOptions as bind, fns
 from scipy.ndimage import maximum_filter
 
 from .. import PipelineFunction

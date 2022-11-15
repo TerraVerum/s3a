@@ -3,9 +3,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+
 from apptests.conftest import NUM_COMPS, dfTester
 from apptests.testingconsts import RND, SAMPLE_IMG, SAMPLE_IMG_FNAME
-
 from s3a import mkQApp
 from s3a.constants import LAYOUTS_DIR, PRJ_CONSTS as CNST, REQD_TBL_FIELDS
 from s3a.plugins.mainimage import MainImagePlugin
