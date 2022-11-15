@@ -338,9 +338,12 @@ class MultiRegionPlot(BoundScatterPlot):
         fills[:, -1] = fillAlpha
 
         # On the chance some specified maps have alpha, ignore it with indexing
-        fills[:, :-1] = fns.getAnyPgColormap(labelColormap, forceExist=True).map(
-            lbls, mode="float"
-        )[:, :3]
+        if labelColormap in [None, "None"]:
+            fills[:] = 0
+        else:
+            fills[:, :-1] = fns.getAnyPgColormap(labelColormap, forceExist=True).map(
+                lbls, mode="float"
+            )[:, :3]
 
         for clr, typ in zip(
             [selectedFill, focusedFill],
