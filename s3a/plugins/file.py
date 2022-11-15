@@ -231,7 +231,7 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         doctoredCur = PipelineFunction(
             exportWrapper(window.exportCurrentAnnotation),
             name="Current Annotation",
-            outFname="",
+            outputPath="",
         )
         doctoredAll = PipelineFunction(
             exportWrapper(self.projectData.exportAnnotations),
