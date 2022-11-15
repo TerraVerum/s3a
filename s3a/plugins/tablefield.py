@@ -57,7 +57,6 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         clctn = AlgorithmCollection(
             ImagePipeline, template=CONFIG_DIR / "imageproc.yml"
         )
-        clctn.addAllModuleProcesses(imageproc)
         super().__init__(clctn, MENU_OPTS_DIR)
 
         self.props = ParameterContainer()

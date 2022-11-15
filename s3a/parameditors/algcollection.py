@@ -212,7 +212,10 @@ class AlgorithmCollection(ParameterEditor):
         self.includeModules: list[str] = []
 
         if template is not None:
-            self.loadParameterValues(template)
+            templateDict = self.stateManager.loadState(template)
+            for module in templateDict.get("modules", []):
+                self.addAllModuleProcesses(module)
+            self.loadParameterValues(template, templateDict)
 
     def saveStagesByReference(
         self,

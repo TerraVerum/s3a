@@ -26,7 +26,6 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         clctn = AlgorithmCollection(
             name="Multi Predictions", template=CONFIG_DIR / f"multipred.yml"
         )
-        clctn.addAllModuleProcesses(multipred)
         super().__init__(clctn, MENU_OPTS_DIR)
 
         self.registerFunction(
