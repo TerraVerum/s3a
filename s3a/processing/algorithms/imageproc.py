@@ -312,7 +312,7 @@ def apply_process_result(
         maxs = xywhRect[1] + xywhRect[3], xywhRect[0] + xywhRect[2]
 
     # Add 1 to max slice so stopping value is last foreground pixel
-    newSlices = (slice(mins[0], maxs[0] + 1), slice(mins[1], maxs[1] + 1))
+    newSlices = (slice(mins[0], maxs[0]), slice(mins[1], maxs[1]))
     return dict(image=outMask[newSlices], boundSlices=newSlices, info={"image": change})
 
 
