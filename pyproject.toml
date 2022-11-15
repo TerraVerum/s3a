@@ -12,7 +12,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 urls = {homepage = "https://gitlab.com/s3a/s3a"}
-# Note! For qtextras/pyqtgraph dependencies, see requirements-intermed.txt
+# Note! For qtextras/pyqtgraph dependencies, see requirements-unreleased.txt
 # for git versions of these packages. Only used until next pypi release.
 dependencies = [
     "numpy",
