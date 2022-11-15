@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import typing as t
 
 from pyqtgraph import QtCore
@@ -120,9 +121,11 @@ class ThreadedFunctionWrapper(QtCore.QThread):
 class AbortableThreadContainer(QtCore.QObject):
     sigThreadsUpdated = QtCore.Signal()
 
-    def __init__(self, maxConcurrentThreads=1):
+    def __init__(self, maxConcurrentThreads=1, rateLimitMs=0):
         self.threads: list[ThreadedFunctionWrapper] = []
         self.maxConcurrentThreads = maxConcurrentThreads
+        self.rateLimitMs = rateLimitMs
+        self.lastThreadStart = time.perf_counter()
         super().__init__()
 
     def addThread(
@@ -131,6 +134,11 @@ class AbortableThreadContainer(QtCore.QObject):
         updateThreads=True,
         **addedKwargs,
     ):
+        currentTime = time.perf_counter()
+        elapsedMs = (currentTime - self.lastThreadStart) * 1000
+        if self.rateLimitMs > 0 and elapsedMs < self.rateLimitMs:
+            return None
+        self.lastThreadStart = currentTime
         if not isinstance(thread, ThreadedFunctionWrapper):
             thread = ThreadedFunctionWrapper(thread, **addedKwargs)
         self.threads.append(thread)

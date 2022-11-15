@@ -70,7 +70,7 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         self.stageInfoImage.hide()
         self._displayedStage = ""
         self.statusButton: QtWidgets.QPushButton | None = None
-        self.taskManager = AbortableThreadContainer()
+        self.taskManager = AbortableThreadContainer(rateLimitMs=250)
         self.taskManager.sigThreadsUpdated.connect(self.updateTaskLabel)
 
         self.oldResultCache = None
@@ -174,15 +174,15 @@ class VerticesPlugin(DASM, TableFieldPlugin):
         kwargs = {vertsKey: verts}
         if self.queueActions:
             # Wait to start thread to guarantee signals are connected
-            thread = self.taskManager.addThread(
+            if thread := self.taskManager.addThread(
                 self.runAndWrapExceptions,
                 **kwargs,
                 name="Vertices Update",
                 updateThreads=False,
-            )
-            thread.sigResultReady.connect(self._onThreadFinished)
-            thread.sigFailed.connect(self._onThreadFinished)
-            self.taskManager.updateThreads()
+            ):
+                thread.sigResultReady.connect(self._onThreadFinished)
+                thread.sigFailed.connect(self._onThreadFinished)
+                self.taskManager.updateThreads()
         else:
             # Run immediately
             result = self.runAndWrapExceptions(**kwargs)
