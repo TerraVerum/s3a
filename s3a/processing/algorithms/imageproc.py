@@ -1,3 +1,4 @@
+import functools
 from typing import Any, Dict, Tuple, Union
 
 import cv2 as cv
@@ -374,6 +375,17 @@ def morph_op(image: NChanImg, op: int, radius=1, shape="rectangle"):
     strel = getattr(morph, shape)(*ksize)
     outImg = cv.morphologyEx(image.copy(), op, strel)
     return dict(image=outImg)
+
+class OpenAndClose(PipelineFunction):
+    def __init__(self, **kwargs):
+        super().__init__(self.open_and_close, "open_and_close", **kwargs)
+
+    # `op` is just provided for consistency with morph_op but is unused
+    @functools.wraps(morph_op)
+    def open_and_close(self, image, op=None, radius=1, shape="rectangle"):
+        tmp = morph_op(image, cv.MORPH_OPEN, radius, shape)["image"]
+        tmp = morph_op(tmp, cv.MORPH_CLOSE, radius, shape)["image"]
+        return dict(image=tmp)
 
 
 opening = PipelineFunction(morph_op, "opening", op=cv.MORPH_OPEN)

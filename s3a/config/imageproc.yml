@@ -13,8 +13,7 @@ primitive:
 
   Basic Region Operations:
     - Fill Holes
-    - Opening
-    - Closing
+    - Open And Close
     - Keep Largest Component
     - Remove Small Components
 
