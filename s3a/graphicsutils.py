@@ -11,7 +11,7 @@ from qtextras import (
     ImageViewer,
     ParameterContainer,
     RunOptions,
-    bindInteractorOptions as bind,
+    bindInteractorOptions as bind, fns,
 )
 
 Signal = QtCore.Signal
@@ -179,13 +179,8 @@ class RegionHistoryViewer(QtWidgets.QMainWindow):
         self.differenceImages = differenceImages
         self.sigImageBufferChanged.emit()
 
+    @bind(timestamp=dict(title=fns.nameFormatter("timestamp (ms)")))
     def autoPlay(self, timestep=500):
-        """
-        Parameters
-        ----------
-        timestep
-            title: Timestep (ms)
-        """
         self.histTimer.start(timestep)
 
     def incrSlicer(self):

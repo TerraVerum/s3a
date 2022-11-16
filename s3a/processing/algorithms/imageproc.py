@@ -482,6 +482,8 @@ class CvGrabcut(PipelineFunction):
 class QuickShift(PipelineFunction):
     def __init__(self, name: str = "quickshift_segmentation", **kwargs):
         super().__init__(self.quickshift_segmentation, name, **kwargs)
+        self.function.__doc__ = seg.quickshift.__doc__
+
 
     @staticmethod
     def quickshift_segmentation(
@@ -497,9 +499,6 @@ class QuickShift(PipelineFunction):
                 image = np.tile(image[:, :, None], (1, 1, 3))
             segImg = seg.quickshift(image, **locs)
         return dict(labels=segImg)
-
-    quickshift_segmentation.__doc__ = seg.quickshift.__doc__
-
 
 # Taken from example page: https://scikit-image.org/docs/dev/auto_examples/segmentation/plot_morphsnakes.html  # noqa
 def morph_acwe(image: NChanImg, initialCheckerSize=6, iters=35, smoothing=3):

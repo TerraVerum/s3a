@@ -438,8 +438,8 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
             title=fns.nameFormatter("output_file"),
             type="file",
             value="",
-            fileMode="ExistingFile",
-            filter=defaultIo.ioFileFilter(PRJ_ENUMS.IO_EXPORT),
+            fileMode="AnyFile",
+            nameFilter=defaultIo.ioFileFilter(PRJ_ENUMS.IO_EXPORT),
         )
     )
     def exportCurrentAnnotation(self, outputPath: str | Path, **kwargs):

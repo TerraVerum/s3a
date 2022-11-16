@@ -56,7 +56,7 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         self.projectData = self.exposes(ProjectData(startupName, startupCfg))
         self.autosaveTimer = QtCore.QTimer()
         self.projNameLbl = QtWidgets.QLabel()
-        self.exportOptsParam = self._buildIoOptions()
+        self.exportOptsParam = None
 
         self._projectImagePane = ProjectImagePane()
         self._projectImagePane.sigImageSelected.connect(
@@ -231,7 +231,6 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         doctoredCur = PipelineFunction(
             exportWrapper(window.exportCurrentAnnotation),
             name="Current Annotation",
-            outputPath="",
         )
         doctoredAll = PipelineFunction(
             exportWrapper(self.projectData.exportAnnotations),
@@ -241,6 +240,7 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
             ["Project", "All Annotations", "Current Annotation"],
             runActionTemplate=CNST.TOOL_PROJ_EXPORT,
         )
+        self.exportOptsParam = self._buildIoOptions()
         self._projectImagePane.hide()
         self._updateProjectLabel()
         window.addTabbedDock(
