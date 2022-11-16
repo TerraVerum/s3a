@@ -376,6 +376,7 @@ def morph_op(image: NChanImg, op: int, radius=1, shape="rectangle"):
     outImg = cv.morphologyEx(image.copy(), op, strel)
     return dict(image=outImg)
 
+
 class OpenAndClose(PipelineFunction):
     def __init__(self, **kwargs):
         super().__init__(self.open_and_close, "open_and_close", **kwargs)
@@ -484,7 +485,6 @@ class QuickShift(PipelineFunction):
         super().__init__(self.quickshift_segmentation, name, **kwargs)
         self.function.__doc__ = seg.quickshift.__doc__
 
-
     @staticmethod
     def quickshift_segmentation(
         image: NChanImg, ratio=1.0, max_dist=10.0, kernel_size=5, sigma=0.0
@@ -499,6 +499,7 @@ class QuickShift(PipelineFunction):
                 image = np.tile(image[:, :, None], (1, 1, 3))
             segImg = seg.quickshift(image, **locs)
         return dict(labels=segImg)
+
 
 # Taken from example page: https://scikit-image.org/docs/dev/auto_examples/segmentation/plot_morphsnakes.html  # noqa
 def morph_acwe(image: NChanImg, initialCheckerSize=6, iters=35, smoothing=3):

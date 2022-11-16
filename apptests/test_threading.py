@@ -9,6 +9,7 @@ from s3a.processing.threads import (
     # RunnableThreadContainer,
     ThreadedFunctionWrapper,
 )
+
 # isort: on
 
 # class GlobalThreadPoolContainer(RunnableThreadContainer):

@@ -11,7 +11,8 @@ from qtextras import (
     ImageViewer,
     ParameterContainer,
     RunOptions,
-    bindInteractorOptions as bind, fns,
+    bindInteractorOptions as bind,
+    fns,
 )
 
 Signal = QtCore.Signal
