@@ -4,6 +4,8 @@
 #
 #    pip-compile --extra=full --output-file=requirements-pinned.txt ./pyproject.toml requirements-unreleased.txt
 #
+docstring-parser==0.15
+    # via s3a (./pyproject.toml)
 imageio==2.22.4
     # via scikit-image
 networkx==2.8.8
@@ -58,7 +60,7 @@ pywavelets==1.4.1
     # via scikit-image
 qdarkstyle==3.1
     # via s3a (./pyproject.toml)
-qtextras @ git+https://gitlab.com/s3a/qtextras.git@4f9366c
+qtextras @ git+https://gitlab.com/s3a/qtextras.git@7a7bae4
     # via
     #   -r requirements-unreleased.txt
     #   s3a (./pyproject.toml)
