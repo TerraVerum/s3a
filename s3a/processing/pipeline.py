@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import typing as t
 
 import numpy as np
@@ -38,10 +39,7 @@ class StageAncestryPrinter:
         stages = []
         while stage and isinstance(stage, PipelineStageType.__args__):
             stages.append(stage)
-            if isinstance(stage, PipelineParameter):
-                stage = stage.parent()
-            else:
-                stage = stage.parent
+            stage = stage.parent()
         # Reverse the list so that the first stage is at the beginning
         self.stages = stages[::-1]
 
@@ -67,14 +65,23 @@ class PipelineFunction(InteractiveFunction):
             self.__name__ = name
 
         self.defaultInput = dict(self.input)
-        self.parent: PipelineParameter | None = None
+        self._parent: PipelineParameter | None = None
 
         self.result = None
 
     @classmethod
     def fromInteractive(cls, interactive: InteractiveFunction, name: str = None):
-        obj = cls(interactive.function, name)
-        obj.__dict__.update(interactive.__dict__)
+        obj = copy.copy(interactive)
+        func = obj.function
+        # Special case: interactives whose function is bound to themselves need to be
+        # rebound to `obj` so that the `self` argument is correct
+        if (
+            hasattr(func, "__self__")
+            and func.__self__ is interactive
+            and hasattr(obj, func.__name__)
+        ):
+            obj.function = getattr(obj, obj.function.__name__)
+
         # `parameters` and their cache should be copied specifically to avoid clearing
         # them from the reference InteractiveFunction during clears/etc.
         obj.parameters, obj.parameterCache = {}, {}
@@ -90,6 +97,16 @@ class PipelineFunction(InteractiveFunction):
         #   changes
 
         return ret
+
+    def parent(self):
+        """
+        Normally, this would conform to standards and be an attribute, but
+        to be compatible with a ``Parameter`` parent, it must be a method
+        """
+        return self._parent
+
+    def setParent(self, parent):
+        self._parent = parent
 
     @property
     def input(self):
@@ -220,7 +237,7 @@ class PipelineParameter(ActionGroupParameter):
             raise TypeError("Stage must be callable")
 
         stage: PipelineFunction
-        stage.parent = self
+        stage.setParent(self)
         if cache and stage.cachable:
             stage.function = simpleCache(stage.function)
 

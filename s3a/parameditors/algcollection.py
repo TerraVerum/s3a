@@ -277,7 +277,9 @@ class AlgorithmCollection(ParameterEditor):
                 or process.__module__ != module.__name__
             ):
                 continue
-            if inspect.isclass(process):
+            if inspect.isclass(process) and issubclass(
+                process, PipelineStageType.__args__
+            ):
                 try:
                     process = process()
                 except TypeError:
