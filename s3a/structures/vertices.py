@@ -217,7 +217,7 @@ class ComplexXYVertices(list):
         self,
         maskShape: Union[Sequence, NChanImg] = None,
         fillColor: Union[int, float, np.ndarray] = None,
-        checkForDisconnectedVerts=False,
+        onlyFillConnected=False,
         warnIfTooSmall=True,
     ):
         if maskShape is None:
@@ -244,7 +244,7 @@ class ComplexXYVertices(list):
                     f"Vertex shape: {vertMax}, mask shape: {cmpShape}",
                     stacklevel=2,
                 )
-        if checkForDisconnectedVerts:
+        if onlyFillConnected:
             fillArg = []
             for verts in self:  # type: XYVertices
                 if verts.connected:

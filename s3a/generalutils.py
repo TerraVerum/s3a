@@ -701,7 +701,7 @@ def subImageFromVertices(
 
 def _getRotationStats(
     verts: ComplexXYVertices | np.ndarray,
-    rotationDeg: float | Any,
+    rotationDegrees: float | Any,
     outputShape: np.ndarray = None,
     allowTranspose=False,
 ):
@@ -716,12 +716,12 @@ def _getRotationStats(
         trueRotationDeg -= 90
         width_height = width_height[::-1]
 
-    if rotationDeg is PRJ_ENUMS.ROTATION_OPTIMAL:
+    if rotationDegrees is PRJ_ENUMS.ROTATION_OPTIMAL:
         # Use the rotation that most squarely aligns the component
-        rotationDeg = trueRotationDeg
+        rotationDegrees = trueRotationDeg
         allowTranspose = True
 
-    points = cv.boxPoints((center, width_height, rotationDeg - trueRotationDeg))
+    points = cv.boxPoints((center, width_height, rotationDegrees - trueRotationDeg))
     if (
         allowTranspose
         and outputShape is not None
@@ -729,15 +729,15 @@ def _getRotationStats(
     ):
         # Redo the rotation with an extra 90 degrees to swap width and height
         # Use whichever re-orientation leads closer to a 0 degree angle
-        newRots = [rotationDeg + 90, rotationDeg - 90, rotationDeg]
+        newRots = [rotationDegrees + 90, rotationDegrees - 90, rotationDegrees]
         newIdx = np.argmin(np.abs(newRots) % 360)
-        rotationDeg = newRots[newIdx]
+        rotationDegrees = newRots[newIdx]
         # Case where width/height should be swapped, as done to trueRotDeg
         if newIdx == 2:
             width_height = width_height[::-1]
-        points = cv.boxPoints((center, width_height, rotationDeg - trueRotationDeg))
+        points = cv.boxPoints((center, width_height, rotationDegrees - trueRotationDeg))
 
-    return points, rotationDeg
+    return points, rotationDegrees
 
 
 def _shapeTransposeNeeded(inputShape, outputShape):
@@ -759,7 +759,7 @@ def _getAffineSubregion(
     transformedBbox: np.ndarray,
     totalBbox: np.ndarray,
     outputShape,
-    rotationDeg=0.0,
+    rotationDegrees=0.0,
     padBorderOpts: dict = None,
     **affineKwargs,
 ):
@@ -768,7 +768,7 @@ def _getAffineSubregion(
     # This is easily resolved by adding just a few more pixels to the total box
     totalBbox[0] -= 1
     totalBbox[1] += 1
-    hasRotation = not np.isclose(rotationDeg, 0)
+    hasRotation = not np.isclose(rotationDegrees, 0)
     xyImageShape = image.shape[:2][::-1]
     # It's possible for mins and maxs to be outside image regions
     underoverPadding = np.zeros_like(totalBbox, dtype=int)
@@ -797,7 +797,7 @@ def _getAffineSubregion(
     inter = affineKwargs.pop("interpolation", cv.INTER_NEAREST)
     if hasRotation:
         midpoint = transformedBbox.mean(0) - subImageBbox[0]
-        M = cv.getRotationMatrix2D(midpoint, rotationDeg, 1)
+        M = cv.getRotationMatrix2D(midpoint, rotationDegrees, 1)
         rotated = cv.warpAffine(
             subImage, M, subImage.shape[:2][::-1], flags=inter, **affineKwargs
         )
@@ -815,7 +815,7 @@ def _getAffineSubregion(
     stats = dict(
         subImageBbox=subImageBbox,
         normedTransformedBbox=normedTransformedBbox,
-        rotation=rotationDeg,
+        rotation=rotationDegrees,
         interpolation=inter,
         **affineKwargs,
     )

@@ -164,7 +164,6 @@ class LblPngExporter(AnnotationExporter):
         verts.toMask(
             exportObject,
             instance[PRJ_ENUMS.FIELD_LABEL],
-            checkForDisconnectedVerts=False,
         )
         return exportObject
 
