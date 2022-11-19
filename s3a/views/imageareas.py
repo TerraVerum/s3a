@@ -197,7 +197,7 @@ class MainImage(DASM, ImageViewer):
         self.regionMover.erase()
 
     def _widgetContainerChildren(self):
-        return [self.drawActionGroup, self.drawShapeGroup, self]
+        return [[self.drawActionGroup, self.drawShapeGroup], self]
 
     def _initGrid(self):
         pi: pg.PlotItem = self.plotItem
