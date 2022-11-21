@@ -24,9 +24,11 @@ class MultiPredictionsPlugin(ProcessorPlugin):
 
     def __init__(self):
         clctn = AlgorithmCollection(
-            name="Multi Predictions", template=CONFIG_DIR / f"multipred.yml"
+            name="Multi Predictions",
+            template=CONFIG_DIR / f"multipred.yml",
+            directory=MENU_OPTS_DIR,
         )
-        super().__init__(clctn, MENU_OPTS_DIR)
+        super().__init__(clctn)
 
         self.registerFunction(
             self.lastRunAnalytics, runActionTemplate=CNST.TOOL_PROC_ANALYTICS

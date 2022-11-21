@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 from pyqtgraph.parametertree import InteractiveFunction
 from pyqtgraph.Qt import QtWidgets
-from qtextras import FilePath, ParameterEditor, fns
+from qtextras import ParameterEditor, fns
 
 from ..constants import MENU_OPTS_DIR, PRJ_CONSTS
 from ..graphicsutils import reorderMenuActions
@@ -145,24 +145,27 @@ class ProcessorPlugin(ParameterEditorPlugin):
     processEditor: algcollection.AlgorithmEditor = None
     """
     Most table field plugins will use some sort of processor to infer field data.
-    This property holds spawned collections. See :class:`XYVerticesPlugin` for
+    This property holds spawned collections. See :class:`VerticesPlugin` for
     an example.
     """
-    _processorDirectoryParent = MENU_OPTS_DIR
 
     def __init__(
         self,
-        algorithmCollection: AlgorithmCollection,
-        processorParentPath: FilePath,
+        algorithmCollection: AlgorithmCollection = None,
         processorSuffix: str = ".alg",
         **kwargs,
     ):
+        if algorithmCollection is None:
+            algorithmCollection = AlgorithmCollection()
         super().__init__(**kwargs)
         self.algorithmCollection = algorithmCollection
 
         procName = f"{self.name} Processor"
-        procDir = Path(processorParentPath) / procName.lower()
-        procDir.mkdir(exist_ok=True)
+        if algorithmCollection.directory:
+            procDir = Path(algorithmCollection.directory) / procName.lower()
+            procDir.mkdir(exist_ok=True)
+        else:
+            procDir = None
 
         self.processEditor = AlgorithmEditor(
             self.algorithmCollection,
