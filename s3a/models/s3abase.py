@@ -88,7 +88,7 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
             },
         )
 
-        self.filePlugin = FilePlugin()
+        self.filePlugin = FilePlugin(startupName=startupSettings.pop("project", None))
         self.tableData = self.filePlugin.projectData.tableData
         self.componentIo = self.filePlugin.projectData.componentIo
         self.tableData.filter = TableFilterEditor(directory=TABLE_DIR)

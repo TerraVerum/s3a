@@ -53,7 +53,7 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
 
     def __init__(self, startupName: FilePath = None, startupCfg: dict = None):
         super().__init__()
-        self.projectData = self.exposes(ProjectData(startupName, startupCfg))
+        self.projectData = prjData = self.exposes(ProjectData(startupName, startupCfg))
         self.autosaveTimer = QtCore.QTimer()
         self.projNameLbl = QtWidgets.QLabel()
         self.exportOptsParam = None
@@ -62,7 +62,8 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         self._projectImagePane.sigImageSelected.connect(
             lambda imgFname: self.window.setMainImage(imgFname)
         )
-        self._projectImagePane.setRootDirectory(str(self.projectData.imagesPath))
+        rootDirectory = str(prjData.imagesPath) if prjData.location else os.getcwd()
+        self._projectImagePane.setRootDirectory(rootDirectory)
 
         def onCfgLoad():
             self._updateProjectLabel()
