@@ -12,6 +12,7 @@ from qtextras.typeoverloads import FilePath
 from .templatemgr import IOTemplateManager
 from .yamlparser import YamlParser
 from ..constants import REQD_TBL_FIELDS as RTF
+from ..generalutils import getMaybeReplaceKey
 from ..parameditors.tablefilter import TableFilterEditor
 from ..structures import OptionsDictGroup
 
@@ -175,8 +176,12 @@ class TableData(QtCore.QObject):
             configPath = configPath.resolve()
         # Often, a table config can be wrapped in a project config; look for this case
         # first
-        if configDict is not None and "table-config" in configDict:
-            configDict = configDict["table-config"]
+        if configDict is not None and (
+            "table-config" in configDict or "table-cfg" in configDict
+        ):
+            configDict = getMaybeReplaceKey(
+                configDict, oldKey="table-cfg", newKey="table-config"
+            )
 
         fns.hierarchicalUpdate(baseConfigDict, configDict, uniqueListElements=True)
         cfg = baseConfigDict

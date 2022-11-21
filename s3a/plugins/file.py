@@ -30,7 +30,7 @@ from ..constants import (
     PROJECT_FILE_TYPE,
     REQD_TBL_FIELDS,
 )
-from ..generalutils import cvImsaveRgb, hierarchicalUpdate
+from ..generalutils import cvImsaveRgb, getMaybeReplaceKey, hierarchicalUpdate
 from ..graphicsutils import DropList
 from ..logger import getAppLogger
 from ..processing import PipelineFunction
@@ -62,14 +62,11 @@ class FilePlugin(CompositionMixin, ParameterEditorPlugin):
         self._projectImagePane.sigImageSelected.connect(
             lambda imgFname: self.window.setMainImage(imgFname)
         )
-        self.projectData.sigConfigLoaded.connect(
-            lambda: self._projectImagePane.setRootDirectory(
-                str(self.projectData.imagesPath)
-            )
-        )
+        self._projectImagePane.setRootDirectory(str(self.projectData.imagesPath))
 
         def onCfgLoad():
             self._updateProjectLabel()
+            self._projectImagePane.setRootDirectory(str(self.projectData.imagesPath))
             if self.window:
                 # Other arguments are consumed by app state editor
                 state = self.window.appStateEditor
@@ -631,7 +628,7 @@ class ProjectData(QtCore.QObject):
         """Records annotations belonging to each image"""
         self.spawnedPlugins: List[ParameterEditorPlugin] = []
         """
-        Plugin instances stored separately from plugin-cfg to maintain serializability 
+        Plugin instances stored separately from plugin-config to maintain serializability
         of ``self.config`` 
         """
 
@@ -693,7 +690,7 @@ class ProjectData(QtCore.QObject):
 
     @property
     def pluginConfig(self) -> Dict[str, str]:
-        return self.config["plugin-cfg"]
+        return self.config["plugin-config"]
 
     def clearImagesAndAnnotations(self):
         oldImgs = self.images.copy()
@@ -726,7 +723,9 @@ class ProjectData(QtCore.QObject):
 
         hierarchicalUpdate(baseCfgDict, configDict, uniqueListElements=True)
 
-        loadPrjPlugins = baseCfgDict.get("plugin-cfg", {})
+        loadPrjPlugins = getMaybeReplaceKey(
+            baseCfgDict, "plugin-cfg", newKey="plugin-config", default={}
+        )
         newPlugins = {
             k: v for (k, v) in loadPrjPlugins.items() if k not in self.pluginConfig
         }
@@ -762,20 +761,16 @@ class ProjectData(QtCore.QObject):
         cfg = self.config = baseCfgDict
 
         self.clearImagesAndAnnotations()
-
-        tableInfo = cfg.get("table-config", None)
+        tableInfo = getMaybeReplaceKey(cfg, "table-cfg", "table-config", {})
         if isinstance(tableInfo, str):
-            tableDict = None
             tableName = tableInfo
+            tableInfo = None
         else:
-            if tableInfo is None:
-                tableInfo = {}
-            tableDict = tableInfo
             tableName = configPath
         tableName = Path(tableName)
         if not tableName.is_absolute() and configPath:
             tableName = self.location / tableName
-        self.tableData.loadConfig(tableName, tableDict, force=True)
+        self.tableData.loadConfig(tableName, tableInfo, force=True)
 
         if configPath:
             self._hookupProjectDirectoryInfo()

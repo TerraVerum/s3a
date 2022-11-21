@@ -44,8 +44,6 @@ buffEntry = namedtuple("buffentry", "id_ vertices")
 
 
 class VerticesPlugin(DASM, TableFieldPlugin):
-    name = "Vertices"
-
     def __initSharedSettings__(self, shared: SharedAppSettings = None, **kwargs):
         super().__initSharedSettings__(shared, **kwargs)
 
@@ -55,7 +53,9 @@ class VerticesPlugin(DASM, TableFieldPlugin):
 
     def __init__(self):
         clctn = AlgorithmCollection(
-            ImagePipeline, template=CONFIG_DIR / "imageproc.yml"
+            name="Vertices",
+            processType=ImagePipeline,
+            template=CONFIG_DIR / "imageproc.yml",
         )
         super().__init__(clctn, MENU_OPTS_DIR)
 

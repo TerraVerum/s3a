@@ -123,18 +123,18 @@ def test_load_with_plg(monkeypatch, tmp_path):
     with monkeypatch.context() as m:
         from apptests.files.sample_plg import SamplePlugin
 
-        cfg = {"plugin-cfg": {"Test": "apptests.files.sample_plg.SamplePlugin"}}
+        cfg = {"plugin-config": {"Test": "apptests.files.sample_plg.SamplePlugin"}}
         filePlugin.open(tmp_path / "plgprj.s3aprj", cfg)
         assert SamplePlugin in app.classPluginMap
         assert len(filePlugin.projectData.spawnedPlugins) == 1
         assert filePlugin.projectData.spawnedPlugins[0].window
 
     # Remove existing plugin
-    cfg = {"plugin-cfg": {"New Name": "nonsense.Plugin"}}
+    cfg = {"plugin-config": {"New Name": "nonsense.Plugin"}}
     with pytest.raises(ValueError):
         filePlugin.open(tmp_path / "plgprj2.s3aprj", cfg)
     # Add nonsense plugin
-    cfg["plugin-cfg"]["Test"] = "files.sample_plg.SamplePlugin"
+    cfg["plugin-config"]["Test"] = "files.sample_plg.SamplePlugin"
     with pytest.warns(UserWarning):
         filePlugin.open(tmp_path / "plgprj2.s3aprj", cfg)
 

@@ -1006,3 +1006,30 @@ class ClassInteractiveFunction(InteractiveFunction):
             return self
         self.extra["self"] = instance
         return self
+
+
+def getMaybeReplaceKey(
+    dictionary: dict,
+    oldKey: str,
+    newKey: str,
+    default=None,
+    replace=True,
+    category=FutureWarning,
+    stacklevel=3,
+):
+    """
+    If the old key is in the dictionary, warn about its usage if a warning type is
+    provided and return the value. Optionally replace the key with the new key.
+    """
+    if oldKey in dictionary and newKey not in dictionary:
+        if category is not None:
+            warnings.warn(
+                f"The key `{oldKey}` is deprecated. Use `{newKey}` instead.",
+                category,
+                stacklevel=stacklevel,
+            )
+        default = dictionary[oldKey]
+        if replace:
+            dictionary[newKey] = default
+            del dictionary[oldKey]
+    return dictionary.get(newKey, default)
