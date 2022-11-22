@@ -13,9 +13,9 @@ from apptests.testingconsts import (
     SAMPLE_SMALL_IMG,
     SAMPLE_SMALL_IMG_FNAME,
 )
-from s3a import REQD_TBL_FIELDS, constants, mkQApp
+from s3a import REQD_TBL_FIELDS, mkQApp
 from s3a.constants import PRJ_ENUMS
-from s3a.plugins.file import FilePlugin
+from s3a.plugins.file import FilePlugin, ProjectData
 from s3a.plugins.tablefield import VerticesPlugin
 from s3a.views.s3agui import S3A
 
@@ -33,11 +33,17 @@ def sampleComps():
 # Assign temporary project directory
 @pytest.fixture(scope="session", autouse=True)
 def app(tmpdir_factory):
-    constants.APP_STATE_DIR = tmpdir_factory.mktemp("settings")
-    app_ = S3A(Image=SAMPLE_IMG_FNAME, log=PRJ_ENUMS.LOG_TERM, loadLastState=False)
+    dummyProject = ProjectData.create(name=str(tmpdir_factory.mktemp("proj")))
+    app_ = S3A(
+        Image=SAMPLE_IMG_FNAME,
+        log=PRJ_ENUMS.LOG_TERM,
+        loadLastState=False,
+        project=dummyProject.configPath,
+    )
     app_.filePlugin.projectData.create(
         name=str(tmpdir_factory.mktemp("proj")), parent=app_.filePlugin.projectData
     )
+    app_.appStateEditor.stateManager.moveDirectory(tmpdir_factory.mktemp("settings"))
     return app_
 
 
