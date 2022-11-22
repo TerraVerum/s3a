@@ -651,13 +651,13 @@ def subImageFromVertices(
         vertices[vertices[:, ax].argmin()] -= margin
         vertices[vertices[:, ax].argmax()] += margin
 
-    initialBbox = coordsToBox(vertices)
+    initialBox = polygonToBox(vertices)
     transformedPts, rotationDegrees = _getRotationStats(
         vertices, rotationDegrees, shape, allowTranspose
     )
     if shape is None:
         shape = (transformedPts.ptp(0)[::-1] + 1).astype(int)
-    transformedBbox = coordsToBox(transformedPts)
+    transformedBbox = polygonToBox(transformedPts)
     # Handle half-coordinates by preserving both ends of the spectrum
     newXYShape = transformedBbox.ptp(0).astype(int)
     transformedBbox[0] = np.floor(transformedBbox[0])
@@ -679,15 +679,15 @@ def subImageFromVertices(
         rotatedPoints = cv.boxPoints(
             (transformedBbox.mean(0), transformedBbox.ptp(0), -rotationDegrees)
         )
-        # rotatedPoints = initialBbox
-        totalBbox = np.r_[initialBbox, rotatedPoints, transformedBbox]
+        # rotatedPoints = initialBox
+        totalBbox = np.r_[initialBox, rotatedPoints, transformedBbox]
     else:
-        totalBbox = np.r_[initialBbox, transformedBbox]
+        totalBbox = np.r_[initialBox, transformedBbox]
 
     subImage, stats = _getAffineSubregion(
         image, transformedBbox, totalBbox, shape, rotationDegrees, **kwargs
-    )
-    stats["initialBbox"] = initialBbox
+        )
+    stats["initialBox"] = initialBox
 
     ret = [subImage]
     if returnBoundingBox:
@@ -756,47 +756,47 @@ def _shapeTransposeNeeded(inputShape, outputShape):
 
 def _getAffineSubregion(
     image,
-    transformedBbox: np.ndarray,
-    totalBbox: np.ndarray,
+    transformedBox: np.ndarray,
+    totalBox: np.ndarray,
     outputShape,
     rotationDegrees=0.0,
-    padBorderOpts: dict = None,
+    padBorderOptions: dict = None,
     **affineKwargs,
 ):
-    totalBbox = coordsToBox(totalBbox, addOneToMax=False)
+    totalBox = polygonToBox(totalBox, addOneToMax=False)
     # It's common for rotation angles to cut off fractions of a pixel during warping.
     # This is easily resolved by adding just a few more pixels to the total box
-    totalBbox[0] -= 1
-    totalBbox[1] += 1
+    totalBox[0] -= 1
+    totalBox[1] += 1
     hasRotation = not np.isclose(rotationDegrees, 0)
     xyImageShape = image.shape[:2][::-1]
     # It's possible for mins and maxs to be outside image regions
-    underoverPadding = np.zeros_like(totalBbox, dtype=int)
-    idx = totalBbox[0] < 0
-    underoverPadding[0, idx] = -totalBbox[0, idx]
-    idx = totalBbox[1] > xyImageShape
-    underoverPadding[1, idx] = (totalBbox[1] - xyImageShape)[idx]
-    subImageBbox = totalBbox.astype(int)
-    normedTransformedBbox = (transformedBbox - subImageBbox[0]).astype(int)
-    totalBbox = np.clip(totalBbox, 0, xyImageShape).astype(int)
+    underoverPadding = np.zeros_like(totalBox, dtype=int)
+    idx = totalBox[0] < 0
+    underoverPadding[0, idx] = -totalBox[0, idx]
+    idx = totalBox[1] > xyImageShape
+    underoverPadding[1, idx] = (totalBox[1] - xyImageShape)[idx]
+    subImageBbox = totalBox.astype(int)
+    normedTransformedBbox = (transformedBox - subImageBbox[0]).astype(int)
+    totalBox = np.clip(totalBox, 0, xyImageShape).astype(int)
 
-    mins = totalBbox.min(0)
-    maxs = totalBbox.max(0)
+    mins = totalBox.min(0)
+    maxs = totalBox.max(0)
 
     subImage = image[mins[1] : maxs[1], mins[0] : maxs[0], ...]
     if np.any(underoverPadding):
-        padBorderOpts = padBorderOpts or dict(value=0, borderType=cv.BORDER_CONSTANT)
+        padBorderOptions = padBorderOptions or dict(value=0, borderType=cv.BORDER_CONSTANT)
         subImage = cv.copyMakeBorder(
             subImage,
             underoverPadding[0, 1],
             underoverPadding[1, 1],
             underoverPadding[0, 0],
             underoverPadding[1, 0],
-            **padBorderOpts,
+            **padBorderOptions,
         )
     inter = affineKwargs.pop("interpolation", cv.INTER_NEAREST)
     if hasRotation:
-        midpoint = transformedBbox.mean(0) - subImageBbox[0]
+        midpoint = transformedBox.mean(0) - subImageBbox[0]
         M = cv.getRotationMatrix2D(midpoint, rotationDegrees, 1)
         rotated = cv.warpAffine(
             subImage, M, subImage.shape[:2][::-1], flags=inter, **affineKwargs
@@ -813,8 +813,8 @@ def _getAffineSubregion(
         ...,
     ]
     stats = dict(
-        subImageBbox=subImageBbox,
-        normedTransformedBbox=normedTransformedBbox,
+        subImageBox=subImageBbox,
+        normedTransformedBox=normedTransformedBbox,
         rotation=rotationDegrees,
         interpolation=inter,
         **affineKwargs,
@@ -822,7 +822,7 @@ def _getAffineSubregion(
     return cv.resize(toRescale, outputShape[::-1], interpolation=inter), stats
 
 
-def inverseSubImage(subImage, stats, finalBbox: np.ndarray = None):
+def inverseSubImage(subImage, stats, finalBoundingBox: np.ndarray = None):
     """
     From a subImage after a call from `subImageFromVerts`, turns it back into a
     regularly size, de-rotated version
@@ -833,11 +833,11 @@ def inverseSubImage(subImage, stats, finalBbox: np.ndarray = None):
         Image to resize and re-rotate
     stats
         dict of stats coming from the `subImageFromVerts` call
-    finalBbox
+    finalBoundingBox
         If provided, this is the region from within the inverted subImage to extract
     """
-    subBbox = stats["subImageBbox"]
-    transBbox = stats["normedTransformedBbox"]
+    subBbox = stats["subImageBox"]
+    transBbox = stats["normedTransformedBox"]
     preResizedShape = transBbox.ptp(0)
     unresized = cv.resize(
         subImage, preResizedShape, interpolation=stats.get("interpolation")
@@ -847,12 +847,12 @@ def inverseSubImage(subImage, stats, finalBbox: np.ndarray = None):
     unrotated = trans.rotate(
         unresized, -stats["rotation"], resize=True, preserve_range=True
     ).astype(subImage.dtype)
-    if finalBbox is None and "initialBbox" not in stats:
+    if finalBoundingBox is None and "initialBox" not in stats:
         return unrotated
-    elif finalBbox is None:
-        finalBbox = stats["initialBbox"]
-    idxOffset = np.clip(finalBbox[0] - (subBbox[0]), 0, np.inf).astype(int)
-    outputSizeXY = finalBbox.ptp(0)
+    elif finalBoundingBox is None:
+        finalBoundingBox = stats["initialBox"]
+    idxOffset = np.clip(finalBoundingBox[0] - (subBbox[0]), 0, np.inf).astype(int)
+    outputSizeXY = finalBoundingBox.ptp(0)
     out = unrotated[
         idxOffset[1] : idxOffset[1] + outputSizeXY[1],
         idxOffset[0] : idxOffset[0] + outputSizeXY[0],
@@ -861,8 +861,8 @@ def inverseSubImage(subImage, stats, finalBbox: np.ndarray = None):
     return out
 
 
-def coordsToBox(coords: np.ndarray, addOneToMax=True):
-    ret = np.r_[coords.min(0, keepdims=True), coords.max(0, keepdims=True)]
+def polygonToBox(polygon: np.ndarray, addOneToMax=True):
+    ret = np.r_[polygon.min(0, keepdims=True), polygon.max(0, keepdims=True)]
     if addOneToMax:
         ret[1] += 1
     return ret

@@ -465,12 +465,12 @@ def single_categorical_prediction(
     prediction = np.argmax(prediction[0], axis=-1)
     prediction[prediction > 0] = 1
     prediction = gutils.inverseSubImage(
-        prediction.astype("uint8"), stats, gutils.coordsToBox(verts)
+        prediction.astype("uint8"), stats, gutils.polygonToBox(verts)
     )
     if not np.any(prediction):
         return dict(components=pd.DataFrame(columns=component.index))
     out = component.copy()
-    paddingOffset = verts.min(0) - stats["subImageBbox"][0]
+    paddingOffset = verts.min(0) - stats["subImageBox"][0]
     totalOffset = -(coords[0] + paddingOffset).astype(int)
     out[RTF.VERTICES] = ComplexXYVertices.fromBinaryMask(prediction).removeOffset(
         totalOffset
