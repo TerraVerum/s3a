@@ -99,6 +99,7 @@ class AlgorithmEditor(MetaTreeParameterEditor):
         if self.collection.topProcesses:
             top = next(iter(self.collection.topProcesses))
             self.props["process"] = top
+            self.props.parameters["process"].setDefault(top)
 
     def saveParameterValues(
         self,
