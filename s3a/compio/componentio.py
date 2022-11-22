@@ -254,4 +254,4 @@ class ComponentIO:
         return exportFn(fromData, toFile, **exportArgs)
 
 
-defaultIo = ComponentIO()
+defaultIo = ComponentIO(TableData())
