@@ -4,7 +4,7 @@ from typing import Union
 import cv2 as cv
 import numpy as np
 import pandas as pd
-from qtextras import CompositionMixin, OptionsDict
+from qtextras import OptionsDict
 
 from apptests.testingconsts import RND, TEST_FILE_DIR
 from s3a.constants import REQD_TBL_FIELDS
@@ -12,12 +12,12 @@ from s3a.structures import ComplexXYVertices
 from s3a.tabledata import TableData
 
 
-class CompDfTester(CompositionMixin):
+class CompDfTester:
     def __init__(self, numComps, fillInfo=True, tableData=None):
         if tableData is None:
             tableData = TableData()
         self.tableData = tableData
-        self.compDf = self.exposes(tableData.makeComponentDf(numComps))
+        self.compDf = tableData.makeComponentDf(numComps)
         self.compDf.set_index(np.arange(numComps, dtype=int), inplace=True)
         self.numComps = numComps
         if fillInfo:

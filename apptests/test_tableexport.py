@@ -190,7 +190,7 @@ def test_compimgs_export(tmp_path, _simpleTbl):
     tester.compDf.index = np.concatenate(
         [tester.compDf.index[:50], tester.compDf.index[:50]]
     )
-    tester.compDf[REQD_TBL_FIELDS.ID] = tester.index
+    tester.compDf[REQD_TBL_FIELDS.ID] = tester.compDf.index
 
     # Do df export just to test the output file capability and various options
     io.exportCompImgsDf(tester.compDf, tmp_path / "test.pkl", labelField="List")
