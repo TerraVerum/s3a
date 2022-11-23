@@ -178,15 +178,16 @@ class ComponentController(DASM, QtCore.QObject):
 
     def _createFieldDisplayProcess(self):
         io = {}
+        interactor = ParameterEditor.defaultInteractor
         for deleg in self.fieldDisplay.availableDelegates.values():
-            delegIo = ParameterEditor.defaultInteractor.functionToParameterDict(
-                deleg.setData
-            )
+            delegIo = interactor.functionToParameterDict(deleg.setData)
             useIo = {
                 ch["name"]: ch for ch in delegIo["children"] if ch["type"] != "type"
             }
             io.update(useIo)
-        return InteractiveFunction(self.showFieldInfoById, **io)
+        toReturn = InteractiveFunction(self.showFieldInfoById)
+        interactor(toReturn, **io)
+        return toReturn
 
     def recomputePenWidth(self):
         if not self.props[PRJ_CONSTS.PROP_SCALE_PEN_WIDTH]:
@@ -312,7 +313,7 @@ class ComponentController(DASM, QtCore.QObject):
         self.selectedIds = selectedIds
         # Silently update selected ids since focusById will force another graphic update
         self.regionPlot.updateSelectedAndFocused(
-            selectedIds=selectedIds, updatePlot=False
+            selectedIds=selectedIds, updatePlot=True
         )
         selectedComps = self._componentManager.compDf.loc[selectedIds]
         self.sigComponentsSelected.emit(selectedComps)
