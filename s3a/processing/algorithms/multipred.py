@@ -75,6 +75,7 @@ class ProcessDispatcher(PipelineFunction):
         else:
             # Concat fails with empty list, just make an empty dataframe
             outComps = components.iloc[0:0].copy()
+        outComps.index = outComps[RTF.ID]
         out = dict(**result, components=outComps)
         return out
 
