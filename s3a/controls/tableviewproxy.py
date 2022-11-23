@@ -512,7 +512,7 @@ class ComponentController(DASM, QtCore.QObject):
                 newComps, PRJ_ENUMS.COMPONENT_ADD_AS_MERGE
             )
 
-    @bind(file=dict(type="file", fileMode="ExistingFile"))
+    @bind(file=dict(type="file", fileMode="AnyFile"))
     def exportComponentOverlay(self, file="", toClipboard=False):
         """
         Exports the current component overlay to a file or clipboard
