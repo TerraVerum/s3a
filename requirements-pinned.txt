@@ -60,7 +60,7 @@ pywavelets==1.4.1
     # via scikit-image
 qdarkstyle==3.1
     # via s3a (./pyproject.toml)
-qtextras @ git+https://gitlab.com/s3a/qtextras.git@1ac8402
+qtextras @ git+https://gitlab.com/s3a/qtextras.git@91a093d
     # via
     #   -r requirements-unreleased.txt
     #   s3a (./pyproject.toml)

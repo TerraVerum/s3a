@@ -137,7 +137,7 @@ class AlgorithmEditor(MetaTreeParameterEditor):
         self.collection.loadParameterValues(stateName, stateDict, **kwargs)
         self.props.parameters["process"].setLimits(list(self.collection.topProcesses))
 
-        if processName:
+        if processName and processName != self.currentProcessor.title():
             self.changeActiveProcessor(processName, saveBeforeChange=False, force=True)
         # Parameter tree is managed by the collection, so don't load any candidates
         return super().loadParameterValues(

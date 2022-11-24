@@ -381,9 +381,21 @@ class OpenAndClose(PipelineFunction):
     def __init__(self, **kwargs):
         super().__init__(self.open_and_close, "open_and_close", **kwargs)
 
-    # `op` is just provided for consistency with morph_op but is unused
-    @functools.wraps(morph_op)
-    def open_and_close(self, image, op=None, radius=1, shape="rectangle"):
+    @staticmethod
+    def open_and_close(image: np.ndarray, radius=1, shape="rectangle"):
+        """
+        Perform morphological opening and closing on the input image.
+
+        Parameters
+        ----------
+        image
+            Input image
+        radius
+            Radius of the structuring element. Note that the total side length of the
+            structuring element will be (2*radius)+1.
+        shape
+            Structuring element shape
+        """
         tmp = morph_op(image, cv.MORPH_OPEN, radius, shape)["image"]
         tmp = morph_op(tmp, cv.MORPH_CLOSE, radius, shape)["image"]
         return dict(image=tmp)

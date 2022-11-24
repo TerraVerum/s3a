@@ -5,15 +5,18 @@ import typing as t
 
 import numpy as np
 import pyqtgraph as pg
-from pkg_resources import parse_version
-from pyqtgraph.parametertree import InteractiveFunction, Parameter
+from pyqtgraph.parametertree import InteractiveFunction, Parameter, Interactor
 from pyqtgraph.parametertree.parameterTypes import (
     ActionGroupParameter,
-    ActionGroupParameterItem,
 )
-from pyqtgraph.Qt import QtCore, QtGui
-from qtextras import ParameterContainer, ParameterEditor, fns
-from qtextras._funcparse import FROM_PREV_IO
+from pyqtgraph.Qt import QtCore
+from qtextras import (
+    ParameterContainer,
+    ParameterEditor,
+    fns,
+    FROM_PREV_IO,
+    ChainedActionGroupParameter,
+)
 
 from ..generalutils import augmentException, simpleCache
 
@@ -23,7 +26,6 @@ __all__ = [
     "maybeGetFunction",
     "PipelineFunction",
     "PipelineParameter",
-    "PipelineParameterItem",
     "PipelineStageType",
     "StageAncestryPrinter",
 ]
@@ -57,7 +59,7 @@ def maybeGetFunction(parameter: Parameter) -> PipelineFunction | None:
 class PipelineFunction(InteractiveFunction):
     defaultInput: dict[str, t.Any] = {}
     infoKey = "info"
-    cachable = True
+    cacheable = True
 
     def __init__(self, function, name: str = None, **kwargs):
         super().__init__(function, **kwargs)
@@ -70,8 +72,14 @@ class PipelineFunction(InteractiveFunction):
         self.result = None
 
     @classmethod
-    def fromInteractive(cls, interactive: InteractiveFunction, name: str = None):
-        obj = copy.copy(interactive)
+    def fromInteractive(
+        cls, interactive: InteractiveFunction, name: str = None
+    ) -> t.Self:
+        if isinstance(interactive, cls):
+            obj = copy.copy(interactive)
+        else:
+            obj = cls(interactive.function, name=name)
+            obj.__dict__.update(interactive.__dict__)
         func = obj.function
         # Special case: interactives whose function is bound to themselves need to be
         # rebound to `obj` so that the `self` argument is correct
@@ -86,6 +94,7 @@ class PipelineFunction(InteractiveFunction):
         # them from the reference InteractiveFunction during clears/etc.
         obj.parameters, obj.parameterCache = {}, {}
         obj.hookupParameters(interactive.parameters.values(), clearOld=False)
+        obj: cls
         return obj
 
     def hookupParameters(self, params=None, clearOld=True):
@@ -151,133 +160,38 @@ class PipelineFunction(InteractiveFunction):
                 self.parameters[kk].setDefault(toUpdate[kk])
 
 
-class PipelineParameterItem(ActionGroupParameterItem):
-    def __init__(self, param, depth):
-        self.enabledFontMap = None
-        super().__init__(param, depth)
-        if param.opts["enabled"]:
-            # Starts out unchecked, adjust at the start
-            self.setCheckState(0, QtCore.Qt.CheckState.Checked)
-
-    def _mkFontMap(self):
-        if self.enabledFontMap:
-            return
-        enabledFont = self.font(0)
-        disableFont = QtGui.QFont()
-        disableFont.setStrikeOut(True)
-        self.enabledFontMap = {True: enabledFont, False: disableFont}
-
-    def optsChanged(self, param, opts):
-        super().optsChanged(param, opts)
-        if "enabled" in opts:
-            enabled = opts["enabled"]
-            cs = QtCore.Qt.CheckState
-            role = cs.Checked if enabled else cs.Unchecked
-            # Bypass subclass to prevent early short-circuit
-            self.setCheckState(0, role)
-            # This gets called before constructor can finish, so add enabled font map here
-            self._mkFontMap()
-            self.setFont(0, self.enabledFontMap[enabled])
-
-    def updateFlags(self):
-        # It's a shame super() doesn't return flags...
-        super().updateFlags()
-        flags = self.flags()
-        flags |= QtCore.Qt.ItemFlag.ItemIsUserCheckable & (
-            ~QtCore.Qt.ItemFlag.ItemIsAutoTristate
-        )
-        self.setFlags(flags)
-
-    def setData(self, column, role, value):
-        castedRole = QtCore.Qt.ItemDataRole(role)
-        if parse_version(pg.Qt.QtVersion) >= parse_version("6.0"):
-            # 'int' no longer implicitly cast. However, casting role on earlier
-            # versions results in an error.
-            role = castedRole
-        if castedRole != QtCore.Qt.ItemDataRole.CheckStateRole:
-            return super().setData(column, role, value)
-        cs = QtCore.Qt.CheckState
-        newEnabled = cs(value) == cs.Checked
-        if newEnabled == self.param.opts["enabled"]:
-            # Ensure no mismatch between param enabled and item checkstate
-            super().setData(column, role, value)
-        else:
-            # `optsChanged` above will handle check state
-            self.param.setOpts(enabled=newEnabled)
-        return True
-
-
-class PipelineParameter(ActionGroupParameter):
-    itemClass = PipelineParameterItem
-
+class PipelineParameter(ChainedActionGroupParameter):
     metaKeys = ["enabled"]
 
     def __init__(self, **opts):
         opts.setdefault("type", "pipelinegroup")
         opts.setdefault("title", fns.nameFormatter(opts.get("name", "")))
         super().__init__(**opts)
-        self.sigOptionsChanged.connect(self.optsChanged)
 
     def addStage(
         self,
         stage: InteractiveFunction | PipelineStageType | t.Callable,
+        *,
+        interactor: Interactor = None,
         cache=True,
-        stageInputOptions: dict = None,
-        **metaOptions,
+        **kwargs,
     ):
-        if isinstance(stage, PipelineParameter):
-            return self.addChild(stage)
-        if isinstance(stage, InteractiveFunction):
-            # If already a PipelineFunction, the copy created is still useful
-            # in case caching is needed or other modifications are made
-            stage = PipelineFunction.fromInteractive(stage)
-        elif callable(stage):
-            stage = PipelineFunction(stage)
-        else:
-            raise TypeError("Stage must be callable")
+        if interactor is None:
+            interactor = ParameterEditor.defaultInteractor
+        stage = self._resolveStage(stage, cache)
+        return super().addStage(stage, interactor=interactor, **kwargs)
 
-        stage: PipelineFunction
-        stage.setParent(self)
-        if cache and stage.cachable:
+    def _resolveStage(self, stage, cache=True):
+        if isinstance(stage, InteractiveFunction):
+            stage = PipelineFunction.fromInteractive(stage)
+            stage.setParent(self)
+        elif callable(stage) and not isinstance(stage, ChainedActionGroupParameter):
+            stage = PipelineFunction(stage)
+            stage.setParent(self)
+        if cache and isinstance(stage, PipelineFunction) and stage.cacheable:
             stage.function = simpleCache(stage.function)
 
-        # Treat stage input options that collide with already-registered parameters
-        # as value options
-        registered = fns.interactAndHandleExistingParameters(  # noqa
-            ParameterEditor.defaultInteractor,
-            stage,
-            allowSetValue=True,
-            parent=self,
-            runOptions=[],
-            **(stageInputOptions or {}),
-        )
-        # Override item class to allow checkboxes on stages
-        registered.itemClass = PipelineParameterItem
-        registered.setOpts(title=stage.title(), function=stage, **metaOptions)
-        return registered
-
-    def activate(self, **kwargs):
-        super().activate()
-        if not self.opts["enabled"]:
-            return kwargs
-        for child in self.children():  # type: ActionGroupParameter
-            if isinstance(child, PipelineParameter):
-                kwargs.update(child.activate(**kwargs))
-            if not child.opts["enabled"] or not (function := maybeGetFunction(child)):
-                continue
-            useKwargs = {k: v for k, v in kwargs.items() if k in function.input}
-            output = function(**useKwargs)
-            if isinstance(output, dict):
-                kwargs.update(output)
-        return kwargs
-
-    def optsChanged(self, _param, opts):
-        if "enabled" not in opts:
-            return
-        enabled = opts["enabled"]
-        for child in self:
-            if isinstance(child, PipelineParameter) or maybeGetFunction(child):
-                child.setOpts(enabled=enabled)
+        return stage
 
     def flattenedFunctions(self) -> list[PipelineFunction]:
         """
