@@ -137,8 +137,8 @@ class AlgorithmEditor(MetaTreeParameterEditor):
         self.collection.loadParameterValues(stateName, stateDict, **kwargs)
         self.props.parameters["process"].setLimits(list(self.collection.topProcesses))
 
-        if processName and processName != self.currentProcessor.title():
-            self.changeActiveProcessor(processName, saveBeforeChange=False, force=True)
+        if processName and (process := self._resolveProccessor(processName)):
+            self.changeActiveProcessor(process, saveBeforeChange=False)
         # Parameter tree is managed by the collection, so don't load any candidates
         return super().loadParameterValues(
             stateName, stateDict, candidateParameters=[], **kwargs
@@ -169,7 +169,11 @@ class AlgorithmEditor(MetaTreeParameterEditor):
         # TODO: Maybe there's a better way of doing this? Ensures process label is updated
         #  for programmatic calls
         title = process.title() if isinstance(process, PipelineParameter) else process
-        needsChange = process and (force or title != self.currentProcessor.title())
+        needsChange = process and (
+            force
+            or title != self.currentProcessor.title()
+            or not self.stateEqualsCurrent(process)
+        )
         # Easier to understand "if not needsChange" vs. a double negative from direct
         # evaluation
         if not needsChange:
@@ -186,6 +190,16 @@ class AlgorithmEditor(MetaTreeParameterEditor):
         self.rootParameter.addChild(process)
         fns.setParametersExpanded(self.tree)
         self.sigProcessorChanged.emit(process.title())
+
+    def stateEqualsCurrent(self, other: PipelineParameter | str | None):
+        if other is None:
+            return False
+        if isinstance(other, str):
+            return other == self.currentProcessor.title()
+        filter_ = ["meta", "default"]
+        return self.collection.unnestedProcessState(
+            self.currentProcessor, processFilter=filter_
+        ) == self.collection.unnestedProcessState(other, processFilter=filter_)
 
     def _resolveProccessor(self, processor):
         if isinstance(processor, str):
