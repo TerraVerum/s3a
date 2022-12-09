@@ -50,7 +50,7 @@ from .tabledata import TableData
 from .views.s3agui import S3A
 
 appInst = None
-__version__ = "0.6.2"
+__version__ = "0.7.0"
 
 
 def mkQApp(*args):
