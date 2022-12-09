@@ -11,6 +11,7 @@ from qtextras import (
     ParameterContainer,
     ParameterEditor,
     bindInteractorOptions as bind,
+    FROM_PREV_IO,
 )
 
 from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
@@ -182,7 +183,9 @@ class ComponentController(DASM, QtCore.QObject):
         for deleg in self.fieldDisplay.availableDelegates.values():
             delegIo = interactor.functionToParameterDict(deleg.setData)
             useIo = {
-                ch["name"]: ch for ch in delegIo["children"] if ch["type"] != "type"
+                ch["name"]: ch
+                for ch in delegIo["children"]
+                if ch["value"] is not FROM_PREV_IO
             }
             io.update(useIo)
         toReturn = InteractiveFunction(self.showFieldInfoById)

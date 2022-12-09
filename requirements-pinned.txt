@@ -39,16 +39,15 @@ pillow==9.3.0
     #   scikit-image
 pyparsing==3.0.9
     # via packaging
-pyqtgraph @ git+https://github.com/pyqtgraph/pyqtgraph.git@025c5d0
+pyqtgraph==0.13.1
     # via
-    #   -r requirements-unreleased.txt
     #   qtextras
     #   s3a (./pyproject.toml)
-pyside6==6.4.0.1
+pyside6==6.3.2
     # via s3a (./pyproject.toml)
-pyside6-addons==6.4.0.1
+pyside6-addons==6.3.2
     # via pyside6
-pyside6-essentials==6.4.0.1
+pyside6-essentials==6.3.2
     # via
     #   pyside6
     #   pyside6-addons
@@ -60,10 +59,8 @@ pywavelets==1.4.1
     # via scikit-image
 qdarkstyle==3.1
     # via s3a (./pyproject.toml)
-qtextras @ git+https://gitlab.com/s3a/qtextras.git@91a093d
-    # via
-    #   -r requirements-unreleased.txt
-    #   s3a (./pyproject.toml)
+qtextras==0.6.6
+    # via s3a (./pyproject.toml)
 qtpy==2.3.0
     # via qdarkstyle
 ruamel-yaml==0.17.21
@@ -76,7 +73,7 @@ scipy==1.9.3
     # via
     #   s3a (./pyproject.toml)
     #   scikit-image
-shiboken6==6.4.0.1
+shiboken6==6.3.2
     # via
     #   pyside6
     #   pyside6-addons

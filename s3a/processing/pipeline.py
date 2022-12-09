@@ -5,18 +5,16 @@ import typing as t
 
 import numpy as np
 import pyqtgraph as pg
-from pyqtgraph.parametertree import InteractiveFunction, Parameter, Interactor
-from pyqtgraph.parametertree.parameterTypes import (
-    ActionGroupParameter,
-)
+from pyqtgraph.parametertree import InteractiveFunction, Interactor, Parameter
 from pyqtgraph.Qt import QtCore
 from qtextras import (
+    FROM_PREV_IO,
+    ChainedActionGroupParameter,
     ParameterContainer,
     ParameterEditor,
     fns,
-    FROM_PREV_IO,
-    ChainedActionGroupParameter,
 )
+from qtextras.shims import ActionGroupParameter
 
 from ..generalutils import augmentException, simpleCache
 

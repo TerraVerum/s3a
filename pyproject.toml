@@ -19,10 +19,10 @@ dependencies = [
     "pandas       >= 1.4.3",
     "scipy",
     "scikit-image >= 0.18.1",
-    "pyqtgraph",
+    "pyqtgraph    >= 0.13.1",
     "Pillow",
     "qdarkstyle",
-    "qtextras ~= 0.6.5",
+    "qtextras     ~= 0.6.6",
 ]
 dynamic = ["version"]
 classifiers = [
@@ -41,7 +41,7 @@ s3a-gui = "s3a.__main__:mainCli"
 full = [
     "docstring-parser       >= 0.10",
     "opencv-python-headless >= 4.1.2.30",
-    "PySide6                >= 6.2.0",
+    "PySide6                ~= 6.3.0",
 ]
 
 [tool.setuptools]
@@ -74,5 +74,5 @@ ignore_init=true
 [tool.piptools.compile]
 input_files = ["./pyproject.toml", "requirements-unreleased.txt"]
 output_file = "requirements-pinned.txt"
-verbose = true
+#verbose = true
 extra = ["full"]

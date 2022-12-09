@@ -3,9 +3,9 @@ from pathlib import Path
 from typing import List, Union
 
 from pyqtgraph.parametertree import Parameter
-from pyqtgraph.parametertree.parameterTypes import ActionGroupParameter
 from pyqtgraph.Qt import QtCore, QtWidgets
 from qtextras import ParameterEditor, PopupLineEditor
+from qtextras.shims import ActionGroupParameter
 
 from ..constants import QUICK_LOAD_DIR
 from ..generalutils import lowerNoSpaces
