@@ -3,7 +3,9 @@ from warnings import warn
 
 import numpy as np
 import pandas as pd
-from pyqtgraph.Qt import QtCore
+from pkg_resources import parse_version
+
+from pyqtgraph.Qt import QtCore, QtVersion
 
 from ..constants import PRJ_ENUMS, REQD_TBL_FIELDS as RTF
 from ..generalutils import coerceDfTypes
@@ -67,6 +69,9 @@ class ComponentTableModel(DASM, QtCore.QAbstractTableModel):
 
     @DASM.undoable("Alter Component Data")
     def setData(self, index, value, role=QtCore.Qt.ItemDataRole.EditRole) -> bool:
+        if role != QtCore.Qt.ItemDataRole.EditRole:
+            return super().setData(index, value, role)
+
         row = index.row()
         col = index.column()
         oldVal = self.compDf.iat[row, col]

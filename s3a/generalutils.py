@@ -1035,3 +1035,12 @@ def getMaybeReplaceKey(
             dictionary[newKey] = default
             del dictionary[oldKey]
     return dictionary.get(newKey, default)
+
+
+def enumConverter(enumVal):
+    if hasattr(enumVal, "value"):
+        return enumVal.value
+    try:
+        return int(enumVal)
+    except TypeError:
+        return enumVal

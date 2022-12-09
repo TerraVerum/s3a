@@ -187,10 +187,8 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
         # Start by adding any potentially new plugins
         for plg in self.filePlugin.projectData.spawnedPlugins:
             self._addPluginObject(plg)
-        self.tableView.setColDelegates()
-        self.tableView.popup.reflectDelegateChange()
         # Make sure this is necessary, first
-        for mgr in self.componentManager, self.tableView.popup.tbl.manager:
+        for mgr in self.componentManager, self.tableView.popup.tableView.manager:
             if mgr.columnTitles == list([f.name for f in self.tableData.allFields]):
                 # Fields haven't changed since last reset. Types could be different,
                 # but nothing will break. So, the table doesn't have to be completely

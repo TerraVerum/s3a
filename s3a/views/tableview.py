@@ -5,6 +5,8 @@ from warnings import warn
 
 import numpy as np
 import pandas as pd
+from pkg_resources import parse_version
+
 import pyqtgraph as pg
 from pyqtgraph.parametertree import Parameter
 from pyqtgraph.parametertree.Parameter import PARAM_TYPES
@@ -12,6 +14,7 @@ from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 
 from ..compio.helpers import deserialize, serialize
 from ..constants import PRJ_CONSTS, PRJ_ENUMS, REQD_TBL_FIELDS
+from ..generalutils import enumConverter
 from ..models.tablemodel import ComponentManager
 from ..structures import TwoDArr
 from ..tabledata import TableData
@@ -104,8 +107,8 @@ class MinimalTableModel(ComponentManager):
         super().__init__()
         # Map true/false to check state
         self.csMap = {
-            True: QtCore.Qt.CheckState.Checked,
-            False: QtCore.Qt.CheckState.Unchecked,
+            True: enumConverter(QtCore.Qt.CheckState.Checked),
+            False: enumConverter(QtCore.Qt.CheckState.Unchecked),
         }
 
         # Since the minimal model only contains one row, everything checkable can be on a
@@ -115,14 +118,14 @@ class MinimalTableModel(ComponentManager):
     def flags(self, index: QtCore.QModelIndex) -> QtCore.Qt.ItemFlags:
         return super().flags(index) | QtCore.Qt.ItemFlag.ItemIsUserCheckable
 
-    def data(self, index: QtCore.QModelIndex, role: int) -> Any:
+    def data(self, index: QtCore.QModelIndex, role) -> Any:
         if role == QtCore.Qt.ItemDataRole.CheckStateRole:
             return self.csMap[index.column() in self.checkedColIdxs]
         return super().data(index, role)
 
     def setData(self, index, value, role=QtCore.Qt.ItemDataRole.EditRole) -> bool:
         if role == QtCore.Qt.ItemDataRole.CheckStateRole:
-            if value == QtCore.Qt.CheckState.Checked:
+            if value == enumConverter(QtCore.Qt.CheckState.Checked):
                 self.checkedColIdxs.add(index.column())
             else:
                 self.checkedColIdxs.remove(index.column())
@@ -137,14 +140,14 @@ class PopupTableDialog(QtWidgets.QDialog):
         # -----------
         # Table View
         # -----------
-        self.tbl = ComponentTableView(minimal=True)
         self.model = MinimalTableModel()
-        self.tbl.setModel(self.model)
+        self.titles = []
+        self.tableView = ComponentTableView(manager=self.model, minimal=True)
+        self.reflectDelegateChange()
 
         # -----------
         # Warning Message
         # -----------
-        self.reflectDelegateChange()
         self.warnLbl = QtWidgets.QLabel(
             "Check the boxes for data you wish to propagate to all selected cells.\n"
             "Selections where every row has the same data are checkd by default.",
@@ -167,10 +170,10 @@ class PopupTableDialog(QtWidgets.QDialog):
 
         centralLayout = QtWidgets.QVBoxLayout()
         centralLayout.addWidget(self.warnLbl)
-        centralLayout.addWidget(self.tbl)
+        centralLayout.addWidget(self.tableView)
         centralLayout.addLayout(btnLayout)
         self.setLayout(centralLayout)
-        self.setMinimumWidth(self.tbl.width())
+        self.setMinimumWidth(self.tableView.width())
 
         # -----------
         # UI Element Signals
@@ -180,8 +183,8 @@ class PopupTableDialog(QtWidgets.QDialog):
 
     def reflectDelegateChange(self):
         # TODO: Find if there's a better way to see if changes happen in a table
-        self.titles = np.array(list([f.name for f in self.tbl.tableData.allFields]))
-        self.tbl.setColDelegates()
+        self.titles = np.array(list([f.name for f in self.model.tableData.allFields]))
+        self.tableView.setColDelegates()
         # Avoid loop scoping
         def wrapper(col):
             def onUpdate():
@@ -190,12 +193,12 @@ class PopupTableDialog(QtWidgets.QDialog):
             return onUpdate
 
         for colIdx in range(len(self.titles)):
-            deleg = self.tbl.itemDelegateForColumn(colIdx)
+            deleg = self.tableView.itemDelegateForColumn(colIdx)
             deleg.commitData.connect(wrapper(colIdx))
 
     @property
     def data(self):
-        return self.tbl.manager.compDf.iloc[[0], :]
+        return self.tableView.manager.compDf.iloc[[0], :]
 
     def setData(
         self,
@@ -213,18 +216,19 @@ class PopupTableDialog(QtWidgets.QDialog):
 
         for ii in range(len(self.titles)):
             if ii not in colIdxs:
-                self.tbl.hideColumn(ii)
+                self.tableView.hideColumn(ii)
             else:
-                self.tbl.showColumn(ii)
-        self.tbl.manager.removeComponents()
-        self.tbl.manager.addComponents(
+                self.tableView.showColumn(ii)
+        self.tableView.manager.removeComponents()
+        self.tableView.manager.addComponents(
             componentDf, addType=PRJ_ENUMS.COMPONENT_ADD_AS_MERGE
         )
+        return True
 
     def reject(self):
         # On dialog close be sure to unhide all columns / reset dirty cols
         for ii in range(len(self.titles)):
-            self.tbl.showColumn(ii)
+            self.tableView.showColumn(ii)
         super().reject()
 
 
@@ -276,6 +280,9 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
         self._onTableChange()
 
     def _onTableChange(self, *_args):
+        self.setColDelegates()
+        if not self.minimal:
+            self.popup.reflectDelegateChange()
         if not self.tableData or "visibleColumns" not in self.props.parameters:
             # Possible for this view to be used without registering visible columns
             # as a parameter, or without setting table information
@@ -342,6 +349,9 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
         except AttributeError:
             self.manager = modelOrProxy
         self.manager: ComponentManager
+        if not self.minimal:
+            self.popup.model.tableData = self.manager.tableData
+            self.popup.reflectDelegateChange()
         self.tableData.sigConfigUpdated.connect(self._onTableChange)
         self.instanceIdIndex = self.tableData.allFields.index(REQD_TBL_FIELDS.ID)
 
