@@ -412,7 +412,11 @@ def remove_overlapping_components(
             continue
         vertsMask = verts.removeOffset().toMask(checkArea.shape) > 0
         # Don't count on pixels outside the current footprint
-        if np.count_nonzero(checkArea & vertsMask) / checkArea.size < overlapThreshold:
+        if (
+            np.count_nonzero(checkArea & vertsMask)
+            / np.count_nonzero(checkArea | vertsMask)
+            < overlapThreshold
+        ):
             keepComps.append(comp)
         if removeOverlapWithNew:
             # Make sure no new checks can overlap with this component
