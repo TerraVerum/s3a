@@ -1,4 +1,3 @@
-import functools
 from typing import Any, Dict, Tuple, Union
 
 import cv2 as cv

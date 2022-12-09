@@ -686,7 +686,7 @@ def subImageFromVertices(
 
     subImage, stats = _getAffineSubregion(
         image, transformedBbox, totalBbox, shape, rotationDegrees, **kwargs
-        )
+    )
     stats["initialBox"] = initialBox
 
     ret = [subImage]
@@ -785,7 +785,9 @@ def _getAffineSubregion(
 
     subImage = image[mins[1] : maxs[1], mins[0] : maxs[0], ...]
     if np.any(underoverPadding):
-        padBorderOptions = padBorderOptions or dict(value=0, borderType=cv.BORDER_CONSTANT)
+        padBorderOptions = padBorderOptions or dict(
+            value=0, borderType=cv.BORDER_CONSTANT
+        )
         subImage = cv.copyMakeBorder(
             subImage,
             underoverPadding[0, 1],
