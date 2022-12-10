@@ -125,7 +125,7 @@ class ToolsPlugin(ParameterEditorPlugin):
         console.show()
 
     @classmethod
-    def deferredregisterFunctiontion(cls, func: Callable, **registerKwargs):
+    def deferredRegisterFunction(cls, func: Callable, **registerKwargs):
         cls._deferredRegisters[func] = registerKwargs
 
 

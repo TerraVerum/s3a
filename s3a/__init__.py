@@ -19,6 +19,7 @@ __all__ = [
     "__version__",
     "PRJ_ENUMS",
     "TableData",
+    "ToolsPlugin",
     "defaultIo",
     "SharedAppSettings",
 ]
