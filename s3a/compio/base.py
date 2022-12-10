@@ -13,19 +13,18 @@ from qtextras.typeoverloads import FilePath
 from .helpers import checkVerticesBounds, deserialize
 from ..constants import REQD_TBL_FIELDS as RTF
 from ..generalutils import toDictGen
-from ..shims import typing_extensions
 from ..structures import AnnInstanceError, AnnParseError
 from ..tabledata import TableData
 
 
-class _GenericExportProtocol(typing_extensions.Protocol):
+class _GenericExportProtocol(t.Protocol):
     def __call__(
         self, componentDf: pd.DataFrame, exportObject, **kwargs
     ) -> (t.Any, pd.DataFrame):
         return exportObject, NO_ERRORS.copy()
 
 
-class _updateExportObjectProtocol(typing_extensions.Protocol):
+class _updateExportObjectProtocol(t.Protocol):
     def __call__(self, inst: dict, exportObject, **kwargs) -> t.Any:
         return exportObject
 

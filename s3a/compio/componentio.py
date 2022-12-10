@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Callable, Optional, Tuple, Union
+from typing import Callable, Optional, Tuple, Union, Literal
 
 import numpy as np
 import pandas as pd
@@ -15,14 +15,13 @@ from .exporters import *
 from .helpers import compareDataframes
 from .importers import *
 from ..constants import PRJ_ENUMS
-from ..shims import typing_extensions
 from ..structures import FilePath
 from ..tabledata import TableData
 
 FilePathOrDf = Union[FilePath, pd.DataFrame]
 # Values are strings
 # noinspection PyTypeHints
-_litLst = typing_extensions.Literal[PRJ_ENUMS.IO_IMPORT, PRJ_ENUMS.IO_EXPORT]
+_litLst = Literal[PRJ_ENUMS.IO_IMPORT, PRJ_ENUMS.IO_EXPORT]
 _maybeCallable = Optional[Union[Callable, AnnotationIOBase]]
 
 

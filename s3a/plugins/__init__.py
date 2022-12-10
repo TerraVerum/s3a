@@ -1,10 +1,11 @@
 import pydoc
+import sys
 import typing
 import warnings
 from functools import lru_cache
+from importlib.metadata import entry_points
 
 from .base import ParameterEditorPlugin
-from ..shims import entry_points
 
 
 def INTERNAL_PLUGINS():
@@ -36,7 +37,12 @@ _nonEntryPointExternalPlugins = []
 
 @lru_cache()
 def EXTERNAL_PLUGINS():
-    discoveredPlgs = entry_points().get("s3a.plugins", [])
+    # Account for warnings in py3.10
+    ep = entry_points()
+    if sys.version_info >= (3, 10):
+        discoveredPlgs = ep.select(group="s3a.plugins")
+    else:
+        discoveredPlgs = ep.get("s3a.plugins", [])
     externPlgs = _nonEntryPointExternalPlugins.copy()
 
     def fallback():
