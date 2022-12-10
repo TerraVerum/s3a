@@ -1,5 +1,6 @@
 from argparse import Action
 
+import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
 from qtextras import fns
 
@@ -20,13 +21,10 @@ def main(loadLastState=True, **load):
     load
         States to load, see the help output for possible values
     """
-    appInst = mkQApp()
+    mkQApp()
     win = S3A(log=PRJ_ENUMS.LOG_GUI, loadLastState=loadLastState, **load)
     QtCore.QTimer.singleShot(0, win.showMaximized)
-    try:
-        appInst.exec_()
-    except AttributeError:
-        appInst.exec()
+    pg.exec()
     return win
 
 
