@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from inspect import Parameter as IParameter
 import typing as t
 
 import numpy as np
@@ -148,14 +149,26 @@ class PipelineFunction(InteractiveFunction):
         return fns.nameFormatter(self.__name__)
 
     def updateInput(self, setDefaults=False, **kwargs):
-        toUpdate = {kk: kwargs[kk] for kk in self.input.keys() & kwargs}
-        if setDefaults:
-            self.defaultInput.update(toUpdate)
-        self.input.update(toUpdate)
-
-        if setDefaults and (paramKeys := self.parameters.keys() & toUpdate):
-            for kk in paramKeys:
-                self.parameters[kk].setDefault(toUpdate[kk])
+        currentInput = self.input
+        toUpdate = {kk: kwargs[kk] for kk in currentInput.keys() & kwargs}
+        for name, value in toUpdate.items():
+            inspectParam = IParameter(
+                name, IParameter.POSITIONAL_OR_KEYWORD, default=currentInput[name]
+            )
+            # Allows setting value, parameter options, and more through "updateInput"
+            sanitized = ParameterEditor.defaultInteractor.createFunctionParameter(
+                name, inspectParam, value
+            )
+            # keys added by default should not be changeable by this function
+            for kk in ("name", "type", "title"):
+                sanitized.pop(kk, None)
+            if setDefaults:
+                sanitized.setdefault("default", sanitized["value"])
+                self.defaultInput[name] = sanitized["default"]
+            if name in self.parameters:
+                self.parameters[name].setOpts(**sanitized)
+            else:
+                self.extra[name] = sanitized["value"]
 
 
 class PipelineParameter(ChainedActionGroupParameter):
@@ -172,12 +185,21 @@ class PipelineParameter(ChainedActionGroupParameter):
         *,
         interactor: Interactor = None,
         cache=True,
-        **kwargs,
+        stageInputOptions: dict = None,
+        **metaOptions,
     ):
         if interactor is None:
             interactor = ParameterEditor.defaultInteractor
         stage = self._resolveStage(stage, cache)
-        return super().addStage(stage, interactor=interactor, **kwargs)
+        stage = super().addStage(
+            stage,
+            interactor=interactor,
+            stageInputOptions=stageInputOptions,
+            **metaOptions,
+        )
+        if isinstance(stage, PipelineParameter) and stageInputOptions:
+            stage.updateInput(**stageInputOptions)
+        return stage
 
     def _resolveStage(self, stage, cache=True):
         if isinstance(stage, InteractiveFunction):
