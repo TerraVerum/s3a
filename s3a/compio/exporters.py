@@ -379,7 +379,7 @@ class CompImgsDfExporter(AnnotationExporter):
         source = DirectoryDict(
             source,
             allowAbsolute=True,
-            readFunc=imageReaderFunc,
+            readFunction=imageReaderFunc,
             cacheOnRead=False,
         )
         self.source = source
@@ -387,7 +387,7 @@ class CompImgsDfExporter(AnnotationExporter):
         self.labelMaskSource = DirectoryDict(
             labelMaskSource,
             allowAbsolute=True,
-            readFunc=imageReaderFunc,
+            readFunction=imageReaderFunc,
             cacheOnRead=False,
         )
         if resizeOptions is not None:

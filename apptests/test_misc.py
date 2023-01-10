@@ -134,11 +134,11 @@ def test_directorydict_equality():
     def reader(file):
         return ""
 
-    dd1 = DirectoryDict("./somefolder", readFunc=reader)
-    dd2 = DirectoryDict("./differentfolder", readFunc=reader)
+    dd1 = DirectoryDict("./somefolder", readFunction=reader)
+    dd2 = DirectoryDict("./differentfolder", readFunction=reader)
 
     assert dd1 != dd2
-    dd2.fileDir = dd1.fileDir
+    dd2.folder = dd1.folder
     assert dd1 == dd2
 
     assert dd1 == {}

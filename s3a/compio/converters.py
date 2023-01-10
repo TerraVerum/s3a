@@ -122,7 +122,7 @@ class SuperannotateImporter(AnnotationImporter):
     ):
         if source is None:
             source = file.parent
-        source = DirectoryDict(source, readFunc=self.readFile, allowAbsolute=True)
+        source = DirectoryDict(source, readFunction=self.readFile, allowAbsolute=True)
         classes = source.get("classes.json")
         if classes is None and file is not None:
             classes = source.get(file.parent / "classes" / "classes.json")

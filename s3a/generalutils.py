@@ -451,14 +451,14 @@ class DirectoryDict(MaxSizeDict):
     """
 
     _UNSET = object()
-    # Define readFunc and allowAbsolute here to suppress PyCharm warnings in __init__
-    readFunc: Any
+    # Define readFunction and allowAbsolute here to suppress PyCharm warnings in __init__
+    readFunction: Any
     allowAbsolute: Any
 
     def __init__(
         self,
         initData: Union[FilePath, dict, "DirectoryDict"] = None,
-        readFunc: Callable[[str], Any] = None,
+        readFunction: Callable[[str], Any] = None,
         allowAbsolute=False,
         cacheOnRead=True,
         **kwargs,
@@ -469,8 +469,8 @@ class DirectoryDict(MaxSizeDict):
         initData
             Either startup dict or backing directory path. If a DirectoryDict is
             passed, its attribute will be used instead of the value passed for
-            allowAbsolute. Its readFunc will be used if the passed readFunc is *None*
-        readFunc
+            allowAbsolute. Its readFunction will be used if the passed readFunction is *None*
+        readFunction
             Function used to read files from the directory, i.e. ``io.imread``,
             ``attemptFileLoad``, etc. Must accept the name of the file to read
         allowAbsolute
@@ -478,19 +478,19 @@ class DirectoryDict(MaxSizeDict):
         **kwargs
             Passed to super constructor
         """
-        self.fileDir = None
+        self.folder = None
         if isinstance(initData, FilePath.__args__):
-            self.fileDir = Path(initData)
+            self.folder = Path(initData)
             super().__init__(**kwargs)
         else:
             if isinstance(initData, DirectoryDict):
-                readFunc = readFunc or initData.readFunc
+                readFunction = readFunction or initData.readFunction
                 allowAbsolute = initData.allowAbsolute
-                self.fileDir = initData.fileDir
+                self.folder = initData.folder
             if initData is None:
                 initData = {}
             super().__init__(initData, **kwargs)
-        self.readFunc = readFunc
+        self.readFunction = readFunction
         self.allowAbsolute = allowAbsolute
         self.cacheReads = cacheOnRead
 
@@ -499,7 +499,7 @@ class DirectoryDict(MaxSizeDict):
         exists = super().get(key, self._UNSET)
         if exists is not self._UNSET:
             return exists
-        if self.fileDir is None:
+        if self.folder is None:
             raise KeyError(
                 f'"{key}" is not in dict and no backing file system was provided'
             )
@@ -507,7 +507,7 @@ class DirectoryDict(MaxSizeDict):
         isAbsolute = pathKey.is_absolute()
         if not self.allowAbsolute and isAbsolute:
             raise KeyError(f"Directory paths must be relative, received {key}")
-        testPath = pathKey if isAbsolute else self.fileDir / key
+        testPath = pathKey if isAbsolute else self.folder / key
         candidates = list(testPath.parent.glob(testPath.name))
         if len(candidates) != 1:
             grammar = ": " if len(candidates) else ""
@@ -517,7 +517,7 @@ class DirectoryDict(MaxSizeDict):
             )
         else:
             file = candidates[0]
-            ret = self.readFunc(str(file))
+            ret = self.readFunction(str(file))
             if self.cacheReads:
                 self[key] = ret
         return ret
@@ -539,10 +539,10 @@ class DirectoryDict(MaxSizeDict):
         # Since additional keys can come from the directory (in theory determining
         # dict contents), check for equality on those attributes
         return (
-            self.fileDir.resolve() == other.fileDir.resolve()
+            self.folder.resolve() == other.folder.resolve()
             # TODO: Should readfuncs be allowed to differ? This would require some sort
             #   of type-checking on its output
-            and self.readFunc == other.readFunc
+            and self.readFunction == other.readFunction
         )
 
     def __ne__(self, other):
