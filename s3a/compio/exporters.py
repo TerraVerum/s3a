@@ -344,20 +344,17 @@ class CompImgsDfExporter(AnnotationExporter):
               - ``shape`` : Required. It is the shape that all images will be resized
                 to before being saved. This is useful for neural networks with a fixed
                 input size which forces all inputs to be e.g. 100x100 pixels.
-              - ``keepAspectRatio``: default True. Whether to keep the aspect ratio and
-                pad the problematic axis, or to stretch the image to the right fit. I.e.
-                if a component with shape (25, 50) exists, and an export ``shape`` of
-                (25, 25) is specified with ``keepAspectRatio``, the component will be
-                resized to (12, 25) and padded on the top and bottom with 6 and 7 pixels
-                of ``padVal``, respectively.
-              - ``padVal``: default np.nan. How to fill the padded axis if
-                `keepAspectRatio` is *True*. If *np.nan*, the values are grabbed from the
-                image instead. If a component is on the image boundary, black (0) is
-                used.
-              - ``allowReorient``: default False. If *True*, the output image can be
+              - ``padBorderOptions``: default to 0, constant-value padding. Determines how
+                an extracted component image is padded where padding is required, i.e.
+                when next to the border of the full scene and a square area is requested.
+                Can contain any keys consumable by ``cv.copyMakeBorder``.
+              - ``allowTranspose``: default False. If ``True``, the output image can be
                 rotated 90 degrees if this reduces the amount of manipulation required
                 to get the output to be the proper shape
-              - ``interpolation``: Any interpolation value accepted by ``cv.resize``
+              - Any additional keyword argument accepted by ``cv.warpAffine``
+              - ``margin``: if scalar, determines the pixels of padding added to the
+                extracted component image. If float, the padding is taken as a percentage
+                of the total [x, y] component size.
         returnLabelMap
             Whether to return the mapping of label numeric values to table field values
 
