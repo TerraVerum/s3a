@@ -10,7 +10,7 @@ import cv2 as cv
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
-from pkg_resources import parse_version
+from packaging.version import Version
 from pyqtgraph.parametertree.interactive import InteractiveFunction
 from qtextras import OptionsDict, fns
 
@@ -24,7 +24,7 @@ from .constants import PRJ_ENUMS
 from .structures import BlackWhiteImg, ComplexXYVertices, NChanImg, TwoDArr, XYVertices
 
 _coordType = Union[np.ndarray, Tuple[slice, slice]]
-USE_MULTICHANNEL_KWARG = parse_version(_skimage_version) < parse_version("0.19.0")
+USE_MULTICHANNEL_KWARG = Version(_skimage_version) < Version("0.19.0")
 
 
 def stackedVerticesPlusConnections(

@@ -3,7 +3,7 @@ from warnings import warn
 
 import numpy as np
 import pandas as pd
-from pkg_resources import parse_version
+from packaging.version import Version
 
 from pyqtgraph.Qt import QtCore, QtVersion
 

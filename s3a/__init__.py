@@ -4,7 +4,7 @@ import os
 import sys
 
 import pyqtgraph as pg
-from pkg_resources import parse_version
+from packaging.version import Version
 
 __all__ = [
     "appInst",
@@ -31,7 +31,7 @@ pg.setConfigOptions(imageAxisOrder="row-major")
 try:
     import cv2
 
-    assert parse_version(cv2.__version__) >= parse_version("4.1.2.30")
+    assert Version(cv2.__version__) >= Version("4.1.2.30")
 
 except (ImportError, AssertionError):
     raise ImportError(
