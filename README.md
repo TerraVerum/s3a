@@ -20,7 +20,7 @@ vision algorithms/models.
 We're continuing to provide a level of support but, to avoid brand confusion, this is _not_ our intended commercial 
 offering. Some concepts apply, but this isn't it.
 
-A more detailed overview can be found in the project wiki [here](https://gitlab.com/ficsresearch/s3a/-/wikis/docs/user's-guide).
+A more detailed overview can be found in the project wiki [here](https://gitlab.com/s3a/s3a/-/wikis/docs/user's-guide).
 
 ## Install
 
