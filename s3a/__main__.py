@@ -4,7 +4,8 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
 from qtextras import fns
 
-from . import __version__, mkQApp
+# from . import __version__, mkQApp
+from . import mkQApp
 from .constants import PRJ_ENUMS
 from .views.s3agui import S3A
 
@@ -31,7 +32,7 @@ def main(loadLastState=True, **load):
 def mainCli():
     parser = fns.makeCli(main, parserKwargs=dict(prog="S3A", add_help=False))
     parser.register("action", "help", S3AHelp)
-    parser.add_argument("--version", action="version", version=__version__)
+    parser.add_argument("--version", action="version", version="TODO")
     parser.add_argument("--help", action="help")
     args = parser.parse_args()
     main(**vars(args))

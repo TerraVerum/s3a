@@ -16,7 +16,7 @@ urls = {homepage = "https://gitlab.com/s3a/s3a"}
 # for git versions of these packages. Only used until next pypi release.
 dependencies = [
     "numpy",
-    "pandas       >= 1.4.3",
+    "pandas       >= 2.2.0",
     "scipy",
     "scikit-image >= 0.18.1",
     "pyqtgraph    >= 0.13.1",

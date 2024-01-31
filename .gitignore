@@ -17,3 +17,7 @@ menuopts
 # Auto-generated test files
 /apptests/files/*.png
 .coverage
+.wine-*
+s3a.spec
+*.zip
+*dist/
