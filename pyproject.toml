@@ -23,6 +23,8 @@ dependencies = [
     "Pillow",
     "qdarkstyle",
     "qtextras     ~= 0.6.7",
+    "opencv-python-headless >= 4.9.0.80",
+    "PySide6                ~= 6.6.1",
 ]
 dynamic = ["version"]
 classifiers = [
@@ -40,8 +42,6 @@ s3a-gui = "s3a.__main__:mainCli"
 [project.optional-dependencies]
 full = [
     "docstring-parser       >= 0.10",
-    "opencv-python-headless >= 4.9.0.80",
-    "PySide6                ~= 6.6.1",
 ]
 
 [tool.setuptools]
