@@ -13,14 +13,12 @@
 
 ## Description
 
-A highly adaptable tool for both visualizing and generating semantic annotations for generic images. You can also use
-the model plugin system to rapidly test and improve computer vision algorithms/models. This latter use-case is the
-unintended primary use among some users.
+A highly adaptable tool built by TerraVerum's founder during his PhD program for both visualizing and generating 
+semantic annotations for generic images. You can also use the model plugin system to rapidly test and improve computer
+vision algorithms/models.
 
-Most software solutions for semantic (pixel-level) labeling are designed for low-resolution (<10MB) images with fewer 
-than 10 components of interest. Violating either constraint (e.g. using a high-res image or annotating ~1000 
-components) led to detrimental performance impacts when this project was started. S3A is designed to combat both these 
-deficiencies. It remains interactive With images up to 150 MB and 2000 components.
+We're continuing to provide a level of support but, to avoid brand confusion, this is _not_ our intended commercial 
+offering. Some concepts apply, but this isn't it.
 
 A more detailed overview can be found in the project wiki [here](https://gitlab.com/ficsresearch/s3a/-/wikis/docs/user's-guide).
 
