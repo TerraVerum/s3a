@@ -70,9 +70,3 @@ combine_as_imports = true
 
 [tool.unimport]
 ignore_init=true
-
-[tool.piptools.compile]
-input_files = ["./pyproject.toml", "requirements-unreleased.txt"]
-output_file = "requirements-pinned.txt"
-#verbose = true
-extra = ["full"]

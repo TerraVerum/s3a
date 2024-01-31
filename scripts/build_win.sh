@@ -2,7 +2,6 @@
 
 [[ -d ".wine-0/" ]] && rm -rf .wine-0/
 
-wine pip install --no-warn-script-location -r requirements-pinned.txt
 wine pip install -e . --no-dependencies --no-warn-script-location
 
 [[ -d "win_dist" ]] && rm -rf win_dist/

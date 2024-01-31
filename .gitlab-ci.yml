@@ -24,7 +24,7 @@ pytest:
     libopengl0
   "
   - python --version
-  - pip install -r requirements-pinned.txt
+  - pip install .
   - pip install pytest
   - pip install pytest-cov
   - pip install pytest-qt
