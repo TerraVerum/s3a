@@ -9,7 +9,7 @@ from warnings import warn
 
 import numpy as np
 import pandas as pd
-from pyqtgraph.Qt import QtCore, QtWidgets
+from pyqtgraph.Qt import QtCore, QtWidgets, QtGui
 from qtextras import (
     ActionStack,
     DeferredActionStackMixin as DASM,
@@ -78,6 +78,9 @@ class S3ABase(DASM, QtWidgets.QMainWindow, metaclass=S3ABaseMeta):
 
         self.tableFieldToolbar = QtWidgets.QToolBar("Table Field Plugins")
         self.generalToolbar = QtWidgets.QToolBar("General")
+
+        # Increase QImage default size limit
+        QtGui.QImageReader.setAllocationLimit(256000000)
 
         self.mainImage = MainImage(toolbar=self.generalToolbar)
         self.mainImage.toolsEditor.registerFunction(
