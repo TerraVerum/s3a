@@ -72,7 +72,7 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         if self.window.mainImage.image is None:
             return
         if components is None:
-            components = self.window.componentDf
+            components = self.window.componentManager.compDf
         # It is possible for a previously selected id to be deleted before a redraw
         # occurs, in which case the selected id won't correspond to a valid index.
         # Resolve using intersection with all components
