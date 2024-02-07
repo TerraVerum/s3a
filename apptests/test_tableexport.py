@@ -125,6 +125,7 @@ def test_serial_export(tmp_path, sampleComps, app):
     assert len(list(tmp_path.glob("*.*"))) == 0
 
     sampleComps = sampleComps.copy()
+
     # Put in data that pandas can't handle
     class BadRep:
         def __str__(self):

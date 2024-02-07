@@ -83,7 +83,6 @@ def format_vertices(
     useFullBoundary=True,
     keepVerticesHistory=True,
 ):
-
     if firstRun or not keepVerticesHistory or not np.any(procCache["mask"]):
         _historyMask = np.zeros(image.shape[:2], "uint8")
     else:

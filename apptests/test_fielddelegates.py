@@ -28,7 +28,6 @@ def td():
 
 
 def test_combined(sampleComps, td):
-
     comps = td.makeComponentDf(len(sampleComps))
     sampleComps = sampleComps.copy()
     comps.index = sampleComps.index

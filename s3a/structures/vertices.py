@@ -124,7 +124,6 @@ class ComplexXYVertices(list):
         hierarchy: np.ndarray = None,
         coerceListElements=False,
     ):
-
         if verticesArray is None:
             verticesArray = []
         numInpts = len(verticesArray)

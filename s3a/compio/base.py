@@ -36,7 +36,6 @@ _exportCallable = t.Callable[[pd.DataFrame, t.Any], t.Tuple[t.Any, pd.DataFrame]
 
 
 class AnnotationIOBase:
-
     __name__: t.Optional[str] = None
     """
     Determines which config template's required fields are necessary for this input. 

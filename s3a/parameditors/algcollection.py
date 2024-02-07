@@ -389,7 +389,6 @@ class AlgorithmCollection(ParameterEditor):
         return out
 
     def parseProcessQualname(self, processName: str, **kwargs):
-
         # Special case: Qualname-loaded procs should be added under their qualname
         # otherwise they won't be rediscoverable after saving->restarting S3A
         for prefix in ["", *self.includeModules]:

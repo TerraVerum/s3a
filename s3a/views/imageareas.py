@@ -180,7 +180,7 @@ class MainImage(DASM, ImageViewer):
                 and not self.regionMover.active
             ):
                 pos = self.imageItem.mapFromScene(eventPos)
-                xx, yy, = (
+                (xx, yy) = (
                     pos.x(),
                     pos.y(),
                 )
@@ -299,6 +299,7 @@ class MainImage(DASM, ImageViewer):
         menu = toolsEditor.createActionsFromFunctions(stealShortcuts=False)
         self.menu.addMenu(menu)
         retClctn = None
+
         # Define some helper functions for listening to toolsEditor changes
         def visit(param, child=None):
             if child:
