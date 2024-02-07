@@ -71,7 +71,7 @@ class ProcessDispatcher(PipelineFunction):
                 result = self.resultConverter(result, comp)
             compList.append(result.pop("components"))
         if compList:
-            outComps = pd.concat(compList, ignore_index=True)
+            outComps = gutils.concatAllowEmpty(compList, ignore_index=True)
         else:
             # Concat fails with empty list, just make an empty dataframe
             outComps = components.iloc[0:0].copy()
@@ -86,7 +86,7 @@ def points_to_components(matchPts: np.ndarray, component: pd.Series):
         ret = fns.seriesAsFrame(component).copy()
         return ret.loc[[]]
     # Explicit copy otherwise all rows point to the same component
-    outComps = pd.concat(
+    outComps = gutils.concatAllowEmpty(
         [fns.seriesAsFrame(component)] * numOutComps, ignore_index=True
     ).copy()
     origOffset = component[RTF.VERTICES].stack().min(0)
@@ -316,7 +316,9 @@ def merge_overlapping_components(components: pd.DataFrame):
     delComponents[RTF.VERTICES] = [
         ComplexXYVertices() for _ in range(len(delComponents))
     ]
-    outComps = pd.concat([newComps, delComponents]).set_index("__old_index__")
+    outComps = gutils.concatAllowEmpty([newComps, delComponents]).set_index(
+        "__old_index__"
+    )
     outComps.index.name = oldName
     return dict(components=outComps)
 

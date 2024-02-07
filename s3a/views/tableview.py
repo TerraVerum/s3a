@@ -184,6 +184,7 @@ class PopupTableDialog(QtWidgets.QDialog):
         # TODO: Find if there's a better way to see if changes happen in a table
         self.titles = np.array(list([f.name for f in self.model.tableData.allFields]))
         self.tableView.setColDelegates()
+
         # Avoid loop scoping
         def wrapper(col):
             def onUpdate():
@@ -374,7 +375,7 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
                     QtCore.Qt.ItemDataRole.EditRole
                 )
             )
-        newRows = pd.unique(selectedIds)
+        newRows = pd.unique(np.array(selectedIds))
         if np.array_equal(newRows, self._previouslySelectedRows):
             return
         self._previouslySelectedRows = newRows
@@ -393,7 +394,7 @@ class ComponentTableView(DASM, QtWidgets.QTableView):
         if len(idList) == 0:
             return
         # Make sure the user actually wants this
-        idList = pd.unique(idList)
+        idList = pd.unique(np.array(idList))
         dlg = QtWidgets.QMessageBox()
         btnType = dlg.StandardButton
         confirm = dlg.question(

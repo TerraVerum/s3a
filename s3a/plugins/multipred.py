@@ -14,6 +14,7 @@ from ..constants import (
     PRJ_ENUMS,
     REQD_TBL_FIELDS as RTF,
 )
+from ..generalutils import concatAllowEmpty
 from ..models.tablemodel import ComponentManager
 from ..parameditors.algcollection import AlgorithmCollection
 from ..processing.algorithms import multipred
@@ -135,7 +136,7 @@ class MultiPredictionsPlugin(ProcessorPlugin):
             )
             if len(empty):
                 emptyComps.append(empty)
-        return dict(components=pd.concat([components, *emptyComps]))
+        return dict(components=concatAllowEmpty([components, *emptyComps]))
 
     def _handleDispatchedComponents(
         self,

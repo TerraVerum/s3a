@@ -11,7 +11,7 @@ from qtextras import OptionsDict, bindInteractorOptions as bind
 
 from .regions import MultiRegionPlot
 from ..constants import REQD_TBL_FIELDS as RTF
-from ..generalutils import getTopLeftCoordinate, symbolFromVertices
+from ..generalutils import getTopLeftCoordinate, symbolFromVertices, concatAllowEmpty
 from ..structures import OptionsDictGroup
 
 
@@ -361,7 +361,7 @@ class FieldDisplay:
         text = components[fields].apply(converter, axis=1)
         text.name = cls.DEFAULT_FIELD
         keepColumns = np.setdiff1d(components.columns, fields)
-        delegateComps = pd.concat([text, components[keepColumns]], axis=1)
+        delegateComps = concatAllowEmpty([text, components[keepColumns]], axis=1)
         return delegateComps
 
     def callDelegateFunction(self, functionName, *args):

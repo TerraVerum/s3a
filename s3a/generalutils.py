@@ -1044,3 +1044,18 @@ def enumConverter(enumVal):
         return int(enumVal)
     except TypeError:
         return enumVal
+
+
+def concatAllowEmpty(dfs: Sequence[pd.DataFrame], **args):
+    """
+    Starting in Pandas 2.1.1, `pd.concat` raises a FutureWarning when any array in
+    ``dfs`` is empty. This function manually removes empty arrays before concatenation
+    and returns an empty dataframe with the same fields as the first dataframe if no
+    non-empty dataframes are provided.
+    """
+    if not len(dfs):
+        raise ValueError("No dataframes were provided")
+    nonEmpty = [df for df in dfs if len(df)]
+    if not nonEmpty:
+        return dfs[0].copy()
+    return pd.concat(nonEmpty, **args)

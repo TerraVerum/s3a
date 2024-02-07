@@ -8,7 +8,12 @@ import pandas as pd
 from qtextras import ParameterEditor, attemptFileLoad, seriesAsFrame
 
 from ..constants import APP_STATE_DIR
-from ..generalutils import hierarchicalUpdate, safeCallFunction, safeCallFunctionList
+from ..generalutils import (
+    hierarchicalUpdate,
+    safeCallFunction,
+    safeCallFunctionList,
+    concatAllowEmpty,
+)
 from ..logger import getAppLogger
 from ..structures import FilePath
 
@@ -185,11 +190,11 @@ class AppStateEditor(ParameterEditor):
         if index is not None:
             # First, shift old entries
             df = self.stateFunctionsDf
-            self.stateFunctionsDf = pd.concat(
+            self.stateFunctionsDf = concatAllowEmpty(
                 [df.iloc[:index], seriesAsFrame(newRow), df.iloc[index:]]
             )
         else:
-            self.stateFunctionsDf = pd.concat(
+            self.stateFunctionsDf = concatAllowEmpty(
                 [self.stateFunctionsDf, seriesAsFrame(newRow)]
             )
 

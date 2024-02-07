@@ -12,7 +12,7 @@ from qtextras.typeoverloads import FilePath
 
 from .helpers import checkVerticesBounds, deserialize
 from ..constants import REQD_TBL_FIELDS as RTF
-from ..generalutils import toDictGen
+from ..generalutils import toDictGen, concatAllowEmpty
 from ..structures import AnnInstanceError, AnnParseError
 from ..tabledata import TableData
 
@@ -271,7 +271,7 @@ class AnnotationImporter(AnnotationIOBase):
                 # Serialize with native option from column
                 dfVals, parsedErrs = deserialize(col, dfVals)
                 parsedErrs = parsedErrs.apply(AnnInstanceError)
-                dfVals = pd.concat([dfVals, parsedErrs])
+                dfVals = concatAllowEmpty([dfVals, parsedErrs])
             # Else, assume field should stay as-is
             outDf[col] = dfVals
         # All recognized output fields should now be deserialied

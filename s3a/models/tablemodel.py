@@ -8,7 +8,7 @@ from packaging.version import Version
 from pyqtgraph.Qt import QtCore, QtVersion
 
 from ..constants import PRJ_ENUMS, REQD_TBL_FIELDS as RTF
-from ..generalutils import coerceDfTypes
+from ..generalutils import coerceDfTypes, concatAllowEmpty
 from ..logger import getAppLogger
 from ..structures import ComplexXYVertices, OneDArr
 from ..tabledata import TableData
@@ -252,7 +252,7 @@ class ComponentManager(ComponentTableModel):
                 compsToAdd.index
             )
             compsToAdd[missingCols] = embedInfo[missingCols]
-        self.compDf = pd.concat((self.compDf, compsToAdd), sort=False)
+        self.compDf = concatAllowEmpty((self.compDf, compsToAdd), sort=False)
         # Retain type information
         coerceDfTypes(self.compDf)
 

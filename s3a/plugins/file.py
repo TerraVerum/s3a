@@ -30,7 +30,12 @@ from ..constants import (
     PROJECT_FILE_TYPE,
     REQD_TBL_FIELDS,
 )
-from ..generalutils import cvImsaveRgb, getMaybeReplaceKey, hierarchicalUpdate
+from ..generalutils import (
+    cvImsaveRgb,
+    getMaybeReplaceKey,
+    hierarchicalUpdate,
+    concatAllowEmpty,
+)
 from ..graphicsutils import DropList
 from ..logger import getAppLogger
 from ..processing import PipelineFunction
@@ -1108,7 +1113,7 @@ class ProjectData(QtCore.QObject):
         if annForImg is not None and not overwriteOld:
             oldAnns.append(self.componentIo.importByFileType(annForImg))
         combinedAnns = oldAnns + [data]
-        outAnn = pd.concat(combinedAnns, ignore_index=True)
+        outAnn = concatAllowEmpty(combinedAnns, ignore_index=True)
         outAnn[REQD_TBL_FIELDS.ID] = outAnn.index
         outFmt = f".{self.config['annotation-format']}"
         outName = self.annotationsPath / f"{image.name}{outFmt}"
@@ -1291,8 +1296,8 @@ class ProjectData(QtCore.QObject):
         ]
         if combine:
             outAnnsPath = outputFolder / f"annotations.{annotationFormat}"
-            outAnn = pd.concat(
-                map(self.componentIo.importByFileType, existingAnnFiles),
+            outAnn = concatAllowEmpty(
+                list(map(self.componentIo.importByFileType, existingAnnFiles)),
                 ignore_index=True,
             )
             outAnn[REQD_TBL_FIELDS.ID] = outAnn.index
