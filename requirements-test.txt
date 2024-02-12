@@ -1,0 +1,5 @@
+docstring-parser==0.15
+pytest==8.0.0
+pytest-cov==4.1.0
+pytest-qt==4.4.0
+pyinstaller==6.4.0
