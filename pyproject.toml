@@ -23,9 +23,9 @@ dependencies = [
     "Pillow",
     "qdarkstyle",
     "qtextras     >= 0.6.0",
-    "opencv-python-headless >= 4.4.0.0",
+    "opencv-python >= 4.4.0.0",
     "PySide6                >= 6.0.0",
-    "setuptools"
+    "setuptools >= 61.0.0",
 ]
 dynamic = ["version"]
 classifiers = [
@@ -47,6 +47,12 @@ full = [
     "pytest-cov",
     "pytest-qt",
     "pyinstaller",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [
+  ".",
+  "src/",
 ]
 
 [tool.setuptools]
