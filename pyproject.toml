@@ -22,9 +22,9 @@ dependencies = [
     "pyqtgraph    >= 0.13.0",
     "Pillow",
     "qdarkstyle",
-    "qtextras     ~= 0.6.0",
+    "qtextras     >= 0.6.0",
     "opencv-python-headless >= 4.4.0.0",
-    "PySide6                ~= 6.0.0",
+    "PySide6                >= 6.0.0",
     "setuptools"
 ]
 dynamic = ["version"]
