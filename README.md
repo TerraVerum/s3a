@@ -36,7 +36,7 @@ If you don't already know, you might get a [virtual environment](https://docs.py
 ```bash
 python -m pip install virtualenv
 python -m virtualenv venv
-./venv/bin/activate # If on Linux
+source venv/bin/activate # If on Linux
 .\venv\Scripts\activate # if on Windows
 ```
 
