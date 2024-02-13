@@ -81,3 +81,6 @@ combine_as_imports = true
 
 [tool.unimport]
 ignore_init=true
+
+[tool.pylint.main]
+load-plugins = "pylint_actions"
