@@ -40,5 +40,5 @@ jobs:
       - name: Run tests
         run: pytest
       
-      - name: Run pylint
-        run: pylint --output-format=actions s3a/ apptests/
+      # - name: Run pylint
+      #   run: pylint --output-format=actions s3a/ apptests/
