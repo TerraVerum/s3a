@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, ubuntu-22.04, macos-10, macos-11, windows-10, windows-11]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python-version:
           - "3.8"
           - "3.9"
@@ -29,7 +29,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
         
       - name: Install Ubuntu Graphics Libs
-        if: matrix.os == 'ubuntu-*'
+        if: matrix.os == 'ubuntu-latest'
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
           packages: libxkbcommon-x11-0 x11-utils libyaml-dev libegl1-mesa libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libdbus-1-3 libopengl0
