@@ -1,0 +1,11 @@
+numpy==1.26.4
+pandas==2.2.0
+scipy==1.12.0
+scikit-image==0.22.0
+pyqtgraph==0.13.3
+pillow==10.2.0
+qdarkstyle==3.2.3
+qtextras==0.6.7
+PySide6==6.6.1
+setuptools==69.1.0
+opencv-python==4.9.0.80

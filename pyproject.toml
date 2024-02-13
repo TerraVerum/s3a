@@ -16,16 +16,16 @@ urls = {homepage = "https://gitlab.com/s3a/s3a"}
 # for git versions of these packages. Only used until next pypi release.
 dependencies = [
     "numpy",
-    "pandas       >= 2.2.0",
+    "pandas       >= 2.0.0",
     "scipy",
-    "scikit-image >= 0.22.0",
-    "pyqtgraph    >= 0.13.3",
+    "scikit-image >= 0.20.0",
+    "pyqtgraph    >= 0.13.0",
     "Pillow",
     "qdarkstyle",
-    "qtextras     ~= 0.6.7",
-    "opencv-python-headless >= 4.9.0.80",
-    "PySide6                ~= 6.6.1",
-    "setuptools"
+    "qtextras     >= 0.6.0",
+    "opencv-python >= 4.4.0.0",
+    "PySide6                >= 6.0.0",
+    "setuptools >= 61.0.0",
 ]
 dynamic = ["version"]
 classifiers = [
@@ -46,6 +46,13 @@ full = [
     "pytest",
     "pytest-cov",
     "pytest-qt",
+    "pyinstaller",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [
+  ".",
+  "src/",
 ]
 
 [tool.setuptools]
