@@ -1200,13 +1200,11 @@ class ProjectData(QtCore.QObject):
         # Compare using "endswith" when folder names are included, otherwise a direct
         # analysis of the name is preferred
         if strName == name.name:
-            compare = lambda strName, selfImageName: strName == selfImageName.name
+            matchesInput = lambda imagePath: strName in (imagePath.name, imagePath.stem)
         else:
-            compare = lambda strName, selfImageName: str(selfImageName).endswith(
-                strName
-            )
+            matchesInput = lambda imagePath: str(imagePath).endswith(strName)
         for img in self.images:
-            if compare(strName, img):
+            if matchesInput(img):
                 if not thorough:
                     return img
                 candidates.add(img)
