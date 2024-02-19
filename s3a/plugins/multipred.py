@@ -14,7 +14,7 @@ from ..constants import (
     PRJ_ENUMS,
     REQD_TBL_FIELDS as RTF,
 )
-from ..generalutils import concatAllowEmpty
+from ..generalutils import concatAllowEmpty, coerceDfTypes
 from ..models.tablemodel import ComponentManager
 from ..parameditors.algcollection import AlgorithmCollection
 from ..processing.algorithms import multipred
@@ -100,6 +100,7 @@ class MultiPredictionsPlugin(ProcessorPlugin):
         addType = runKwargs.get("addType") or result.get(
             "addType", PRJ_ENUMS.COMPONENT_ADD_AS_MERGE
         )
+        compsToAdd = coerceDfTypes(compsToAdd, components.columns)
         return self.manager.addComponents(compsToAdd, addType)
 
     @bind(
