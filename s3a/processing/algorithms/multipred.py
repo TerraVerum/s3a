@@ -450,26 +450,31 @@ def single_categorical_prediction(
     inputShape
         Specifies the image shape the model requires to run a prediction
     """
-    if inputShape is None or not inputShape:
-        raise ValueError(
-            '"inputShape" must be specified either as a (h, w) tuple or string eval '
-            'with namespace "model=model"'
-        )
-    elif isinstance(inputShape, str):
+    inputShape = inputShape or None
+    if isinstance(inputShape, str):
         inputShape = eval(inputShape, dict(model=model))
+    if inputShape is not None:
+        inputShape = tuple(inputShape)[:2]
     verts = component[RTF.VERTICES].stack()
     resized_image, coords, stats = gutils.subImageFromVertices(
         image,
         verts,
         returnBoundingBox=True,
         returnStats=True,
-        shape=inputShape[:2],
+        shape=inputShape,
         interpolation=cv.INTER_NEAREST,
     )
 
     resized_image = np.array([resized_image])
-    prediction = model.predict(resized_image)
-    prediction = np.argmax(prediction[0], axis=-1)
+    # Remove batch dimension
+    prediction = model.predict(resized_image)[0]
+    if prediction.ndim > 2:
+        # 3D tensor -> assume last dimension is probs per class
+        prediction = np.argmax(prediction, axis=-1)
+    if prediction.ndim != 2:
+        raise ValueError(
+            f"Model output must be 2D or 3D tensor, got {prediction.ndim}D tensor"
+        )
     prediction[prediction > 0] = 1
     prediction = gutils.inverseSubImage(
         prediction.astype("uint8"), stats, gutils.polygonToBox(verts)
